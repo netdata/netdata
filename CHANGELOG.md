@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- fix clickhouse in apps groups [\#17742](https://github.com/netdata/netdata/pull/17742) ([ilyam8](https://github.com/ilyam8))
+- fix ebpf cgroup swap context [\#17740](https://github.com/netdata/netdata/pull/17740) ([ilyam8](https://github.com/ilyam8))
+- Update netdata-agent-security.md [\#17738](https://github.com/netdata/netdata/pull/17738) ([Ancairon](https://github.com/Ancairon))
+- Grammar pass on docs [\#17735](https://github.com/netdata/netdata/pull/17735) ([Ancairon](https://github.com/Ancairon))
 - Include the Host in the HTTP header \(mqtt\) [\#17731](https://github.com/netdata/netdata/pull/17731) ([stelfrag](https://github.com/stelfrag))
 - Add alert meta info [\#17730](https://github.com/netdata/netdata/pull/17730) ([stelfrag](https://github.com/stelfrag))
 - grammar pass on alerts and notifications dir [\#17729](https://github.com/netdata/netdata/pull/17729) ([Ancairon](https://github.com/Ancairon))
@@ -33,6 +37,7 @@
 - Revert "Support to WolfSSL \(Step 1\)" [\#17697](https://github.com/netdata/netdata/pull/17697) ([stelfrag](https://github.com/stelfrag))
 - fix sender parsing when receiving remote input [\#17696](https://github.com/netdata/netdata/pull/17696) ([ktsaou](https://github.com/ktsaou))
 - dyncfg files on disk do not contain colons [\#17694](https://github.com/netdata/netdata/pull/17694) ([ktsaou](https://github.com/ktsaou))
+- Simplify and unify the way we are handling versions. [\#17693](https://github.com/netdata/netdata/pull/17693) ([vkalintiris](https://github.com/vkalintiris))
 - DYNCFG: add userconfig action [\#17692](https://github.com/netdata/netdata/pull/17692) ([ktsaou](https://github.com/ktsaou))
 - Add agent CLI command to remove a stale node [\#17691](https://github.com/netdata/netdata/pull/17691) ([stelfrag](https://github.com/stelfrag))
 - Check for empty dimension id from a plugin [\#17690](https://github.com/netdata/netdata/pull/17690) ([stelfrag](https://github.com/stelfrag))
@@ -422,13 +427,6 @@
 - Update themes.md [\#17176](https://github.com/netdata/netdata/pull/17176) ([Ancairon](https://github.com/Ancairon))
 - go.d sd docker use well-known port for app identification too [\#17174](https://github.com/netdata/netdata/pull/17174) ([ilyam8](https://github.com/ilyam8))
 - go.d sd docker add mongodb-community-server [\#17173](https://github.com/netdata/netdata/pull/17173) ([ilyam8](https://github.com/ilyam8))
-- Update themes.md [\#17172](https://github.com/netdata/netdata/pull/17172) ([Ancairon](https://github.com/Ancairon))
-- go.d sd config add "disabled" [\#17171](https://github.com/netdata/netdata/pull/17171) ([ilyam8](https://github.com/ilyam8))
-- docs: add "With NVIDIA GPUs monitoring" to docker install [\#17167](https://github.com/netdata/netdata/pull/17167) ([ilyam8](https://github.com/ilyam8))
-- go.d.plugin: jsonschema allow array/object to be null [\#17166](https://github.com/netdata/netdata/pull/17166) ([ilyam8](https://github.com/ilyam8))
-- DYNCFG: alerts improvements [\#17165](https://github.com/netdata/netdata/pull/17165) ([ktsaou](https://github.com/ktsaou))
-- go.d.plugin: update file path pattern in jsonschema [\#17164](https://github.com/netdata/netdata/pull/17164) ([ilyam8](https://github.com/ilyam8))
-- Announce dynamic configuration capability to the cloud [\#17162](https://github.com/netdata/netdata/pull/17162) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
