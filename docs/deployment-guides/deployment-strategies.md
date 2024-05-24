@@ -1,36 +1,12 @@
-# Deployment strategies
+# Deployment Examples
 
 ## Deployment Options Overview
 
-This section provides a quick overview of a few common deployment options for Netdata. The next sections go into configuration examples and further reading.
+This section provides a quick overview for a few common deployment options for Netdata.
 
-### Stand-alone Deployment
+You can read about [Standalone Deployment](/docs/deployment-guides/standalone-deployment.md) and [Deployment with Centralization Points](/docs/deployment-guides/deployment-with-centralization-points.md) in the documentation inside this section.
 
-To help our users have a complete experience of Netdata when they install it for the first time, the Netdata Agent with default configuration is a complete monitoring solution out of the box, with features enabled and available.
-
-The Agent will act as a **stand-alone** Agent by default. This is great to start out with for small setups and home labs. By [connecting each Agent to Cloud](/src/claim/README.md), you can see an overview of all your nodes, with aggregated charts and centralized alerting, without setting up a Parent.
-
-![image](https://github.com/netdata/netdata/assets/116741/6a638175-aec4-4d46-85a6-520c283ab6a8)
-
-### Parent – Child Deployment
-
-An Agent connected to a Parent is called a **Child**. It will **stream metrics** to its Parent. The Parent can then take care of storing metrics on behalf of that node (with longer retention), handle metrics queries for showing dashboards and provide alerting.
-
-When using Cloud, it is recommended that just the Parent is connected to Cloud. Child Agents can then be configured to have short retention, in RAM instead of on Disk, and have alerting and other features disabled.
-
-Due to the fact they don't need to connect to Cloud themselves, those Children can then be further secured by not allowing outbound traffic.
-
-![image](https://github.com/netdata/netdata/assets/116741/cb65698d-a6b7-43ee-a2d1-c30d0a46f084)
-
-This setup allows for leaner Child nodes and is good for setups with more than a handful of nodes. Metrics remain accessible if the Child node is temporarily unavailable or decommissioned, although there is no failover in case the Parent becomes unavailable.
-
-### Active–Active Parent Deployment
-
-For high availability, Parents can be configured to stream data for their Children between them, and keep their data sets in sync. Children are configured with the addresses of both Parents, but will only stream to one of them at a time. When one Parent becomes unavailable, the Child reconnects to the other. When the first Parent becomes available again, that Parent will catch up by receiving the backlog from the second.
-
-With both Parent Agents connected to Cloud, Cloud will route queries to either of them transparently, depending on their availability. Alerts trigger on either Parent will stream to Cloud, and Cloud will deduplicate and debounce state changes to prevent spurious notifications.
-
-![image](https://github.com/netdata/netdata/assets/116741/6ae2b10c-7f7d-4503-aac4-0a9381c6f80b)
+The sections below go into configuration examples about these deployment concepts.
 
 ## Deployment Configuration Details
 
