@@ -6,10 +6,14 @@
 
 **Merged pull requests:**
 
+- remove unused go.d/prometheus meta file [\#17749](https://github.com/netdata/netdata/pull/17749) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17748](https://github.com/netdata/netdata/pull/17748) ([netdatabot](https://github.com/netdatabot))
+- add go.d clickhouse [\#17743](https://github.com/netdata/netdata/pull/17743) ([ilyam8](https://github.com/ilyam8))
 - fix clickhouse in apps groups [\#17742](https://github.com/netdata/netdata/pull/17742) ([ilyam8](https://github.com/ilyam8))
 - fix ebpf cgroup swap context [\#17740](https://github.com/netdata/netdata/pull/17740) ([ilyam8](https://github.com/ilyam8))
 - Update netdata-agent-security.md [\#17738](https://github.com/netdata/netdata/pull/17738) ([Ancairon](https://github.com/Ancairon))
 - Grammar pass on docs [\#17735](https://github.com/netdata/netdata/pull/17735) ([Ancairon](https://github.com/Ancairon))
+- Ensure that the choice of compiler and target is passed to sub-projects. [\#17732](https://github.com/netdata/netdata/pull/17732) ([Ferroin](https://github.com/Ferroin))
 - Include the Host in the HTTP header \(mqtt\) [\#17731](https://github.com/netdata/netdata/pull/17731) ([stelfrag](https://github.com/stelfrag))
 - Add alert meta info [\#17730](https://github.com/netdata/netdata/pull/17730) ([stelfrag](https://github.com/stelfrag))
 - grammar pass on alerts and notifications dir [\#17729](https://github.com/netdata/netdata/pull/17729) ([Ancairon](https://github.com/Ancairon))
@@ -29,6 +33,7 @@
 - Bump k8s.io/client-go from 0.30.0 to 0.30.1 in /src/go/collectors/go.d.plugin [\#17708](https://github.com/netdata/netdata/pull/17708) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/docker/docker from 26.1.2+incompatible to 26.1.3+incompatible in /src/go/collectors/go.d.plugin [\#17706](https://github.com/netdata/netdata/pull/17706) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Fix multipler on Windows \("Memory"\) [\#17705](https://github.com/netdata/netdata/pull/17705) ([thiagoftsm](https://github.com/thiagoftsm))
+- Win processes \("System" name\) [\#17704](https://github.com/netdata/netdata/pull/17704) ([thiagoftsm](https://github.com/thiagoftsm))
 - some markdown fixes [\#17703](https://github.com/netdata/netdata/pull/17703) ([ilyam8](https://github.com/ilyam8))
 - go.d fix some JB code inspection issues [\#17702](https://github.com/netdata/netdata/pull/17702) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17701](https://github.com/netdata/netdata/pull/17701) ([netdatabot](https://github.com/netdatabot))
@@ -136,6 +141,7 @@
 - Notification section updates [\#17551](https://github.com/netdata/netdata/pull/17551) ([Ancairon](https://github.com/Ancairon))
 - Adjust eBPF code. [\#17550](https://github.com/netdata/netdata/pull/17550) ([thiagoftsm](https://github.com/thiagoftsm))
 - Remove Fedora 38 from CI. [\#17548](https://github.com/netdata/netdata/pull/17548) ([Ferroin](https://github.com/Ferroin))
+- Remove Alpine 3.16 from CI. [\#17547](https://github.com/netdata/netdata/pull/17547) ([Ferroin](https://github.com/Ferroin))
 - Fix platform EOL check issue assignment. [\#17544](https://github.com/netdata/netdata/pull/17544) ([Ferroin](https://github.com/Ferroin))
 - refresh the ML documentation and consolidate the two docs [\#17543](https://github.com/netdata/netdata/pull/17543) ([Ancairon](https://github.com/Ancairon))
 - Bump github.com/likexian/whois from 1.15.2 to 1.15.3 in /src/go/collectors/go.d.plugin [\#17542](https://github.com/netdata/netdata/pull/17542) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -423,10 +429,6 @@
 - Bump github.com/vmware/govmomi from 0.36.0 to 0.36.1 in /src/go/collectors/go.d.plugin [\#17185](https://github.com/netdata/netdata/pull/17185) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump k8s.io/client-go from 0.29.2 to 0.29.3 in /src/go/collectors/go.d.plugin [\#17184](https://github.com/netdata/netdata/pull/17184) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/prometheus/common from 0.48.0 to 0.50.0 in /src/go/collectors/go.d.plugin [\#17182](https://github.com/netdata/netdata/pull/17182) ([dependabot[bot]](https://github.com/apps/dependabot))
-- split apps.plugin into multiple files and support MacOS [\#17180](https://github.com/netdata/netdata/pull/17180) ([ktsaou](https://github.com/ktsaou))
-- Update themes.md [\#17176](https://github.com/netdata/netdata/pull/17176) ([Ancairon](https://github.com/Ancairon))
-- go.d sd docker use well-known port for app identification too [\#17174](https://github.com/netdata/netdata/pull/17174) ([ilyam8](https://github.com/ilyam8))
-- go.d sd docker add mongodb-community-server [\#17173](https://github.com/netdata/netdata/pull/17173) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
