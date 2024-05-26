@@ -27,7 +27,7 @@ modules:
           Specifically, it collects metrics from the following tables:
 
           - system.metrics
-          - systemd.async_metrics
+          - system.async_metrics
           - system.events
           - system.disks
           - system.parts
@@ -212,6 +212,12 @@ modules:
               chart_type: area
               dimensions:
                 - name: used
+            - name: clickhouse.running_queries
+              description: Running queries
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: running
             - name: clickhouse.queries
               description: Queries
               unit: queries/s
@@ -545,12 +551,6 @@ modules:
               chart_type: area
               dimensions:
                 - name: size
-            - name: clickhouse.database_table_parts
-              description: Table parts
-              unit: parts
-              chart_type: line
-              dimensions:
-                - name: parts
             - name: clickhouse.database_table_parts
               description: Table parts
               unit: parts

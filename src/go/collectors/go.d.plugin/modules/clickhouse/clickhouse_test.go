@@ -187,6 +187,7 @@ func TestClickHouse_Collect(t *testing.T) {
 				"metrics_DistributedSend":                                  0,
 				"metrics_HTTPConnection":                                   0,
 				"metrics_InterserverConnection":                            0,
+				"metrics_Query":                                            1,
 				"metrics_MemoryTracking":                                   1270999152,
 				"metrics_MySQLConnection":                                  0,
 				"metrics_PartsActive":                                      25,
