@@ -50,6 +50,7 @@ func (c *ClickHouse) collectSystemMetrics(mx map[string]int64) error {
 }
 
 var wantSystemMetrics = map[string]bool{
+	"Query":                    true,
 	"TCPConnection":            true,
 	"HTTPConnection":           true,
 	"MySQLConnection":          true,

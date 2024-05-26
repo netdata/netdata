@@ -19,6 +19,7 @@ const (
 
 	prioDiskSpaceUsage
 
+	prioRunningQueries
 	prioQueries
 	prioSelectQueries
 	prioInsertQueries
@@ -95,6 +96,7 @@ var chCharts = module.Charts{
 	chartSlowReads.Copy(),
 	chartReadBackoff.Copy(),
 
+	chartRunningQueries.Copy(),
 	chartQueries.Copy(),
 	chartSelectQueries.Copy(),
 	chartInsertQueries.Copy(),
@@ -238,6 +240,17 @@ var (
 )
 
 var (
+	chartRunningQueries = module.Chart{
+		ID:       "running_queries",
+		Title:    "Running queries",
+		Units:    "queries",
+		Fam:      "queries",
+		Ctx:      "clickhouse.running_queries",
+		Priority: prioRunningQueries,
+		Dims: module.Dims{
+			{ID: "metrics_Query", Name: "running"},
+		},
+	}
 	chartQueries = module.Chart{
 		ID:       "queries",
 		Title:    "Queries",
