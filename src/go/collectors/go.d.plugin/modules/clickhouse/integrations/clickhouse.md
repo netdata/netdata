@@ -28,7 +28,7 @@ It sends HTTP requests to the ClickHouse [HTTP interface](https://clickhouse.com
 Specifically, it collects metrics from the following tables:
 
 - system.metrics
-- systemd.async_metrics
+- system.async_metrics
 - system.events
 - system.disks
 - system.parts
@@ -80,6 +80,7 @@ Metrics:
 | clickhouse.slow_reads | slow | reads/s |
 | clickhouse.read_backoff | read_backoff | events/s |
 | clickhouse.memory_usage | used | bytes |
+| clickhouse.running_queries | running | queries |
 | clickhouse.queries | successful, failed | queries/s |
 | clickhouse.select_queries | successful, failed | selects/s |
 | clickhouse.insert_queries | successful, failed | inserts/s |
@@ -161,7 +162,6 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | clickhouse.database_table_size | size | bytes |
-| clickhouse.database_table_parts | parts | parts |
 | clickhouse.database_table_parts | parts | parts |
 | clickhouse.database_table_rows | rows | rows |
 
