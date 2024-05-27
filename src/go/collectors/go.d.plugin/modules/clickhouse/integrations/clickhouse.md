@@ -87,6 +87,7 @@ Metrics:
 | clickhouse.select_queries | successful, failed | selects/s |
 | clickhouse.insert_queries | successful, failed | inserts/s |
 | clickhouse.queries_memory_limit_exceeded | mem_limit_exceeded | queries/s |
+| clickhouse.longest_running_query_time | longest_query_time | seconds |
 | clickhouse.queries_latency | queries_time | microseconds |
 | clickhouse.select_queries_latency | selects_time | microseconds |
 | clickhouse.insert_queries_latency | inserts_time | microseconds |
@@ -172,7 +173,21 @@ Metrics:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ clickhouse_restarted ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.uptime | ClickHouse has recently been restarted |
+| [ clickhouse_queries_preempted ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.queries_preempted | ClickHouse has queries that are stopped and waiting due to priority setting |
+| [ clickhouse_long_running_query ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.longest_running_query_time | ClickHouse has a long-running query exceeding the threshold |
+| [ clickhouse_rejected_inserts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.rejected_inserts | ClickHouse has INSERT queries that are rejected due to high number of active data parts for partition in a MergeTree |
+| [ clickhouse_delayed_inserts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.delayed_inserts | ClickHouse has INSERT queries that are throttled due to high number of active data parts for partition in a MergeTree |
+| [ clickhouse_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.replicas_max_absolute_delay | ClickHouse is experiencing replication lag greater than 5 minutes |
+| [ clickhouse_replicated_readonly_tables ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.replicated_readonly_tables | ClickHouse has replicated tables in readonly state due to ZooKeeper session loss/startup without ZooKeeper configured |
+| [ clickhouse_max_part_count_for_partition ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.max_part_count_for_partition | ClickHouse high number of parts per partition |
+| [ clickhouse_distributed_connections_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.distributed_connections_fail_exhausted_retries | ClickHouse has failed distributed connections after exhausting all retry attempts |
+| [ clickhouse_distributed_files_to_insert ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.distributed_files_to_insert | ClickHouse high number of pending files to process for asynchronous insertion into Distributed tables |
 
 
 ## Setup
