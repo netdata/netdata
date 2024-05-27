@@ -12,12 +12,6 @@ The easiest way to install Netdata on your system is via Netdata Cloud, to do so
 
 Upon installation completing successfully, you should be able to see the node live in your Netdata Space and charts in the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md).
 
-1. Sign up to <https://app.netdata.cloud/>
-2. You will be presented with an empty space, and a prompt to "Connect Nodes" with the install command for each platform
-3. Select the platform you want to install Netdata to, copy and paste the script into your node's terminal, and run it
-
-Upon installation completing successfully, you should be able to see the node live in your Netdata Space and live charts in the Overview tab.
-
 Take a look at our [Dashboards and Charts](/docs/dashboards-and-charts/README.md) section to read more about Netdata's features.
 
 ## Post-install
