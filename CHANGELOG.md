@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#17752](https://github.com/netdata/netdata/pull/17752) ([netdatabot](https://github.com/netdatabot))
+- go.d clickhouse add running queries [\#17751](https://github.com/netdata/netdata/pull/17751) ([ilyam8](https://github.com/ilyam8))
 - remove unused go.d/prometheus meta file [\#17749](https://github.com/netdata/netdata/pull/17749) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17748](https://github.com/netdata/netdata/pull/17748) ([netdatabot](https://github.com/netdatabot))
 - add go.d clickhouse [\#17743](https://github.com/netdata/netdata/pull/17743) ([ilyam8](https://github.com/ilyam8))
@@ -428,7 +430,6 @@
 - add callout that snapshots only available on v1 [\#17189](https://github.com/netdata/netdata/pull/17189) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Bump github.com/vmware/govmomi from 0.36.0 to 0.36.1 in /src/go/collectors/go.d.plugin [\#17185](https://github.com/netdata/netdata/pull/17185) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump k8s.io/client-go from 0.29.2 to 0.29.3 in /src/go/collectors/go.d.plugin [\#17184](https://github.com/netdata/netdata/pull/17184) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/prometheus/common from 0.48.0 to 0.50.0 in /src/go/collectors/go.d.plugin [\#17182](https://github.com/netdata/netdata/pull/17182) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
