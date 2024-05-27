@@ -11,6 +11,8 @@ import (
 	"slices"
 )
 
+const precision = 1000
+
 func (c *ClickHouse) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
@@ -27,6 +29,9 @@ func (c *ClickHouse) collect() (map[string]int64, error) {
 		return nil, err
 	}
 	if err := c.collectSystemDisks(mx); err != nil {
+		return nil, err
+	}
+	if err := c.collectLongestRunningQueryTime(mx); err != nil {
 		return nil, err
 	}
 

@@ -14,15 +14,21 @@ SELECT
     metric,
     value 
 FROM
-    system.asynchronous_metrics where metric like 'Uptime' FORMAT CSVWithNames
+    system.asynchronous_metrics 
+where
+    metric LIKE 'Uptime' 
+    OR metric LIKE 'MaxPartCountForPartition' 
+    OR metric LIKE 'ReplicasMaxAbsoluteDelay' FORMAT CSVWithNames
 `
 
 func (c *ClickHouse) collectSystemAsyncMetrics(mx map[string]int64) error {
 	req, _ := web.NewHTTPRequest(c.Request)
 	req.URL.RawQuery = makeURLQuery(querySystemAsyncMetrics)
 
-	want := map[string]bool{
-		"Uptime": true,
+	want := map[string]float64{
+		"Uptime":                   1,
+		"MaxPartCountForPartition": 1,
+		"ReplicasMaxAbsoluteDelay": precision,
 	}
 
 	px := "async_metrics_"
@@ -34,12 +40,13 @@ func (c *ClickHouse) collectSystemAsyncMetrics(mx map[string]int64) error {
 		case "metric":
 			metric = value
 		case "value":
-			if !want[metric] {
+			mul, ok := want[metric]
+			if !ok {
 				return
 			}
 			n++
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				mx[px+metric] = int64(v)
+				mx[px+metric] = int64(v * mul)
 			}
 		}
 	})

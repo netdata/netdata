@@ -31,6 +31,7 @@ modules:
           - system.events
           - system.disks
           - system.parts
+          - system.processes
       supported_platforms:
         include: []
         exclude: []
@@ -218,6 +219,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: running
+            - name: clickhouse.queries_preempted
+              description: Queries waiting due to priority
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: preempted
             - name: clickhouse.queries
               description: Queries
               unit: queries/s
@@ -239,12 +246,6 @@ modules:
               dimensions:
                 - name: successful
                 - name: failed
-            - name: clickhouse.queries_preempted
-              description: Queries waiting due to priority
-              unit: queries
-              chart_type: line
-              dimensions:
-                - name: preempted
             - name: clickhouse.queries_memory_limit_exceeded
               description: Memory limit exceeded for query
               unit: queries/s
@@ -310,6 +311,12 @@ modules:
                 - name: fetch
                 - name: send
                 - name: check
+            - name: clickhouse.replicas_max_absolute_dela
+              description: Replicas max absolute delay
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: replication_delay
             - name: clickhouse.replicated_readonly_tables
               description: Replicated tables in readonly state
               unit: tables
@@ -445,6 +452,12 @@ modules:
               dimensions:
                 - name: hits
                 - name: misses
+            - name: clickhouse.max_part_count_for_partition
+              description: Max part count for partition
+              unit: parts
+              chart_type: line
+              dimensions:
+                - name: max_parts_partition
             - name: clickhouse.parts_count
               description: Parts
               unit: parts
