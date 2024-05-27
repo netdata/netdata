@@ -146,8 +146,7 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         rrddim_set_by_pointer(p->st, p->rd_idle, (collected_number)idle);
         rrdset_done(p->st);
 
-        uint64_t interrupts = p->interruptsPerSec.current.Data;
-        common_interrupts(interrupts, update_every);
+        common_interrupts(&p->interruptsPerSec, update_every);
 //        if(!p->st2) {
 //            p->st2 = rrdset_create_localhost(
 //                is_total ? "system" : "cpu2"
