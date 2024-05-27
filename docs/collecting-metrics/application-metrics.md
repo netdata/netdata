@@ -31,5 +31,5 @@ Popular application collectors:
 | [Postgres](/src/go/collectors/go.d.plugin/modules/postgres/README.md)                      | Collects database health and performance metrics.                                                                                                   |
 | [ElasticSearch](/src/go/collectors/go.d.plugin/modules/elasticsearch/README.md)            | Collects search engine performance and health statistics. Can optionally collect per-index metrics as well.                                         |
 
-Check our [data collection integrations list](/src/collectors/COLLECTORS.md#available-data-collection-integrations) for
+Check available [data collection integrations](/src/collectors/COLLECTORS.md#available-data-collection-integrations) for
 a comprehensive view to all the integrations you can use to gather metrics with Netdata.
