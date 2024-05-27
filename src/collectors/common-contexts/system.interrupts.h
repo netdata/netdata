@@ -5,7 +5,7 @@
 
 #include "common-contexts.h"
 
-static inline void common_interrupts(uint64_t interrupts, int update_every) {
+static inline void common_interrupts(uint64_t interrupts, int update_every, RRD_ALGORITHM alg) {
     static RRDSET *st_intr = NULL;
     static RRDDIM *rd_interrupts = NULL;
 
@@ -27,7 +27,7 @@ static inline void common_interrupts(uint64_t interrupts, int update_every) {
 
         rrdset_flag_set(st_intr, RRDSET_FLAG_DETAIL);
 
-        rd_interrupts = rrddim_add(st_intr, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_interrupts = rrddim_add(st_intr, "interrupts", NULL, 1, 1, alg);
     }
 
     rrddim_set_by_pointer(st_intr, rd_interrupts, (collected_number)interrupts);

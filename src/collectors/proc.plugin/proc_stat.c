@@ -753,7 +753,7 @@ int do_proc_stat(int update_every, usec_t dt) {
         else if(unlikely(hash == hash_intr && strcmp(row_key, "intr") == 0)) {
             if(likely(do_interrupts)) {
                 unsigned long long value = str2ull(procfile_lineword(ff, l, 1), NULL);
-                common_interrupts(value, update_every);
+                common_interrupts(value, update_every, RRD_ALGORITHM_INCREMENTAL);
             }
         }
         else if(unlikely(hash == hash_ctxt && strcmp(row_key, "ctxt") == 0)) {
