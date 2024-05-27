@@ -31,7 +31,6 @@ static inline void common_interrupts(COUNTER_DATA *interrupts, int update_every)
 
         rrdset_flag_set(st_intr, RRDSET_FLAG_DETAIL);
 
-        rd_interrupts = rrddim_add(, , NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_interrupts = perflib_rrddim_add(st_intr, "interrupts", NULL, 1, 1, interrupts);
     }
 
