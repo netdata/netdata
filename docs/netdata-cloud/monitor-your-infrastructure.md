@@ -143,17 +143,11 @@ After you've learned the basics, you should [secure your infrastructure's nodes]
 one of our recommended methods. These security best practices ensure no untrusted parties gain access to the metrics
 collected on any of your nodes.
 
-### Collect metrics from systems and applications
+### Collect metrics from anywhere
 
-Netdata has [300+ pre-installed collectors](/src/collectors/COLLECTORS.md) that gather thousands of metrics with zero
-configuration. Collectors search each of your nodes in default locations and ports to find running applications and
-gather as many metrics as they can without you having to configure them individually.
+Netdata has [300+ pre-installed collectors](/src/collectors/COLLECTORS.md) that gather thousands of metrics with zero configuration. Collectors search each of your nodes in default locations and ports to find running applications and gather as many metrics as they can without you having to configure them individually.
 
-Most collectors work without configuration, should you want more info, you can read more on [how Netdata's metrics collectors work](/src/collectors/README.md) and the [Collectors configuration reference](/src/collectors/REFERENCE.md) documentation.
-
-In addition, find detailed information about which [system](/docs/collecting-metrics/system-metrics.md),
-[container](/docs/collecting-metrics/container-metrics.md), and [application](/docs/collecting-metrics/application-metrics.md) metrics you can
-collect from across your infrastructure with Netdata.
+Check our [comprehensive integrations section](/src/collectors/COLLECTORS.md), to find information about whatever you want to monitor with Netdata
 
 ## Netdata Cloud features
 
