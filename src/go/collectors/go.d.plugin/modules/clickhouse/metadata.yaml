@@ -252,6 +252,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: mem_limit_exceeded
+            - name: clickhouse.longest_running_query_time
+              description: Longest running query time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: longest_query_time
             - name: clickhouse.queries_latency
               description: Queries latency
               unit: microseconds
