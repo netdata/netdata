@@ -371,7 +371,7 @@ Selecting timeframes is useful when you see an interesting spike or change in a 
 
 > **Note**
 >
-> To clear a highlighted area, simply click on the chart area.
+> To clear a highlighted timeframe, simply click on the chart area.
 
 ### Select and zoom
 
