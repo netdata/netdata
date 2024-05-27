@@ -32,6 +32,7 @@ Specifically, it collects metrics from the following tables:
 - system.events
 - system.disks
 - system.parts
+- system.processes
 
 
 This collector is supported on all platforms.
@@ -81,10 +82,10 @@ Metrics:
 | clickhouse.read_backoff | read_backoff | events/s |
 | clickhouse.memory_usage | used | bytes |
 | clickhouse.running_queries | running | queries |
+| clickhouse.queries_preempted | preempted | queries |
 | clickhouse.queries | successful, failed | queries/s |
 | clickhouse.select_queries | successful, failed | selects/s |
 | clickhouse.insert_queries | successful, failed | inserts/s |
-| clickhouse.queries_preempted | preempted | queries |
 | clickhouse.queries_memory_limit_exceeded | mem_limit_exceeded | queries/s |
 | clickhouse.queries_latency | queries_time | microseconds |
 | clickhouse.select_queries_latency | selects_time | microseconds |
@@ -95,6 +96,7 @@ Metrics:
 | clickhouse.io_seeks | lseek | ops/s |
 | clickhouse.io_file_opens | file_open | ops/s |
 | clickhouse.replicated_parts_current_activity | fetch, send, check | parts |
+| clickhouse.replicas_max_absolute_dela | replication_delay | seconds |
 | clickhouse.replicated_readonly_tables | read_only | tables |
 | clickhouse.replicated_data_loss | data_loss | events |
 | clickhouse.replicated_part_fetches | successful, failed | fetches/s |
@@ -117,6 +119,7 @@ Metrics:
 | clickhouse.merge_tree_data_writer_compressed_bytes | written | bytes/s |
 | clickhouse.uncompressed_cache_requests | hits, misses | requests/s |
 | clickhouse.mark_cache_requests | hits, misses | requests/s |
+| clickhouse.max_part_count_for_partition | max_parts_partition | parts |
 | clickhouse.parts_count | temporary, pre_active, active, deleting, delete_on_destroy, outdated, wide, compact | parts |
 | distributed_connections | active | connections |
 | distributed_connections_attempts | connection | attempts/s |
