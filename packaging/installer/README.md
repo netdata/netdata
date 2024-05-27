@@ -1,44 +1,34 @@
-import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
-import { InstallRegexLink, InstallBoxRegexLink } from '@site/src/components/InstallRegexLink/'
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Netdata Agent Installation
 
 Netdata is very flexible and can be used to monitor all kinds of infrastructure. Read more about possible [Deployment guides](/docs/deployment-guides/README.md) to understand what better suites your needs.
 
 ## Install through Netdata Cloud
 
-Netdata is a free and open-source (FOSS) monitoring agent that collects thousands of hardware and software metrics from any physical or virtual system (we call them _nodes_). These metrics are organized in an easy-to-use and -navigate interface.
+The easiest way to install Netdata on your system is via Netdata Cloud, to do so:
 
-Netdata runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
-It runs on Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms (Kubernetes clusters, Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` required.
+1. Sign up to <https://app.netdata.cloud/>.
+2. You will be presented with an empty space, and a prompt to "Connect Nodes" with the install command for each platform.
+3. Select the platform you want to install Netdata to, copy and paste the script into your node's terminal, and run it.
 
-To install Netdata in minutes on your platform:
+Once Netdata is installed, you can see the node live in your Netdata Space and charts in the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md).
 
-1. Sign up to <https://app.netdata.cloud/>
-2. You will be presented with an empty space, and a prompt to "Connect Nodes" with the install command for each platform
-3. Select the platform you want to install Netdata to, copy and paste the script into your node's terminal, and run it
+Take a look at our [Dashboards and Charts](/docs/dashboards-and-charts/README.md) section to read more about Netdata's features.
 
-Upon installation completing successfully, you should be able to see the node live in your Netdata Space and live charts in the Overview tab. [Take a look at our Dashboards and Charts](/docs/dashboards-and-charts/README.md) section to read more about Netdata's features.
+## Post-install
 
-## Maintaining a Netdata Agent installation
-
-For actions like starting, stopping, restarting, updating and uninstalling the Netdata Agent take a look at your specific installation platform in the current section of our Documentation.
-
-## Configuration
+### Configuration
 
 If you are looking to configure your Netdata Agent installation, refer to the [respective section in our Documentation](/docs/netdata-agent/configuration/README.md).
 
-## Data collection
+### Data collection
 
-If Netdata didn't autodetect all the hardware, containers, services, or applications running on your node, you should learn more about [how data collectors work](/src/collectors/README.md). If there's a [supported collector](/src/collectors/COLLECTORS.md) for metrics you need, [configure the collector](/src/collectors/REFERENCE.md) or read about its requirements to configure your endpoint to publish metrics in the correct format and endpoint.
+If Netdata didn't autodetect all the hardware, containers, services, or applications running on your node, you should learn more about [how data collectors work](/src/collectors/README.md). If there's a [supported integration](/src/collectors/COLLECTORS.md) for metrics you need, refer to its respective page and read about its requirements to configure your endpoint to publish metrics in the correct format and endpoint.
 
-## Alerts & notifications
+### Alerts & notifications
 
 Netdata comes with hundreds of pre-configured alerts, designed by our monitoring gurus in parallel with our open-source community, but you may want to [edit alerts](/src/health/REFERENCE.md) or [enable notifications](/docs/alerts-and-notifications/notifications/README.md) to customize your Netdata experience.
 
-## Make your deployment production ready
+### Make your deployment production ready
 
 Go through our [deployment guides](/docs/deployment-guides/README.md), for suggested configuration changes for production deployments.
 
@@ -48,32 +38,16 @@ Go through our [deployment guides](/docs/deployment-guides/README.md), for sugge
 
 By default, Netdata's installation scripts enable automatic updates for both nightly and stable release channels.
 
-If you preferred to update your Netdata agent manually, you can disable automatic updates by using the `--no-updates`
-option when you install or update Netdata using the [automatic one-line installation
-script](/packaging/installer/methods/kickstart.md).
+If you preferred to update your Netdata Agent manually, you can disable automatic updates by using the `--no-updates`
+option when you install or update Netdata using the [automatic one-line installation script](/packaging/installer/methods/kickstart.md).
 
 ```bash
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
 ```
 
-With automatic updates disabled, you can choose exactly when and how you [update
-Netdata](/packaging/installer/UPDATE.md).
+With automatic updates disabled, you can choose exactly when and how you [update Netdata](/packaging/installer/UPDATE.md).
 
-#### Network usage of Netdata’s automatic updater
-
-The auto-update functionality set up by the installation scripts requires working internet access to function
-correctly. In particular, it currently requires access to GitHub (to check if a newer version of the updater script
-is available or not, as well as potentially fetching build-time dependencies that are bundled as part of the install),
-and Google Cloud Storage (to check for newer versions of Netdata and download the sources if there is a newer version).
-
-Note that the auto-update functionality will check for updates to itself independently of updates to Netdata,
-and will try to use the latest version of the updater script whenever possible. This is intended to reduce the
-amount of effort required by users to get updates working again in the event of a bug in the updater code.
-
-### Nightly vs. stable releases
-
-The Netdata team maintains two releases of the Netdata agent: **nightly** and **stable**. By default, Netdata's
-installation scripts will give you **automatic, nightly** updates, as that is our recommended configuration.
+### Nightly vs. Stable Releases
 
 **Nightly**: We create nightly builds every 24 hours. They contain fully-tested code that fixes bugs or security flaws,
 or introduces new features to Netdata. Every nightly release is a candidate for then becoming a stable release—when
@@ -94,8 +68,7 @@ the community helps fix any bugs that might have been introduced in previous rel
 
 **Pros of using stable releases:**
 
-- Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata
-    installation
+- Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata installation
 - Retain more control over the Netdata version you use
 
 ### Anonymous statistics
