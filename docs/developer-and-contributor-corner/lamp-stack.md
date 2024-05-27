@@ -61,7 +61,7 @@ replacing `NODE` with the hostname or IP address of your system.
 
 ## Enable hardware and Linux system monitoring
 
-There's nothing you need to do to enable [system monitoring](/docs/collecting-metrics/system-metrics.md) and Linux monitoring with
+There's nothing you need to do to enable system monitoring and Linux monitoring with
 the Netdata Agent, which autodetects metrics from CPUs, memory, disks, networking devices, and Linux processes like
 systemd without any configuration. If you're using containers, Netdata automatically collects resource utilization
 metrics from each using the [cgroups data collector](/src/collectors/cgroups.plugin/README.md).
