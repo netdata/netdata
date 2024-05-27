@@ -369,6 +369,10 @@ Selecting timeframes is useful when you see an interesting spike or change in a 
 |:-----------------------------------|:---------------------------------------------------------|:---------------------|
 | **Highlight** a specific timeframe | `Alt + mouse selection` or `⌘ + mouse selection` (macOS) | `n/a`                |
 
+> **Note**
+>
+> To clear a highlighted timeframe, simply click on the chart area.
+
 ### Select and zoom
 
 You can zoom to a specific timeframe, either horizontally of vertically, by selecting a timeframe.

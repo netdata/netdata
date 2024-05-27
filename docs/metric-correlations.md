@@ -10,7 +10,7 @@ Because Metric Correlations uses every available metric from your infrastructure
 
 When viewing the [Metrics tab or a single-node dashboard](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md), the **Metric Correlations** button appears in the top right corner of the page.
 
-To start correlating metrics, click the **Metric Correlations** button, hold the `Alt` key (or `⌘` on macOS), and drag a selection of metrics on a single chart. The selected timeframe needs at least 15 seconds for Metric Correlation to work.
+To start correlating metrics, click the **Metric Correlations** button, [highlight a selection of metrics](/docs/dashboards-and-charts/netdata-charts.md#highlight) on a single chart. The selected timeframe needs at least 15 seconds for Metric Correlation to work.
 
 The menu then displays information about the selected area and reference baseline. Metric Correlations uses the reference baseline to discover which additional metrics are most closely connected to the selected metrics. The reference baseline is based upon the period immediately preceding the highlighted window and is the length of 4 times the highlighted window. This is to ensure that the reference baseline is always immediately before the highlighted window of interest and a bit longer so as to ensure it's a more representative short term baseline.
 
