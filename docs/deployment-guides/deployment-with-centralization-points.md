@@ -14,7 +14,7 @@ When metrics and logs are centralized, the Children are never queried for metric
 |  Unified infrastructure dashboards for logs   | All logs are accessible via the same dashboard at Netdata Cloud, although they are unified per Netdata Parent |
 |          Centrally configured alerts          |                                            Yes, at Netdata Parents                                            |
 |   Centrally dispatched alert notifications    |                                             Yes, at Netdata Cloud                                             |
-|         Data are exclusively on-prem          |                                                 Yes, Netdata Cloud queries Netdata Agents to satisfy dashboard queries.                                                 |
+|         Data are exclusively on-prem          |                    Yes, Netdata Cloud queries Netdata Agents to satisfy dashboard queries.                    |
 
 A configuration with 2 observability centralization points, looks like this:
 
@@ -24,7 +24,7 @@ flowchart LR
         dashboard
         for all nodes"]]
     NC(["<b>Netdata Cloud</b>
-        decides which agents
+        decides which Agents
         need to be queried"])
     SA1["Netdata at AWS
          A1"]
@@ -93,15 +93,23 @@ flowchart LR
     SB1 & SB2 & SBN ---|stream| PB 
 ```
 
-### Configuration steps for deploying Netdata with Observability Centralization Points
+## Active–Active Parent Deployment
+
+For high availability, Parents can be configured to stream data for their Children between them, and keep their data sets in sync. Children are configured with the addresses of both Parents, but will only stream to one of them at a time. When one Parent becomes unavailable, the Child reconnects to the other. When the first Parent becomes available again, that Parent will catch up by receiving the backlog from the second.
+
+With both Parent Agents connected to Netdata Cloud, it will route queries to either of them transparently, depending on their availability. Alerts trigger on either Parent will stream to Cloud, and Cloud will deduplicate and debounce state changes to prevent spurious notifications.
+
+## Configuration steps for deploying Netdata with Observability Centralization Points
 
 For Metrics:
 
-- Install Netdata agents on all systems and the Netdata Parents.
+- Install Netdata Agents on all systems and the Netdata Parents.
 
 - Configure `stream.conf` at the Netdata Parents to enable streaming access with an API key.
 
 - Configure `stream.conf` at the Netdata Children to enable streaming to the configured Netdata Parents.
+
+Check the [related section in our documentation](/docs/observability-centralization-points/metrics-centralization-points/README.md) for more info
 
 For Logs:
 
@@ -111,11 +119,4 @@ For Logs:
 
 - Configure `systemd-journal-upload` at the Netdata Children to enable transmission of their logs to the Netdata Parents.
 
-Optionally:
-
-- Disable ML, health checks and dashboard access at Netdata Children to save resources and avoid duplicate notifications.
-
-When using Netdata Cloud:
-
-- Optionally: disable dashboard access on all Netdata agents (including Netdata Parents).
-- Optionally: disable alert notifications on all Netdata agents (including Netdata Parents).
+Check the [related section in our documentation](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md) for more info
