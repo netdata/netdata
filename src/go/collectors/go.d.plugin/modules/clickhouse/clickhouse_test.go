@@ -24,6 +24,7 @@ var (
 	dataRespSystemEvents, _       = os.ReadFile("testdata/resp_system_events.csv")
 	dataRespSystemParts, _        = os.ReadFile("testdata/resp_system_parts.csv")
 	dataRespSystemDisks, _        = os.ReadFile("testdata/resp_system_disks.csv")
+	dataRespLongestQueryTime, _   = os.ReadFile("testdata/resp_longest_query_time.csv")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -35,6 +36,7 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataRespSystemEvents":       dataRespSystemEvents,
 		"dataRespSystemParts":        dataRespSystemParts,
 		"dataRespSystemDisks":        dataRespSystemDisks,
+		"dataRespLongestQueryTime":   dataRespLongestQueryTime,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -122,6 +124,9 @@ func TestClickHouse_Collect(t *testing.T) {
 		"success on valid response": {
 			prepare: prepareCaseOk,
 			wantMetrics: map[string]int64{
+				"LongestRunningQueryTime":                                  73,
+				"async_metrics_MaxPartCountForPartition":                   7,
+				"async_metrics_ReplicasMaxAbsoluteDelay":                   0,
 				"async_metrics_Uptime":                                     64380,
 				"disk_default_free_space_bytes":                            165494767616,
 				"disk_default_used_space_bytes":                            45184565248,
@@ -187,7 +192,6 @@ func TestClickHouse_Collect(t *testing.T) {
 				"metrics_DistributedSend":                                  0,
 				"metrics_HTTPConnection":                                   0,
 				"metrics_InterserverConnection":                            0,
-				"metrics_Query":                                            1,
 				"metrics_MemoryTracking":                                   1270999152,
 				"metrics_MySQLConnection":                                  0,
 				"metrics_PartsActive":                                      25,
@@ -199,6 +203,7 @@ func TestClickHouse_Collect(t *testing.T) {
 				"metrics_PartsTemporary":                                   0,
 				"metrics_PartsWide":                                        76,
 				"metrics_PostgreSQLConnection":                             0,
+				"metrics_Query":                                            1,
 				"metrics_QueryPreempted":                                   0,
 				"metrics_ReadonlyReplica":                                  0,
 				"metrics_ReplicatedChecks":                                 0,
@@ -272,6 +277,8 @@ func prepareCaseOk(t *testing.T) (*ClickHouse, func()) {
 				_, _ = w.Write(dataRespSystemParts)
 			case querySystemDisks:
 				_, _ = w.Write(dataRespSystemDisks)
+			case queryLongestQueryTime:
+				_, _ = w.Write(dataRespLongestQueryTime)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
