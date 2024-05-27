@@ -1460,7 +1460,12 @@ int unittest_prepare_rrd(char **user) {
     return 0;
 }
 
-int main(int argc, char **argv) {
+#ifdef OS_WINDOWS
+int netdata_main(int argc, char **argv)
+#else
+int main(int argc, char **argv)
+#endif
+{
     // initialize the system clocks
     clocks_init();
     netdata_start_time = now_realtime_sec();
@@ -1471,10 +1476,15 @@ int main(int argc, char **argv) {
 
     int i;
     int config_loaded = 0;
-    int dont_fork = 0;
     bool close_open_fds = true;
     size_t default_stacksize;
     char *user = NULL;
+
+#ifdef OS_WINDOWS
+    int dont_fork = 1;
+#else
+    int dont_fork = 0;
+#endif
 
     static_threads = static_threads_get();
 
@@ -1489,6 +1499,7 @@ int main(int argc, char **argv) {
         exit(0);
     }
 
+    #if 0
     // parse options
     {
         int num_opts = sizeof(option_definitions) / sizeof(struct option_def);
@@ -1949,6 +1960,7 @@ int main(int argc, char **argv) {
             }
         }
     }
+    #endif
 
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
@@ -2214,7 +2226,10 @@ int main(int argc, char **argv) {
 
     // fork the spawn server
     delta_startup_time("fork the spawn server");
+
+#if 0
     spawn_init();
+#endif
 
     /*
      * Libuv uv_spawn() uses SIGCHLD internally:
