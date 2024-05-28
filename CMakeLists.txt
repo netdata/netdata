@@ -2367,7 +2367,6 @@ set(CONFIGURE_COMMAND "dummy-configure-command")
 if (NOT NETDATA_USER)
         set(NETDATA_USER "netdata")
 endif()
-set(VERSION "${GIT_DESCRIBE_OUTPUT}")
 
 configure_file(packaging/cmake/config.cmake.h.in config.h)
 
