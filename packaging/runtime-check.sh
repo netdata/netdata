@@ -72,14 +72,15 @@ plugins.d/xenstat.plugin
 
 if [ -d "${NETDATA_LIBEXEC_PREFIX}" ]; then
     success=1
-    for plugin in ${NETDATA_LIBEXEC_PARTS}; do
-        case "${plugin}" in
-            "${NETDATA_SKIP_LIBEXEC_PARTS}") continue ;;
-        esac
+    for part in ${NETDATA_LIBEXEC_PARTS}; do
+        # shellcheck disable=SC2254
+        if echo "${part}" | grep -qE "${NETDATA_SKIP_LIBEXEC_PARTS}"; then
+            continue
+        fi
 
-        if [ ! -x "${NETDATA_LIBEXEC_PREFIX}/${plugin}" ]; then
+        if [ ! -x "${NETDATA_LIBEXEC_PREFIX}/${part}" ]; then
             success=0
-            echo "!!! ${NETDATA_LIBEXEC_PREFIX}/${plugin} is missing"
+            echo "!!! ${NETDATA_LIBEXEC_PREFIX}/${part} is missing"
         fi
     done
 

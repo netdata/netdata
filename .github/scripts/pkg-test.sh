@@ -120,8 +120,12 @@ esac
 
 trap dump_log EXIT
 
-NETDATA_LIBEXEC_PREFIX=/usr/libexec/netdata
-NETDATA_SKIP_LIBEXEC_PARTS="*logs-management*|*freeipmi*|*xenstat*|*nfacct*|*ebpf*|*cups*"
+export NETDATA_LIBEXEC_PREFIX=/usr/libexec/netdata
+export NETDATA_SKIP_LIBEXEC_PARTS="logs-management|freeipmi|xenstat|nfacct|cups"
+
+if [ "$(uname -m)" != "x86_64" ]; then
+    export NETDATA_SKIP_LIBEXEC_PARTS="${NETDATA_SKIP_LIBEXEC_PARTS}|ebpf"
+fi
 
 /usr/sbin/netdata -D > ./netdata.log 2>&1 &
 
