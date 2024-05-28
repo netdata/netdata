@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#17761](https://github.com/netdata/netdata/pull/17761) ([netdatabot](https://github.com/netdatabot))
+- add clickhouse alerts [\#17760](https://github.com/netdata/netdata/pull/17760) ([ilyam8](https://github.com/ilyam8))
+- simplify installation page [\#17759](https://github.com/netdata/netdata/pull/17759) ([Ancairon](https://github.com/Ancairon))
+- Regenerate integrations.js [\#17758](https://github.com/netdata/netdata/pull/17758) ([netdatabot](https://github.com/netdatabot))
+- Collecting metrics docs section simplification [\#17757](https://github.com/netdata/netdata/pull/17757) ([Ancairon](https://github.com/Ancairon))
+- go.d clickhouse add more metrics [\#17756](https://github.com/netdata/netdata/pull/17756) ([ilyam8](https://github.com/ilyam8))
+- mention how to remove highlight in documentation [\#17755](https://github.com/netdata/netdata/pull/17755) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#17752](https://github.com/netdata/netdata/pull/17752) ([netdatabot](https://github.com/netdatabot))
 - go.d clickhouse add running queries [\#17751](https://github.com/netdata/netdata/pull/17751) ([ilyam8](https://github.com/ilyam8))
 - remove unused go.d/prometheus meta file [\#17749](https://github.com/netdata/netdata/pull/17749) ([ilyam8](https://github.com/ilyam8))
@@ -14,6 +21,7 @@
 - fix clickhouse in apps groups [\#17742](https://github.com/netdata/netdata/pull/17742) ([ilyam8](https://github.com/ilyam8))
 - fix ebpf cgroup swap context [\#17740](https://github.com/netdata/netdata/pull/17740) ([ilyam8](https://github.com/ilyam8))
 - Update netdata-agent-security.md [\#17738](https://github.com/netdata/netdata/pull/17738) ([Ancairon](https://github.com/Ancairon))
+- Collecting metrics docs grammar pass [\#17736](https://github.com/netdata/netdata/pull/17736) ([Ancairon](https://github.com/Ancairon))
 - Grammar pass on docs [\#17735](https://github.com/netdata/netdata/pull/17735) ([Ancairon](https://github.com/Ancairon))
 - Ensure that the choice of compiler and target is passed to sub-projects. [\#17732](https://github.com/netdata/netdata/pull/17732) ([Ferroin](https://github.com/Ferroin))
 - Include the Host in the HTTP header \(mqtt\) [\#17731](https://github.com/netdata/netdata/pull/17731) ([stelfrag](https://github.com/stelfrag))
@@ -387,7 +395,6 @@
 - Bump github.com/docker/docker from 25.0.4+incompatible to 25.0.5+incompatible in /src/go/collectors/go.d.plugin [\#17211](https://github.com/netdata/netdata/pull/17211) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Add -Wno-builtin-macro-redefined to compiler flags. [\#17209](https://github.com/netdata/netdata/pull/17209) ([Ferroin](https://github.com/Ferroin))
 - Move bundling of JSON-C to CMake. [\#17207](https://github.com/netdata/netdata/pull/17207) ([Ferroin](https://github.com/Ferroin))
-- Compatibility with Prometheus HELP [\#17191](https://github.com/netdata/netdata/pull/17191) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.45.5](https://github.com/netdata/netdata/tree/v1.45.5) (2024-05-21)
 
@@ -426,10 +433,6 @@
 - Fix alert hash table definition [\#17196](https://github.com/netdata/netdata/pull/17196) ([stelfrag](https://github.com/stelfrag))
 - health: unsilence cpu % alarm [\#17194](https://github.com/netdata/netdata/pull/17194) ([ilyam8](https://github.com/ilyam8))
 - Fix sum calculation in rrdr2value [\#17193](https://github.com/netdata/netdata/pull/17193) ([stelfrag](https://github.com/stelfrag))
-- Move bundling of libyaml to CMake. [\#17190](https://github.com/netdata/netdata/pull/17190) ([Ferroin](https://github.com/Ferroin))
-- add callout that snapshots only available on v1 [\#17189](https://github.com/netdata/netdata/pull/17189) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Bump github.com/vmware/govmomi from 0.36.0 to 0.36.1 in /src/go/collectors/go.d.plugin [\#17185](https://github.com/netdata/netdata/pull/17185) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump k8s.io/client-go from 0.29.2 to 0.29.3 in /src/go/collectors/go.d.plugin [\#17184](https://github.com/netdata/netdata/pull/17184) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
