@@ -212,6 +212,7 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
     (void)args;
     netdata_log_info("COMMAND: reloading host labels.");
     reload_host_labels();
+    aclk_queue_node_info(localhost, 1);
 
     BUFFER *wb = buffer_create(10, NULL);
     rrdlabels_log_to_buffer(localhost->rrdlabels, wb);
