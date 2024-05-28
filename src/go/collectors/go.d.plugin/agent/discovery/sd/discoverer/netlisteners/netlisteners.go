@@ -308,12 +308,11 @@ func (e *localListenersExec) discover(ctx context.Context) ([]byte, error) {
 }
 
 func extractComm(cmdLine string) string {
-	i := strings.IndexByte(cmdLine, ' ')
-	if i <= 0 {
-		return cmdLine
+	if i := strings.IndexByte(cmdLine, ' '); i != -1 {
+		cmdLine = cmdLine[:i]
 	}
-	_, comm := filepath.Split(cmdLine[:i])
-	return comm
+	_, comm := filepath.Split(cmdLine)
+	return strings.TrimSuffix(comm, ":")
 }
 
 func calcHash(obj any) (uint64, error) {
