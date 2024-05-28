@@ -10,6 +10,9 @@ dump_log() {
 
 trap dump_log EXIT
 
+NETDATA_LIBEXEC_PREFIX="${NETDATA_INSTALL_PATH}/usr/libexec/netdata"
+NETDATA_SKIP_LIBEXEC_PARTS="*logs-management*|*freeipmi*|*xenstat*|*cups*"
+
 "${NETDATA_INSTALL_PATH}/bin/netdata" -D > ./netdata.log 2>&1 &
 
 "${NETDATA_SOURCE_PATH}/packaging/runtime-check.sh" || exit 1

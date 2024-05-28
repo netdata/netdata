@@ -120,6 +120,9 @@ esac
 
 trap dump_log EXIT
 
+NETDATA_LIBEXEC_PREFIX=/usr/libexec/netdata
+NETDATA_SKIP_LIBEXEC_PARTS="*logs-management*|*freeipmi*|*xenstat*|*nfacct*|*ebpf*|*cups*"
+
 /usr/sbin/netdata -D > ./netdata.log 2>&1 &
 
 "${SCRIPT_DIR}/../../packaging/runtime-check.sh" || exit 1
