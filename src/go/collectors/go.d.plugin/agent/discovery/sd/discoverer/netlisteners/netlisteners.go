@@ -308,11 +308,10 @@ func (e *localListenersExec) discover(ctx context.Context) ([]byte, error) {
 }
 
 func extractComm(cmdLine string) string {
-	i := strings.IndexByte(cmdLine, ' ')
-	if i <= 0 {
-		return strings.TrimSuffix(cmdLine, ":")
+	if i := strings.IndexByte(cmdLine, ' '); i != -1 {
+		cmdLine = cmdLine[:i]
 	}
-	_, comm := filepath.Split(cmdLine[:i])
+	_, comm := filepath.Split(cmdLine)
 	return strings.TrimSuffix(comm, ":")
 }
 

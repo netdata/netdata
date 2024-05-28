@@ -13,6 +13,7 @@ func TestDiscoverer_Discover(t *testing.T) {
 	tests := map[string]discoverySim{
 		"add listeners": {
 			listenersCli: func(cli listenersCli, interval, expiry time.Duration) {
+				cli.addListener("UDP|127.0.0.1|323|/usr/sbin/chronyd")
 				cli.addListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
 				cli.addListener("TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
 				cli.addListener("TCP6|::|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
@@ -31,6 +32,14 @@ func TestDiscoverer_Discover(t *testing.T) {
 				provider: "sd:net_listeners",
 				source:   "discoverer=net_listeners,host=localhost",
 				targets: []model.Target{
+					withHash(&target{
+						Protocol:  "UDP",
+						IPAddress: "127.0.0.1",
+						Port:      "323",
+						Address:   "127.0.0.1:323",
+						Comm:      "chronyd",
+						Cmdline:   "/usr/sbin/chronyd",
+					}),
 					withHash(&target{
 						Protocol:  "TCP",
 						IPAddress: "127.0.0.1",
