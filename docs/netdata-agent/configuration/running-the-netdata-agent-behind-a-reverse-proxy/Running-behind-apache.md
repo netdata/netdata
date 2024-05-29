@@ -349,8 +349,8 @@ If your apache server is not on localhost, you can set:
 apache logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
 ```
-[global]
-    access log = none
+[logs]
+    access = off
 ```
 
 ## Troubleshooting mod_proxy

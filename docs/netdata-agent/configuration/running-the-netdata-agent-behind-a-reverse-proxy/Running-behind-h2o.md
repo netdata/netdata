@@ -182,6 +182,6 @@ H2O logs accesses and Netdata logs them too. You can prevent Netdata from genera
 this in `/etc/netdata/netdata.conf`:
 
 ```
-[global]
-      access log = none
+[logs]
+    access = off
 ```
