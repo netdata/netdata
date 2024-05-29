@@ -212,9 +212,7 @@ static void calculate_values_and_show_charts(
 
     int rendered = 0;
 
-    if(m->do_space == CONFIG_BOOLEAN_YES || (m->do_space == CONFIG_BOOLEAN_AUTO &&
-                                             (bavail || breserved_root || bused ||
-                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (m->do_space == CONFIG_BOOLEAN_YES || m->do_space == CONFIG_BOOLEAN_AUTO) {
         if(unlikely(!m->st_space) || m->st_space->update_every != update_every) {
             m->do_space = CONFIG_BOOLEAN_YES;
             m->st_space = rrdset_find_active_bytype_localhost("disk_space", disk);
@@ -252,9 +250,7 @@ static void calculate_values_and_show_charts(
         rendered++;
     }
 
-    if(m->do_inodes == CONFIG_BOOLEAN_YES || (m->do_inodes == CONFIG_BOOLEAN_AUTO &&
-                                              (favail || freserved_root || fused ||
-                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (m->do_inodes == CONFIG_BOOLEAN_YES || m->do_inodes == CONFIG_BOOLEAN_AUTO) {
         if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
             m->do_inodes = CONFIG_BOOLEAN_YES;
             m->st_inodes = rrdset_find_active_bytype_localhost("disk_inodes", disk);
