@@ -1,15 +1,54 @@
-# View Plan & Billing
+# Netdata Plans & Billing
 
-This section outlines how to view and manage your Space's plan, billing settings, and usage from the Netdata Cloud interface.
+Netdata offers a **Community plan**, a free SaaS and Open Source Agent, and paid subscriptions — **Homelab**, **Business**, and **Enterprise On-Premise** — providing key business features and unlimited access to your dashboards.
 
-## Prerequisites
+For more info visit the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page.
+
+## Plans
+
+Plans define the features and customization options available within a Space. Different Spaces can have different plans, giving you flexibility based on your needs.
+
+Netdata Cloud plans (excluding Community) involve:
+
+- A yearly flat fee for [committed nodes](#committed-nodes)
+- An on-demand metered component based on the [number of running nodes](#running-nodes-and-billing)
+
+Billing options include monthly (pay-as-you-go) and yearly (annual prepayment).
+
+### Technical Details
+
+#### Running Nodes and Billing
+
+Billing is based solely on active nodes, excluding offline or stale instances. Daily and P90 metrics ensure fair pricing by mitigating transient increases in node activity.
+
+#### Committed Nodes
+
+Yearly plans offer a discounted rate for a pre-defined number of committed nodes. Any usage exceeding this commitment will be billed at the standard rate.
+
+#### Plan Changes and Credit Balance
+
+You can change your plan, billing frequency, or committed nodes at any time. For guidance, see [updating your plan](#update-a-subscription-plan).
+
+> **Note**
+>
+> - Changes like downgrades or cancellations keep notification configurations active for 24 hours. After that, any methods not supported by the new plan are disabled.
+> - Changes may restrict user access in your Space. Review role availability under [each plan](https://netdata.cloud/pricing).
+> - Any credits are valid until the end of the following year.
+
+#### Areas That Change Upon Subscription
+
+Please refer to the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page for more information on what each plan provides.
+
+## View Plan and Billing Information
+
+### Prerequisites
 
 - A Netdata Cloud account
 - Admin or Billing user access to the Space
 
-## Steps
+### Steps
 
-### View Current Plan, Billing Options, and Invoices
+#### View Current Plan, Billing Options, and Invoices
 
 1. Navigate to **Space settings** (the cog above your profile icon).
 2. Select the **Plan & Billing** tab.
@@ -23,7 +62,7 @@ This section outlines how to view and manage your Space's plan, billing settings
    - The **Change plan** button, showing details of your current plan with options to upgrade or cancel.
    - Your **Usage chart**, displaying daily and period counts of live nodes and how they relate to your billing.
 
-### Update a Subscription Plan
+#### Update a Subscription Plan
 
 1. In the **Plan & Billing** tab, click **Change plan** to see:
    - Billing frequency and committed nodes (if applicable).
