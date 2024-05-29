@@ -31,7 +31,7 @@ Once you've chosen your installation method, follow the provided instructions to
 There are two methods to connect an already installed Netdata Agent to your Netdata Cloud Space:
 
 - using the Netdata Cloud user interface (UI).
-- using a claiming script.
+- using the claiming script.
 
 #### Using the UI (recommended)
 
