@@ -244,8 +244,8 @@ connection IP address.
 Nginx logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
 ```
-[global]
-      access log = none
+[logs]
+    access = off
 ```
 
 ## Use gzip compression
