@@ -1,12 +1,12 @@
 # Netdata Plans & Billing
 
-Netdata offers a **Community plan**, a free SaaS and Open Source Agent, while also it offers paid subscriptions — **Homelab**, **Business**, and **Enterprise On-Premise** — providing key business features and unlimited access to your dashboards.
+Netdata offers a **Community plan**, a free SaaS and Open Source Agent, and paid subscriptions — **Homelab**, **Business**, and **Enterprise On-Premise** — providing key business features and unlimited access to your dashboards.
 
 For more info visit the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page.
 
 ## Plans
 
-Each plan is linked to a Space, defining the capabilities and customizations available. Different Spaces can have different plans, offering flexibility based on your needs.
+Plans define the features and customization options available within a Space. Different Spaces can have different plans, giving you flexibility based on your needs.
 
 Netdata Cloud plans (excluding Community) involve:
 
@@ -19,11 +19,11 @@ Billing options include monthly (pay-as-you-go) and yearly (annual prepayment).
 
 #### Running Nodes and Billing
 
-Billing is based on the number of active nodes. We do not charge for offline or stale nodes. We calculate daily and running P90 figures to ensure fair billing by smoothing out sporadic spikes in node activity.
+Billing is based solely on active nodes, excluding offline or stale instances. Daily and P90 metrics ensure fair pricing by mitigating transient increases in node activity.
 
 #### Committed Nodes
 
-Yearly plans require specifying a number of committed nodes, which receive a discounted rate. Usage above these committed nodes incurs charges at the standard rate.
+Yearly plans offer a discounted rate for a pre-defined number of committed nodes. Any usage exceeding this commitment will be billed at the standard rate.
 
 #### Plan Changes and Credit Balance
 
