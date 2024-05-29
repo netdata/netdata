@@ -33,7 +33,7 @@ There are two methods to connect an already installed Netdata Agent to your Netd
 - using the Netdata Cloud user interface (UI).
 - using a claiming script.
 
-### Using the UI (recommended)
+#### Using the UI (recommended)
 
 The UI method is the easiest and recommended way to connect your Agent. Here's how:
 
@@ -42,7 +42,7 @@ The UI method is the easiest and recommended way to connect your Agent. Here's h
 3. Click the "Connect to netdata" button.
 4. Follow the on-screen instructions to connect your Agent.
 
-### Using claiming script
+#### Using claiming script
 
 You can connect an Agent by running
 the [netdata-claim.sh](https://github.com/netdata/netdata/blob/master/src/claim/netdata-claim.sh.in) script directly.
