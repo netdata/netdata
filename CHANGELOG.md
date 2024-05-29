@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix DEB package builds. [\#17765](https://github.com/netdata/netdata/pull/17765) ([Ferroin](https://github.com/Ferroin))
+- Fix version for go.d plugin [\#17764](https://github.com/netdata/netdata/pull/17764) ([vkalintiris](https://github.com/vkalintiris))
+- go.d sd local-listeners fix extractComm [\#17763](https://github.com/netdata/netdata/pull/17763) ([ilyam8](https://github.com/ilyam8))
+- Schedule a node info on label reload [\#17762](https://github.com/netdata/netdata/pull/17762) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#17761](https://github.com/netdata/netdata/pull/17761) ([netdatabot](https://github.com/netdatabot))
 - add clickhouse alerts [\#17760](https://github.com/netdata/netdata/pull/17760) ([ilyam8](https://github.com/ilyam8))
 - simplify installation page [\#17759](https://github.com/netdata/netdata/pull/17759) ([Ancairon](https://github.com/Ancairon))
@@ -431,8 +435,6 @@
 - Fix issues with permissions when installing from source on macOS [\#17198](https://github.com/netdata/netdata/pull/17198) ([ilyam8](https://github.com/ilyam8))
 - Handle agents will wrong alert\_hash table definition [\#17197](https://github.com/netdata/netdata/pull/17197) ([stelfrag](https://github.com/stelfrag))
 - Fix alert hash table definition [\#17196](https://github.com/netdata/netdata/pull/17196) ([stelfrag](https://github.com/stelfrag))
-- health: unsilence cpu % alarm [\#17194](https://github.com/netdata/netdata/pull/17194) ([ilyam8](https://github.com/ilyam8))
-- Fix sum calculation in rrdr2value [\#17193](https://github.com/netdata/netdata/pull/17193) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
