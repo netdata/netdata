@@ -36,14 +36,12 @@ same nodes, you can create separate Spaces for each team.
 
 ### Navigate between spaces
 
-Click on any of the boxes to switch between available Spaces.
+Click on any of the boxes on the bar on the left-hand side to switch between available Spaces.
 
 Netdata Cloud abbreviates each Space to the first letter of the name, or the first two letters if the name is two words
 or more. Hover over each icon to see the full name in a tooltip.
 
 To add a new Space click on the green **+** button. Enter the name of the Space and click **Save**.
-
-![Switch between Spaces](https://github.com/netdata/netdata/assets/70198089/aa0d7a2f-02ec-4c01-a2d9-1f99642f2496)
 
 ### Manage Spaces
 
@@ -80,8 +78,6 @@ Netdata admin users now have the ability to remove obsolete nodes from a space.
   space
 - If the obsoleted nodes eventually become live or online once more they will be automatically re-added to the space
 
-![Obsoleting an offline node](https://user-images.githubusercontent.com/24860547/173087202-70abfd2d-f0eb-4959-bd0f-74aeee2a2a5a.gif)
-
 ## Netdata Cloud War rooms
 
 Netdata Cloud uses War Rooms to organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
@@ -89,8 +85,6 @@ Netdata Cloud uses War Rooms to organize your connected nodes and provide infras
 Once you add nodes to a Space, all of your nodes will be visible in the **All nodes** War Room. This is a special War Room
 which gives you an overview of all of your nodes in this particular Space. Then you can create functional separations of
 your nodes into more War Rooms. Every War Room has its own dashboards, navigation, indicators, and management tools.
-
-![An example War Room](https://user-images.githubusercontent.com/43294513/225355998-f16730ba-06d4-4953-8fd3-f1c2751e102d.png)
 
 ### War Room organization
 
@@ -150,9 +144,6 @@ Invite your entire SRE, DevOPs, or ITOps team to Netdata Cloud, to give everyone
 Invite new users to your Space by clicking on **Invite Users** in
 the [Space](#netdata-cloud-spaces) management area.
 
-![image](https://user-images.githubusercontent.com/70198089/227887469-e46bad55-ef5d-441a-83a5-dcc2af038678.png)
-
-
 You will be prompted to enter the email addresses of the users you want to invite to your Space. You can enter any number of email addresses, separated by a comma, to send multiple invitations at once.
 
 Next, choose the War Rooms you want to invite these users to. Once logged in, these users are not restricted only to
@@ -162,8 +153,6 @@ Next, pick a role for the invited user. You can read more about [which roles are
 
 Click the **Send** button to send an email invitation, which will prompt them
 to [sign up](/docs/netdata-cloud/authentication-and-authorization/README.md) and join your Space.
-
-![image](https://user-images.githubusercontent.com/70198089/227888899-8511081b-0157-4e22-81d9-898cc464dcb0.png)
 
 Any unaccepted invitations remain under **Invitations awaiting response**. These invitations can be rescinded at any
 time by clicking the trash can icon.
