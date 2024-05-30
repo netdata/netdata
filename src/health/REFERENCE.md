@@ -10,7 +10,7 @@ applications in real time.
 
 While you can see active alerts both on the local dashboard and Netdata Cloud, all health alerts are configured _per
 node_ via individual Netdata Agents. If you want to deploy a new alert across your
-[infrastructure](/docs/netdata-cloud/monitor-your-infrastructure.md), you must configure each node with the same health configuration
+[infrastructure](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md), you must configure each node with the same health configuration
 files.
 
 ## Reload health configuration

@@ -194,7 +194,7 @@ We strongly recommend the following configuration changes for production deploym
 
 We also suggest that you:
 
-1. [Use Netdata Cloud to access the dashboards](/docs/netdata-cloud/monitor-your-infrastructure.md)
+1. [Use Netdata Cloud to access the dashboards](/docs/netdata-cloud/README.md)
 
    For increased security, user management and access to our latest features, tools and troubleshooting solutions.
 
