@@ -24,6 +24,8 @@ typedef uint8_t oomkill_ebpf_val_t;
 
 #define NETDATA_OOMKILL_CHART "_ebpf_oomkill"
 
+#define EBPF_OOMKILL_UNIT_KILLS "kills/s"
+
 // Contexts
 #define NETDATA_CGROUP_OOMKILLS_CONTEXT "cgroup.oomkills"
 

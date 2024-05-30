@@ -59,7 +59,7 @@ static void ebpf_obsolete_oomkill_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_OOMKILL_CHART,
                               "Systemd service OOM kills.",
-                              EBPF_COMMON_DIMENSION_KILLS,
+                              EBPF_OOMKILL_UNIT_KILLS,
                               NETDATA_EBPF_MEMORY_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
                               NETDATA_CGROUP_OOMKILLS_CONTEXT,
@@ -111,7 +111,7 @@ static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
                                   w->clean_name,
                                   NETDATA_OOMKILL_CHART,
                                   "Processes OOM kills.",
-                                  EBPF_COMMON_DIMENSION_KILLS,
+                                  EBPF_OOMKILL_UNIT_KILLS,
                                   NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "ebpf.app_oomkill",
@@ -219,7 +219,7 @@ write_dim:
 static void ebpf_create_specific_oomkill_charts(char *type, int update_every)
 {
     ebpf_create_chart(type, NETDATA_OOMKILL_CHART, "Cgroup OOM kills.",
-                      EBPF_COMMON_DIMENSION_KILLS, NETDATA_EBPF_MEMORY_GROUP,
+                      EBPF_OOMKILL_UNIT_KILLS, NETDATA_EBPF_MEMORY_GROUP,
                       NETDATA_CGROUP_OOMKILLS_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5600,
                       ebpf_create_global_dimension,
@@ -237,7 +237,7 @@ static void ebpf_create_systemd_oomkill_charts(int update_every)
 {
     static ebpf_systemd_args_t data_oom = {
         .title = "Systemd service OOM kills.",
-        .units = EBPF_COMMON_DIMENSION_KILLS,
+        .units = EBPF_OOMKILL_UNIT_KILLS,
         .family = NETDATA_EBPF_MEMORY_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20191,
@@ -309,7 +309,7 @@ static void ebpf_send_specific_oomkill_data(char *type, int value)
 static void ebpf_obsolete_specific_oomkill_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_OOMKILL_CHART, "", "Cgroup OOM kills.",
-                              EBPF_COMMON_DIMENSION_KILLS, NETDATA_EBPF_MEMORY_GROUP,
+                              EBPF_OOMKILL_UNIT_KILLS, NETDATA_EBPF_MEMORY_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_OOMKILLS_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5600, update_every);
 }
@@ -515,7 +515,7 @@ void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              NETDATA_OOMKILL_CHART,
                              "Processes OOM kills.",
-                             EBPF_COMMON_DIMENSION_KILLS,
+                             EBPF_OOMKILL_UNIT_KILLS,
                              NETDATA_EBPF_MEMORY_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_oomkill",
