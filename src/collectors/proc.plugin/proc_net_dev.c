@@ -1197,11 +1197,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         //        , d->rframe, d->tcollisions, d->tcarrier
         //        );
 
-        if(unlikely(d->do_bandwidth == CONFIG_BOOLEAN_AUTO &&
-                    (d->rbytes || d->tbytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_bandwidth = CONFIG_BOOLEAN_YES;
-
-        if(d->do_bandwidth == CONFIG_BOOLEAN_YES) {
+        if (d->do_bandwidth == CONFIG_BOOLEAN_YES || d->do_bandwidth == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_bandwidth)) {
 
                 d->st_bandwidth = rrdset_create_localhost(
@@ -1443,11 +1439,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_mtu);
         }
 
-        if(unlikely(d->do_packets == CONFIG_BOOLEAN_AUTO &&
-           (d->rpackets || d->tpackets || d->rmulticast || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_packets = CONFIG_BOOLEAN_YES;
-
-        if(d->do_packets == CONFIG_BOOLEAN_YES) {
+        if (d->do_packets == CONFIG_BOOLEAN_YES || d->do_packets == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_packets)) {
 
                 d->st_packets = rrdset_create_localhost(
@@ -1488,11 +1480,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_packets);
         }
 
-        if(unlikely(d->do_errors == CONFIG_BOOLEAN_AUTO &&
-                    (d->rerrors || d->terrors || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_errors = CONFIG_BOOLEAN_YES;
-
-        if(d->do_errors == CONFIG_BOOLEAN_YES) {
+        if (d->do_errors == CONFIG_BOOLEAN_YES || d->do_errors == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_errors)) {
 
                 d->st_errors = rrdset_create_localhost(
@@ -1531,11 +1519,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_errors);
         }
 
-        if(unlikely(d->do_drops == CONFIG_BOOLEAN_AUTO &&
-                    (d->rdrops || d->tdrops || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_drops = CONFIG_BOOLEAN_YES;
-
-        if(d->do_drops == CONFIG_BOOLEAN_YES) {
+        if (d->do_drops == CONFIG_BOOLEAN_YES || d->do_drops == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_drops)) {
 
                 d->st_drops = rrdset_create_localhost(
@@ -1574,11 +1558,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_drops);
         }
 
-        if(unlikely(d->do_fifo == CONFIG_BOOLEAN_AUTO &&
-                    (d->rfifo || d->tfifo || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_fifo = CONFIG_BOOLEAN_YES;
-
-        if(d->do_fifo == CONFIG_BOOLEAN_YES) {
+        if (d->do_fifo == CONFIG_BOOLEAN_YES || d->do_fifo == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_fifo)) {
 
                 d->st_fifo = rrdset_create_localhost(
@@ -1617,11 +1597,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_fifo);
         }
 
-        if(unlikely(d->do_compressed == CONFIG_BOOLEAN_AUTO &&
-                    (d->rcompressed || d->tcompressed || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_compressed = CONFIG_BOOLEAN_YES;
-
-        if(d->do_compressed == CONFIG_BOOLEAN_YES) {
+        if (d->do_compressed == CONFIG_BOOLEAN_YES || d->do_compressed == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_compressed)) {
 
                 d->st_compressed = rrdset_create_localhost(
@@ -1660,11 +1636,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_compressed);
         }
 
-        if(unlikely(d->do_events == CONFIG_BOOLEAN_AUTO &&
-                    (d->rframe || d->tcollisions || d->tcarrier || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_events = CONFIG_BOOLEAN_YES;
-
-        if(d->do_events == CONFIG_BOOLEAN_YES) {
+        if (d->do_events == CONFIG_BOOLEAN_YES || d->do_events == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_events)) {
 
                 d->st_events = rrdset_create_localhost(
@@ -1700,9 +1672,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         d->function_ready = true;
     }
 
-    if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO &&
-                                              (system_rbytes || system_tbytes ||
-                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (do_bandwidth == CONFIG_BOOLEAN_YES || do_bandwidth == CONFIG_BOOLEAN_AUTO) {
         do_bandwidth = CONFIG_BOOLEAN_YES;
         static RRDSET *st_system_net = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
