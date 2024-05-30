@@ -254,9 +254,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     unsigned long long SwapUsed = SwapTotal - SwapFree;
 
-    if(do_swap == CONFIG_BOOLEAN_YES || (do_swap == CONFIG_BOOLEAN_AUTO &&
-                                         (SwapTotal || SwapUsed || SwapFree ||
-                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (SwapTotal && (do_swap == CONFIG_BOOLEAN_YES || do_swap == CONFIG_BOOLEAN_AUTO)) {
         do_swap = CONFIG_BOOLEAN_YES;
         common_mem_swap(SwapFree * 1024, SwapUsed * 1024, update_every);
 
@@ -317,10 +315,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         }
     }
 
-    if(arl_hwcorrupted->flags & ARL_ENTRY_FLAG_FOUND &&
-       (do_hwcorrupt == CONFIG_BOOLEAN_YES || (do_hwcorrupt == CONFIG_BOOLEAN_AUTO &&
-                                               (HardwareCorrupted > 0 ||
-                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))) {
+    if (arl_hwcorrupted->flags & ARL_ENTRY_FLAG_FOUND &&
+        (do_hwcorrupt == CONFIG_BOOLEAN_YES || do_hwcorrupt == CONFIG_BOOLEAN_AUTO)) {
         do_hwcorrupt = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_mem_hwcorrupt = NULL;
@@ -490,10 +486,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         rrdset_done(st_mem_slab);
     }
 
-    if(arl_hugepages_total->flags & ARL_ENTRY_FLAG_FOUND &&
-        (do_hugepages == CONFIG_BOOLEAN_YES || (do_hugepages == CONFIG_BOOLEAN_AUTO &&
-                                              ((Hugepagesize && HugePages_Total) ||
-                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))) {
+    if (arl_hugepages_total->flags & ARL_ENTRY_FLAG_FOUND && HugePages_Total &&
+        (do_hugepages == CONFIG_BOOLEAN_YES || do_hugepages == CONFIG_BOOLEAN_AUTO)) {
         do_hugepages = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_mem_hugepages = NULL;
@@ -530,10 +524,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         rrdset_done(st_mem_hugepages);
     }
 
-    if(do_transparent_hugepages == CONFIG_BOOLEAN_YES || (do_transparent_hugepages == CONFIG_BOOLEAN_AUTO &&
-                                                          (AnonHugePages ||
-                                                           ShmemHugePages ||
-                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (do_transparent_hugepages == CONFIG_BOOLEAN_YES || do_transparent_hugepages == CONFIG_BOOLEAN_AUTO) {
         do_transparent_hugepages = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_mem_transparent_hugepages = NULL;
