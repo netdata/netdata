@@ -390,7 +390,7 @@ Then for histograms and timers the following types are also supported:
 
 StatsD metrics: `foo` and `bar`.
 
-Contents of file `/etc/netdata/stats.d/foobar.conf`:
+Contents of file `/etc/netdata/statsd.d/foobar.conf`:
 
 ```
 [app]
