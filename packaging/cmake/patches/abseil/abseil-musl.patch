@@ -1,0 +1,58 @@
+Patch-Source: https://github.com/void-linux/void-packages/blob/master/srcpkgs/mozc/patches/abseil.patch
+
+Ported from grpc's patches
+
+An all-in-one patch that fixes several issues:
+
+1) UnscaledCycleClock not fully implemented for ppc*-musl (disabled on musl)
+2) powerpc stacktrace implementation only works on glibc (disabled on musl)
+4) examine_stack.cpp makes glibc assumptions on powerpc (fixed)
+
+--- a/absl/debugging/internal/examine_stack.cc
++++ b/absl/debugging/internal/examine_stack.cc
+@@ -33,6 +33,10 @@
+ #include <csignal>
+ #include <cstdio>
+ 
++#if defined(__powerpc__)
++#include <asm/ptrace.h>
++#endif
++
+ #include "absl/base/attributes.h"
+ #include "absl/base/internal/raw_logging.h"
+ #include "absl/base/macros.h"
+@@ -174,8 +178,10 @@
+     return reinterpret_cast<void*>(context->uc_mcontext.pc);
+ #elif defined(__powerpc64__)
+     return reinterpret_cast<void*>(context->uc_mcontext.gp_regs[32]);
++#elif defined(__powerpc__) && defined(__GLIBC__)
++    return reinterpret_cast<void*>(context->uc_mcontext.regs->nip);
+ #elif defined(__powerpc__)
+-    return reinterpret_cast<void*>(context->uc_mcontext.uc_regs->gregs[32]);
++    return reinterpret_cast<void*>(((struct pt_regs *)context->uc_regs)->nip);
+ #elif defined(__riscv)
+     return reinterpret_cast<void*>(context->uc_mcontext.__gregs[REG_PC]);
+ #elif defined(__s390__) && !defined(__s390x__)
+--- a/absl/debugging/internal/stacktrace_config.h
++++ b/absl/debugging/internal/stacktrace_config.h
+@@ -60,7 +60,7 @@
+ #elif defined(__i386__) || defined(__x86_64__)
+ #define ABSL_STACKTRACE_INL_HEADER \
+   "absl/debugging/internal/stacktrace_x86-inl.inc"
+-#elif defined(__ppc__) || defined(__PPC__)
++#elif (defined(__ppc__) || defined(__PPC__)) && defined(__GLIBC__)
+ #define ABSL_STACKTRACE_INL_HEADER \
+   "absl/debugging/internal/stacktrace_powerpc-inl.inc"
+ #elif defined(__aarch64__)
+--- a/absl/base/internal/unscaledcycleclock_config.h
++++ b/absl/base/internal/unscaledcycleclock_config.h
+@@ -21,7 +21,8 @@
+ 
+ // The following platforms have an implementation of a hardware counter.
+ #if defined(__i386__) || defined(__x86_64__) || defined(__aarch64__) || \
+-    defined(__powerpc__) || defined(__ppc__) || defined(__riscv) ||     \
++    defined(__riscv) ||     \
++    ((defined(__powerpc__) || defined(__ppc__)) && defined(__GLIBC__)) || \
+     defined(_M_IX86) || (defined(_M_X64) && !defined(_M_ARM64EC))
+ #define ABSL_HAVE_UNSCALED_CYCLECLOCK_IMPLEMENTATION 1
+ #else
