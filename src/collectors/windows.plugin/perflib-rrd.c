@@ -126,6 +126,13 @@ collected_number perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_D
 
     switch(cd->current.CounterType) {
         case PERF_COUNTER_COUNTER:
+            if(!VALID_DELTA(cd)) return 0;
+            numerator = cd->current.Data - cd->previous.Data;
+            denominator = cd->current.Time - cd->previous.Time;
+            doubleValue = ((double)numerator / ((double)denominator / cd->current.Frequency));
+            value = (collected_number)(doubleValue);
+            break;
+
         case PERF_SAMPLE_COUNTER:
         case PERF_COUNTER_BULK_COUNT:
             // (N1 - N0) / ((D1 - D0) / F)
