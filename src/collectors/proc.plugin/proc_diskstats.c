@@ -1570,9 +1570,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------------
         // Do performance metrics
-        if(d->do_io == CONFIG_BOOLEAN_YES || (d->do_io == CONFIG_BOOLEAN_AUTO &&
-                                              (readsectors || writesectors || discardsectors ||
-                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (d->do_io == CONFIG_BOOLEAN_YES || d->do_io == CONFIG_BOOLEAN_AUTO) {
             d->do_io = CONFIG_BOOLEAN_YES;
 
             last_readsectors = d->disk_io.rd_io_reads ? d->disk_io.rd_io_reads->collector.last_collected_value / SECTOR_SIZE : 0;
@@ -1614,9 +1612,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrdset_done(d->st_ext_io);
         }
 
-        if(d->do_ops == CONFIG_BOOLEAN_YES || (d->do_ops == CONFIG_BOOLEAN_AUTO &&
-                                               (reads || writes || discards || flushes ||
-                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (d->do_ops == CONFIG_BOOLEAN_YES || d->do_ops == CONFIG_BOOLEAN_AUTO) {
             d->do_ops = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!d->st_ops)) {
@@ -1680,8 +1676,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrdset_done(d->st_ext_ops);
         }
 
-        if(d->do_qops == CONFIG_BOOLEAN_YES || (d->do_qops == CONFIG_BOOLEAN_AUTO &&
-                                                (queued_ios || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (d->do_qops == CONFIG_BOOLEAN_YES || d->do_qops == CONFIG_BOOLEAN_AUTO) {
             d->do_qops = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!d->st_qops)) {
@@ -1711,8 +1706,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrdset_done(d->st_qops);
         }
 
-        if(d->do_backlog == CONFIG_BOOLEAN_YES || (d->do_backlog == CONFIG_BOOLEAN_AUTO &&
-                                                   (backlog_ms || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (d->do_backlog == CONFIG_BOOLEAN_YES || d->do_backlog == CONFIG_BOOLEAN_AUTO) {
             d->do_backlog = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!d->st_backlog)) {
@@ -1742,8 +1736,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrdset_done(d->st_backlog);
         }
 
-        if(d->do_util == CONFIG_BOOLEAN_YES || (d->do_util == CONFIG_BOOLEAN_AUTO &&
-                                                (busy_ms || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (d->do_util == CONFIG_BOOLEAN_YES || d->do_util == CONFIG_BOOLEAN_AUTO) {
             d->do_util = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!d->st_busy)) {
@@ -1803,9 +1796,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrdset_done(d->st_util);
         }
 
-        if(d->do_mops == CONFIG_BOOLEAN_YES || (d->do_mops == CONFIG_BOOLEAN_AUTO &&
-                                                (mreads || mwrites || mdiscards ||
-                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (d->do_mops == CONFIG_BOOLEAN_YES || d->do_mops == CONFIG_BOOLEAN_AUTO) {
             d->do_mops = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!d->st_mops)) {
@@ -1867,8 +1858,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrdset_done(d->st_ext_mops);
         }
 
-        if(d->do_iotime == CONFIG_BOOLEAN_YES || (d->do_iotime == CONFIG_BOOLEAN_AUTO &&
-                                                  (readms || writems || discardms || flushms || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (d->do_iotime == CONFIG_BOOLEAN_YES || d->do_iotime == CONFIG_BOOLEAN_AUTO) {
             d->do_iotime = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!d->st_iotime)) {
@@ -1936,13 +1926,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // only if this is not the first time we run
 
         if(likely(dt)) {
-            if( (d->do_iotime == CONFIG_BOOLEAN_YES || (d->do_iotime == CONFIG_BOOLEAN_AUTO &&
-                                                        (readms || writems ||
-                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) &&
-                (d->do_ops    == CONFIG_BOOLEAN_YES || (d->do_ops    == CONFIG_BOOLEAN_AUTO &&
-                                                        (reads || writes ||
-                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))) {
-
+            if ((d->do_iotime == CONFIG_BOOLEAN_YES || d->do_iotime == CONFIG_BOOLEAN_AUTO) &&
+                (d->do_ops == CONFIG_BOOLEAN_YES || d->do_ops == CONFIG_BOOLEAN_AUTO)) {
                 if(unlikely(!d->st_await)) {
                     d->st_await = rrdset_create_localhost(
                             "disk_await"
@@ -2010,11 +1995,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_done(d->st_ext_await);
             }
 
-            if( (d->do_io  == CONFIG_BOOLEAN_YES || (d->do_io  == CONFIG_BOOLEAN_AUTO &&
-                                                     (readsectors || writesectors || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) &&
-                (d->do_ops == CONFIG_BOOLEAN_YES || (d->do_ops == CONFIG_BOOLEAN_AUTO &&
-                                                     (reads || writes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))) {
-
+            if ((d->do_io == CONFIG_BOOLEAN_YES || d->do_io == CONFIG_BOOLEAN_AUTO) &&
+                (d->do_ops == CONFIG_BOOLEAN_YES || d->do_ops == CONFIG_BOOLEAN_AUTO)) {
                 if(unlikely(!d->st_avgsz)) {
                     d->st_avgsz = rrdset_create_localhost(
                             "disk_avgsz"
@@ -2075,13 +2057,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_done(d->st_ext_avgsz);
             }
 
-            if( (d->do_util == CONFIG_BOOLEAN_YES || (d->do_util == CONFIG_BOOLEAN_AUTO &&
-                                                      (busy_ms ||
-                                                       netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) &&
-                (d->do_ops  == CONFIG_BOOLEAN_YES || (d->do_ops  == CONFIG_BOOLEAN_AUTO &&
-                                                      (reads || writes ||
-                                                       netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))) {
-
+            if ((d->do_util == CONFIG_BOOLEAN_YES || d->do_util == CONFIG_BOOLEAN_AUTO) &&
+                (d->do_ops == CONFIG_BOOLEAN_YES || d->do_ops == CONFIG_BOOLEAN_AUTO)) {
                 if(unlikely(!d->st_svctm)) {
                     d->st_svctm = rrdset_create_localhost(
                             "disk_svctm"
@@ -2328,12 +2305,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_done(d->st_bcache_cache_read_races);
             }
 
-            if(d->do_bcache == CONFIG_BOOLEAN_YES || (d->do_bcache == CONFIG_BOOLEAN_AUTO &&
-                                                      (stats_total_cache_hits ||
-                                                       stats_total_cache_misses ||
-                                                       stats_total_cache_miss_collisions ||
-                                                       netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-
+            if (d->do_bcache == CONFIG_BOOLEAN_YES || d->do_bcache == CONFIG_BOOLEAN_AUTO) {
                 if(unlikely(!d->st_bcache)) {
                     d->st_bcache = rrdset_create_localhost(
                             "disk_bcache"
@@ -2367,11 +2339,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_done(d->st_bcache);
             }
 
-            if(d->do_bcache == CONFIG_BOOLEAN_YES || (d->do_bcache == CONFIG_BOOLEAN_AUTO &&
-                                                      (stats_total_cache_bypass_hits ||
-                                                       stats_total_cache_bypass_misses ||
-                                                       netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-
+            if (d->do_bcache == CONFIG_BOOLEAN_YES || d->do_bcache == CONFIG_BOOLEAN_AUTO) {
                 if(unlikely(!d->st_bcache_bypass)) {
                     d->st_bcache_bypass = rrdset_create_localhost(
                             "disk_bcache_bypass"
@@ -2410,9 +2378,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
     netdata_mutex_unlock(&diskstats_dev_mutex);
     // update the system total I/O
 
-    if(global_do_io == CONFIG_BOOLEAN_YES || (global_do_io == CONFIG_BOOLEAN_AUTO &&
-                                              (system_read_kb || system_write_kb ||
-                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (global_do_io == CONFIG_BOOLEAN_YES || global_do_io == CONFIG_BOOLEAN_AUTO) {
         common_system_io(system_read_kb * 1024, system_write_kb * 1024, update_every);
     }
 
