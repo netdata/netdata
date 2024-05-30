@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- docs fix "Prevent the double access.log" [\#17773](https://github.com/netdata/netdata/pull/17773) ([ilyam8](https://github.com/ilyam8))
+- docs: simplify claiming readme part1 [\#17771](https://github.com/netdata/netdata/pull/17771) ([ilyam8](https://github.com/ilyam8))
+- Netdata Cloud docs section edits [\#17768](https://github.com/netdata/netdata/pull/17768) ([Ancairon](https://github.com/Ancairon))
 - Fix DEB package builds. [\#17765](https://github.com/netdata/netdata/pull/17765) ([Ferroin](https://github.com/Ferroin))
 - Fix version for go.d plugin [\#17764](https://github.com/netdata/netdata/pull/17764) ([vkalintiris](https://github.com/vkalintiris))
 - go.d sd local-listeners fix extractComm [\#17763](https://github.com/netdata/netdata/pull/17763) ([ilyam8](https://github.com/ilyam8))
@@ -432,9 +435,6 @@
 - go.d: local-listeners sd: trust known ports to identify an app [\#17205](https://github.com/netdata/netdata/pull/17205) ([ilyam8](https://github.com/ilyam8))
 - go.d: weblog allow PURGE HTTP method [\#17204](https://github.com/netdata/netdata/pull/17204) ([ilyam8](https://github.com/ilyam8))
 - go.d: local-listeners sd: use "ip:port" as address instead of "localhost" [\#17203](https://github.com/netdata/netdata/pull/17203) ([ilyam8](https://github.com/ilyam8))
-- Fix issues with permissions when installing from source on macOS [\#17198](https://github.com/netdata/netdata/pull/17198) ([ilyam8](https://github.com/ilyam8))
-- Handle agents will wrong alert\_hash table definition [\#17197](https://github.com/netdata/netdata/pull/17197) ([stelfrag](https://github.com/stelfrag))
-- Fix alert hash table definition [\#17196](https://github.com/netdata/netdata/pull/17196) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
