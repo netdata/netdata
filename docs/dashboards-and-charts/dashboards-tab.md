@@ -2,7 +2,7 @@
 
 With Netdata Cloud, you can build **custom dashboards** that target your infrastructure's unique needs. Put key metrics from any number of distributed systems in one place for a bird's eye view of your infrastructure.
 
-Click on the **Dashboards** tab in any War Room to get started.
+Click on the **Dashboards** tab in any Room to get started.
 
 ## Create your first dashboard
 
@@ -41,7 +41,7 @@ Charts also synchronize as you interact with them, even across contexts _or_ nod
 
 ### Text cards
 
-You can use text cards as notes to explain to other members of the [War Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms) the purpose of the dashboard's arrangement.
+You can use text cards as notes to explain to other members of the [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-rooms) the purpose of the dashboard's arrangement.
 
 By clicking the `T` icon on the text box, you can switch between font sizes.
 
@@ -71,13 +71,13 @@ Click on the 3-dot icon in the corner of any card to open a menu. Click the **Re
 
 ## Managing your dashboard
 
-To see dashboards associated with the current War Room, click the **Dashboards** tab in any War Room. You can select dashboards and delete them using the 🗑️ icon.
+To see dashboards associated with the current Room, click the **Dashboards** tab in any Room. You can select dashboards and delete them using the 🗑️ icon.
 
 ### Update/save a dashboard
 
 If you've made changes to a dashboard, such as adding or moving elements, the **Save** button is enabled. Click it to save your most recent changes.
 
-Any other members of the War Room will be able to see these changes the next time they load this dashboard.
+Any other members of the Room will be able to see these changes the next time they load this dashboard.
 
 If multiple users attempt to make concurrent changes to the same dashboard, the second user who hits Save will be
 prompted to either overwrite the dashboard or reload to see the most recent changes.
@@ -85,7 +85,7 @@ prompted to either overwrite the dashboard or reload to see the most recent chan
 ### Delete a dashboard
 
 Delete any dashboard by navigating to it and clicking the **Delete** button. This will remove this entry from the
-dropdown for every member of this War Room.
+dropdown for every member of this Room.
 
 ### Minimum browser viewport
 
@@ -93,4 +93,4 @@ Because of the visual complexity of individual charts, dashboards require a mini
 
 ## What's next?
 
-Once you've designed a dashboard or two, make sure to [invite your team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team) if you haven't already. You can add these new users to the same War Room to let them see the same dashboards without any effort.
+Once you've designed a dashboard or two, make sure to [invite your team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team) if you haven't already. You can add these new users to the same Room to let them see the same dashboards without any effort.

@@ -27,7 +27,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## B
 
-- [**Bookmarks**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#manage-spaces): Netdata Cloud's bookmarks put your tools in one accessible place. Bookmarks are shared between all War Rooms in a Space, so any users in your Space will be able to see and use them.
+- [**Bookmarks**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#manage-spaces): Netdata Cloud's bookmarks put your tools in one accessible place. Bookmarks are shared between all Rooms in a Space, so any users in your Space will be able to see and use them.
 
 ## C
 
@@ -71,7 +71,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Health Entity Reference**](/src/health/REFERENCE.md#health-entity-reference):
 
-- [**Home** tab](/docs/dashboards-and-charts/home-tab.md): Tab in Netdata Cloud that provides a predefined dashboard of relevant information about entities in the War Room.
+- [**Home** tab](/docs/dashboards-and-charts/home-tab.md): Tab in Netdata Cloud that provides a predefined dashboard of relevant information about entities in the Room.
 
 ## I
 
@@ -124,7 +124,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Replication Streaming**](/src/streaming/README.md): Streaming configuration where child `A`, _with_ a database and web dashboard, streams metrics to parent `B`.
 
-- [**Room** or **War Room**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
+- [**Room**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-rooms): Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
 
 ## S
 
@@ -146,10 +146,6 @@ even thousands of nodes. There are no actual bottlenecks especially if you retai
 ## V
 
 - [**Visualizations**](/docs/category-overview-pages/visualizations-overview.md): Netdata uses dimensions, contexts, and families to sort your metric data into graphs, charts, and alerts that maximize your understand of your infrastructure and your ability to troubleshoot it, along or on a team.
-
-## W
-
-- [**War Room** or **Room**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
 
 ## Z
 

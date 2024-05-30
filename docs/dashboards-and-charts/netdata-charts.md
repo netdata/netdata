@@ -172,7 +172,7 @@ It supports:
 
 1. **Group by Node**, to summarize the data of each node, and provide one dimension on the chart for each of the nodes involved. Filtering nodes is supported at the same time, using the nodes dropdown menu.
 2. **Group by Instance**, to summarize the data of each instance and provide one dimension on the chart for each of the instances involved. Filtering instances is supported at the same time, using the instances dropdown menu.
-3. **Group by Dimension**, so that each metric in the visualization is the aggregation of a single dimension. This provides a per dimension view of the data from all the nodes in the War Room, taking into account filtering criteria if defined.
+3. **Group by Dimension**, so that each metric in the visualization is the aggregation of a single dimension. This provides a per dimension view of the data from all the nodes in the Room, taking into account filtering criteria if defined.
 4. **Group by Label**, to summarize the data for each label value. Multiple label keys can be selected at the same time.
 
 Using this menu, you can slice and dice the data in any possible way, to quickly get different views of it, without the need to edit a query string and without any need to better understand the format of the underlying data.

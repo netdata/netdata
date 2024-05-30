@@ -1,6 +1,6 @@
 # Nodes tab
 
-The nodes tab provides a summarized view of your [War Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms), allowing you to view quick information per node.
+The nodes tab provides a summarized view of your [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-rooms), allowing you to view quick information per node.
 
 > **Tip**  
 >
@@ -33,7 +33,7 @@ Each node row allows you to:
 
 ## Right bar
 
-The bar on the right-hand side provides additional information about the nodes in the War Room and allows you to filter what is displayed in the [center information view](#center-information-view).
+The bar on the right-hand side provides additional information about the nodes in the Room and allows you to filter what is displayed in the [center information view](#center-information-view).
 
 ### Node hierarchy
 
@@ -50,7 +50,7 @@ The second tab allows you to filter which nodes are displayed, you can filter by
 
 ### Alerts sub-tab
 
-The third tab displays room alerts and allows you to see additional information about each alert.
+The third tab displays Room alerts and allows you to see additional information about each alert.
 
 ### Info sub-tab
 

@@ -10,7 +10,7 @@ features like centralized monitoring and easier collaboration.
 
 There are two places in the UI where you can add/connect your Node:
 
-- **Space/Room settings**: Click the cogwheel (the bottom-left corner or next to the War Room name at the top) and
+- **Space/Room settings**: Click the cogwheel (the bottom-left corner or next to the Room name at the top) and
   select "Nodes." Click the "+" button to add
   a new node.
 - [**Nodes tab**](/docs/dashboards-and-charts/nodes-tab.md): Click on the "Add nodes" button.
@@ -60,7 +60,7 @@ Claiming script options:
 | Option | Description                                                        | Required | Default value                                         |
 |--------|--------------------------------------------------------------------|:--------:|:------------------------------------------------------|
 | token  | The claiming token for your Netdata Cloud Space.                   |   yes    |                                                       |
-| rooms  | A comma-separated list of War Rooms to add the Agent to.           |    no    | The Agent will be added to the "All nodes" room only. |
+| rooms  | A comma-separated list of Rooms to add the Agent to.           |    no    | The Agent will be added to the "All nodes" Room only. |
 | id     | The unique identifier of the Agent.                                |    no    | The Agent's MACHINE_GUID.                             |
 | proxy  | The URL of a proxy server to use for the connection, if necessary. |    no    |                                                       |
 
@@ -70,7 +70,7 @@ Example:
 netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2
 ```
 
-This command connects the Agent and adds it to the "room1" and "room2" War Rooms using your claiming token
+This command connects the Agent and adds it to the "room1" and "room2" Rooms using your claiming token
 MYTOKEN1234567.
 
 ## Reconnect
@@ -85,7 +85,7 @@ sudo rm -rf cloud.d/
 ```
 
 This node no longer has access to the credentials it was used when connecting to Netdata Cloud via the ACLK. You will
-still be able to see this node in your War Rooms in an **unreachable** state.
+still be able to see this node in your Rooms in an **unreachable** state.
 
 If you want to reconnect this node, you need to:
 

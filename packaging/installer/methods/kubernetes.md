@@ -97,7 +97,7 @@ On an existing installation, in order to connect it to Netdata Cloud you will ne
   > :bookmark_tabs: Note
   >  
   > Make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-  > and `YOUR_ROOM_ID` with the ID of the room you are willing to connect to.
+  > and `YOUR_ROOM_ID` with the ID of the Room you are willing to connect to.
 
   These settings connect your `parent`/`child` nodes to Netdata Cloud and store more metrics in the nodes' time-series databases.
 

@@ -29,7 +29,7 @@ Beyond charts, the local dashboard can be broken down into three key areas:
   - [Sections](#sections)
   - [Time \& date picker](#time--date-picker)
   - [Metrics menus](#metrics-menus)
-  - [Cloud menus (Spaces, War Rooms, and Visited nodes)](#cloud-menus-spaces-war-rooms-and-visited-nodes)
+  - [Cloud menus (Spaces, Rooms, and Visited nodes)](#cloud-menus-spaces-rooms-and-visited-nodes)
 - [Customizing the local dashboard](#customizing-the-local-dashboard)
 - [Custom dashboards](#custom-dashboards)
 
@@ -89,12 +89,12 @@ partition Netdata recognizes.
 ![Screenshot of some metrics
 submenus](https://user-images.githubusercontent.com/1153921/80834697-11577e00-8ba6-11ea-979c-92fd19cdb480.png)
 
-### Cloud menus (Spaces, War Rooms, and Visited nodes)
+### Cloud menus (Spaces, Rooms, and Visited nodes)
 
 The dashboard also features a menu related to Netdata Cloud functionality. You can view your existing Spaces or create
 new ones via the left vertical column of boxes. This menu also displays the name of your current Space, shows a list of
-any War Rooms you've added you your Space, and lists any notes you recently visited via their Agent dashboards. Click on
-a War Room's name to jump to the Netdata Cloud web interface.
+any Rooms you've added you your Space, and lists any notes you recently visited via their Agent dashboards. Click on
+a Room's name to jump to the Netdata Cloud web interface.
 
 ![A screenshot of the Cloud
 menus](https://user-images.githubusercontent.com/1153921/80837210-3f8b8c80-8bab-11ea-9c75-128c2d823ef8.png)

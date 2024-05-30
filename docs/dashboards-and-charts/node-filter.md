@@ -1,6 +1,6 @@
 # Node filter
 
-The node filter allows you to quickly filter the nodes visualized in a War Room's views. It appears on all views, except on single-node dashboards.
+The node filter allows you to quickly filter the nodes visualized in a Room's views. It appears on all views, except on single-node dashboards.
 
 Inside the filter, the nodes get categorized into three groups:
 

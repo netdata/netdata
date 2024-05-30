@@ -5,16 +5,16 @@ Netdata Cloud's role-based-access mechanism allows you to control what functiona
 ## What roles are available?
 
 With the advent of the paid plans we revamped the roles to cover needs expressed by Netdata users, like providing more limited access to their customers, or
-being able to join any room. We also aligned the offered roles to the target audience of each plan. The end result is the following:
+being able to join any Room. We also aligned the offered roles to the target audience of each plan. The end result is the following:
 
 | **Role**                                                                                                                                                                                          | **Community**      | **Homelab**        | **Business**       | **Enterprise On-Premise** |
 |:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------|:-------------------|:-------------------|:--------------------------|
-| **Admins**<p>Users with this role can control Spaces, War Rooms, Nodes, Users and Billing.</p><p>They can also access any War Room in the Space.</p>                                              | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
-| **Managers**<p>Users with this role can manage War Rooms and Users.</p><p>They can access any War Room in the Space.</p>                                                                          | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
-| **Troubleshooters**<p>Users with this role can use Netdata to troubleshoot, not manage entities.</p><p>They can access any War Room in the Space.</p>                                             | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
-| **Observers**<p>Users with this role can only view data in specific War Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p>                            | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
+| **Admins**<p>Users with this role can control Spaces, Rooms, Nodes, Users and Billing.</p><p>They can also access any Room in the Space.</p>                                              | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
+| **Managers**<p>Users with this role can manage Rooms and Users.</p><p>They can access any Room in the Space.</p>                                                                          | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
+| **Troubleshooters**<p>Users with this role can use Netdata to troubleshoot, not manage entities.</p><p>They can access any Room in the Space.</p>                                             | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
+| **Observers**<p>Users with this role can only view data in specific Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p>                            | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
 | **Billing**<p>Users with this role can handle billing options and invoices.</p>                                                                                                                   | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
-| **Member** ⚠️ Legacy role<p>Users with this role you can create War Rooms and invite other Members.</p><p>They can only see the War Rooms they belong to and all Nodes in the All Nodes room.</p> | -                  | -                  | -                  | -                         |
+| **Member** ⚠️ Legacy role<p>Users with this role you can create Rooms and invite other Members.</p><p>They can only see the Rooms they belong to and all Nodes in the All Nodes Room.</p> | -                  | -                  | -                  | -                         |
 
 ## Which functionalities are available for each role?
 
@@ -36,7 +36,7 @@ In more detail, you can find on the following tables which functionalities are a
 
 | **Functionality**                         |     **Admin**      |    **Manager**     | **Troubleshooter** | **Observer** | **Billing** |     **Member**     | Notes                                      |
 |:------------------------------------------|:------------------:|:------------------:|:------------------:|:------------:|:-----------:|:------------------:|:-------------------------------------------|
-| See all Nodes in Space (_All Nodes_ room) | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -       |      -      | :heavy_check_mark: | Members are always on the _All Nodes_ room |
+| See all Nodes in Space (_All Nodes_ Room) | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -       |      -      | :heavy_check_mark: | Members are always on the _All Nodes_ Room |
 | Connect Node to Space                     | :heavy_check_mark: |         -          |         -          |      -       |      -      |         -          | -                                          |
 | Delete Node from Space                    | :heavy_check_mark: |         -          |         -          |      -       |      -      |         -          | -                                          |
 
@@ -63,11 +63,11 @@ In more detail, you can find on the following tables which functionalities are a
 | **Functionality**            |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     | Notes                                                                              |
 |:-----------------------------|:------------------:|:------------------:|:------------------:|:------------------:|:-----------:|:------------------:|:-----------------------------------------------------------------------------------|
 | See all Rooms in a Space     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |         -          |                                                                                    |
-| Join any Room in a Space     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |         -          | By joining a room you will be enabled to get notifications from nodes on that room |
+| Join any Room in a Space     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |         -          | By joining a Room you will be enabled to get notifications from nodes on that Room |
 | Leave Room                   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      | :heavy_check_mark: |                                                                                    |
 | Create a new Room in a Space | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      | :heavy_check_mark: |                                                                                    |
 | Delete Room                  | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |         -          |                                                                                    |
-| Change Room name             | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      | :heavy_check_mark: | If not the _All Nodes_ room                                                        |
+| Change Room name             | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      | :heavy_check_mark: | If not the _All Nodes_ Room                                                        |
 | Change Room description      | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      | :heavy_check_mark: |                                                                                    |
 | Add existing Nodes to Room   | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      | :heavy_check_mark: | Node already connected to the Space                                                |
 | Remove Nodes from Room       | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      | :heavy_check_mark: |                                                                                    |

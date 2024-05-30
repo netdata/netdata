@@ -8,7 +8,7 @@ The following are questions that are usually asked by Netdata Cloud On-Prem oper
 
 ## Loading charts takes a long time or ends with an error
 
-The charts service is trying to collect data from the agents involved in the query. In most of the cases, this microservice queries many agents (depending on the room), and all of them have to reply for the query to be satisfied.
+The charts service is trying to collect data from the agents involved in the query. In most of the cases, this microservice queries many agents (depending on the Room), and all of them have to reply for the query to be satisfied.
 
 One or more of the following may be the cause:
 

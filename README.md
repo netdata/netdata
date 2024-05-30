@@ -319,7 +319,7 @@ navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostnam
 
    - Access your Netdata agents from anywhere
    - Access sensitive Netdata agent features (like "Netdata Functions": processes, systemd-journal)
-   - Organize your infra in spaces and rooms
+   - Organize your infra in spaces and Rooms
    - Create, manage, and share **custom dashboards**
    - Invite your team and assign roles to them (Role Based Access Control - RBAC)
    - Get infinite horizontal scalability (multiple independent Netdata Agents are viewed as one infra)

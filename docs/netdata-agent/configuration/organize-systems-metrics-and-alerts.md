@@ -1,15 +1,15 @@
 # Organize systems, metrics, and alerts
 
 When you use Netdata to monitor and troubleshoot an entire infrastructure, you need sophisticated ways of keeping everything organized.
-Netdata allows to organize your observability infrastructure with spaces, war rooms, virtual nodes, host labels, and metric labels.
+Netdata allows to organize your observability infrastructure with Spaces, Rooms, virtual nodes, host labels, and metric labels.
 
-## Spaces and war rooms
+## Spaces and Rooms
 
 [Spaces](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces) are used for organization-level or infrastructure-level 
 grouping of nodes and people. A node can only appear in a single space, while people can have access to multiple spaces.
 
-The [war rooms](https://github.com/netdata/netdata/edit/master/docs/cloud/war-rooms.md) in a space bring together nodes and people in 
-collaboration areas. War rooms can also be used for fine-tuned 
+The [Rooms](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-rooms) in a space bring together nodes and people in 
+collaboration areas. Rooms can also be used for fine-tuned 
 [role based access control](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md). 
 
 ## Virtual nodes
