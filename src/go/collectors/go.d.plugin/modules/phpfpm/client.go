@@ -13,7 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
-	fcgiclient "github.com/tomasen/fcgi_client"
+	fcgiclient "github.com/kanocz/fcgi_client"
 )
 
 type (
@@ -128,6 +128,10 @@ func (c *socketClient) getStatus() (*status, error) {
 	}
 	defer socket.Close()
 
+	if err := socket.SetTimeout(c.timeout); err != nil {
+		return nil, fmt.Errorf("error on setting socket timeout: %v", err)
+	}
+
 	resp, err := socket.Get(c.env)
 	if err != nil {
 		return nil, fmt.Errorf("error on getting data from socket '%s': %v", c.socket, err)
@@ -142,6 +146,7 @@ func (c *socketClient) getStatus() (*status, error) {
 	if err := json.Unmarshal(content, st); err != nil {
 		return nil, fmt.Errorf("error on decoding response from socket '%s': %v", c.socket, err)
 	}
+
 	return st, nil
 }
 

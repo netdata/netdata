@@ -195,6 +195,8 @@ github.com/josharian/native v1.1.0 h1:uuaP0hAbW7Y4l0ZRQ6C9zfb7Mg1mbFKry/xzDAfmtL
 github.com/josharian/native v1.1.0/go.mod h1:7X/raswPFr05uY3HiLlYeyQntB6OO7E/d2Cu7qoaN2w=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
+github.com/kanocz/fcgi_client v0.0.0-20210113082628-fff85c8adfb7 h1:W0fAsQ7bC1db4k9O2X6yZvatz/0c/ISyxhmNnc6arZA=
+github.com/kanocz/fcgi_client v0.0.0-20210113082628-fff85c8adfb7/go.mod h1:dHpIS7C6YjFguh5vo9QBVEojDoL3vh3v6oEho2HtNyA=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/kisielk/sqlstruct v0.0.0-20201105191214-5f3e10d3ab46/go.mod h1:yyMNCyc/Ib3bDTKd379tNMpB/7/H5TjM2Y9QJ5THLbE=
@@ -338,8 +340,6 @@ github.com/tidwall/match v1.1.1 h1:+Ho715JplO36QYgwN9PGYNhgZvoUSc9X2c80KVTi+GA=
 github.com/tidwall/match v1.1.1/go.mod h1:eRSPERbgtNPcGhD8UCthc6PmLEQXEWd3PRB5JTxsfmM=
 github.com/tidwall/pretty v1.2.0 h1:RWIZEg2iJ8/g6fDDYzMpobmaoGh5OLl4AXtGUGPcqCs=
 github.com/tidwall/pretty v1.2.0/go.mod h1:ITEVvHYasfjBbM0u2Pg8T2nJnzm8xPwvNhhsoaGGjNU=
-github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19 h1:ZCmSnT6CLGhfoQ2lPEhL4nsJstKDCw1F1RfN8/smTCU=
-github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19/go.mod h1:SXTY+QvI+KTTKXQdg0zZ7nx0u94QWh8ZAwBQYsW9cqk=
 github.com/valyala/fastjson v1.6.4 h1:uAUNq9Z6ymTgGhcm0UynUAB6tlbakBrz6CQFax3BXVQ=
 github.com/valyala/fastjson v1.6.4/go.mod h1:CLCAqky6SMuOcxStkYQvblddUtoRxhYMGLrsQns1aXY=
 github.com/vmware/govmomi v0.37.2 h1:5ANLoaTxWv600ZnoosJ2zXbM3A+EaxqGheEZbRN8YVE=

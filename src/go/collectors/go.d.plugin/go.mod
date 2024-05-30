@@ -28,6 +28,7 @@ require (
 	github.com/ilyam8/hashstructure v1.1.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jessevdk/go-flags v1.5.0
+	github.com/kanocz/fcgi_client v0.0.0-20210113082628-fff85c8adfb7
 	github.com/likexian/whois v1.15.3
 	github.com/likexian/whois-parser v1.24.16
 	github.com/lmittmann/tint v1.0.4
@@ -41,7 +42,6 @@ require (
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/stretchr/testify v1.9.0
 	github.com/tidwall/gjson v1.17.1
-	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
 	github.com/valyala/fastjson v1.6.4
 	github.com/vmware/govmomi v0.37.2
 	go.mongodb.org/mongo-driver v1.15.0
