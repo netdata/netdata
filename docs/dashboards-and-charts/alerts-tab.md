@@ -41,7 +41,7 @@ By clicking on the name of an entry of the table you can access that alert's det
 - Configuration section
 - Instance values - Node Instances
 
-At the bottom of the panel you can click the green button "View alert page" to open a [dynamic tab](/docs/netdata-cloud/monitor-your-infrastructure.md#dynamic-tabs) containing all the info for this alert in a tab format, where you can also run correlations and go to the node's chart that raised the particular alert.
+At the bottom of the panel you can click the green button "View alert page" to open a dynamic tab containing all the info for this alert in a tab format, where you can also run correlations and go to the node's chart that raised the particular alert.
 
 ### Silence an alert
 

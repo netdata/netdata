@@ -40,7 +40,7 @@ Available to all plans, includes basic methods like Email and Discord.
 
 #### Business
 
-Exclusive to [paid plans](/docs/netdata-cloud/netdata-subscription-plans.md), includes advanced services like PagerDuty and Slack.
+Exclusive to [paid plans](/docs/netdata-cloud/view-plan-and-billing.md), includes advanced services like PagerDuty and Slack.
 
 ## Alert Notification Silencing Rules
 

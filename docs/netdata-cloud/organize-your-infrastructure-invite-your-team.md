@@ -158,7 +158,7 @@ You will be prompted to enter the email addresses of the users you want to invit
 Next, choose the War Rooms you want to invite these users to. Once logged in, these users are not restricted only to
 these War Rooms. They can be invited to others, or join any that are public.
 
-Next, pick a role for the invited user. You can read more about [which roles are available](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#what-roles-are-available) based on your [subscription plan](/docs/netdata-cloud/netdata-subscription-plans.md).
+Next, pick a role for the invited user. You can read more about [which roles are available](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#what-roles-are-available) based on your [subscription plan](/docs/netdata-cloud/view-plan-and-billing.md).
 
 Click the **Send** button to send an email invitation, which will prompt them
 to [sign up](/docs/netdata-cloud/authentication-and-authorization/README.md) and join your Space.
