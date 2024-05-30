@@ -57,8 +57,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_syns == CONFIG_BOOLEAN_YES || (do_syns == CONFIG_BOOLEAN_AUTO &&
-                                         (events || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (do_syns == CONFIG_BOOLEAN_YES || do_syns == CONFIG_BOOLEAN_AUTO) {
         do_syns = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
@@ -87,8 +86,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_reopened == CONFIG_BOOLEAN_YES || (do_reopened == CONFIG_BOOLEAN_AUTO &&
-                                             (events || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (do_reopened == CONFIG_BOOLEAN_YES || do_reopened == CONFIG_BOOLEAN_AUTO) {
         do_reopened = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
@@ -117,8 +115,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_cookies == CONFIG_BOOLEAN_YES || (do_cookies == CONFIG_BOOLEAN_AUTO &&
-                                            (events || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (do_cookies == CONFIG_BOOLEAN_YES || do_cookies == CONFIG_BOOLEAN_AUTO) {
         do_cookies = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
