@@ -12,7 +12,7 @@ Entropy is similar to "randomness". A Linux system gathers "real" random numbers
 
 Encryption and cryptography applications require random numbers to operate. A function or an algorithm that produces numbers -*that seem to be random*- is very predictable, if you know what function is used.
 
-In real life, we use our surroundings and our thoughts to produce truly random numbers. A computer can't really do this by itself, so it gathers numbers from a lot of sources. For example, it can get the CO2 levels in a room from a sensor on the system and use that as a random number.
+In real life, we use our surroundings and our thoughts to produce truly random numbers. A computer can't really do this by itself, so it gathers numbers from a lot of sources. For example, it can get the CO2 levels in a Room from a sensor on the system and use that as a random number.
 
 This way all the values are random and there is no pattern to be found among them.
 

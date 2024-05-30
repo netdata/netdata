@@ -43,7 +43,7 @@ Netdata Cloud provides the following features, on top of what the Netdata agents
 
    Netdata Cloud is a fundamental component for achieving an optimal cost structure and flexibility, in structuring observability the way that is best suited for each case.
 
-2. **Role Based Access Control (RBAC)**: Netdata Cloud has all the mechanisms for user-management and access control. It allows assigning all users a role, segmenting the infrastructure into rooms, and associating rooms with roles and users.
+2. **Role Based Access Control (RBAC)**: Netdata Cloud has all the mechanisms for user-management and access control. It allows assigning all users a role, segmenting the infrastructure into rooms, and associating Rooms with roles and users.
 
 3. **Access from anywhere**: Netdata agents are installed on-prem and this is where all your data are always stored. Netdata Cloud allows querying all the Netdata agents (Standalone, Children and Parents) in real-time when dashboards are accessed via Netdata Cloud.
 
@@ -57,7 +57,7 @@ Netdata Cloud provides the following features, on top of what the Netdata agents
 
    Custom dashboards are created directly from the UI, without the need for learning a query language. Netdata Cloud provides all the APIs to the Netdata dashboards to store, browse and retrieve custom dashboards created by all users.
 
-6. **Advanced Customization**: Netdata Cloud provides all the APIs for the dashboard to have different default settings per space, per room and per user, allowing administrators and users to customize the Netdata dashboards and charts the way they see fit.
+6. **Advanced Customization**: Netdata Cloud provides all the APIs for the dashboard to have different default settings per space, per Room and per user, allowing administrators and users to customize the Netdata dashboards and charts the way they see fit.
 
 ## Data Exposed to Netdata Cloud
 

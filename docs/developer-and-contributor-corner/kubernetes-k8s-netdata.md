@@ -93,7 +93,7 @@ The Netdata Helm chart deploys and enables everything you need for monitoring Ku
 Netdata and connect your cluster's nodes, you're ready to check out the visualizations **with zero configuration**.
 
 To get started, [sign in](https://app.netdata.cloud/sign-in?cloudRoute=/spaces) to your Netdata Cloud account. Head over
-to the War Room you connected your cluster to, if not **General**.
+to the Room you connected your cluster to, if not **General**.
 
 Let's walk through monitoring each layer of a Kubernetes cluster using the Overview as our framework.
 

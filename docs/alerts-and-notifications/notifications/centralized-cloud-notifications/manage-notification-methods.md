@@ -67,6 +67,6 @@ Note: If an administrator has disabled a Personal [service level](/docs/alerts-a
 3. On this modal you will be able to:
    1. **Enable/Disable** the notification method for you; this applies across all Spaces and Rooms.
       - Use the toggle to enable or disable the notification method.
-   2. **Define what notifications you want** per Space/room: All Alerts and unreachable, All Alerts, Critical only, or No notifications.
+   2. **Define what notifications you want** per Space/Room: All Alerts and unreachable, All Alerts, Critical only, or No notifications.
    3. **Activate notifications** for a Room you aren't a member of.
       - From the **All Rooms** tab, click on the Join button for the Room(s) you want.

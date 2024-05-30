@@ -35,7 +35,7 @@ To install Netdata, run the following as your normal user:
 > :bookmark_tabs: Note
 >
 > If you plan to also connect the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-> and `YOUR_ROOM_ID` with the ID of the room you are willing to connect the node to.
+> and `YOUR_ROOM_ID` with the ID of the Room you are willing to connect the node to.
 
 ## Verify script integrity
 
@@ -240,7 +240,7 @@ By default, the kickstart script will provide a Netdata agent installation that 
 - `--claim-url`
   Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`. Use this option to change the Netdata Cloud URL to point to your Netdata Cloud installation.
 - `--claim-rooms`
-  Specify a comma-separated list of tokens for each War Room this node should appear in.
+  Specify a comma-separated list of tokens for each Room this node should appear in.
 - `--claim-proxy`
   Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [connecting through a proxy](/src/claim/README.md#connect-through-a-proxy) for details.
 - `--claim-only`

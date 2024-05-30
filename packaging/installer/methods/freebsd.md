@@ -39,8 +39,6 @@ Please respond in the affirmative for any relevant prompts during the installati
 
 Once the installation is completed, you should be able to start monitoring the FreeBSD server using Netdata. 
 
-![image](https://user-images.githubusercontent.com/24860547/202489210-3c5a3346-8f53-4b7b-9832-f9383b34d864.png)
-
 Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net-mgmt/netdata).
 
 ## Manual installation
@@ -85,8 +83,6 @@ cd /opt/netdata/usr/libexec/netdata/ && ./netdata-updater.sh
 ```
 
 You can now access the Netdata dashboard by navigating to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your system.
-
-![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
 Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self hosted PostHog instance within the Netdata infrastructure. To read
 more about the information collected and how to opt-out, check the [anonymous statistics
