@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#17786](https://github.com/netdata/netdata/pull/17786) ([netdatabot](https://github.com/netdatabot))
+- docs fix statsd conf dir [\#17785](https://github.com/netdata/netdata/pull/17785) ([ilyam8](https://github.com/ilyam8))
+- go.d phpfpm switch to github.com/kanocz/fcgi\_client [\#17784](https://github.com/netdata/netdata/pull/17784) ([ilyam8](https://github.com/ilyam8))
+- Change "War Room" to "Room" and other docs changes [\#17783](https://github.com/netdata/netdata/pull/17783) ([Ancairon](https://github.com/Ancairon))
+- rm "ignore zero metrics" proc meminfo [\#17781](https://github.com/netdata/netdata/pull/17781) ([ilyam8](https://github.com/ilyam8))
+- fix links [\#17779](https://github.com/netdata/netdata/pull/17779) ([Ancairon](https://github.com/Ancairon))
+- remove "ignore zero metrics" from proc network modules [\#17776](https://github.com/netdata/netdata/pull/17776) ([ilyam8](https://github.com/ilyam8))
+- proc/diskstats and diskspace: remove "ignore zero metrics" [\#17775](https://github.com/netdata/netdata/pull/17775) ([ilyam8](https://github.com/ilyam8))
 - docs fix "Prevent the double access.log" [\#17773](https://github.com/netdata/netdata/pull/17773) ([ilyam8](https://github.com/ilyam8))
 - docs: simplify claiming readme part1 [\#17771](https://github.com/netdata/netdata/pull/17771) ([ilyam8](https://github.com/ilyam8))
 - Netdata Cloud docs section edits [\#17768](https://github.com/netdata/netdata/pull/17768) ([Ancairon](https://github.com/Ancairon))
@@ -72,6 +80,7 @@
 - Re-enable ML for RHEL 7 and AL 2 RPM packages. [\#17682](https://github.com/netdata/netdata/pull/17682) ([Ferroin](https://github.com/Ferroin))
 - Clean up DEB package dependencies. [\#17680](https://github.com/netdata/netdata/pull/17680) ([Ferroin](https://github.com/Ferroin))
 - add go.d/rspamd [\#17679](https://github.com/netdata/netdata/pull/17679) ([ilyam8](https://github.com/ilyam8))
+- Restructure packaging related files to better reflect usage. [\#17678](https://github.com/netdata/netdata/pull/17678) ([Ferroin](https://github.com/Ferroin))
 - Do not specify linker in compilation flags. [\#17677](https://github.com/netdata/netdata/pull/17677) ([vkalintiris](https://github.com/vkalintiris))
 - Regenerate integrations.js [\#17676](https://github.com/netdata/netdata/pull/17676) ([netdatabot](https://github.com/netdatabot))
 - fix broken links and links pointing to Learn [\#17675](https://github.com/netdata/netdata/pull/17675) ([Ancairon](https://github.com/Ancairon))
@@ -397,11 +406,6 @@
 - go.d: mysql: disable session query log and slow query log [\#17219](https://github.com/netdata/netdata/pull/17219) ([ilyam8](https://github.com/ilyam8))
 - go.d: local-listeners sd: fix mariadbd comm [\#17218](https://github.com/netdata/netdata/pull/17218) ([ilyam8](https://github.com/ilyam8))
 - Assorted macOS build fixes. [\#17216](https://github.com/netdata/netdata/pull/17216) ([Ferroin](https://github.com/Ferroin))
-- Fix job depdendencies in Docker workflow. [\#17215](https://github.com/netdata/netdata/pull/17215) ([Ferroin](https://github.com/Ferroin))
-- add warning on old custom dashboards and rephrase existing page [\#17214](https://github.com/netdata/netdata/pull/17214) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Bump github.com/docker/docker from 25.0.4+incompatible to 25.0.5+incompatible in /src/go/collectors/go.d.plugin [\#17211](https://github.com/netdata/netdata/pull/17211) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Add -Wno-builtin-macro-redefined to compiler flags. [\#17209](https://github.com/netdata/netdata/pull/17209) ([Ferroin](https://github.com/Ferroin))
-- Move bundling of JSON-C to CMake. [\#17207](https://github.com/netdata/netdata/pull/17207) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.5](https://github.com/netdata/netdata/tree/v1.45.5) (2024-05-21)
 
@@ -426,15 +430,6 @@
 ## [v1.45.0](https://github.com/netdata/netdata/tree/v1.45.0) (2024-03-21)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.44.3...v1.45.0)
-
-**Merged pull requests:**
-
-- Dynamic configuration switch to version 2 [\#17212](https://github.com/netdata/netdata/pull/17212) ([stelfrag](https://github.com/stelfrag))
-- update bundled UI to v6.104.1 [\#17208](https://github.com/netdata/netdata/pull/17208) ([ilyam8](https://github.com/ilyam8))
-- go.d: adjust dyncfg return codes [\#17206](https://github.com/netdata/netdata/pull/17206) ([ilyam8](https://github.com/ilyam8))
-- go.d: local-listeners sd: trust known ports to identify an app [\#17205](https://github.com/netdata/netdata/pull/17205) ([ilyam8](https://github.com/ilyam8))
-- go.d: weblog allow PURGE HTTP method [\#17204](https://github.com/netdata/netdata/pull/17204) ([ilyam8](https://github.com/ilyam8))
-- go.d: local-listeners sd: use "ip:port" as address instead of "localhost" [\#17203](https://github.com/netdata/netdata/pull/17203) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
