@@ -219,19 +219,26 @@ done
 
 # -----------------------------------------------------------------------------
 
+replace_symlink() {
+    target="${1}"
+    name="${2}"
+    rm -f "${name}"
+    ln -s "${1}" "${2}"
+}
+
 select_system_certs() {
   if [ -d /etc/pki/tls ] ; then
     echo "${1} /etc/pki/tls for TLS configuration and certificates"
-    ln -sf /etc/pki/tls /opt/netdata/etc/ssl
+    replace_symlink /etc/pki/tls /opt/netdata/etc/ssl
   elif [ -d /etc/ssl ] ; then
     echo "${1} /etc/ssl for TLS configuration and certificates"
-    ln -sf /etc/ssl /opt/netdata/etc/ssl
+    replace_symlink /etc/ssl /opt/netdata/etc/ssl
   fi
 }
 
 select_internal_certs() {
   echo "Using bundled TLS configuration and certificates"
-  ln -sf /opt/netdata/share/ssl /opt/netdata/etc/ssl
+  replace_symlink /opt/netdata/share/ssl /opt/netdata/etc/ssl
 }
 
 certs_selected() {
