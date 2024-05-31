@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Use correct path for package files. [\#17793](https://github.com/netdata/netdata/pull/17793) ([vkalintiris](https://github.com/vkalintiris))
+- proc/net\_dev: remove "ignore zero metrics" [\#17789](https://github.com/netdata/netdata/pull/17789) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17786](https://github.com/netdata/netdata/pull/17786) ([netdatabot](https://github.com/netdatabot))
 - docs fix statsd conf dir [\#17785](https://github.com/netdata/netdata/pull/17785) ([ilyam8](https://github.com/ilyam8))
 - go.d phpfpm switch to github.com/kanocz/fcgi\_client [\#17784](https://github.com/netdata/netdata/pull/17784) ([ilyam8](https://github.com/ilyam8))
@@ -32,6 +34,7 @@
 - go.d clickhouse add running queries [\#17751](https://github.com/netdata/netdata/pull/17751) ([ilyam8](https://github.com/ilyam8))
 - remove unused go.d/prometheus meta file [\#17749](https://github.com/netdata/netdata/pull/17749) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17748](https://github.com/netdata/netdata/pull/17748) ([netdatabot](https://github.com/netdatabot))
+- Use semver releases with sentry. [\#17746](https://github.com/netdata/netdata/pull/17746) ([vkalintiris](https://github.com/vkalintiris))
 - add go.d clickhouse [\#17743](https://github.com/netdata/netdata/pull/17743) ([ilyam8](https://github.com/ilyam8))
 - fix clickhouse in apps groups [\#17742](https://github.com/netdata/netdata/pull/17742) ([ilyam8](https://github.com/ilyam8))
 - fix ebpf cgroup swap context [\#17740](https://github.com/netdata/netdata/pull/17740) ([ilyam8](https://github.com/ilyam8))
@@ -404,8 +407,6 @@
 - fixing the helm login command for the onprem installation [\#17222](https://github.com/netdata/netdata/pull/17222) ([M4itee](https://github.com/M4itee))
 - Reduce flush operations during journal build [\#17220](https://github.com/netdata/netdata/pull/17220) ([stelfrag](https://github.com/stelfrag))
 - go.d: mysql: disable session query log and slow query log [\#17219](https://github.com/netdata/netdata/pull/17219) ([ilyam8](https://github.com/ilyam8))
-- go.d: local-listeners sd: fix mariadbd comm [\#17218](https://github.com/netdata/netdata/pull/17218) ([ilyam8](https://github.com/ilyam8))
-- Assorted macOS build fixes. [\#17216](https://github.com/netdata/netdata/pull/17216) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.5](https://github.com/netdata/netdata/tree/v1.45.5) (2024-05-21)
 
