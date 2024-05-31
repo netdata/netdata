@@ -47,9 +47,6 @@ struct memory {
     int enabled_msw_usage_in_bytes; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
     int enabled_failcnt;            // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
 
-    int delay_counter_detailed;
-    int delay_counter_failcnt;
-
     char *filename_detailed;
     char *filename_usage_in_bytes;
     char *filename_msw_usage_in_bytes;
@@ -353,9 +350,6 @@ extern int cgroup_search_in_devices;
 extern int cgroup_check_for_new_every;
 extern int cgroup_update_every;
 extern int cgroup_containers_chart_priority;
-extern int cgroup_recheck_zero_blkio_every_iterations;
-extern int cgroup_recheck_zero_mem_failcnt_every_iterations;
-extern int cgroup_recheck_zero_mem_detailed_every_iterations;
 extern char *cgroup_cpuacct_base;
 extern char *cgroup_cpuset_base;
 extern char *cgroup_blkio_base;

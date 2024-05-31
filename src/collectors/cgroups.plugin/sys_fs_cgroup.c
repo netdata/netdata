@@ -42,9 +42,6 @@ int cgroup_search_in_devices = 1;
 int cgroup_check_for_new_every = 10;
 int cgroup_update_every = 1;
 int cgroup_containers_chart_priority = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS;
-int cgroup_recheck_zero_blkio_every_iterations = 10;
-int cgroup_recheck_zero_mem_failcnt_every_iterations = 10;
-int cgroup_recheck_zero_mem_detailed_every_iterations = 10;
 char *cgroup_cpuacct_base = NULL;
 char *cgroup_cpuset_base = NULL;
 char *cgroup_blkio_base = NULL;
@@ -286,10 +283,6 @@ void read_cgroup_plugin_configuration() {
     cgroup_enable_pressure_io_full = config_get_boolean_ondemand("plugin:cgroups", "enable io full pressure", cgroup_enable_pressure_io_full);
     cgroup_enable_pressure_memory_some = config_get_boolean_ondemand("plugin:cgroups", "enable memory some pressure", cgroup_enable_pressure_memory_some);
     cgroup_enable_pressure_memory_full = config_get_boolean_ondemand("plugin:cgroups", "enable memory full pressure", cgroup_enable_pressure_memory_full);
-
-    cgroup_recheck_zero_blkio_every_iterations = (int)config_get_number("plugin:cgroups", "recheck zero blkio every iterations", cgroup_recheck_zero_blkio_every_iterations);
-    cgroup_recheck_zero_mem_failcnt_every_iterations = (int)config_get_number("plugin:cgroups", "recheck zero memory failcnt every iterations", cgroup_recheck_zero_mem_failcnt_every_iterations);
-    cgroup_recheck_zero_mem_detailed_every_iterations = (int)config_get_number("plugin:cgroups", "recheck zero detailed memory every iterations", cgroup_recheck_zero_mem_detailed_every_iterations);
 
     cgroup_enable_systemd_services = config_get_boolean("plugin:cgroups", "enable systemd services", cgroup_enable_systemd_services);
     cgroup_enable_systemd_services_detailed_memory = config_get_boolean("plugin:cgroups", "enable systemd services detailed memory", cgroup_enable_systemd_services_detailed_memory);
@@ -581,9 +574,7 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
 
         cp->updated = 1;
 
-        if(unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO &&
-                    (cp->user || cp->system || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            cp->enabled = CONFIG_BOOLEAN_YES;
+        cp->enabled = CONFIG_BOOLEAN_YES;
     }
 }
 
@@ -634,13 +625,7 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_throttling *c
 
     cp->updated = 1;
 
-    if (unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO)) {
-        if (likely(
-                cp->nr_periods || cp->nr_throttled || cp->throttled_time ||
-                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
-            cp->enabled = CONFIG_BOOLEAN_YES;
-        }
-    }
+    cp->enabled = CONFIG_BOOLEAN_YES;
 }
 
 static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct cpuacct_cpu_throttling *cpt) {
@@ -696,18 +681,8 @@ static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct
     cp->updated = 1;
     cpt->updated = 1;
 
-    if (unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO)) {
-        if (likely(cp->user || cp->system || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
-            cp->enabled = CONFIG_BOOLEAN_YES;
-        }
-    }
-    if (unlikely(cpt->enabled == CONFIG_BOOLEAN_AUTO)) {
-        if (likely(
-                cpt->nr_periods || cpt->nr_throttled || cpt->throttled_time ||
-                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
-            cpt->enabled = CONFIG_BOOLEAN_YES;
-        }
-    }
+    cp->enabled = CONFIG_BOOLEAN_YES;
+    cpt->enabled = CONFIG_BOOLEAN_YES;
 }
 
 static inline void cgroup_read_cpuacct_cpu_shares(struct cpuacct_cpu_shares *cp) {
@@ -722,10 +697,7 @@ static inline void cgroup_read_cpuacct_cpu_shares(struct cpuacct_cpu_shares *cp)
     }
 
     cp->updated = 1;
-    if (unlikely((cp->enabled == CONFIG_BOOLEAN_AUTO)) &&
-        (cp->shares || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
-        cp->enabled = CONFIG_BOOLEAN_YES;
-    }
+    cp->enabled = CONFIG_BOOLEAN_YES;
 }
 
 static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
@@ -780,9 +752,7 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 
         ca->updated = 1;
 
-        if(unlikely(ca->enabled == CONFIG_BOOLEAN_AUTO &&
-                    (total || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            ca->enabled = CONFIG_BOOLEAN_YES;
+        ca->enabled = CONFIG_BOOLEAN_YES;
     }
 }
 
@@ -849,11 +819,8 @@ static inline void cgroup_read_blkio(struct blkio *io) {
 
         io->updated = 1;
 
-        if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO)) {
-            if(unlikely(io->Read || io->Write || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
-                io->enabled = CONFIG_BOOLEAN_YES;
-            else
-                io->delay_counter = cgroup_recheck_zero_blkio_every_iterations;
+        if (unlikely(io->enabled == CONFIG_BOOLEAN_AUTO)) {
+            io->enabled = CONFIG_BOOLEAN_YES;
         }
     }
 }
@@ -899,11 +866,8 @@ static inline void cgroup2_read_blkio(struct blkio *io, unsigned int word_offset
 
             io->updated = 1;
 
-            if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO)) {
-                if(unlikely(io->Read || io->Write || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
-                    io->enabled = CONFIG_BOOLEAN_YES;
-                else
-                    io->delay_counter = cgroup_recheck_zero_blkio_every_iterations;
+            if (unlikely(io->enabled == CONFIG_BOOLEAN_AUTO)) {
+                io->enabled = CONFIG_BOOLEAN_YES;
             }
         }
 }
@@ -1043,30 +1007,18 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
         if(unlikely(parent_cg_is_unified == 0 && mem->arl_swap->flags & ARL_ENTRY_FLAG_FOUND))
             mem->detailed_has_swap = 1;
 
-        // fprintf(stderr, "READ: '%s', cache: %llu, rss: %llu, rss_huge: %llu, mapped_file: %llu, writeback: %llu, dirty: %llu, swap: %llu, pgpgin: %llu, pgpgout: %llu, pgfault: %llu, pgmajfault: %llu, inactive_anon: %llu, active_anon: %llu, inactive_file: %llu, active_file: %llu, unevictable: %llu, hierarchical_memory_limit: %llu, total_cache: %llu, total_rss: %llu, total_rss_huge: %llu, total_mapped_file: %llu, total_writeback: %llu, total_dirty: %llu, total_swap: %llu, total_pgpgin: %llu, total_pgpgout: %llu, total_pgfault: %llu, total_pgmajfault: %llu, total_inactive_anon: %llu, total_active_anon: %llu, total_inactive_file: %llu, total_active_file: %llu, total_unevictable: %llu\n", mem->filename, mem->cache, mem->rss, mem->rss_huge, mem->mapped_file, mem->writeback, mem->dirty, mem->swap, mem->pgpgin, mem->pgpgout, mem->pgfault, mem->pgmajfault, mem->inactive_anon, mem->active_anon, mem->inactive_file, mem->active_file, mem->unevictable, mem->hierarchical_memory_limit, mem->total_cache, mem->total_rss, mem->total_rss_huge, mem->total_mapped_file, mem->total_writeback, mem->total_dirty, mem->total_swap, mem->total_pgpgin, mem->total_pgpgout, mem->total_pgfault, mem->total_pgmajfault, mem->total_inactive_anon, mem->total_active_anon, mem->total_inactive_file, mem->total_active_file, mem->total_unevictable);
-
         mem->updated_detailed = 1;
 
-        if(unlikely(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO)) {
-            if(( (!parent_cg_is_unified) && ( mem->total_cache || mem->total_dirty || mem->total_rss || mem->total_rss_huge || mem->total_mapped_file || mem->total_writeback
-                    || mem->total_swap || mem->total_pgpgin || mem->total_pgpgout || mem->total_pgfault || mem->total_pgmajfault || mem->total_inactive_file))
-               || (parent_cg_is_unified && ( mem->anon || mem->total_dirty || mem->kernel_stack || mem->slab || mem->sock || mem->total_writeback
-                    || mem->anon_thp || mem->total_pgfault || mem->total_pgmajfault || mem->total_inactive_file))
-               || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)
-                mem->enabled_detailed = CONFIG_BOOLEAN_YES;
-            else
-                mem->delay_counter_detailed = cgroup_recheck_zero_mem_detailed_every_iterations;
+        if (unlikely(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO)) {
+            mem->enabled_detailed = CONFIG_BOOLEAN_YES;
         }
     }
 
 memory_next:
 
     // read usage_in_bytes
-    if(likely(mem->filename_usage_in_bytes)) {
+    if (likely(mem->filename_usage_in_bytes)) {
         mem->updated_usage_in_bytes = !read_single_number_file(mem->filename_usage_in_bytes, &mem->usage_in_bytes);
-        if(unlikely(mem->updated_usage_in_bytes && mem->enabled_usage_in_bytes == CONFIG_BOOLEAN_AUTO &&
-                    (mem->usage_in_bytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            mem->enabled_usage_in_bytes = CONFIG_BOOLEAN_YES;
     }
 
     if (likely(mem->updated_usage_in_bytes && mem->updated_detailed)) {
@@ -1075,28 +1027,14 @@ memory_next:
     }
 
     // read msw_usage_in_bytes
-    if(likely(mem->filename_msw_usage_in_bytes)) {
-        mem->updated_msw_usage_in_bytes = !read_single_number_file(mem->filename_msw_usage_in_bytes, &mem->msw_usage_in_bytes);
-        if(unlikely(mem->updated_msw_usage_in_bytes && mem->enabled_msw_usage_in_bytes == CONFIG_BOOLEAN_AUTO &&
-                    (mem->msw_usage_in_bytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            mem->enabled_msw_usage_in_bytes = CONFIG_BOOLEAN_YES;
+    if (likely(mem->filename_msw_usage_in_bytes)) {
+        mem->updated_msw_usage_in_bytes =
+            !read_single_number_file(mem->filename_msw_usage_in_bytes, &mem->msw_usage_in_bytes);
     }
 
     // read failcnt
-    if(likely(mem->filename_failcnt)) {
-        if(unlikely(mem->enabled_failcnt == CONFIG_BOOLEAN_AUTO && mem->delay_counter_failcnt > 0)) {
-            mem->updated_failcnt = 0;
-            mem->delay_counter_failcnt--;
-        }
-        else {
-            mem->updated_failcnt = !read_single_number_file(mem->filename_failcnt, &mem->failcnt);
-            if(unlikely(mem->updated_failcnt && mem->enabled_failcnt == CONFIG_BOOLEAN_AUTO)) {
-                if(unlikely(mem->failcnt || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
-                    mem->enabled_failcnt = CONFIG_BOOLEAN_YES;
-                else
-                    mem->delay_counter_failcnt = cgroup_recheck_zero_mem_failcnt_every_iterations;
-            }
-        }
+    if (likely(mem->filename_failcnt)) {
+        mem->updated_failcnt = !read_single_number_file(mem->filename_failcnt, &mem->failcnt);
     }
 }
 

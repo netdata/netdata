@@ -497,8 +497,7 @@ static inline void discovery_update_filenames_cgroup_v1(struct cgroup *cg) {
         snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
         if (likely(stat(filename, &buf) != -1)) {
             cg->memory.filename_detailed = strdupz(filename);
-            cg->memory.enabled_detailed =
-                (cgroup_enable_detailed_memory == CONFIG_BOOLEAN_YES) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_AUTO;
+            cg->memory.enabled_detailed = cgroup_enable_detailed_memory;
         }
     }
     if (unlikely(cgroup_enable_memory && !cg->memory.filename_usage_in_bytes)) {
