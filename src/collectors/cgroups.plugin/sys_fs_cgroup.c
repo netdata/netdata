@@ -10,46 +10,24 @@
 // ----------------------------------------------------------------------------
 // cgroup globals
 unsigned long long host_ram_total = 0;
-int is_inside_k8s = 0;
+bool is_inside_k8s = false;
 long system_page_size = 4096; // system will be queried via sysconf() in configuration()
-int cgroup_enable_cpuacct_stat = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_NO;
-int cgroup_enable_cpuacct_cpu_throttling = CONFIG_BOOLEAN_YES;
-int cgroup_enable_cpuacct_cpu_shares = CONFIG_BOOLEAN_NO;
-int cgroup_enable_memory = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_detailed_memory = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_memory_failcnt = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_swap = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_blkio_io = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_blkio_ops = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_blkio_throttle_io = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_blkio_throttle_ops = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_blkio_merged_ops = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_blkio_queued_ops = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_pressure_cpu = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_pressure_io_some = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_pressure_io_full = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_pressure_memory_some = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_pressure_memory_full = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_pressure_irq_some = CONFIG_BOOLEAN_NO;
-int cgroup_enable_pressure_irq_full = CONFIG_BOOLEAN_AUTO;
-int cgroup_enable_systemd_services = CONFIG_BOOLEAN_YES;
-int cgroup_enable_systemd_services_detailed_memory = CONFIG_BOOLEAN_NO;
-int cgroup_used_memory = CONFIG_BOOLEAN_YES;
-int cgroup_use_unified_cgroups = CONFIG_BOOLEAN_NO;
-int cgroup_unified_exist = CONFIG_BOOLEAN_AUTO;
-int cgroup_search_in_devices = 1;
+
+bool cgroup_use_unified_cgroups = false;
+bool cgroup_unified_exist = true;
+
+bool cgroup_enable_blkio = true;
+bool cgroup_enable_pressure = true;
+bool cgroup_enable_memory = true;
+bool cgroup_enable_cpuacct = true;
+bool cgroup_enable_cpuacct_cpu_shares = false;
+
 int cgroup_check_for_new_every = 10;
 int cgroup_update_every = 1;
-int cgroup_containers_chart_priority = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS;
-int cgroup_recheck_zero_blkio_every_iterations = 10;
-int cgroup_recheck_zero_mem_failcnt_every_iterations = 10;
-int cgroup_recheck_zero_mem_detailed_every_iterations = 10;
 char *cgroup_cpuacct_base = NULL;
 char *cgroup_cpuset_base = NULL;
 char *cgroup_blkio_base = NULL;
 char *cgroup_memory_base = NULL;
-char *cgroup_devices_base = NULL;
 char *cgroup_pids_base = NULL;
 char *cgroup_unified_base = NULL;
 int cgroup_root_count = 0;
@@ -254,57 +232,12 @@ void read_cgroup_plugin_configuration() {
     if(cgroup_check_for_new_every < cgroup_update_every)
         cgroup_check_for_new_every = cgroup_update_every;
 
-    cgroup_use_unified_cgroups = config_get_boolean_ondemand("plugin:cgroups", "use unified cgroups", CONFIG_BOOLEAN_AUTO);
-    if(cgroup_use_unified_cgroups == CONFIG_BOOLEAN_AUTO)
-        cgroup_use_unified_cgroups = (cgroups_try_detect_version() == CGROUPS_V2);
-
+    cgroup_use_unified_cgroups = (cgroups_try_detect_version() == CGROUPS_V2);
     collector_info("use unified cgroups %s", cgroup_use_unified_cgroups ? "true" : "false");
-
-    cgroup_containers_chart_priority = (int)config_get_number("plugin:cgroups", "containers priority", cgroup_containers_chart_priority);
-    if(cgroup_containers_chart_priority < 1)
-        cgroup_containers_chart_priority = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS;
-
-    cgroup_enable_cpuacct_stat = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct stat (total CPU)", cgroup_enable_cpuacct_stat);
-    cgroup_enable_cpuacct_usage = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct usage (per core CPU)", cgroup_enable_cpuacct_usage);
-    cgroup_enable_cpuacct_cpu_throttling = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct cpu throttling", cgroup_enable_cpuacct_cpu_throttling);
-    cgroup_enable_cpuacct_cpu_shares = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct cpu shares", cgroup_enable_cpuacct_cpu_shares);
-
-    cgroup_enable_memory = config_get_boolean_ondemand("plugin:cgroups", "enable memory", cgroup_enable_memory);
-    cgroup_enable_detailed_memory = config_get_boolean_ondemand("plugin:cgroups", "enable detailed memory", cgroup_enable_detailed_memory);
-    cgroup_enable_memory_failcnt = config_get_boolean_ondemand("plugin:cgroups", "enable memory limits fail count", cgroup_enable_memory_failcnt);
-    cgroup_enable_swap = config_get_boolean_ondemand("plugin:cgroups", "enable swap memory", cgroup_enable_swap);
-
-    cgroup_enable_blkio_io = config_get_boolean_ondemand("plugin:cgroups", "enable blkio bandwidth", cgroup_enable_blkio_io);
-    cgroup_enable_blkio_ops = config_get_boolean_ondemand("plugin:cgroups", "enable blkio operations", cgroup_enable_blkio_ops);
-    cgroup_enable_blkio_throttle_io = config_get_boolean_ondemand("plugin:cgroups", "enable blkio throttle bandwidth", cgroup_enable_blkio_throttle_io);
-    cgroup_enable_blkio_throttle_ops = config_get_boolean_ondemand("plugin:cgroups", "enable blkio throttle operations", cgroup_enable_blkio_throttle_ops);
-    cgroup_enable_blkio_queued_ops = config_get_boolean_ondemand("plugin:cgroups", "enable blkio queued operations", cgroup_enable_blkio_queued_ops);
-    cgroup_enable_blkio_merged_ops = config_get_boolean_ondemand("plugin:cgroups", "enable blkio merged operations", cgroup_enable_blkio_merged_ops);
-
-    cgroup_enable_pressure_cpu = config_get_boolean_ondemand("plugin:cgroups", "enable cpu pressure", cgroup_enable_pressure_cpu);
-    cgroup_enable_pressure_io_some = config_get_boolean_ondemand("plugin:cgroups", "enable io some pressure", cgroup_enable_pressure_io_some);
-    cgroup_enable_pressure_io_full = config_get_boolean_ondemand("plugin:cgroups", "enable io full pressure", cgroup_enable_pressure_io_full);
-    cgroup_enable_pressure_memory_some = config_get_boolean_ondemand("plugin:cgroups", "enable memory some pressure", cgroup_enable_pressure_memory_some);
-    cgroup_enable_pressure_memory_full = config_get_boolean_ondemand("plugin:cgroups", "enable memory full pressure", cgroup_enable_pressure_memory_full);
-
-    cgroup_recheck_zero_blkio_every_iterations = (int)config_get_number("plugin:cgroups", "recheck zero blkio every iterations", cgroup_recheck_zero_blkio_every_iterations);
-    cgroup_recheck_zero_mem_failcnt_every_iterations = (int)config_get_number("plugin:cgroups", "recheck zero memory failcnt every iterations", cgroup_recheck_zero_mem_failcnt_every_iterations);
-    cgroup_recheck_zero_mem_detailed_every_iterations = (int)config_get_number("plugin:cgroups", "recheck zero detailed memory every iterations", cgroup_recheck_zero_mem_detailed_every_iterations);
-
-    cgroup_enable_systemd_services = config_get_boolean("plugin:cgroups", "enable systemd services", cgroup_enable_systemd_services);
-    cgroup_enable_systemd_services_detailed_memory = config_get_boolean("plugin:cgroups", "enable systemd services detailed memory", cgroup_enable_systemd_services_detailed_memory);
-    cgroup_used_memory = config_get_boolean("plugin:cgroups", "report used memory", cgroup_used_memory);
 
     char filename[FILENAME_MAX + 1], *s;
     struct mountinfo *mi, *root = mountinfo_read(0);
-    if(!cgroup_use_unified_cgroups) {
-        // cgroup v1 does not have pressure metrics
-        cgroup_enable_pressure_cpu =
-        cgroup_enable_pressure_io_some =
-        cgroup_enable_pressure_io_full =
-        cgroup_enable_pressure_memory_some =
-        cgroup_enable_pressure_memory_full = CONFIG_BOOLEAN_NO;
-
+    if (!cgroup_use_unified_cgroups) {
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
         if (!mi)
             mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
@@ -314,7 +247,7 @@ void read_cgroup_plugin_configuration() {
         } else
             s = mi->mount_point;
         set_cgroup_base_path(filename, s);
-        cgroup_cpuacct_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuacct", filename);
+        cgroup_cpuacct_base = strdupz(filename);
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuset");
         if (!mi)
@@ -325,7 +258,7 @@ void read_cgroup_plugin_configuration() {
         } else
             s = mi->mount_point;
         set_cgroup_base_path(filename, s);
-        cgroup_cpuset_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuset", filename);
+        cgroup_cpuset_base = strdupz(filename);
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
         if (!mi)
@@ -336,7 +269,7 @@ void read_cgroup_plugin_configuration() {
         } else
             s = mi->mount_point;
         set_cgroup_base_path(filename, s);
-        cgroup_blkio_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/blkio", filename);
+        cgroup_blkio_base = strdupz(filename);
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
         if (!mi)
@@ -344,21 +277,11 @@ void read_cgroup_plugin_configuration() {
         if (!mi) {
             collector_error("CGROUP: cannot find memory mountinfo. Assuming default: /sys/fs/cgroup/memory");
             s = "/sys/fs/cgroup/memory";
-        } else
+        } else {
             s = mi->mount_point;
+        }
         set_cgroup_base_path(filename, s);
-        cgroup_memory_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/memory", filename);
-
-        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "devices");
-        if (!mi)
-            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "devices");
-        if (!mi) {
-            collector_error("CGROUP: cannot find devices mountinfo. Assuming default: /sys/fs/cgroup/devices");
-            s = "/sys/fs/cgroup/devices";
-        } else
-            s = mi->mount_point;
-        set_cgroup_base_path(filename, s);
-        cgroup_devices_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/devices", filename);
+        cgroup_memory_base = strdupz(filename);
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "pids");
         if (!mi)
@@ -366,28 +289,13 @@ void read_cgroup_plugin_configuration() {
         if (!mi) {
             collector_error("CGROUP: cannot find pids mountinfo. Assuming default: /sys/fs/cgroup/pids");
             s = "/sys/fs/cgroup/pids";
-        } else
+        } else {
             s = mi->mount_point;
-        set_cgroup_base_path(filename, s);
-        cgroup_pids_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/pids", filename);
-    }
-    else {
-        //cgroup_enable_cpuacct_stat =
-        cgroup_enable_cpuacct_usage =
-        //cgroup_enable_memory =
-        //cgroup_enable_detailed_memory =
-        cgroup_enable_memory_failcnt =
-        //cgroup_enable_swap =
-        //cgroup_enable_blkio_io =
-        //cgroup_enable_blkio_ops =
-        cgroup_enable_blkio_throttle_io =
-        cgroup_enable_blkio_throttle_ops =
-        cgroup_enable_blkio_merged_ops =
-        cgroup_enable_blkio_queued_ops = CONFIG_BOOLEAN_NO;
-        cgroup_search_in_devices = 0;
-        cgroup_enable_systemd_services_detailed_memory = CONFIG_BOOLEAN_NO;
-        cgroup_used_memory = CONFIG_BOOLEAN_NO; //unified cgroups use different values
+        }
 
+        set_cgroup_base_path(filename, s);
+        cgroup_pids_base = strdupz(filename);
+    } else {
         //TODO: can there be more than 1 cgroup2 mount point?
         //there is no cgroup2 specific super option - for now use 'rw' option
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup2", "rw");
@@ -401,7 +309,7 @@ void read_cgroup_plugin_configuration() {
             s = mi->mount_point;
 
         set_cgroup_base_path(filename, s);
-        cgroup_unified_base = config_get("plugin:cgroups", "path to unified cgroups", filename);
+        cgroup_unified_base = strdupz(filename);
     }
 
     cgroup_root_max = (int)config_get_number("plugin:cgroups", "max cgroups to allow", cgroup_root_max);
@@ -512,13 +420,15 @@ void read_cgroup_plugin_configuration() {
                        " * "
             ), NULL, SIMPLE_PATTERN_EXACT, true);
 
-    if(cgroup_enable_systemd_services) {
-        systemd_services_cgroups = simple_pattern_create(
-                config_get("plugin:cgroups", "cgroups to match as systemd services",
-                           " !/system.slice/*/*.service "
-                           " /system.slice/*.service "
-                ), NULL, SIMPLE_PATTERN_EXACT, true);
-    }
+    systemd_services_cgroups = simple_pattern_create(
+        config_get(
+            "plugin:cgroups",
+            "cgroups to match as systemd services",
+            " !/system.slice/*/*.service "
+            " /system.slice/*.service "),
+        NULL,
+        SIMPLE_PATTERN_EXACT,
+        true);
 
     mountinfo_free_all(root);
 }
@@ -580,10 +490,6 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
         }
 
         cp->updated = 1;
-
-        if(unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO &&
-                    (cp->user || cp->system || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            cp->enabled = CONFIG_BOOLEAN_YES;
     }
 }
 
@@ -633,14 +539,6 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_throttling *c
         calc_percentage(calc_delta(cp->nr_throttled, nr_throttled_last), calc_delta(cp->nr_periods, nr_periods_last));
 
     cp->updated = 1;
-
-    if (unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO)) {
-        if (likely(
-                cp->nr_periods || cp->nr_throttled || cp->throttled_time ||
-                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
-            cp->enabled = CONFIG_BOOLEAN_YES;
-        }
-    }
 }
 
 static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct cpuacct_cpu_throttling *cpt) {
@@ -695,19 +593,6 @@ static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct
 
     cp->updated = 1;
     cpt->updated = 1;
-
-    if (unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO)) {
-        if (likely(cp->user || cp->system || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
-            cp->enabled = CONFIG_BOOLEAN_YES;
-        }
-    }
-    if (unlikely(cpt->enabled == CONFIG_BOOLEAN_AUTO)) {
-        if (likely(
-                cpt->nr_periods || cpt->nr_throttled || cpt->throttled_time ||
-                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
-            cpt->enabled = CONFIG_BOOLEAN_YES;
-        }
-    }
 }
 
 static inline void cgroup_read_cpuacct_cpu_shares(struct cpuacct_cpu_shares *cp) {
@@ -722,10 +607,6 @@ static inline void cgroup_read_cpuacct_cpu_shares(struct cpuacct_cpu_shares *cp)
     }
 
     cp->updated = 1;
-    if (unlikely((cp->enabled == CONFIG_BOOLEAN_AUTO)) &&
-        (cp->shares || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
-        cp->enabled = CONFIG_BOOLEAN_YES;
-    }
 }
 
 static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
@@ -779,31 +660,22 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
         }
 
         ca->updated = 1;
-
-        if(unlikely(ca->enabled == CONFIG_BOOLEAN_AUTO &&
-                    (total || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            ca->enabled = CONFIG_BOOLEAN_YES;
     }
 }
 
 static inline void cgroup_read_blkio(struct blkio *io) {
-    if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO && io->delay_counter > 0)) {
-        io->delay_counter--;
-        return;
-    }
-
-    if(likely(io->filename)) {
+    if (likely(io->filename)) {
         static procfile *ff = NULL;
 
         ff = procfile_reopen(ff, io->filename, NULL, CGROUP_PROCFILE_FLAG);
-        if(unlikely(!ff)) {
+        if (unlikely(!ff)) {
             io->updated = 0;
             cgroups_check = 1;
             return;
         }
 
         ff = procfile_readall(ff);
-        if(unlikely(!ff)) {
+        if (unlikely(!ff)) {
             io->updated = 0;
             cgroups_check = 1;
             return;
@@ -811,7 +683,7 @@ static inline void cgroup_read_blkio(struct blkio *io) {
 
         unsigned long i, lines = procfile_lines(ff);
 
-        if(unlikely(lines < 1)) {
+        if (unlikely(lines < 1)) {
             collector_error("CGROUP: file '%s' should have 1+ lines.", io->filename);
             io->updated = 0;
             return;
@@ -819,93 +691,57 @@ static inline void cgroup_read_blkio(struct blkio *io) {
 
         io->Read = 0;
         io->Write = 0;
-/*
-        io->Sync = 0;
-        io->Async = 0;
-        io->Total = 0;
-*/
 
-        for(i = 0; i < lines ; i++) {
+        for (i = 0; i < lines; i++) {
             char *s = procfile_lineword(ff, i, 1);
             uint32_t hash = simple_hash(s);
 
-            if(unlikely(hash == Read_hash && !strcmp(s, "Read")))
+            if (unlikely(hash == Read_hash && !strcmp(s, "Read")))
                 io->Read += str2ull(procfile_lineword(ff, i, 2), NULL);
-
-            else if(unlikely(hash == Write_hash && !strcmp(s, "Write")))
+            else if (unlikely(hash == Write_hash && !strcmp(s, "Write")))
                 io->Write += str2ull(procfile_lineword(ff, i, 2), NULL);
-
-/*
-            else if(unlikely(hash == Sync_hash && !strcmp(s, "Sync")))
-                io->Sync += str2ull(procfile_lineword(ff, i, 2));
-
-            else if(unlikely(hash == Async_hash && !strcmp(s, "Async")))
-                io->Async += str2ull(procfile_lineword(ff, i, 2));
-
-            else if(unlikely(hash == Total_hash && !strcmp(s, "Total")))
-                io->Total += str2ull(procfile_lineword(ff, i, 2));
-*/
         }
 
         io->updated = 1;
-
-        if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO)) {
-            if(unlikely(io->Read || io->Write || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
-                io->enabled = CONFIG_BOOLEAN_YES;
-            else
-                io->delay_counter = cgroup_recheck_zero_blkio_every_iterations;
-        }
     }
 }
 
 static inline void cgroup2_read_blkio(struct blkio *io, unsigned int word_offset) {
-    if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO && io->delay_counter > 0)) {
-            io->delay_counter--;
+    if (likely(io->filename)) {
+        static procfile *ff = NULL;
+
+        ff = procfile_reopen(ff, io->filename, NULL, CGROUP_PROCFILE_FLAG);
+        if (unlikely(!ff)) {
+            io->updated = 0;
+            cgroups_check = 1;
             return;
         }
 
-        if(likely(io->filename)) {
-            static procfile *ff = NULL;
-
-            ff = procfile_reopen(ff, io->filename, NULL, CGROUP_PROCFILE_FLAG);
-            if(unlikely(!ff)) {
-                io->updated = 0;
-                cgroups_check = 1;
-                return;
-            }
-
-            ff = procfile_readall(ff);
-            if(unlikely(!ff)) {
-                io->updated = 0;
-                cgroups_check = 1;
-                return;
-            }
-
-            unsigned long i, lines = procfile_lines(ff);
-
-            if (unlikely(lines < 1)) {
-                collector_error("CGROUP: file '%s' should have 1+ lines.", io->filename);
-                io->updated = 0;
-                return;
-            }
-
-            io->Read = 0;
-            io->Write = 0;
-
-            for (i = 0; i < lines; i++) {
-                io->Read += str2ull(procfile_lineword(ff, i, 2 + word_offset), NULL);
-                io->Write += str2ull(procfile_lineword(ff, i, 4 + word_offset), NULL);
-            }
-
-            io->updated = 1;
-
-            if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO)) {
-                if(unlikely(io->Read || io->Write || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
-                    io->enabled = CONFIG_BOOLEAN_YES;
-                else
-                    io->delay_counter = cgroup_recheck_zero_blkio_every_iterations;
-            }
+        ff = procfile_readall(ff);
+        if (unlikely(!ff)) {
+            io->updated = 0;
+            cgroups_check = 1;
+            return;
         }
+
+        unsigned long i, lines = procfile_lines(ff);
+
+        if (unlikely(lines < 1)) {
+            collector_error("CGROUP: file '%s' should have 1+ lines.", io->filename);
+            io->updated = 0;
+            return;
+        }
+
+        io->Read = 0;
+        io->Write = 0;
+
+        for (i = 0; i < lines; i++) {
+            io->Read += str2ull(procfile_lineword(ff, i, 2 + word_offset), NULL);
+            io->Write += str2ull(procfile_lineword(ff, i, 4 + word_offset), NULL);
+        }
+
+        io->updated = 1;
+    }
 }
 
 static inline void cgroup2_read_pressure(struct pressure *res) {
@@ -966,13 +802,7 @@ static inline void cgroup2_read_pressure(struct pressure *res) {
 static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unified) {
     static procfile *ff = NULL;
 
-    // read detailed ram usage
     if(likely(mem->filename_detailed)) {
-        if(unlikely(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO && mem->delay_counter_detailed > 0)) {
-            mem->delay_counter_detailed--;
-            goto memory_next;
-        }
-
         ff = procfile_reopen(ff, mem->filename_detailed, NULL, CGROUP_PROCFILE_FLAG);
         if(unlikely(!ff)) {
             mem->updated_detailed = 0;
@@ -1031,42 +861,24 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
 
         arl_begin(mem->arl_base);
 
-        for(i = 0; i < lines ; i++) {
-            if(arl_check(mem->arl_base,
-                    procfile_lineword(ff, i, 0),
-                    procfile_lineword(ff, i, 1))) break;
+        for (i = 0; i < lines; i++) {
+            if (arl_check(mem->arl_base, procfile_lineword(ff, i, 0), procfile_lineword(ff, i, 1)))
+                break;
         }
 
-        if(unlikely(mem->arl_dirty->flags & ARL_ENTRY_FLAG_FOUND))
+        if (unlikely(mem->arl_dirty->flags & ARL_ENTRY_FLAG_FOUND))
             mem->detailed_has_dirty = 1;
 
-        if(unlikely(parent_cg_is_unified == 0 && mem->arl_swap->flags & ARL_ENTRY_FLAG_FOUND))
+        if (unlikely(parent_cg_is_unified == 0 && mem->arl_swap->flags & ARL_ENTRY_FLAG_FOUND))
             mem->detailed_has_swap = 1;
 
-        // fprintf(stderr, "READ: '%s', cache: %llu, rss: %llu, rss_huge: %llu, mapped_file: %llu, writeback: %llu, dirty: %llu, swap: %llu, pgpgin: %llu, pgpgout: %llu, pgfault: %llu, pgmajfault: %llu, inactive_anon: %llu, active_anon: %llu, inactive_file: %llu, active_file: %llu, unevictable: %llu, hierarchical_memory_limit: %llu, total_cache: %llu, total_rss: %llu, total_rss_huge: %llu, total_mapped_file: %llu, total_writeback: %llu, total_dirty: %llu, total_swap: %llu, total_pgpgin: %llu, total_pgpgout: %llu, total_pgfault: %llu, total_pgmajfault: %llu, total_inactive_anon: %llu, total_active_anon: %llu, total_inactive_file: %llu, total_active_file: %llu, total_unevictable: %llu\n", mem->filename, mem->cache, mem->rss, mem->rss_huge, mem->mapped_file, mem->writeback, mem->dirty, mem->swap, mem->pgpgin, mem->pgpgout, mem->pgfault, mem->pgmajfault, mem->inactive_anon, mem->active_anon, mem->inactive_file, mem->active_file, mem->unevictable, mem->hierarchical_memory_limit, mem->total_cache, mem->total_rss, mem->total_rss_huge, mem->total_mapped_file, mem->total_writeback, mem->total_dirty, mem->total_swap, mem->total_pgpgin, mem->total_pgpgout, mem->total_pgfault, mem->total_pgmajfault, mem->total_inactive_anon, mem->total_active_anon, mem->total_inactive_file, mem->total_active_file, mem->total_unevictable);
-
         mem->updated_detailed = 1;
-
-        if(unlikely(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO)) {
-            if(( (!parent_cg_is_unified) && ( mem->total_cache || mem->total_dirty || mem->total_rss || mem->total_rss_huge || mem->total_mapped_file || mem->total_writeback
-                    || mem->total_swap || mem->total_pgpgin || mem->total_pgpgout || mem->total_pgfault || mem->total_pgmajfault || mem->total_inactive_file))
-               || (parent_cg_is_unified && ( mem->anon || mem->total_dirty || mem->kernel_stack || mem->slab || mem->sock || mem->total_writeback
-                    || mem->anon_thp || mem->total_pgfault || mem->total_pgmajfault || mem->total_inactive_file))
-               || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)
-                mem->enabled_detailed = CONFIG_BOOLEAN_YES;
-            else
-                mem->delay_counter_detailed = cgroup_recheck_zero_mem_detailed_every_iterations;
-        }
     }
 
 memory_next:
 
-    // read usage_in_bytes
-    if(likely(mem->filename_usage_in_bytes)) {
+    if (likely(mem->filename_usage_in_bytes)) {
         mem->updated_usage_in_bytes = !read_single_number_file(mem->filename_usage_in_bytes, &mem->usage_in_bytes);
-        if(unlikely(mem->updated_usage_in_bytes && mem->enabled_usage_in_bytes == CONFIG_BOOLEAN_AUTO &&
-                    (mem->usage_in_bytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            mem->enabled_usage_in_bytes = CONFIG_BOOLEAN_YES;
     }
 
     if (likely(mem->updated_usage_in_bytes && mem->updated_detailed)) {
@@ -1074,44 +886,28 @@ memory_next:
             (mem->usage_in_bytes > mem->total_inactive_file) ? (mem->usage_in_bytes - mem->total_inactive_file) : 0;
     }
 
-    // read msw_usage_in_bytes
-    if(likely(mem->filename_msw_usage_in_bytes)) {
-        mem->updated_msw_usage_in_bytes = !read_single_number_file(mem->filename_msw_usage_in_bytes, &mem->msw_usage_in_bytes);
-        if(unlikely(mem->updated_msw_usage_in_bytes && mem->enabled_msw_usage_in_bytes == CONFIG_BOOLEAN_AUTO &&
-                    (mem->msw_usage_in_bytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            mem->enabled_msw_usage_in_bytes = CONFIG_BOOLEAN_YES;
+    if (likely(mem->filename_msw_usage_in_bytes)) {
+        mem->updated_msw_usage_in_bytes =
+            !read_single_number_file(mem->filename_msw_usage_in_bytes, &mem->msw_usage_in_bytes);
     }
 
-    // read failcnt
-    if(likely(mem->filename_failcnt)) {
-        if(unlikely(mem->enabled_failcnt == CONFIG_BOOLEAN_AUTO && mem->delay_counter_failcnt > 0)) {
-            mem->updated_failcnt = 0;
-            mem->delay_counter_failcnt--;
-        }
-        else {
-            mem->updated_failcnt = !read_single_number_file(mem->filename_failcnt, &mem->failcnt);
-            if(unlikely(mem->updated_failcnt && mem->enabled_failcnt == CONFIG_BOOLEAN_AUTO)) {
-                if(unlikely(mem->failcnt || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
-                    mem->enabled_failcnt = CONFIG_BOOLEAN_YES;
-                else
-                    mem->delay_counter_failcnt = cgroup_recheck_zero_mem_failcnt_every_iterations;
-            }
-        }
+    if (likely(mem->filename_failcnt)) {
+        mem->updated_failcnt = !read_single_number_file(mem->filename_failcnt, &mem->failcnt);
     }
 }
 
 static void cgroup_read_pids_current(struct pids *pids) {
-    pids->pids_current_updated = 0;
+    pids->updated = 0;
 
-    if (unlikely(!pids->pids_current_filename))
+    if (unlikely(!pids->filename))
         return;
 
-    pids->pids_current_updated = !read_single_number_file(pids->pids_current_filename, &pids->pids_current);
+    pids->updated = !read_single_number_file(pids->filename, &pids->pids_current);
 }
 
 static inline void read_cgroup(struct cgroup *cg) {
     netdata_log_debug(D_CGROUP, "reading metrics for cgroups '%s'", cg->id);
-    if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+    if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
         cgroup_read_cpuacct_stat(&cg->cpuacct_stat);
         cgroup_read_cpuacct_usage(&cg->cpuacct_usage);
         cgroup_read_cpuacct_cpu_stat(&cg->cpuacct_cpu_throttling);
@@ -1123,10 +919,8 @@ static inline void read_cgroup(struct cgroup *cg) {
         cgroup_read_blkio(&cg->throttle_io_serviced);
         cgroup_read_blkio(&cg->io_merged);
         cgroup_read_blkio(&cg->io_queued);
-        cgroup_read_pids_current(&cg->pids);
-    }
-    else {
-        //TODO: io_service_bytes and io_serviced use same file merge into 1 function
+        cgroup_read_pids_current(&cg->pids_current);
+    } else {
         cgroup2_read_blkio(&cg->io_service_bytes, 0);
         cgroup2_read_blkio(&cg->io_serviced, 4);
         cgroup2_read_cpuacct_cpu_stat(&cg->cpuacct_stat, &cg->cpuacct_cpu_throttling);
@@ -1136,7 +930,7 @@ static inline void read_cgroup(struct cgroup *cg) {
         cgroup2_read_pressure(&cg->memory_pressure);
         cgroup2_read_pressure(&cg->irq_pressure);
         cgroup_read_memory(&cg->memory, 1);
-        cgroup_read_pids_current(&cg->pids);
+        cgroup_read_pids_current(&cg->pids_current);
     }
 }
 
@@ -1314,7 +1108,7 @@ void update_cgroup_systemd_services_charts() {
             update_io_merged_ops_chart(cg);
         }
 
-        if (likely(cg->pids.pids_current_updated)) {
+        if (likely(cg->pids_current.updated)) {
             update_pids_current_chart(cg);
         }
 
@@ -1324,14 +1118,14 @@ void update_cgroup_systemd_services_charts() {
 
 void update_cgroup_charts() {
     for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
-        if(unlikely(!cg->enabled || cg->pending_renames || is_cgroup_systemd_service(cg)))
+        if (unlikely(!cg->enabled || cg->pending_renames || is_cgroup_systemd_service(cg)))
             continue;
 
-        if (likely(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_BOOLEAN_YES)) {
+        if (likely(cg->cpuacct_stat.updated)) {
             update_cpu_utilization_chart(cg);
 
-            if(likely(cg->filename_cpuset_cpus || cg->filename_cpu_cfs_period || cg->filename_cpu_cfs_quota)) {
-                if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+            if (likely(cg->filename_cpuset_cpus || cg->filename_cpu_cfs_period || cg->filename_cpu_cfs_quota)) {
+                if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
                     update_cpu_limits(&cg->filename_cpuset_cpus, &cg->cpuset_cpus, cg);
                     update_cpu_limits(&cg->filename_cpu_cfs_period, &cg->cpu_cfs_period, cg);
                     update_cpu_limits(&cg->filename_cpu_cfs_quota, &cg->cpu_cfs_quota, cg);
@@ -1339,31 +1133,39 @@ void update_cgroup_charts() {
                     update_cpu_limits2(cg);
                 }
 
-                if(unlikely(!cg->chart_var_cpu_limit)) {
+                if (unlikely(!cg->chart_var_cpu_limit)) {
                     cg->chart_var_cpu_limit = rrdvar_chart_variable_add_and_acquire(cg->st_cpu, "cpu_limit");
-                    if(!cg->chart_var_cpu_limit) {
-                        collector_error("Cannot create cgroup %s chart variable 'cpu_limit'. Will not update its limit anymore.", cg->id);
-                        if(cg->filename_cpuset_cpus) freez(cg->filename_cpuset_cpus);
+                    if (!cg->chart_var_cpu_limit) {
+                        collector_error(
+                            "Cannot create cgroup %s chart variable 'cpu_limit'. Will not update its limit anymore.",
+                            cg->id);
+                        if (cg->filename_cpuset_cpus)
+                            freez(cg->filename_cpuset_cpus);
                         cg->filename_cpuset_cpus = NULL;
-                        if(cg->filename_cpu_cfs_period) freez(cg->filename_cpu_cfs_period);
+                        if (cg->filename_cpu_cfs_period)
+                            freez(cg->filename_cpu_cfs_period);
                         cg->filename_cpu_cfs_period = NULL;
-                        if(cg->filename_cpu_cfs_quota) freez(cg->filename_cpu_cfs_quota);
+                        if (cg->filename_cpu_cfs_quota)
+                            freez(cg->filename_cpu_cfs_quota);
                         cg->filename_cpu_cfs_quota = NULL;
                     }
                 } else {
                     NETDATA_DOUBLE value = 0, quota = 0;
 
-                    if(likely( ((!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) && (cg->filename_cpuset_cpus || (cg->filename_cpu_cfs_period && cg->filename_cpu_cfs_quota)))
-                            || ((cg->options & CGROUP_OPTIONS_IS_UNIFIED) && cg->filename_cpu_cfs_quota))) {
-                        if(unlikely(cg->cpu_cfs_quota > 0))
+                    if (likely(
+                            ((!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) &&
+                             (cg->filename_cpuset_cpus ||
+                              (cg->filename_cpu_cfs_period && cg->filename_cpu_cfs_quota))) ||
+                            ((cg->options & CGROUP_OPTIONS_IS_UNIFIED) && cg->filename_cpu_cfs_quota))) {
+                        if (unlikely(cg->cpu_cfs_quota > 0))
                             quota = (NETDATA_DOUBLE)cg->cpu_cfs_quota / (NETDATA_DOUBLE)cg->cpu_cfs_period;
 
-                        if(unlikely(quota > 0 && quota < cg->cpuset_cpus))
+                        if (unlikely(quota > 0 && quota < cg->cpuset_cpus))
                             value = quota * 100;
                         else
                             value = (NETDATA_DOUBLE)cg->cpuset_cpus * 100;
                     }
-                    if(likely(value)) {
+                    if (likely(value)) {
                         update_cpu_utilization_limit_chart(cg, value);
                     } else {
                         if (unlikely(cg->st_cpu_limit)) {
@@ -1376,20 +1178,20 @@ void update_cgroup_charts() {
             }
         }
 
-        if (likely(cg->cpuacct_cpu_throttling.updated && cg->cpuacct_cpu_throttling.enabled == CONFIG_BOOLEAN_YES)) {
+        if (likely(cg->cpuacct_cpu_throttling.updated)) {
             update_cpu_throttled_chart(cg);
             update_cpu_throttled_duration_chart(cg);
         }
 
-        if (likely(cg->cpuacct_cpu_shares.updated && cg->cpuacct_cpu_shares.enabled == CONFIG_BOOLEAN_YES)) {
+        if (unlikely(cg->cpuacct_cpu_shares.updated)) {
             update_cpu_shares_chart(cg);
         }
 
-        if (likely(cg->cpuacct_usage.updated && cg->cpuacct_usage.enabled == CONFIG_BOOLEAN_YES)) {
+        if (likely(cg->cpuacct_usage.updated)) {
             update_cpu_per_core_usage_chart(cg);
         }
 
-        if (likely(cg->memory.updated_detailed && cg->memory.enabled_detailed == CONFIG_BOOLEAN_YES)) {
+        if (likely(cg->memory.updated_detailed)) {
             update_mem_usage_detailed_chart(cg);
             update_mem_writeback_chart(cg);
 
@@ -1400,14 +1202,13 @@ void update_cgroup_charts() {
             update_mem_pgfaults_chart(cg);
         }
 
-        if (likely(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_BOOLEAN_YES)) {
+        if (likely(cg->memory.updated_usage_in_bytes)) {
             update_mem_usage_chart(cg);
 
-            // FIXME: this if should be only for unlimited charts
-            if(likely(host_ram_total)) {
+            // FIXME: this "if" should be only for unlimited charts
+            if (likely(host_ram_total)) {
                 // FIXME: do we need to update mem limits on every data collection?
                 if (likely(update_memory_limits(cg))) {
-
                     unsigned long long memory_limit = host_ram_total;
                     if (unlikely(cg->memory_limit < host_ram_total))
                         memory_limit = cg->memory_limit;
@@ -1428,35 +1229,35 @@ void update_cgroup_charts() {
             }
         }
 
-        if (likely(cg->memory.updated_failcnt && cg->memory.enabled_failcnt == CONFIG_BOOLEAN_YES)) {
+        if (likely(cg->memory.updated_failcnt)) {
             update_mem_failcnt_chart(cg);
         }
 
-        if (likely(cg->io_service_bytes.updated && cg->io_service_bytes.enabled == CONFIG_BOOLEAN_YES)) {
+        if (likely(cg->io_service_bytes.updated)) {
             update_io_serviced_bytes_chart(cg);
         }
 
-        if (likely(cg->io_serviced.updated && cg->io_serviced.enabled == CONFIG_BOOLEAN_YES)) {
+        if (likely(cg->io_serviced.updated)) {
             update_io_serviced_ops_chart(cg);
         }
 
-        if (likely(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.enabled == CONFIG_BOOLEAN_YES)) {
-                update_throttle_io_serviced_bytes_chart(cg);
+        if (likely(cg->throttle_io_service_bytes.updated)) {
+            update_throttle_io_serviced_bytes_chart(cg);
         }
 
-        if (likely(cg->throttle_io_serviced.updated && cg->throttle_io_serviced.enabled == CONFIG_BOOLEAN_YES)) {
-                update_throttle_io_serviced_ops_chart(cg);
+        if (likely(cg->throttle_io_serviced.updated)) {
+            update_throttle_io_serviced_ops_chart(cg);
         }
 
-        if (likely(cg->io_queued.updated && cg->io_queued.enabled == CONFIG_BOOLEAN_YES)) {
-                update_io_queued_ops_chart(cg);
+        if (likely(cg->io_queued.updated)) {
+            update_io_queued_ops_chart(cg);
         }
 
-        if (likely(cg->io_merged.updated && cg->io_merged.enabled == CONFIG_BOOLEAN_YES)) {
-                update_io_merged_ops_chart(cg);
+        if (likely(cg->io_merged.updated)) {
+            update_io_merged_ops_chart(cg);
         }
 
-        if (likely(cg->pids.pids_current_updated)) {
+        if (likely(cg->pids_current.updated)) {
                 update_pids_current_chart(cg);
         }
 
@@ -1541,10 +1342,9 @@ static void cgroup_main_cleanup(void *pptr) {
 void cgroup_read_host_total_ram() {
     procfile *ff = NULL;
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/meminfo");
 
-    ff = procfile_open(
-        config_get("plugin:cgroups", "meminfo filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/meminfo");
+    ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
 
     if (likely((ff = procfile_readall(ff)) && procfile_lines(ff) && !strncmp(procfile_word(ff, 0), "MemTotal", 8)))
         host_ram_total = str2ull(procfile_word(ff, 1), NULL) * 1024;
@@ -1563,8 +1363,8 @@ void *cgroups_main(void *ptr) {
     worker_register_job_name(WORKER_CGROUPS_CHART, "chart");
 
     if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL) {
-        is_inside_k8s = 1;
-        cgroup_enable_cpuacct_cpu_shares = CONFIG_BOOLEAN_YES;
+        is_inside_k8s = true;
+        cgroup_enable_cpuacct_cpu_shares = true;
     }
 
     read_cgroup_plugin_configuration();
@@ -1643,8 +1443,7 @@ void *cgroups_main(void *ptr) {
         worker_is_busy(WORKER_CGROUPS_CHART);
 
         update_cgroup_charts();
-        if (cgroup_enable_systemd_services)
-            update_cgroup_systemd_services_charts();
+        update_cgroup_systemd_services_charts();
 
         if (unlikely(!service_running(SERVICE_COLLECTORS))) {
            uv_mutex_unlock(&cgroup_root_mutex);

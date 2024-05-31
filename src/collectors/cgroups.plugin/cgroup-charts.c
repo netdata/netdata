@@ -17,7 +17,7 @@ void update_cpu_utilization_chart(struct cgroup *cg) {
         } else {
             title = k8s_is_kubepod(cg) ? "CPU Usage (100%% = 1000 mCPU)" : "CPU Usage (100%% = 1 core)";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.cpu" : "cgroup.cpu";
-            prio = cgroup_containers_chart_priority;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -60,7 +60,7 @@ void update_cpu_utilization_limit_chart(struct cgroup *cg, NETDATA_DOUBLE cpu_li
     if (unlikely(!cg->st_cpu_limit)) {
         char *title = "CPU Usage within the limits";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_limit" : "cgroup.cpu_limit";
-        int prio = cgroup_containers_chart_priority - 1;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS - 1;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = cg->st_cpu_limit = rrdset_create_localhost(
@@ -109,7 +109,7 @@ void update_cpu_throttled_chart(struct cgroup *cg) {
     if (unlikely(!cg->st_cpu_nr_throttled)) {
         char *title = "CPU Throttled Runnable Periods";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.throttled" : "cgroup.throttled";
-        int prio = cgroup_containers_chart_priority + 10;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 10;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = cg->st_cpu_nr_throttled = rrdset_create_localhost(
@@ -143,7 +143,7 @@ void update_cpu_throttled_duration_chart(struct cgroup *cg) {
     if (unlikely(!cg->st_cpu_throttled_time)) {
         char *title = "CPU Throttled Time Duration";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.throttled_duration" : "cgroup.throttled_duration";
-        int prio = cgroup_containers_chart_priority + 15;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 15;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = cg->st_cpu_throttled_time = rrdset_create_localhost(
@@ -177,7 +177,7 @@ void update_cpu_shares_chart(struct cgroup *cg) {
     if (unlikely(!cg->st_cpu_shares)) {
         char *title = "CPU Time Relative Share";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_shares" : "cgroup.cpu_shares";
-        int prio = cgroup_containers_chart_priority + 20;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 20;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = cg->st_cpu_shares = rrdset_create_localhost(
@@ -212,7 +212,7 @@ void update_cpu_per_core_usage_chart(struct cgroup *cg) {
     if (unlikely(!cg->st_cpu_per_core)) {
         char *title = k8s_is_kubepod(cg) ? "CPU Usage (100%% = 1000 mCPU) Per Core" : "CPU Usage (100%% = 1 core) Per Core";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_per_core" : "cgroup.cpu_per_core";
-        int prio = cgroup_containers_chart_priority + 100;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 100;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         cg->st_cpu_per_core = rrdset_create_localhost(
@@ -258,7 +258,7 @@ void update_mem_usage_detailed_chart(struct cgroup *cg) {
         } else {
             title = "Memory Usage";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.mem" : "cgroup.mem";
-            prio = cgroup_containers_chart_priority + 220;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 220;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -333,7 +333,7 @@ void update_mem_writeback_chart(struct cgroup *cg) {
         } else {
             title = "Writeback Memory";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.writeback" : "cgroup.writeback";
-            prio = cgroup_containers_chart_priority + 300;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 300;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -377,7 +377,7 @@ void update_mem_activity_chart(struct cgroup *cg) {
         } else {
             title = "Memory Activity";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.mem_activity" : "cgroup.mem_activity";
-            prio = cgroup_containers_chart_priority + 400;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 400;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -420,7 +420,7 @@ void update_mem_pgfaults_chart(struct cgroup *cg) {
         } else {
             title = "Memory Page Faults";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.pgfaults" : "cgroup.pgfaults";
-            prio = cgroup_containers_chart_priority + 500;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 500;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -457,7 +457,7 @@ void update_mem_usage_limit_chart(struct cgroup *cg, unsigned long long memory_l
     if (unlikely(!cg->st_mem_usage_limit)) {
         char *title = "Used RAM within the limits";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.mem_usage_limit" : "cgroup.mem_usage_limit";
-        int prio = cgroup_containers_chart_priority + 200;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 200;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = cg->st_mem_usage_limit = rrdset_create_localhost(
@@ -496,7 +496,7 @@ void update_mem_utilization_chart(struct cgroup *cg, unsigned long long memory_l
     if (unlikely(!cg->st_mem_utilization)) {
         char *title = "Memory Utilization";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.mem_utilization" : "cgroup.mem_utilization";
-        int prio = cgroup_containers_chart_priority + 199;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 199;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = cg->st_mem_utilization = rrdset_create_localhost(
@@ -538,7 +538,7 @@ void update_mem_failcnt_chart(struct cgroup *cg) {
         } else {
             title = "Memory Limit Failures";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.mem_failcnt" : "cgroup.mem_failcnt";
-            prio = cgroup_containers_chart_priority + 250;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 250;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -578,7 +578,7 @@ void update_mem_usage_chart(struct cgroup *cg) {
         } else {
             title = "Used Memory";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.mem_usage" : "cgroup.mem_usage";
-            prio = cgroup_containers_chart_priority + 210;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 210;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -633,7 +633,7 @@ void update_io_serviced_bytes_chart(struct cgroup *cg) {
         } else {
             title = "I/O Bandwidth (all disks)";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.io" : "cgroup.io";
-            prio = cgroup_containers_chart_priority + 1200;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -675,7 +675,7 @@ void update_io_serviced_ops_chart(struct cgroup *cg) {
         } else {
             title = "Serviced I/O Operations (all disks)";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.serviced_ops" : "cgroup.serviced_ops";
-            prio = cgroup_containers_chart_priority + 1200;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -717,7 +717,7 @@ void update_throttle_io_serviced_bytes_chart(struct cgroup *cg) {
         } else {
             title = "Throttle I/O Bandwidth (all disks)";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.throttle_io" : "cgroup.throttle_io";
-            prio = cgroup_containers_chart_priority + 1200;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -760,7 +760,7 @@ void update_throttle_io_serviced_ops_chart(struct cgroup *cg) {
         } else {
             title = "Throttle Serviced I/O Operations (all disks)";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.throttle_serviced_ops" : "cgroup.throttle_serviced_ops";
-            prio = cgroup_containers_chart_priority + 1200;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -802,7 +802,7 @@ void update_io_queued_ops_chart(struct cgroup *cg) {
         } else {
             title = "Queued I/O Operations (all disks)";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.queued_ops" : "cgroup.queued_ops";
-            prio = cgroup_containers_chart_priority + 2000;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2000;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -844,7 +844,7 @@ void update_io_merged_ops_chart(struct cgroup *cg) {
         } else {
             title = "Merged I/O Operations (all disks)";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.merged_ops" : "cgroup.merged_ops";
-            prio = cgroup_containers_chart_priority + 2100;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2100;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -883,7 +883,7 @@ void update_cpu_some_pressure_chart(struct cgroup *cg) {
     if (unlikely(!pcs->share_time.st)) {
         char *title = "CPU some pressure";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_some_pressure" : "cgroup.cpu_some_pressure";
-        int prio = cgroup_containers_chart_priority + 2200;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2200;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->share_time.st = rrdset_create_localhost(
@@ -924,7 +924,7 @@ void update_cpu_some_pressure_stall_time_chart(struct cgroup *cg) {
         char *title = "CPU some pressure stall time";
         char *context =
             k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_some_pressure_stall_time" : "cgroup.cpu_some_pressure_stall_time";
-        int prio = cgroup_containers_chart_priority + 2220;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2220;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->total_time.st = rrdset_create_localhost(
@@ -959,7 +959,7 @@ void update_cpu_full_pressure_chart(struct cgroup *cg) {
     if (unlikely(!pcs->share_time.st)) {
         char *title = "CPU full pressure";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_full_pressure" : "cgroup.cpu_full_pressure";
-        int prio = cgroup_containers_chart_priority + 2240;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2240;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->share_time.st = rrdset_create_localhost(
@@ -1000,7 +1000,7 @@ void update_cpu_full_pressure_stall_time_chart(struct cgroup *cg) {
         char *title = "CPU full pressure stall time";
         char *context =
             k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_full_pressure_stall_time" : "cgroup.cpu_full_pressure_stall_time";
-        int prio = cgroup_containers_chart_priority + 2260;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2260;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->total_time.st = rrdset_create_localhost(
@@ -1036,7 +1036,7 @@ void update_mem_some_pressure_chart(struct cgroup *cg) {
     if (unlikely(!pcs->share_time.st)) {
         char *title = "Memory some pressure";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.memory_some_pressure" : "cgroup.memory_some_pressure";
-        int prio = cgroup_containers_chart_priority + 2300;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2300;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->share_time.st = rrdset_create_localhost(
@@ -1077,7 +1077,7 @@ void update_mem_some_pressure_stall_time_chart(struct cgroup *cg) {
         char *title = "Memory some pressure stall time";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.memory_some_pressure_stall_time" :
                                              "cgroup.memory_some_pressure_stall_time";
-        int prio = cgroup_containers_chart_priority + 2320;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2320;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->total_time.st = rrdset_create_localhost(
@@ -1113,7 +1113,7 @@ void update_mem_full_pressure_chart(struct cgroup *cg) {
     if (unlikely(!pcs->share_time.st)) {
         char *title = "Memory full pressure";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.memory_full_pressure" : "cgroup.memory_full_pressure";
-        int prio = cgroup_containers_chart_priority + 2340;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2340;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->share_time.st = rrdset_create_localhost(
@@ -1154,7 +1154,7 @@ void update_mem_full_pressure_stall_time_chart(struct cgroup *cg) {
         char *title = "Memory full pressure stall time";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.memory_full_pressure_stall_time" :
                                              "cgroup.memory_full_pressure_stall_time";
-        int prio = cgroup_containers_chart_priority + 2360;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2360;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->total_time.st = rrdset_create_localhost(
@@ -1189,7 +1189,7 @@ void update_irq_some_pressure_chart(struct cgroup *cg) {
     if (unlikely(!pcs->share_time.st)) {
         char *title = "IRQ some pressure";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.irq_some_pressure" : "cgroup.irq_some_pressure";
-        int prio = cgroup_containers_chart_priority + 2310;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2310;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->share_time.st = rrdset_create_localhost(
@@ -1230,7 +1230,7 @@ void update_irq_some_pressure_stall_time_chart(struct cgroup *cg) {
         char *title = "IRQ some pressure stall time";
         char *context =
             k8s_is_kubepod(cg) ? "k8s.cgroup.irq_some_pressure_stall_time" : "cgroup.irq_some_pressure_stall_time";
-        int prio = cgroup_containers_chart_priority + 2330;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2330;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->total_time.st = rrdset_create_localhost(
@@ -1266,7 +1266,7 @@ void update_irq_full_pressure_chart(struct cgroup *cg) {
     if (unlikely(!pcs->share_time.st)) {
         char *title = "IRQ full pressure";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.irq_full_pressure" : "cgroup.irq_full_pressure";
-        int prio = cgroup_containers_chart_priority + 2350;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2350;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->share_time.st = rrdset_create_localhost(
@@ -1307,7 +1307,7 @@ void update_irq_full_pressure_stall_time_chart(struct cgroup *cg) {
         char *title = "IRQ full pressure stall time";
         char *context =
             k8s_is_kubepod(cg) ? "k8s.cgroup.irq_full_pressure_stall_time" : "cgroup.irq_full_pressure_stall_time";
-        int prio = cgroup_containers_chart_priority + 2370;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2370;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->total_time.st = rrdset_create_localhost(
@@ -1343,7 +1343,7 @@ void update_io_some_pressure_chart(struct cgroup *cg) {
     if (unlikely(!pcs->share_time.st)) {
         char *title = "I/O some pressure";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.io_some_pressure" : "cgroup.io_some_pressure";
-        int prio = cgroup_containers_chart_priority + 2400;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2400;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->share_time.st = rrdset_create_localhost(
@@ -1384,7 +1384,7 @@ void update_io_some_pressure_stall_time_chart(struct cgroup *cg) {
         char *title = "I/O some pressure stall time";
         char *context =
             k8s_is_kubepod(cg) ? "k8s.cgroup.io_some_pressure_stall_time" : "cgroup.io_some_pressure_stall_time";
-        int prio = cgroup_containers_chart_priority + 2420;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2420;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->total_time.st = rrdset_create_localhost(
@@ -1419,7 +1419,7 @@ void update_io_full_pressure_chart(struct cgroup *cg) {
     if (unlikely(!pcs->share_time.st)) {
         char *title = "I/O full pressure";
         char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.io_full_pressure" : "cgroup.io_full_pressure";
-        int prio = cgroup_containers_chart_priority + 2440;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2440;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->share_time.st = rrdset_create_localhost(
@@ -1460,7 +1460,7 @@ void update_io_full_pressure_stall_time_chart(struct cgroup *cg) {
         char *title = "I/O full pressure stall time";
         char *context =
             k8s_is_kubepod(cg) ? "k8s.cgroup.io_full_pressure_stall_time" : "cgroup.io_full_pressure_stall_time";
-        int prio = cgroup_containers_chart_priority + 2460;
+        int prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2460;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
         chart = pcs->total_time.st = rrdset_create_localhost(
@@ -1499,7 +1499,7 @@ void update_pids_current_chart(struct cgroup *cg) {
         } else {
             title = "Number of processes";
             context = k8s_is_kubepod(cg) ? "k8s.cgroup.pids_current" : "cgroup.pids_current";
-            prio = cgroup_containers_chart_priority + 2150;
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2150;
         }
 
         char buff[RRD_ID_LENGTH_MAX + 1];
@@ -1521,6 +1521,6 @@ void update_pids_current_chart(struct cgroup *cg) {
         cg->st_pids_rd_pids_current = rrddim_add(chart, "pids", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set_by_pointer(chart, cg->st_pids_rd_pids_current, (collected_number)cg->pids.pids_current);
+    rrddim_set_by_pointer(chart, cg->st_pids_rd_pids_current, (collected_number)cg->pids_current.pids_current);
     rrdset_done(chart);
 }
