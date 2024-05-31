@@ -231,7 +231,7 @@ if(NEED_PROTOBUF)
         endif()
 endif()
 
-set(PKG_FILES_PATH "packaging/cmake/pkg-files")
+set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
 
 if(ENABLE_PLUGIN_EBPF)
         include(NetdataLibBPF)
