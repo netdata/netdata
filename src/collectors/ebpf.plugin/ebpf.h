@@ -338,7 +338,6 @@ void ebpf_pid_file(char *filename, size_t length);
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
 #define EBPF_COMMON_DIMENSION_FILES "files"
 #define EBPF_COMMON_DIMENSION_MILLISECONDS "milliseconds"
-#define EBPF_COMMON_DIMENSION_KILLS "kills"
 
 #define EBPF_CHART_ALGORITHM_ABSOLUTE "absolute"
 #define EBPF_CHART_ALGORITHM_INCREMENTAL "incremental"

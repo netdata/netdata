@@ -40,11 +40,11 @@ static ebpf_tracepoint_t oomkill_tracepoints[] = {
     {.enabled = false, .class = NULL, .event = NULL}
 };
 
-static netdata_publish_syscall_t oomkill_publish_aggregated = {.name = "oomkill", .dimension = "oomkill",
+static netdata_publish_syscall_t oomkill_publish_aggregated = {.name = "kills", .dimension = "kills",
                                                                .algorithm = "absolute",
                                                                .next = NULL};
 
-static void ebpf_create_specific_oomkill_charts(char *type, int update_every);
+static void ebpf_obsolete_specific_oomkill_charts(char *type, int update_every);
 
 /**
  * Obsolete services
@@ -58,11 +58,11 @@ static void ebpf_obsolete_oomkill_services(ebpf_module_t *em, char *id)
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               id,
                               NETDATA_OOMKILL_CHART,
-                              "OOM kills. This chart is provided by eBPF plugin.",
-                              EBPF_COMMON_DIMENSION_KILLS,
+                              "Systemd service OOM kills.",
+                              EBPF_OOMKILL_UNIT_KILLS,
                               NETDATA_EBPF_MEMORY_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NETDATA_CGROUP_OOMKILLS_CONTEXT,
                               20191,
                               em->update_every);
 }
@@ -86,7 +86,7 @@ static inline void ebpf_obsolete_oomkill_cgroup_charts(ebpf_module_t *em)
             continue;
         }
 
-        ebpf_create_specific_oomkill_charts(ect->name, em->update_every);
+        ebpf_obsolete_specific_oomkill_charts(ect->name, em->update_every);
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
@@ -109,13 +109,13 @@ static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_app_oomkill",
-                                  "OOM kills.",
-                                  EBPF_COMMON_DIMENSION_KILLS,
+                                  NETDATA_OOMKILL_CHART,
+                                  "Processes OOM kills.",
+                                  EBPF_OOMKILL_UNIT_KILLS,
                                   NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "ebpf.app_oomkill",
-                                  20020,
+                                  20072,
                                   update_every);
 
         w->charts_created &= ~(1<<EBPF_MODULE_OOMKILL_IDX);
@@ -164,8 +164,10 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
 {
     // for each app, see if it was OOM killed. record as 1 if so otherwise 0.
     struct ebpf_target *w;
+    uint32_t used_pid = 0;
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w != NULL; w = w->next) {
-        if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_OOMKILL_IDX))))
+        if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_OOMKILL_IDX))))
             continue;
 
         bool was_oomkilled = false;
@@ -175,6 +177,7 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
                 uint32_t j;
                 for (j = 0; j < total; j++) {
                     if (pids->pid == keys[j]) {
+                        used_pid++;
                         was_oomkilled = true;
                         // set to 0 so we consider it "done".
                         keys[j] = 0;
@@ -185,27 +188,24 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
             }
         }
 write_dim:
-        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_oomkill");
-        write_chart_dimension(EBPF_COMMON_DIMENSION_KILLS, was_oomkilled);
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, NETDATA_OOMKILL_CHART);
+        write_chart_dimension(oomkill_publish_aggregated.dimension, was_oomkilled);
         ebpf_write_end_chart();
     }
 
-    // for any remaining keys for which we couldn't find a group, this could be
-    // for various reasons, but the primary one is that the PID has not yet
-    // been picked up by the process thread when parsing the proc filesystem.
-    // since it's been OOM killed, it will never be parsed in the future, so
-    // we have no choice but to dump it into `other`.
-    uint32_t j;
-    uint32_t rem_count = 0;
-    for (j = 0; j < total; j++) {
-        int32_t key = keys[j];
-        if (key != 0) {
-            rem_count += 1;
-        }
+    if (total != used_pid) {
+        // for any remaining keys for which we couldn't find a group, this could be
+        // for various reasons, but the primary one is that the PID has not yet
+        // been picked up by the process thread when parsing the proc filesystem.
+        // since it's been OOM killed, it will never be parsed in the future, so
+        // we have no choice but to dump it into `other`.
+        uint32_t rem_count = total - used_pid;
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, "other", NETDATA_OOMKILL_CHART);
+        write_chart_dimension(oomkill_publish_aggregated.dimension, rem_count);
+        ebpf_write_end_chart();
     }
-    if (rem_count > 0) {
-        write_chart_dimension("other", rem_count);
-    }
+
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -218,8 +218,8 @@ write_dim:
  */
 static void ebpf_create_specific_oomkill_charts(char *type, int update_every)
 {
-    ebpf_create_chart(type, NETDATA_OOMKILL_CHART, "OOM kills. This chart is provided by eBPF plugin.",
-                      EBPF_COMMON_DIMENSION_KILLS, NETDATA_EBPF_MEMORY_GROUP,
+    ebpf_create_chart(type, NETDATA_OOMKILL_CHART, "Cgroup OOM kills.",
+                      EBPF_OOMKILL_UNIT_KILLS, NETDATA_EBPF_MEMORY_GROUP,
                       NETDATA_CGROUP_OOMKILLS_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5600,
                       ebpf_create_global_dimension,
@@ -236,17 +236,17 @@ static void ebpf_create_specific_oomkill_charts(char *type, int update_every)
 static void ebpf_create_systemd_oomkill_charts(int update_every)
 {
     static ebpf_systemd_args_t data_oom = {
-        .title = "OOM kills. This chart is provided by eBPF plugin.",
-        .units = EBPF_COMMON_DIMENSION_KILLS,
+        .title = "Systemd service OOM kills.",
+        .units = EBPF_OOMKILL_UNIT_KILLS,
         .family = NETDATA_EBPF_MEMORY_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20191,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
-        .context = NETDATA_EBPF_MODULE_NAME_OOMKILL,
-        .module = NETDATA_EBPF_MODULE_NAME_SWAP,
+        .context = NETDATA_CGROUP_OOMKILLS_CONTEXT,
+        .module = NETDATA_EBPF_MODULE_NAME_OOMKILL,
         .update_every = 0,
         .suffix = NETDATA_OOMKILL_CHART,
-        .dimension = "oom"
+        .dimension = "kills"
     };
 
     if (!data_oom.update_every)
@@ -277,7 +277,7 @@ static void ebpf_send_systemd_oomkill_charts()
             continue;
         }
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name,  NETDATA_OOMKILL_CHART);
-        write_chart_dimension("oom", (long long) ect->oomkill);
+        write_chart_dimension(oomkill_publish_aggregated.dimension, (long long) ect->oomkill);
         ect->oomkill = 0;
         ebpf_write_end_chart();
     }
@@ -294,7 +294,7 @@ static void ebpf_send_systemd_oomkill_charts()
 static void ebpf_send_specific_oomkill_data(char *type, int value)
 {
     ebpf_write_begin_chart(type, NETDATA_OOMKILL_CHART, "");
-    write_chart_dimension(oomkill_publish_aggregated.name, (long long)value);
+    write_chart_dimension(oomkill_publish_aggregated.dimension, (long long)value);
     ebpf_write_end_chart();
 }
 
@@ -308,8 +308,8 @@ static void ebpf_send_specific_oomkill_data(char *type, int value)
  */
 static void ebpf_obsolete_specific_oomkill_charts(char *type, int update_every)
 {
-    ebpf_write_chart_obsolete(type, NETDATA_OOMKILL_CHART, "", "OOM kills. This chart is provided by eBPF plugin.",
-                              EBPF_COMMON_DIMENSION_KILLS, NETDATA_EBPF_MEMORY_GROUP,
+    ebpf_write_chart_obsolete(type, NETDATA_OOMKILL_CHART, "", "Cgroup OOM kills.",
+                              EBPF_OOMKILL_UNIT_KILLS, NETDATA_EBPF_MEMORY_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_OOMKILLS_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5600, update_every);
 }
@@ -340,11 +340,13 @@ void ebpf_oomkill_send_cgroup_data(int update_every)
             ect->flags |= NETDATA_EBPF_CGROUP_HAS_OOMKILL_CHART;
         }
 
-        if (ect->flags & NETDATA_EBPF_CGROUP_HAS_OOMKILL_CHART && ect->updated) {
-            ebpf_send_specific_oomkill_data(ect->name, ect->oomkill);
-        } else {
-            ebpf_obsolete_specific_oomkill_charts(ect->name, update_every);
-            ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_OOMKILL_CHART;
+        if (ect->flags & NETDATA_EBPF_CGROUP_HAS_OOMKILL_CHART) {
+            if (ect->updated) {
+                ebpf_send_specific_oomkill_data(ect->name, ect->oomkill);
+            } else {
+                ebpf_obsolete_specific_oomkill_charts(ect->name, update_every);
+                ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_OOMKILL_CHART;
+            }
         }
     }
 
@@ -369,6 +371,7 @@ static uint32_t oomkill_read_data(int32_t *keys)
     uint32_t curr_key = 0;
     uint32_t key = 0;
     int mapfd = oomkill_maps[OOMKILL_MAP_KILLCNT].map_fd;
+    uint32_t limit = NETDATA_OOMKILL_MAX_ENTRIES -1;
     while (bpf_map_get_next_key(mapfd, &curr_key, &key) == 0) {
         curr_key = key;
 
@@ -383,6 +386,8 @@ static uint32_t oomkill_read_data(int32_t *keys)
             // impossible to get this condition.
             netdata_log_error("key unexpectedly not available for deletion.");
         }
+        if (i > limit)
+            break;
     }
 
     return i;
@@ -399,6 +404,7 @@ static uint32_t oomkill_read_data(int32_t *keys)
 static void ebpf_update_oomkill_cgroup(int32_t *keys, uint32_t total)
 {
     ebpf_cgroup_target_t *ect;
+    pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         ect->oomkill = 0;
         struct pid_on_target2 *pids;
@@ -413,6 +419,7 @@ static void ebpf_update_oomkill_cgroup(int32_t *keys, uint32_t total)
             }
         }
     }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
 /**
@@ -470,18 +477,18 @@ static void oomkill_collector(ebpf_module_t *em)
         stats[NETDATA_CONTROLLER_PID_TABLE_ADD] += (uint64_t) count;
         stats[NETDATA_CONTROLLER_PID_TABLE_DEL] += (uint64_t) count;
 
-        pthread_mutex_lock(&lock);
-        if (cgroups && shm_ebpf_cgroup.header) {
+        if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_oomkill_cgroup(keys, count);
-            // write everything from the ebpf map.
-            ebpf_oomkill_send_cgroup_data(update_every);
-        }
 
-        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            pthread_mutex_lock(&collect_data_mutex);
+        netdata_apps_integration_flags_t apps = em->apps_charts;
+        pthread_mutex_lock(&lock);
+        // write everything from the ebpf map.
+        if (cgroups && shm_ebpf_cgroup.header)
+            ebpf_oomkill_send_cgroup_data(update_every);
+
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             oomkill_write_data(keys, count);
-            pthread_mutex_unlock(&collect_data_mutex);
-        }
+
         pthread_mutex_unlock(&lock);
 
         running_time = ebpf_update_oomkill_period(running_time, em);
@@ -506,18 +513,20 @@ void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_ebpf_oomkill",
-                             "OOM kills.",
-                             EBPF_COMMON_DIMENSION_KILLS,
+                             NETDATA_OOMKILL_CHART,
+                             "Processes OOM kills.",
+                             EBPF_OOMKILL_UNIT_KILLS,
                              NETDATA_EBPF_MEMORY_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_oomkill",
                              20072,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_OOMKILL);
-        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
+        ebpf_create_chart_labels("app_group", w->clean_name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
-        fprintf(stdout, "DIMENSION kills '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        fprintf(stdout, "DIMENSION '%s' '' %s 1 1\n",
+                oomkill_publish_aggregated.dimension,
+                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
         w->charts_created |= 1<<EBPF_MODULE_OOMKILL_IDX;
     }
