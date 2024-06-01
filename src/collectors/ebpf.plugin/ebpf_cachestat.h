@@ -15,9 +15,9 @@
 
 #define NETDATA_CACHESTAT_SUBMENU "page_cache"
 
-#define EBPF_CACHESTAT_DIMENSION_PAGE "pages/s"
-#define EBPF_CACHESTAT_DIMENSION_HITS "hits/s"
-#define EBPF_CACHESTAT_DIMENSION_MISSES "misses/s"
+#define EBPF_CACHESTAT_UNITY_PAGE "pages/s"
+#define EBPF_CACHESTAT_UNITY_HITS "hits/s"
+#define EBPF_CACHESTAT_UNITY_MISSES "misses/s"
 
 // configuration file
 #define NETDATA_CACHESTAT_CONFIG_FILE "cachestat.conf"
