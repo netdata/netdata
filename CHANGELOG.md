@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Correctly handle eBPF check in package test script. [\#17794](https://github.com/netdata/netdata/pull/17794) ([Ferroin](https://github.com/Ferroin))
 - Use correct path for package files. [\#17793](https://github.com/netdata/netdata/pull/17793) ([vkalintiris](https://github.com/vkalintiris))
 - proc/net\_dev: remove "ignore zero metrics" [\#17789](https://github.com/netdata/netdata/pull/17789) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17786](https://github.com/netdata/netdata/pull/17786) ([netdatabot](https://github.com/netdatabot))
@@ -41,6 +42,7 @@
 - Update netdata-agent-security.md [\#17738](https://github.com/netdata/netdata/pull/17738) ([Ancairon](https://github.com/Ancairon))
 - Collecting metrics docs grammar pass [\#17736](https://github.com/netdata/netdata/pull/17736) ([Ancairon](https://github.com/Ancairon))
 - Grammar pass on docs [\#17735](https://github.com/netdata/netdata/pull/17735) ([Ancairon](https://github.com/Ancairon))
+- eBPF OOMKills adjust and fixes. [\#17734](https://github.com/netdata/netdata/pull/17734) ([thiagoftsm](https://github.com/thiagoftsm))
 - Ensure that the choice of compiler and target is passed to sub-projects. [\#17732](https://github.com/netdata/netdata/pull/17732) ([Ferroin](https://github.com/Ferroin))
 - Include the Host in the HTTP header \(mqtt\) [\#17731](https://github.com/netdata/netdata/pull/17731) ([stelfrag](https://github.com/stelfrag))
 - Add alert meta info [\#17730](https://github.com/netdata/netdata/pull/17730) ([stelfrag](https://github.com/stelfrag))
@@ -405,8 +407,6 @@
 - feat: add netdata cloud api-tokens docs [\#17225](https://github.com/netdata/netdata/pull/17225) ([witalisoft](https://github.com/witalisoft))
 - Trigger subsequent workflows for Helmchart and MSI [\#17224](https://github.com/netdata/netdata/pull/17224) ([tkatsoulas](https://github.com/tkatsoulas))
 - fixing the helm login command for the onprem installation [\#17222](https://github.com/netdata/netdata/pull/17222) ([M4itee](https://github.com/M4itee))
-- Reduce flush operations during journal build [\#17220](https://github.com/netdata/netdata/pull/17220) ([stelfrag](https://github.com/stelfrag))
-- go.d: mysql: disable session query log and slow query log [\#17219](https://github.com/netdata/netdata/pull/17219) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.5](https://github.com/netdata/netdata/tree/v1.45.5) (2024-05-21)
 
