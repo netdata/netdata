@@ -32,6 +32,9 @@
 // ARAL name
 #define NETDATA_EBPF_DCSTAT_ARAL_NAME "ebpf_dcstat"
 
+// Unity
+#define EBPF_COMMON_UNITY_FILES "files"
+
 enum directory_cache_indexes {
     NETDATA_DCSTAT_IDX_RATIO,
     NETDATA_DCSTAT_IDX_REFERENCE,
