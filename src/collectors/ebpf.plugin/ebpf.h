@@ -328,7 +328,6 @@ void ebpf_pid_file(char *filename, size_t length);
 
 #define EBPF_COMMON_UNITY_PERCENTAGE "%"
 #define EBPF_COMMON_UNITY_CALL "calls/s"
-#define EBPF_COMMON_DIMENSION_BYTES "bytes/s"
 #define EBPF_COMMON_DIMENSION_DIFFERENCE "difference"
 #define EBPF_COMMON_DIMENSION_PACKETS "packets"
 #define EBPF_COMMON_DIMENSION_FILES "files"

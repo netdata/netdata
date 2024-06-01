@@ -459,7 +459,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
                               "Bytes written on disk",
-                              EBPF_COMMON_DIMENSION_BYTES,
+                              EBPF_COMMON_UNITY_BYTES,
                               NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
                               NULL,
@@ -470,7 +470,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
                               "Bytes read from disk",
-                              EBPF_COMMON_DIMENSION_BYTES,
+                              EBPF_COMMON_UNITY_BYTES,
                               NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
                               NULL,
@@ -652,7 +652,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_call_vfs_write_bytes",
                                   "Bytes written on disk.",
-                                  EBPF_COMMON_DIMENSION_BYTES,
+                                  EBPF_COMMON_UNITY_BYTES,
                                   NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_call_vfs_write_bytes",
@@ -663,7 +663,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_call_vfs_read_bytes",
                                   "Bytes read from disk.",
-                                  EBPF_COMMON_DIMENSION_BYTES,
+                                  EBPF_COMMON_UNITY_BYTES,
                                   NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_call_vfs_read_bytes",
@@ -781,7 +781,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
                               NETDATA_VFS_IO_FILE_BYTES,
                               "",
                               "Bytes written and read",
-                              EBPF_COMMON_DIMENSION_BYTES,
+                              EBPF_COMMON_UNITY_BYTES,
                               NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NULL,
@@ -1403,7 +1403,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
     }
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES, "Bytes written on disk",
-                      EBPF_COMMON_DIMENSION_BYTES, NETDATA_VFS_GROUP, NETDATA_CGROUP_VFS_WRITE_BYTES_CONTEXT,
+                      EBPF_COMMON_UNITY_BYTES, NETDATA_VFS_GROUP, NETDATA_CGROUP_VFS_WRITE_BYTES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5505,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_WRITE],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
@@ -1411,7 +1411,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_READ_BYTES, "Bytes read from disk",
-                      EBPF_COMMON_DIMENSION_BYTES, NETDATA_VFS_GROUP, NETDATA_CGROUP_VFS_READ_BYTES_CONTEXT,
+                      EBPF_COMMON_UNITY_BYTES, NETDATA_VFS_GROUP, NETDATA_CGROUP_VFS_READ_BYTES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5506,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
@@ -1513,12 +1513,12 @@ static void ebpf_obsolete_specific_vfs_charts(char *type, ebpf_module_t *em)
     }
 
     ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES, "", "Bytes written on disk",
-                              EBPF_COMMON_DIMENSION_BYTES, NETDATA_VFS_GROUP,
+                              EBPF_COMMON_UNITY_BYTES, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_WRITE_BYTES_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5505, em->update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_READ_BYTES, "", "Bytes read from disk",
-                              EBPF_COMMON_DIMENSION_BYTES, NETDATA_VFS_GROUP,
+                              EBPF_COMMON_UNITY_BYTES, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_READ_BYTES_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5506, em->update_every);
 
@@ -1725,7 +1725,7 @@ static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
 
     static ebpf_systemd_args_t data_vfs_write_bytes = {
         .title = "Bytes written on disk",
-        .units = EBPF_COMMON_DIMENSION_BYTES,
+        .units = EBPF_COMMON_UNITY_BYTES,
         .family = NETDATA_VFS_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20070,
@@ -1739,7 +1739,7 @@ static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
 
     static ebpf_systemd_args_t data_vfs_read_bytes = {
         .title = "Bytes read from disk",
-        .units = EBPF_COMMON_DIMENSION_BYTES,
+        .units = EBPF_COMMON_UNITY_BYTES,
         .family = NETDATA_VFS_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20071,
@@ -2201,7 +2201,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       2, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
 
     ebpf_create_io_chart(NETDATA_FILESYSTEM_FAMILY,
-                         NETDATA_VFS_IO_FILE_BYTES, EBPF_COMMON_DIMENSION_BYTES,
+                         NETDATA_VFS_IO_FILE_BYTES, EBPF_COMMON_UNITY_BYTES,
                          NETDATA_VFS_GROUP,
                          NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_BYTES,
                          NETDATA_EBPF_INCREMENTAL_IDX, em->update_every);
@@ -2402,7 +2402,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_call_vfs_write_bytes",
                              "Bytes written on disk.",
-                             EBPF_COMMON_DIMENSION_BYTES,
+                             EBPF_COMMON_UNITY_BYTES,
                              NETDATA_VFS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_call_vfs_write_bytes",
@@ -2417,7 +2417,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_call_vfs_read_bytes",
                              "Bytes read from disk.",
-                             EBPF_COMMON_DIMENSION_BYTES,
+                             EBPF_COMMON_UNITY_BYTES,
                              NETDATA_VFS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_call_vfs_read_bytes",
