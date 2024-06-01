@@ -16,7 +16,9 @@
 // Vector indexes
 #define NETDATA_UDP_START 3
 
+// dimensions
 #define EBPF_COMMON_UNITY_CONNECTIONS "connections/s"
+#define EBPF_COMMON_UNITY_KILOBITS "kilobits/s"
 
 // config file
 #define NETDATA_NETWORK_CONFIG_FILE "network.conf"
