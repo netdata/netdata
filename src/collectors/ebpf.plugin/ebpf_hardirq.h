@@ -47,8 +47,6 @@ typedef struct hardirq_ebpf_static_val {
     uint64_t ts;
 } hardirq_ebpf_static_val_t;
 
-// unity
-#define EBPF_COMMON_UNITY_MILLISECONDS "milliseconds"
 
 /*****************************************************************
  * below this is eBPF plugin-specific code.
