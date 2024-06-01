@@ -283,7 +283,7 @@ static void ebpf_obsolete_dc_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_DC_HIT_CHART,
                               "Percentage of files inside directory cache",
-                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              EBPF_COMMON_UNITY_PERCENTAGE,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT,
@@ -367,7 +367,7 @@ void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_dc_hit",
                                   "Percentage of files inside directory cache.",
-                                  EBPF_COMMON_DIMENSION_PERCENTAGE,
+                                  EBPF_COMMON_UNITY_PERCENTAGE,
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   "app.ebpf_dc_hit",
@@ -425,7 +425,7 @@ static void ebpf_obsolete_dc_global(ebpf_module_t *em)
                               NETDATA_DC_HIT_CHART,
                               "",
                               "Percentage of files inside directory cache",
-                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              EBPF_COMMON_UNITY_PERCENTAGE,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NULL,
@@ -687,7 +687,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_dc_hit",
                              "Percentage of files inside directory cache.",
-                             EBPF_COMMON_DIMENSION_PERCENTAGE,
+                             EBPF_COMMON_UNITY_PERCENTAGE,
                              NETDATA_DIRECTORY_CACHE_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_LINE,
                              "app.ebpf_dc_hit",
@@ -910,7 +910,7 @@ static void ebpf_create_specific_dc_charts(char *type, int update_every)
 {
     char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_create_chart(type, NETDATA_DC_HIT_CHART, "Percentage of files inside directory cache",
-                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
+                      EBPF_COMMON_UNITY_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
                       NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5700,
                       ebpf_create_global_dimension,
@@ -964,7 +964,7 @@ static void ebpf_obsolete_specific_dc_charts(char *type, int update_every)
     ebpf_write_chart_obsolete(type, NETDATA_DC_HIT_CHART,
                               "",
                               "Percentage of files inside directory cache",
-                              EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              EBPF_COMMON_UNITY_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5700, update_every);
 
@@ -1049,7 +1049,7 @@ static void ebpf_create_systemd_dc_charts(int update_every)
 {
     static ebpf_systemd_args_t data_dc_hit_ratio = {
         .title = "Percentage of files inside directory cache",
-        .units = EBPF_COMMON_DIMENSION_PERCENTAGE,
+        .units = EBPF_COMMON_UNITY_PERCENTAGE,
         .family = NETDATA_DIRECTORY_CACHE_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
         .order = 21200,
@@ -1312,7 +1312,7 @@ static void ebpf_create_dc_global_charts(int update_every)
 {
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
                       "Percentage of files inside directory cache",
-                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
+                      EBPF_COMMON_UNITY_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21200,

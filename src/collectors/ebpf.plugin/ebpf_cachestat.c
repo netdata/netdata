@@ -334,7 +334,7 @@ static void ebpf_obsolete_cachestat_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_CACHESTAT_HIT_RATIO_CHART,
                               "Hit ratio",
-                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              EBPF_COMMON_UNITY_PERCENTAGE,
                               NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT,
@@ -411,7 +411,7 @@ static void ebpf_obsolete_cachestat_global(ebpf_module_t *em)
                               NETDATA_CACHESTAT_HIT_RATIO_CHART,
                               "",
                               "Hit ratio",
-                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              EBPF_COMMON_UNITY_PERCENTAGE,
                               NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NULL,
@@ -472,7 +472,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_cachestat_hit_ratio",
                                   "Hit ratio",
-                                  EBPF_COMMON_DIMENSION_PERCENTAGE,
+                                  EBPF_COMMON_UNITY_PERCENTAGE,
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   "app.ebpf_cachestat_hit_ratio",
@@ -886,7 +886,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_cachestat_hit_ratio",
                              "Hit ratio",
-                             EBPF_COMMON_DIMENSION_PERCENTAGE,
+                             EBPF_COMMON_UNITY_PERCENTAGE,
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_LINE,
                              "app.ebpf_cachestat_hit_ratio",
@@ -1115,7 +1115,7 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
 {
     static ebpf_systemd_args_t data_hit_ratio = {
         .title = "Hit ratio",
-        .units = EBPF_COMMON_DIMENSION_PERCENTAGE,
+        .units = EBPF_COMMON_UNITY_PERCENTAGE,
         .family = NETDATA_CACHESTAT_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
         .order = 21100,
@@ -1260,7 +1260,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
     char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                       "Hit ratio",
-                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
+                      EBPF_COMMON_UNITY_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200,
                       ebpf_create_global_dimension,
@@ -1315,7 +1315,7 @@ static void ebpf_obsolete_specific_cachestat_charts(char *type, int update_every
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                               "",
                       "Hit ratio",
-                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
+                      EBPF_COMMON_UNITY_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200, update_every);
 
@@ -1453,7 +1453,7 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                       "Hit ratio",
-                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
+                      EBPF_COMMON_UNITY_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21100,
