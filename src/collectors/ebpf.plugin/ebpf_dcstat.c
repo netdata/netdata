@@ -428,7 +428,7 @@ static void ebpf_obsolete_dc_global(ebpf_module_t *em)
                               EBPF_COMMON_UNITY_PERCENTAGE,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              NETDATA_FS_DC_HIT_RATIO_CONTEXT,
                               21200,
                               em->update_every);
 
@@ -439,7 +439,7 @@ static void ebpf_obsolete_dc_global(ebpf_module_t *em)
                               EBPF_COMMON_UNITY_FILES,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              NETDATA_FS_DC_REFERENCE_CONTEXT,
                               21201,
                               em->update_every);
 }
@@ -1313,7 +1313,7 @@ static void ebpf_create_dc_global_charts(int update_every)
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
                       "Percentage of files inside directory cache",
                       EBPF_COMMON_UNITY_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
-                      NULL,
+                      NETDATA_FS_DC_HIT_RATIO_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21200,
                       ebpf_create_global_dimension,
@@ -1322,7 +1322,7 @@ static void ebpf_create_dc_global_charts(int update_every)
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_REFERENCE_CHART,
                       "Variables used to calculate hit ratio.",
                       EBPF_COMMON_UNITY_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
-                      NULL,
+                      NETDATA_FS_DC_REFERENCE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21201,
                       ebpf_create_global_dimension,
