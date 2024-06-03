@@ -1820,8 +1820,8 @@ void dbengine_retention_statistics(void)
                                                     100 * retention / multidb_ctx[tier]->config.max_retention_s :
                                                     0;
 
-        if (retention_percentage > 100.0)
-            retention_percentage = 100.0;
+        if (retention_percentage > 100)
+            retention_percentage = 100;
 
         rrddim_set_by_pointer(stats[tier].st, stats[tier].rd_space, (collected_number) disk_percentage);
         rrddim_set_by_pointer(stats[tier].st, stats[tier].rd_time, (collected_number) retention_percentage);
