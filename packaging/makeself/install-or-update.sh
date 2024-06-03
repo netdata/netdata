@@ -223,7 +223,7 @@ replace_symlink() {
     target="${1}"
     name="${2}"
     rm -f "${name}"
-    ln -s "${1}" "${2}"
+    ln -s "${target}" "${name}"
 }
 
 select_system_certs() {
