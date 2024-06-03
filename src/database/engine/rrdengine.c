@@ -1798,10 +1798,12 @@ void dbengine_retention_statistics(void)
             stats[tier].rd_space = rrddim_add(stats[tier].st, "space", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             stats[tier].rd_time = rrddim_add(stats[tier].st, "time", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-            stats[tier].st ->rrdlabels = rrdlabels_create();
-            rrdlabels_add(stats[tier].st ->rrdlabels, "dbengine_retention", "yes", RRDLABEL_SRC_AUTO);
-            rrdset_flag_set(stats[tier].st , RRDSET_FLAG_METADATA_UPDATE);
-            rrdhost_flag_set(stats[tier].st ->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
+            char tier_str[5];
+            snprintfz(tier_str, 4, "%ld", tier);
+            rrdlabels_add(stats[tier].st->rrdlabels, "dbengine_tier", tier_str, RRDLABEL_SRC_AUTO);
+
+            rrdset_flag_set(stats[tier].st, RRDSET_FLAG_METADATA_UPDATE);
+            rrdhost_flag_set(stats[tier].st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
             rrdset_metadata_updated(stats[tier].st);
         }
 
