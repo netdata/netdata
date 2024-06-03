@@ -84,24 +84,25 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     if (!fp_child_output)
         return retval;
 
-    fd_set rfds;
-    struct timeval timeout;
     int fd = fileno(fp_child_output);
-    int ret = -1;
-
-    FD_ZERO(&rfds);
-    FD_SET(fd, &rfds);
-    timeout.tv_sec = 3;
-    timeout.tv_usec = 0;
-
-    if (fd != -1) {
-        ret = select(fd + 1, &rfds, NULL, NULL, &timeout);
+    if (fd == -1 ) {
+        collector_error("Cannot get the output of \"%s\": failed to get file descriptor", exec);
+        netdata_pclose(fp_child_input, fp_child_output, command_pid);
+        return retval;
     }
+
+    struct pollfd pfd;
+    pfd.fd = fd;
+    pfd.events = POLLIN;
+
+    int timeout = 3000; // milliseconds
+
+    int ret = poll(&pfd, 1, timeout);
 
     if (ret == -1) {
         collector_error("Failed to get the output of \"%s\"", exec);
     } else if (ret == 0) {
-        collector_info("Cannot get the output of \"%s\" within %"PRId64" seconds", exec, (int64_t)timeout.tv_sec);
+        collector_info("Cannot get the output of \"%s\" within timeout (%d ms)", exec, timeout);
     } else {
         while (fgets(buf, MAXSIZE_PROC_CMDLINE, fp_child_output) != NULL) {
             if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
@@ -168,9 +169,6 @@ static enum cgroups_type cgroups_try_detect_version()
     // 3. check systemd compiletime setting
     if ((systemd_setting = cgroups_detect_systemd("systemd --version")) == SYSTEMD_CGROUP_ERR)
         systemd_setting = cgroups_detect_systemd(SYSTEMD_CMD_RHEL);
-
-    if(systemd_setting == SYSTEMD_CGROUP_ERR)
-        return CGROUPS_AUTODETECT_FAIL;
 
     if(systemd_setting == SYSTEMD_CGROUP_LEGACY || systemd_setting == SYSTEMD_CGROUP_HYBRID) {
         // currently we prefer V1 if HYBRID is set as it seems to be more feature complete
