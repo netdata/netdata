@@ -969,7 +969,7 @@ void dbengine_init(char *hostname) {
         storage_tiers_grouping_iterations[tier] = grouping_iterations;
 
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention days", tier);
-        storage_tiers_retention_days[tier] = config_get_float(
+        storage_tiers_retention_days[tier] = config_get_number(
             CONFIG_SECTION_DB, dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_days[tier] : 0);
 
         tiers_init[tier].disk_space_mb = (int) disk_space_mb;
