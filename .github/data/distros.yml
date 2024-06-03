@@ -135,12 +135,6 @@ include:
         - aarch64
     test:
       ebpf-core: true
-  - <<: *centos_stream
-    version: '8'
-    base_image: 'quay.io/centos/centos:stream8'
-    packages:
-      <<: *cs_packages
-      repo_distro: el/c8s
 
   - &debian
     distro: debian
@@ -341,6 +335,12 @@ legacy: # Info for platforms we used to support and still need to handle package
     packages:
       <<: *opensuse_packages
       repo_distro: opensuse/15.4
+  - <<: *centos_stream
+    version: '8'
+    base_image: 'quay.io/centos/centos:stream8'
+    packages:
+      <<: *cs_packages
+      repo_distro: el/c8s
 no_include: # Info for platforms not covered in CI
   - distro: docker
     version: "19.03 or newer"
