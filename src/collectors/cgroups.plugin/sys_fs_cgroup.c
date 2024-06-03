@@ -85,27 +85,24 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
         return retval;
 
     int fd = fileno(fp_child_output);
-    if (fd < 0 || fd >= FD_SETSIZE) {
-        collector_error("Cannot get the output of \"%s\": invalid file descriptor: %d", exec, fd);
+    if (fd == -1 ) {
+        collector_error("Cannot get the output of \"%s\": failed to get file descriptor", exec);
         netdata_pclose(fp_child_input, fp_child_output, command_pid);
         return retval;
     }
 
-    fd_set rfds;
-    struct timeval timeout;
-    int ret = -1;
+    struct pollfd pfd;
+    pfd.fd = fd;
+    pfd.events = POLLIN;
 
-    FD_ZERO(&rfds);
-    FD_SET(fd, &rfds);
-    timeout.tv_sec = 3;
-    timeout.tv_usec = 0;
+    int timeout = 3000; // milliseconds
 
-    ret = select(fd + 1, &rfds, NULL, NULL, &timeout);
+    int ret = poll(&pfd, 1, timeout);
 
     if (ret == -1) {
         collector_error("Failed to get the output of \"%s\"", exec);
     } else if (ret == 0) {
-        collector_info("Cannot get the output of \"%s\" within %"PRId64" seconds", exec, (int64_t)timeout.tv_sec);
+        collector_info("Cannot get the output of \"%s\" within timeout (%d ms)", exec, timeout);
     } else {
         while (fgets(buf, MAXSIZE_PROC_CMDLINE, fp_child_output) != NULL) {
             if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
