@@ -73,7 +73,7 @@
 #define NETDATA_EBPF_VFS_ARAL_NAME "ebpf_vfs"
 
 // dimension
-#define EBPF_COMMON_UNITY_BYTES "bytes/s"
+#define EBPF_COMMON_UNITS_BYTES "bytes/s"
 
 typedef struct netdata_publish_vfs {
     uint64_t ct;

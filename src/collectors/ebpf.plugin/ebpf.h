@@ -326,9 +326,9 @@ void ebpf_pid_file(char *filename, size_t length);
 
 #define EBPF_PROGRAMS_SECTION "ebpf programs"
 
-#define EBPF_COMMON_UNITY_PERCENTAGE "%"
-#define EBPF_COMMON_UNITY_CALL "calls/s"
-#define EBPF_COMMON_UNITY_MILLISECONDS "milliseconds"
+#define EBPF_COMMON_UNITS_PERCENTAGE "%"
+#define EBPF_COMMON_UNITS_CALL "calls/s"
+#define EBPF_COMMON_UNITS_MILLISECONDS "milliseconds"
 
 #define EBPF_CHART_ALGORITHM_ABSOLUTE "absolute"
 #define EBPF_CHART_ALGORITHM_INCREMENTAL "incremental"
