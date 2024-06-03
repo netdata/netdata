@@ -952,7 +952,7 @@ void dbengine_init(char *hostname) {
         int disk_space_mb = tier ? RRDENG_DEFAULT_TIER_DISK_SPACE_MB : default_multidb_disk_quota_mb;
         grouping_iterations = storage_tiers_grouping_iterations[tier];
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu multihost disk space MB", tier);
-        disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, RRDENG_DEFAULT_TIER_DISK_SPACE_MB);
+        disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
         if (tier > 0) {
 
