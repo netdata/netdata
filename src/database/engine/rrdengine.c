@@ -1800,7 +1800,7 @@ void dbengine_retention_statistics(void)
 
             char tier_str[5];
             snprintfz(tier_str, 4, "%ld", tier);
-            rrdlabels_add(stats[tier].st->rrdlabels, "dbengine_tier", tier_str, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(stats[tier].st->rrdlabels, "tier", tier_str, RRDLABEL_SRC_AUTO);
 
             rrdset_flag_set(stats[tier].st, RRDSET_FLAG_METADATA_UPDATE);
             rrdhost_flag_set(stats[tier].st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
