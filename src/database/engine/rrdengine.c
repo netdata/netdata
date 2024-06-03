@@ -1786,7 +1786,7 @@ void dbengine_retention_statistics(void)
                 id,
                 NULL,
                 "dbengine",
-                "dbengine_retention",
+                "netdata.dbengine_tier_retention",
                 "dbengine space and time retention",
                 "%",
                 "netdata",
