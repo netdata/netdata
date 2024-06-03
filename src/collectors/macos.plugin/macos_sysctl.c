@@ -1262,7 +1262,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "OutAdvertisements", icmp6stat.icp6s_outhist[ND_NEIGHBOR_ADVERT]);
             }
 
-            if (do_icmp6_types == CONFIG_BOOLEAN_YES || do_icmp6_types == CONFIG_BOOLEAN_AUTO &&) {
+            if (do_icmp6_types == CONFIG_BOOLEAN_YES || do_icmp6_types == CONFIG_BOOLEAN_AUTO) {
                 do_icmp6_types = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_active_localhost("ipv6.icmptypes");
                 if (unlikely(!st)) {
