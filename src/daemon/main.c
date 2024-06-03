@@ -1499,7 +1499,7 @@ int main(int argc, char **argv)
         exit(0);
     }
 
-    #if 0
+    #if 1
     // parse options
     {
         int num_opts = sizeof(option_definitions) / sizeof(struct option_def);
