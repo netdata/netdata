@@ -84,9 +84,15 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     if (!fp_child_output)
         return retval;
 
+    int fd = fileno(fp_child_output);
+    if (fd < 0 || fd >= FD_SETSIZE) {
+        collector_error("Cannot get the output of \"%s\": invalid file descriptor: %d", exec, fd);
+        netdata_pclose(fp_child_input, fp_child_output, command_pid);
+        return retval;
+    }
+
     fd_set rfds;
     struct timeval timeout;
-    int fd = fileno(fp_child_output);
     int ret = -1;
 
     FD_ZERO(&rfds);
@@ -94,9 +100,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     timeout.tv_sec = 3;
     timeout.tv_usec = 0;
 
-    if (fd != -1) {
-        ret = select(fd + 1, &rfds, NULL, NULL, &timeout);
-    }
+    ret = select(fd + 1, &rfds, NULL, NULL, &timeout);
 
     if (ret == -1) {
         collector_error("Failed to get the output of \"%s\"", exec);
@@ -168,9 +172,6 @@ static enum cgroups_type cgroups_try_detect_version()
     // 3. check systemd compiletime setting
     if ((systemd_setting = cgroups_detect_systemd("systemd --version")) == SYSTEMD_CGROUP_ERR)
         systemd_setting = cgroups_detect_systemd(SYSTEMD_CMD_RHEL);
-
-    if(systemd_setting == SYSTEMD_CGROUP_ERR)
-        return CGROUPS_AUTODETECT_FAIL;
 
     if(systemd_setting == SYSTEMD_CGROUP_LEGACY || systemd_setting == SYSTEMD_CGROUP_HYBRID) {
         // currently we prefer V1 if HYBRID is set as it seems to be more feature complete
