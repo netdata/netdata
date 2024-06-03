@@ -790,12 +790,8 @@ static inline void cgroup2_read_pressure(struct pressure *res) {
         }
 
         res->updated = (did_full || did_some) ? 1 : 0;
-
-        if(unlikely(res->some.enabled == CONFIG_BOOLEAN_AUTO))
-            res->some.enabled = (did_some) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
-
-        if(unlikely(res->full.enabled == CONFIG_BOOLEAN_AUTO))
-            res->full.enabled = (did_full) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
+        res->some.available = did_some;
+        res->full.available = did_full;
     }
 }
 
@@ -1263,44 +1259,44 @@ void update_cgroup_charts() {
 
         if (cg->options & CGROUP_OPTIONS_IS_UNIFIED) {
             if (likely(cg->cpu_pressure.updated)) {
-                    if (cg->cpu_pressure.some.enabled) {
+                    if (cg->cpu_pressure.some.available) {
                         update_cpu_some_pressure_chart(cg);
                         update_cpu_some_pressure_stall_time_chart(cg);
                     }
-                    if (cg->cpu_pressure.full.enabled) {
+                    if (cg->cpu_pressure.full.available) {
                         update_cpu_full_pressure_chart(cg);
                         update_cpu_full_pressure_stall_time_chart(cg);
                     }
             }
 
             if (likely(cg->memory_pressure.updated)) {
-                if (cg->memory_pressure.some.enabled) {
+                if (cg->memory_pressure.some.available) {
                         update_mem_some_pressure_chart(cg);
                         update_mem_some_pressure_stall_time_chart(cg);
                 }
-                if (cg->memory_pressure.full.enabled) {
+                if (cg->memory_pressure.full.available) {
                         update_mem_full_pressure_chart(cg);
                         update_mem_full_pressure_stall_time_chart(cg);
                 }
             }
 
             if (likely(cg->irq_pressure.updated)) {
-                if (cg->irq_pressure.some.enabled) {
+                if (cg->irq_pressure.some.available) {
                         update_irq_some_pressure_chart(cg);
                         update_irq_some_pressure_stall_time_chart(cg);
                 }
-                if (cg->irq_pressure.full.enabled) {
+                if (cg->irq_pressure.full.available) {
                         update_irq_full_pressure_chart(cg);
                         update_irq_full_pressure_stall_time_chart(cg);
                 }
             }
 
             if (likely(cg->io_pressure.updated)) {
-                if (cg->io_pressure.some.enabled) {
+                if (cg->io_pressure.some.available) {
                         update_io_some_pressure_chart(cg);
                         update_io_some_pressure_stall_time_chart(cg);
                 }
-                if (cg->io_pressure.full.enabled) {
+                if (cg->io_pressure.full.available) {
                         update_io_full_pressure_chart(cg);
                         update_io_full_pressure_stall_time_chart(cg);
                 }
