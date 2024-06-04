@@ -1808,7 +1808,10 @@ void dbengine_retention_statistics(void)
         }
 
         uint64_t disk_space = get_used_disk_space(multidb_ctx[tier]);
-        time_t retention = get_tier_retention(multidb_ctx[tier]);
+
+        STORAGE_ENGINE *eng = localhost->db[tier].eng;
+        time_t first_time_s = storage_engine_global_first_time_s(eng->seb, localhost->db[tier].si);
+        time_t retention = first_time_s ? now_realtime_sec() - first_time_s : 0;
 
         uint64_t config_disk_space = multidb_ctx[tier]->config.max_disk_space;
         if (!config_disk_space)
