@@ -284,7 +284,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
     ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP,
                       NETDATA_PROCESS_SYSCALL,
                       "Start process",
-                      EBPF_COMMON_UNITS_CALL,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC,
                       NETDATA_PROCESS_GROUP,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
@@ -296,7 +296,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
     ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP,
                       NETDATA_EXIT_SYSCALL,
                       "Exit process",
-                      EBPF_COMMON_UNITS_CALL,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC,
                       NETDATA_PROCESS_GROUP,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
@@ -307,7 +307,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
 
     ebpf_process_status_chart(NETDATA_EBPF_SYSTEM_GROUP,
                               NETDATA_PROCESS_STATUS_NAME,
-                              EBPF_COMMON_UNITS_DIFFERENCE,
+                              EBPF_COMMON_UNITS_CALLS,
                               NETDATA_PROCESS_GROUP,
                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
                               21004, em->update_every);
@@ -316,7 +316,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
         ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP,
                           NETDATA_PROCESS_ERROR_NAME,
                           "Fails to create process",
-                          EBPF_COMMON_UNITS_CALL,
+                          EBPF_COMMON_UNITS_CALLS_PER_SEC,
                           NETDATA_PROCESS_GROUP,
                           NULL,
                           NETDATA_EBPF_CHART_TYPE_LINE,
@@ -350,7 +350,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_process_start",
                              "Process started.",
-                             EBPF_COMMON_UNITS_CALL,
+                             EBPF_COMMON_UNITS_CALLS_PER_SEC,
                              NETDATA_PROCESS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_process_start",
@@ -365,7 +365,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_thread_start",
                              "Threads started.",
-                             EBPF_COMMON_UNITS_CALL,
+                             EBPF_COMMON_UNITS_CALLS_PER_SEC,
                              NETDATA_PROCESS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_thread_start",
@@ -380,7 +380,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_task_exit",
                              "Tasks starts exit process.",
-                             EBPF_COMMON_UNITS_CALL,
+                             EBPF_COMMON_UNITS_CALLS_PER_SEC,
                              NETDATA_PROCESS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_task_exit",
@@ -395,7 +395,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_task_released",
                              "Tasks released.",
-                             EBPF_COMMON_UNITS_CALL,
+                             EBPF_COMMON_UNITS_CALLS_PER_SEC,
                              NETDATA_PROCESS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_task_released",
@@ -411,7 +411,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                  w->clean_name,
                                  "_ebpf_task_error",
                                  "Errors to create process or threads.",
-                                 EBPF_COMMON_UNITS_CALL,
+                                 EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                  NETDATA_PROCESS_GROUP,
                                  NETDATA_EBPF_CHART_TYPE_STACKED,
                                  "app.ebpf_task_error",
@@ -449,7 +449,7 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_SYSCALL_APPS_TASK_PROCESS,
                               "Process started",
-                              EBPF_COMMON_UNITS_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
                               NULL,
@@ -460,7 +460,7 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_SYSCALL_APPS_TASK_THREAD,
                               "Threads started",
-                              EBPF_COMMON_UNITS_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
                               NULL,
@@ -471,7 +471,7 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_SYSCALL_APPS_TASK_CLOSE,
                               "Tasks starts exit process.",
-                              EBPF_COMMON_UNITS_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
                               NULL,
@@ -482,7 +482,7 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_SYSCALL_APPS_TASK_EXIT,
                               "Tasks closed",
-                              EBPF_COMMON_UNITS_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
                               NULL,
@@ -494,7 +494,7 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                                   id,
                                   NETDATA_SYSCALL_APPS_TASK_ERROR,
                                   "Errors to create process or threads.",
-                                  EBPF_COMMON_UNITS_CALL,
+                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_APPS_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   NULL,
@@ -545,7 +545,7 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_process_start",
                                   "Process started.",
-                                  EBPF_COMMON_UNITS_CALL,
+                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_process_start",
@@ -556,7 +556,7 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_thread_start",
                                   "Threads started.",
-                                  EBPF_COMMON_UNITS_CALL,
+                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_thread_start",
@@ -567,7 +567,7 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_task_exit",
                                   "Tasks starts exit process.",
-                                  EBPF_COMMON_UNITS_CALL,
+                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_task_exit",
@@ -578,7 +578,7 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_task_released",
                                   "Tasks released.",
-                                  EBPF_COMMON_UNITS_CALL,
+                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_task_released",
@@ -590,7 +590,7 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
                                       w->clean_name,
                                       "_ebpf_task_error",
                                       "Errors to create process or threads.",
-                                      EBPF_COMMON_UNITS_CALL,
+                                      EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                       NETDATA_PROCESS_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED,
                                       "app.ebpf_task_error",
@@ -615,7 +615,7 @@ static void ebpf_obsolete_process_global(ebpf_module_t *em)
                               NETDATA_PROCESS_SYSCALL,
                               "",
                               "Start process",
-                              EBPF_COMMON_UNITS_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NULL,
@@ -626,7 +626,7 @@ static void ebpf_obsolete_process_global(ebpf_module_t *em)
                               NETDATA_EXIT_SYSCALL,
                               "",
                               "Exit process",
-                              EBPF_COMMON_UNITS_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NULL,
@@ -637,7 +637,7 @@ static void ebpf_obsolete_process_global(ebpf_module_t *em)
                               NETDATA_PROCESS_STATUS_NAME,
                               "",
                               "Process not closed",
-                              EBPF_COMMON_UNITS_DIFFERENCE,
+                              EBPF_COMMON_UNITS_CALLS,
                               NETDATA_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NULL,
@@ -649,7 +649,7 @@ static void ebpf_obsolete_process_global(ebpf_module_t *em)
                                   NETDATA_PROCESS_ERROR_NAME,
                                   "",
                                   "Fails to create process",
-                                  EBPF_COMMON_UNITS_CALL,
+                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   NULL,
@@ -823,7 +823,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
 {
     char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_PROCESS, "Process started",
-                      EBPF_COMMON_UNITS_CALL, NETDATA_PROCESS_GROUP,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_PROCESS_GROUP,
                       NETDATA_CGROUP_PROCESS_CREATE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5000,
                       ebpf_create_global_dimension, &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
@@ -832,7 +832,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_THREAD, "Threads started",
-                      EBPF_COMMON_UNITS_CALL, NETDATA_PROCESS_GROUP,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_PROCESS_GROUP,
                       NETDATA_CGROUP_THREAD_CREATE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5001,
                       ebpf_create_global_dimension,
@@ -842,7 +842,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_EXIT, "Tasks starts exit process.",
-                      EBPF_COMMON_UNITS_CALL, NETDATA_PROCESS_GROUP,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_PROCESS_GROUP,
                       NETDATA_CGROUP_PROCESS_EXIT_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5002,
                       ebpf_create_global_dimension,
@@ -852,7 +852,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_CLOSE, "Tasks closed",
-                      EBPF_COMMON_UNITS_CALL, NETDATA_PROCESS_GROUP,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_PROCESS_GROUP,
                       NETDATA_CGROUP_PROCESS_CLOSE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5003,
                       ebpf_create_global_dimension,
@@ -863,7 +863,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_ERROR, "Errors to create process or threads.",
-                          EBPF_COMMON_UNITS_CALL, NETDATA_PROCESS_GROUP,
+                          EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_PROCESS_GROUP,
                           NETDATA_CGROUP_PROCESS_ERROR_CONTEXT,
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5004,
                           ebpf_create_global_dimension,
@@ -885,28 +885,28 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
 static void ebpf_obsolete_specific_process_charts(char *type, ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_TASK_PROCESS, "", "Process started",
-                              EBPF_COMMON_UNITS_CALL, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_CGROUP_PROCESS_CREATE_CONTEXT, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5000,
                               em->update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_TASK_THREAD, "", "Threads started",
-                              EBPF_COMMON_UNITS_CALL, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_CGROUP_THREAD_CREATE_CONTEXT, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5001,
                               em->update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_TASK_EXIT, "","Tasks starts exit process.",
-                              EBPF_COMMON_UNITS_CALL, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_CGROUP_PROCESS_EXIT_CONTEXT, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5002,
                               em->update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_TASK_CLOSE, "","Tasks closed",
-                              EBPF_COMMON_UNITS_CALL, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_CGROUP_PROCESS_CLOSE_CONTEXT, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5003,
                               em->update_every);
 
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_TASK_ERROR, "","Errors to create process or threads.",
-                                  EBPF_COMMON_UNITS_CALL, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
+                                  EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_PROCESS_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
                                   NETDATA_CGROUP_PROCESS_ERROR_CONTEXT, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5004,
                                   em->update_every);
     }
@@ -923,7 +923,7 @@ static void ebpf_create_systemd_process_charts(ebpf_module_t *em)
 {
     static ebpf_systemd_args_t data_process = {
         .title = "Process started",
-        .units = EBPF_COMMON_UNITS_CALL,
+        .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_APPS_PROCESS_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20065,
@@ -937,7 +937,7 @@ static void ebpf_create_systemd_process_charts(ebpf_module_t *em)
 
     static ebpf_systemd_args_t data_thread = {
         .title = "Threads started",
-        .units = EBPF_COMMON_UNITS_CALL,
+        .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_APPS_PROCESS_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20066,
@@ -951,7 +951,7 @@ static void ebpf_create_systemd_process_charts(ebpf_module_t *em)
 
     static ebpf_systemd_args_t task_exit = {
         .title = "Tasks starts exit process.",
-        .units = EBPF_COMMON_UNITS_CALL,
+        .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_APPS_PROCESS_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20067,
@@ -965,7 +965,7 @@ static void ebpf_create_systemd_process_charts(ebpf_module_t *em)
 
     static ebpf_systemd_args_t task_closed = {
         .title = "Tasks closed",
-        .units = EBPF_COMMON_UNITS_CALL,
+        .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_APPS_PROCESS_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20068,
@@ -979,7 +979,7 @@ static void ebpf_create_systemd_process_charts(ebpf_module_t *em)
 
     static ebpf_systemd_args_t task_error = {
         .title = "Errors to create process or threads.",
-        .units = EBPF_COMMON_UNITS_CALL,
+        .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_APPS_PROCESS_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20069,
