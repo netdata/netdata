@@ -16,7 +16,7 @@ unsigned long long zfs_arcstats_shrinkable_cache_size_bytes = 0;
 int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     (void)dt;
 
-    static int show_zero_charts = 0, do_zfs_stats = 0;
+    static int do_zfs_stats = 0;
     static procfile *ff = NULL;
     static char *dirname = NULL;
     static ARL_BASE *arl_base = NULL;
@@ -128,12 +128,6 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/spl/kstat/zfs");
         dirname = config_get("plugin:proc:" ZFS_PROC_ARCSTATS, "directory to monitor", filename);
-
-        show_zero_charts = config_get_boolean_ondemand("plugin:proc:" ZFS_PROC_ARCSTATS, "show zero charts", CONFIG_BOOLEAN_NO);
-        if(show_zero_charts == CONFIG_BOOLEAN_AUTO && netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)
-            show_zero_charts = CONFIG_BOOLEAN_YES;
-        if(unlikely(show_zero_charts == CONFIG_BOOLEAN_YES))
-            do_zfs_stats = 1;
     }
 
     // check if any pools exist
@@ -201,8 +195,8 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     if(unlikely(arcstats.l2exist == -1))
         arcstats.l2exist = 0;
 
-    generate_charts_arcstats(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, show_zero_charts, update_every);
-    generate_charts_arc_summary(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, show_zero_charts, update_every);
+    generate_charts_arcstats(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, update_every);
+    generate_charts_arc_summary(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, update_every);
 
     return 0;
 }
