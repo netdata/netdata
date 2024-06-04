@@ -21,7 +21,7 @@ Module: ping
 
 ## Overview
 
-This module measures round-tripe time and packet loss by sending ping messages to network hosts.
+This module measures round-trip time and packet loss by sending ping messages to network hosts.
 
 There are two operational modes:
 
