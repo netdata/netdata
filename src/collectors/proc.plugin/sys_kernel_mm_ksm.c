@@ -89,7 +89,8 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
     offered = pages_sharing + pages_shared + pages_unshared + pages_volatile;
     saved = pages_sharing;
 
-    if(unlikely(!offered /*|| !pages_to_scan*/ && netdata_zero_metrics_enabled == CONFIG_BOOLEAN_NO)) return 0;
+    if (!offered)
+        return 0;
 
     // --------------------------------------------------------------------
 
