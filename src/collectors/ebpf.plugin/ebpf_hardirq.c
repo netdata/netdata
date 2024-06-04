@@ -231,7 +231,7 @@ static void ebpf_obsolete_hardirq_global(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_MILLISECONDS,
                               "interrupts",
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
+                              NETDATA_EBPF_SYSTEM_HARDIRQ_LATENCY_CTX,
                               NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
                               em->update_every
     );
@@ -502,7 +502,7 @@ static void hardirq_create_charts(int update_every)
         "Hardware IRQ latency",
         EBPF_COMMON_UNITS_MILLISECONDS,
         "interrupts",
-        NULL,
+        NETDATA_EBPF_SYSTEM_HARDIRQ_LATENCY_CTX,
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
         NULL, NULL, 0, update_every,
