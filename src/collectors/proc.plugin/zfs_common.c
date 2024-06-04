@@ -4,13 +4,13 @@
 
 struct arcstats arcstats = { 0 };
 
-void generate_charts_arcstats(const char *plugin, const char *module, int show_zero_charts, int update_every) {
+void generate_charts_arcstats(const char *plugin, const char *module, int update_every) {
     static int do_arc_size = -1, do_l2_size = -1, do_reads = -1, do_l2bytes = -1, do_ahits = -1, do_dhits = -1, \
                do_phits = -1, do_mhits = -1, do_l2hits = -1, do_list_hits = -1;
 
-    if(unlikely(do_arc_size == -1))
-        do_arc_size = do_l2_size = do_reads = do_l2bytes = do_ahits = do_dhits = do_phits = do_mhits \
-        = do_l2hits = do_list_hits = show_zero_charts;
+    if (unlikely(do_arc_size == -1))
+        do_arc_size = do_l2_size = do_reads = do_l2bytes = do_ahits = do_dhits = do_phits = do_mhits = do_l2hits =
+            do_list_hits = 1;
 
     // ARC reads
     unsigned long long aread = arcstats.hits + arcstats.misses;
@@ -545,13 +545,13 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
     }
 }
 
-void generate_charts_arc_summary(const char *plugin, const char *module, int show_zero_charts, int update_every) {
+void generate_charts_arc_summary(const char *plugin, const char *module, int update_every) {
     static int do_arc_size_breakdown = -1, do_memory = -1, do_important_ops = -1, do_actual_hits = -1, \
                do_demand_data_hits = -1, do_prefetch_data_hits = -1, do_hash_elements = -1, do_hash_chains = -1;
 
-    if(unlikely(do_arc_size_breakdown == -1))
-        do_arc_size_breakdown = do_memory = do_important_ops = do_actual_hits = do_demand_data_hits \
-        = do_prefetch_data_hits = do_hash_elements = do_hash_chains = show_zero_charts;
+    if (unlikely(do_arc_size_breakdown == -1))
+        do_arc_size_breakdown = do_memory = do_important_ops = do_actual_hits = do_demand_data_hits =
+            do_prefetch_data_hits = do_hash_elements = do_hash_chains = 1;
 
     unsigned long long arc_accesses_total = arcstats.hits + arcstats.misses;
     unsigned long long real_hits = arcstats.mfu_hits + arcstats.mru_hits;
