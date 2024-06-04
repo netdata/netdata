@@ -16,7 +16,6 @@
 #endif
 
 bool unittest_running = false;
-int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
 int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
@@ -2240,8 +2239,6 @@ int main(int argc, char **argv) {
     delta_startup_time("start the static threads");
 
     web_server_config_options();
-
-    netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_DB, "enable zero metrics", CONFIG_BOOLEAN_NO);
 
     set_late_global_environment(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {
