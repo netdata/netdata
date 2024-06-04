@@ -1580,6 +1580,16 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
                         buffer_json_add_array_item_object(wb);
                         {
                             buffer_json_member_add_uint64(wb, "ati", t->ati);
+
+                            buffer_json_member_add_array(wb, "ni");
+                            void *host_guid;
+                            dfe_start_read(t->nodes, host_guid) {
+                                struct contexts_v2_node *cn = dictionary_get(ctl->nodes.dict,host_guid_dfe.name);
+                                buffer_json_add_array_item_int64(wb, (int64_t) cn->ni);
+                            }
+                            dfe_done(host_guid);
+                            buffer_json_array_close(wb);
+
                             buffer_json_member_add_string(wb, "nm", string2str(t->name));
                             buffer_json_member_add_string(wb, "sum", string2str(t->summary));
 
