@@ -487,10 +487,10 @@ static void ebpf_obsolete_disk_global(ebpf_module_t *em)
                                       ned->family,
                                       "",
                                       "Disk latency",
-                                      EBPF_COMMON_DIMENSION_CALL,
+                                      EBPF_COMMON_UNITS_CALL,
                                       ned->family,
                                       NETDATA_EBPF_CHART_TYPE_STACKED,
-                                      NULL,
+                                      NETDATA_EBPF_DISK_LATENCY_CONTEXT,
                                       ned->histogram.order,
                                       em->update_every);
         }
@@ -657,11 +657,11 @@ static void read_hard_disk_tables(int table, int maps_per_core)
  */
 static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w, int update_every)
 {
-    ebpf_write_chart_obsolete(w->histogram.name, w->family, "", w->histogram.title, EBPF_COMMON_DIMENSION_CALL,
-                              w->family, NETDATA_EBPF_CHART_TYPE_STACKED, "disk.latency_io",
+    ebpf_write_chart_obsolete(w->histogram.name, w->family, "", "Disk latency", EBPF_COMMON_UNITS_CALL,
+                              w->family, NETDATA_EBPF_CHART_TYPE_STACKED, NETDATA_EBPF_DISK_LATENCY_CONTEXT,
                               w->histogram.order, update_every);
 
-    w->flags = 0;
+    w->flags = NETDATA_DISK_NONE;
 }
 
 /**
@@ -681,8 +681,8 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w, int update_every)
     w->histogram.title = NULL;
     w->histogram.order = order;
 
-    ebpf_create_chart(w->histogram.name, family, "Disk latency", EBPF_COMMON_DIMENSION_CALL,
-                      family, "disk.latency_io", NETDATA_EBPF_CHART_TYPE_STACKED, order,
+    ebpf_create_chart(w->histogram.name, family, "Disk latency", EBPF_COMMON_UNITS_CALL,
+                      family, NETDATA_EBPF_DISK_LATENCY_CONTEXT, NETDATA_EBPF_CHART_TYPE_STACKED, order,
                       ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
                       update_every, NETDATA_EBPF_MODULE_NAME_DISK);
     order++;

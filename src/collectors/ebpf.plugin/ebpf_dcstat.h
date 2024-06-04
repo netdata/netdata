@@ -19,6 +19,9 @@
 #define NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE "dcstat.conf"
 
 // Contexts
+#define NETDATA_FS_DC_HIT_RATIO_CONTEXT "filesystem.dc_hit_ratio"
+#define NETDATA_FS_DC_REFERENCE_CONTEXT "filesystem.dc_reference"
+
 #define NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT "cgroup.dc_ratio"
 #define NETDATA_CGROUP_DC_REFERENCE_CONTEXT "cgroup.dc_reference"
 #define NETDATA_CGROUP_DC_NOT_CACHE_CONTEXT "cgroup.dc_not_cache"
@@ -31,6 +34,9 @@
 
 // ARAL name
 #define NETDATA_EBPF_DCSTAT_ARAL_NAME "ebpf_dcstat"
+
+// Unity
+#define EBPF_COMMON_UNITS_FILES "files"
 
 enum directory_cache_indexes {
     NETDATA_DCSTAT_IDX_RATIO,

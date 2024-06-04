@@ -280,7 +280,7 @@ void ebpf_sync_cleanup_objects()
                                        int end,
                                        int update_every)
     {
-        ebpf_write_chart_cmd(NETDATA_EBPF_MEMORY_GROUP, id, title, EBPF_COMMON_DIMENSION_CALL,
+        ebpf_write_chart_cmd(NETDATA_EBPF_MEMORY_GROUP, id, title, EBPF_COMMON_UNITS_CALL,
                              NETDATA_EBPF_SYNC_SUBMENU, NETDATA_EBPF_CHART_TYPE_LINE, NULL, order,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SYNC);
@@ -300,7 +300,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
                                   NETDATA_EBPF_FILE_SYNC_CHART,
                                   "",
                                   "Monitor calls to fsync(2) and fdatasync(2).",
-                                  EBPF_COMMON_DIMENSION_CALL,
+                                  EBPF_COMMON_UNITS_CALL,
                                   NETDATA_EBPF_SYNC_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   NULL,
@@ -312,7 +312,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
                                   NETDATA_EBPF_MSYNC_CHART,
                                   "",
                                   "Monitor calls to msync(2).",
-                                  EBPF_COMMON_DIMENSION_CALL,
+                                  EBPF_COMMON_UNITS_CALL,
                                   NETDATA_EBPF_SYNC_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   NULL,
@@ -324,7 +324,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
                                   NETDATA_EBPF_SYNC_CHART,
                                   "",
                                   "Monitor calls to sync(2) and syncfs(2).",
-                                  EBPF_COMMON_DIMENSION_CALL,
+                                  EBPF_COMMON_UNITS_CALL,
                                   NETDATA_EBPF_SYNC_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   NULL,
@@ -336,7 +336,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
                                   NETDATA_EBPF_FILE_SEGMENT_CHART,
                                   "",
                                   "Monitor calls to sync_file_range(2).",
-                                  EBPF_COMMON_DIMENSION_CALL,
+                                  EBPF_COMMON_UNITS_CALL,
                                   NETDATA_EBPF_SYNC_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   NULL,
@@ -615,7 +615,7 @@ static void ebpf_create_sync_chart(char *id,
                                    int end,
                                    int update_every)
 {
-    ebpf_write_chart_cmd(NETDATA_EBPF_MEMORY_GROUP, id, "", title, EBPF_COMMON_DIMENSION_CALL,
+    ebpf_write_chart_cmd(NETDATA_EBPF_MEMORY_GROUP, id, "", title, EBPF_COMMON_UNITS_CALL,
                          NETDATA_EBPF_SYNC_SUBMENU, NETDATA_EBPF_CHART_TYPE_LINE, NULL, order,
                          update_every,
                          NETDATA_EBPF_MODULE_NAME_SYNC);

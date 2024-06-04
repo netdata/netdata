@@ -15,14 +15,19 @@
 
 #define NETDATA_CACHESTAT_SUBMENU "page_cache"
 
-#define EBPF_CACHESTAT_DIMENSION_PAGE "pages/s"
-#define EBPF_CACHESTAT_DIMENSION_HITS "hits/s"
-#define EBPF_CACHESTAT_DIMENSION_MISSES "misses/s"
+#define EBPF_CACHESTAT_UNITS_PAGE "pages/s"
+#define EBPF_CACHESTAT_UNITS_HITS "hits/s"
+#define EBPF_CACHESTAT_UNITS_MISSES "misses/s"
 
 // configuration file
 #define NETDATA_CACHESTAT_CONFIG_FILE "cachestat.conf"
 
 // Contexts
+#define NETDATA_MEM_CACHESTAT_HIT_RATIO_CONTEXT "mem.cachestat_ratio"
+#define NETDATA_MEM_CACHESTAT_MODIFIED_CACHE_CONTEXT "mem.cachestat_dirties"
+#define NETDATA_MEM_CACHESTAT_HIT_FILES_CONTEXT "mem.cachestat_hits"
+#define NETDATA_MEM_CACHESTAT_MISS_FILES_CONTEXT "mem.cachestat_misses"
+
 #define NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT "cgroup.cachestat_ratio"
 #define NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT "cgroup.cachestat_dirties"
 #define NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT "cgroup.cachestat_hits"

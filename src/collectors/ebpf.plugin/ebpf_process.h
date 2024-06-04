@@ -41,6 +41,9 @@
 
 #define NETDATA_EBPF_CGROUP_UPDATE 30
 
+// Unity
+#define EBPF_COMMON_UNITS_DIFFERENCE "difference"
+
 enum netdata_ebpf_stats_order {
     NETDATA_EBPF_ORDER_STAT_THREADS = 140000,
     NETDATA_EBPF_ORDER_STAT_LIFE_TIME,

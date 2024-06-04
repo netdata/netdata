@@ -353,21 +353,21 @@ static void ebpf_obsolete_fs_charts(int update_every)
             ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
                                       "",
                                       efp->hread.title,
-                                      EBPF_COMMON_DIMENSION_CALL, efp->family_name,
+                                      EBPF_COMMON_UNITS_CALL, efp->family_name,
                                       NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hread.order, update_every);
 
             ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hwrite.name,
                                       "",
                                       efp->hwrite.title,
-                                      EBPF_COMMON_DIMENSION_CALL, efp->family_name,
+                                      EBPF_COMMON_UNITS_CALL, efp->family_name,
                                       NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hwrite.order, update_every);
 
             ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name, "", efp->hopen.title,
-                                      EBPF_COMMON_DIMENSION_CALL, efp->family_name,
+                                      EBPF_COMMON_UNITS_CALL, efp->family_name,
                                       NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hopen.order, update_every);
 
             ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hadditional.name,"",  efp->hadditional.title,
-                                      EBPF_COMMON_DIMENSION_CALL, efp->family_name,
+                                      EBPF_COMMON_UNITS_CALL, efp->family_name,
                                       NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hadditional.order,
                                       update_every);
         }
@@ -403,7 +403,7 @@ static void ebpf_create_fs_charts(int update_every)
 
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
                               efp->hread.title,
-                              EBPF_COMMON_DIMENSION_CALL, efp->family_name,
+                              EBPF_COMMON_UNITS_CALL, efp->family_name,
                               "filesystem.read_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order,
                               ebpf_create_global_dimension,
                               filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
@@ -418,7 +418,7 @@ static void ebpf_create_fs_charts(int update_every)
             efp->hwrite.order = order;
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hwrite.name,
                               efp->hwrite.title,
-                              EBPF_COMMON_DIMENSION_CALL, efp->family_name,
+                              EBPF_COMMON_UNITS_CALL, efp->family_name,
                               "filesystem.write_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order,
                               ebpf_create_global_dimension,
                               filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
@@ -433,7 +433,7 @@ static void ebpf_create_fs_charts(int update_every)
             efp->hopen.order = order;
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name,
                               efp->hopen.title,
-                              EBPF_COMMON_DIMENSION_CALL, efp->family_name,
+                              EBPF_COMMON_UNITS_CALL, efp->family_name,
                               "filesystem.open_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order,
                               ebpf_create_global_dimension,
                               filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
@@ -449,7 +449,7 @@ static void ebpf_create_fs_charts(int update_every)
             efp->hadditional.ctx = strdupz(ctx);
             efp->hadditional.order = order;
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hadditional.name, efp->hadditional.title,
-                              EBPF_COMMON_DIMENSION_CALL, efp->family_name,
+                              EBPF_COMMON_UNITS_CALL, efp->family_name,
                               ctx, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
                               filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
                               update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
@@ -675,7 +675,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
                                   efp->hread.name,
                                   "",
                                   efp->hread.title,
-                                  EBPF_COMMON_DIMENSION_CALL,
+                                  EBPF_COMMON_UNITS_CALL,
                                   efp->family_name,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "filesystem.read_latency",
@@ -686,7 +686,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
                                   efp->hwrite.name,
                                   "",
                                   efp->hwrite.title,
-                                  EBPF_COMMON_DIMENSION_CALL,
+                                  EBPF_COMMON_UNITS_CALL,
                                   efp->family_name,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "filesystem.write_latency",
@@ -697,7 +697,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
                                   efp->hopen.name,
                                   "",
                                   efp->hopen.title,
-                                  EBPF_COMMON_DIMENSION_CALL,
+                                  EBPF_COMMON_UNITS_CALL,
                                   efp->family_name,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "filesystem.open_latency",
@@ -708,7 +708,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
                                   efp->hadditional.name,
                                   "",
                                   efp->hadditional.title,
-                                  EBPF_COMMON_DIMENSION_CALL,
+                                  EBPF_COMMON_UNITS_CALL,
                                   efp->family_name,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   efp->hadditional.ctx,
