@@ -6,9 +6,16 @@
 
 **Merged pull requests:**
 
+- remove "ingore zero metrics" from freebsd plugin [\#17805](https://github.com/netdata/netdata/pull/17805) ([ilyam8](https://github.com/ilyam8))
+- Bump github.com/prometheus/common from 0.53.0 to 0.54.0 in /src/go/collectors/go.d.plugin [\#17804](https://github.com/netdata/netdata/pull/17804) ([dependabot[bot]](https://github.com/apps/dependabot))
+- remove "ingore 0 metrics" from macos plugin [\#17803](https://github.com/netdata/netdata/pull/17803) ([ilyam8](https://github.com/ilyam8))
+- fix cgroups pressure [\#17800](https://github.com/netdata/netdata/pull/17800) ([ilyam8](https://github.com/ilyam8))
+- fix buffer overflow incgroups\_detect\_systemd\(\) [\#17799](https://github.com/netdata/netdata/pull/17799) ([ilyam8](https://github.com/ilyam8))
+- cgroup plugin: simplify and remove "ignore zero metrics" [\#17795](https://github.com/netdata/netdata/pull/17795) ([ilyam8](https://github.com/ilyam8))
 - Correctly handle eBPF check in package test script. [\#17794](https://github.com/netdata/netdata/pull/17794) ([Ferroin](https://github.com/Ferroin))
 - Use correct path for package files. [\#17793](https://github.com/netdata/netdata/pull/17793) ([vkalintiris](https://github.com/vkalintiris))
 - proc/net\_dev: remove "ignore zero metrics" [\#17789](https://github.com/netdata/netdata/pull/17789) ([ilyam8](https://github.com/ilyam8))
+- Add Alpine 3.20 to CI checks. [\#17788](https://github.com/netdata/netdata/pull/17788) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17786](https://github.com/netdata/netdata/pull/17786) ([netdatabot](https://github.com/netdatabot))
 - docs fix statsd conf dir [\#17785](https://github.com/netdata/netdata/pull/17785) ([ilyam8](https://github.com/ilyam8))
 - go.d phpfpm switch to github.com/kanocz/fcgi\_client [\#17784](https://github.com/netdata/netdata/pull/17784) ([ilyam8](https://github.com/ilyam8))
@@ -19,6 +26,7 @@
 - proc/diskstats and diskspace: remove "ignore zero metrics" [\#17775](https://github.com/netdata/netdata/pull/17775) ([ilyam8](https://github.com/ilyam8))
 - docs fix "Prevent the double access.log" [\#17773](https://github.com/netdata/netdata/pull/17773) ([ilyam8](https://github.com/ilyam8))
 - docs: simplify claiming readme part1 [\#17771](https://github.com/netdata/netdata/pull/17771) ([ilyam8](https://github.com/ilyam8))
+- Upgrade sqlite version to 3.45.3 [\#17769](https://github.com/netdata/netdata/pull/17769) ([stelfrag](https://github.com/stelfrag))
 - Netdata Cloud docs section edits [\#17768](https://github.com/netdata/netdata/pull/17768) ([Ancairon](https://github.com/Ancairon))
 - Fix DEB package builds. [\#17765](https://github.com/netdata/netdata/pull/17765) ([Ferroin](https://github.com/Ferroin))
 - Fix version for go.d plugin [\#17764](https://github.com/netdata/netdata/pull/17764) ([vkalintiris](https://github.com/vkalintiris))
@@ -142,6 +150,7 @@
 - Regenerate integrations.js [\#17603](https://github.com/netdata/netdata/pull/17603) ([netdatabot](https://github.com/netdatabot))
 - Make offline installs properly offline again. [\#17602](https://github.com/netdata/netdata/pull/17602) ([Ferroin](https://github.com/Ferroin))
 - remove python.d/smartd\_log [\#17600](https://github.com/netdata/netdata/pull/17600) ([ilyam8](https://github.com/ilyam8))
+- Remove CentOS Stream 8 from CI. [\#17599](https://github.com/netdata/netdata/pull/17599) ([Ferroin](https://github.com/Ferroin))
 - go.d postgres: reset table/index bloat stats before querying [\#17598](https://github.com/netdata/netdata/pull/17598) ([ilyam8](https://github.com/ilyam8))
 - Bump golang.org/x/text from 0.14.0 to 0.15.0 in /src/go/collectors/go.d.plugin [\#17596](https://github.com/netdata/netdata/pull/17596) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/docker/docker from 26.1.0+incompatible to 26.1.1+incompatible in /src/go/collectors/go.d.plugin [\#17592](https://github.com/netdata/netdata/pull/17592) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -398,15 +407,6 @@
 - DBENGINE: support ZSTD compression [\#17244](https://github.com/netdata/netdata/pull/17244) ([ktsaou](https://github.com/ktsaou))
 - apps\_proc\_pid\_fd: ignore kf\_sock\_inpcb on modern FreeBSD [\#17243](https://github.com/netdata/netdata/pull/17243) ([glebius](https://github.com/glebius))
 - Fix MRG Metric refcount issue [\#17239](https://github.com/netdata/netdata/pull/17239) ([ktsaou](https://github.com/ktsaou))
-- Code cleanup [\#17237](https://github.com/netdata/netdata/pull/17237) ([ktsaou](https://github.com/ktsaou))
-- DBENGINE: use gorilla by default [\#17234](https://github.com/netdata/netdata/pull/17234) ([ktsaou](https://github.com/ktsaou))
-- updated dbengine unittest [\#17232](https://github.com/netdata/netdata/pull/17232) ([ktsaou](https://github.com/ktsaou))
-- dbengine: cache bug-fix when under pressure [\#17231](https://github.com/netdata/netdata/pull/17231) ([ktsaou](https://github.com/ktsaou))
-- fix html [\#17228](https://github.com/netdata/netdata/pull/17228) ([Ancairon](https://github.com/Ancairon))
-- update flowchart cloud-onprem [\#17227](https://github.com/netdata/netdata/pull/17227) ([M4itee](https://github.com/M4itee))
-- feat: add netdata cloud api-tokens docs [\#17225](https://github.com/netdata/netdata/pull/17225) ([witalisoft](https://github.com/witalisoft))
-- Trigger subsequent workflows for Helmchart and MSI [\#17224](https://github.com/netdata/netdata/pull/17224) ([tkatsoulas](https://github.com/tkatsoulas))
-- fixing the helm login command for the onprem installation [\#17222](https://github.com/netdata/netdata/pull/17222) ([M4itee](https://github.com/M4itee))
 
 ## [v1.45.5](https://github.com/netdata/netdata/tree/v1.45.5) (2024-05-21)
 
