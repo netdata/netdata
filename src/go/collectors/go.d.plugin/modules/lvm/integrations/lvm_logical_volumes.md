@@ -77,7 +77,13 @@ Metrics:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ lvm_lv_data_space_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/lvm.conf) | lvm.lv_data_space_utilization | LVM logical volume high data space usage (LV ${label:lv_name} VG ${label:vg_name} Type ${label:volume_type}) |
+| [ lvm_lv_metadata_space_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/lvm.conf) | lvm.lv_metadata_space_utilization | LVM logical volume high metadata space usage (LV ${label:lv_name} VG ${label:vg_name} Type ${label:volume_type}) |
 
 
 ## Setup
