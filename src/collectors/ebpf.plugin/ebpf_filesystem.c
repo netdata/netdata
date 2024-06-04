@@ -657,6 +657,23 @@ void ebpf_filesystem_cleanup_ebpf_data()
 }
 
 /**
+ * Cleanup FS Histograms
+ *
+ * @param ptr pointer to structure to be cleaned
+ */
+static void ebpf_cleanup_fs_histograms(netdata_ebpf_histogram_t *ptr)
+{
+    freez(ptr->name);
+    ptr->name = NULL;
+
+    freez(ptr->title);
+    ptr->title = NULL;
+
+    freez(ptr->ctx);
+    ptr->ctx = NULL;
+}
+
+/**
  * Obsolete global
  *
  * Obsolete global charts created by thread.
@@ -681,6 +698,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
                                   "filesystem.read_latency",
                                   efp->hread.order,
                                   em->update_every);
+        ebpf_cleanup_fs_histograms(&efp->hread);
 
         ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                                   efp->hwrite.name,
@@ -692,6 +710,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
                                   "filesystem.write_latency",
                                   efp->hwrite.order,
                                   em->update_every);
+        ebpf_cleanup_fs_histograms(&efp->hwrite);
 
         ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                                   efp->hopen.name,
@@ -703,6 +722,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
                                   "filesystem.open_latency",
                                   efp->hopen.order,
                                   em->update_every);
+        ebpf_cleanup_fs_histograms(&efp->hopen);
 
         ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                                   efp->hadditional.name,
@@ -714,6 +734,9 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
                                   efp->hadditional.ctx,
                                   efp->hadditional.order,
                                   em->update_every);
+        ebpf_cleanup_fs_histograms(&efp->hadditional);
+
+        efp->flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION;
     }
 }
 
