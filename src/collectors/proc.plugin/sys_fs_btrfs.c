@@ -785,9 +785,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         // --------------------------------------------------------------------
         // allocation/disks
 
-        if(do_allocation_disks == CONFIG_BOOLEAN_YES || (do_allocation_disks == CONFIG_BOOLEAN_AUTO &&
-                                                         ((node->all_disks_total && node->allocation_data_disk_total) ||
-                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (do_allocation_disks == CONFIG_BOOLEAN_YES || do_allocation_disks == CONFIG_BOOLEAN_AUTO) {
             do_allocation_disks = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!node->st_allocation_disks)) {
@@ -840,13 +838,10 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             rrdset_done(node->st_allocation_disks);
         }
 
-
         // --------------------------------------------------------------------
         // allocation/data
 
-        if(do_allocation_data == CONFIG_BOOLEAN_YES || (do_allocation_data == CONFIG_BOOLEAN_AUTO &&
-                                                        (node->allocation_data_total_bytes ||
-                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (do_allocation_data == CONFIG_BOOLEAN_YES || do_allocation_data == CONFIG_BOOLEAN_AUTO) {
             do_allocation_data = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!node->st_allocation_data)) {
@@ -888,9 +883,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         // --------------------------------------------------------------------
         // allocation/metadata
 
-        if(do_allocation_metadata == CONFIG_BOOLEAN_YES || (do_allocation_metadata == CONFIG_BOOLEAN_AUTO &&
-                                                            (node->allocation_metadata_total_bytes ||
-                                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (do_allocation_metadata == CONFIG_BOOLEAN_YES || do_allocation_metadata == CONFIG_BOOLEAN_AUTO) {
             do_allocation_metadata = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!node->st_allocation_metadata)) {
@@ -934,9 +927,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         // --------------------------------------------------------------------
         // allocation/system
 
-        if(do_allocation_system == CONFIG_BOOLEAN_YES || (do_allocation_system == CONFIG_BOOLEAN_AUTO &&
-                                                          (node->allocation_system_total_bytes ||
-                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (do_allocation_system == CONFIG_BOOLEAN_YES || do_allocation_system == CONFIG_BOOLEAN_AUTO) {
             do_allocation_system = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!node->st_allocation_system)) {
@@ -978,9 +969,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         // --------------------------------------------------------------------
         // commit_stats
 
-        if(do_commit_stats == CONFIG_BOOLEAN_YES || (do_commit_stats == CONFIG_BOOLEAN_AUTO &&
-                                                    (node->commits_total ||
-                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (do_commit_stats == CONFIG_BOOLEAN_YES || do_commit_stats == CONFIG_BOOLEAN_AUTO) {
             do_commit_stats = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!node->st_commits)) {
@@ -1089,9 +1078,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         // --------------------------------------------------------------------
         // error_stats per device
 
-        if(do_error_stats == CONFIG_BOOLEAN_YES ||  (do_error_stats == CONFIG_BOOLEAN_AUTO &&
-                                                    (node->devices ||
-                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (do_error_stats == CONFIG_BOOLEAN_YES || do_error_stats == CONFIG_BOOLEAN_AUTO) {
             do_error_stats = CONFIG_BOOLEAN_YES;
 
             for(BTRFS_DEVICE *d = node->devices ; d ; d = d->next) {
@@ -1146,7 +1133,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(d->st_error_stats, d->rd_generation_errs, d->generation_errs);
 
                 rrdset_done(d->st_error_stats);
-            }           
+            }
         }
     }
 
