@@ -278,7 +278,7 @@ static void ebpf_obsolete_swap_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_MEM_SWAP_READ_CHART,
                               "Calls to function swap_readpage.",
-                              EBPF_COMMON_UNITS_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_CGROUP_SWAP_READ_CONTEXT,
@@ -289,7 +289,7 @@ static void ebpf_obsolete_swap_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_MEM_SWAP_WRITE_CHART,
                               "Calls to function swap_writepage.",
-                              EBPF_COMMON_UNITS_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_CGROUP_SWAP_WRITE_CONTEXT,
@@ -340,7 +340,7 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_call_swap_readpage",
                                   "Calls to function swap_readpage.",
-                                  EBPF_COMMON_UNITS_CALL,
+                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_call_swap_readpage",
@@ -351,7 +351,7 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_call_swap_writepage",
                                   "Calls to function swap_writepage.",
-                                  EBPF_COMMON_UNITS_CALL,
+                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_call_swap_writepage",
@@ -375,7 +375,7 @@ static void ebpf_obsolete_swap_global(ebpf_module_t *em)
                               NETDATA_MEM_SWAP_CHART,
                               "",
                               "Calls to access swap memory",
-                              EBPF_COMMON_UNITS_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NULL,
                               NETDATA_CHART_PRIO_MEM_SWAP_CALLS,
@@ -745,7 +745,7 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
     char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_create_chart(type, NETDATA_MEM_SWAP_READ_CHART,
                       "Calls to function swap_readpage.",
-                      EBPF_COMMON_UNITS_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
                       NETDATA_CGROUP_SWAP_READ_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100,
                       ebpf_create_global_dimension,
@@ -755,7 +755,7 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
 
     ebpf_create_chart(type, NETDATA_MEM_SWAP_WRITE_CHART,
                       "Calls to function swap_writepage.",
-                      EBPF_COMMON_UNITS_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
                       NETDATA_CGROUP_SWAP_WRITE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101,
                       ebpf_create_global_dimension,
@@ -776,12 +776,12 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
 static void ebpf_obsolete_specific_swap_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_READ_CHART, "", "Calls to function swap_readpage.",
-                              EBPF_COMMON_UNITS_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SWAP_READ_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_WRITE_CHART, "",  "Calls to function swap_writepage.",
-                              EBPF_COMMON_UNITS_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SWAP_WRITE_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101, update_every);
 }
@@ -816,7 +816,7 @@ static void ebpf_create_systemd_swap_charts(int update_every)
 {
     static ebpf_systemd_args_t data_read = {
         .title = "Calls to swap_readpage.",
-        .units = EBPF_COMMON_UNITS_CALL,
+        .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_SYSTEM_SWAP_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20191,
@@ -830,7 +830,7 @@ static void ebpf_create_systemd_swap_charts(int update_every)
 
     static ebpf_systemd_args_t data_write = {
         .title = "Calls to function swap_writepage.",
-        .units = EBPF_COMMON_UNITS_CALL,
+        .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_SYSTEM_SWAP_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20192,
@@ -978,7 +978,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_call_swap_readpage",
                              "Calls to function swap_readpage.",
-                             EBPF_COMMON_UNITS_CALL,
+                             EBPF_COMMON_UNITS_CALLS_PER_SEC,
                              NETDATA_EBPF_MEMORY_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_call_swap_readpage",
@@ -993,7 +993,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_call_swap_writepage",
                              "Calls to function swap_writepage.",
-                             EBPF_COMMON_UNITS_CALL,
+                             EBPF_COMMON_UNITS_CALLS_PER_SEC,
                              NETDATA_EBPF_MEMORY_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_call_swap_writepage",
@@ -1041,7 +1041,7 @@ static void ebpf_create_swap_charts(int update_every)
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_MEM_SWAP_CHART,
                       "Calls to access swap memory",
-                      EBPF_COMMON_UNITS_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_MEM_SWAP_CALLS,
