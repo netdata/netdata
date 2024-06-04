@@ -1589,7 +1589,7 @@ static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, vo
     return data;
 }
 
-static uint64_t get_used_disk_space(struct rrdengine_instance *ctx)
+uint64_t get_used_disk_space(struct rrdengine_instance *ctx)
 {
     uint64_t active_space = 0;
 
@@ -1772,10 +1772,32 @@ uint64_t get_directory_free_bytes_space(struct rrdengine_instance *ctx)
     return (free_bytes - (free_bytes * 5 / 100));
 }
 
+void calculate_tier_disk_space_percentage(void)
+{
+    static uint64_t tier_space[RRD_STORAGE_TIERS];
+
+    uint64_t total_diskspace = 0;
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        uint64_t tier_disk_space = multidb_ctx[tier]->config.max_disk_space ?
+                                       multidb_ctx[tier]->config.max_disk_space :
+                                       get_directory_free_bytes_space(multidb_ctx[tier]);
+        total_diskspace += tier_disk_space;
+        tier_space[tier] = tier_disk_space;
+    }
+
+    if (total_diskspace) {
+        for (size_t tier = 0; tier < storage_tiers; tier++) {
+            multidb_ctx[tier]->config.disk_percentage = (100 * tier_space[tier] / total_diskspace);
+        }
+    }
+}
+
 void dbengine_retention_statistics(void)
 {
     static bool init = false;
     static DBENGINE_TIER_STATS stats[RRD_STORAGE_TIERS];
+
+    calculate_tier_disk_space_percentage();
 
     for (size_t tier = 0; tier < storage_tiers; tier++) {
         if (init == false) {

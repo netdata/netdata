@@ -551,7 +551,8 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-
+uint64_t get_used_disk_space(struct rrdengine_instance *ctx);
+void calculate_tier_disk_space_percentage(void);
 void dbengine_retention_statistics(void);
 uint64_t get_directory_free_bytes_space(struct rrdengine_instance *ctx);
 

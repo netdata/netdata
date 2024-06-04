@@ -1010,17 +1010,10 @@ void dbengine_init(char *hostname) {
     else if(!created_tiers)
         fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, netdata_configured_cache_dir);
 
-    uint64_t total_diskspace = 0;
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        total_diskspace += multidb_ctx[tier]->config.max_disk_space;
+    for(size_t tier = 0; tier < storage_tiers ;tier++)
         rrdeng_readiness_wait(multidb_ctx[tier]);
-    }
 
-    if (total_diskspace) {
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
-            multidb_ctx[tier]->config.disk_percentage = (100 * multidb_ctx[tier]->config.max_disk_space) / total_diskspace;
-        }
-    }
+    calculate_tier_disk_space_percentage();
 
     dbengine_enabled = true;
 #else
