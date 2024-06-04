@@ -1596,9 +1596,9 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
                             rrdlabels_key_to_buffer_array_item(t->context, wb);
                             buffer_json_array_close(wb); // ctx
 
-                            buffer_json_member_add_array(wb, "cl");
+                            buffer_json_member_add_array(wb, "cls");
                             rrdlabels_key_to_buffer_array_item(t->classification, wb);
-                            buffer_json_array_close(wb); // ctx
+                            buffer_json_array_close(wb); // classification
 
 
                             buffer_json_member_add_array(wb, "cp");
