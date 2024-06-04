@@ -521,7 +521,7 @@ static void ebpf_obsolete_fd_global(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_FILE_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              NETDATA_FS_FILEDESCRIPTOR_CONTEXT,
                               NETDATA_CHART_PRIO_EBPF_FD_CHARTS,
                               em->update_every);
 
@@ -533,7 +533,7 @@ static void ebpf_obsolete_fd_global(ebpf_module_t *em)
                                   EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_FILE_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
-                                  NULL,
+                                  NETDATA_FS_FILEDESCRIPTOR_ERROR_CONTEXT,
                                   NETDATA_CHART_PRIO_EBPF_FD_CHARTS + 1,
                                   em->update_every);
     }
@@ -1032,7 +1032,7 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
         .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_APPS_FILE_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
-        .order = 20061,
+        .order = 20270,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_FD_OPEN_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_FD,
@@ -1046,7 +1046,7 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
         .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_APPS_FILE_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
-        .order = 20062,
+        .order = 20271,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_FD_OPEN_ERR_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_FD,
@@ -1060,7 +1060,7 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
         .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_APPS_FILE_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
-        .order = 20063,
+        .order = 20272,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_FD_CLOSE_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_FD,
@@ -1074,7 +1074,7 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
         .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_APPS_FILE_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
-        .order = 20064,
+        .order = 20273,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_FD_OPEN_ERR_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_FD,
@@ -1095,12 +1095,9 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
 
         data_open.id = data_open_error.id = data_close.id = data_close_error.id = w->name;
         ebpf_create_charts_on_systemd(&data_open);
-        if (mode < MODE_ENTRY) {
-            ebpf_create_charts_on_systemd(&data_open_error);
-        }
-
         ebpf_create_charts_on_systemd(&data_close);
         if (mode < MODE_ENTRY) {
+            ebpf_create_charts_on_systemd(&data_open_error);
             ebpf_create_charts_on_systemd(&data_close_error);
         }
 
@@ -1345,7 +1342,7 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
                       "Open and close calls",
                       EBPF_COMMON_UNITS_CALLS_PER_SEC,
                       NETDATA_FILE_GROUP,
-                      NULL,
+                      NETDATA_FS_FILEDESCRIPTOR_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_EBPF_FD_CHARTS,
                       ebpf_create_global_dimension,
@@ -1359,7 +1356,7 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
                           "Open fails",
                           EBPF_COMMON_UNITS_CALLS_PER_SEC,
                           NETDATA_FILE_GROUP,
-                          NULL,
+                          NETDATA_FS_FILEDESCRIPTOR_ERROR_CONTEXT,
                           NETDATA_EBPF_CHART_TYPE_LINE,
                           NETDATA_CHART_PRIO_EBPF_FD_CHARTS + 1,
                           ebpf_create_global_dimension,
