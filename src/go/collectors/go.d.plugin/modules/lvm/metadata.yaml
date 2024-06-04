@@ -75,7 +75,15 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
+    alerts:
+      - name: lvm_lv_data_space_utilization
+        metric: lvm.lv_data_space_utilization
+        info: LVM logical volume high data space usage (LV ${label:lv_name} VG ${label:vg_name} Type ${label:volume_type})
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/lvm.conf
+      - name: lvm_lv_metadata_space_utilization
+        metric: lvm.lv_metadata_space_utilization
+        info: LVM logical volume high metadata space usage (LV ${label:lv_name} VG ${label:vg_name} Type ${label:volume_type})
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/lvm.conf
     metrics:
       folding:
         title: Metrics
