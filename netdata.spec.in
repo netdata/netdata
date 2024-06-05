@@ -360,7 +360,11 @@ happened, on your systems and applications.
 	-DENABLE_BUNDLED_PROTOBUF=Off \
 	%endif
 	%else
+	%if 0%{?suse_version:1}
+	-DENABLE_BUNDLED_PROTOBUF=On \
+	%else
 	-DENABLE_BUNDLED_PROTOBUF=Off \
+	%endif
 	%endif
 	%if %{_have_ml}
 	-DENABLE_ML=On \
