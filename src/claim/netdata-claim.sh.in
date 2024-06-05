@@ -413,6 +413,7 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] || [ "${ERROR_KEY}" = "ErrAlreadyClaimed" ]
 [global]
   enabled = yes
   cloud base url = $URL_BASE
+${PROXY:+  proxy = $PROXY}
 HERE_DOC
         if [ "$EUID" == "0" ]; then
             chown -R "${NETDATA_USER}:${NETDATA_USER}" "${CLAIMING_DIR}" || (echo >&2 "Claiming failed"; set -e; exit 2)
