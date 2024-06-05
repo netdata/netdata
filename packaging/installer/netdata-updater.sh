@@ -149,9 +149,11 @@ issystemd() {
   return 1
 }
 
+# shellcheck disable=SC2009
 running_under_anacron() {
-    ppid="$(ps -p "$$" -o ppid= | tr -d ' ')"
-    ps -p "${ppid}" -o command= | grep -q anacron && return 0
+    ppid="$(ps -o pid=,ppid= | grep -e "^ $$" | xargs | cut -f 2 -d ' ')"
+    ps -o pid=,command= | grep -e "^ ${ppid}" | grep -q anacron && return 0
+
     return 1
 }
 
