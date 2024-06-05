@@ -67,7 +67,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | mem.file_sync | fsync, fdatasync | calls/s |
-| mem.meory_map | msync | calls/s |
+| mem.memory_map | msync | calls/s |
 | mem.sync | sync, syncfs | calls/s |
 | mem.file_segment | sync_file_range | calls/s |
 
