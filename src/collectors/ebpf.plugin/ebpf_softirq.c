@@ -76,7 +76,7 @@ static void ebpf_obsolete_softirq_global(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_MILLISECONDS,
                               "softirqs",
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
+                              "system.softirq_latency",
                               NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS+1,
                               em->update_every);
 }
@@ -167,7 +167,7 @@ static void softirq_create_charts(int update_every)
         "Software IRQ latency",
         EBPF_COMMON_UNITS_MILLISECONDS,
         "softirqs",
-        NULL,
+        "system.softirq_latency",
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS+1,
         NULL, NULL, 0, update_every,
