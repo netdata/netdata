@@ -1829,11 +1829,17 @@ void dbengine_retention_statistics(void)
             rrdset_metadata_updated(stats[tier].st);
         }
 
-        uint64_t disk_space = get_used_disk_space(multidb_ctx[tier]);
-
         STORAGE_ENGINE *eng = localhost->db[tier].eng;
         time_t first_time_s = storage_engine_global_first_time_s(eng->seb, localhost->db[tier].si);
         time_t retention = first_time_s ? now_realtime_sec() - first_time_s : 0;
+
+        //
+        // Note: storage_engine_disk_space_used is the exact diskspace (as reported by api/v2/node_instances
+        //       get_used_disk_space is used to determine if database cleanup (file rotation should happen)
+        //                           and adds to the disk space used the desired file size of the active
+        //                           datafile
+        uint64_t disk_space = get_used_disk_space(multidb_ctx[tier]);
+        //uint64_t disk_space = storage_engine_disk_space_used(eng->seb, localhost->db[tier].si);
 
         uint64_t config_disk_space = multidb_ctx[tier]->config.max_disk_space;
         if (!config_disk_space)
