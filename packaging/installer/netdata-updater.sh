@@ -154,6 +154,9 @@ running_under_anacron() {
     ppid="$(ps -o pid=,ppid= | grep -e "^ $$" | xargs | cut -f 2 -d ' ')"
     ps -o pid=,command= | grep -e "^ ${ppid}" | grep -q anacron && return 0
 
+    ppid2="$(ps -o pid=,ppid= | grep -e "^ ${ppid}" | xargs | cut -f 2 -d ' ')"
+    ps -o pid=,command= | grep -e "^ ${ppid2}" | grep -q anacron && return 0
+
     return 1
 }
 
