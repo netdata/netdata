@@ -355,6 +355,9 @@ void sqlite_close_databases(void)
 
 uint64_t get_total_database_space(void)
 {
+    return 0;
+
+/*
     if (!new_dbengine_defaults)
         return 0;
 
@@ -363,6 +366,7 @@ uint64_t get_total_database_space(void)
     database_space +=  sqlite_get_ml_space();
 #endif
     return database_space;
+*/
 }
 
 int sqlite_library_init(void)
