@@ -281,8 +281,8 @@ static void ebpf_obsolete_swap_services(ebpf_module_t *em, char *id)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NETDATA_CGROUP_SWAP_READ_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100,
+                              NETDATA_SYSTEMD_SWAP_READ_CONTEXT,
+                              20191,
                               em->update_every);
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
@@ -293,7 +293,7 @@ static void ebpf_obsolete_swap_services(ebpf_module_t *em, char *id)
                               NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_CGROUP_SWAP_WRITE_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101,
+                              20192,
                               em->update_every);
 }
 
@@ -377,7 +377,7 @@ static void ebpf_obsolete_swap_global(ebpf_module_t *em)
                               "Calls to access swap memory",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "mem.swapcalls",
                               NETDATA_CHART_PRIO_MEM_SWAP_CALLS,
                               em->update_every);
 }
@@ -815,7 +815,7 @@ static void ebpf_send_specific_swap_data(char *type, netdata_publish_swap_t *val
 static void ebpf_create_systemd_swap_charts(int update_every)
 {
     static ebpf_systemd_args_t data_read = {
-        .title = "Calls to swap_readpage.",
+        .title = "Calls to function swap_readpage.",
         .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_SYSTEM_SWAP_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -1042,7 +1042,7 @@ static void ebpf_create_swap_charts(int update_every)
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_MEM_SWAP_CHART,
                       "Calls to access swap memory",
                       EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
-                      NULL,
+                      "mem.swapcalls",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_MEM_SWAP_CALLS,
                       ebpf_create_global_dimension,

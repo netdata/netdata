@@ -294,7 +294,7 @@ static void ebpf_obsolete_shm_services(ebpf_module_t *em, char *id)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_IPC_SHM_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
+                              NETDATA_SYSTEMD_SHM_GET_CONTEXT,
                               20191,
                               em->update_every);
 
@@ -305,7 +305,7 @@ static void ebpf_obsolete_shm_services(ebpf_module_t *em, char *id)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_IPC_SHM_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
+                              NETDATA_SYSTEMD_SHM_AT_CONTEXT,
                               20192,
                               em->update_every);
 
@@ -316,7 +316,7 @@ static void ebpf_obsolete_shm_services(ebpf_module_t *em, char *id)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_IPC_SHM_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
+                              NETDATA_SYSTEMD_SHM_DT_CONTEXT,
                               20193,
                               em->update_every);
 
@@ -327,8 +327,8 @@ static void ebpf_obsolete_shm_services(ebpf_module_t *em, char *id)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_IPC_SHM_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
-                              20193,
+                              NETDATA_SYSTEMD_SHM_CTL_CONTEXT,
+                              20194,
                               em->update_every);
 }
 
@@ -436,7 +436,7 @@ static void ebpf_obsolete_shm_global(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_SYSTEM_IPC_SHM_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "system.shared_memory_calls",
                               NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_CALLS,
                               em->update_every);
 }
@@ -1266,7 +1266,7 @@ static void ebpf_create_shm_charts(int update_every)
         "Calls to shared memory system calls",
         EBPF_COMMON_UNITS_CALLS_PER_SEC,
         NETDATA_SYSTEM_IPC_SHM_SUBMENU,
-        NULL,
+        "system.shared_memory_calls",
         NETDATA_EBPF_CHART_TYPE_LINE,
         NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_CALLS,
         ebpf_create_global_dimension,

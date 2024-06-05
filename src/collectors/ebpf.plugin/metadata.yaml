@@ -1088,7 +1088,7 @@ modules:
               dimensions:
                 - name: fsync
                 - name: fdatasync
-            - name: mem.meory_map
+            - name: mem.memory_map
               description: Monitor calls to msync(2).
               unit: "calls/s"
               chart_type: line

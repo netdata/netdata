@@ -303,7 +303,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
                                   EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_EBPF_SYNC_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
-                                  NULL,
+                                  "mem.file_sync",
                                   21300,
                                   em->update_every);
 
@@ -315,7 +315,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
                                   EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_EBPF_SYNC_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
-                                  NULL,
+                                  "mem.memory_map",
                                   21301,
                                   em->update_every);
 
@@ -327,7 +327,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
                                   EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_EBPF_SYNC_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
-                                  NULL,
+                                  "mem.sync",
                                   21302,
                                   em->update_every);
 
@@ -339,7 +339,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
                                   EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_EBPF_SYNC_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
-                                  NULL,
+                                  "mem.file_segment",
                                   21303,
                                   em->update_every);
 }
@@ -607,16 +607,18 @@ static void sync_collector(ebpf_module_t *em)
  * @param idx       the first index with data.
  * @param end       the last index with data.
  * @param update_every value to overwrite the update frequency set by the server.
+ * @param context   the chart context
  */
 static void ebpf_create_sync_chart(char *id,
                                    char *title,
                                    int order,
                                    int idx,
                                    int end,
-                                   int update_every)
+                                   int update_every,
+                                   char *context)
 {
     ebpf_write_chart_cmd(NETDATA_EBPF_MEMORY_GROUP, id, "", title, EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                         NETDATA_EBPF_SYNC_SUBMENU, NETDATA_EBPF_CHART_TYPE_LINE, NULL, order,
+                         NETDATA_EBPF_SYNC_SUBMENU, NETDATA_EBPF_CHART_TYPE_LINE, context, order,
                          update_every,
                          NETDATA_EBPF_MODULE_NAME_SYNC);
 
@@ -643,22 +645,26 @@ static void ebpf_create_sync_charts(int update_every)
     if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_FILE_SYNC_CHART,
                                "Monitor calls to fsync(2) and fdatasync(2).", 21300,
-                               NETDATA_SYNC_FSYNC_IDX, NETDATA_SYNC_FDATASYNC_IDX, update_every);
+                               NETDATA_SYNC_FSYNC_IDX, NETDATA_SYNC_FDATASYNC_IDX, update_every,
+                               "mem.file_sync");
 
     if (local_syscalls[NETDATA_SYNC_MSYNC_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_MSYNC_CHART,
                                "Monitor calls to msync(2).", 21301,
-                               NETDATA_SYNC_MSYNC_IDX, NETDATA_SYNC_MSYNC_IDX, update_every);
+                               NETDATA_SYNC_MSYNC_IDX, NETDATA_SYNC_MSYNC_IDX, update_every,
+                               "mem.memory_map");
 
     if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_SYNC_CHART,
                                "Monitor calls to sync(2) and syncfs(2).", 21302,
-                               NETDATA_SYNC_SYNC_IDX, NETDATA_SYNC_SYNCFS_IDX, update_every);
+                               NETDATA_SYNC_SYNC_IDX, NETDATA_SYNC_SYNCFS_IDX, update_every,
+                               "mem.sync");
 
     if (local_syscalls[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_FILE_SEGMENT_CHART,
                                "Monitor calls to sync_file_range(2).", 21303,
-                               NETDATA_SYNC_SYNC_FILE_RANGE_IDX, NETDATA_SYNC_SYNC_FILE_RANGE_IDX, update_every);
+                               NETDATA_SYNC_SYNC_FILE_RANGE_IDX, NETDATA_SYNC_SYNC_FILE_RANGE_IDX, update_every,
+                               "mem.file_segment");
 
     fflush(stdout);
 }

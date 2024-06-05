@@ -145,7 +145,7 @@ static void ebpf_obsolete_mdflush_global(ebpf_module_t *em)
                               "flushes",
                               "flush (eBPF)",
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
+                              "mdstat.mdstat_flush",
                               NETDATA_CHART_PRIO_MDSTAT_FLUSH,
                               em->update_every);
 }
@@ -292,7 +292,7 @@ static void mdflush_create_charts(int update_every)
         "MD flushes",
         "flushes",
         "flush (eBPF)",
-        "md.flush",
+        "mdstat.mdstat_flush",
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_MDSTAT_FLUSH,
         NULL, NULL, 0, update_every,

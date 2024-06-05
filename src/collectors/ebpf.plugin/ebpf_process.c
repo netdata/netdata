@@ -260,7 +260,7 @@ static void ebpf_update_process_cgroup()
 static void ebpf_process_status_chart(char *family, char *name, char *axis,
                                       char *web, char *algorithm, int order, int update_every)
 {
-    printf("CHART %s.%s '' 'Process not closed' '%s' '%s' '' line %d %d '' 'ebpf.plugin' 'process'\n",
+    printf("CHART %s.%s '' 'Process not closed' '%s' '%s' 'system.process_status' line %d %d '' 'ebpf.plugin' 'process'\n",
            family,
            name,
            axis,
@@ -286,7 +286,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       "Start process",
                       EBPF_COMMON_UNITS_CALLS_PER_SEC,
                       NETDATA_PROCESS_GROUP,
-                      NULL,
+                      "system.process_thread",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21002,
                       ebpf_create_global_dimension,
@@ -298,7 +298,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                       "Exit process",
                       EBPF_COMMON_UNITS_CALLS_PER_SEC,
                       NETDATA_PROCESS_GROUP,
-                      NULL,
+                      "system.exit",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21003,
                       ebpf_create_global_dimension,
@@ -318,7 +318,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           "Fails to create process",
                           EBPF_COMMON_UNITS_CALLS_PER_SEC,
                           NETDATA_PROCESS_GROUP,
-                          NULL,
+                          "system.task_error",
                           NETDATA_EBPF_CHART_TYPE_LINE,
                           21005,
                           ebpf_create_global_dimension,
@@ -452,7 +452,7 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
+                              NETDATA_SYSTEMD_PROCESS_CREATE_CONTEXT,
                               20065,
                               em->update_every);
 
@@ -463,7 +463,7 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
+                              NETDATA_SYSTEMD_THREAD_CREATE_CONTEXT,
                               20066,
                               em->update_every);
 
@@ -474,7 +474,7 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
+                              NETDATA_SYSTEMD_PROCESS_EXIT_CONTEXT,
                               20067,
                               em->update_every);
 
@@ -485,7 +485,7 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
+                              NETDATA_SYSTEMD_PROCESS_CLOSE_CONTEXT,
                               20068,
                               em->update_every);
 
@@ -497,7 +497,7 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                                   EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_APPS_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  NULL,
+                                  NETDATA_SYSTEMD_PROCESS_ERROR_CONTEXT,
                                   20069,
                                   em->update_every);
     }
@@ -618,7 +618,7 @@ static void ebpf_obsolete_process_global(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "system.process_thread",
                               21002,
                               em->update_every);
 
@@ -629,7 +629,7 @@ static void ebpf_obsolete_process_global(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "system.exit",
                               21003,
                               em->update_every);
 
@@ -640,7 +640,7 @@ static void ebpf_obsolete_process_global(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_CALLS,
                               NETDATA_PROCESS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "system.process_status",
                               21004,
                               em->update_every);
 
@@ -652,7 +652,7 @@ static void ebpf_obsolete_process_global(ebpf_module_t *em)
                                   EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
-                                  NULL,
+                                  "system.task_error",
                                   21005,
                                   em->update_every);
     }
