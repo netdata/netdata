@@ -187,7 +187,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
             rd_savings = rrddim_add(st_mem_ksm_ratios, "savings", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(st_mem_ksm_ratios, rd_savings, offered ? (saved * 1000000) / offered : 0);
+        rrddim_set_by_pointer(st_mem_ksm_ratios, rd_savings, (saved * 1000000) / offered);
         rrdset_done(st_mem_ksm_ratios);
     }
 
