@@ -2366,7 +2366,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_CONNECTION_TCP_V4,
-        .dimension = "connections"
+        .dimension = EBPF_COMMON_UNITS_CONNECTIONS
     };
 
     static ebpf_systemd_args_t data_tcp_v6 = {
@@ -2380,7 +2380,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_CONNECTION_TCP_V6,
-        .dimension = "connections"
+        .dimension = EBPF_COMMON_UNITS_CONNECTIONS
     };
 
     static ebpf_systemd_args_t data_bandwith_recv = {
@@ -2394,7 +2394,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_RECV,
-        .dimension = "bits"
+        .dimension = EBPF_COMMON_UNITS_KILOBITS
     };
 
     static ebpf_systemd_args_t data_bandwith_sent = {
@@ -2408,7 +2408,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_SENT,
-        .dimension = "bits"
+        .dimension = EBPF_COMMON_UNITS_KILOBITS
     };
 
     static ebpf_systemd_args_t data_tcp_cleanup = {
@@ -2422,7 +2422,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
-        .dimension = "calls"
+        .dimension = EBPF_COMMON_UNITS_CALLS_PER_SEC
     };
 
     static ebpf_systemd_args_t data_tcp_sendmsg = {
@@ -2436,7 +2436,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
-        .dimension = "calls"
+        .dimension = EBPF_COMMON_UNITS_CALLS_PER_SEC
     };
 
     static ebpf_systemd_args_t data_tcp_retransmit = {
@@ -2450,7 +2450,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
-        .dimension = "calls"
+        .dimension = EBPF_COMMON_UNITS_CALLS_PER_SEC
     };
 
     static ebpf_systemd_args_t data_udp_send = {
@@ -2464,7 +2464,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
-        .dimension = "calls"
+        .dimension = EBPF_COMMON_UNITS_CALLS_PER_SEC
     };
 
     static ebpf_systemd_args_t data_udp_recv = {
@@ -2478,7 +2478,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
-        .dimension = "calls"
+        .dimension = EBPF_COMMON_UNITS_CALLS_PER_SEC
     };
 
     if (!data_tcp_v4.update_every)
