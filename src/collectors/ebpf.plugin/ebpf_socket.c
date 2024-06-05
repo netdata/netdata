@@ -775,7 +775,7 @@ static void ebpf_socket_obsolete_global_charts(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_CONNECTIONS,
                               NETDATA_SOCKET_KERNEL_FUNCTIONS,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "ip.inbound_conn",
                               order++,
                               em->update_every);
 
@@ -786,7 +786,7 @@ static void ebpf_socket_obsolete_global_charts(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_CONNECTIONS,
                               NETDATA_SOCKET_KERNEL_FUNCTIONS,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "ip.tcp_outbound_conn",
                               order++,
                               em->update_every);
 
@@ -798,7 +798,7 @@ static void ebpf_socket_obsolete_global_charts(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_SOCKET_KERNEL_FUNCTIONS,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "ip.tcp_functions",
                               order++,
                               em->update_every);
 
@@ -809,7 +809,7 @@ static void ebpf_socket_obsolete_global_charts(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_KILOBITS,
                               NETDATA_SOCKET_KERNEL_FUNCTIONS,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "ip.total_tcp_bandwidth",
                               order++,
                               em->update_every);
 
@@ -821,7 +821,7 @@ static void ebpf_socket_obsolete_global_charts(ebpf_module_t *em)
                                   EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_SOCKET_KERNEL_FUNCTIONS,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
-                                  NULL,
+                                  "ip.tcp_error",
                                   order++,
                                   em->update_every);
     }
@@ -833,7 +833,7 @@ static void ebpf_socket_obsolete_global_charts(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_SOCKET_KERNEL_FUNCTIONS,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "ip.tcp_retransmit",
                               order++,
                               em->update_every);
 
@@ -844,7 +844,7 @@ static void ebpf_socket_obsolete_global_charts(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_SOCKET_KERNEL_FUNCTIONS,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "ip.udp_functions",
                               order++,
                               em->update_every);
 
@@ -855,7 +855,7 @@ static void ebpf_socket_obsolete_global_charts(ebpf_module_t *em)
                               EBPF_COMMON_UNITS_KILOBITS,
                               NETDATA_SOCKET_KERNEL_FUNCTIONS,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "ip.total_udp_bandwidth",
                               order++,
                               em->update_every);
 
@@ -867,7 +867,7 @@ static void ebpf_socket_obsolete_global_charts(ebpf_module_t *em)
                                   EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_SOCKET_KERNEL_FUNCTIONS,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
-                                  NULL,
+                                  "ip.udp_error",
                                   order++,
                                   em->update_every);
     }
@@ -1101,7 +1101,7 @@ static void ebpf_socket_create_global_charts(ebpf_module_t *em)
                       "Inbound connections.",
                       EBPF_COMMON_UNITS_CONNECTIONS,
                       NETDATA_SOCKET_KERNEL_FUNCTIONS,
-                      NULL,
+                      "ip.inbound_conn",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       order++,
                       ebpf_create_global_dimension,
@@ -1113,7 +1113,7 @@ static void ebpf_socket_create_global_charts(ebpf_module_t *em)
                       "TCP outbound connections.",
                       EBPF_COMMON_UNITS_CONNECTIONS,
                       NETDATA_SOCKET_KERNEL_FUNCTIONS,
-                      NULL,
+                      "ip.tcp_outbound_conn",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       order++,
                       ebpf_create_global_dimension,
@@ -1126,7 +1126,7 @@ static void ebpf_socket_create_global_charts(ebpf_module_t *em)
                       "Calls to internal functions",
                       EBPF_COMMON_UNITS_CALLS_PER_SEC,
                       NETDATA_SOCKET_KERNEL_FUNCTIONS,
-                      NULL,
+                      "ip.tcp_functions",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       order++,
                       ebpf_create_global_dimension,
@@ -1136,7 +1136,7 @@ static void ebpf_socket_create_global_charts(ebpf_module_t *em)
     ebpf_create_chart(NETDATA_EBPF_IP_FAMILY, NETDATA_TCP_FUNCTION_BITS,
                       "TCP bandwidth", EBPF_COMMON_UNITS_KILOBITS,
                       NETDATA_SOCKET_KERNEL_FUNCTIONS,
-                      NULL,
+                      "ip.total_tcp_bandwidth",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       order++,
                       ebpf_create_global_dimension,
@@ -1149,7 +1149,7 @@ static void ebpf_socket_create_global_charts(ebpf_module_t *em)
                           "TCP errors",
                           EBPF_COMMON_UNITS_CALLS_PER_SEC,
                           NETDATA_SOCKET_KERNEL_FUNCTIONS,
-                          NULL,
+                          "ip.tcp_error",
                           NETDATA_EBPF_CHART_TYPE_LINE,
                           order++,
                           ebpf_create_global_dimension,
@@ -1162,7 +1162,7 @@ static void ebpf_socket_create_global_charts(ebpf_module_t *em)
                       "Packages retransmitted",
                       EBPF_COMMON_UNITS_CALLS_PER_SEC,
                       NETDATA_SOCKET_KERNEL_FUNCTIONS,
-                      NULL,
+                      "ip.tcp_retransmit",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       order++,
                       ebpf_create_global_dimension,
@@ -1174,7 +1174,7 @@ static void ebpf_socket_create_global_charts(ebpf_module_t *em)
                       "UDP calls",
                       EBPF_COMMON_UNITS_CALLS_PER_SEC,
                       NETDATA_SOCKET_KERNEL_FUNCTIONS,
-                      NULL,
+                      "ip.udp_functions",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       order++,
                       ebpf_create_global_dimension,
@@ -1184,7 +1184,7 @@ static void ebpf_socket_create_global_charts(ebpf_module_t *em)
     ebpf_create_chart(NETDATA_EBPF_IP_FAMILY, NETDATA_UDP_FUNCTION_BITS,
                       "UDP bandwidth", EBPF_COMMON_UNITS_KILOBITS,
                       NETDATA_SOCKET_KERNEL_FUNCTIONS,
-                      NULL,
+                      "ip.total_udp_bandwidth",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       order++,
                       ebpf_create_global_dimension,
@@ -1197,7 +1197,7 @@ static void ebpf_socket_create_global_charts(ebpf_module_t *em)
                           "UDP errors",
                           EBPF_COMMON_UNITS_CALLS_PER_SEC,
                           NETDATA_SOCKET_KERNEL_FUNCTIONS,
-                          NULL,
+                          "ip.udp_error",
                           NETDATA_EBPF_CHART_TYPE_LINE,
                           order++,
                           ebpf_create_global_dimension,
