@@ -897,6 +897,8 @@ void dbengine_init(char *hostname) {
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 
+    default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
+
     new_dbengine_defaults =
         (!config_exists(CONFIG_SECTION_DB, "dbengine tier 1 update every iterations") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 update every iterations") &&
@@ -921,8 +923,6 @@ void dbengine_init(char *hostname) {
     size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
     char dbengineconfig[200 + 1];
-
-    default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
 
     size_t grouping_iterations = default_rrd_update_every;
     storage_tiers_grouping_iterations[0] = default_rrd_update_every;
