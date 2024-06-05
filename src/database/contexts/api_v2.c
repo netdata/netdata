@@ -1184,12 +1184,9 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             uint64_t max = storage_engine_disk_space_max(eng->seb, localhost->db[tier].si);
             if (!max)
                 max = get_directory_free_bytes_space(multidb_ctx[tier]);
-            uint64_t used = get_used_disk_space(multidb_ctx[tier]);
+            uint64_t used = storage_engine_disk_space_used(eng->seb, localhost->db[tier].si);
             time_t first_time_s = storage_engine_global_first_time_s(eng->seb, localhost->db[tier].si);
             size_t currently_collected_metrics = storage_engine_collected_metrics(eng->seb, localhost->db[tier].si);
-
-            uint64_t database_space = get_total_database_space();
-            uint64_t adjusted_database_space = database_space * multidb_ctx[tier]->config.disk_percentage / 100;
 
             NETDATA_DOUBLE percent;
             if (used && max)
@@ -1208,8 +1205,6 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
             if(used || max) {
                 buffer_json_member_add_uint64(wb, "disk_used", used);
-                if (adjusted_database_space)
-                    buffer_json_member_add_uint64(wb, "disk_used_metadata", adjusted_database_space);
                 buffer_json_member_add_uint64(wb, "disk_max", max);
                 buffer_json_member_add_double(wb, "disk_percent", percent);
             }
