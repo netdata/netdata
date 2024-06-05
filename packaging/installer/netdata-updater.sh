@@ -149,6 +149,12 @@ issystemd() {
   return 1
 }
 
+running_under_anacron() {
+    ppid="$(ps -p "$$" -o ppid= | tr -d ' ')"
+    ps -p "${ppid}" -o command= | grep -q anacron && return 0
+    return 1
+}
+
 _get_intervaldir() {
   if [ -d /etc/cron.daily ]; then
     echo /etc/cron.daily
@@ -1079,6 +1085,12 @@ if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
   NETDATA_NO_UPDATER_SELF_UPDATE=1
   NETDATA_UPDATER_JITTER=0
   NETDATA_FORCE_UPDATE=1
+fi
+
+# If we seem to be running under anacron, act as if we’re not running from cron.
+# This is mostly to disable jitter, which should not be needed when run from anacron.
+if running_under_anacron; then
+  NETDATA_NOT_RUNNING_FROM_CRON="${NETDATA_NOT_RUNNING_FROM_CRON:-1}"
 fi
 
 # Random sleep to alleviate stampede effect of Agents upgrading
