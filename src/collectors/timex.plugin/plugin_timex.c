@@ -33,6 +33,7 @@ struct status_codes {
 static void timex_main_cleanup(void *pptr)
 {
     struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
