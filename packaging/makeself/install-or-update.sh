@@ -252,7 +252,7 @@ certs_selected() {
 }
 
 test_certs() {
-  /opt/netdata/bin/curl --fail --silent --output /dev/null "${NETDATA_CERT_TEST_URL}" || return 1
+  /opt/netdata/bin/curl --fail --max-time 300 --silent --output /dev/null "${NETDATA_CERT_TEST_URL}" || return 1
 }
 
 # If the user has manually set up certificates, don’t mess with it.
