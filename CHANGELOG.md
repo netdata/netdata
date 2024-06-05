@@ -6,11 +6,21 @@
 
 **Merged pull requests:**
 
+- remove "ignore 0 metrics" leftovers [\#17817](https://github.com/netdata/netdata/pull/17817) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17815](https://github.com/netdata/netdata/pull/17815) ([netdatabot](https://github.com/netdatabot))
+- fix typo: `round tripe` → `round trip` [\#17814](https://github.com/netdata/netdata/pull/17814) ([luckman212](https://github.com/luckman212))
+- Change classification to "cls" since "cl" is clear count [\#17811](https://github.com/netdata/netdata/pull/17811) ([stelfrag](https://github.com/stelfrag))
+- remove "ignore 0 metrics" from tc/btrfs/ksm [\#17810](https://github.com/netdata/netdata/pull/17810) ([ilyam8](https://github.com/ilyam8))
+- fix ebpf units [\#17809](https://github.com/netdata/netdata/pull/17809) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17808](https://github.com/netdata/netdata/pull/17808) ([netdatabot](https://github.com/netdatabot))
+- health: add go.d/lvm alerts [\#17807](https://github.com/netdata/netdata/pull/17807) ([ilyam8](https://github.com/ilyam8))
+- Update libbpf [\#17806](https://github.com/netdata/netdata/pull/17806) ([thiagoftsm](https://github.com/thiagoftsm))
 - remove "ingore zero metrics" from freebsd plugin [\#17805](https://github.com/netdata/netdata/pull/17805) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/prometheus/common from 0.53.0 to 0.54.0 in /src/go/collectors/go.d.plugin [\#17804](https://github.com/netdata/netdata/pull/17804) ([dependabot[bot]](https://github.com/apps/dependabot))
 - remove "ingore 0 metrics" from macos plugin [\#17803](https://github.com/netdata/netdata/pull/17803) ([ilyam8](https://github.com/ilyam8))
 - fix cgroups pressure [\#17800](https://github.com/netdata/netdata/pull/17800) ([ilyam8](https://github.com/ilyam8))
 - fix buffer overflow incgroups\_detect\_systemd\(\) [\#17799](https://github.com/netdata/netdata/pull/17799) ([ilyam8](https://github.com/ilyam8))
+- eBPF contexts \(part I\) [\#17797](https://github.com/netdata/netdata/pull/17797) ([thiagoftsm](https://github.com/thiagoftsm))
 - cgroup plugin: simplify and remove "ignore zero metrics" [\#17795](https://github.com/netdata/netdata/pull/17795) ([ilyam8](https://github.com/ilyam8))
 - Correctly handle eBPF check in package test script. [\#17794](https://github.com/netdata/netdata/pull/17794) ([Ferroin](https://github.com/Ferroin))
 - Use correct path for package files. [\#17793](https://github.com/netdata/netdata/pull/17793) ([vkalintiris](https://github.com/vkalintiris))
@@ -399,14 +409,6 @@
 - go.d: job manager: set config defaults [\#17255](https://github.com/netdata/netdata/pull/17255) ([ilyam8](https://github.com/ilyam8))
 - go.d: sd local-listeners: drop docker-proxy targets [\#17254](https://github.com/netdata/netdata/pull/17254) ([ilyam8](https://github.com/ilyam8))
 - go.d: sd local-listeners: discover /proc/net/tcp6 only apps [\#17252](https://github.com/netdata/netdata/pull/17252) ([ilyam8](https://github.com/ilyam8))
-- update whats new [\#17251](https://github.com/netdata/netdata/pull/17251) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Try finding OpenSSL using pkg-config first on macOS. [\#17250](https://github.com/netdata/netdata/pull/17250) ([Ferroin](https://github.com/Ferroin))
-- remove USR1 "Save internal DB to disk" [\#17249](https://github.com/netdata/netdata/pull/17249) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/docker/docker from 25.0.5+incompatible to 26.0.0+incompatible in /src/go/collectors/go.d.plugin [\#17248](https://github.com/netdata/netdata/pull/17248) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/prometheus/common from 0.50.0 to 0.51.1 in /src/go/collectors/go.d.plugin [\#17247](https://github.com/netdata/netdata/pull/17247) ([dependabot[bot]](https://github.com/apps/dependabot))
-- DBENGINE: support ZSTD compression [\#17244](https://github.com/netdata/netdata/pull/17244) ([ktsaou](https://github.com/ktsaou))
-- apps\_proc\_pid\_fd: ignore kf\_sock\_inpcb on modern FreeBSD [\#17243](https://github.com/netdata/netdata/pull/17243) ([glebius](https://github.com/glebius))
-- Fix MRG Metric refcount issue [\#17239](https://github.com/netdata/netdata/pull/17239) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.45.5](https://github.com/netdata/netdata/tree/v1.45.5) (2024-05-21)
 
