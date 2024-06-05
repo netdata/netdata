@@ -898,6 +898,24 @@ void dbengine_init(char *hostname) {
     }
 
     default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
+    char dbengineconfig[200 + 1];
+
+    size_t grouping_iterations = default_rrd_update_every;
+    storage_tiers_grouping_iterations[0] = default_rrd_update_every;
+
+    for (size_t tier = 1; tier < storage_tiers; tier++) {
+        grouping_iterations = storage_tiers_grouping_iterations[tier];
+        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu update every iterations", tier);
+        grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
+        if(grouping_iterations < 2) {
+            grouping_iterations = 2;
+            config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
+                   hostname, tier);
+        }
+        storage_tiers_grouping_iterations[tier] = grouping_iterations;
+    }
 
     new_dbengine_defaults =
         (!config_exists(CONFIG_SECTION_DB, "dbengine tier 1 update every iterations") &&
@@ -922,10 +940,6 @@ void dbengine_init(char *hostname) {
 
     size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
-    char dbengineconfig[200 + 1];
-
-    size_t grouping_iterations = default_rrd_update_every;
-    storage_tiers_grouping_iterations[0] = default_rrd_update_every;
 
     for (size_t tier = 0; tier < storage_tiers; tier++) {
 
@@ -941,23 +955,8 @@ void dbengine_init(char *hostname) {
         }
 
         int disk_space_mb = tier ? RRDENG_DEFAULT_TIER_DISK_SPACE_MB : default_multidb_disk_quota_mb;
-        grouping_iterations = storage_tiers_grouping_iterations[tier];
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu disk space MB", tier);
         disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
-
-        if (tier > 0) {
-
-            snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu update every iterations", tier);
-            grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-            if(grouping_iterations < 2) {
-                grouping_iterations = 2;
-                config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
-                       hostname, tier);
-            }
-        }
-        storage_tiers_grouping_iterations[tier] = grouping_iterations;
 
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention days", tier);
         storage_tiers_retention_days[tier] = config_get_number(
