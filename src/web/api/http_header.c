@@ -118,14 +118,14 @@ static void http_header_x_forwarded_for(struct web_client *w, const char *v, siz
 static void http_header_x_transaction_id(struct web_client *w, const char *v, size_t len) {
     char buffer[UUID_STR_LEN * 2];
     strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
-    uuid_parse_flexi(buffer, w->transaction); // will not alter w->transaction if it fails
+    (void) uuid_parse_flexi(buffer, w->transaction); // will not alter w->transaction if it fails
 }
 
 static void http_header_x_netdata_account_id(struct web_client *w, const char *v, size_t len) {
     if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl & HTTP_ACL_ACLK) {
         char buffer[UUID_STR_LEN * 2];
         strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
-        uuid_parse_flexi(buffer, w->auth.cloud_account_id); // will not alter w->cloud_account_id if it fails
+        (void) uuid_parse_flexi(buffer, w->auth.cloud_account_id); // will not alter w->cloud_account_id if it fails
     }
 }
 
