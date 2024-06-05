@@ -57,8 +57,14 @@ while [ "${1}" ]; do
         bundled) NETDATA_CERT_MODE="bundled" ;;
         *) run_failed "Unknown certificate handling mode '${2}'. Supported modes are auto, check, system, and bundled."; exit 1 ;;
       esac
+      REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1} ${2}"
+      shift 1
       ;;
-    "--certificate-test-url") NETDATA_CERT_TEST_URL="${2}" ;;
+    "--certificate-test-url")
+      NETDATA_CERT_TEST_URL="${2}"
+      REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1} ${2}"
+      shift 1
+      ;;
 
     *) echo >&2 "Unknown option '${1}'. Ignoring it." ;;
   esac
@@ -249,6 +255,7 @@ test_certs() {
   /opt/netdata/bin/curl --fail --silent --output /dev/null "${NETDATA_CERT_TEST_URL}" || return 1
 }
 
+# If the user has manually set up certificates, don’t mess with it.
 if [ ! -L /opt/netdata/etc/ssl ] && [ -d /opt/netdata/etc/ssl ] ; then
   echo "Preserving existing user configuration for TLS"
 else
