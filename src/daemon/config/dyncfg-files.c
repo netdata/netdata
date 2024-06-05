@@ -241,12 +241,12 @@ static bool dyncfg_read_file_to_buffer(const char *filename, BUFFER *dst) {
 static bool dyncfg_get_schema_from(const char *dir, const char *id, BUFFER *dst) {
     char filename[FILENAME_MAX + 1];
 
-    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", dir, id);
+    CLEAN_CHAR_P *escaped_id = dyncfg_escape_id_for_filename(id);
+    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", dir, escaped_id);
     if(dyncfg_read_file_to_buffer(filename, dst))
         return true;
 
-    CLEAN_CHAR_P *escaped_id = dyncfg_escape_id_for_filename(id);
-    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", dir, escaped_id);
+    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", dir, id);
     if(dyncfg_read_file_to_buffer(filename, dst))
         return true;
 
