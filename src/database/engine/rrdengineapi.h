@@ -19,6 +19,7 @@ extern int db_engine_journal_check;
 extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
 extern bool new_dbengine_defaults;
+extern bool legacy_multihost_db_space;
 extern RRD_BACKFILL default_backfill;
 
 extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];

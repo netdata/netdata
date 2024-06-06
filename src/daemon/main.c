@@ -1049,6 +1049,18 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_DB,      "dbengine multihost disk space MB",
                 CONFIG_SECTION_DB,      "dbengine tier 0 disk space MB");
 
+    config_move(CONFIG_SECTION_DB,      "dbengine tier 1 multihost disk space MB",
+                CONFIG_SECTION_DB,      "dbengine tier 1 disk space MB");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine tier 2 multihost disk space MB",
+                CONFIG_SECTION_DB,      "dbengine tier 2 disk space MB");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine tier 3 multihost disk space MB",
+                CONFIG_SECTION_DB,      "dbengine tier 3 disk space MB");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine tier 4 multihost disk space MB",
+                CONFIG_SECTION_DB,      "dbengine tier 4 disk space MB");
+
     config_move(CONFIG_SECTION_GLOBAL,  "memory deduplication (ksm)",
                 CONFIG_SECTION_DB,      "memory deduplication (ksm)");
 
@@ -1107,6 +1119,8 @@ static int get_hostname(char *buf, size_t buf_size) {
 
 static void get_netdata_configured_variables()
 {
+    legacy_multihost_db_space = config_exists(CONFIG_SECTION_DB, "dbengine multihost disk space MB");
+
     backwards_compatible_config();
 
     // ------------------------------------------------------------------------

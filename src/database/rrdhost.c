@@ -897,6 +897,17 @@ void dbengine_init(char *hostname) {
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 
+    new_dbengine_defaults =
+        (!legacy_multihost_db_space &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 update every iterations") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 update every iterations") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 update every iterations") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 update every iterations") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 disk space MB") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 disk space MB") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 disk space MB") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 disk space MB"));
+
     default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
     char dbengineconfig[200 + 1];
 
@@ -917,21 +928,11 @@ void dbengine_init(char *hostname) {
         storage_tiers_grouping_iterations[tier] = grouping_iterations;
     }
 
-    new_dbengine_defaults =
-        (!config_exists(CONFIG_SECTION_DB, "dbengine tier 1 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 multihost disk space MB") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 multihost disk space MB") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 multihost disk space MB") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 multihost disk space MB"));
-
     default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine tier 0 disk space MB", RRDENG_DEFAULT_TIER_DISK_SPACE_MB);
     if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        netdata_log_error("Invalid multidb disk space %d for tier 0 given. Defaulting to %d.", default_multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+        netdata_log_error("Invalid disk space %d for tier 0 given. Defaulting to %d.", default_multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
         default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-        config_set_number(CONFIG_SECTION_DB, "dbengine tier 0 multihost disk space MB", default_multidb_disk_quota_mb);
+        config_set_number(CONFIG_SECTION_DB, "dbengine tier 0 disk space MB", default_multidb_disk_quota_mb);
     }
 
     bool parallel_initialization = (storage_tiers <= (size_t)get_netdata_cpus()) ? true : false;
