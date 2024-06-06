@@ -384,13 +384,17 @@ int dyncfg_health_prototype_to_conf(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, const c
     wb->content_type = CT_TEXT_PLAIN;
     wb->expires = now_realtime_sec();
 
+    int n = 0;
     for(RRD_ALERT_PROTOTYPE *nap = ap; nap ; nap = nap->_internal.next) {
+        if(++n > 1)
+            buffer_sprintf(wb, "\n");
+
         if(nap->match.is_template) {
-            buffer_sprintf(wb, "\n%13s: %s\n", "template", name);
+            buffer_sprintf(wb, "%13s: %s\n", "template", name);
             buffer_sprintf(wb, "%13s: %s\n", "on", string2str(nap->match.on.context));
         }
         else {
-            buffer_sprintf(wb, "\n%13s: %s\n", "alarm", name);
+            buffer_sprintf(wb, "%13s: %s\n", "alarm", name);
             buffer_sprintf(wb, "%13s: %s\n", "on", string2str(nap->match.on.chart));
         }
 
