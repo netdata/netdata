@@ -151,11 +151,26 @@ issystemd() {
 
 # shellcheck disable=SC2009
 running_under_anacron() {
-    ppid="$(ps -o pid=,ppid= | grep -e "^ $$" | xargs | cut -f 2 -d ' ')"
-    ps -o pid=,command= | grep -e "^ ${ppid}" | grep -q anacron && return 0
+    if [ "$(uname -s)" = "Linux" ] && [ -d "/proc/$$" ]; then
+        ppid="$(cut -f 4 -d ' ' "/proc/$$/stat")"
+        if [ -n "${ppid}" ] && [ -d "/proc/${ppid}" ]; then
+            grep -q anacron "/proc/${ppid}/comm" && return 0
 
-    ppid2="$(ps -o pid=,ppid= | grep -e "^ ${ppid}" | xargs | cut -f 2 -d ' ')"
-    ps -o pid=,command= | grep -e "^ ${ppid2}" | grep -q anacron && return 0
+            ppid2="$(cut -f 4 -d ' ' "/proc/${ppid}/stat")"
+
+            if [ -n "${ppid2}" ] && [ -d "/proc/${ppid2}" ]; then
+                grep -q anacron "/proc/${ppid2}/comm" && return 0
+            fi
+        fi
+    else
+        ppid="$(ps -o pid=,ppid= | grep -e "^ *$$" | xargs | cut -f 2 -d ' ')"
+        if [ -n "${ppid}" ]; then
+            ps -o pid=,command= | grep -e "^ ${ppid}" | grep -q anacron && return 0
+
+            ppid2="$(ps -o pid=,ppid= | grep -e "^ *${ppid}" | xargs | cut -f 2 -d ' ')"
+            ps -o pid=,command= | grep -e "^ ${ppid2}" | grep -q anacron && return 0
+        fi
+    fi
 
     return 1
 }
