@@ -60,7 +60,7 @@ Claiming script options:
 | Option | Description                                                        | Required | Default value                                         |
 |--------|--------------------------------------------------------------------|:--------:|:------------------------------------------------------|
 | token  | The claiming token for your Netdata Cloud Space.                   |   yes    |                                                       |
-| rooms  | A comma-separated list of Rooms to add the Agent to.           |    no    | The Agent will be added to the "All nodes" Room only. |
+| rooms  | A comma-separated list of Rooms to add the Agent to.               |    no    | The Agent will be added to the "All nodes" Room only. |
 | id     | The unique identifier of the Agent.                                |    no    | The Agent's MACHINE_GUID.                             |
 | proxy  | The URL of a proxy server to use for the connection, if necessary. |    no    |                                                       |
 
@@ -325,13 +325,14 @@ Agent's command line tool, and details about the files found in `cloud.d`.
 
 ### The `cloud.conf` file
 
-This section defines how and whether your Agent connects to Netdata Cloud
-using the [ACLK](/src/aclk/README.md).
+This section defines how and whether your Agent connects to Netdata Cloud using
+the [Agent-Cloud link](/src/aclk/README.md)(ACLK).
 
-| setting        | default                     | info                                                                                                                                   |
-|:---------------|:----------------------------|:---------------------------------------------------------------------------------------------------------------------------------------|
-| cloud base url | <https://app.netdata.cloud> | The URL for the Netdata Cloud web application. You should not change this. If you want to disable Cloud, change the `enabled` setting. |
-| enabled        | yes                         | The runtime option to disable the [Agent-Cloud link](/src/aclk/README.md) and prevent your Agent from connecting to Netdata Cloud.     |
+| setting        | default                     | info                                                                                                                                                 |
+|:---------------|:----------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| enabled        | yes                         | Controls whether the ACLK is active. Set to no to prevent the Agent from connecting to Netdata Cloud.                                                |
+| cloud base url | <https://app.netdata.cloud> | The URL for the Netdata Cloud web application. Typically, this should not be changed.                                                                |
+| proxy          | env                         | Specifies the proxy setting for the ACLK. Options: none (no proxy), env (use environment's proxy), or a URL (e.g., `http://proxy.example.com:1080`). |
 
 ### Connection directory
 

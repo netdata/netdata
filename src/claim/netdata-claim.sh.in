@@ -422,29 +422,24 @@ HERE_DOC
             exit $EXIT_CODE
         fi
 
-        if [ -z "${PROXY}" ]; then
-           PROXYMSG=""
-        else
-           PROXYMSG="You have attempted to claim this node through a proxy - please update your the proxy setting in your netdata.conf to ${PROXY}. "
-        fi
         # Update cloud.conf in the agent memory
         @sbindir_POST@/netdatacli write-config 'cloud|global|enabled|yes' && \
         @sbindir_POST@/netdatacli write-config "cloud|global|cloud base url|$URL_BASE" && \
         @sbindir_POST@/netdatacli reload-claiming-state && \
         if [ "${HTTP_STATUS_CODE}" = "204" ] ; then
-                echo >&2 "${PROXYMSG}Node was successfully claimed."
+                echo >&2 "Node was successfully claimed."
         else
                 echo >&2 "The agent cloud base url is set to the url provided."
                 echo >&2 "The cloud may have different credentials already registered for this agent ID and it cannot be reclaimed under different credentials for security reasons. If you are unable to connect use -id=\$(uuidgen) to overwrite this agent ID with a fresh value if the original credentials cannot be restored."
-                echo >&2 "${PROXYMSG}Failed to claim node with the following error message:\"${ERROR_MESSAGES[$EXIT_CODE]}\""
+                echo >&2 "Failed to claim node with the following error message:\"${ERROR_MESSAGES[$EXIT_CODE]}\""
         fi && exit $EXIT_CODE
 
         if [ "${ERROR_KEY}" = "ErrAlreadyClaimed" ] ; then
                 echo >&2 "The cloud may have different credentials already registered for this agent ID and it cannot be reclaimed under different credentials for security reasons. If you are unable to connect use -id=\$(uuidgen) to overwrite this agent ID with a fresh value if the original credentials cannot be restored."
-                echo >&2 "${PROXYMSG}Failed to claim node with the following error message:\"${ERROR_MESSAGES[$EXIT_CODE]}\""
+                echo >&2 "Failed to claim node with the following error message:\"${ERROR_MESSAGES[$EXIT_CODE]}\""
                 exit $EXIT_CODE
         fi
-        echo >&2 "${PROXYMSG}The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud."
+        echo >&2 "The claim was successful but the agent could not be notified ($?)- it requires a restart to connect to the cloud."
         [ "$NETDATA_RUNNING" -eq 0 ] && exit 0 || exit 5
 fi
 
