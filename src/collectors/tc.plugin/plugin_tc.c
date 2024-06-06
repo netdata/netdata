@@ -392,22 +392,6 @@ static inline void tc_device_commit(struct tc_device *d) {
         return;
     }
 
-    netdata_log_debug(D_TC_LOOP, "TC: evaluating TC device '%s'. enabled = %d/%d (bytes: %d/%d, packets: %d/%d, dropped: %d/%d, tokens: %d/%d, ctokens: %d/%d, all_classes_qdiscs: %d/%d), classes: (bytes = %llu, packets = %llu, dropped = %llu, tokens = %llu, ctokens = %llu).",
-        string2str(d->name?d->name:d->id),
-        d->enabled, enable_new_interfaces,
-        d->enabled_bytes, enable_bytes,
-        d->enabled_packets, enable_packets,
-        d->enabled_dropped, enable_dropped,
-        d->enabled_tokens, enable_tokens,
-        d->enabled_ctokens, enable_ctokens,
-        d->enabled_all_classes_qdiscs, enabled_all_classes_qdiscs,
-        bytes_sum,
-        packets_sum,
-        dropped_sum,
-        tokens_sum,
-        ctokens_sum
-        );
-
     // --------------------------------------------------------------------
     // bytes
 
