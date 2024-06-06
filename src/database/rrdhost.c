@@ -929,7 +929,7 @@ void dbengine_init(char *hostname) {
     }
 
     default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine tier 0 disk space MB", RRDENG_DEFAULT_TIER_DISK_SPACE_MB);
-    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+    if(default_multidb_disk_quota_mb && default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
         netdata_log_error("Invalid disk space %d for tier 0 given. Defaulting to %d.", default_multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
         default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
         config_set_number(CONFIG_SECTION_DB, "dbengine tier 0 disk space MB", default_multidb_disk_quota_mb);
