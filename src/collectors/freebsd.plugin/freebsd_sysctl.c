@@ -24,6 +24,10 @@
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
+#define _COMMON_PLUGIN_NAME "windows.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "PerflibProcessor"
+#include "../common-contexts/common-contexts.h"
+
 // --------------------------------------------------------------------------------------------------------------------
 // common definitions and variables
 
