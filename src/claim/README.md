@@ -39,7 +39,7 @@ The UI method is the easiest and recommended way to connect your Agent. Here's h
 
 1. Open your Agent local UI.
 2. Sign in to your Netdata Cloud account.
-3. Click the "Connect to netdata" button.
+3. Click the "Connect" button.
 4. Follow the on-screen instructions to connect your Agent.
 
 #### Using claiming script
