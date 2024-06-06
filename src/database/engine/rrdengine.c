@@ -1821,7 +1821,7 @@ void dbengine_retention_statistics(void)
             stats[tier].rd_time = rrddim_add(stats[tier].st, "time", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
             char tier_str[5];
-            snprintfz(tier_str, 4, "%ld", tier);
+            snprintfz(tier_str, 4, "%zu", tier);
             rrdlabels_add(stats[tier].st->rrdlabels, "tier", tier_str, RRDLABEL_SRC_AUTO);
 
             rrdset_flag_set(stats[tier].st, RRDSET_FLAG_METADATA_UPDATE);
