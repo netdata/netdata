@@ -892,41 +892,33 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         char filename[FILENAME_MAX + 1];
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, (*netdata_configured_host_prefix)?"/proc/1/net/dev":"/proc/net/dev");
-        proc_net_dev_filename = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "filename to monitor", filename);
+        proc_net_dev_filename = strdupz(filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/virtual/net/%s");
-        path_to_sys_devices_virtual_net = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get virtual interfaces", filename);
+        path_to_sys_devices_virtual_net = strdupz(filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/speed");
-        path_to_sys_class_net_speed = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device speed", filename);
+        path_to_sys_class_net_speed = strdupz(filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/duplex");
-        path_to_sys_class_net_duplex = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device duplex", filename);
+        path_to_sys_class_net_duplex = strdupz(filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/operstate");
-        path_to_sys_class_net_operstate = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device operstate", filename);
+        path_to_sys_class_net_operstate = strdupz(filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/carrier");
-        path_to_sys_class_net_carrier = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device carrier", filename);
+        path_to_sys_class_net_carrier = strdupz(filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/mtu");
-        path_to_sys_class_net_mtu = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device mtu", filename);
+        path_to_sys_class_net_mtu = strdupz(filename);
 
+        enable_new_interfaces = CONFIG_BOOLEAN_YES;
 
-        enable_new_interfaces = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "enable new interfaces detected at runtime", CONFIG_BOOLEAN_AUTO);
+        do_bandwidth = do_packets = do_errors = do_drops = do_fifo = do_events = do_speed = do_duplex = do_operstate =
+            do_carrier = do_mtu = CONFIG_BOOLEAN_YES;
 
-        do_bandwidth    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "bandwidth for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_packets      = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "packets for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_errors       = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "errors for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_drops        = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "drops for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_fifo         = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "fifo for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_compressed   = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "compressed packets for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_events       = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "frames, collisions, carrier counters for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_speed        = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "speed for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_duplex       = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "duplex for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_operstate    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "operstate for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_carrier      = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "carrier for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_mtu          = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "mtu for all interfaces", CONFIG_BOOLEAN_AUTO);
+        // only CSLIP, PPP
+        do_compressed   = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "compressed packets for all interfaces", CONFIG_BOOLEAN_NO);
 
         disabled_list = simple_pattern_create(
                 config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "disable by default interfaces matching",
