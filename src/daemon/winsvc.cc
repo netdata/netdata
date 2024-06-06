@@ -120,7 +120,7 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     }
 }
 
-#if 0
+#if 1
 int main() {
     SERVICE_TABLE_ENTRY serviceTable[] = {
         { strdupz("Netdata"), ServiceMain },
