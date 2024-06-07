@@ -64,6 +64,7 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     static const RRDVAR_ACQUIRED *cpus_var = NULL;
     int cores_found = 0;
+    uint64_t totalIPC = 0;
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for(LONG i = 0; i < pObjectType->NumInstances ; i++) {
@@ -139,6 +140,8 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         uint64_t irq = p->percentInterruptTime.current.Data;
         uint64_t idle = p->percentIdleTime.current.Data;
 
+        totalIPC += p->interruptsPerSec.current.Data;
+
         rrddim_set_by_pointer(p->st, p->rd_user, (collected_number)user);
         rrddim_set_by_pointer(p->st, p->rd_system, (collected_number)system);
         rrddim_set_by_pointer(p->st, p->rd_irq, (collected_number)irq);
@@ -146,7 +149,6 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         rrddim_set_by_pointer(p->st, p->rd_idle, (collected_number)idle);
         rrdset_done(p->st);
 
-        common_interrupts(&p->interruptsPerSec, update_every);
 //        if(!p->st2) {
 //            p->st2 = rrdset_create_localhost(
 //                is_total ? "system" : "cpu2"
@@ -176,6 +178,8 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     if(cpus_var)
         rrdvar_host_variable_set(localhost, cpus_var, cores_found);
+
+    common_interrupts(totalIPC, update_every);
 
     return true;
 }
