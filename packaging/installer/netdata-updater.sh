@@ -165,10 +165,10 @@ running_under_anacron() {
     else
         ppid="$(ps -o pid= -o ppid= 2>/dev/null | grep -e "^ *$$" | xargs | cut -f 2 -d ' ')"
         if [ -n "${ppid}" ]; then
-            ps -o pid= -o command= 2>/dev/null | grep -e "^ ${ppid}" | grep -q anacron && return 0
+            ps -o pid= -o command= 2>/dev/null | grep -e "^ *${ppid}" | grep -q anacron && return 0
 
             ppid2="$(ps -o pid= -o ppid= 2>/dev/null | grep -e "^ *${ppid}" | xargs | cut -f 2 -d ' ')"
-            ps -o pid= -o command= 2>/dev/null | grep -e "^ ${ppid2}" | grep -q anacron && return 0
+            ps -o pid= -o command= 2>/dev/null | grep -e "^ *${ppid2}" | grep -q anacron && return 0
         fi
     fi
 
