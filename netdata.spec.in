@@ -200,6 +200,10 @@ BuildRequires: systemd
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
 
+# Explicitly call out that we provide these
+Provides: user(%{name})
+Provides: group(%{name})
+
 # #####################################################################
 # External plugin package dependencies
 # #####################################################################
