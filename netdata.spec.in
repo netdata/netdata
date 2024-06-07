@@ -92,6 +92,17 @@ AutoReqProv: yes
 %global _have_xenstat 0
 %endif
 
+# log2journal isn’t available on older openSUSE systems
+%if 0%{?suse_version}
+%if %{suse_version} < 1600
+%global _have_log2journal 0
+%else
+%global _have_log2journal 1
+%endif
+%else
+%global _have_log2journal 1
+%endif
+
 # Skip MongoDB exporter on known problem platforms
 %if 0%{?oraclelinux} || 0%{?suse_version} || 0%{?amzn}
 %global _have_mongo_exporter 0
@@ -147,9 +158,7 @@ BuildRequires: pkgconfig(libcurl)
 BuildRequires: pkgconfig(liblz4)
 BuildRequires: pkgconfig(yaml-0.1)
 BuildRequires: pkgconfig(json-c)
-%if 0%{?suse_version}
-# log2journal is not available on these systems
-%else
+%if %{_have_log2journal}
 BuildRequires: pkgconfig(libpcre2-8)
 %endif
 %if 0%{?suse_version}
@@ -494,9 +503,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
-%if 0%{?suse_version}
-# log2journal is not available on these systems
-%else
+%if %{_have_log2journal}
 %{_sbindir}/log2journal
 %endif
 %{_sbindir}/systemd-cat-native
