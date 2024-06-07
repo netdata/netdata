@@ -252,7 +252,15 @@ certs_selected() {
 }
 
 test_certs() {
-  /opt/netdata/bin/curl --fail --max-time 300 --silent --output /dev/null "${NETDATA_CERT_TEST_URL}" || return 1
+  /opt/netdata/bin/curl --fail --max-time 300 --silent --output /dev/null "${NETDATA_CERT_TEST_URL}"
+
+  case "$?" in
+    35|77) echo "Failed to load certificate files for test." ; return 1 ;;
+    60|82|83) echo "Certificates cannot be used to connect to ${NETDATA_CERT_TEST_URL}" ; return 1 ;;
+    53|54|66) echo "Unable to use OpenSSL configuration associated with certificates" ; return 1 ;;
+    0) echo "Successfully connected to ${NETDATA_CERT_TEST_URL} using certificates" ;;
+    *) echo "Unable to test certificates due to networking problems, blindly assuming they work" ;;
+  esac
 }
 
 # If the user has manually set up certificates, don’t mess with it.
