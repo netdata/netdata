@@ -33,7 +33,6 @@ run ./netdata-installer.sh \
   --dont-start-it \
   --disable-exporting-mongodb \
   --require-cloud \
-  --use-system-protobuf \
   --dont-scrub-cflags-even-though-it-may-break-things \
   --one-time-build \
   --disable-logsmanagement \
