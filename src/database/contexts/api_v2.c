@@ -1182,8 +1182,10 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
             group_seconds *= storage_tiers_grouping_iterations[tier];
             uint64_t max = storage_engine_disk_space_max(eng->seb, localhost->db[tier].si);
+#ifdef ENABLE_DBENGINE
             if (!max)
                 max = get_directory_free_bytes_space(multidb_ctx[tier]);
+#endif
             uint64_t used = storage_engine_disk_space_used(eng->seb, localhost->db[tier].si);
             time_t first_time_s = storage_engine_global_first_time_s(eng->seb, localhost->db[tier].si);
             size_t currently_collected_metrics = storage_engine_collected_metrics(eng->seb, localhost->db[tier].si);
@@ -1220,7 +1222,10 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                 buffer_json_member_add_string(wb, "retention_human", human_retention);
 
                 if(used || max) { // we have disk space information
-                    time_t time_retention =  multidb_ctx[tier]->config.max_retention_s;
+                    time_t time_retention = 0;
+#ifdef ENABLE_DBENGINE
+                    time_retention = multidb_ctx[tier]->config.max_retention_s;
+#endif
                     time_t space_retention = (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent);
                     time_t actual_retention = MIN(space_retention, time_retention ? time_retention : space_retention);
 
