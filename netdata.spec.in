@@ -94,6 +94,17 @@ AutoReqProv: yes
 %global _have_xenstat 0
 %endif
 
+# log2journal isn’t available on older openSUSE systems
+%if 0%{?suse_version}
+%if %{suse_version} < 1600
+%global _have_log2journal 0
+%else
+%global _have_log2journal 1
+%endif
+%else
+%global _have_log2journal 1
+%endif
+
 # Skip MongoDB exporter on known problem platforms
 %if 0%{?oraclelinux} || 0%{?suse_version} || 0%{?amzn}
 %global _have_mongo_exporter 0
