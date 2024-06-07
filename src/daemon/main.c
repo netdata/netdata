@@ -1119,11 +1119,13 @@ static int get_hostname(char *buf, size_t buf_size) {
 
 static void get_netdata_configured_variables()
 {
+#ifdef ENABLE_DBENGINE
     legacy_multihost_db_space = config_exists(CONFIG_SECTION_DB, "dbengine multihost disk space MB");
     if (!legacy_multihost_db_space)
         legacy_multihost_db_space = config_exists(CONFIG_SECTION_GLOBAL, "dbengine multihost disk space");
     if (!legacy_multihost_db_space)
         legacy_multihost_db_space = config_exists(CONFIG_SECTION_GLOBAL, "dbengine disk space");
+#endif
 
     backwards_compatible_config();
 
