@@ -669,6 +669,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
     }
 
     time_t now_s = max_acceptable_collected_time();
+    time_t extent_first_time_s = journalfile->v2.first_time_s ? journalfile->v2.first_time_s : LONG_MAX;
     for (i = 0; i < count ; ++i) {
         nd_uuid_t *temp_id;
         uint8_t page_type = jf_metric_data->descr[i].type;
@@ -728,8 +729,18 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
                 journalfile->datafile,
                 jf_metric_data->extent_offset, jf_metric_data->extent_size, jf_metric_data->descr[i].page_length);
 
+        extent_first_time_s = MIN(extent_first_time_s, vd.start_time_s);
+
         mrg_metric_release(main_mrg, metric);
     }
+
+    journalfile->v2.first_time_s = extent_first_time_s;
+
+    time_t old = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);;
+    do {
+        if(old <= extent_first_time_s)
+            break;
+    } while(!__atomic_compare_exchange_n(&ctx->atomic.first_time_s, &old, extent_first_time_s, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
 /*

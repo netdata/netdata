@@ -2306,6 +2306,10 @@ void metadata_delete_host_chart_labels(char *machine_guid)
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Queued command delete chart labels for host %s", machine_guid);
 }
 
+uint64_t sqlite_get_meta_space(void)
+{
+    return sqlite_get_db_space(db_meta);
+}
 
 //
 // unitests

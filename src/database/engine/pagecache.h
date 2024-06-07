@@ -33,15 +33,6 @@ struct page_descr_with_data {
     } link;
 };
 
-#define PAGE_INFO_SCRATCH_SZ (8)
-struct rrdeng_page_info {
-    uint8_t scratch[PAGE_INFO_SCRATCH_SZ]; /* scratch area to be used by page-cache users */
-
-    usec_t start_time_ut;
-    usec_t end_time_ut;
-    uint32_t page_length;
-};
-
 struct pg_alignment {
     uint32_t refcount;
 };

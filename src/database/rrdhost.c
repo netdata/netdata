@@ -3,17 +3,18 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
+#if RRD_STORAGE_TIERS != 5
+#error RRD_STORAGE_TIERS is not 5 - you need to update the grouping iterations per tier
+#endif
+
 static void rrdhost_streaming_sender_structures_init(RRDHOST *host);
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
 size_t storage_tiers = 3;
 bool use_direct_io = true;
-size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
-RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW };
-
-#if RRD_STORAGE_TIERS != 5
-#error RRD_STORAGE_TIERS is not 5 - you need to update the grouping iterations per tier
-#endif
+size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = {1, 60, 60, 60, 60};
+size_t storage_tiers_collection_per_sec[RRD_STORAGE_TIERS] = {1, 60, 3600, 8 * 3600, 24 * 3600};
+double storage_tiers_retention_days[RRD_STORAGE_TIERS] = {14, 90, 2 * 365, 2 * 365, 2 * 365};
 
 size_t get_tier_grouping(size_t tier) {
     if(unlikely(tier >= storage_tiers)) tier = storage_tiers - 1;
@@ -299,6 +300,7 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
                 (struct rrdengine_instance **)&host->db[0].si,
                 dbenginepath,
                 default_rrdeng_disk_quota_mb,
+                0,
                 0); // may fail here for legacy dbengine initialization
 
             initialized = (ret == 0);
@@ -682,7 +684,7 @@ static void rrdhost_update(RRDHOST *host
         host->rrdpush_replication_step = rrdpush_replication_step;
 
         ml_host_new(host);
-        
+
         rrdhost_load_rrdcontext_data(host);
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "Host %s is not in archived mode anymore",
@@ -814,19 +816,58 @@ struct dbengine_initialization {
     ND_THREAD *thread;
     char path[FILENAME_MAX + 1];
     int disk_space_mb;
+    size_t retention_seconds;
     size_t tier;
     int ret;
 };
 
+typedef struct rrd_alert_prototype {
+    struct rrd_alert_match match;
+    struct rrd_alert_config config;
+
+    struct {
+        uint32_t uses;
+        bool enabled;
+        bool is_on_disk;
+        SPINLOCK spinlock;
+        struct rrd_alert_prototype *prev, *next;
+    } _internal;
+} RRD_ALERT_PROTOTYPE;
+
 void *dbengine_tier_init(void *ptr) {
     struct dbengine_initialization *dbi = ptr;
-    dbi->ret = rrdeng_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier);
+    dbi->ret = rrdeng_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier, dbi->retention_seconds);
     return ptr;
 }
+
+RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
+{
+    const char *bf = config_get(
+        CONFIG_SECTION_DB,
+        "dbengine tier backfill",
+        backfill == RRD_BACKFILL_NEW  ? "new" :
+        backfill == RRD_BACKFILL_FULL ? "full" :
+                                        "none");
+
+    if (strcmp(bf, "new") == 0)
+        backfill = RRD_BACKFILL_NEW;
+    else if (strcmp(bf, "full") == 0)
+        backfill = RRD_BACKFILL_FULL;
+    else if (strcmp(bf, "none") == 0)
+        backfill = RRD_BACKFILL_NONE;
+    else {
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
+        config_set(CONFIG_SECTION_DB, "dbengine tier backfill", "new");
+        backfill = RRD_BACKFILL_NEW;
+    }
+    return backfill;
+}
+
 #endif
 
 void dbengine_init(char *hostname) {
 #ifdef ENABLE_DBENGINE
+
     use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", use_direct_io);
 
     unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", DEFAULT_PAGES_PER_EXTENT);
@@ -842,8 +883,7 @@ void dbengine_init(char *hostname) {
 
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     if(storage_tiers < 1) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "At least 1 storage tier is required. Assuming 1.");
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "At least 1 storage tier is required. Assuming 1.");
 
         storage_tiers = 1;
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
@@ -857,66 +897,54 @@ void dbengine_init(char *hostname) {
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 
+    new_dbengine_defaults =
+        (!legacy_multihost_db_space &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 update every iterations") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 update every iterations") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 update every iterations") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 update every iterations") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 disk space MB") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 disk space MB") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 disk space MB") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 disk space MB"));
+
+    default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
+    char dbengineconfig[200 + 1];
+
+    size_t grouping_iterations = default_rrd_update_every;
+    storage_tiers_grouping_iterations[0] = default_rrd_update_every;
+
+    for (size_t tier = 1; tier < storage_tiers; tier++) {
+        grouping_iterations = storage_tiers_grouping_iterations[tier];
+        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu update every iterations", tier);
+        grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
+        if(grouping_iterations < 2) {
+            grouping_iterations = 2;
+            config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
+                   hostname, tier);
+        }
+        storage_tiers_grouping_iterations[tier] = grouping_iterations;
+    }
+
+    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine tier 0 disk space MB", RRDENG_DEFAULT_TIER_DISK_SPACE_MB);
+    if(default_multidb_disk_quota_mb && default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+        netdata_log_error("Invalid disk space %d for tier 0 given. Defaulting to %d.", default_multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+        default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+        config_set_number(CONFIG_SECTION_DB, "dbengine tier 0 disk space MB", default_multidb_disk_quota_mb);
+    }
+
     bool parallel_initialization = (storage_tiers <= (size_t)get_netdata_cpus()) ? true : false;
-    parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", parallel_initialization);
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
 
-    bool tiers_adjusted = false;
     size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
-    char dbengineconfig[200 + 1];
-    int divisor = 1;
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
 
-        if(tier > 0)
-            divisor *= 2;
+    for (size_t tier = 0; tier < storage_tiers; tier++) {
 
-        int disk_space_mb = default_multidb_disk_quota_mb / divisor;
-        size_t grouping_iterations = storage_tiers_grouping_iterations[tier];
-        RRD_BACKFILL backfill = storage_tiers_backfill[tier];
-
-        if(tier > 0) {
-            snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu multihost disk space MB", tier);
-            disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
-
-            snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu update every iterations", tier);
-            grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-            if(grouping_iterations < 2) {
-                grouping_iterations = 2;
-                config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
-                       hostname, tier);
-            }
-
-            snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu backfill", tier);
-            const char *bf = config_get(CONFIG_SECTION_DB, dbengineconfig, backfill == RRD_BACKFILL_NEW ? "new" : backfill == RRD_BACKFILL_FULL ? "full" : "none");
-            if(strcmp(bf, "new") == 0) backfill = RRD_BACKFILL_NEW;
-            else if(strcmp(bf, "full") == 0) backfill = RRD_BACKFILL_FULL;
-            else if(strcmp(bf, "none") == 0) backfill = RRD_BACKFILL_NONE;
-            else {
-                nd_log(NDLS_DAEMON, NDLP_WARNING, "DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
-                config_set(CONFIG_SECTION_DB, dbengineconfig, "new");
-                backfill = RRD_BACKFILL_NEW;
-            }
-        }
-
-        storage_tiers_grouping_iterations[tier] = grouping_iterations;
-        storage_tiers_backfill[tier] = backfill;
-
-        if(tier > 0 && get_tier_grouping(tier) > 65535) {
-            storage_tiers_grouping_iterations[tier] = 1;
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "DBENGINE on '%s': dbengine tier %zu gives aggregation of more than 65535 points of tier 0. "
-                   "Disabling tiers %zu and above",
-                   hostname, tier, tier);
-            storage_tiers = tier;
-            tiers_adjusted = true;
-            break;
-        }
-
-        if(tier == 0)
+        if (tier == 0)
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
         else
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
@@ -924,13 +952,20 @@ void dbengine_init(char *hostname) {
         int ret = mkdir(dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
             nd_log(NDLS_DAEMON, NDLP_CRIT, "DBENGINE on '%s': cannot create directory '%s'", hostname, dbenginepath);
-            break;
+            continue;
         }
 
-        internal_error(true, "DBENGINE tier %zu grouping iterations is set to %zu", tier, storage_tiers_grouping_iterations[tier]);
+        int disk_space_mb = tier ? RRDENG_DEFAULT_TIER_DISK_SPACE_MB : default_multidb_disk_quota_mb;
+        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu disk space MB", tier);
+        disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
-        tiers_init[tier].disk_space_mb = disk_space_mb;
+        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention days", tier);
+        storage_tiers_retention_days[tier] = config_get_number(
+            CONFIG_SECTION_DB, dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_days[tier] : 0);
+
+        tiers_init[tier].disk_space_mb = (int) disk_space_mb;
         tiers_init[tier].tier = tier;
+        tiers_init[tier].retention_seconds = (size_t) (86400.0 * storage_tiers_retention_days[tier]);
         strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
         tiers_init[tier].ret = 0;
 
@@ -942,8 +977,6 @@ void dbengine_init(char *hostname) {
         else
             dbengine_tier_init(&tiers_init[tier]);
     }
-    if (tiers_adjusted)
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(parallel_initialization)
@@ -970,6 +1003,8 @@ void dbengine_init(char *hostname) {
 
     for(size_t tier = 0; tier < storage_tiers ;tier++)
         rrdeng_readiness_wait(multidb_ctx[tier]);
+
+    calculate_tier_disk_space_percentage();
 
     dbengine_enabled = true;
 #else

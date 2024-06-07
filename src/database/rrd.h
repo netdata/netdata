@@ -155,8 +155,6 @@ typedef enum __attribute__ ((__packed__)) {
     RRD_BACKFILL_NEW
 } RRD_BACKFILL;
 
-extern RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
-
 #define UPDATE_EVERY 1
 #define UPDATE_EVERY_MAX 3600
 
