@@ -9,6 +9,7 @@
 typedef pthread_mutex_t netdata_mutex_t;
 #define NETDATA_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 
+#if 0
 typedef struct netdata_spinlock {
     bool locked;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -16,9 +17,19 @@ typedef struct netdata_spinlock {
     size_t spins;
 #endif
 } SPINLOCK;
+#else
+typedef struct netdata_spinlock {
+    netdata_mutex_t inner;
+} SPINLOCK;
+#endif
 
+#if 0
 #define NETDATA_SPINLOCK_INITIALIZER \
     { .locked = false }
+#else
+#define NETDATA_SPINLOCK_INITIALIZER \
+    { .inner = PTHREAD_MUTEX_INITIALIZER }
+#endif
 
 void spinlock_init(SPINLOCK *spinlock);
 void spinlock_lock(SPINLOCK *spinlock);
