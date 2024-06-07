@@ -89,17 +89,33 @@ install_amazon_linux() {
 }
 
 install_suse_like() {
-  # Using a glob pattern here because I can't reliably determine what the
-  # resulting package name will be (TODO: There must be a better way!)
+  rpmarch="$(rpm --eval '%{_build_arch}')"
+  packages=""
+
+  for pkg in /netdata/artifacts/netdata*.rpm; do
+    pkg="$(basename "${pkg}")"
+    packages="${packages} ${pkg%%."${rpmarch}".rpm}"
+  done
+
+  [ -z "${packages}" ] && exit 1
+
+  # Install prerequisites to prepare a local directory repository.
+  zypper install -y --solver-focus Installed --allow-downgrade --no-recommends createrepo_c || exit 1
+
+  # Prepare the repo
+  mkdir -p /var/tmp/local-repo || exit 1
+  cp -va /netdata/artifacts/netdata*.rpm /var/tmp/local-repo || exit 1
+  createrepo /var/tmp/local-repo || exit 1
+  zypper addrepo -c -K -G -f file:///var/tmp/local-repo local || exit 1
 
   # Install Netdata
-  # Strange quoting is required here so that glob matching works.
-  zypper install -y --solver-focus Installed --allow-downgrade --allow-unsigned-rpm /netdata/artifacts/netdata*.rpm || exit 1
+  # shellcheck disable=SC2086
+  zypper install -y --solver-focus Installed --allow-downgrade --allow-unsigned-rpm ${packages} || exit 1
 
   # Install testing tools
   zypper install -y --solver-focus Installed --allow-downgrade --no-recommends curl netcat-openbsd jq || exit 1
 
-  [ "$(rpm --eval '%{_build_arch}')" = "x86_64" ] || NETDATA_SKIP_EBPF=1
+  [ "${rpmarch}" = "x86_64" ] || NETDATA_SKIP_EBPF=1
 }
 
 dump_log() {
