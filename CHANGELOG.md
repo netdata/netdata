@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- explicitly disable removed collectors in python.d.conf [\#17840](https://github.com/netdata/netdata/pull/17840) ([ilyam8](https://github.com/ilyam8))
+- fix tc plugin undeclared vars [\#17839](https://github.com/netdata/netdata/pull/17839) ([ilyam8](https://github.com/ilyam8))
+- proc net dev: simplify config [\#17837](https://github.com/netdata/netdata/pull/17837) ([ilyam8](https://github.com/ilyam8))
+- tc plugin simplify config [\#17835](https://github.com/netdata/netdata/pull/17835) ([ilyam8](https://github.com/ilyam8))
+- health dyncfg userconfig: remove first newline [\#17834](https://github.com/netdata/netdata/pull/17834) ([ilyam8](https://github.com/ilyam8))
+- docs: claiming: rename connect button [\#17831](https://github.com/netdata/netdata/pull/17831) ([ilyam8](https://github.com/ilyam8))
+- Sockets VFS \(context update\) [\#17830](https://github.com/netdata/netdata/pull/17830) ([thiagoftsm](https://github.com/thiagoftsm))
+- fix order of loading schema files in dyncfg\_get\_schema\_from [\#17829](https://github.com/netdata/netdata/pull/17829) ([ilyam8](https://github.com/ilyam8))
 - claiming: add proxy to cloud.conf if set [\#17828](https://github.com/netdata/netdata/pull/17828) ([ilyam8](https://github.com/ilyam8))
 - fix health alert load15 info [\#17823](https://github.com/netdata/netdata/pull/17823) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17822](https://github.com/netdata/netdata/pull/17822) ([netdatabot](https://github.com/netdatabot))
@@ -403,12 +411,6 @@
 - add additional fields to webhook reachability notifications [\#17271](https://github.com/netdata/netdata/pull/17271) ([juacker](https://github.com/juacker))
 - Update Codeowners [\#17270](https://github.com/netdata/netdata/pull/17270) ([tkatsoulas](https://github.com/tkatsoulas))
 - go.d: config schemas update: prohibit additional properties [\#17269](https://github.com/netdata/netdata/pull/17269) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17268](https://github.com/netdata/netdata/pull/17268) ([netdatabot](https://github.com/netdatabot))
-- fix duplicate chart context [\#17267](https://github.com/netdata/netdata/pull/17267) ([ilyam8](https://github.com/ilyam8))
-- Reset database connection handle on close [\#17266](https://github.com/netdata/netdata/pull/17266) ([stelfrag](https://github.com/stelfrag))
-- docs: update pagerduty meta [\#17264](https://github.com/netdata/netdata/pull/17264) ([ilyam8](https://github.com/ilyam8))
-- Correctly propagate errors from child scripts in kickstart.sh. [\#17263](https://github.com/netdata/netdata/pull/17263) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#17261](https://github.com/netdata/netdata/pull/17261) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
