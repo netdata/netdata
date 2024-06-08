@@ -841,6 +841,8 @@ set(DAEMON_FILES
         src/daemon/analytics.h
         src/daemon/main.c
         src/daemon/main.h
+        src/daemon/win_system-info.c
+        src/daemon/win_system-info.h
         src/daemon/signals.c
         src/daemon/signals.h
         src/daemon/service.c

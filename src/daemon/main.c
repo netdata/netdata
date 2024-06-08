@@ -7,6 +7,10 @@
 
 #include "database/engine/page_test.h"
 
+#ifdef OS_WINDOWS
+#include "win_system-info.h"
+#endif
+
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
 #endif
