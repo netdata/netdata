@@ -1406,6 +1406,8 @@ int get_system_info(struct rrdhost_system_info *system_info) {
         netdata_pclose(fp_child_input, fp_child_output, command_pid);
     }
     freez(script);
+#else
+    windowsget_system_info(system_info);
 #endif
     return 0;
 }
