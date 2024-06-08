@@ -1407,7 +1407,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
     }
     freez(script);
 #else
-    windowsget_system_info(system_info);
+    netdata_windows_get_system_info(system_info);
 #endif
     return 0;
 }

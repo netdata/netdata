@@ -7,7 +7,7 @@
 #ifdef OS_WINDOWS
 #include "windows.h"
 
-void windowsget_system_info(struct rrdhost_system_info *system_info);
+void netdata_windows_get_system_info(struct rrdhost_system_info *system_info);
 #endif
 
 #endif // _NETDATA_WIN_SYSTEM_INFO_H_
