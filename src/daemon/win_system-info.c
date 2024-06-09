@@ -35,7 +35,7 @@ void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo) {
 
     netdata_windows_cloud(systemInfo, unknowValue);
     netdata_windows_container(systemInfo, unknowValue);
-    netdata_windows_host(systemInfo, defaultValue);
+    netdata_windows_host(systemInfo, unknowValue);
 
 }
 #endif
