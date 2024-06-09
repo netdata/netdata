@@ -1649,6 +1649,9 @@ void retention_timer_cb(uv_timer_t *handle)
     uv_update_time(handle->loop);
 
     for (size_t tier = 0; tier < storage_tiers; tier++) {
+        STORAGE_ENGINE *eng = localhost->db[tier].eng;
+        if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
+            continue;
         bool cleanup = rrdeng_ctx_tier_cap_exceeded(multidb_ctx[tier]);
         if (cleanup)
             rrdeng_enq_cmd(multidb_ctx[tier], RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
