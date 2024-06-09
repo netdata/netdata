@@ -1644,6 +1644,9 @@ bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx)
 
 void retention_timer_cb(uv_timer_t *handle)
 {
+    if (!localhost)
+        return;
+
     worker_is_busy(RRDENG_TIMER_CB);
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
