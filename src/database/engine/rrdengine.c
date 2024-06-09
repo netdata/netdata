@@ -1807,13 +1807,13 @@ void dbengine_retention_statistics(void)
                 "netdata",
                 id,
                 NULL,
-                "dbengine",
+                "dbengine retention",
                 "netdata.dbengine_tier_retention",
                 "dbengine space and time retention",
                 "%",
                 "netdata",
                 "stats",
-                200000,
+                134900, // before "dbengine memory" (dbengine2_statistics_charts)
                 10,
                 RRDSET_TYPE_LINE);
 
