@@ -4,6 +4,45 @@
 
 #include "win_system-info.h"
 
+// Hardware
+char *netdata_windows_arch(DWORD value, char *defaultValue)
+{
+    switch(value) {
+        case 9:
+            return "x86_64";
+        case 5:
+            return "ARM";
+        case 12:
+            return "ARM64";
+        case 6:
+            return "Intel Intaniun-based";
+        case 0:
+            return "x86";
+        default:
+            return defaultValue;
+    }
+}
+
+void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo, char *defaultValue)
+{
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+
+    char temp[256];
+    (void)snprintf(temp, 255, "%d", sysInfo.dwNumberOfProcessors);
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", temp);
+
+    LARGE_INTEGER freq;
+    if (!QueryPerformanceFrequency(&freq))
+        freq.QuadPart = 0;
+
+    (void)snprintf(temp, 255, "%lu", (unsigned long) freq.QuadPart);
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_CPU_FREQ", temp);
+
+    char *arch = netdata_windows_arch(sysInfo.wProcessorArchitecture, defaultValue);
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
+}
+
 // Host
 void netdata_windows_discover_os_version(char *os, size_t length) {
     char *commonName = { "Windows" };
@@ -71,11 +110,11 @@ static inline void netdata_windows_container(struct rrdhost_system_info *systemI
 }
 
 void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo) {
-    static char *unknowValue = { "unknown" };
+    char *unknowValue = { "unknown" };
 
     netdata_windows_cloud(systemInfo, unknowValue);
     netdata_windows_container(systemInfo, unknowValue);
     netdata_windows_host(systemInfo, unknowValue);
-
+    netdata_windows_get_cpu(systemInfo, unknowValue);
 }
 #endif
