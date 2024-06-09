@@ -1917,7 +1917,7 @@ void dbengine_event_loop(void* arg) {
     main->tid = gettid_cached();
 
     fatal_assert(0 == uv_timer_start(&main->timer, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
-    fatal_assert(0 == uv_timer_start(&main->retention_timer, retention_timer_cb, 10 * 1, 10 * 1));
+    fatal_assert(0 == uv_timer_start(&main->retention_timer, retention_timer_cb, TIMER_PERIOD_MS * 60, TIMER_PERIOD_MS * 60));
 
     bool shutdown = false;
     while (likely(!shutdown)) {
