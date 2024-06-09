@@ -6,6 +6,7 @@
 
 #ifdef OS_WINDOWS
 #include "windows.h"
+#include "versionhelpers.h"
 
 void netdata_windows_get_system_info(struct rrdhost_system_info *system_info);
 #endif
