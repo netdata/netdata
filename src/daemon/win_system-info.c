@@ -43,6 +43,18 @@ void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo, char *defau
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
 }
 
+void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo, char *defaultValue)
+{
+    ULONGLONG size;
+    char temp[256];
+    if (!GetPhysicallyInstalledSystemMemory(&size))
+        size = 0;
+    else
+        (void)snprintf(temp, 255, "%lu", size);
+
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_TOTAL_RAM", (!size) ? defaultValue : temp);
+}
+
 // Host
 void netdata_windows_discover_os_version(char *os, size_t length) {
     char *commonName = { "Windows" };
@@ -116,5 +128,6 @@ void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo) {
     netdata_windows_container(systemInfo, unknowValue);
     netdata_windows_host(systemInfo, unknowValue);
     netdata_windows_get_cpu(systemInfo, unknowValue);
+    netdata_windows_get_mem(systemInfo, unknowValue);
 }
 #endif
