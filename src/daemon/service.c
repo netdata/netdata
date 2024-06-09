@@ -315,7 +315,8 @@ void *service_main(void *ptr)
         real_step = USEC_PER_SEC;
 
 #ifdef ENABLE_DBENGINE
-        dbengine_retention_statistics();
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            dbengine_retention_statistics();
 #endif
 
         svc_rrd_cleanup_obsolete_charts_from_all_hosts();
