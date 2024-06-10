@@ -23,6 +23,26 @@ char *netdata_windows_arch(DWORD value)
     }
 }
 
+DWORD netdata_windows_cpu_frequency()
+{
+    HKEY hKey;
+    long ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+                            "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+                            0,
+                            KEY_READ,
+                            &hKey);
+    if (ret != ERROR_SUCCESS)
+        return 0;
+
+    DWORD length, freq;
+    ret = RegQueryValueEx(hKey, "~MHz", NULL, NULL, (LPBYTE) &freq, &length);
+    if (ret != ERROR_SUCCESS)
+        freq = 0;
+
+    RegCloseKey(hKey);
+    return freq;
+}
+
 void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
 {
     SYSTEM_INFO sysInfo;
@@ -32,12 +52,13 @@ void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
     (void)snprintf(cpuData, 255, "%d", sysInfo.dwNumberOfProcessors);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", cpuData);
 
-    LARGE_INTEGER freq;
-    if (!QueryPerformanceFrequency(&freq))
-        freq.QuadPart = 0;
+    ULONGLONG cpuFreq = netdata_windows_cpu_frequency();
+    if (cpuFreq)
+        (void)snprintf(cpuData, 255, "%lu", (unsigned long) cpuFreq);
 
-    (void)snprintf(cpuData, 255, "%lu", (unsigned long) freq.QuadPart);
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_CPU_FREQ", cpuData);
+    (void)rrdhost_set_system_info_variable(systemInfo,
+                                           "NETDATA_SYSTEM_CPU_FREQ",
+                                           (!cpuFreq) ? NETDATA_DEFAULT_VALUE_SYSTEM_INFO : cpuData);
 
     char *arch = netdata_windows_arch(sysInfo.wProcessorArchitecture);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
@@ -57,11 +78,9 @@ void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
                                            (!size) ? NETDATA_DEFAULT_VALUE_SYSTEM_INFO : memSize);
 }
 
-ULONGLONG netdata_windows_get_disk_size(char volume)
+ULONGLONG inline netdata_windows_get_disk_size(char *cVolume)
 {
     DISK_SPACE_INFORMATION dsi;
-    char cVolume[8];
-    snprintf(cVolume, 7, "%c:\\", volume);
     if (!GetDiskSpaceInformation(cVolume, &dsi))
         return 0;
 
@@ -72,6 +91,9 @@ void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo)
 {
     ULONGLONG total = 0;
 
+    char cVolume[8];
+    snprintf(cVolume, 7, " :\\");
+
     DWORD lDrives = GetLogicalDrives();
     int i;
 #define ND_POSSIBLE_VOLUMES 26
@@ -79,7 +101,8 @@ void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo)
         if (!(lDrives & 1<<i))
             continue;
 
-        total += netdata_windows_get_disk_size('A' + i);
+        cVolume[0] = 'A' + i;
+        total += netdata_windows_get_disk_size(cVolume);
     }
 
     char diskSize[256];
@@ -118,7 +141,7 @@ void netdata_windows_discover_os_version(char *os, size_t length) {
     }
 	// We are not testing older, because it is not supported anymore by Microsoft
 
-    (void)snprintf(os, length, "%s Client %s", commonName, version);
+	(void)snprintf(os, length, "%s %s Client", commonName, version);
 }
 
 static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo) {
