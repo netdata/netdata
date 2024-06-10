@@ -3,8 +3,8 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
-#define _COMMON_PLUGIN_NAME "freebsd.plugin"
-#define _COMMON_PLUGIN_MODULE_NAME "freebsd"
+#define _COMMON_PLUGIN_NAME "windows.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "PerflibProcesses"
 #include "../common-contexts/common-contexts.h"
 
 struct processor {
