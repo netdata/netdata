@@ -57,12 +57,10 @@ while [ "${1}" ]; do
         bundled) NETDATA_CERT_MODE="bundled" ;;
         *) run_failed "Unknown certificate handling mode '${2}'. Supported modes are auto, check, system, and bundled."; exit 1 ;;
       esac
-      REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1} ${2}"
       shift 1
       ;;
     "--certificate-test-url")
       NETDATA_CERT_TEST_URL="${2}"
-      REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1} ${2}"
       shift 1
       ;;
 
@@ -77,6 +75,14 @@ if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
   [ -n "$DO_NOT_TRACK" ]; then
   NETDATA_DISABLE_TELEMETRY=1
   REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --disable-telemetry"
+fi
+
+if [ -n "${NETDATA_CERT_MODE}" ]; then
+  REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --certificates ${NETDATA_CERT_MODE}"
+fi
+
+if [ -n "${NETDATA_CERT_TEST_URL}" ]; then
+  REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --certificate-test-url ${NETDATA_CERT_TEST_URL}"
 fi
 
 # -----------------------------------------------------------------------------
