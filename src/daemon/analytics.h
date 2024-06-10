@@ -86,6 +86,7 @@ void analytics_log_dashboard(void);
 void analytics_gather_mutable_meta_data(void);
 void analytics_report_oom_score(long long int score);
 void get_system_timezone(void);
+void analytics_init(void);
 
 typedef struct {
     const char *action;
