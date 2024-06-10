@@ -28,16 +28,16 @@ void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
     SYSTEM_INFO sysInfo;
     GetSystemInfo(&sysInfo);
 
-    char temp[256];
-    (void)snprintf(temp, 255, "%d", sysInfo.dwNumberOfProcessors);
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", temp);
+    char cpuData[256];
+    (void)snprintf(cpuData, 255, "%d", sysInfo.dwNumberOfProcessors);
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", cpuData);
 
     LARGE_INTEGER freq;
     if (!QueryPerformanceFrequency(&freq))
         freq.QuadPart = 0;
 
-    (void)snprintf(temp, 255, "%lu", (unsigned long) freq.QuadPart);
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_CPU_FREQ", temp);
+    (void)snprintf(cpuData, 255, "%lu", (unsigned long) freq.QuadPart);
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_CPU_FREQ", cpuData);
 
     char *arch = netdata_windows_arch(sysInfo.wProcessorArchitecture);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
@@ -46,15 +46,15 @@ void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
 void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
 {
     ULONGLONG size;
-    char temp[256];
+    char memSize[256];
     if (!GetPhysicallyInstalledSystemMemory(&size))
         size = 0;
     else
-        (void)snprintf(temp, 255, "%llu", size);
+        (void)snprintf(memSize, 255, "%llu", size);
 
     (void)rrdhost_set_system_info_variable(systemInfo,
                                            "NETDATA_SYSTEM_TOTAL_RAM",
-                                           (!size) ? NETDATA_DEFAULT_VALUE_SYSTEM_INFO : temp);
+                                           (!size) ? NETDATA_DEFAULT_VALUE_SYSTEM_INFO : memSize);
 }
 
 ULONGLONG netdata_windows_get_disk_size(char volume)
@@ -122,16 +122,16 @@ void netdata_windows_discover_os_version(char *os, size_t length) {
 }
 
 static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo) {
-	char temp[4096];
+	char osVersion[4096];
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_NAME", "Windows");
 
-    netdata_windows_discover_os_version(temp, 4095);
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_ID", temp);
+    netdata_windows_discover_os_version(osVersion, 4095);
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_ID", osVersion);
 
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_ID_LIKE", NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
 
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION", temp);
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION_ID", temp);
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION", osVersion);
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION_ID", osVersion);
 
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_DETECTION", "Windows API");
 
