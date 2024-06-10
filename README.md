@@ -12,6 +12,7 @@
 <br />
 <p align="center">
   <a href="https://github.com/netdata/netdata/"><img src="https://img.shields.io/github/stars/netdata/netdata?style=social" alt="GitHub Stars"></a>
+  <a href="https://github.com/netdata/netdata/pkgs/container/netdata"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fipitio%2Fghcr-pulls%2Fmaster%2Findex.json&query=%24%5B%3F(%40.owner%3D%3D%22netdata%22%20%26%26%20%40.repo%3D%3D%22netdata%22%20%26%26%20%40.image%3D%3D%22netdata%22)%5D.pulls&logo=github&label=Pulls" alt="GitHub Pulls"></a>
   <br />
   <a href="https://app.netdata.cloud/spaces/netdata-demo?utm_campaign=github_readme_demo_badge"><img src="https://img.shields.io/badge/Live%20Demo-green" alt="Live Demo"></a>
   <a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata.svg" alt="Latest release"></a>
