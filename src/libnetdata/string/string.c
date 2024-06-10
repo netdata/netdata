@@ -702,3 +702,8 @@ int string_unittest(size_t entries) {
     fprintf(stderr, "\n%zu errors found\n", errors);
     return  errors ? 1 : 0;
 }
+
+void string_init(void) {
+    for (size_t i = 0; i != STRING_PARTITIONS; i++)
+        rw_spinlock_init(&string_base[i].spinlock);
+}
