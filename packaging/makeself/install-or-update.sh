@@ -297,7 +297,7 @@ fi
 
 echo "Save install options"
 grep -qv 'IS_NETDATA_STATIC_BINARY="yes"' "${NETDATA_PREFIX}/etc/netdata/.environment" || echo IS_NETDATA_STATIC_BINARY=\"yes\" >> "${NETDATA_PREFIX}/etc/netdata/.environment"
-REINSTALL_OPTIONS="$(echo "${REINSTALL_OPTIONS}" | awk '{gsub("/", "\\\\/"); print}')"
+REINSTALL_OPTIONS="$(echo "${REINSTALL_OPTIONS}" | awk '{gsub("/", "\\/"); print}')"
 sed -i "s/REINSTALL_OPTIONS=\".*\"/REINSTALL_OPTIONS=\"${REINSTALL_OPTIONS}\"/" "${NETDATA_PREFIX}/etc/netdata/.environment"
 
 # -----------------------------------------------------------------------------
