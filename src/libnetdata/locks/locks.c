@@ -224,21 +224,24 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
 // spinlock implementation
 // https://www.youtube.com/watch?v=rmGJc9PXpuE&t=41s
 
-#if 0
-void spinlock_init(SPINLOCK *spinlock) {
-    memset(spinlock, 0, sizeof(SPINLOCK));
+#ifdef SPINLOCK_IMPL_WITH_MUTEX
+void spinlock_init(SPINLOCK *spinlock)
+{
+    netdata_mutex_init(&spinlock->inner);
 }
 #else
-void spinlock_init(SPINLOCK *spinlock) {
-    netdata_mutex_init(&spinlock->inner);
+void spinlock_init(SPINLOCK *spinlock)
+{
+    memset(spinlock, 0, sizeof(SPINLOCK));
 }
 #endif
 
-#if 0
-static inline void spinlock_lock_internal(SPINLOCK *spinlock) {
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifndef SPINLOCK_IMPL_WITH_MUTEX
+static inline void spinlock_lock_internal(SPINLOCK *spinlock)
+{
+    #ifdef NETDATA_INTERNAL_CHECKS
     size_t spins = 0;
-#endif
+    #endif
 
     for(int i = 1;
         __atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) ||
@@ -246,9 +249,10 @@ static inline void spinlock_lock_internal(SPINLOCK *spinlock) {
         ; i++
         ) {
 
-#ifdef NETDATA_INTERNAL_CHECKS
+        #ifdef NETDATA_INTERNAL_CHECKS
         spins++;
-#endif
+        #endif
+
         if(unlikely(i == 8)) {
             i = 0;
             tinysleep();
@@ -257,27 +261,29 @@ static inline void spinlock_lock_internal(SPINLOCK *spinlock) {
 
     // we have the lock
 
-#ifdef NETDATA_INTERNAL_CHECKS
+    #ifdef NETDATA_INTERNAL_CHECKS
     spinlock->spins += spins;
     spinlock->locker_pid = gettid_cached();
-#endif
+    #endif
 
     nd_thread_spinlock_locked();
 }
-#endif
+#endif // SPINLOCK_IMPL_WITH_MUTEX
 
-#if 0
-static inline void spinlock_unlock_internal(SPINLOCK *spinlock) {
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifndef SPINLOCK_IMPL_WITH_MUTEX
+static inline void spinlock_unlock_internal(SPINLOCK *spinlock)
+{
+    #ifdef NETDATA_INTERNAL_CHECKS
     spinlock->locker_pid = 0;
-#endif
+    #endif
+
     __atomic_clear(&spinlock->locked, __ATOMIC_RELEASE);
 
     nd_thread_spinlock_unlocked();
 }
-#endif
+#endif // SPINLOCK_IMPL_WITH_MUTEX
 
-#if 0
+#ifndef SPINLOCK_IMPL_WITH_MUTEX
 static inline bool spinlock_trylock_internal(SPINLOCK *spinlock) {
     if(!__atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) &&
         !__atomic_test_and_set(&spinlock->locked, __ATOMIC_ACQUIRE)) {
@@ -288,77 +294,77 @@ static inline bool spinlock_trylock_internal(SPINLOCK *spinlock) {
 
     return false;
 }
-#endif
+#endif // SPINLOCK_IMPL_WITH_MUTEX
 
-#if 0
-void spinlock_lock(SPINLOCK *spinlock)
-{
-    spinlock_lock_internal(spinlock);
-}
-#else
+#ifdef SPINLOCK_IMPL_WITH_MUTEX
 void spinlock_lock(SPINLOCK *spinlock)
 {
     netdata_mutex_lock(&spinlock->inner);
 }
+#else
+void spinlock_lock(SPINLOCK *spinlock)
+{
+    spinlock_lock_internal(spinlock);
+}
 #endif
 
-#if 0
-void spinlock_unlock(SPINLOCK *spinlock)
-{
-    spinlock_unlock_internal(spinlock);
-}
-#else
+#ifdef SPINLOCK_IMPL_WITH_MUTEX
 void spinlock_unlock(SPINLOCK *spinlock)
 {
     netdata_mutex_unlock(&spinlock->inner);
 }
+#else
+void spinlock_unlock(SPINLOCK *spinlock)
+{
+    spinlock_unlock_internal(spinlock);
+}
 #endif
 
-#if 0
-bool spinlock_trylock(SPINLOCK *spinlock)
-{
-    return spinlock_trylock_internal(spinlock);
-}
-#else
+#ifdef SPINLOCK_IMPL_WITH_MUTEX
 bool spinlock_trylock(SPINLOCK *spinlock)
 {
     return netdata_mutex_trylock(&spinlock->inner) == 0;
 }
+#else
+bool spinlock_trylock(SPINLOCK *spinlock)
+{
+    return spinlock_trylock_internal(spinlock);
+}
 #endif
 
-#if 0
-void spinlock_lock_cancelable(SPINLOCK *spinlock)
-{
-    spinlock_lock_internal(spinlock);
-}
-#else
+#ifdef SPINLOCK_IMPL_WITH_MUTEX
 void spinlock_lock_cancelable(SPINLOCK *spinlock)
 {
     netdata_mutex_lock(&spinlock->inner);
 }
+#else
+void spinlock_lock_cancelable(SPINLOCK *spinlock)
+{
+    spinlock_lock_internal(spinlock);
+}
 #endif
 
-#if 0
-void spinlock_unlock_cancelable(SPINLOCK *spinlock)
-{
-    spinlock_unlock_internal(spinlock);
-}
-#else
+#ifdef SPINLOCK_IMPL_WITH_MUTEX
 void spinlock_unlock_cancelable(SPINLOCK *spinlock)
 {
     netdata_mutex_unlock(&spinlock->inner);
 }
+#else
+void spinlock_unlock_cancelable(SPINLOCK *spinlock)
+{
+    spinlock_unlock_internal(spinlock);
+}
 #endif
 
-#if 0
+#ifdef SPINLOCK_IMPL_WITH_MUTEX
 bool spinlock_trylock_cancelable(SPINLOCK *spinlock)
 {
-    return spinlock_trylock_internal(spinlock);
+    return netdata_mutex_trylock(&spinlock->inner) == 0;
 }
 #else
 bool spinlock_trylock_cancelable(SPINLOCK *spinlock)
 {
-    return netdata_mutex_trylock(&spinlock->inner) == 0;
+    return spinlock_trylock_internal(spinlock);
 }
 #endif
 
