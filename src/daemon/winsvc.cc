@@ -174,6 +174,11 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
 
 int main()
 {
+#if RUN_FROM_CLI
+    int nd_argc = 2;
+    char *nd_argv[] = {strdupz("/usr/bin/netdata"), strdupz("-D"), NULL};
+    netdata_main(nd_argc, nd_argv);
+#else
     SERVICE_TABLE_ENTRY serviceTable[] = {
         { strdupz("Netdata"), ServiceMain },
         { nullptr, nullptr }
@@ -184,6 +189,7 @@ int main()
         WriteLog("@main() - StartServiceCtrlDispatcher() failed...");
         return 1;
     }
+#endif
 
     return 0;
 }
