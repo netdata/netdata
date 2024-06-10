@@ -61,7 +61,7 @@ ULONGLONG netdata_windows_get_disk_size(char volume)
 {
     DISK_SPACE_INFORMATION dsi;
     char cVolume[8];
-    snprintf(cVolume, 7, "%d:\\", volume);
+    snprintf(cVolume, 7, "%c:\\", volume);
     if (!GetDiskSpaceInformation(cVolume, &dsi))
         return 0;
 
@@ -100,21 +100,21 @@ void netdata_windows_discover_os_version(char *os, size_t length) {
 #define ND_WIN_VER_LENGTH 16
     char version[ND_WIN_VER_LENGTH + 1];
     if (IsWindows10OrGreater()) {
-        (void)snprintf(os, ND_WIN_VER_LENGTH, "10");
+        (void)snprintf(version, ND_WIN_VER_LENGTH, "10");
     } else if (IsWindows8Point1OrGreater()) {
-        (void)snprintf(os, ND_WIN_VER_LENGTH, "8.1");
+        (void)snprintf(version, ND_WIN_VER_LENGTH, "8.1");
     } else if (IsWindows8OrGreater()) {
-        (void)snprintf(os, ND_WIN_VER_LENGTH, "8");
+        (void)snprintf(version, ND_WIN_VER_LENGTH, "8");
     } else if (IsWindows7SP1OrGreater()) {
-        (void)snprintf(os, ND_WIN_VER_LENGTH, "7 SP1");
+        (void)snprintf(version, ND_WIN_VER_LENGTH, "7 SP1");
     } else if (IsWindows7OrGreater()) {
-        (void)snprintf(os, ND_WIN_VER_LENGTH, "7");
+        (void)snprintf(version, ND_WIN_VER_LENGTH, "7");
     } else if (IsWindowsVistaSP2OrGreater()) {
-        (void)snprintf(os, ND_WIN_VER_LENGTH, "Vista SP2");
+        (void)snprintf(version, ND_WIN_VER_LENGTH, "Vista SP2");
     } else if (IsWindowsVistaSP1OrGreater()) {
-        (void)snprintf(os, ND_WIN_VER_LENGTH, "Vista SP1");
+        (void)snprintf(version, ND_WIN_VER_LENGTH, "Vista SP1");
     } else if (IsWindowsVistaOrGreater()) {
-        (void)snprintf(os, ND_WIN_VER_LENGTH, "Vista");
+        (void)snprintf(version, ND_WIN_VER_LENGTH, "Vista");
     }
 	// We are not testing older, because it is not supported anymore by Microsoft
 
