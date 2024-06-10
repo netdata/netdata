@@ -57,6 +57,38 @@ void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
                                            (!size) ? NETDATA_DEFAULT_VALUE_SYSTEM_INFO : temp);
 }
 
+ULONGLONG netdata_windows_get_disk_size(char volume)
+{
+    DISK_SPACE_INFORMATION dsi;
+    char cVolume[8];
+    snprintf(cVolume, 7, "%d:\\", volume);
+    if (!GetDiskSpaceInformation(cVolume, &dsi))
+        return 0;
+
+    return (ULONGLONG) dsi.ActualTotalAllocationUnits;
+}
+
+void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo)
+{
+    ULONGLONG total = 0;
+
+    DWORD lDrives = GetLogicalDrives();
+    int i;
+#define ND_POSSIBLE_VOLUMES 26
+    for (i = 0 ; i < ND_POSSIBLE_VOLUMES; i++) {
+        if (!(lDrives & 1<<i))
+            continue;
+
+        total += netdata_windows_get_disk_size('A' + i);
+    }
+
+    char diskSize[256];
+    (void)snprintf(diskSize, 255, "%llu", total);
+    (void)rrdhost_set_system_info_variable(systemInfo,
+                                           "NETDATA_SYSTEM_TOTAL_DISK_SIZE",
+                                           diskSize);
+}
+
 // Host
 void netdata_windows_discover_os_version(char *os, size_t length) {
     char *commonName = { "Windows" };
@@ -141,5 +173,6 @@ void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo) {
     netdata_windows_host(systemInfo);
     netdata_windows_get_cpu(systemInfo);
     netdata_windows_get_mem(systemInfo);
+    netdata_windows_get_total_disk_size(systemInfo);
 }
 #endif
