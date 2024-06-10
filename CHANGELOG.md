@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Delay retention check until agent has initialized [\#17850](https://github.com/netdata/netdata/pull/17850) ([stelfrag](https://github.com/stelfrag))
+- Fix tier statistics  [\#17849](https://github.com/netdata/netdata/pull/17849) ([stelfrag](https://github.com/stelfrag))
+- fix: check memory mode before creating dbengine retention chart [\#17848](https://github.com/netdata/netdata/pull/17848) ([ilyam8](https://github.com/ilyam8))
+- update dbengine retention chart family and priority [\#17847](https://github.com/netdata/netdata/pull/17847) ([ilyam8](https://github.com/ilyam8))
 - Remove unused variable [\#17846](https://github.com/netdata/netdata/pull/17846) ([stelfrag](https://github.com/stelfrag))
 - Properly initialize spinlock in ARAL. [\#17844](https://github.com/netdata/netdata/pull/17844) ([vkalintiris](https://github.com/vkalintiris))
 - Fix compilation without dbengine [\#17843](https://github.com/netdata/netdata/pull/17843) ([stelfrag](https://github.com/stelfrag))
@@ -410,8 +414,6 @@
 - go.d: sd docker: create multiple nginx configs [\#17285](https://github.com/netdata/netdata/pull/17285) ([ilyam8](https://github.com/ilyam8))
 - go.d: socket package: don't set client on connect\(\) err [\#17283](https://github.com/netdata/netdata/pull/17283) ([ilyam8](https://github.com/ilyam8))
 - Add Fedora 40 to CI, packages, and support policy. [\#17282](https://github.com/netdata/netdata/pull/17282) ([Ferroin](https://github.com/Ferroin))
-- Add Ubuntu 24.04 to CI, package builds, and support policy. [\#17281](https://github.com/netdata/netdata/pull/17281) ([Ferroin](https://github.com/Ferroin))
-- Revert "Enable sentry on all Debian and Ubuntu versions." [\#17279](https://github.com/netdata/netdata/pull/17279) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
