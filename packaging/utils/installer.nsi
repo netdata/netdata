@@ -1,5 +1,6 @@
 !include "MUI2.nsh"
 
+Name "Netdata"
 Outfile "netdata-installer.exe"
 InstallDir "$PROGRAMFILES\netdata"
 RequestExecutionLevel admin
