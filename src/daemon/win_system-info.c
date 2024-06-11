@@ -34,12 +34,14 @@ DWORD netdata_windows_cpu_frequency()
     if (ret != ERROR_SUCCESS)
         return 0;
 
-    DWORD length, freq;
+    DWORD length = 260, freq = 260;
     ret = RegQueryValueEx(hKey, "~MHz", NULL, NULL, (LPBYTE) &freq, &length);
     if (ret != ERROR_SUCCESS)
         freq = 0;
 
     RegCloseKey(hKey);
+    freq *= 1000000;
+
     return freq;
 }
 
@@ -80,28 +82,39 @@ void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
 
 ULONGLONG inline netdata_windows_get_disk_size(char *cVolume)
 {
-    DISK_SPACE_INFORMATION dsi;
-    if (!GetDiskSpaceInformation(cVolume, &dsi))
+    HANDLE disk = CreateFile(cVolume, GENERIC_READ, FILE_SHARE_VALID_FLAGS, 0, OPEN_EXISTING, 0, 0);
+    if (!disk)
         return 0;
 
-    return (ULONGLONG) dsi.ActualTotalAllocationUnits;
+    GET_LENGTH_INFORMATION length;
+    DWORD ret;
+
+    if (!DeviceIoControl(disk, IOCTL_DISK_GET_LENGTH_INFO, 0, 0, &length, sizeof(length), &ret, 0))
+        return 0;
+
+    CloseHandle(disk);
+
+    return length.Length.QuadPart;
 }
 
 void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo)
 {
     ULONGLONG total = 0;
-
     char cVolume[8];
-    snprintf(cVolume, 7, " :\\");
+    snprintf(cVolume, 7, "\\\\.\\C:");
 
     DWORD lDrives = GetLogicalDrives();
+    if (!lDrives) {
+        return 0;
+    }
+
     int i;
 #define ND_POSSIBLE_VOLUMES 26
     for (i = 0 ; i < ND_POSSIBLE_VOLUMES; i++) {
         if (!(lDrives & 1<<i))
             continue;
 
-        cVolume[0] = 'A' + i;
+        cVolume[4] = 'A' + i;
         total += netdata_windows_get_disk_size(cVolume);
     }
 
