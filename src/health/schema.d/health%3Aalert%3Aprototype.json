@@ -467,6 +467,7 @@
       "ui:widget": "hidden"
     },
     "rules": {
+      "ui:openEmptyItem":  true,
       "items": {
         "ui:classNames": "dyncfg-grid dyncfg-grid-col-6",
         "enabled": {
