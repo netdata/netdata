@@ -7,9 +7,11 @@
 
 #define _
 
-static inline void common_interrupts(uint64_t interrupts, int update_every) {
+static inline void common_interrupts(uint64_t interrupts, int update_every, char *ext_module) {
     static RRDSET *st_intr = NULL;
     static RRDDIM *rd_interrupts = NULL;
+
+    char *module =  (!ext_module) ? _COMMON_PLUGIN_MODULE_NAME: ext_module;
 
     if(unlikely(!st_intr)) {
         st_intr = rrdset_create_localhost( "system"
@@ -20,7 +22,7 @@ static inline void common_interrupts(uint64_t interrupts, int update_every) {
                                           , "CPU Interrupts"
                                           , "interrupts/s"
                                           , _COMMON_PLUGIN_NAME
-                                          , _COMMON_PLUGIN_MODULE_NAME
+                                          , module
                                           , NETDATA_CHART_PRIO_SYSTEM_INTR
                                           , update_every
                                           , RRDSET_TYPE_LINE);

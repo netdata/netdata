@@ -179,7 +179,7 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     if(cpus_var)
         rrdvar_host_variable_set(localhost, cpus_var, cores_found);
 
-    common_interrupts(totalIPC, update_every);
+    common_interrupts(totalIPC, update_every, NULL);
 
     return true;
 }
