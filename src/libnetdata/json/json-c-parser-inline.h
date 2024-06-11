@@ -3,11 +3,11 @@
 #ifndef NETDATA_JSON_C_PARSER_INLINE_H
 #define NETDATA_JSON_C_PARSER_INLINE_H
 
-#define JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, member, dst, error) do {                               \
+#define JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                     \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_boolean))             \
         dst = json_object_get_boolean(_j);                                                                      \
-    else {                                                                                                      \
+    else if(required) {                                                                                         \
         buffer_sprintf(error, "missing or invalid type for '%s.%s' boolean", path, member);                     \
         return false;                                                                                           \
     }                                                                                                           \
@@ -48,7 +48,7 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, member, dst, error) do {                        \
+#define JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {              \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
         string_freez(dst);                                                                                      \
@@ -58,13 +58,13 @@
         else                                                                                                    \
             dst = string_strdupz(_v);                                                                           \
     }                                                                                                           \
-    else {                                                                                                      \
+    else if(required) {                                                                                         \
         buffer_sprintf(error, "missing or invalid type for '%s.%s' string", path, member);                      \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, member, dst, error) do {                     \
+#define JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {           \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
         const char *_t = json_object_get_string(_j);                                                            \
@@ -80,13 +80,13 @@
             }                                                                                                   \
         }                                                                                                       \
     }                                                                                                           \
-    else {                                                                                                      \
+    else if(required) {                                                                                         \
         buffer_sprintf(error, "missing or invalid type for '%s.%s' expression", path, member);                  \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, member, converter, dst, error) do {     \
+#define JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, member, converter, dst, error, required) do {     \
     json_object *_jarray;                                                                                       \
     if (json_object_object_get_ex(jobj, member, &_jarray) && json_object_is_type(_jarray, json_type_array)) {   \
         size_t _num_options = json_object_array_length(_jarray);                                                \
@@ -105,24 +105,24 @@
             }                                                                                                   \
             dst |= _bit;                                                                                        \
         }                                                                                                       \
-    } else {                                                                                                    \
+    } else if(required) {                                                                                       \
         buffer_sprintf(error, "missing or invalid type for '%s.%s' array", path, member);                       \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
 
 
-#define JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, member, converter, dst, error) do {                \
+#define JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, member, converter, dst, error, required) do {      \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string))              \
         dst = converter(json_object_get_string(_j));                                                            \
-    else {                                                                                                      \
+    else if(required) {                                                                                         \
         buffer_sprintf(error, "missing or invalid type (expected text value) for '%s.%s' enum", path, member);  \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, member, dst, error) do {                                \
+#define JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                      \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         if (_j != NULL && json_object_is_type(_j, json_type_int))                                               \
@@ -135,13 +135,13 @@
             buffer_sprintf(error, "not supported type (expected int) for '%s.%s'", path, member);               \
             return false;                                                                                       \
         }                                                                                                       \
-    } else {                                                                                                    \
+    } else if(required) {                                                                                       \
         buffer_sprintf(error, "missing or invalid type (expected double value or null) for '%s.%s'", path, member); \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, member, dst, error) do {                             \
+#define JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                   \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         if (_j != NULL && json_object_is_type(_j, json_type_double))                                            \
@@ -154,21 +154,21 @@
             buffer_sprintf(error, "not supported type (expected double) for '%s.%s'", path, member);            \
             return false;                                                                                       \
         }                                                                                                       \
-    } else {                                                                                                    \
+    } else if(required) {                                                                                       \
         buffer_sprintf(error, "missing or invalid type (expected double value or null) for '%s.%s'", path, member); \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_SUBOBJECT(jobj, path, member, dst, callback, error) do { \
+#define JSONC_PARSE_SUBOBJECT(jobj, path, member, dst, callback, error, required) do { \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         char _new_path[strlen(path) + strlen(member) + 2];                                                      \
         snprintfz(_new_path, sizeof(_new_path), "%s%s%s", path, *path?".":"", member);                          \
-        if (!callback(_j, _new_path, dst, error)) {                                                             \
+        if (!callback(_j, _new_path, dst, error, required)) {                                                   \
             return false;                                                                                       \
         }                                                                                                       \
-    } else {                                                                                                    \
+    } else if(required) {                                                                                       \
         buffer_sprintf(error, "missing '%s.%s' object", path, member);                                          \
         return false;                                                                                           \
     }                                                                                                           \
