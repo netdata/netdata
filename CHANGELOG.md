@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Bump github.com/vmware/govmomi from 0.37.2 to 0.37.3 in /src/go/collectors/go.d.plugin [\#17854](https://github.com/netdata/netdata/pull/17854) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump golang.org/x/net from 0.25.0 to 0.26.0 in /src/go/collectors/go.d.plugin [\#17852](https://github.com/netdata/netdata/pull/17852) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/docker/docker from 26.1.3+incompatible to 26.1.4+incompatible in /src/go/collectors/go.d.plugin [\#17851](https://github.com/netdata/netdata/pull/17851) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Delay retention check until agent has initialized [\#17850](https://github.com/netdata/netdata/pull/17850) ([stelfrag](https://github.com/stelfrag))
 - Fix tier statistics  [\#17849](https://github.com/netdata/netdata/pull/17849) ([stelfrag](https://github.com/stelfrag))
 - fix: check memory mode before creating dbengine retention chart [\#17848](https://github.com/netdata/netdata/pull/17848) ([ilyam8](https://github.com/ilyam8))
@@ -26,6 +29,7 @@
 - fix order of loading schema files in dyncfg\_get\_schema\_from [\#17829](https://github.com/netdata/netdata/pull/17829) ([ilyam8](https://github.com/ilyam8))
 - claiming: add proxy to cloud.conf if set [\#17828](https://github.com/netdata/netdata/pull/17828) ([ilyam8](https://github.com/ilyam8))
 - Use bundled protobuf for openSUSE packages. [\#17827](https://github.com/netdata/netdata/pull/17827) ([Ferroin](https://github.com/Ferroin))
+- Disable updater jitter when run from anacron. [\#17826](https://github.com/netdata/netdata/pull/17826) ([Ferroin](https://github.com/Ferroin))
 - fix health alert load15 info [\#17823](https://github.com/netdata/netdata/pull/17823) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17822](https://github.com/netdata/netdata/pull/17822) ([netdatabot](https://github.com/netdatabot))
 - Proper check for static\_thread being NULL [\#17821](https://github.com/netdata/netdata/pull/17821) ([stelfrag](https://github.com/stelfrag))
@@ -407,13 +411,6 @@
 - Fix SWAP pages [\#17295](https://github.com/netdata/netdata/pull/17295) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update hpssa.chart.py [\#17294](https://github.com/netdata/netdata/pull/17294) ([Metric-Void](https://github.com/Metric-Void))
 - fix rrdlabels traversal [\#17292](https://github.com/netdata/netdata/pull/17292) ([ktsaou](https://github.com/ktsaou))
-- fix positive and negative matches on labels [\#17290](https://github.com/netdata/netdata/pull/17290) ([ktsaou](https://github.com/ktsaou))
-- go.d: don't create jobs with unknown module [\#17289](https://github.com/netdata/netdata/pull/17289) ([ilyam8](https://github.com/ilyam8))
-- Fix repoconfig publishing. [\#17288](https://github.com/netdata/netdata/pull/17288) ([Ferroin](https://github.com/Ferroin))
-- go.d: set User-Agent automatically when creating HTTP req [\#17286](https://github.com/netdata/netdata/pull/17286) ([ilyam8](https://github.com/ilyam8))
-- go.d: sd docker: create multiple nginx configs [\#17285](https://github.com/netdata/netdata/pull/17285) ([ilyam8](https://github.com/ilyam8))
-- go.d: socket package: don't set client on connect\(\) err [\#17283](https://github.com/netdata/netdata/pull/17283) ([ilyam8](https://github.com/ilyam8))
-- Add Fedora 40 to CI, packages, and support policy. [\#17282](https://github.com/netdata/netdata/pull/17282) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
