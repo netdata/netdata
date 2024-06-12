@@ -1,6 +1,7 @@
 X-Repolib-Name: Netdata @VARIANT@ repository
 Types: deb
 URIs: http://repo.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/
+      http://repo2.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/
 Suites: @SUITE@/
 Signed-By: /usr/share/keyrings/netdata-archive-keyring.gpg
 By-Hash: Yes
@@ -9,6 +10,7 @@ Enabled: Yes
 X-Repolib-Name: Netdata repository configuration repository
 Types: deb
 URIs: http://repo.netdata.cloud/repos/repoconfig/@DIST_NAME@/
+      http://repo2.netdata.cloud/repos/repoconfig/@DIST_NAME@/
 Suites: @SUITE@/
 Signed-By: /usr/share/keyrings/netdata-archive-keyring.gpg
 By-Hash: Yes

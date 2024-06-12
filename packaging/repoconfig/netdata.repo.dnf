@@ -1,9 +1,11 @@
 [netdata]
 name=Netdata
 baseurl=https://repo.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/@DIST_VERSION@/$basearch
+        https://repo2.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/@DIST_VERSION@/$basearch
 repo_gpgcheck=1
 gpgcheck=1
 gpgkey=https://repo.netdata.cloud/netdatabot.gpg.key
+       https://repo2.netdata.cloud/netdatabot.gpg.key
 enabled=1
 sslverify=1
 priority=50
@@ -11,9 +13,11 @@ priority=50
 [netdata-repoconfig]
 name=Netdata Repository Config
 baseurl=https://repo.netdata.cloud/repos/repoconfig/@DIST_NAME@/@DIST_VERSION@/$basearch
+        https://repo2.netdata.cloud/repos/repoconfig/@DIST_NAME@/@DIST_VERSION@/$basearch
 repo_gpgcheck=1
 gpgcheck=1
 gpgkey=https://repo.netdata.cloud/netdatabot.gpg.key
+       https://repo2.netdata.cloud/netdatabot.gpg.key
 enabled=1
 sslverify=1
 priority=50
