@@ -132,7 +132,7 @@ jobs:
               netdata/netdata-repoconfig
           done
       - name: Upload to packages2.netdata.cloud
-        id: package-upload
+        id: package2-upload
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
         run: |
           # shellcheck disable=SC2043
