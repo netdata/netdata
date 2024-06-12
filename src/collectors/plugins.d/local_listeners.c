@@ -15,6 +15,14 @@ static const char *protocol_name(LOCAL_SOCKET *n) {
         else
             return "UNKNOWN_IPV4";
     }
+    else if(n->local.family == AF_INET6 && !n->ipv6ony.set) {
+        if (n->local.protocol == IPPROTO_TCP)
+            return "TCP46";
+        else if(n->local.protocol == IPPROTO_UDP)
+            return "UDP46";
+        else
+            return "UNKNOWN_IPV46";
+    }
     else if(n->local.family == AF_INET6) {
         if (n->local.protocol == IPPROTO_TCP)
             return "TCP6";
@@ -64,7 +72,7 @@ static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, LOCAL_SOCKE
            (n->direction & (SOCKET_DIRECTION_LOCAL_INBOUND|SOCKET_DIRECTION_LOCAL_OUTBOUND)) ? "LOCAL," : "",
            (n->direction == 0) ? "NONE," : "",
            n->pid,
-           n->state,
+           (unsigned int)n->state,
            n->net_ns_inode,
            local_address, n->local.port,
            remote_address, n->remote.port,

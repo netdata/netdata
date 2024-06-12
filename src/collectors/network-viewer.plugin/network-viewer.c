@@ -67,6 +67,11 @@ static void local_socket_to_json_array(BUFFER *wb, LOCAL_SOCKET *n, uint64_t pro
         ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
         protocol = n->local.protocol == IPPROTO_TCP ? "tcp4" : "udp4";
     }
+    else if(n->local.family == AF_INET6 && !n->ipv6ony.set) {
+        ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
+        ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
+        protocol = n->local.protocol == IPPROTO_TCP ? "tcp46" : "udp46";
+    }
     else if(n->local.family == AF_INET6) {
         ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
         ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);

@@ -187,6 +187,11 @@ typedef struct local_socket {
     uint32_t wqueue;
     uid_t uid;
 
+    struct {
+        bool checked;
+        bool set;
+    } ipv6ony;
+
     char comm[TASK_COMM_LEN];
     STRING *cmdline;
 
@@ -224,6 +229,152 @@ static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static bool local_sockets_is_ipv4_mapped_ipv6_address(const struct in6_addr *addr) {
+    // An IPv4-mapped IPv6 address starts with 80 bits of zeros followed by 16 bits of ones
+    static const unsigned char ipv4_mapped_prefix[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF };
+    return memcmp(addr->s6_addr, ipv4_mapped_prefix, 12) == 0;
+}
+
+static bool local_sockets_is_loopback_address(struct socket_endpoint *se) {
+    if (se->family == AF_INET) {
+        // For IPv4, loopback addresses are in the 127.0.0.0/8 range
+        return (ntohl(se->ip.ipv4) >> 24) == 127; // Check if the first byte is 127
+    } else if (se->family == AF_INET6) {
+        // Check if the address is an IPv4-mapped IPv6 address
+        if (local_sockets_is_ipv4_mapped_ipv6_address(&se->ip.ipv6)) {
+            // Extract the last 32 bits (IPv4 address) and check if it's in the 127.0.0.0/8 range
+            uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
+            const uint32_t ipv4_addr = *((const uint32_t *)(ip6 + 12));
+            return (ntohl(ipv4_addr) >> 24) == 127;
+        }
+
+        // For IPv6, loopback address is ::1
+        return memcmp(&se->ip.ipv6, &in6addr_loopback, sizeof(se->ip.ipv6)) == 0;
+    }
+
+    return false;
+}
+
+static inline bool local_sockets_is_ipv4_reserved_address(uint32_t ip) {
+    // Check for the reserved address ranges
+    ip = ntohl(ip);
+    return (
+            (ip >> 24 == 10) ||                         // Private IP range (A class)
+            (ip >> 20 == (172 << 4) + 1) ||             // Private IP range (B class)
+            (ip >> 16 == (192 << 8) + 168) ||           // Private IP range (C class)
+            (ip >> 24 == 127) ||                        // Loopback address (127.0.0.0)
+            (ip >> 24 == 0) ||                          // Reserved (0.0.0.0)
+            (ip >> 24 == 169 && (ip >> 16) == 254) ||   // Link-local address (169.254.0.0)
+            (ip >> 16 == (192 << 8) + 0)                // Test-Net (192.0.0.0)
+            );
+}
+
+static inline bool local_sockets_is_private_address(struct socket_endpoint *se) {
+    if (se->family == AF_INET) {
+        return local_sockets_is_ipv4_reserved_address(se->ip.ipv4);
+    }
+    else if (se->family == AF_INET6) {
+        uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
+
+        // Check if the address is an IPv4-mapped IPv6 address
+        if (local_sockets_is_ipv4_mapped_ipv6_address(&se->ip.ipv6)) {
+            // Extract the last 32 bits (IPv4 address) and check if it's in the 127.0.0.0/8 range
+            const uint32_t ipv4_addr = *((const uint32_t *)(ip6 + 12));
+            return local_sockets_is_ipv4_reserved_address(ipv4_addr);
+        }
+
+        // Check for link-local addresses (fe80::/10)
+        if ((ip6[0] == 0xFE) && ((ip6[1] & 0xC0) == 0x80))
+            return true;
+
+        // Check for Unique Local Addresses (ULA) (fc00::/7)
+        if ((ip6[0] & 0xFE) == 0xFC)
+            return true;
+
+        // Check for multicast addresses (ff00::/8)
+        if (ip6[0] == 0xFF)
+            return true;
+
+        // For IPv6, loopback address is :: or ::1
+        return memcmp(&se->ip.ipv6, &in6addr_any, sizeof(se->ip.ipv6)) == 0 ||
+               memcmp(&se->ip.ipv6, &in6addr_loopback, sizeof(se->ip.ipv6)) == 0;
+    }
+
+    return false;
+}
+
+static bool local_sockets_is_multicast_address(struct socket_endpoint *se) {
+    if (se->family == AF_INET) {
+        // For IPv4, check if the address is 0.0.0.0
+        uint32_t ip = htonl(se->ip.ipv4);
+        return (ip >= 0xE0000000 && ip <= 0xEFFFFFFF);   // Multicast address range (224.0.0.0/4)
+    }
+    else if (se->family == AF_INET6) {
+        // For IPv6, check if the address is ff00::/8
+        uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
+        return ip6[0] == 0xff;
+    }
+
+    return false;
+}
+
+static bool local_sockets_is_zero_address(struct socket_endpoint *se) {
+    if (se->family == AF_INET) {
+        // For IPv4, check if the address is 0.0.0.0
+        return se->ip.ipv4 == 0;
+    }
+    else if (se->family == AF_INET6) {
+        // For IPv6, check if the address is ::
+        return memcmp(&se->ip.ipv6, &in6addr_any, sizeof(se->ip.ipv6)) == 0;
+    }
+
+    return false;
+}
+
+static inline const char *local_sockets_address_space(struct socket_endpoint *se) {
+    if(local_sockets_is_zero_address(se))
+        return "zero";
+    else if(local_sockets_is_loopback_address(se))
+        return "loopback";
+    else if(local_sockets_is_multicast_address(se))
+        return "multicast";
+    else if(local_sockets_is_private_address(se))
+        return "private";
+    else
+        return "public";
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+static inline bool local_sockets_is_ipv6_only(LOCAL_SOCKET *ls) {
+    if(ls->local.family != AF_INET6 || ls->direction != SOCKET_DIRECTION_LISTEN || !ls->pid || !local_sockets_is_zero_address(&ls->local))
+        return false;
+
+    if(ls->ipv6ony.checked)
+        return ls->ipv6ony.set;
+
+    ls->ipv6ony.checked = true; // do not do this check multiple times
+    ls->ipv6ony.set = true; // emulate IPV6 only is set, by default
+
+    char socket_path[256];
+    snprintf(socket_path, sizeof(socket_path), "/proc/%d/fd/socket:[%"PRIu64"]", ls->pid, ls->inode);
+
+    // Open the socket file descriptor to check IPV6_V6ONLY option
+    int fd = open(socket_path, O_RDONLY);
+    if (fd == -1)
+        return ls->ipv6ony.set;
+
+    int v6only = 0;
+    socklen_t optlen = sizeof(v6only);
+    if (getsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, &optlen) == 0)
+        ls->ipv6ony.set = v6only;
+
+    close(fd);
+    return ls->ipv6ony.set;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 static void local_sockets_foreach_local_socket_call_cb(LS_STATE *ls) {
     for(SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_first_read_only_LOCAL_SOCKET(&ls->sockets_hashtable);
          sl;
@@ -236,6 +387,9 @@ static void local_sockets_foreach_local_socket_call_cb(LS_STATE *ls) {
             (ls->config.inbound && n->direction & SOCKET_DIRECTION_INBOUND) ||
             (ls->config.outbound && n->direction & SOCKET_DIRECTION_OUTBOUND)
         ) {
+            // check if the socket is IPv6 only or not
+            local_sockets_is_ipv6_only(n);
+
             // we have to call the callback for this socket
             if (ls->config.cb)
                 ls->config.cb(ls, n, ls->config.data);
@@ -421,123 +575,6 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
 
     closedir(proc_dir);
     return true;
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-
-static bool local_sockets_is_ipv4_mapped_ipv6_address(const struct in6_addr *addr) {
-    // An IPv4-mapped IPv6 address starts with 80 bits of zeros followed by 16 bits of ones
-    static const unsigned char ipv4_mapped_prefix[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF };
-    return memcmp(addr->s6_addr, ipv4_mapped_prefix, 12) == 0;
-}
-
-static bool local_sockets_is_loopback_address(struct socket_endpoint *se) {
-    if (se->family == AF_INET) {
-        // For IPv4, loopback addresses are in the 127.0.0.0/8 range
-        return (ntohl(se->ip.ipv4) >> 24) == 127; // Check if the first byte is 127
-    } else if (se->family == AF_INET6) {
-        // Check if the address is an IPv4-mapped IPv6 address
-        if (local_sockets_is_ipv4_mapped_ipv6_address(&se->ip.ipv6)) {
-            // Extract the last 32 bits (IPv4 address) and check if it's in the 127.0.0.0/8 range
-            uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
-            const uint32_t ipv4_addr = *((const uint32_t *)(ip6 + 12));
-            return (ntohl(ipv4_addr) >> 24) == 127;
-        }
-
-        // For IPv6, loopback address is ::1
-        return memcmp(&se->ip.ipv6, &in6addr_loopback, sizeof(se->ip.ipv6)) == 0;
-    }
-
-    return false;
-}
-
-static inline bool local_sockets_is_ipv4_reserved_address(uint32_t ip) {
-    // Check for the reserved address ranges
-    ip = ntohl(ip);
-    return (
-            (ip >> 24 == 10) ||                         // Private IP range (A class)
-            (ip >> 20 == (172 << 4) + 1) ||             // Private IP range (B class)
-            (ip >> 16 == (192 << 8) + 168) ||           // Private IP range (C class)
-            (ip >> 24 == 127) ||                        // Loopback address (127.0.0.0)
-            (ip >> 24 == 0) ||                          // Reserved (0.0.0.0)
-            (ip >> 24 == 169 && (ip >> 16) == 254) ||   // Link-local address (169.254.0.0)
-            (ip >> 16 == (192 << 8) + 0)                // Test-Net (192.0.0.0)
-            );
-}
-
-static inline bool local_sockets_is_private_address(struct socket_endpoint *se) {
-    if (se->family == AF_INET) {
-        return local_sockets_is_ipv4_reserved_address(se->ip.ipv4);
-    }
-    else if (se->family == AF_INET6) {
-        uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
-
-        // Check if the address is an IPv4-mapped IPv6 address
-        if (local_sockets_is_ipv4_mapped_ipv6_address(&se->ip.ipv6)) {
-            // Extract the last 32 bits (IPv4 address) and check if it's in the 127.0.0.0/8 range
-            const uint32_t ipv4_addr = *((const uint32_t *)(ip6 + 12));
-            return local_sockets_is_ipv4_reserved_address(ipv4_addr);
-        }
-
-        // Check for link-local addresses (fe80::/10)
-        if ((ip6[0] == 0xFE) && ((ip6[1] & 0xC0) == 0x80))
-            return true;
-
-        // Check for Unique Local Addresses (ULA) (fc00::/7)
-        if ((ip6[0] & 0xFE) == 0xFC)
-            return true;
-
-        // Check for multicast addresses (ff00::/8)
-        if (ip6[0] == 0xFF)
-            return true;
-
-        // For IPv6, loopback address is :: or ::1
-        return memcmp(&se->ip.ipv6, &in6addr_any, sizeof(se->ip.ipv6)) == 0 ||
-               memcmp(&se->ip.ipv6, &in6addr_loopback, sizeof(se->ip.ipv6)) == 0;
-    }
-
-    return false;
-}
-
-static bool local_sockets_is_multicast_address(struct socket_endpoint *se) {
-    if (se->family == AF_INET) {
-        // For IPv4, check if the address is 0.0.0.0
-        uint32_t ip = htonl(se->ip.ipv4);
-        return (ip >= 0xE0000000 && ip <= 0xEFFFFFFF);   // Multicast address range (224.0.0.0/4)
-    }
-    else if (se->family == AF_INET6) {
-        // For IPv6, check if the address is ff00::/8
-        uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
-        return ip6[0] == 0xff;
-    }
-
-    return false;
-}
-
-static bool local_sockets_is_zero_address(struct socket_endpoint *se) {
-    if (se->family == AF_INET) {
-        // For IPv4, check if the address is 0.0.0.0
-        return se->ip.ipv4 == 0;
-    }
-    else if (se->family == AF_INET6) {
-        // For IPv6, check if the address is ::
-        return memcmp(&se->ip.ipv6, &in6addr_any, sizeof(se->ip.ipv6)) == 0;
-    }
-
-    return false;
-}
-
-static inline const char *local_sockets_address_space(struct socket_endpoint *se) {
-    if(local_sockets_is_zero_address(se))
-        return "zero";
-    else if(local_sockets_is_loopback_address(se))
-        return "loopback";
-    else if(local_sockets_is_multicast_address(se))
-        return "multicast";
-    else if(local_sockets_is_private_address(se))
-        return "private";
-    else
-        return "public";
 }
 
 // --------------------------------------------------------------------------------------------------------------------
