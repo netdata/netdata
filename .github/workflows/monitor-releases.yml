@@ -57,7 +57,7 @@ jobs:
           known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
       - name: Sync newer releases to packages.netdata.cloud
         id: sync-releases
-        continue-if-error: true
+        continue-on-error: true
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-newer-releases.outputs.versions_needs_update == 'true'
         run: |
           .github/scripts/upload-new-version-tags.sh packages.netdata.cloud
