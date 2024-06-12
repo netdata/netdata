@@ -119,11 +119,26 @@ jobs:
           known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
       - name: Upload to packages.netdata.cloud
         id: package-upload
+        continue-on-error: true
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
         run: |
           # shellcheck disable=SC2043
           for arch in ${{ matrix.arches }}; do
               .github/scripts/package-upload.sh \
+              packages.netdata.cloud \
+              "${{ matrix.pkgclouddistro }}" \
+              "${arch}" \
+              "${{ matrix.format }}" \
+              netdata/netdata-repoconfig
+          done
+      - name: Upload to packages2.netdata.cloud
+        id: package-upload
+        if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
+        run: |
+          # shellcheck disable=SC2043
+          for arch in ${{ matrix.arches }}; do
+              .github/scripts/package-upload.sh \
+              packages2.netdata.cloud \
               "${{ matrix.pkgclouddistro }}" \
               "${arch}" \
               "${{ matrix.format }}" \
@@ -146,4 +161,5 @@ jobs:
               Publish to PackageCloud: ${{ steps.publish.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
               Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
+              Publish to packages2.netdata.cloud: ${{ steps.package2-upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
