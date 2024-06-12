@@ -379,6 +379,7 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, LOCAL_S
         t = mallocz(sizeof(*t));
         memcpy(t, n, sizeof(*t));
         t->cmdline = string_dup(t->cmdline);
+        t->info.tcp = n_info_tcp;
         simple_hashtable_set_slot_AGGREGATED_SOCKETS(ht, sl, hash, t);
     }
 }
@@ -722,7 +723,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
 
 
             // RTT
-            buffer_rrdf_table_add_field(wb, field_id++, "RTT", "Smoothed Round Trip Time",
+            buffer_rrdf_table_add_field(wb, field_id++, "RTT", aggregated ? "Max Smoothed Round Trip Time" : "Smoothed Round Trip Time",
                                         RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                         2, "ms", st.max.tcpi_rtt / USEC_PER_MS, RRDF_FIELD_SORT_DESCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
@@ -730,7 +731,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                         NULL);
 
             // Asymmetry RTT
-            buffer_rrdf_table_add_field(wb, field_id++, "RecvRTT", "Receiver ACKs RTT",
+            buffer_rrdf_table_add_field(wb, field_id++, "RecvRTT", aggregated ? "Max Receiver ACKs RTT" : "Receiver ACKs RTT",
                                         RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                         2, "ms", st.max.tcpi_rcv_rtt / USEC_PER_MS, RRDF_FIELD_SORT_DESCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
