@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- DYNCFG: health, generate userconfig for incomplete alerts [\#17859](https://github.com/netdata/netdata/pull/17859) ([ktsaou](https://github.com/ktsaou))
+- Create retention charts for higher tiers [\#17855](https://github.com/netdata/netdata/pull/17855) ([stelfrag](https://github.com/stelfrag))
 - Bump github.com/vmware/govmomi from 0.37.2 to 0.37.3 in /src/go/collectors/go.d.plugin [\#17854](https://github.com/netdata/netdata/pull/17854) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump golang.org/x/net from 0.25.0 to 0.26.0 in /src/go/collectors/go.d.plugin [\#17852](https://github.com/netdata/netdata/pull/17852) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/docker/docker from 26.1.3+incompatible to 26.1.4+incompatible in /src/go/collectors/go.d.plugin [\#17851](https://github.com/netdata/netdata/pull/17851) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -410,7 +412,6 @@
 - Bump github.com/go-sql-driver/mysql from 1.8.0 to 1.8.1 in /src/go/collectors/go.d.plugin [\#17299](https://github.com/netdata/netdata/pull/17299) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Fix SWAP pages [\#17295](https://github.com/netdata/netdata/pull/17295) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update hpssa.chart.py [\#17294](https://github.com/netdata/netdata/pull/17294) ([Metric-Void](https://github.com/Metric-Void))
-- fix rrdlabels traversal [\#17292](https://github.com/netdata/netdata/pull/17292) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
