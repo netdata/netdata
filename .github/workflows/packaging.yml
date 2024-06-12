@@ -300,9 +300,21 @@ jobs:
           known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
       - name: Upload to packages.netdata.cloud
         id: package-upload
+        continue-on-error: true
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
         run: |
           .github/scripts/package-upload.sh \
+          packages.netdata.cloud \
+          ${{ matrix.repo_distro }} \
+          ${{ matrix.arch }} \
+          ${{ matrix.format }} \
+          ${{ needs.version-check.outputs.repo }}
+      - name: Upload to packages2.netdata.cloud
+        id: package2-upload
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
+        run: |
+          .github/scripts/package-upload.sh \
+          packages2.netdata.cloud \
           ${{ matrix.repo_distro }} \
           ${{ matrix.arch }} \
           ${{ matrix.format }} \
@@ -325,6 +337,7 @@ jobs:
               Publish to PackageCloud: ${{ steps.upload.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
               Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
+              Publish to packages2.netdata.cloud: ${{ steps.package2-upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
