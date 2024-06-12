@@ -1,0 +1,11 @@
+Types: deb
+URIs: http://repo.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/
+      http://repo2.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/
+Suites: @SUITE@/
+Signed-By: /usr/share/keyrings/netdata-archive-keyring.gpg
+
+Types: deb
+URIs: http://repo.netdata.cloud/repos/repoconfig/@DIST_NAME@/
+      http://repo2.netdata.cloud/repos/repoconfig/@DIST_NAME@/
+Suites: @SUITE@/
+Signed-By: /usr/share/keyrings/netdata-archive-keyring.gpg
