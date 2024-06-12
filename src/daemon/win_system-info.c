@@ -80,7 +80,7 @@ void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
                                            (!size) ? NETDATA_DEFAULT_VALUE_SYSTEM_INFO : memSize);
 }
 
-ULONGLONG inline netdata_windows_get_disk_size(char *cVolume)
+inline ULONGLONG netdata_windows_get_disk_size(char *cVolume)
 {
     HANDLE disk = CreateFile(cVolume, GENERIC_READ, FILE_SHARE_VALID_FLAGS, 0, OPEN_EXISTING, 0, 0);
     if (!disk)
@@ -105,7 +105,7 @@ void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo)
 
     DWORD lDrives = GetLogicalDrives();
     if (!lDrives) {
-        return 0;
+        return;
     }
 
     int i;
@@ -126,6 +126,36 @@ void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo)
 }
 
 // Host
+static inline bool netdata_windows_open_current_version(HKEY *hKey)
+{
+    long ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+                            "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                            0,
+                            KEY_READ,
+                            hKey);
+
+    if (ret != ERROR_SUCCESS)
+        return false;
+
+    return true;
+}
+
+static DWORD netdata_windows_get_current_build()
+{
+    HKEY hKey;
+    if (!netdata_windows_open_current_version(&hKey))
+        return 0;
+
+    DWORD length = 260, version = 260;
+    int ret = RegQueryValueEx(hKey, "CurrentBuild", NULL, NULL, (LPBYTE) &version, &length);
+    if (ret != ERROR_SUCCESS)
+        version = 0;
+
+    RegCloseKey(hKey);
+
+    return version;
+}
+
 void netdata_windows_discover_os_version(char *os, size_t length) {
     char *commonName = { "Windows" };
     if (IsWindowsServer()) {
@@ -136,7 +166,9 @@ void netdata_windows_discover_os_version(char *os, size_t length) {
 #define ND_WIN_VER_LENGTH 16
     char version[ND_WIN_VER_LENGTH + 1];
     if (IsWindows10OrGreater()) {
-        (void)snprintf(version, ND_WIN_VER_LENGTH, "10");
+        DWORD build = netdata_windows_get_current_build();
+        // https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information
+        (void)snprintf(version, ND_WIN_VER_LENGTH, (build < 22000) ? "10" : "11");
     } else if (IsWindows8Point1OrGreater()) {
         (void)snprintf(version, ND_WIN_VER_LENGTH, "8.1");
     } else if (IsWindows8OrGreater()) {
@@ -157,8 +189,19 @@ void netdata_windows_discover_os_version(char *os, size_t length) {
 	(void)snprintf(os, length, "%s %s Client", commonName, version);
 }
 
+static inline void netdata_windows_os_version(char *out, DWORD length)
+{
+    HKEY hKey;
+    if (!netdata_windows_open_current_version(&hKey))
+        return;
+
+    (void)RegQueryValueEx(hKey, "ProductName", NULL, NULL, out, &length);
+
+    RegCloseKey(hKey);
+}
+
 static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo) {
-	char osVersion[4096];
+    char osVersion[4096];
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_NAME", "Windows");
 
     netdata_windows_discover_os_version(osVersion, 4095);
@@ -166,6 +209,7 @@ static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo) 
 
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_ID_LIKE", NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
 
+    netdata_windows_os_version(osVersion, 4095);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION", osVersion);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION_ID", osVersion);
 
