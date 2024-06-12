@@ -129,6 +129,12 @@ In more detail, you can find on the following tables which functionalities are a
 | See invoices               | :heavy_check_mark: |      -      |         -          |      -       | :heavy_check_mark: |     -      |                                                                 |
 | Manage payment methods     | :heavy_check_mark: |      -      |         -          |      -       | :heavy_check_mark: |     -      |                                                                 |
 | Update billing email       | :heavy_check_mark: |      -      |         -          |      -       | :heavy_check_mark: |     -      |                                                                 |
+### Dynamic Configuration Manager
+
+| **Functionality**     |     **Admin**      |    **Manager**     | **Troubleshooter** | **Observer** | **Billing** | **Member** | Notes |
+|:----------------------|:------------------:|:------------------:|:------------------:|:------------:|:-----------:|:----------:|:------|
+| Access and manage configuration items | :heavy_check_mark: | :heavy_check_mark: |         -          |      -       |      -      |     -      |       |
+
 
 ### Other permissions
 
