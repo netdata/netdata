@@ -151,24 +151,35 @@ issystemd() {
 
 # shellcheck disable=SC2009
 running_under_anacron() {
-    if [ "$(uname -s)" = "Linux" ] && [ -r "/proc/$$/stat" ]; then
-        ppid="$(cut -f 4 -d ' ' "/proc/$$/stat")"
-        if [ -n "${ppid}" ] && [ -r "/proc/${ppid}/comm" ]; then
+    pid="${1:-$$}"
+    iter="${2:-0}"
+
+    [ "${iter}" -gt 50 ] && return 1
+
+    if [ "$(uname -s)" = "Linux" ] && [ -r "/proc/${pid}/stat" ]; then
+        ppid="$(cut -f 4 -d ' ' "/proc/${pid}/stat")"
+        if [ -n "${ppid}" ]; then
+            # The below case accounts for the hidepid mount option for procfs, as well as setups with LSM
+            [ ! -r "/proc/${ppid}/comm" ] && return 1
+
+            [ "${ppid}" -eq "${pid}" ] && return 1
+
             grep -q anacron "/proc/${ppid}/comm" && return 0
 
-            ppid2="$(cut -f 4 -d ' ' "/proc/${ppid}/stat")"
+            running_under_anacron "${ppid}" "$((iter + 1))"
 
-            if [ -n "${ppid2}" ] && [ -r "/proc/${ppid2}/comm" ]; then
-                grep -q anacron "/proc/${ppid2}/comm" 2>/dev/null && return 0
-            fi
+            return "$?"
         fi
     else
-        ppid="$(ps -o pid= -o ppid= 2>/dev/null | grep -e "^ *$$" | xargs | cut -f 2 -d ' ')"
+        ppid="$(ps -o pid= -o ppid= 2>/dev/null | grep -e "^ *${pid}" | xargs | cut -f 2 -d ' ')"
         if [ -n "${ppid}" ]; then
+            [ "${ppid}" -eq "${pid}" ] && return 1
+
             ps -o pid= -o command= 2>/dev/null | grep -e "^ *${ppid}" | grep -q anacron && return 0
 
-            ppid2="$(ps -o pid= -o ppid= 2>/dev/null | grep -e "^ *${ppid}" | xargs | cut -f 2 -d ' ')"
-            ps -o pid= -o command= 2>/dev/null | grep -e "^ *${ppid2}" | grep -q anacron && return 0
+            running_under_anacron "${ppid}" "$((iter + 1))"
+
+            return "$?"
         fi
     fi
 
