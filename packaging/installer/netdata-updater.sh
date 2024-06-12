@@ -171,7 +171,7 @@ running_under_anacron() {
             return "$?"
         fi
     else
-        ppid="$(ps -o pid= -o ppid= 2>/dev/null | grep -e "^ *$$" | xargs | cut -f 2 -d ' ')"
+        ppid="$(ps -o pid= -o ppid= 2>/dev/null | grep -e "^ *${pid}" | xargs | cut -f 2 -d ' ')"
         if [ -n "${ppid}" ]; then
             [ "${ppid}" -eq "${pid}" ] && return 1
 
