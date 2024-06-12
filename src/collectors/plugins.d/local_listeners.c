@@ -15,7 +15,7 @@ static const char *protocol_name(LOCAL_SOCKET *n) {
         else
             return "UNKNOWN_IPV4";
     }
-    else if(n->local.family == AF_INET6 && !n->ipv6ony.set) {
+    else if(is_local_socket_ipv46(n)) {
         if (n->local.protocol == IPPROTO_TCP)
             return "TCP46";
         else if(n->local.protocol == IPPROTO_UDP)
@@ -42,6 +42,10 @@ static void print_local_listeners(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, 
     if(n->local.family == AF_INET) {
         ipv4_address_to_txt(n->local.ip.ipv4, local_address);
         ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
+    }
+    else if(is_local_socket_ipv46(n)) {
+        strncpyz(local_address, "*", sizeof(local_address) - 1);
+        remote_address[0] = '\0';
     }
     else if(n->local.family == AF_INET6) {
         ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
@@ -101,6 +105,7 @@ int main(int argc, char **argv) {
             .cmdline = true,
             .comm = false,
             .namespaces = true,
+            .tcp_info = false,
 
             .max_errors = 10,
 
@@ -220,6 +225,7 @@ int main(int argc, char **argv) {
             ls.config.comm = true;
             ls.config.cmdline = true;
             ls.config.namespaces = true;
+            ls.config.tcp_info = true;
             ls.config.uid = true;
             ls.config.max_errors = SIZE_MAX;
             ls.config.cb = print_local_listeners_debug;

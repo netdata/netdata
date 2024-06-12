@@ -57,24 +57,46 @@ ENUM_STR_MAP_DEFINE(TCP_STATE) = {
 };
 ENUM_STR_DEFINE_FUNCTIONS(TCP_STATE, 0, "unknown");
 
-static void local_socket_to_json_array(BUFFER *wb, LOCAL_SOCKET *n, uint64_t proc_self_net_ns_inode, bool aggregated) {
+struct sockets_stats {
+    BUFFER *wb;
+
+    struct {
+        uint32_t tcpi_rtt;
+        uint32_t tcpi_rcv_rtt;
+        uint32_t tcpi_total_retrans;
+    } max;
+};
+
+static void local_socket_to_json_array(struct sockets_stats *st, LOCAL_SOCKET *n, uint64_t proc_self_net_ns_inode, bool aggregated) {
+    BUFFER *wb = st->wb;
+
     char local_address[INET6_ADDRSTRLEN];
     char remote_address[INET6_ADDRSTRLEN];
     char *protocol;
 
     if(n->local.family == AF_INET) {
         ipv4_address_to_txt(n->local.ip.ipv4, local_address);
-        ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
+
+        if(local_sockets_is_zero_address(&n->remote))
+            remote_address[0] = '\0';
+        else
+            ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
+
         protocol = n->local.protocol == IPPROTO_TCP ? "tcp4" : "udp4";
     }
-    else if(n->local.family == AF_INET6 && !n->ipv6ony.set) {
-        ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
-        ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
+    else if(is_local_socket_ipv46(n)) {
+        strncpyz(local_address, "*", sizeof(local_address) - 1);
+        remote_address[0] = '\0';
         protocol = n->local.protocol == IPPROTO_TCP ? "tcp46" : "udp46";
     }
     else if(n->local.family == AF_INET6) {
         ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
-        ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
+
+        if(local_sockets_is_zero_address(&n->remote))
+            remote_address[0] = '\0';
+        else
+            ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
+
         protocol = n->local.protocol == IPPROTO_TCP ? "tcp6" : "udp6";
     }
     else
@@ -167,16 +189,33 @@ static void local_socket_to_json_array(BUFFER *wb, LOCAL_SOCKET *n, uint64_t pro
 
         // buffer_json_add_array_item_uint64(wb, n->inode);
         // buffer_json_add_array_item_uint64(wb, n->net_ns_inode);
+
+        // RTT
+        buffer_json_add_array_item_double(wb, (double)n->info.tcp.tcpi_rtt / (double)USEC_PER_MS);
+        if(st->max.tcpi_rtt < n->info.tcp.tcpi_rtt)
+            st->max.tcpi_rtt = n->info.tcp.tcpi_rtt;
+
+        // Receiver RTT
+        buffer_json_add_array_item_double(wb, (double)n->info.tcp.tcpi_rcv_rtt / (double)USEC_PER_MS);
+        if(st->max.tcpi_rcv_rtt < n->info.tcp.tcpi_rcv_rtt)
+            st->max.tcpi_rcv_rtt = n->info.tcp.tcpi_rcv_rtt;
+
+        // Retransmissions
+        buffer_json_add_array_item_uint64(wb, n->info.tcp.tcpi_total_retrans);
+        if(st->max.tcpi_total_retrans < n->info.tcp.tcpi_total_retrans)
+            st->max.tcpi_total_retrans = n->info.tcp.tcpi_total_retrans;
+
         buffer_json_add_array_item_uint64(wb, n->network_viewer.count);
     }
     buffer_json_array_close(wb);
 }
 
 static void local_sockets_cb_to_json(LS_STATE *ls, LOCAL_SOCKET *n, void *data) {
+    struct sockets_stats *st = data;
     n->network_viewer.count = 1;
     n->network_viewer.local_address_space = local_sockets_address_space(&n->local);
     n->network_viewer.remote_address_space = local_sockets_address_space(&n->remote);
-    local_socket_to_json_array(data, n, ls->proc_self_net_ns_inode, false);
+    local_socket_to_json_array(st, n, ls->proc_self_net_ns_inode, false);
 }
 
 static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, void *data) {
@@ -203,6 +242,9 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, LOCAL_S
             return;
     }
 
+    struct tcp_info n_info_tcp = n->info.tcp;
+    memset(&n->info.tcp, 0, sizeof(n->info.tcp));
+
     n->inode = 0;
     n->local_ip_hash = 0;
     n->remote_ip_hash = 0;
@@ -219,6 +261,119 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, LOCAL_S
     LOCAL_SOCKET *t = SIMPLE_HASHTABLE_SLOT_DATA(sl);
     if(t) {
         t->network_viewer.count++;
+
+        // The current number of consecutive retransmissions that have occurred for the most recently transmitted segment.
+        t->info.tcp.tcpi_retransmits += n_info_tcp.tcpi_retransmits;
+
+        // The total number of retransmissions that have occurred for the entire connection since it was established.
+        t->info.tcp.tcpi_total_retrans += n_info_tcp.tcpi_total_retrans;
+
+        // The total number of segments that have been retransmitted since the connection was established.
+        t->info.tcp.tcpi_retrans += n_info_tcp.tcpi_retrans;
+
+        // The number of keepalive probes sent
+        t->info.tcp.tcpi_probes += n_info_tcp.tcpi_probes;
+
+        // The number of times the retransmission timeout has been backed off.
+        t->info.tcp.tcpi_backoff += n_info_tcp.tcpi_backoff;
+
+        // A bitmask representing the TCP options currently enabled for the connection, such as SACK and Timestamps.
+        t->info.tcp.tcpi_options |= n_info_tcp.tcpi_options;
+
+        // The send window scale value used for this connection
+        if(t->info.tcp.tcpi_snd_wscale > n_info_tcp.tcpi_snd_wscale)
+            t->info.tcp.tcpi_snd_wscale = n_info_tcp.tcpi_snd_wscale;
+
+        // The receive window scale value used for this connection
+        if(t->info.tcp.tcpi_rcv_wscale > n_info_tcp.tcpi_rcv_wscale)
+            t->info.tcp.tcpi_rcv_wscale = n_info_tcp.tcpi_rcv_wscale;
+
+        // Retransmission timeout in milliseconds
+        if(t->info.tcp.tcpi_rto > n_info_tcp.tcpi_rto)
+            t->info.tcp.tcpi_rto = n_info_tcp.tcpi_rto;
+
+        // The delayed acknowledgement timeout in milliseconds.
+        if(t->info.tcp.tcpi_ato > n_info_tcp.tcpi_ato)
+            t->info.tcp.tcpi_ato = n_info_tcp.tcpi_ato;
+
+        // The maximum segment size for sending.
+        if(t->info.tcp.tcpi_snd_mss > n_info_tcp.tcpi_snd_mss)
+            t->info.tcp.tcpi_snd_mss = n_info_tcp.tcpi_snd_mss;
+
+        // The maximum segment size for receiving.
+        if(t->info.tcp.tcpi_rcv_mss > n_info_tcp.tcpi_rcv_mss)
+            t->info.tcp.tcpi_rcv_mss = n_info_tcp.tcpi_rcv_mss;
+
+        // The number of unacknowledged segments
+        t->info.tcp.tcpi_unacked += n_info_tcp.tcpi_unacked;
+
+        // The number of segments that have been selectively acknowledged
+        t->info.tcp.tcpi_sacked += n_info_tcp.tcpi_sacked;
+
+        // The number of segments that have been selectively acknowledged
+        t->info.tcp.tcpi_sacked += n_info_tcp.tcpi_sacked;
+
+        // The number of lost segments.
+        t->info.tcp.tcpi_lost += n_info_tcp.tcpi_lost;
+
+        // The number of forward acknowledgment segments.
+        t->info.tcp.tcpi_fackets += n_info_tcp.tcpi_fackets;
+
+        // The time in milliseconds since the last data was sent.
+        if(t->info.tcp.tcpi_last_data_sent > n_info_tcp.tcpi_last_data_sent)
+            t->info.tcp.tcpi_last_data_sent = n_info_tcp.tcpi_last_data_sent;
+
+        // The time in milliseconds since the last acknowledgment was sent (not tracked in Linux, hence often zero).
+        if(t->info.tcp.tcpi_last_ack_sent > n_info_tcp.tcpi_last_ack_sent)
+            t->info.tcp.tcpi_last_ack_sent = n_info_tcp.tcpi_last_ack_sent;
+
+        // The time in milliseconds since the last data was received.
+        if(t->info.tcp.tcpi_last_data_recv > n_info_tcp.tcpi_last_data_recv)
+            t->info.tcp.tcpi_last_data_recv = n_info_tcp.tcpi_last_data_recv;
+
+        // The time in milliseconds since the last acknowledgment was received.
+        if(t->info.tcp.tcpi_last_ack_recv > n_info_tcp.tcpi_last_ack_recv)
+            t->info.tcp.tcpi_last_ack_recv = n_info_tcp.tcpi_last_ack_recv;
+
+        // The path MTU for this connection
+        if(t->info.tcp.tcpi_pmtu > n_info_tcp.tcpi_pmtu)
+            t->info.tcp.tcpi_pmtu = n_info_tcp.tcpi_pmtu;
+
+        // The slow start threshold for receiving
+        if(t->info.tcp.tcpi_rcv_ssthresh > n_info_tcp.tcpi_rcv_ssthresh)
+            t->info.tcp.tcpi_rcv_ssthresh = n_info_tcp.tcpi_rcv_ssthresh;
+
+        // The slow start threshold for sending
+        if(t->info.tcp.tcpi_snd_ssthresh > n_info_tcp.tcpi_snd_ssthresh)
+            t->info.tcp.tcpi_snd_ssthresh = n_info_tcp.tcpi_snd_ssthresh;
+
+        // The round trip time in milliseconds
+        if(t->info.tcp.tcpi_rtt < n_info_tcp.tcpi_rtt)
+            t->info.tcp.tcpi_rtt = n_info_tcp.tcpi_rtt;
+
+        // The round trip time variance in milliseconds.
+        if(t->info.tcp.tcpi_rttvar < n_info_tcp.tcpi_rttvar)
+            t->info.tcp.tcpi_rttvar = n_info_tcp.tcpi_rttvar;
+
+        // The size of the sending congestion window.
+        if(t->info.tcp.tcpi_snd_cwnd > n_info_tcp.tcpi_snd_cwnd)
+            t->info.tcp.tcpi_snd_cwnd = n_info_tcp.tcpi_snd_cwnd;
+
+        // The maximum segment size that could be advertised.
+        if(t->info.tcp.tcpi_advmss < n_info_tcp.tcpi_advmss)
+            t->info.tcp.tcpi_advmss = n_info_tcp.tcpi_advmss;
+
+        // The reordering metric
+        if(t->info.tcp.tcpi_reordering > n_info_tcp.tcpi_reordering)
+            t->info.tcp.tcpi_reordering = n_info_tcp.tcpi_reordering;
+
+        // The receive round trip time in milliseconds.
+        if(t->info.tcp.tcpi_rcv_rtt < n_info_tcp.tcpi_rcv_rtt)
+            t->info.tcp.tcpi_rcv_rtt = n_info_tcp.tcpi_rcv_rtt;
+
+        // The available space in the receive buffer.
+        if(t->info.tcp.tcpi_rcv_space > n_info_tcp.tcpi_rcv_space)
+            t->info.tcp.tcpi_rcv_space = n_info_tcp.tcpi_rcv_space;
     }
     else {
         t = mallocz(sizeof(*t));
@@ -244,6 +399,10 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+
+    struct sockets_stats st = {
+        .wb = wb,
+    };
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
@@ -333,6 +492,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                 .cmdline = true,
                 .comm = true,
                 .namespaces = true,
+                .tcp_info = true,
 
                 .max_errors = 10,
             },
@@ -350,7 +510,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         }
         else {
             ls.config.cb = local_sockets_cb_to_json;
-            ls.config.data = wb;
+            ls.config.data = &st;
         }
 
         local_sockets_process(&ls);
@@ -371,7 +531,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             qsort(array, added, sizeof(LOCAL_SOCKET *), local_sockets_compar);
 
             for(size_t i = 0; i < added ;i++) {
-                local_socket_to_json_array(wb, array[i], proc_self_net_ns_inode, true);
+                local_socket_to_json_array(&st, array[i], proc_self_net_ns_inode, true);
                 string_freez(array[i]->cmdline);
                 freez(array[i]);
             }
@@ -475,7 +635,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             }
 
             // Local Address Space
-            buffer_rrdf_table_add_field(wb, field_id++, "LocalAddressSpace", "Local IP Address Space",
+            buffer_rrdf_table_add_field(wb, field_id++, "LocalAddrSpace", "Local IP Address Space",
                                         RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                         0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -501,7 +661,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             }
 
             // Remote Address Space
-            buffer_rrdf_table_add_field(wb, field_id++, "RemoteAddressSpace", "Remote IP Address Space",
+            buffer_rrdf_table_add_field(wb, field_id++, "RemoteAddrSpace", "Remote IP Address Space",
                                         RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                         0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -528,7 +688,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
 
             if(aggregated) {
                 // Client Address Space
-                buffer_rrdf_table_add_field(wb, field_id++, "ClientAddressSpace", "Client IP Address Space",
+                buffer_rrdf_table_add_field(wb, field_id++, "ClientAddrSpace", "Client IP Address Space",
                                             RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                             0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                             RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -536,7 +696,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                             NULL);
 
                 // Server Address Space
-                buffer_rrdf_table_add_field(wb, field_id++, "ServerAddressSpace", "Server IP Address Space",
+                buffer_rrdf_table_add_field(wb, field_id++, "ServerAddrSpace", "Server IP Address Space",
                                             RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                             0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                             RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -559,6 +719,31 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
 //                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
 //                                        RRDF_FIELD_OPTS_NONE,
 //                                        NULL);
+
+
+            // RTT
+            buffer_rrdf_table_add_field(wb, field_id++, "RTT", "Smoothed Round Trip Time",
+                                        RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                        2, "ms", st.max.tcpi_rtt / USEC_PER_MS, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_VISIBLE,
+                                        NULL);
+
+            // Asymmetry RTT
+            buffer_rrdf_table_add_field(wb, field_id++, "RecvRTT", "Receiver ACKs RTT",
+                                        RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                        2, "ms", st.max.tcpi_rcv_rtt / USEC_PER_MS, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_VISIBLE,
+                                        NULL);
+
+            // Rentrasmissions
+            buffer_rrdf_table_add_field(wb, field_id++, "Retrans", "Total Retransmissions",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                        0, "pkts", st.max.tcpi_total_retrans, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_VISIBLE,
+                                        NULL);
 
             // Count
             buffer_rrdf_table_add_field(wb, field_id++, "Count", "Number of sockets like this",

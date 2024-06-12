@@ -5,10 +5,8 @@
 
 #include "libnetdata/libnetdata.h"
 
-// disable libmnl for the moment
-#undef HAVE_LIBMNL
-
 #ifdef HAVE_LIBMNL
+#include <linux/rtnetlink.h>
 #include <linux/inet_diag.h>
 #include <linux/sock_diag.h>
 #include <linux/unix_diag.h>
@@ -82,6 +80,7 @@ typedef struct local_socket_state {
         bool comm;
         bool uid;
         bool namespaces;
+        bool tcp_info;
         size_t max_errors;
 
         local_sockets_cb_t cb;
@@ -181,7 +180,7 @@ typedef struct local_socket {
     SOCKET_DIRECTION direction;
 
     uint8_t timer;
-    uint8_t retransmits;
+    uint8_t retransmits; // the # of packets currently queued for retransmission (not yet acknowledged)
     uint32_t expires;
     uint32_t rqueue;
     uint32_t wqueue;
@@ -189,8 +188,12 @@ typedef struct local_socket {
 
     struct {
         bool checked;
-        bool set;
+        bool ipv46;
     } ipv6ony;
+
+    union {
+        struct tcp_info tcp;
+    } info;
 
     char comm[TASK_COMM_LEN];
     STRING *cmdline;
@@ -210,12 +213,12 @@ typedef struct local_socket {
 
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) PRINTFLIKE(2, 3);
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
-    if(++ls->stats.errors_encountered == ls->config.max_errors) {
+    if(ls && ++ls->stats.errors_encountered == ls->config.max_errors) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-SOCKETS: max number of logs reached. Not logging anymore");
         return;
     }
 
-    if(ls->stats.errors_encountered > ls->config.max_errors)
+    if(ls && ls->stats.errors_encountered > ls->config.max_errors)
         return;
 
     char buf[16384];
@@ -346,31 +349,11 @@ static inline const char *local_sockets_address_space(struct socket_endpoint *se
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline bool local_sockets_is_ipv6_only(LOCAL_SOCKET *ls) {
-    if(ls->local.family != AF_INET6 || ls->direction != SOCKET_DIRECTION_LISTEN || !ls->pid || !local_sockets_is_zero_address(&ls->local))
-        return false;
-
-    if(ls->ipv6ony.checked)
-        return ls->ipv6ony.set;
-
-    ls->ipv6ony.checked = true; // do not do this check multiple times
-    ls->ipv6ony.set = true; // emulate IPV6 only is set, by default
-
-    char socket_path[256];
-    snprintf(socket_path, sizeof(socket_path), "/proc/%d/fd/socket:[%"PRIu64"]", ls->pid, ls->inode);
-
-    // Open the socket file descriptor to check IPV6_V6ONLY option
-    int fd = open(socket_path, O_RDONLY);
-    if (fd == -1)
-        return ls->ipv6ony.set;
-
-    int v6only = 0;
-    socklen_t optlen = sizeof(v6only);
-    if (getsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, &optlen) == 0)
-        ls->ipv6ony.set = v6only;
-
-    close(fd);
-    return ls->ipv6ony.set;
+static inline bool is_local_socket_ipv46(LOCAL_SOCKET *n) {
+    return n->local.family == AF_INET6 &&
+            n->direction == SOCKET_DIRECTION_LISTEN &&
+            n->ipv6ony.checked &&
+            n->ipv6ony.ipv46;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -387,9 +370,6 @@ static void local_sockets_foreach_local_socket_call_cb(LS_STATE *ls) {
             (ls->config.inbound && n->direction & SOCKET_DIRECTION_INBOUND) ||
             (ls->config.outbound && n->direction & SOCKET_DIRECTION_OUTBOUND)
         ) {
-            // check if the socket is IPv6 only or not
-            local_sockets_is_ipv6_only(n);
-
             // we have to call the callback for this socket
             if (ls->config.cb)
                 ls->config.cb(ls, n, ls->config.data);
@@ -673,28 +653,31 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
 
 #ifdef HAVE_LIBMNL
 
-static inline void local_sockets_netlink_init(LS_STATE *ls) {
-    ls->use_nl = true;
+static inline void local_sockets_libmnl_init(LS_STATE *ls) {
     ls->nl = mnl_socket_open(NETLINK_INET_DIAG);
-    if (!ls->nl) {
-        local_sockets_log(ls, "cannot open netlink socket");
+    if (ls->nl == NULL) {
+        local_sockets_log(ls, "cannot open libmnl netlink socket");
         ls->use_nl = false;
     }
-
-    if (mnl_socket_bind(ls->nl, 0, MNL_SOCKET_AUTOPID) < 0) {
-        local_sockets_log(ls, "cannot bind netlink socket");
+    else if (mnl_socket_bind(ls->nl, 0, MNL_SOCKET_AUTOPID) < 0) {
+        local_sockets_log(ls, "cannot bind libmnl netlink socket");
+        mnl_socket_close(ls->nl);
+        ls->nl = NULL;
         ls->use_nl = false;
     }
+    else
+        ls->use_nl = true;
 }
 
-static inline void local_sockets_netlink_cleanup(LS_STATE *ls) {
+static inline void local_sockets_libmnl_cleanup(LS_STATE *ls) {
     if(ls->nl) {
         mnl_socket_close(ls->nl);
         ls->nl = NULL;
+        ls->use_nl = false;
     }
 }
 
-static inline int local_sockets_netlink_cb_data(const struct nlmsghdr *nlh, void *data) {
+static inline int local_sockets_libmnl_cb_data(const struct nlmsghdr *nlh, void *data) {
     LS_STATE *ls = data;
 
     struct inet_diag_msg *diag_msg = mnl_nlmsg_get_payload(nlh);
@@ -703,6 +686,10 @@ static inline int local_sockets_netlink_cb_data(const struct nlmsghdr *nlh, void
         .inode = diag_msg->idiag_inode,
         .direction = SOCKET_DIRECTION_NONE,
         .state = diag_msg->idiag_state,
+        .ipv6ony = {
+            .checked = false,
+            .ipv46 = false,
+        },
         .local = {
             .protocol = ls->tmp_protocol,
             .family = diag_msg->idiag_family,
@@ -730,12 +717,36 @@ static inline int local_sockets_netlink_cb_data(const struct nlmsghdr *nlh, void
         memcpy(&n.remote.ip.ipv6, diag_msg->id.idiag_dst, sizeof(n.remote.ip.ipv6));
     }
 
+    struct rtattr *attr = (struct rtattr *)(diag_msg + 1);
+    int rtattrlen = nlh->nlmsg_len - NLMSG_LENGTH(sizeof(*diag_msg));
+    for (; !n.ipv6ony.checked && RTA_OK(attr, rtattrlen); attr = RTA_NEXT(attr, rtattrlen)) {
+        switch (attr->rta_type) {
+            case INET_DIAG_INFO: {
+                if(ls->tmp_protocol == IPPROTO_TCP) {
+                    struct tcp_info *info = (struct tcp_info *)RTA_DATA(attr);
+                    n.info.tcp = *info;
+                }
+            }
+            break;
+
+            case INET_DIAG_SKV6ONLY: {
+                n.ipv6ony.checked = true;
+                int ipv6only = *(int *)RTA_DATA(attr);
+                n.ipv6ony.ipv46 = !ipv6only;
+            }
+            break;
+
+            default:
+                break;
+        }
+    }
+
     local_sockets_add_socket(ls, &n);
 
     return MNL_CB_OK;
 }
 
-static inline bool local_sockets_netlink_get_sockets(LS_STATE *ls, uint16_t family, uint16_t protocol) {
+static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t family, uint16_t protocol) {
     ls->tmp_protocol = protocol;
 
     char buf[MNL_SOCKET_BUFFER_SIZE];
@@ -747,6 +758,13 @@ static inline bool local_sockets_netlink_get_sockets(LS_STATE *ls, uint16_t fami
     req.sdiag_family = family;
     req.sdiag_protocol = protocol;
     req.idiag_states = -1;
+    req.idiag_ext = 0;
+
+    if(family == AF_INET6)
+        req.idiag_ext |= 1 << (INET_DIAG_SKV6ONLY - 1);
+
+    if(protocol == IPPROTO_TCP && ls->config.tcp_info)
+        req.idiag_ext |= 1 << (INET_DIAG_INFO - 1);
 
     nlh = mnl_nlmsg_put_header(buf);
     nlh->nlmsg_type = SOCK_DIAG_BY_FAMILY;
@@ -762,7 +780,7 @@ static inline bool local_sockets_netlink_get_sockets(LS_STATE *ls, uint16_t fami
 
     ssize_t ret;
     while ((ret = mnl_socket_recvfrom(ls->nl, buf, sizeof(buf))) > 0) {
-        ret = mnl_cb_run(buf, ret, seq, portid, local_sockets_netlink_cb_data, ls);
+        ret = mnl_cb_run(buf, ret, seq, portid, local_sockets_libmnl_cb_data, ls);
         if (ret <= MNL_CB_STOP)
             break;
     }
@@ -811,6 +829,10 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
 
         LOCAL_SOCKET n = {
             .direction = SOCKET_DIRECTION_NONE,
+            .ipv6ony = {
+                .checked = false,
+                .ipv46 = false,
+            },
             .local = {
                 .family = family,
                 .protocol = protocol,
@@ -1000,8 +1022,8 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
 
 static inline void local_sockets_do_family_protocol(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
 #ifdef HAVE_LIBMNL
-    if(ls->use_nl) {
-        ls->use_nl = local_sockets_netlink_get_sockets(ls, family, protocol);
+    if(ls->nl && ls->use_nl) {
+        ls->use_nl = local_sockets_libmnl_get_sockets(ls, family, protocol);
 
         if(ls->use_nl)
             return;
@@ -1133,8 +1155,8 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
         }
 
 #ifdef HAVE_LIBMNL
-        local_sockets_netlink_cleanup(ls);
-        local_sockets_netlink_init(ls);
+        local_sockets_libmnl_cleanup(ls);
+        local_sockets_libmnl_init(ls);
 #endif
 
         // read all sockets from /proc
@@ -1150,7 +1172,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
         local_sockets_send_to_parent(ls, &zero, &cw);
 
 #ifdef HAVE_LIBMNL
-        local_sockets_netlink_cleanup(ls);
+        local_sockets_libmnl_cleanup(ls);
 #endif
 
         close(pipefd[1]); // Close write end of pipe
@@ -1266,7 +1288,7 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
 static inline void local_sockets_process(LS_STATE *ls) {
 
 #ifdef HAVE_LIBMNL
-    local_sockets_netlink_init(ls);
+    local_sockets_libmnl_init(ls);
 #endif
 
     ls->config.host_prefix = netdata_configured_host_prefix;
@@ -1292,7 +1314,7 @@ static inline void local_sockets_process(LS_STATE *ls) {
     local_sockets_cleanup(ls);
 
 #ifdef HAVE_LIBMNL
-    local_sockets_netlink_cleanup(ls);
+    local_sockets_libmnl_cleanup(ls);
 #endif
 }
 
