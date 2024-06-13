@@ -78,6 +78,9 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
 
+    "CREATE TABLE IF NOT EXISTS agent_event_log (id INTEGER PRIMARY KEY, version TEXT, event_type INT, value, date_created INT)",
+    "CREATE INDEX IF NOT EXISTS idx_agent_event_log1 on agent_event_log (event_type)",
+
     "CREATE TABLE IF NOT EXISTS alert_queue "
     " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, status INT, date_scheduled INT, "
     " UNIQUE(host_id, health_log_id, alarm_id))",
@@ -2335,6 +2338,60 @@ void metadata_delete_host_chart_labels(char *machine_guid)
 uint64_t sqlite_get_meta_space(void)
 {
     return sqlite_get_db_space(db_meta);
+}
+
+#define SQL_ADD_AGENT_EVENT_LOG      \
+    "INSERT INTO agent_event_log (event_type, version, value, date_created) VALUES " \
+    " (@event_type, @version, @value, UNIXEPOCH())"
+
+void add_agent_event(event_log_type_t event_id, int64_t value)
+{
+    sqlite3_stmt *res = NULL;
+
+    if (!PREPARE_STATEMENT(db_meta, SQL_ADD_AGENT_EVENT_LOG, &res))
+        return;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, event_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, NETDATA_VERSION, -1, SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, value));
+
+    param = 0;
+    int rc = execute_insert(res);
+    if (rc != SQLITE_DONE)
+        error_report("Failed to store agent event information, rc = %d", rc);
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+}
+
+void cleanup_agent_event_log(void)
+{
+    db_execute(db_meta, "DELETE FROM agent_event_log WHERE date_created < UNIXEPOCH() - 30 * 86400");
+}
+
+#define SQL_GET_AGENT_EVENT_TYPE_AVERAGE \
+        "SELECT CAST(AVG(value) AS INT) FROM agent_event_log WHERE event_type = @event"
+
+usec_t get_agent_event_time_average(event_log_type_t event_id)
+{
+    sqlite3_stmt *res = NULL;
+    if (!PREPARE_STATEMENT(db_meta, SQL_GET_AGENT_EVENT_TYPE_AVERAGE, &res))
+        return 0;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, event_id));
+    usec_t avg_time = 0;
+    param = 0;
+    if (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        avg_time = sqlite3_column_int64(res, 0);
+    }
+    sqlite3_finalize(res);
+    return avg_time;
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+    return -1;
 }
 
 //

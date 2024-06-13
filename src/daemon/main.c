@@ -316,6 +316,7 @@ void web_client_cache_destroy(void);
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
     netdata_exit = 1;
 
+    usec_t shutdown_start_time = now_monotonic_usec();
     watcher_shutdown_begin();
 
     nd_log_limits_unlimited();
@@ -464,6 +465,9 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 #endif
     }
 
+    // Don't register a shutdown event if we crashed
+    if (!ret)
+        add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
     sqlite_close_databases();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
@@ -2307,7 +2311,13 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("ready");
 
     usec_t ready_ut = now_monotonic_usec();
-    netdata_log_info("NETDATA STARTUP: completed in %llu ms. Enjoy real-time performance monitoring!", (ready_ut - started_ut) / USEC_PER_MS);
+    add_agent_event(EVENT_AGENT_START_TIME, (int64_t ) (ready_ut - started_ut));
+    usec_t avg_start_time = get_agent_event_time_average(EVENT_AGENT_START_TIME);
+    netdata_log_info(
+        "NETDATA STARTUP: completed in %llu ms (average start up time is %llu ms). Enjoy real-time performance monitoring!",
+        (ready_ut - started_ut) / USEC_PER_MS, avg_start_time / USEC_PER_MS);
+
+    cleanup_agent_event_log();
     netdata_ready = true;
 
     analytics_statistic_t start_statistic = { "START", "-",  "-" };
