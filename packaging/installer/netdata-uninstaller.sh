@@ -729,6 +729,7 @@ fi
 
 #### REMOVE NETDATA FILES
 rm_file /etc/logrotate.d/netdata
+rm_file /etc/systemd/journald@netdata.conf
 rm_file /etc/systemd/system/netdata.service
 rm_file /lib/systemd/system/netdata.service
 rm_file /usr/lib/systemd/system/netdata.service
