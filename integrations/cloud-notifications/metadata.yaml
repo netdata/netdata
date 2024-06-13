@@ -457,7 +457,6 @@
           - Contact the [@myidbot](https://t.me/myidbot) bot and send the `/getid` command to get your personal chat ID, or invite it into a group and use the `/getgroupid` command to get the group chat ID.
           - Alternatively, you can get the chat ID directly from the bot API. Send your bot a command in the chat you want to use, then check `https://api.telegram.org/bot{YourBotToken}/getUpdates`, eg. `https://api.telegram.org/bot111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5/getUpdates`
       - To get the topic ID the simplest way is the following: Post a message to that topic and then right-click on it and select `Copy Message Link`. Paste it on a scratchpad and notice that it has the following structure `https://t.me/c/XXXXXXXXXX/YY/ZZ`. The topic ID is `YY` (integer).
-      
 - id: 'notify-cloud-splunk'
   meta:
     name: 'Splunk'
