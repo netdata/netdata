@@ -299,7 +299,7 @@ int main(int argc, char **argv) {
         unsigned long long system = ended.ru_stime.tv_sec * 1000000ULL + ended.ru_stime.tv_usec - started.ru_stime.tv_sec * 1000000ULL + started.ru_stime.tv_usec;
         unsigned long long total  = user + system;
 
-        fprintf(stderr, "CPU Usage %llu user, %llu system, %llu total\n", user, system, total);
+        fprintf(stderr, "CPU Usage %llu user, %llu system, %llu total, %zu namespaces\n", user, system, total, ls.stats.namespaces_found);
     }
 
     return 0;

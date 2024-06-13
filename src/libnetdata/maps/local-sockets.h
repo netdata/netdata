@@ -90,6 +90,8 @@ typedef struct local_socket_state {
     } config;
 
     struct {
+        size_t mnl_sends;
+        size_t namespaces_found;
         size_t tcp_info_received;
         size_t pid_fds_processed;
         size_t pid_fds_opendir_failed;
@@ -749,6 +751,28 @@ static inline int local_sockets_libmnl_cb_data(const struct nlmsghdr *nlh, void 
     return MNL_CB_OK;
 }
 
+static inline ssize_t mnl_socket_sendmsg(const struct mnl_socket *nl, const void *buf, size_t len) {
+    struct sockaddr_nl snl = {
+        .nl_family = AF_NETLINK
+    };
+    struct iovec iov = {
+        .iov_base = (void *)buf,
+        .iov_len = len
+    };
+    struct msghdr msg = {
+        .msg_name = (void *)&snl,
+        .msg_namelen = sizeof(snl),
+        .msg_iov = &iov,
+        .msg_iovlen = 1,
+        .msg_control = NULL,
+        .msg_controllen = 0,
+        .msg_flags = 0
+    };
+
+    int fd = mnl_socket_get_fd(nl);
+    return sendmsg(fd, &msg, 0);
+}
+
 static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t family, uint16_t protocol) {
     ls->tmp_protocol = protocol;
 
@@ -771,11 +795,12 @@ static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t famil
 
     nlh = mnl_nlmsg_put_header(buf);
     nlh->nlmsg_type = SOCK_DIAG_BY_FAMILY;
-    nlh->nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST;
+    nlh->nlmsg_flags = NLM_F_ROOT | NLM_F_MATCH | NLM_F_REQUEST;
     nlh->nlmsg_seq = seq = time(NULL);
     mnl_nlmsg_put_extra_header(nlh, sizeof(req));
     memcpy(mnl_nlmsg_get_payload(nlh), &req, sizeof(req));
 
+    ls->stats.mnl_sends++;
     if (mnl_socket_sendto(ls->nl, nlh, nlh->nlmsg_len) < 0) {
         local_sockets_log(ls, "mnl_socket_send failed");
         return false;
@@ -1036,7 +1061,7 @@ static inline void local_sockets_do_family_protocol(LS_STATE *ls, const char *fi
     local_sockets_read_proc_net_x(ls, filename, family, protocol);
 }
 
-static inline void local_sockets_read_sockets_from_proc(LS_STATE *ls) {
+static inline void local_sockets_read_all_system_sockets(LS_STATE *ls) {
     char path[FILENAME_MAX + 1];
 
     if(ls->config.namespaces) {
@@ -1129,6 +1154,8 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
         return false;
     }
 
+    ls->stats.namespaces_found++;
+
     *pid = fork();
     if (*pid == 0) {
         // Child process
@@ -1163,7 +1190,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
 #endif
 
         // read all sockets from /proc
-        local_sockets_read_sockets_from_proc(ls);
+        local_sockets_read_all_system_sockets(ls);
 
         // send all sockets to parent
         local_sockets_foreach_local_socket_call_cb(ls);
@@ -1300,7 +1327,7 @@ static inline void local_sockets_process(LS_STATE *ls) {
     local_sockets_init(ls);
 
     // read all sockets from /proc
-    local_sockets_read_sockets_from_proc(ls);
+    local_sockets_read_all_system_sockets(ls);
 
     // check all socket namespaces
     if(ls->config.namespaces)
