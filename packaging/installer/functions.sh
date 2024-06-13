@@ -915,15 +915,17 @@ install_netdata_logrotate() {
 install_netdata_journald_conf() {
   src="${NETDATA_PREFIX}/usr/lib/netdata/system/systemd/journald@netdata.conf"
 
-  [ ! -d /etc/systemd ] && return 0
+  [ ! -d /usr/lib/systemd/ ] && return 0
   [ "${UID}" -ne 0 ] && return 1
 
-  # This file has the lowest precedence.
-  # https://manpages.debian.org/testing/systemd/journald.conf.5.en.html
-  run cp "${src}" /etc/systemd/journald@netdata.conf
+  if [ ! -d /usr/lib/systemd/journald@netdata.conf.d/ ]; then
+    run mkdir /usr/lib/systemd/journald@netdata.conf.d/
+  fi
 
-  if [ -f /etc/systemd/journald@netdata.conf ]; then
-    run chmod 644 /etc/systemd/journald@netdata.conf
+  run cp "${src}" /usr/lib/systemd/journald@netdata.conf.d/netdata.conf
+
+  if [ -f /usr/lib/systemd/journald@netdata.conf.d/netdata.conf ]; then
+    run chmod 644 /usr/lib/systemd/journald@netdata.conf.d/netdata.conf
   fi
 
   return 0
