@@ -633,7 +633,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             }
 
             // Local Address Space
-            buffer_rrdf_table_add_field(wb, field_id++, "LocalAddrSpace", "Local IP Address Space",
+            buffer_rrdf_table_add_field(wb, field_id++, "LocalAddressSpace", "Local IP Address Space",
                                         RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                         0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -659,7 +659,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             }
 
             // Remote Address Space
-            buffer_rrdf_table_add_field(wb, field_id++, "RemoteAddrSpace", "Remote IP Address Space",
+            buffer_rrdf_table_add_field(wb, field_id++, "RemoteAddressSpace", "Remote IP Address Space",
                                         RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                         0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -686,7 +686,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
 
             if(aggregated) {
                 // Client Address Space
-                buffer_rrdf_table_add_field(wb, field_id++, "ClientAddrSpace", "Client IP Address Space",
+                buffer_rrdf_table_add_field(wb, field_id++, "ClientAddressSpace", "Client IP Address Space",
                                             RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                             0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                             RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -694,7 +694,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                             NULL);
 
                 // Server Address Space
-                buffer_rrdf_table_add_field(wb, field_id++, "ServerAddrSpace", "Server IP Address Space",
+                buffer_rrdf_table_add_field(wb, field_id++, "ServerAddressSpace", "Server IP Address Space",
                                             RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                             0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                             RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -939,15 +939,17 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ----------------------------------------------------------------------------------------------------------------
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
-        bool cancelled = false;
-        usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
-        char buf[] = "network-connections sockets:aggregated";
-        network_viewer_function("123", buf, &stop_monotonic_ut, &cancelled,
-                                 NULL, HTTP_ACCESS_ALL, NULL, NULL);
+//        for(int i = 0; i < 100; i++) {
+            bool cancelled = false;
+            usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
+            char buf[] = "network-connections sockets:aggregated";
+            network_viewer_function("123", buf, &stop_monotonic_ut, &cancelled,
+                                     NULL, HTTP_ACCESS_ALL, NULL, NULL);
 
-        char buf2[] = "network-connections sockets:detailed";
-        network_viewer_function("123", buf2, &stop_monotonic_ut, &cancelled,
-                                NULL, HTTP_ACCESS_ALL, NULL, NULL);
+            char buf2[] = "network-connections sockets:detailed";
+            network_viewer_function("123", buf2, &stop_monotonic_ut, &cancelled,
+                                    NULL, HTTP_ACCESS_ALL, NULL, NULL);
+//        }
         exit(1);
     }
 
