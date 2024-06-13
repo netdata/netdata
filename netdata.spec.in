@@ -100,8 +100,12 @@ AutoReqProv: yes
 %endif
 
 # log2journal can’t build on some systems
-%if 0%{?sle_version} && 0%{sle_version} < 150600
+%if 0%{?sle_version}
+%if %{sle_version} < 150600
 %global _have_log2journal 0
+%else
+%global _have_log2journal 1
+%endif
 %else
 %global _have_log2journal 1
 %endif
