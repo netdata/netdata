@@ -9,11 +9,12 @@ distro="${2}"
 arch="${3}"
 format="${4}"
 repo="${5}"
+pkg_src="${6:-./artifacts}"
 
 staging="${TMPDIR:-/tmp}/package-staging"
 prefix="/home/netdatabot/incoming/${repo}/"
 
-packages="$(find artifacts -name "*.${format}")"
+packages="$(find "${pkg_src}" -name "*.${format}")"
 
 mkdir -p "${staging}"
 
