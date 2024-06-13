@@ -152,7 +152,7 @@ static bool parse_config(json_object *jobj, const char *path, RRD_ALERT_PROTOTYP
 }
 
 static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTOTYPE *base, BUFFER *error, const char *name, bool strict) {
-    int64_t version;
+    int64_t version = 0;
     JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "format_version", version, error, strict);
 
     if(version != 1) {
