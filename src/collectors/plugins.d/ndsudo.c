@@ -197,7 +197,8 @@ bool check_string(const char *str, size_t index, char *err, size_t err_size) {
         if(!((c >= 'A' && c <= 'Z') ||
              (c >= 'a' && c <= 'z') ||
              (c >= '0' && c <= '9') ||
-              c == ' ' || c == '_' || c == '-' || c == '/' || c == '.' || c == ',')) {
+              c == ' ' || c == '_' || c == '-' || c == '/' || 
+              c == '.' || c == ',' || c == ':' || c == '=')) {
             snprintf(err, err_size, "command line argument No %zu includes invalid character '%c'", index, c);
             return false;
         }
