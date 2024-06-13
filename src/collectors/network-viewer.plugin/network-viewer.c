@@ -12,8 +12,8 @@
             pid_t pid;                          \
             uid_t uid;                          \
             SOCKET_DIRECTION direction;         \
-            uint64_t net_ns_inode;              \
             int state;                          \
+            uint64_t net_ns_inode;              \
             struct socket_endpoint server;      \
             const char *local_address_space;    \
             const char *remote_address_space;   \
