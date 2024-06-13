@@ -607,8 +607,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Disk space](https://github.com/netdata/netdata/blob/master/src/collectors/diskspace.plugin/integrations/disk_space.md)
 
-- [Files and directories](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/filecheck/integrations/files_and_directories.md)
-
 - [OpenRC](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/openrc.md)
 
 #### CPU
@@ -892,6 +890,8 @@ If you don't see the app/service you'd like to monitor in this list:
 ### Other
 
 - [Example collector](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/example/integrations/example_collector.md)
+
+- [Files and directories](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/filecheck/integrations/files_and_directories.md)
 
 - [GitHub API rate limit](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/github_api_rate_limit.md)
 
