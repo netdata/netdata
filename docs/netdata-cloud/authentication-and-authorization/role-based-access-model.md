@@ -137,7 +137,7 @@ Netdata Cloud paid subscription required for all action except "List All".
 | **Functionality**                     |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    |    **Billing**     |     **Member**     |
 |:--------------------------------------|:------------------:|:------------------:|:------------------:|:------------------:|:------------------:|:------------------:|
 | List All (see all configurable items) | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| Enable/Disable)                       | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |         -          |         -          |
+| Enable/Disable                        | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |         -          |         -          |
 | Add                                   | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |         -          |         -          |
 | Update                                | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |         -          |         -          |
 | Remove                                | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |         -          |         -          |
