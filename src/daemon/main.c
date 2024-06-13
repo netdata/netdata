@@ -121,7 +121,11 @@ bool service_running(SERVICE_TYPE service) {
 
     sth->services |= service;
 
-    return !sth->stop_immediately && !netdata_exit && !nd_thread_signaled_to_cancel();
+	bool cancelled = false;
+	if (sth->type == SERVICE_THREAD_TYPE_NETDATA)
+		cancelled = nd_thread_signaled_to_cancel();
+
+    return !sth->stop_immediately && !netdata_exit && !cancelled;
 }
 
 void service_signal_exit(SERVICE_TYPE service) {
@@ -136,8 +140,16 @@ void service_signal_exit(SERVICE_TYPE service) {
         if((sth->services & service)) {
             sth->stop_immediately = true;
 
-            // this does not harm - it just raises a flag
-            nd_thread_signal_cancel(sth->netdata_thread);
+			switch(sth->type) {
+               default:
+               case SERVICE_THREAD_TYPE_NETDATA:
+                  nd_thread_signal_cancel(sth->netdata_thread);
+                  break;
+
+               case SERVICE_THREAD_TYPE_EVENT_LOOP:
+               case SERVICE_THREAD_TYPE_LIBUV:
+                  break;
+            }
 
             if(sth->request_quit_callback) {
                 spinlock_unlock(&service_globals.lock);
@@ -332,6 +344,8 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
     watcher_step_complete(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
 
+    ml_stop_threads();
+
 #ifdef ENABLE_DBENGINE
     if(dbengine_enabled) {
         for (size_t tier = 0; tier < storage_tiers; tier++)
@@ -362,7 +376,6 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     metadata_sync_shutdown_prepare();
     watcher_step_complete(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
 
-    ml_stop_threads();
     ml_fini();
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS);
 
