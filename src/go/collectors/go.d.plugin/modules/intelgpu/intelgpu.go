@@ -29,7 +29,8 @@ func New() *IntelGPU {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
+	UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
+	Device      string `yaml:"device,omitempty" json:"device"`
 }
 
 type (
