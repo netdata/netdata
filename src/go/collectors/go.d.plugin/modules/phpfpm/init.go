@@ -30,8 +30,7 @@ func (p *Phpfpm) initHTTPClient() (*httpClient, error) {
 		return nil, fmt.Errorf("create HTTP client: %v", err)
 	}
 
-	p.Debugf("using HTTP client, URL: %s", p.URL)
-	p.Debugf("using timeout: %s", p.Timeout)
+	p.Debugf("using HTTP client: url='%s', timeout='%s'", p.URL, p.Timeout)
 
 	return newHTTPClient(c, p.Request)
 }
@@ -41,17 +40,13 @@ func (p *Phpfpm) initSocketClient() (*socketClient, error) {
 		return nil, fmt.Errorf("the socket '%s' does not exist: %v", p.Socket, err)
 	}
 
-	p.Debugf("using socket client: %s", p.Socket)
-	p.Debugf("using timeout: %s", p.Timeout)
-	p.Debugf("using fcgi path: %s", p.FcgiPath)
+	p.Debugf("using socket client: socket='%s', timeout='%s', fcgi_path='%s'", p.Socket, p.Timeout, p.FcgiPath)
 
-	return newSocketClient(p.Socket, p.Timeout.Duration(), p.FcgiPath), nil
+	return newSocketClient(p.Logger, p.Socket, p.Timeout.Duration(), p.FcgiPath), nil
 }
 
 func (p *Phpfpm) initTcpClient() (*tcpClient, error) {
-	p.Debugf("using tcp client: %s", p.Address)
-	p.Debugf("using timeout: %s", p.Timeout)
-	p.Debugf("using fcgi path: %s", p.FcgiPath)
+	p.Debugf("using tcp client: address='%s', timeout='%s', fcgi_path='%s'", p.Address, p.Timeout, p.FcgiPath)
 
-	return newTcpClient(p.Address, p.Timeout.Duration(), p.FcgiPath), nil
+	return newTcpClient(p.Logger, p.Address, p.Timeout.Duration(), p.FcgiPath), nil
 }
