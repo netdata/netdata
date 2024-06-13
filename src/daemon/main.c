@@ -344,8 +344,6 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
     watcher_step_complete(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
 
-    ml_stop_threads();
-
 #ifdef ENABLE_DBENGINE
     if(dbengine_enabled) {
         for (size_t tier = 0; tier < storage_tiers; tier++)
@@ -376,6 +374,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     metadata_sync_shutdown_prepare();
     watcher_step_complete(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
 
+    ml_stop_threads();
     ml_fini();
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS);
 
