@@ -70,7 +70,11 @@ const struct netdata_static_thread static_threads_common[] = {
         .name = "PLUGINSD",
         .config_section = NULL,
         .config_name = NULL,
+#ifdef OS_WINDOWS
+        .enabled = 0,
+#else
         .enabled = 1,
+#endif
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = pluginsd_main
