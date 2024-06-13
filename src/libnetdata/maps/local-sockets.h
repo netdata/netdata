@@ -90,6 +90,7 @@ typedef struct local_socket_state {
     } config;
 
     struct {
+        size_t tcp_info_received;
         size_t pid_fds_processed;
         size_t pid_fds_opendir_failed;
         size_t pid_fds_readlink_failed;
@@ -726,6 +727,7 @@ static inline int local_sockets_libmnl_cb_data(const struct nlmsghdr *nlh, void 
                 if(ls->tmp_protocol == IPPROTO_TCP) {
                     struct tcp_info *info = (struct tcp_info *)RTA_DATA(attr);
                     n.info.tcp = *info;
+                    ls->stats.tcp_info_received++;
                 }
             }
             break;

@@ -218,6 +218,7 @@ static void local_socket_to_json_array(struct sockets_stats *st, LOCAL_SOCKET *n
         if(st->max.tcpi_total_retrans < n->info.tcp.tcpi_total_retrans)
             st->max.tcpi_total_retrans = n->info.tcp.tcpi_total_retrans;
 
+        // count
         buffer_json_add_array_item_uint64(wb, n->network_viewer.count);
     }
     buffer_json_array_close(wb);
@@ -736,8 +737,8 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
 
             // Rentrasmissions
             buffer_rrdf_table_add_field(wb, field_id++, "Retrans", "Total Retransmissions",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                        0, "pkts", st.max.tcpi_total_retrans, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, "packets", st.max.tcpi_total_retrans, RRDF_FIELD_SORT_DESCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                         RRDF_FIELD_OPTS_VISIBLE,
                                         NULL);
@@ -745,11 +746,12 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             // Count
             buffer_rrdf_table_add_field(wb, field_id++, "Count", "Number of sockets like this",
                                         RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                        0, "sockets", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                                         aggregated ? (RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY) : RRDF_FIELD_OPTS_NONE,
                                         NULL);
         }
+
         buffer_json_object_close(wb); // columns
         buffer_json_member_add_string(wb, "default_sort_column", aggregated ? "Count" : "Direction");
 
