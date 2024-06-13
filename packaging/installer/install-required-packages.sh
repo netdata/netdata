@@ -671,14 +671,18 @@ declare -A pkg_automake=(
   ['default']="automake"
 )
 
-# Required to build libwebsockets and libmosquitto on some systems.
 declare -A pkg_cmake=(
   ['gentoo']="dev-util/cmake"
   ['clearlinux']="c-basic"
   ['default']="cmake"
 )
 
-# bison and flex are required by Fluent-Bit
+# patch, bison and flex are required by Fluent-Bit
+declare -A pkg_patch=(
+  ['default']="patch"
+  ['gentoo']="dev-util/patch"
+)
+
 declare -A pkg_bison=(
   ['default']="bison"
 )
@@ -690,7 +694,7 @@ declare -A pkg_flex=(
 # fts-dev is required by Fluent-Bit on Alpine
 declare -A pkg_fts_dev=(
   ['default']="NOTREQUIRED"
-  ['alpine']="musl-fts-dev" 
+  ['alpine']="musl-fts-dev"
   ['alpine-3.16.9']="fts-dev"
 )
 
@@ -1279,6 +1283,7 @@ packages() {
     require_cmd tar || suitable_package tar
     require_cmd curl || suitable_package curl
     require_cmd gzip || suitable_package gzip
+    require_cmd patch || suitable_package patch
     require_cmd bison || suitable_package bison
     require_cmd flex || suitable_package flex
   fi

@@ -1,0 +1,72 @@
+diff --git a/lib/cfl/CMakeLists.txt b/lib/cfl/CMakeLists.txt
+index 98ee88f7c..c2da38855 100644
+--- a/lib/cfl/CMakeLists.txt
++++ b/lib/cfl/CMakeLists.txt
+@@ -40,12 +40,7 @@ if(NOT MSVC)
+   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+ endif()
+ 
+-# Define __FILENAME__ consistently across Operating Systems
+-if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
+-else()
+-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__=__FILE__")
+-endif()
++set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__=__FILE__")
+ 
+ 
+ 
+diff --git a/lib/cmetrics/CMakeLists.txt b/lib/cmetrics/CMakeLists.txt
+index 38a86e5f4..bd70c07ae 100644
+--- a/lib/cmetrics/CMakeLists.txt
++++ b/lib/cmetrics/CMakeLists.txt
+@@ -60,12 +60,7 @@ if(NOT MSVC)
+   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+ endif()
+ 
+-# Define __CMT_FILENAME__ consistently across Operating Systems
+-if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__CMT_FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
+-else()
+-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__CMT_FILENAME__=__FILE__")
+-endif()
++set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__CMT_FILENAME__=__FILE__")
+ 
+ # Configuration options
+ option(CMT_DEV                       "Enable development mode"                   No)
+diff --git a/lib/ctraces/CMakeLists.txt b/lib/ctraces/CMakeLists.txt
+index 08e1b6d29..0f8d8e455 100644
+--- a/lib/ctraces/CMakeLists.txt
++++ b/lib/ctraces/CMakeLists.txt
+@@ -30,12 +30,7 @@ set(CTR_VERSION_MINOR  3)
+ set(CTR_VERSION_PATCH  1)
+ set(CTR_VERSION_STR "${CTR_VERSION_MAJOR}.${CTR_VERSION_MINOR}.${CTR_VERSION_PATCH}")
+ 
+-# Define __FILENAME__ consistently across Operating Systems
+-if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
+-else()
+-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__=__FILE__")
+-endif()
++set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__=__FILE__")
+ 
+ # Configuration options
+ option(CTR_DEV             "Enable development mode"                   No)
+diff --git a/lib/monkey/CMakeLists.txt b/lib/monkey/CMakeLists.txt
+index 2d43835b7..9e1756499 100644
+--- a/lib/monkey/CMakeLists.txt
++++ b/lib/monkey/CMakeLists.txt
+@@ -15,11 +15,10 @@ include(GNUInstallDirs)
+ # Set default compiler options
+ if (NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Wall -Wextra")
+-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath \$<))\"'")
+-else()
+-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__=__FILE__")
+ endif()
+ 
++set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__=__FILE__")
++
+ # Monkey Version
+ set(MK_VERSION_MAJOR  1)
+ set(MK_VERSION_MINOR  7)
