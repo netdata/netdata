@@ -2566,9 +2566,18 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
+install(FILES
+        system/systemd/journald@netdata.conf
+        COMPONENT netdata
+        DESTINATION usr/lib/netdata/system/systemd)
+
 if(BUILD_FOR_PACKAGING)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
+                COMPONENT netdata
+                DESTINATION lib/systemd/system)
+        install(FILES
+                system/systemd/journald@netdata.conf
                 COMPONENT netdata
                 DESTINATION lib/systemd/system)
 endif()
