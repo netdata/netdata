@@ -78,6 +78,22 @@ struct command {
         },
     },
     {
+        .name = "igt-list-gpus",
+        .params = "-L",
+        .search = {
+            [0] = "intel_gpu_top",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "igt-device-json",
+        .params = "-d {{device}} -J -s {{interval}}",
+        .search = {
+            [0] = "intel_gpu_top",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "igt-json",
         .params = "-J -s {{interval}}",
         .search = {
