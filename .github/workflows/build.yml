@@ -951,11 +951,17 @@ jobs:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
           known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
-      - name: Sync newer releases
+      - name: Sync release info to packages.netdata.cloud
         id: sync-releases
+        continue-on-error: true
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-latest-version.outputs.versions_needs_update == 'true'
         run: |
-          .github/scripts/upload-new-version-tags.sh
+          .github/scripts/upload-new-version-tags.sh packages.netdata.cloud
+      - name: Sync release info to packages2.netdata.cloud
+        id: sync-releases2
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-latest-version.outputs.versions_needs_update == 'true'
+        run: |
+          .github/scripts/upload-new-version-tags.sh packages.netdata.cloud
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -976,7 +982,8 @@ jobs:
               Setup python environment: ${{ steps.setup-python.outcome }}
               Check the nearly published release against the advertised: ${{ steps.check-latest-version.outcome }}
               Setup ssh: ${{ steps.ssh-setup.outcome }}
-              Sync with the releases: ${{ steps.sync-releases.outcome }}
+              Sync release info to packages.netdata.cloud: ${{ steps.sync-releases.outcome }}
+              Sync release info to packages2.netdata.cloud: ${{ steps.sync-releases2.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
