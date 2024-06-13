@@ -11,9 +11,7 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
-////go:embed "config_schema.json"
-//var configSchema string
-
+//go:embed "config_schema.json"
 var configSchema string
 
 func init() {
@@ -43,9 +41,9 @@ func New() *Phpfpm {
 type Config struct {
 	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP    `yaml:",inline" json:""`
-	Socket      string `yaml:"socket" json:"socket"`
-	Address     string `yaml:"address" json:"address"`
-	FcgiPath    string `yaml:"fcgi_path" json:"fcgi_path"`
+	Socket      string `yaml:"socket,omitempty" json:"socket"`
+	Address     string `yaml:"address,omitempty" json:"address"`
+	FcgiPath    string `yaml:"fcgi_path,omitempty" json:"fcgi_path"`
 }
 
 type Phpfpm struct {
