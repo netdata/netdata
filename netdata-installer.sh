@@ -583,6 +583,33 @@ build_fluentbit() {
   cd - > /dev/null || return 1
 }
 
+detect_libc() {
+  libc=
+  if ldd --version 2>&1 | grep -q -i glibc; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i 'gnu libc'; then
+    echo >&2 " Detected GLIBC"
+    libc="glibc"
+  elif ldd --version 2>&1 | grep -q -i musl; then
+    echo >&2 " Detected musl"
+    libc="musl"
+  else
+      cmd=$(ldd /bin/sh | grep -w libc | cut -d" " -f 3)
+      if bash -c "${cmd}" 2>&1 | grep -q -i "GNU C Library"; then
+        echo >&2 " Detected GLIBC"
+        libc="glibc"
+      fi
+  fi
+
+  if [ -z "$libc" ]; then
+    warning "Cannot detect a supported libc on your system, eBPF support will be disabled."
+    return 1
+  fi
+
+  echo "${libc}"
+}
+
 bundle_fluentbit() {
   progress "Prepare Fluent-Bit"
 
@@ -1054,33 +1081,6 @@ else
 fi
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-
-detect_libc() {
-  libc=
-  if ldd --version 2>&1 | grep -q -i glibc; then
-    echo >&2 " Detected GLIBC"
-    libc="glibc"
-  elif ldd --version 2>&1 | grep -q -i 'gnu libc'; then
-    echo >&2 " Detected GLIBC"
-    libc="glibc"
-  elif ldd --version 2>&1 | grep -q -i musl; then
-    echo >&2 " Detected musl"
-    libc="musl"
-  else
-      cmd=$(ldd /bin/sh | grep -w libc | cut -d" " -f 3)
-      if bash -c "${cmd}" 2>&1 | grep -q -i "GNU C Library"; then
-        echo >&2 " Detected GLIBC"
-        libc="glibc"
-      fi
-  fi
-
-  if [ -z "$libc" ]; then
-    warning "Cannot detect a supported libc on your system, eBPF support will be disabled."
-    return 1
-  fi
-
-  echo "${libc}"
-}
 
 should_install_fluentbit() {
   if [ "$(uname -s)" = "Darwin" ]; then
