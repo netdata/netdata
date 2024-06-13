@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Update CI infrastructure to publish to secondary packaging host. [\#17863](https://github.com/netdata/netdata/pull/17863) ([Ferroin](https://github.com/Ferroin))
+- Improve anacron detection in updater. [\#17862](https://github.com/netdata/netdata/pull/17862) ([Ferroin](https://github.com/Ferroin))
 - DYNCFG: health, generate userconfig for incomplete alerts [\#17859](https://github.com/netdata/netdata/pull/17859) ([ktsaou](https://github.com/ktsaou))
 - Create retention charts for higher tiers [\#17855](https://github.com/netdata/netdata/pull/17855) ([stelfrag](https://github.com/stelfrag))
 - Bump github.com/vmware/govmomi from 0.37.2 to 0.37.3 in /src/go/collectors/go.d.plugin [\#17854](https://github.com/netdata/netdata/pull/17854) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -188,6 +190,7 @@
 - Bump golang.org/x/net from 0.24.0 to 0.25.0 in /src/go/collectors/go.d.plugin [\#17609](https://github.com/netdata/netdata/pull/17609) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump jinja2 from 3.1.3 to 3.1.4 in /packaging/dag [\#17607](https://github.com/netdata/netdata/pull/17607) ([dependabot[bot]](https://github.com/apps/dependabot))
 - go.d systemdunits add unit files state [\#17606](https://github.com/netdata/netdata/pull/17606) ([ilyam8](https://github.com/ilyam8))
+- Add improved handling for TLS certificates for static builds. [\#17605](https://github.com/netdata/netdata/pull/17605) ([Ferroin](https://github.com/Ferroin))
 - Add option to limit architectures for offline installs. [\#17604](https://github.com/netdata/netdata/pull/17604) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17603](https://github.com/netdata/netdata/pull/17603) ([netdatabot](https://github.com/netdatabot))
 - Make offline installs properly offline again. [\#17602](https://github.com/netdata/netdata/pull/17602) ([Ferroin](https://github.com/Ferroin))
@@ -410,8 +413,6 @@
 - go.d: sd local listeners: add unix socket job [\#17304](https://github.com/netdata/netdata/pull/17304) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/vmware/govmomi from 0.36.1 to 0.36.2 in /src/go/collectors/go.d.plugin [\#17300](https://github.com/netdata/netdata/pull/17300) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/go-sql-driver/mysql from 1.8.0 to 1.8.1 in /src/go/collectors/go.d.plugin [\#17299](https://github.com/netdata/netdata/pull/17299) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Fix SWAP pages [\#17295](https://github.com/netdata/netdata/pull/17295) ([thiagoftsm](https://github.com/thiagoftsm))
-- Update hpssa.chart.py [\#17294](https://github.com/netdata/netdata/pull/17294) ([Metric-Void](https://github.com/Metric-Void))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
