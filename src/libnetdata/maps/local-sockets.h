@@ -352,6 +352,7 @@ static inline const char *local_sockets_address_space(struct socket_endpoint *se
 static inline bool is_local_socket_ipv46(LOCAL_SOCKET *n) {
     return n->local.family == AF_INET6 &&
             n->direction == SOCKET_DIRECTION_LISTEN &&
+            local_sockets_is_zero_address(&n->local) &&
             n->ipv6ony.checked &&
             n->ipv6ony.ipv46;
 }

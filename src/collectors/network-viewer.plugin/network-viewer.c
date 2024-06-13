@@ -8,8 +8,16 @@
 
 #define LOCAL_SOCKETS_EXTENDED_MEMBERS struct { \
         size_t count;                           \
-        const char *local_address_space;        \
-        const char *remote_address_space;       \
+        struct {                                \
+            pid_t pid;                          \
+            uid_t uid;                          \
+            SOCKET_DIRECTION direction;         \
+            uint64_t net_ns_inode;              \
+            int state;                          \
+            struct socket_endpoint server;      \
+            const char *local_address_space;    \
+            const char *remote_address_space;   \
+        } aggregated_key;                       \
     } network_viewer;
 
 #include "libnetdata/maps/local-sockets.h"
@@ -68,6 +76,9 @@ struct sockets_stats {
 };
 
 static void local_socket_to_json_array(struct sockets_stats *st, LOCAL_SOCKET *n, uint64_t proc_self_net_ns_inode, bool aggregated) {
+    if(n->direction == SOCKET_DIRECTION_NONE)
+        return;
+
     BUFFER *wb = st->wb;
 
     char local_address[INET6_ADDRSTRLEN];
@@ -144,15 +155,14 @@ static void local_socket_to_json_array(struct sockets_stats *st, LOCAL_SOCKET *n
             buffer_json_add_array_item_string(wb, local_address);
             buffer_json_add_array_item_uint64(wb, n->local.port);
         }
-        buffer_json_add_array_item_string(wb, n->network_viewer.local_address_space);
+        buffer_json_add_array_item_string(wb, n->network_viewer.aggregated_key.local_address_space);
 
         if(!aggregated) {
             buffer_json_add_array_item_string(wb, remote_address);
             buffer_json_add_array_item_uint64(wb, n->remote.port);
         }
-        buffer_json_add_array_item_string(wb, n->network_viewer.remote_address_space);
+        buffer_json_add_array_item_string(wb, n->network_viewer.aggregated_key.remote_address_space);
 
-        uint16_t server_port;
         const char *server_address;
         const char *client_address_space;
         const char *server_address_space;
@@ -160,27 +170,30 @@ static void local_socket_to_json_array(struct sockets_stats *st, LOCAL_SOCKET *n
             case SOCKET_DIRECTION_LISTEN:
             case SOCKET_DIRECTION_INBOUND:
             case SOCKET_DIRECTION_LOCAL_INBOUND:
-                server_port = n->local.port;
                 server_address = local_address;
-                server_address_space = n->network_viewer.local_address_space;
-                client_address_space = n->network_viewer.remote_address_space;
+                server_address_space = n->network_viewer.aggregated_key.local_address_space;
+                client_address_space = n->network_viewer.aggregated_key.remote_address_space;
                 break;
 
             case SOCKET_DIRECTION_OUTBOUND:
             case SOCKET_DIRECTION_LOCAL_OUTBOUND:
-                server_port = n->remote.port;
                 server_address = remote_address;
-                server_address_space = n->network_viewer.remote_address_space;
-                client_address_space = n->network_viewer.local_address_space;
+                server_address_space = n->network_viewer.aggregated_key.remote_address_space;
+                client_address_space = n->network_viewer.aggregated_key.local_address_space;
                 break;
 
             case SOCKET_DIRECTION_NONE:
+                server_address = NULL;
+                client_address_space = NULL;
+                server_address_space = NULL;
                 break;
         }
-        if(aggregated)
-            buffer_json_add_array_item_string(wb, server_address);
 
-        buffer_json_add_array_item_uint64(wb, server_port);
+        if(aggregated) {
+            buffer_json_add_array_item_string(wb, server_address);
+        }
+
+        buffer_json_add_array_item_uint64(wb, n->network_viewer.aggregated_key.server.port);
 
         if(aggregated) {
             buffer_json_add_array_item_string(wb, client_address_space);
@@ -210,176 +223,159 @@ static void local_socket_to_json_array(struct sockets_stats *st, LOCAL_SOCKET *n
     buffer_json_array_close(wb);
 }
 
-static void local_sockets_cb_to_json(LS_STATE *ls, LOCAL_SOCKET *n, void *data) {
-    struct sockets_stats *st = data;
+static void populate_aggregated_key(LOCAL_SOCKET *n) {
     n->network_viewer.count = 1;
-    n->network_viewer.local_address_space = local_sockets_address_space(&n->local);
-    n->network_viewer.remote_address_space = local_sockets_address_space(&n->remote);
-    local_socket_to_json_array(st, n, ls->proc_self_net_ns_inode, false);
-}
 
-static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, void *data) {
-    SIMPLE_HASHTABLE_AGGREGATED_SOCKETS *ht = data;
-    n->network_viewer.count = 1;
-    n->network_viewer.local_address_space = local_sockets_address_space(&n->local);
-    n->network_viewer.remote_address_space = local_sockets_address_space(&n->remote);
+    n->network_viewer.aggregated_key.pid = n->pid;
+    n->network_viewer.aggregated_key.uid = n->uid;
+    n->network_viewer.aggregated_key.direction = n->direction;
+    n->network_viewer.aggregated_key.net_ns_inode = n->net_ns_inode;
+    n->network_viewer.aggregated_key.state = n->state;
 
     switch(n->direction) {
         case SOCKET_DIRECTION_INBOUND:
         case SOCKET_DIRECTION_LOCAL_INBOUND:
         case SOCKET_DIRECTION_LISTEN:
-            memset(&n->remote.ip, 0, sizeof(n->remote.ip));
-            n->remote.port = 0;
+            n->network_viewer.aggregated_key.server = n->local;
             break;
 
         case SOCKET_DIRECTION_OUTBOUND:
         case SOCKET_DIRECTION_LOCAL_OUTBOUND:
-            memset(&n->local.ip, 0, sizeof(n->local.ip));
-            n->local.port = 0;
+            n->network_viewer.aggregated_key.server = n->remote;
             break;
 
         case SOCKET_DIRECTION_NONE:
-            return;
+            break;
     }
 
-    struct tcp_info n_info_tcp = n->info.tcp;
-    memset(&n->info.tcp, 0, sizeof(n->info.tcp));
+    n->network_viewer.aggregated_key.local_address_space = local_sockets_address_space(&n->local);
+    n->network_viewer.aggregated_key.remote_address_space = local_sockets_address_space(&n->remote);
+}
 
-    n->inode = 0;
-    n->local_ip_hash = 0;
-    n->remote_ip_hash = 0;
-    n->local_port_hash = 0;
-    n->timer = 0;
-    n->retransmits = 0;
-    n->expires = 0;
-    n->rqueue = 0;
-    n->wqueue = 0;
-    memset(&n->local_port_key, 0, sizeof(n->local_port_key));
+static void local_sockets_cb_to_json(LS_STATE *ls, LOCAL_SOCKET *n, void *data) {
+    struct sockets_stats *st = data;
+    populate_aggregated_key(n);
+    local_socket_to_json_array(st, n, ls->proc_self_net_ns_inode, false);
+}
 
-    XXH64_hash_t hash = XXH3_64bits(n, sizeof(*n));
+#define KEEP_THE_BIGGER(a, b) (a) = ((a) < (b)) ? (b) : (a)
+#define KEEP_THE_SMALLER(a, b) (a) = ((a) > (b)) ? (b) : (a)
+#define SUM_THEM_ALL(a, b) (a) += (b)
+#define OR_THEM_ALL(a, b) (a) |= (b)
+
+static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, void *data) {
+    SIMPLE_HASHTABLE_AGGREGATED_SOCKETS *ht = data;
+
+    populate_aggregated_key(n);
+    XXH64_hash_t hash = XXH3_64bits(&n->network_viewer.aggregated_key, sizeof(n->network_viewer.aggregated_key));
     SIMPLE_HASHTABLE_SLOT_AGGREGATED_SOCKETS *sl = simple_hashtable_get_slot_AGGREGATED_SOCKETS(ht, hash, n, true);
     LOCAL_SOCKET *t = SIMPLE_HASHTABLE_SLOT_DATA(sl);
     if(t) {
         t->network_viewer.count++;
 
+        KEEP_THE_BIGGER(t->timer, n->timer);
+        KEEP_THE_BIGGER(t->retransmits, n->retransmits);
+        KEEP_THE_SMALLER(t->expires, n->expires);
+        KEEP_THE_BIGGER(t->rqueue, n->rqueue);
+        KEEP_THE_BIGGER(t->wqueue, n->wqueue);
+
         // The current number of consecutive retransmissions that have occurred for the most recently transmitted segment.
-        t->info.tcp.tcpi_retransmits += n_info_tcp.tcpi_retransmits;
+        SUM_THEM_ALL(t->info.tcp.tcpi_retransmits, n->info.tcp.tcpi_retransmits);
 
         // The total number of retransmissions that have occurred for the entire connection since it was established.
-        t->info.tcp.tcpi_total_retrans += n_info_tcp.tcpi_total_retrans;
+        SUM_THEM_ALL(t->info.tcp.tcpi_total_retrans, n->info.tcp.tcpi_total_retrans);
 
         // The total number of segments that have been retransmitted since the connection was established.
-        t->info.tcp.tcpi_retrans += n_info_tcp.tcpi_retrans;
+        SUM_THEM_ALL(t->info.tcp.tcpi_retrans, n->info.tcp.tcpi_retrans);
 
         // The number of keepalive probes sent
-        t->info.tcp.tcpi_probes += n_info_tcp.tcpi_probes;
+        SUM_THEM_ALL(t->info.tcp.tcpi_probes, n->info.tcp.tcpi_probes);
 
         // The number of times the retransmission timeout has been backed off.
-        t->info.tcp.tcpi_backoff += n_info_tcp.tcpi_backoff;
+        SUM_THEM_ALL(t->info.tcp.tcpi_backoff, n->info.tcp.tcpi_backoff);
 
         // A bitmask representing the TCP options currently enabled for the connection, such as SACK and Timestamps.
-        t->info.tcp.tcpi_options |= n_info_tcp.tcpi_options;
+        OR_THEM_ALL(t->info.tcp.tcpi_options, n->info.tcp.tcpi_options);
 
         // The send window scale value used for this connection
-        if(t->info.tcp.tcpi_snd_wscale > n_info_tcp.tcpi_snd_wscale)
-            t->info.tcp.tcpi_snd_wscale = n_info_tcp.tcpi_snd_wscale;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_snd_wscale, n->info.tcp.tcpi_snd_wscale);
 
         // The receive window scale value used for this connection
-        if(t->info.tcp.tcpi_rcv_wscale > n_info_tcp.tcpi_rcv_wscale)
-            t->info.tcp.tcpi_rcv_wscale = n_info_tcp.tcpi_rcv_wscale;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_rcv_wscale, n->info.tcp.tcpi_rcv_wscale);
 
         // Retransmission timeout in milliseconds
-        if(t->info.tcp.tcpi_rto > n_info_tcp.tcpi_rto)
-            t->info.tcp.tcpi_rto = n_info_tcp.tcpi_rto;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_rto, n->info.tcp.tcpi_rto);
 
         // The delayed acknowledgement timeout in milliseconds.
-        if(t->info.tcp.tcpi_ato > n_info_tcp.tcpi_ato)
-            t->info.tcp.tcpi_ato = n_info_tcp.tcpi_ato;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_ato, n->info.tcp.tcpi_ato);
 
         // The maximum segment size for sending.
-        if(t->info.tcp.tcpi_snd_mss > n_info_tcp.tcpi_snd_mss)
-            t->info.tcp.tcpi_snd_mss = n_info_tcp.tcpi_snd_mss;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_snd_mss, n->info.tcp.tcpi_snd_mss);
 
         // The maximum segment size for receiving.
-        if(t->info.tcp.tcpi_rcv_mss > n_info_tcp.tcpi_rcv_mss)
-            t->info.tcp.tcpi_rcv_mss = n_info_tcp.tcpi_rcv_mss;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_rcv_mss, n->info.tcp.tcpi_rcv_mss);
 
         // The number of unacknowledged segments
-        t->info.tcp.tcpi_unacked += n_info_tcp.tcpi_unacked;
+        SUM_THEM_ALL(t->info.tcp.tcpi_unacked, n->info.tcp.tcpi_unacked);
 
         // The number of segments that have been selectively acknowledged
-        t->info.tcp.tcpi_sacked += n_info_tcp.tcpi_sacked;
+        SUM_THEM_ALL(t->info.tcp.tcpi_sacked, n->info.tcp.tcpi_sacked);
 
         // The number of segments that have been selectively acknowledged
-        t->info.tcp.tcpi_sacked += n_info_tcp.tcpi_sacked;
+        SUM_THEM_ALL(t->info.tcp.tcpi_sacked, n->info.tcp.tcpi_sacked);
 
         // The number of lost segments.
-        t->info.tcp.tcpi_lost += n_info_tcp.tcpi_lost;
+        SUM_THEM_ALL(t->info.tcp.tcpi_lost, n->info.tcp.tcpi_lost);
 
         // The number of forward acknowledgment segments.
-        t->info.tcp.tcpi_fackets += n_info_tcp.tcpi_fackets;
+        SUM_THEM_ALL(t->info.tcp.tcpi_fackets, n->info.tcp.tcpi_fackets);
 
         // The time in milliseconds since the last data was sent.
-        if(t->info.tcp.tcpi_last_data_sent > n_info_tcp.tcpi_last_data_sent)
-            t->info.tcp.tcpi_last_data_sent = n_info_tcp.tcpi_last_data_sent;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_last_data_sent, n->info.tcp.tcpi_last_data_sent);
 
         // The time in milliseconds since the last acknowledgment was sent (not tracked in Linux, hence often zero).
-        if(t->info.tcp.tcpi_last_ack_sent > n_info_tcp.tcpi_last_ack_sent)
-            t->info.tcp.tcpi_last_ack_sent = n_info_tcp.tcpi_last_ack_sent;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_last_ack_sent, n->info.tcp.tcpi_last_ack_sent);
 
         // The time in milliseconds since the last data was received.
-        if(t->info.tcp.tcpi_last_data_recv > n_info_tcp.tcpi_last_data_recv)
-            t->info.tcp.tcpi_last_data_recv = n_info_tcp.tcpi_last_data_recv;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_last_data_recv, n->info.tcp.tcpi_last_data_recv);
 
         // The time in milliseconds since the last acknowledgment was received.
-        if(t->info.tcp.tcpi_last_ack_recv > n_info_tcp.tcpi_last_ack_recv)
-            t->info.tcp.tcpi_last_ack_recv = n_info_tcp.tcpi_last_ack_recv;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_last_ack_recv, n->info.tcp.tcpi_last_ack_recv);
 
         // The path MTU for this connection
-        if(t->info.tcp.tcpi_pmtu > n_info_tcp.tcpi_pmtu)
-            t->info.tcp.tcpi_pmtu = n_info_tcp.tcpi_pmtu;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_pmtu, n->info.tcp.tcpi_pmtu);
 
         // The slow start threshold for receiving
-        if(t->info.tcp.tcpi_rcv_ssthresh > n_info_tcp.tcpi_rcv_ssthresh)
-            t->info.tcp.tcpi_rcv_ssthresh = n_info_tcp.tcpi_rcv_ssthresh;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_rcv_ssthresh, n->info.tcp.tcpi_rcv_ssthresh);
 
         // The slow start threshold for sending
-        if(t->info.tcp.tcpi_snd_ssthresh > n_info_tcp.tcpi_snd_ssthresh)
-            t->info.tcp.tcpi_snd_ssthresh = n_info_tcp.tcpi_snd_ssthresh;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_snd_ssthresh, n->info.tcp.tcpi_snd_ssthresh);
 
         // The round trip time in milliseconds
-        if(t->info.tcp.tcpi_rtt < n_info_tcp.tcpi_rtt)
-            t->info.tcp.tcpi_rtt = n_info_tcp.tcpi_rtt;
+        KEEP_THE_BIGGER(t->info.tcp.tcpi_rtt, n->info.tcp.tcpi_rtt);
 
         // The round trip time variance in milliseconds.
-        if(t->info.tcp.tcpi_rttvar < n_info_tcp.tcpi_rttvar)
-            t->info.tcp.tcpi_rttvar = n_info_tcp.tcpi_rttvar;
+        KEEP_THE_BIGGER(t->info.tcp.tcpi_rttvar, n->info.tcp.tcpi_rttvar);
 
         // The size of the sending congestion window.
-        if(t->info.tcp.tcpi_snd_cwnd > n_info_tcp.tcpi_snd_cwnd)
-            t->info.tcp.tcpi_snd_cwnd = n_info_tcp.tcpi_snd_cwnd;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_snd_cwnd, n->info.tcp.tcpi_snd_cwnd);
 
         // The maximum segment size that could be advertised.
-        if(t->info.tcp.tcpi_advmss < n_info_tcp.tcpi_advmss)
-            t->info.tcp.tcpi_advmss = n_info_tcp.tcpi_advmss;
+        KEEP_THE_BIGGER(t->info.tcp.tcpi_advmss, n->info.tcp.tcpi_advmss);
 
         // The reordering metric
-        if(t->info.tcp.tcpi_reordering > n_info_tcp.tcpi_reordering)
-            t->info.tcp.tcpi_reordering = n_info_tcp.tcpi_reordering;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_reordering, n->info.tcp.tcpi_reordering);
 
         // The receive round trip time in milliseconds.
-        if(t->info.tcp.tcpi_rcv_rtt < n_info_tcp.tcpi_rcv_rtt)
-            t->info.tcp.tcpi_rcv_rtt = n_info_tcp.tcpi_rcv_rtt;
+        KEEP_THE_BIGGER(t->info.tcp.tcpi_rcv_rtt, n->info.tcp.tcpi_rcv_rtt);
 
         // The available space in the receive buffer.
-        if(t->info.tcp.tcpi_rcv_space > n_info_tcp.tcpi_rcv_space)
-            t->info.tcp.tcpi_rcv_space = n_info_tcp.tcpi_rcv_space;
+        KEEP_THE_SMALLER(t->info.tcp.tcpi_rcv_space, n->info.tcp.tcpi_rcv_space);
     }
     else {
         t = mallocz(sizeof(*t));
         memcpy(t, n, sizeof(*t));
         t->cmdline = string_dup(t->cmdline);
-        t->info.tcp = n_info_tcp;
         simple_hashtable_set_slot_AGGREGATED_SOCKETS(ht, sl, hash, t);
     }
 }
