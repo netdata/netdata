@@ -98,11 +98,11 @@ names:
 
 ## Title bar
 
-When you start interacting with a chart, you'll notice valuable information on the top bar:
+When you start interacting with a chart, you'll notice valuable information on the Title bar:
 
-<img src="https://user-images.githubusercontent.com/70198089/236133832-fad45e65-5bd6-4fd1-8d68-33acf69fff5c.png" width="900"/>
+<img src="https://github.com/netdata/netdata/assets/70198089/75d700de-bc7d-4b96-b73d-7b248b83afea" width="900"/>
 
-The elements that you can find on this top bar are:
+Title bar elements:
 
 - **Netdata icon**: this indicates that data is continuously being updated, this happens if [Time controls](/docs/dashboards-and-charts/visualization-date-and-time-controls.md#time-controls) are in Play or Force Play mode.
 - **Chart title**: on the chart title you can see the title together with the metric being displayed, as well as the unit of measurement.
@@ -110,12 +110,17 @@ The elements that you can find on this top bar are:
 
 Along with viewing chart type, context and units, on this bar you have access to immediate actions over the chart:
 
-<img src="https://user-images.githubusercontent.com/70198089/236134195-ecb08f79-1355-4bce-8449-e829f4a6b1c0.png" width="200" />
 
+<img src="https://github.com/netdata/netdata/assets/70198089/d21f326e-065c-4a08-bee9-69ad23736e38" width="200" />
+
+- **Manage Alerts**: manage [Alert configurations](/docs/dashboards-and-charts/alerts-tab.md#alert-configurations-tab) for this chart.
 - **Chart info**: get more information relevant to the chart you are interacting with.
 - **Chart type**: change the chart type from **line**, **stacked**, **area**, **stacked bar** and **multi bar**.
 - **Enter fullscreen mode**: expand the current chart to the full size of your screen.
-- **Add chart to dashboard**: add the chart to an existing custom dashboard or directly create a new one that includes the chart.
+- **User settings**: save your settings for the chart at hand, so it persists across dashboard reloads.
+  - Personal has the top priority.
+  - Room and Space settings for a chart are shared across all users who don't have personal settings for it. 
+- **Drag and Drop the chart to a Dashboard**: add the chart to an existing custom [Dashboard](/docs/dashboards-and-charts/dashboards-tab.md) or directly create a new one that includes the chart.
 
 ## Definition bar
 
