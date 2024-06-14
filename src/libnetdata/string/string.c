@@ -63,6 +63,16 @@ static struct string_partition {
 #define string_internal_stats_add(partition, var, val) do {;} while(0)
 #endif
 
+void string_safe_fork_before(void) {
+    for(size_t i = 0; i < STRING_PARTITIONS; i++)
+        rw_spinlock_write_lock(&string_base[i].spinlock);
+}
+
+void string_safe_fork_after(void) {
+    for(size_t i = 0; i < STRING_PARTITIONS; i++)
+        rw_spinlock_write_unlock(&string_base[i].spinlock);
+}
+
 void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory, size_t *duplications, size_t *releases) {
     if (inserts) *inserts = 0;
     if (deletes) *deletes = 0;

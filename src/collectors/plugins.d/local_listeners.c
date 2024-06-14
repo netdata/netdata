@@ -108,6 +108,7 @@ int main(int argc, char **argv) {
             .tcp_info = false,
 
             .max_errors = 10,
+            .max_concurrent_namespaces = 10,
 
             .cb = print_local_listeners,
             .data = NULL,
@@ -299,7 +300,7 @@ int main(int argc, char **argv) {
         unsigned long long system = ended.ru_stime.tv_sec * 1000000ULL + ended.ru_stime.tv_usec - started.ru_stime.tv_sec * 1000000ULL + started.ru_stime.tv_usec;
         unsigned long long total  = user + system;
 
-        fprintf(stderr, "CPU Usage %llu user, %llu system, %llu total, %zu namespaces\n", user, system, total, ls.stats.namespaces_found);
+        fprintf(stderr, "CPU Usage %llu user, %llu system, %llu total, %zu namespaces, %zu nl requests (without namespaces)\n", user, system, total, ls.stats.namespaces_found, ls.stats.mnl_sends);
     }
 
     return 0;

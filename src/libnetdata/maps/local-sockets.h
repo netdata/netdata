@@ -81,7 +81,9 @@ typedef struct local_socket_state {
         bool uid;
         bool namespaces;
         bool tcp_info;
+
         size_t max_errors;
+        size_t max_concurrent_namespaces;
 
         local_sockets_cb_t cb;
         void *data;
@@ -108,6 +110,7 @@ typedef struct local_socket_state {
 
     ARAL *local_socket_aral;
     ARAL *pid_socket_aral;
+    SPINLOCK spinlock; // for namespaces
 
     uint64_t proc_self_net_ns_inode;
 
@@ -751,28 +754,6 @@ static inline int local_sockets_libmnl_cb_data(const struct nlmsghdr *nlh, void 
     return MNL_CB_OK;
 }
 
-static inline ssize_t mnl_socket_sendmsg(const struct mnl_socket *nl, const void *buf, size_t len) {
-    struct sockaddr_nl snl = {
-        .nl_family = AF_NETLINK
-    };
-    struct iovec iov = {
-        .iov_base = (void *)buf,
-        .iov_len = len
-    };
-    struct msghdr msg = {
-        .msg_name = (void *)&snl,
-        .msg_namelen = sizeof(snl),
-        .msg_iov = &iov,
-        .msg_iovlen = 1,
-        .msg_control = NULL,
-        .msg_controllen = 0,
-        .msg_flags = 0
-    };
-
-    int fd = mnl_socket_get_fd(nl);
-    return sendmsg(fd, &msg, 0);
-}
-
 static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t family, uint16_t protocol) {
     ls->tmp_protocol = protocol;
 
@@ -991,6 +972,8 @@ static inline void local_sockets_detect_directions(LS_STATE *ls) {
 // --------------------------------------------------------------------------------------------------------------------
 
 static inline void local_sockets_init(LS_STATE *ls) {
+    spinlock_init(&ls->spinlock);
+
     simple_hashtable_init_NET_NS(&ls->ns_hashtable, 1024);
     simple_hashtable_init_PID_SOCKET(&ls->pid_sockets_hashtable, 65535);
     simple_hashtable_init_LOCAL_SOCKET(&ls->sockets_hashtable, 65535);
@@ -1123,7 +1106,7 @@ static inline void local_sockets_send_to_parent(struct local_socket_state *ls __
             local_sockets_log(ls, "failed to write cmdline to pipe");
 }
 
-static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_socket *ps, pid_t *pid) {
+static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, struct pid_socket *ps) {
     char filename[1024];
     snprintfz(filename, sizeof(filename), "%s/proc/%d/ns/net", ls->config.host_prefix, ps->pid);
 
@@ -1154,10 +1137,11 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
         return false;
     }
 
-    ls->stats.namespaces_found++;
+    // if we don't get the spinlock, then other threads may have locks on strings,
+    // dictionaries, etc, preventing us from finishing.
+    pid_t pid = safe_fork();
 
-    *pid = fork();
-    if (*pid == 0) {
+    if (pid == 0) {
         // Child process
         close(pipefd[0]);
 
@@ -1226,6 +1210,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
                 local_sockets_log(ls, "failed to read cmdline from pipe");
             else {
                 cmdline[len] = '\0';
+
                 buf.cmdline = string_strdupz(cmdline);
             }
         }
@@ -1242,15 +1227,15 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
             break;
         }
 
+        spinlock_lock(&ls->spinlock);
+
         SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ls->sockets_hashtable, buf.inode, &buf, true);
         LOCAL_SOCKET *n = SIMPLE_HASHTABLE_SLOT_DATA(sl);
         if(n) {
             string_freez(buf.cmdline);
-
 //            local_sockets_log(ls,
 //                              "ns inode %" PRIu64" (comm: '%s', pid: %u, ns: %"PRIu64") already exists in hashtable (comm: '%s', pid: %u, ns: %"PRIu64") - ignoring duplicate",
 //                              buf.inode, buf.comm, buf.pid, buf.net_ns_inode, n->comm, n->pid, n->net_ns_inode);
-            continue;
         }
         else {
             n = aral_mallocz(ls->local_socket_aral);
@@ -1259,58 +1244,107 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
 
             local_sockets_index_listening_port(ls, n);
         }
+
+        spinlock_unlock(&ls->spinlock);
     }
 
     close(pipefd[0]);
 
-    return received > 0;
-}
-
-static inline void local_socket_waitpid(LS_STATE *ls, pid_t pid) {
-    if(!pid) return;
-
     int status;
     waitpid(pid, &status, 0);
-
     if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
         local_sockets_log(ls, "Child exited with status %d", WEXITSTATUS(status));
     else if (WIFSIGNALED(status))
         local_sockets_log(ls, "Child terminated by signal %d", WTERMSIG(status));
+
+    return received > 0;
+}
+
+struct local_sockets_namespace_worker {
+    LS_STATE *ls;
+    uint64_t inode;
+};
+
+static inline void *local_sockets_get_namespace_sockets(void *arg) {
+    struct local_sockets_namespace_worker *data = arg;
+    LS_STATE *ls = data->ls;
+    const uint64_t inode = data->inode;
+
+    spinlock_lock(&ls->spinlock);
+
+    // find a pid_socket that has this namespace
+    for(SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl_pid = simple_hashtable_first_read_only_PID_SOCKET(&ls->pid_sockets_hashtable) ;
+        sl_pid ;
+        sl_pid = simple_hashtable_next_read_only_PID_SOCKET(&ls->pid_sockets_hashtable, sl_pid)) {
+        struct pid_socket *ps = SIMPLE_HASHTABLE_SLOT_DATA(sl_pid);
+        if(!ps || ps->net_ns_inode != inode) continue;
+
+        // now we have a pid that has the same namespace inode
+
+        spinlock_unlock(&ls->spinlock);
+        const bool worked = local_sockets_get_namespace_sockets_with_pid(ls, ps);
+        spinlock_lock(&ls->spinlock);
+
+        if(worked)
+            break;
+    }
+
+    spinlock_unlock(&ls->spinlock);
+
+    return NULL;
 }
 
 static inline void local_sockets_namespaces(LS_STATE *ls) {
-    pid_t children[5] = { 0 };
-    size_t last_child = 0;
+    size_t threads = ls->config.max_concurrent_namespaces;
+    if(threads == 0) threads = 5;
+    if(threads > 100) threads = 100;
+
+    size_t last_thread = 0;
+    ND_THREAD *workers[threads];
+    struct local_sockets_namespace_worker workers_data[threads];
+    memset(workers, 0, sizeof(workers));
+    memset(workers_data, 0, sizeof(workers_data));
+
+    spinlock_lock(&ls->spinlock);
 
     for(SIMPLE_HASHTABLE_SLOT_NET_NS *sl = simple_hashtable_first_read_only_NET_NS(&ls->ns_hashtable);
          sl;
          sl = simple_hashtable_next_read_only_NET_NS(&ls->ns_hashtable, sl)) {
-        uint64_t inode = (uint64_t)SIMPLE_HASHTABLE_SLOT_DATA(sl);
+         const uint64_t inode = (uint64_t)SIMPLE_HASHTABLE_SLOT_DATA(sl);
 
         if(inode == ls->proc_self_net_ns_inode)
             continue;
 
-        // find a pid_socket that has this namespace
-        for(SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl_pid = simple_hashtable_first_read_only_PID_SOCKET(&ls->pid_sockets_hashtable) ;
-            sl_pid ;
-            sl_pid = simple_hashtable_next_read_only_PID_SOCKET(&ls->pid_sockets_hashtable, sl_pid)) {
-            struct pid_socket *ps = SIMPLE_HASHTABLE_SLOT_DATA(sl_pid);
-            if(!ps || ps->net_ns_inode != inode) continue;
+        spinlock_unlock(&ls->spinlock);
 
-            if(++last_child >= 5)
-                last_child = 0;
+        ls->stats.namespaces_found++;
 
-            local_socket_waitpid(ls, children[last_child]);
-            children[last_child] = 0;
+        if(workers[last_thread] != NULL) {
+            if(++last_thread >= threads)
+                last_thread = 0;
 
-            // now we have a pid that has the same namespace inode
-            if(local_sockets_get_namespace_sockets(ls, ps, &children[last_child]))
-                break;
+            if(workers[last_thread]) {
+                nd_thread_join(workers[last_thread]);
+                workers[last_thread] = NULL;
+            }
         }
+
+        workers_data[last_thread].ls = ls;
+        workers_data[last_thread].inode = inode;
+        workers[last_thread] = nd_thread_create(
+            "local-sockets-worker", NETDATA_THREAD_OPTION_JOINABLE,
+            local_sockets_get_namespace_sockets, &workers_data[last_thread]);
+
+        spinlock_lock(&ls->spinlock);
     }
 
-    for(size_t i = 0; i < 5 ;i++)
-        local_socket_waitpid(ls, children[i]);
+    spinlock_unlock(&ls->spinlock);
+
+    // wait all the threads running
+    for(size_t i = 0; i < threads ;i++) {
+        if(workers[i])
+            nd_thread_join(workers[i]);
+    }
 }
 
 // --------------------------------------------------------------------------------------------------------------------

@@ -493,6 +493,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                 .tcp_info = true,
 
                 .max_errors = 10,
+                .max_concurrent_namespaces = 5,
             },
             .stats = { 0 },
             .sockets_hashtable = { 0 },

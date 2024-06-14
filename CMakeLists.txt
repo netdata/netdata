@@ -729,6 +729,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setenv.h
         src/libnetdata/os/strndup.c
         src/libnetdata/os/strndup.h
+        src/libnetdata/safe_fork/safe_fork.c
+        src/libnetdata/safe_fork/safe_fork.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
