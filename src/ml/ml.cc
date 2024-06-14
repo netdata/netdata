@@ -1230,6 +1230,9 @@ ml_detect_main(void *arg)
             if (!rh->ml_host)
                 continue;
 
+            if (Cfg.detection_stop)
+                break;
+
             ml_host_detect_once((ml_host_t *) rh->ml_host);
         }
         rrd_rdunlock();
@@ -1844,7 +1847,7 @@ void ml_start_threads() {
     }
 }
 
-void ml_stop_threads()
+void ml_stop_threads(bool wait_to_join)
 {
     if (!Cfg.enable_anomaly_detection)
         return;
@@ -1853,6 +1856,9 @@ void ml_stop_threads()
     Cfg.training_stop = true;
 
     if (!Cfg.detection_thread)
+        return;
+
+    if (!wait_to_join)
         return;
 
     nd_thread_join(Cfg.detection_thread);
