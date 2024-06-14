@@ -78,6 +78,22 @@ struct command {
         },
     },
     {
+        .name = "igt-list-gpus",
+        .params = "-L",
+        .search = {
+            [0] = "intel_gpu_top",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "igt-device-json",
+        .params = "-d {{device}} -J -s {{interval}}",
+        .search = {
+            [0] = "intel_gpu_top",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "igt-json",
         .params = "-J -s {{interval}}",
         .search = {
@@ -181,7 +197,8 @@ bool check_string(const char *str, size_t index, char *err, size_t err_size) {
         if(!((c >= 'A' && c <= 'Z') ||
              (c >= 'a' && c <= 'z') ||
              (c >= '0' && c <= '9') ||
-              c == ' ' || c == '_' || c == '-' || c == '/' || c == '.' || c == ',')) {
+              c == ' ' || c == '_' || c == '-' || c == '/' || 
+              c == '.' || c == ',' || c == ':' || c == '=')) {
             snprintf(err, err_size, "command line argument No %zu includes invalid character '%c'", index, c);
             return false;
         }
