@@ -107,7 +107,7 @@ sudo ./edit-config go.d/phpfpm.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -140,7 +140,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 Collecting data from a local instance over HTTP.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -154,7 +154,7 @@ jobs:
 
 Collecting data from a local instance over Unix socket.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -168,7 +168,7 @@ jobs:
 
 Collecting data from a local instance over TCP socket.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -185,7 +185,7 @@ jobs:
 Collecting metrics from local and remote instances.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

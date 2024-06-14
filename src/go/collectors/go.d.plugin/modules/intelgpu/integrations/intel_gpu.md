@@ -122,7 +122,7 @@ sudo ./edit-config go.d/intelgpu.conf
 The following options can be defined globally: update_every.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -137,7 +137,7 @@ The following options can be defined globally: update_every.
 
 Allows you to override the default data collection interval.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

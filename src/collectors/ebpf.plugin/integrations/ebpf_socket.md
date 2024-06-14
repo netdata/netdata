@@ -176,7 +176,7 @@ sudo ./edit-config ebpf.d/network.conf
 All options are defined inside section `[global]`. Options inside `network connections` are ignored for while.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

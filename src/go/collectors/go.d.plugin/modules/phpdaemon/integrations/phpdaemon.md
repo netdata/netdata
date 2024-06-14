@@ -176,7 +176,7 @@ sudo ./edit-config go.d/phpdaemon.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -206,7 +206,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 A basic example configuration.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -220,7 +220,7 @@ jobs:
 
 HTTP authentication.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -236,7 +236,7 @@ jobs:
 
 HTTPS with self-signed certificate.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -254,7 +254,7 @@ jobs:
 Collecting metrics from local and remote instances.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

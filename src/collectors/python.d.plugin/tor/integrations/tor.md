@@ -119,7 +119,7 @@ Additionally, the following collapsed table contains all the options that can be
 Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -140,7 +140,7 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 A basic TCP configuration. `local_addr` is ommited and will default to `127.0.0.1`
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 local_tcp:
@@ -155,7 +155,7 @@ local_tcp:
 
 A basic local socket configuration
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 local_socket:
