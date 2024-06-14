@@ -98,7 +98,7 @@ names:
 
 ## Title bar
 
-When you start interacting with a chart, you'll notice valuable information on the top bar:
+When you start interacting with a chart, you'll notice valuable information on the title bar:
 
 <img src="https://github.com/netdata/netdata/assets/70198089/75d700de-bc7d-4b96-b73d-7b248b83afea" width="900"/>
 
