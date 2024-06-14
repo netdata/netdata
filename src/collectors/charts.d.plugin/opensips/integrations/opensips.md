@@ -125,7 +125,7 @@ The config file is sourced by the charts.d plugin. It's a standard bash file.
 The following collapsed table contains all the options that can be configured for the opensips collector.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

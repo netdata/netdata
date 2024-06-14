@@ -123,7 +123,7 @@ sudo ./edit-config go.d/sensors.conf
 The following options can be defined globally: update_every.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -139,7 +139,7 @@ The following options can be defined globally: update_every.
 
 The executable is not in the directories specified in the PATH environment variable.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

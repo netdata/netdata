@@ -117,7 +117,7 @@ The following options can be defined globally: priority, penalty, autodetection_
 Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
 
 
-<details><summary>Config options per job</summary>
+<details open><summary>Config options per job</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -148,7 +148,7 @@ localhost:
 
 A typical configuration using an IPv4 endpoint
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 local_ipv4:
@@ -162,7 +162,7 @@ local_ipv4:
 
 A typical configuration using an IPv6 endpoint
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 local_ipv6:

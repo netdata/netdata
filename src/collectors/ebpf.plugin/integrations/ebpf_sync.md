@@ -129,7 +129,7 @@ sudo ./edit-config ebpf.d/sync.conf
 This configuration file have two different sections. The `[global]` overwrites all default options, while `[syscalls]` allow user to select the syscall to monitor.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

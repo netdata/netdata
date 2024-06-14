@@ -163,7 +163,7 @@ sudo ./edit-config go.d/cassandra.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -200,7 +200,7 @@ jobs:
 
 Local server with basic HTTP authentication.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -216,7 +216,7 @@ jobs:
 
 Local server with enabled HTTPS and self-signed certificate.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -234,7 +234,7 @@ jobs:
 Collecting metrics from local and remote instances.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

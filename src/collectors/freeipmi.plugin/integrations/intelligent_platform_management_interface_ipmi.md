@@ -167,7 +167,7 @@ To display a help message listing the available command line options:
 ```
 
 
-<details><summary>Command options</summary>
+<details open><summary>Command options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -213,7 +213,7 @@ Basic example decreasing data collection frequency. The minimum `update every` i
 
 Append to `command options =` the options you need.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 [plugin:freeipmi]
@@ -251,7 +251,7 @@ ID  | Name             | Type                     | State    | Reading    | Unit
 `freeipmi.plugin` supports the option `ignore` that accepts a comma separated list of sensor IDs to ignore. To configure it set on `netdata.conf`:
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 [plugin:freeipmi]

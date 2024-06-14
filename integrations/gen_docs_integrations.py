@@ -61,8 +61,10 @@ def clean_and_write(md, path):
     Then it writes the buffer on the file provided.
     """
     # clean first, replace
-    md = md.replace("{% details summary=\"", "<details><summary>").replace(
-        "\" %}", "</summary>\n").replace("{% /details %}", "</details>\n")
+    md = md.replace("{% details summary=\"", "<details><summary>")
+    md = md.replace("{% details open=true summary=\"", "<details open><summary>")
+    md = md.replace("\" %}", "</summary>\n")
+    md = md.replace("{% /details %}", "</details>\n")
 
     path.write_text(md)
 

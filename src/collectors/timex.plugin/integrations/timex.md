@@ -113,7 +113,7 @@ sudo ./edit-config netdata.conf
 
 At least one option ('clock synchronization state', 'time offset') needs to be enabled for this collector to run.
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -129,7 +129,7 @@ At least one option ('clock synchronization state', 'time offset') needs to be e
 
 A basic configuration example.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 [plugin:timex]

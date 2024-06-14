@@ -118,7 +118,7 @@ sudo ./edit-config go.d/openvpn_status_log.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -135,7 +135,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 Collect metrics of all users.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

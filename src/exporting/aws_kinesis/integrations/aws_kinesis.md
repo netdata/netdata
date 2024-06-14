@@ -62,7 +62,7 @@ Netdata automatically computes a partition key for every record with the purpose
 The following options can be defined for this exporter.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

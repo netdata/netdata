@@ -113,7 +113,7 @@ sudo ./edit-config go.d/couchdb.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -145,7 +145,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 An example configuration.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -160,7 +160,7 @@ jobs:
 Local server with basic HTTP authentication, node name and multiple databases defined. Make sure to match the node name with the `NODENAME` value in your CouchDB's `etc/vm.args` file.  Typically, this is of the form `couchdb@fully.qualified.domain.name` in a cluster, or `couchdb@127.0.0.1` for a single-node server.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -181,7 +181,7 @@ jobs:
 Collecting metrics from local and remote instances.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

@@ -144,7 +144,7 @@ sudo ./edit-config go.d/systemdunits.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -195,7 +195,7 @@ includes:
 
 Collect state of all service type units.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -210,7 +210,7 @@ jobs:
 
 Collect state of one specific unit.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -225,7 +225,7 @@ jobs:
 
 Collect state of all units.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -243,7 +243,7 @@ jobs:
 Collect state of all service and socket type units.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

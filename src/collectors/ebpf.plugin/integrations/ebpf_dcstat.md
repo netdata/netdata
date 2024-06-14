@@ -155,7 +155,7 @@ sudo ./edit-config ebpf.d/dcstat.conf
 All options are defined inside section `[global]`.
 
 
-<details><summary>Config option</summary>
+<details open><summary>Config option</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

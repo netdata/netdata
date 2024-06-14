@@ -97,7 +97,7 @@ sudo ./edit-config Config options
 
 
 
-<details><summary></summary>
+<details open><summary></summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
