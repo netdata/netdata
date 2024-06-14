@@ -119,7 +119,7 @@ Along with viewing chart type, context and units, on this bar you have access to
 - **Enter fullscreen mode**: expand the current chart to the full size of your screen.
 - **User settings**: save your settings for the chart at hand, so it persists across dashboard reloads.
   - Personal has the top priority.
-  - Room and Space wide settings for a chart are shared across all users that don't have personal setting for it. 
+  - Room and Space settings for a chart are shared across all users who don't have personal settings for it. 
 - **Drag and Drop the chart to a Dashboard**: add the chart to an existing custom [Dashboard](/docs/dashboards-and-charts/dashboards-tab.md) or directly create a new one that includes the chart.
 
 ## Definition bar
