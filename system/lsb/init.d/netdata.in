@@ -47,18 +47,24 @@ service_start() {
 	
 	chown @netdata_user_POST@:@netdata_user_POST@ $PIDFILE_PATH
 	
-	log_daemon_msg "Starting real-time performance monitoring" "netdata"
+	log_success_msg "Starting real-time performance monitoring"
 	start_daemon -p $PIDFILE $DAEMON_PATH/$DAEMON $DAEMONOPTS
 	RETVAL=$?
-	log_end_msg $RETVAL
+	case "${RETVAL}" in
+		0) log_success_msg "Started real-time performance monitoring" ;;
+		*) log_error_msg "Failed to start real-time performance monitoring" ;;
+	esac
 	return $RETVAL
 }
 
 service_stop() {
-	log_daemon_msg "Stopping real-time performance monitoring" "netdata"
+	log_success_msg "Stopping real-time performance monitoring"
 	killproc -p ${PIDFILE} $DAEMON_PATH/$DAEMON
 	RETVAL=$?
-	log_end_msg $RETVAL
+	case "${RETVAL}" in
+		0) log_success_msg "Stopped real-time performance monitoring" ;;
+		*) log_error_msg "Failed to stop real-time performance monitoring" ;;
+	esac
 
 	if [ $RETVAL -eq 0 ]; then
 		rm -f ${PIDFILE}
@@ -77,7 +83,7 @@ condrestart() {
 }
 
 service_status() {
-	status_of_proc -p $PIDFILE $DAEMON_PATH/$DAEMON netdata
+	pidofproc -p $PIDFILE $DAEMON_PATH/$DAEMON
 }
 
 

@@ -121,7 +121,11 @@ bool service_running(SERVICE_TYPE service) {
 
     sth->services |= service;
 
-    return !sth->stop_immediately && !netdata_exit && !nd_thread_signaled_to_cancel();
+	bool cancelled = false;
+	if (sth->type == SERVICE_THREAD_TYPE_NETDATA)
+		cancelled = nd_thread_signaled_to_cancel();
+
+    return !sth->stop_immediately && !netdata_exit && !cancelled;
 }
 
 void service_signal_exit(SERVICE_TYPE service) {
@@ -136,8 +140,16 @@ void service_signal_exit(SERVICE_TYPE service) {
         if((sth->services & service)) {
             sth->stop_immediately = true;
 
-            // this does not harm - it just raises a flag
-            nd_thread_signal_cancel(sth->netdata_thread);
+			switch(sth->type) {
+               default:
+               case SERVICE_THREAD_TYPE_NETDATA:
+                  nd_thread_signal_cancel(sth->netdata_thread);
+                  break;
+
+               case SERVICE_THREAD_TYPE_EVENT_LOOP:
+               case SERVICE_THREAD_TYPE_LIBUV:
+                  break;
+            }
 
             if(sth->request_quit_callback) {
                 spinlock_unlock(&service_globals.lock);
