@@ -102,7 +102,7 @@ When you start interacting with a chart, you'll notice valuable information on t
 
 <img src="https://github.com/netdata/netdata/assets/70198089/75d700de-bc7d-4b96-b73d-7b248b83afea" width="900"/>
 
-The Title bar elements are:
+The Title bar elements:
 
 - **Netdata icon**: this indicates that data is continuously being updated, this happens if [Time controls](/docs/dashboards-and-charts/visualization-date-and-time-controls.md#time-controls) are in Play or Force Play mode.
 - **Chart title**: on the chart title you can see the title together with the metric being displayed, as well as the unit of measurement.
