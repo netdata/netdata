@@ -1220,7 +1220,7 @@ ml_detect_main(void *arg)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    while (!Cfg.detection_stop) {
+    while (!Cfg.detection_stop && service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         heartbeat_next(&hb, USEC_PER_SEC);
 
@@ -1229,6 +1229,9 @@ ml_detect_main(void *arg)
         rrdhost_foreach_read(rh) {
             if (!rh->ml_host)
                 continue;
+
+            if (!service_running(SERVICE_COLLECTORS))
+                break;
 
             ml_host_detect_once((ml_host_t *) rh->ml_host);
         }
@@ -1266,6 +1269,7 @@ ml_detect_main(void *arg)
             }
         }
     }
+    Cfg.training_stop = true;
 
     return NULL;
 }
