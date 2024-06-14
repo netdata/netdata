@@ -308,7 +308,7 @@ executed internally by the caddy server.
 
 ```caddyfile
 netdata.example.org {
-  reverse_proxy netdata:19999
+  reverse_proxy host.docker.internal:19999
   tls admin@example.org
 }
 ```
@@ -318,11 +318,15 @@ netdata.example.org {
 After setting Caddyfile run this with `docker-compose up -d` to have a fully functioning Netdata setup behind an HTTP reverse
 proxy.
 
+Make sure Netdata bind to docker0 interface if you've custom `web.bind to` setting in `netdata.conf`.
+
 ```yaml
 version: '3'
 services:
   caddy:
     image: caddy:2
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # To access netdata running with "network_mode: host".
     ports:
       - "80:80"
       - "443:443"
@@ -333,9 +337,9 @@ services:
   netdata:
     image: netdata/netdata
     container_name: netdata
-    hostname: example.com # set to fqdn of host
-    restart: always
     pid: host
+    network_mode: host
+    restart: unless-stopped
     cap_add:
       - SYS_PTRACE
       - SYS_ADMIN
