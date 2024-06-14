@@ -75,6 +75,7 @@ typedef enum __attribute__((packed)) {
     BIB_LIB_LIBCAP,
     BIB_LIB_LIBCRYPTO,
     BIB_LIB_LIBYAML,
+    BIB_LIB_LIBMNL,
     BIB_PLUGIN_APPS,
     BIB_PLUGIN_LINUX_CGROUPS,
     BIB_PLUGIN_LINUX_CGROUP_NETWORK,
@@ -698,6 +699,14 @@ static struct {
             .json = "libyaml",
             .value = NULL,
         },
+        [BIB_LIB_LIBMNL] = {
+            .category = BIC_LIBS,
+            .type = BIT_BOOLEAN,
+            .analytics = "libmnl",
+            .print = "libmnl (library for working with netfilter)",
+            .json = "libmnl",
+            .value = NULL,
+        },
         [BIB_PLUGIN_APPS] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
@@ -1176,6 +1185,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef HAVE_LIBYAML
     build_info_set_status(BIB_LIB_LIBYAML, true);
+#endif
+#ifdef HAVE_LIBMNL
+    build_info_set_status(BIB_LIB_LIBMNL, true);
 #endif
 
 #ifdef ENABLE_PLUGIN_APPS
