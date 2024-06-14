@@ -96,8 +96,8 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
 
 static bool parse_config_value(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, bool strict) {
     JSONC_PARSE_SUBOBJECT(jobj, path, "database_lookup", config, parse_config_value_database_lookup, error, strict);
-    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "calculation", config->calculation, error, strict);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "units", config->units, error, strict);
+    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "calculation", config->calculation, error, false);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "units", config->units, error, false);
     JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "update_every", config->update_every, error, strict);
     return true;
 }
@@ -137,15 +137,15 @@ static bool parse_config(json_object *jobj, const char *path, RRD_ALERT_PROTOTYP
     // JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "source_type", dyncfg_source_type2id, ap->config.source_type, error, strict);
     // JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "source", ap->config.source, error, strict);
 
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "summary", ap->config.summary, error, strict);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "info", ap->config.info, error, strict);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "type", ap->config.type, error, strict);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "component", ap->config.component, error, strict);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "classification", ap->config.classification, error, strict);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "summary", ap->config.summary, error, false);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "info", ap->config.info, error, false);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "type", ap->config.type, error, false);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "component", ap->config.component, error, false);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "classification", ap->config.classification, error, false);
 
     JSONC_PARSE_SUBOBJECT(jobj, path, "value", &ap->config, parse_config_value, error, strict);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "conditions", &ap->config, parse_config_conditions, error, strict);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "action", &ap->config, parse_config_action, error, strict);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "conditions", &ap->config, parse_config_conditions, error, false);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "action", &ap->config, parse_config_action, error, false);
     JSONC_PARSE_SUBOBJECT(jobj, path, "match", &ap->match, parse_match, error, strict);
 
     return true;
@@ -227,6 +227,11 @@ static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, 
     if(!base->config.name && name)
         base->config.name = string_strdupz(name);
 
+    if(name && *name && string_strcmp(base->config.name, name) != 0) {
+        string_freez(base->config.name);
+        base->config.name = string_strdupz(name);
+    }
+
     int i = 1;
     for(RRD_ALERT_PROTOTYPE *ap = base; ap; ap = ap->_internal.next, i++) {
         if(ap->config.name != base->config.name) {
@@ -235,7 +240,7 @@ static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, 
         }
 
         if(!RRDCALC_HAS_DB_LOOKUP(ap) && !ap->config.calculation && strict) {
-            buffer_sprintf(error, "the rule No %d has neither database lookup nor calculation", i);
+            buffer_sprintf(error, "Item %d has neither database lookup nor calculation", i - 1);
             goto cleanup;
         }
 
@@ -244,13 +249,6 @@ static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, 
 
         if(ap->match.enabled)
             base->_internal.enabled = true;
-    }
-
-    if(string_strcmp(base->config.name, name) != 0) {
-        buffer_sprintf(error,
-                       "name parsed ('%s') does not match the name of the alert prototype ('%s')",
-                       string2str(base->config.name), name);
-        goto cleanup;
     }
 
     return base;
@@ -552,12 +550,15 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
             if(!nap)
                 code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
             else {
+                char *msg = "";
+
                 nap->config.source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
-                bool added = health_prototype_add(nap); // this swaps ap <-> nap
+                bool added = health_prototype_add(nap, &msg); // this swaps ap <-> nap
 
                 if(!added) {
                     health_prototype_free(nap);
-                    return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "required attributes are missing");
+                    if(!msg || !*msg) msg = "required attributes are missing";
+                    return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
                 }
                 else
                     freez(nap);
@@ -677,12 +678,14 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
                 if(!nap)
                     code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
                 else {
+                    char *msg = "";
                     nap->config.source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
-                    bool added = health_prototype_add(nap); // this swaps ap <-> nap
+                    bool added = health_prototype_add(nap, &msg); // this swaps ap <-> nap
 
                     if(!added) {
                         health_prototype_free(nap);
-                        return dyncfg_default_response( result, HTTP_RESP_BAD_REQUEST, "required attributes are missing");
+                        if(!msg || !*msg) msg = "required attributes are missing";
+                        return dyncfg_default_response( result, HTTP_RESP_BAD_REQUEST, msg);
                     }
                     else
                         freez(nap);
