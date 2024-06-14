@@ -1220,7 +1220,7 @@ ml_detect_main(void *arg)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    while (!Cfg.detection_stop) {
+    while (!Cfg.detection_stop && service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         heartbeat_next(&hb, USEC_PER_SEC);
 
@@ -1230,7 +1230,7 @@ ml_detect_main(void *arg)
             if (!rh->ml_host)
                 continue;
 
-            if (Cfg.detection_stop)
+            if (!service_running(SERVICE_COLLECTORS))
                 break;
 
             ml_host_detect_once((ml_host_t *) rh->ml_host);
@@ -1269,6 +1269,7 @@ ml_detect_main(void *arg)
             }
         }
     }
+    Cfg.training_stop = true;
 
     return NULL;
 }
@@ -1847,7 +1848,7 @@ void ml_start_threads() {
     }
 }
 
-void ml_stop_threads(bool wait_to_join)
+void ml_stop_threads()
 {
     if (!Cfg.enable_anomaly_detection)
         return;
@@ -1856,9 +1857,6 @@ void ml_stop_threads(bool wait_to_join)
     Cfg.training_stop = true;
 
     if (!Cfg.detection_thread)
-        return;
-
-    if (!wait_to_join)
         return;
 
     nd_thread_join(Cfg.detection_thread);
