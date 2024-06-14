@@ -127,6 +127,7 @@ The following options can be defined globally: update_every.
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | update_every | Data collection frequency. | 1 | no |
+| device | Select a specific GPU using [supported filter](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html#DESCRIPTION). |  | no |
 
 </details>
 
