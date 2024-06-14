@@ -14,11 +14,12 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/logger"
 )
 
-func newIntelGpuTopExec(ndsudoPath string, updateEvery int, log *logger.Logger) (*intelGpuTopExec, error) {
+func newIntelGpuTopExec(log *logger.Logger, ndsudoPath string, updateEvery int, device string) (*intelGpuTopExec, error) {
 	topExec := &intelGpuTopExec{
 		Logger:             log,
 		ndsudoPath:         ndsudoPath,
 		updateEvery:        updateEvery,
+		device:             device,
 		firstSampleTimeout: time.Second * 3,
 	}
 
@@ -34,6 +35,7 @@ type intelGpuTopExec struct {
 
 	ndsudoPath         string
 	updateEvery        int
+	device             string
 	firstSampleTimeout time.Duration
 
 	cmd  *exec.Cmd
@@ -44,7 +46,13 @@ type intelGpuTopExec struct {
 }
 
 func (e *intelGpuTopExec) run() error {
-	cmd := exec.Command(e.ndsudoPath, "igt-json", "--interval", e.calcIntervalArg())
+	var cmd *exec.Cmd
+
+	if e.device != "" {
+		cmd = exec.Command(e.ndsudoPath, "igt-device-json", "--interval", e.calcIntervalArg(), "--device", e.device)
+	} else {
+		cmd = exec.Command(e.ndsudoPath, "igt-json", "--interval", e.calcIntervalArg())
+	}
 
 	e.Debugf("executing '%s'", cmd)
 
@@ -146,11 +154,8 @@ func (e *intelGpuTopExec) stop() error {
 func (e *intelGpuTopExec) calcIntervalArg() string {
 	// intel_gpu_top appends the end marker ("},\n") of the previous sample to the beginning of the next sample.
 	// interval must be < than 'firstSampleTimeout'
-	var interval int
-	m := min(e.updateEvery, int(e.firstSampleTimeout.Seconds()))
-	if m <= 1 {
-		interval = 900
-	} else {
+	interval := 900
+	if m := min(e.updateEvery, int(e.firstSampleTimeout.Seconds())); m > 1 {
 		interval = m*1000 - 500 // milliseconds
 	}
 	return strconv.Itoa(interval)

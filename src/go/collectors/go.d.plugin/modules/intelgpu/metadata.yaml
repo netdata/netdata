@@ -60,6 +60,10 @@ modules:
               description: Data collection frequency.
               default_value: 1
               required: false
+            - name: device
+              description: 'Select a specific GPU using [supported filter](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html#DESCRIPTION).'
+              default_value: ""
+              required: false
         examples:
           folding:
             title: Config
