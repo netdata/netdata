@@ -2578,7 +2578,7 @@ if(BUILD_FOR_PACKAGING)
                 DESTINATION lib/systemd/system)
         install(DIRECTORY
                 COMPONENT netdata
-                DESTINATION lib/systemd/journald@netdata.conf.d
+                DESTINATION lib/systemd/journald@netdata.conf.d)
         install(FILES
                 system/systemd/journald@netdata.conf
                 COMPONENT netdata
