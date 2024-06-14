@@ -395,12 +395,14 @@ void health_prototype_hash_id(RRD_ALERT_PROTOTYPE *ap) {
     sql_alert_store_config(ap);
 }
 
-bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
+bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, char **msg) {
     if(!ap->match.is_template) {
         if(!ap->match.on.chart) {
             netdata_log_error(
                 "HEALTH: alert '%s' does not define a instance (parameter 'on'). Source: %s",
                 string2str(ap->config.name), string2str(ap->config.source));
+            if(msg)
+                *msg = "missing match 'on' parameter for instance";
             return false;
         }
     }
@@ -409,6 +411,8 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
             netdata_log_error(
                 "HEALTH: alert '%s' does not define a context (parameter 'on'). Source: %s",
                 string2str(ap->config.name), string2str(ap->config.source));
+            if(msg)
+                *msg = "missing match 'on' parameter for context";
             return false;
         }
     }
@@ -417,6 +421,8 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
         netdata_log_error(
             "HEALTH: alert '%s' has no frequency (parameter 'every'). Source: %s",
             string2str(ap->config.name), string2str(ap->config.source));
+        if(msg)
+            *msg = "missing update frequency";
         return false;
     }
 
@@ -424,6 +430,8 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
         netdata_log_error(
             "HEALTH: alert '%s' is useless (no db lookup, no calculation, no warning and no critical expressions). Source: %s",
             string2str(ap->config.name), string2str(ap->config.source));
+        if(msg)
+            *msg = "no db lookup, calculation and warning/critical conditions";
         return false;
     }
 

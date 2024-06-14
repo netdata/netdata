@@ -651,7 +651,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                 lookup_data_source_from_rrdr_options(ap);
                 dims_grouping_from_rrdr_options(ap);
                 replace_green_red(ap, green, red);
-                health_prototype_add(ap);
+                health_prototype_add(ap, NULL);
                 freez(ap);
             }
 
@@ -833,7 +833,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         lookup_data_source_from_rrdr_options(ap);
         dims_grouping_from_rrdr_options(ap);
         replace_green_red(ap, green, red);
-        health_prototype_add(ap);
+        health_prototype_add(ap, NULL);
         freez(ap);
     }
 
