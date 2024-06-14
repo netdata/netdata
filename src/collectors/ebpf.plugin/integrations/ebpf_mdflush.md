@@ -116,7 +116,7 @@ sudo ./edit-config ebpf.d/mdflush.conf
 All options are defined inside section `[global]`.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

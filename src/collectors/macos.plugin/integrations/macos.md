@@ -204,7 +204,7 @@ There are three sections in the file which you can configure:
 - `[plugin:macos:iokit]` - Enable or disable monitoring for storage device.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -255,7 +255,7 @@ There are three sections in the file which you can configure:
 
 A basic example that discards swap monitoring
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 [plugin:macos:sysctl]
@@ -270,7 +270,7 @@ A basic example that discards swap monitoring
 
 A basic example that discards swap monitoring
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 [plugin:macos:mach_smi]

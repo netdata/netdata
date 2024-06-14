@@ -114,7 +114,7 @@ sudo ./edit-config go.d/nginxvts.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -154,7 +154,7 @@ jobs:
 
 Basic HTTP authentication.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -171,7 +171,7 @@ jobs:
 Do not validate server certificate chain and hostname.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -189,7 +189,7 @@ jobs:
 Collecting metrics from local and remote instances.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

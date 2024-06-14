@@ -139,7 +139,7 @@ In addition, to make `Squid` [native log format](https://wiki.squid-cache.org/Fe
 | hierarchy   | %Sh/%<a           | Hierarchy code and server address. |
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

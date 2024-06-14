@@ -148,7 +148,7 @@ You can get the available options running:
 ````
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -172,7 +172,7 @@ Monitor all metrics available.
 
 Monitor CPU cycles.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 [plugin:perf]

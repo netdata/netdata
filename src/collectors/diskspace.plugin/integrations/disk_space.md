@@ -119,7 +119,7 @@ sudo ./edit-config netdata.conf
 
 You can also specify per mount point `[plugin:proc:diskspace:mountpoint]`
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

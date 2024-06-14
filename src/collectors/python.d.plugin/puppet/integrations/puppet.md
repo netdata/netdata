@@ -118,7 +118,7 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 > - A secured PuppetDB config may require a client certificate. This does not apply to the default PuppetDB configuration though.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -151,7 +151,7 @@ puppetserver:
 
 An example using a TLS certificate
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 puppetdb:
@@ -170,7 +170,7 @@ puppetdb:
 Collecting metrics from local and remote instances.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 puppetserver1:

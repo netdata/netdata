@@ -129,7 +129,7 @@ Additionally, the following collapsed table contains all the options that can be
 Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -155,7 +155,7 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 example pulling some hourly temperature data, a chart for today forecast (mean,min,max) and another chart for current.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 temperature:
@@ -227,7 +227,7 @@ temperature:
 
 example showing a read_csv from a url and some light pandas data wrangling.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 example_csv:
@@ -255,7 +255,7 @@ example_csv:
 
 example showing a read_json from a url and some light pandas data wrangling.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 example_json:
@@ -282,7 +282,7 @@ example_json:
 
 example showing a read_xml from a url and some light pandas data wrangling.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 example_xml:
@@ -308,7 +308,7 @@ example_xml:
 
 example showing a read_sql from a postgres database using sqlalchemy.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 sql:

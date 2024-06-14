@@ -117,7 +117,7 @@ sudo ./edit-config netdata.conf
 
 
 
-<details><summary>The main configuration file.</summary>
+<details open><summary>The main configuration file.</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

@@ -144,7 +144,7 @@ sudo ./edit-config go.d/nvidia_smi.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -162,7 +162,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 Use CSV format when requesting GPU information.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -176,7 +176,7 @@ jobs:
 
 The executable is not in the directories specified in the PATH environment variable.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

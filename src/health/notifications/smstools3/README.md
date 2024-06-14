@@ -53,7 +53,7 @@ sudo ./edit-config health_alarm_notify.conf
 
 The following options can be defined for this notification
 
-<details><summary>Config Options</summary>
+<details open><summary>Config Options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

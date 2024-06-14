@@ -109,7 +109,7 @@ sudo ./edit-config go.d/x509check.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -133,7 +133,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 Website certificate.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -147,7 +147,7 @@ jobs:
 
 Local file certificate.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -161,7 +161,7 @@ jobs:
 
 SMTP certificate.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -178,7 +178,7 @@ jobs:
 Check the expiration status of the multiple websites' certificates.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
