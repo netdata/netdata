@@ -223,6 +223,12 @@ func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 			tgt.IPAddress = local6
 		}
 
+		// quick support for https://github.com/netdata/netdata/pull/17866
+		// TODO: create both ipv4 and ipv6 targets?
+		if tgt.IPAddress == "*" {
+			tgt.IPAddress = local4
+		}
+
 		tgt.Address = net.JoinHostPort(tgt.IPAddress, tgt.Port)
 
 		hash, err := calcHash(tgt)

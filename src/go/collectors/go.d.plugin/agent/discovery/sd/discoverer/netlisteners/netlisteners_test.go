@@ -22,6 +22,7 @@ func TestDiscoverer_Discover(t *testing.T) {
 				cli.addListener("TCP|0.0.0.0|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
 				cli.addListener("TCP|192.0.2.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
 				cli.addListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				cli.addListener("TCP46|*|80|/usr/sbin/httpd -k start")
 				cli.addListener("TCP6|::|80|/usr/sbin/apache2 -k start")
 				cli.addListener("TCP|0.0.0.0|80|/usr/sbin/apache2 -k start")
 				cli.addListener("TCP|0.0.0.0|8080|/usr/sbin/docker-proxy -proto tcp -host-ip 0.0.0.0 -host-port 8080 -container-ip 172.17.0.4 -container-port 80")
@@ -39,6 +40,14 @@ func TestDiscoverer_Discover(t *testing.T) {
 						Address:   "127.0.0.1:323",
 						Comm:      "chronyd",
 						Cmdline:   "/usr/sbin/chronyd",
+					}),
+					withHash(&target{
+						Protocol:  "TCP46",
+						IPAddress: "127.0.0.1",
+						Port:      "80",
+						Address:   "127.0.0.1:80",
+						Comm:      "httpd",
+						Cmdline:   "/usr/sbin/httpd -k start",
 					}),
 					withHash(&target{
 						Protocol:  "TCP",
