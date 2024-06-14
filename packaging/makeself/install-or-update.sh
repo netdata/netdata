@@ -124,6 +124,10 @@ progress "Install logrotate configuration for netdata"
 
 install_netdata_logrotate || run_failed "Cannot install logrotate file for netdata."
 
+progress "Install journald configuration for netdata"
+
+install_netdata_journald_conf || run_failed "Cannot install journald file for netdata."
+
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
 

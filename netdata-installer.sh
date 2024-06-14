@@ -799,6 +799,10 @@ progress "Install logrotate configuration for netdata"
 
 install_netdata_logrotate
 
+progress "Install journald configuration for netdata"
+
+install_netdata_journald_conf
+
 # -----------------------------------------------------------------------------
 progress "Read installation options from netdata.conf"
 
