@@ -4,6 +4,7 @@ package whoisquery
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -16,7 +17,7 @@ type provider interface {
 	remainingTime() (float64, error)
 }
 
-type fromNet struct {
+type whoisClient struct {
 	domainAddress string
 	client        *whois.Client
 }
@@ -26,35 +27,62 @@ func newProvider(config Config) (provider, error) {
 	client := whois.NewClient()
 	client.SetTimeout(config.Timeout.Duration())
 
-	return &fromNet{
+	return &whoisClient{
 		domainAddress: domain,
 		client:        client,
 	}, nil
 }
 
-func (f *fromNet) remainingTime() (float64, error) {
-	raw, err := f.client.Whois(f.domainAddress)
+func (c *whoisClient) remainingTime() (float64, error) {
+	info, err := c.queryWhoisInfo()
 	if err != nil {
 		return 0, err
 	}
 
-	result, err := whoisparser.Parse(raw)
-	if err != nil {
-		return 0, err
+	if info.Domain.ExpirationDate == "" {
+		if !strings.HasPrefix(c.domainAddress, "=") {
+			// some servers support requesting extended data
+			// https://github.com/netdata/netdata/issues/17907#issuecomment-2171758380
+			c.domainAddress = fmt.Sprintf("= %s", c.domainAddress)
+			return c.remainingTime()
+		}
 	}
 
-	// https://community.netdata.cloud/t/whois-query-monitor-cannot-parse-expiration-time/3485
-	if strings.Contains(result.Domain.ExpirationDate, " ") {
-		if v, err := time.Parse("2006.01.02 15:04:05", result.Domain.ExpirationDate); err == nil {
+	return parseWhoisInfoExpirationDate(info)
+}
+
+func (c *whoisClient) queryWhoisInfo() (*whoisparser.WhoisInfo, error) {
+	resp, err := c.client.Whois(c.domainAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := whoisparser.Parse(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &info, nil
+}
+
+func parseWhoisInfoExpirationDate(info *whoisparser.WhoisInfo) (float64, error) {
+	if info == nil {
+		return 0, errors.New("nil Whois Info")
+	}
+
+	date := info.Domain.ExpirationDate
+	if date == "" {
+		return 0, errors.New("no expiration date")
+	}
+
+	if strings.Contains(date, " ") {
+		// https://community.netdata.cloud/t/whois-query-monitor-cannot-parse-expiration-time/3485
+		if v, err := time.Parse("2006.01.02 15:04:05", date); err == nil {
 			return time.Until(v).Seconds(), nil
 		}
 	}
 
-	if result.Domain.ExpirationDate == "" {
-		return 0, errors.New("no expiration date")
-	}
-
-	expire, err := dateparse.ParseAny(result.Domain.ExpirationDate)
+	expire, err := dateparse.ParseAny(date)
 	if err != nil {
 		return 0, err
 	}
