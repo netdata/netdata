@@ -6,7 +6,19 @@
 
 **Merged pull requests:**
 
+- Fix Caddy setup in Install Netdata with Docker [\#17901](https://github.com/netdata/netdata/pull/17901) ([powerman](https://github.com/powerman))
+- sys\_block\_zram: don't use "/dev" [\#17900](https://github.com/netdata/netdata/pull/17900) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17897](https://github.com/netdata/netdata/pull/17897) ([netdatabot](https://github.com/netdatabot))
+- go.d ll netlisteners add support for wildcard address [\#17896](https://github.com/netdata/netdata/pull/17896) ([ilyam8](https://github.com/ilyam8))
+- integrations make `<details>` open [\#17895](https://github.com/netdata/netdata/pull/17895) ([ilyam8](https://github.com/ilyam8))
+- allow alerts to be created without too many requirements [\#17894](https://github.com/netdata/netdata/pull/17894) ([ktsaou](https://github.com/ktsaou))
+- Improve ml thread termination during agent shutdown [\#17889](https://github.com/netdata/netdata/pull/17889) ([stelfrag](https://github.com/stelfrag))
+- Update netdata-charts.md [\#17888](https://github.com/netdata/netdata/pull/17888) ([Ancairon](https://github.com/Ancairon))
+- Regenerate integrations.js [\#17886](https://github.com/netdata/netdata/pull/17886) ([netdatabot](https://github.com/netdatabot))
 - Restore ML thread termination to original order [\#17885](https://github.com/netdata/netdata/pull/17885) ([stelfrag](https://github.com/stelfrag))
+- go.d intelgpu add an option to select specific GPU [\#17884](https://github.com/netdata/netdata/pull/17884) ([ilyam8](https://github.com/ilyam8))
+- ndsudo update intel\_gpu\_top [\#17883](https://github.com/netdata/netdata/pull/17883) ([ilyam8](https://github.com/ilyam8))
+- add netdata journald configuration [\#17882](https://github.com/netdata/netdata/pull/17882) ([ilyam8](https://github.com/ilyam8))
 - fix detect\_libc in installer [\#17880](https://github.com/netdata/netdata/pull/17880) ([ilyam8](https://github.com/ilyam8))
 - update bundled UI to v6.138.0 [\#17879](https://github.com/netdata/netdata/pull/17879) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17878](https://github.com/netdata/netdata/pull/17878) ([netdatabot](https://github.com/netdatabot))
@@ -400,17 +412,6 @@
 - Increase number of pages per extent in dbengine [\#17343](https://github.com/netdata/netdata/pull/17343) ([stelfrag](https://github.com/stelfrag))
 - fix invalid var in prepare\_offline\_install\_source\(\) [\#17342](https://github.com/netdata/netdata/pull/17342) ([ilyam8](https://github.com/ilyam8))
 - remove unused install\_go.sh [\#17339](https://github.com/netdata/netdata/pull/17339) ([ilyam8](https://github.com/ilyam8))
-- fix proc-power-supply charts family [\#17338](https://github.com/netdata/netdata/pull/17338) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/likexian/whois from 1.15.1 to 1.15.2 in /src/go/collectors/go.d.plugin [\#17337](https://github.com/netdata/netdata/pull/17337) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/vmware/govmomi from 0.36.2 to 0.36.3 in /src/go/collectors/go.d.plugin [\#17336](https://github.com/netdata/netdata/pull/17336) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/prometheus/common from 0.51.1 to 0.52.2 in /src/go/collectors/go.d.plugin [\#17335](https://github.com/netdata/netdata/pull/17335) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Add repo config for Amazon Linux 2023. [\#17330](https://github.com/netdata/netdata/pull/17330) ([PaulSzymanski](https://github.com/PaulSzymanski))
-- Add power consumption metric to power supply monitoring module [\#17329](https://github.com/netdata/netdata/pull/17329) ([eyusupov](https://github.com/eyusupov))
-- Enable Sentry for Ubuntu and Debian native packages. [\#17327](https://github.com/netdata/netdata/pull/17327) ([Ferroin](https://github.com/Ferroin))
-- go.d: schema windows: fix url placeholder scheme [\#17326](https://github.com/netdata/netdata/pull/17326) ([ilyam8](https://github.com/ilyam8))
-- go.d: schemas: add missing "body" and "method" [\#17325](https://github.com/netdata/netdata/pull/17325) ([ilyam8](https://github.com/ilyam8))
-- remove old overview infrastructure and add home tab doc [\#17323](https://github.com/netdata/netdata/pull/17323) ([Ancairon](https://github.com/Ancairon))
-- Drop generic bitmap implementation. [\#17322](https://github.com/netdata/netdata/pull/17322) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 

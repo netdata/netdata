@@ -72,7 +72,7 @@ func TestWhoisQuery_Init(t *testing.T) {
 
 				var typeOK bool
 				if test.providerType == net {
-					_, typeOK = whoisquery.prov.(*fromNet)
+					_, typeOK = whoisquery.prov.(*whoisClient)
 				}
 
 				assert.True(t, typeOK)
