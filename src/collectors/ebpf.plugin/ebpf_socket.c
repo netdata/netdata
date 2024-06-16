@@ -2379,7 +2379,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_CONNECTION_TCP_V4,
-        .dimension = EBPF_COMMON_UNITS_CONNECTIONS
+        .dimension = "connections"
     };
 
     static ebpf_systemd_args_t data_tcp_v6 = {
@@ -2393,7 +2393,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_CONNECTION_TCP_V6,
-        .dimension = "connection"
+        .dimension = "connections"
     };
 
     static ebpf_systemd_args_t data_bandwith_recv = {
@@ -2407,7 +2407,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_RECV,
-        .dimension = "connection"
+        .dimension = "bandwidth"
     };
 
     static ebpf_systemd_args_t data_bandwith_sent = {
@@ -2421,7 +2421,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_SENT,
-        .dimension = EBPF_COMMON_UNITS_KILOBITS
+        .dimension = "bandwidth"
     };
 
     static ebpf_systemd_args_t data_tcp_cleanup = {
@@ -2554,11 +2554,11 @@ static void ebpf_send_systemd_socket_charts()
         }
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_NET_APPS_BANDWIDTH_SENT);
-        write_chart_dimension("bits", (long long)ect->publish_socket.bytes_sent);
+        write_chart_dimension("bandwidth", (long long)ect->publish_socket.bytes_sent);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_NET_APPS_BANDWIDTH_RECV);
-        write_chart_dimension("bits", (long long)ect->publish_socket.bytes_received);
+        write_chart_dimension("bandwidth", (long long)ect->publish_socket.bytes_received);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS);
