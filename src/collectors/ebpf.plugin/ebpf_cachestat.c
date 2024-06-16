@@ -1205,19 +1205,19 @@ static void ebpf_send_systemd_cachestat_charts()
             continue;
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_CACHESTAT_HIT_RATIO_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_CACHESTAT_HIT_RATIO_CHART, "");
         write_chart_dimension("percentage", (long long)ect->publish_cachestat.ratio);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_CACHESTAT_DIRTY_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_CACHESTAT_DIRTY_CHART, "");
         write_chart_dimension("pages", (long long)ect->publish_cachestat.dirty);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_CACHESTAT_HIT_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_CACHESTAT_HIT_CHART, "");
         write_chart_dimension("hits", (long long)ect->publish_cachestat.hit);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_CACHESTAT_MISSES_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_CACHESTAT_MISSES_CHART, "");
         write_chart_dimension("misses", (long long)ect->publish_cachestat.miss);
         ebpf_write_end_chart();
     }

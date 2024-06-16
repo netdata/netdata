@@ -329,9 +329,9 @@ void ebpf_parse_cgroup_shm_data()
  */
 void ebpf_create_charts_on_systemd(ebpf_systemd_args_t *chart)
 {
-    ebpf_write_chart_cmd(NETDATA_SERVICE_FAMILY,
-                         chart->id,
+    ebpf_write_chart_cmd(chart->id,
                          chart->suffix,
+                         "",
                          chart->title,
                          chart->units,
                          chart->family,
