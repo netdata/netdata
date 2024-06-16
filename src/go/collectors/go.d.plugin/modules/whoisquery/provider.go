@@ -3,6 +3,7 @@
 package whoisquery
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -47,6 +48,10 @@ func (f *fromNet) remainingTime() (float64, error) {
 		if v, err := time.Parse("2006.01.02 15:04:05", result.Domain.ExpirationDate); err == nil {
 			return time.Until(v).Seconds(), nil
 		}
+	}
+
+	if result.Domain.ExpirationDate == "" {
+		return 0, errors.New("no expiration date")
 	}
 
 	expire, err := dateparse.ParseAny(result.Domain.ExpirationDate)
