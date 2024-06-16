@@ -276,7 +276,7 @@ static void ebpf_send_systemd_oomkill_charts()
         if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_OOMKILL_CHART)) ) {
             continue;
         }
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name,  NETDATA_OOMKILL_CHART);
+        ebpf_write_begin_chart(ect->name,  NETDATA_OOMKILL_CHART, "");
         write_chart_dimension(oomkill_publish_aggregated.dimension, (long long) ect->oomkill);
         ect->oomkill = 0;
         ebpf_write_end_chart();

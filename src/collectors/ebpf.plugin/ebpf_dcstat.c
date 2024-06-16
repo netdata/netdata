@@ -1139,22 +1139,22 @@ static void ebpf_send_systemd_dc_charts()
             continue;
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_DC_HIT_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_DC_HIT_CHART, "");
         write_chart_dimension("percentage", (long long) ect->publish_dc.ratio);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_DC_REFERENCE_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_DC_REFERENCE_CHART, "");
         write_chart_dimension("files", (long long) ect->publish_dc.cache_access);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_DC_REQUEST_NOT_CACHE_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_DC_REQUEST_NOT_CACHE_CHART, "");
         value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
                 (long long )ect->publish_dc.curr.file_system - (long long)ect->publish_dc.prev.file_system;
         ect->publish_dc.prev.file_system = ect->publish_dc.curr.file_system;
         write_chart_dimension("files", (long long) value);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_DC_REQUEST_NOT_FOUND_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_DC_REQUEST_NOT_FOUND_CHART, "");
         value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
                 (long long)ect->publish_dc.curr.not_found - (long long)ect->publish_dc.prev.not_found;
 
