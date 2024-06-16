@@ -59,7 +59,7 @@ modules:
               default_value: 0
               required: false
             - name: source
-              description: "Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file."
+              description: "Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file, smtp."
               default_value: ""
               required: false
             - name: days_until_expiration_warning
