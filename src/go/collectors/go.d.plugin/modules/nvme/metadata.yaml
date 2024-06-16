@@ -48,15 +48,15 @@ modules:
           - title: "For Netdata running in a Docker container: grant NVMe device access"
             description: |
               Your NVMe devices need to be accessible within the Docker container for Netdata to monitor them.
-              
+
               Include the following option in your `docker run` command or add the device mapping in your `docker-compose.yml` file:
-              
+
               - `docker run`
-              
+
                 ```bash
                 --device '/dev/nvme0n1:/dev/nvme0n1'
                 ```
-              
+
               - `docker-compose.yml`
 
                 ```yaml
