@@ -115,7 +115,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |:----|:-----------|:-------|:--------:|
 | update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| source | Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file. |  | no |
+| source | Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file, smtp. |  | no |
 | days_until_expiration_warning | Number of days before the alarm status is warning. | 30 | no |
 | days_until_expiration_critical | Number of days before the alarm status is critical. | 15 | no |
 | check_revocation_status | Whether to check the revocation status of the certificate. | no | no |
