@@ -2112,7 +2112,7 @@ int main(int argc, char **argv) {
                 st->init_routine();
 
             if(st->env_name)
-                setenv(st->env_name, st->enabled?"YES":"NO", 1);
+                setenv(st->env_name, st->enabled ? "YES" : "NO", 0);
 
             if(st->global_variable)
                 *st->global_variable = (st->enabled) ? true : false;
