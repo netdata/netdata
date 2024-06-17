@@ -434,3 +434,15 @@
       - TimescaleDB
       - prometheus
       - remote write
+- <<: *promexport
+  id: 'export-greptimedb'
+  meta:
+    <<: *meta
+    name: GreptimeDB
+    link: https://greptime.com/product/db
+    icon_filename: 'greptimedb.png'
+    keywords:
+      - export
+      - GreptimeDB
+      - prometheus
+      - remote write
