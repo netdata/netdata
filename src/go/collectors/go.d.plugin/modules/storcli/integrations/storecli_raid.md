@@ -71,11 +71,13 @@ Labels:
 |:-----------|:----------------|
 | controller_number | Controller number (index) |
 | model | Controller model |
+| driver_name | Controller driver (megaraid_sas or mpt3sas) |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
+| storcli.controller_health_status | healthy, unhealthy | status |
 | storcli.controller_status | optimal, degraded, partially_degraded, failed | status |
 | storcli.controller_bbu_status | healthy, unhealthy, na | status |
 
@@ -128,7 +130,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ storcli_controller_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.controller_status | RAID controller ${label:controller_number} health status is not optimal |
+| [ storcli_controller_health_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.controller_health_status | RAID controller ${label:controller_number} is unhealthy |
 | [ storcli_controller_bbu_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.controller_bbu_status | RAID controller ${label:controller_number} BBU is unhealthy |
 | [ storcli_phys_drive_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.phys_drive_errors | RAID physical drive c${label:controller_number}/e${label:enclosure_number}/s${label:slot_number} errors |
 | [ storcli_phys_drive_predictive_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.phys_drive_predictive_failures | RAID physical drive c${label:controller_number}/e${label:enclosure_number}/s${label:slot_number} predictive failures |
