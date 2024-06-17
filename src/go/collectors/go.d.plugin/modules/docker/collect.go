@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types"
 	typesContainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	typesImage "github.com/docker/docker/api/types/image"
 )
 
 func (d *Docker) collect() (map[string]int64, error) {
@@ -63,7 +64,7 @@ func (d *Docker) collectImages(mx map[string]int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration())
 	defer cancel()
 
-	images, err := d.client.ImageList(ctx, types.ImageListOptions{})
+	images, err := d.client.ImageList(ctx, typesImage.ListOptions{})
 	if err != nil {
 		return err
 	}
