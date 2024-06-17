@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.13.0...3.28)
 
 list(APPEND RHEL_DISTROS centos centos-stream rocky almalinux cloudlinux)
 list(APPEND SUSE_DISTROS opensuse-leap opensuse-tumbleweed)
-list(APPEND RPM_DISTROS rhel suse ol amzn fedora)
+list(APPEND RPM_DISTROS rhel opensuse ol amzn fedora)
 list(APPEND DEB_DISTROS debian ubuntu)
 
 set(DEB_GPG_KEY_SOURCE "https://repo.netdata.cloud/netdatabot.gpg.key")
