@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- go.d whoisquery: try requesting extended data if no expiration date [\#17913](https://github.com/netdata/netdata/pull/17913) ([ilyam8](https://github.com/ilyam8))
+- go.d whoisquery: check if exp date is empty [\#17911](https://github.com/netdata/netdata/pull/17911) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17910](https://github.com/netdata/netdata/pull/17910) ([netdatabot](https://github.com/netdatabot))
+- Update nvme/metadata: add how to use in a docker [\#17909](https://github.com/netdata/netdata/pull/17909) ([powerman](https://github.com/powerman))
+- Update x509check/metadata: add missing smtp schema [\#17908](https://github.com/netdata/netdata/pull/17908) ([powerman](https://github.com/powerman))
 - Fix Caddy setup in Install Netdata with Docker [\#17901](https://github.com/netdata/netdata/pull/17901) ([powerman](https://github.com/powerman))
 - sys\_block\_zram: don't use "/dev" [\#17900](https://github.com/netdata/netdata/pull/17900) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17897](https://github.com/netdata/netdata/pull/17897) ([netdatabot](https://github.com/netdatabot))
@@ -408,10 +413,6 @@
 - add try except [\#17352](https://github.com/netdata/netdata/pull/17352) ([Ancairon](https://github.com/Ancairon))
 - add Okta SSO integration [\#17351](https://github.com/netdata/netdata/pull/17351) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - revised node-tab document [\#17348](https://github.com/netdata/netdata/pull/17348) ([Ancairon](https://github.com/Ancairon))
-- add intel\_gpu\_top collector [\#17344](https://github.com/netdata/netdata/pull/17344) ([ilyam8](https://github.com/ilyam8))
-- Increase number of pages per extent in dbengine [\#17343](https://github.com/netdata/netdata/pull/17343) ([stelfrag](https://github.com/stelfrag))
-- fix invalid var in prepare\_offline\_install\_source\(\) [\#17342](https://github.com/netdata/netdata/pull/17342) ([ilyam8](https://github.com/ilyam8))
-- remove unused install\_go.sh [\#17339](https://github.com/netdata/netdata/pull/17339) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
