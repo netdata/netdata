@@ -51,7 +51,7 @@ modules:
           list:
             - name: update_every
               description: Data collection frequency.
-              default_value: 1
+              default_value: 60
               required: false
             - name: autodetection_retry
               description: Recheck interval in seconds. Zero means no recheck will be scheduled.
