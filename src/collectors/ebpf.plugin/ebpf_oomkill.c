@@ -55,9 +55,9 @@ static void ebpf_obsolete_specific_oomkill_charts(char *type, int update_every);
  */
 static void ebpf_obsolete_oomkill_services(ebpf_module_t *em, char *id)
 {
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_OOMKILL_CHART,
+                              "",
                               "Systemd service OOM kills.",
                               EBPF_OOMKILL_UNIT_KILLS,
                               NETDATA_EBPF_MEMORY_GROUP,

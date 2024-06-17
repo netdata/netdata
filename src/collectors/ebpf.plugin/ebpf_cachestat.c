@@ -330,9 +330,9 @@ static void ebpf_obsolete_specific_cachestat_charts(char *type, int update_every
  */
 static void ebpf_obsolete_cachestat_services(ebpf_module_t *em, char *id)
 {
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_CACHESTAT_HIT_RATIO_CHART,
+                              "",
                               "Hit ratio",
                               EBPF_COMMON_UNITS_PERCENTAGE,
                               NETDATA_CACHESTAT_SUBMENU,
@@ -341,9 +341,9 @@ static void ebpf_obsolete_cachestat_services(ebpf_module_t *em, char *id)
                               21100,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_CACHESTAT_DIRTY_CHART,
+                              "",
                               "Number of dirty pages",
                               EBPF_CACHESTAT_UNITS_PAGE,
                               NETDATA_CACHESTAT_SUBMENU,
@@ -352,9 +352,9 @@ static void ebpf_obsolete_cachestat_services(ebpf_module_t *em, char *id)
                               21101,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_CACHESTAT_HIT_CHART,
+                              "",
                               "Number of accessed files",
                               EBPF_CACHESTAT_UNITS_HITS,
                               NETDATA_CACHESTAT_SUBMENU,
@@ -363,9 +363,9 @@ static void ebpf_obsolete_cachestat_services(ebpf_module_t *em, char *id)
                               21102,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_CACHESTAT_MISSES_CHART,
+                              "",
                               "Files out of page cache",
                               EBPF_CACHESTAT_UNITS_MISSES,
                               NETDATA_CACHESTAT_SUBMENU,

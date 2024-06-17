@@ -445,9 +445,9 @@ static void ebpf_obsolete_specific_process_charts(char *type, ebpf_module_t *em)
  */
 static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
 {
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_SYSCALL_APPS_TASK_PROCESS,
+                              "",
                               "Process started",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_PROCESS_GROUP,
@@ -456,9 +456,9 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                               20065,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_SYSCALL_APPS_TASK_THREAD,
+                              "",
                               "Threads started",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_PROCESS_GROUP,
@@ -467,9 +467,9 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                               20066,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_SYSCALL_APPS_TASK_CLOSE,
+                              "",
                               "Tasks starts exit process.",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_PROCESS_GROUP,
@@ -478,9 +478,9 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                               20067,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_SYSCALL_APPS_TASK_EXIT,
+                              "",
                               "Tasks closed",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_PROCESS_GROUP,
@@ -490,9 +490,9 @@ static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
                               em->update_every);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                                  id,
+        ebpf_write_chart_obsolete(id,
                                   NETDATA_SYSCALL_APPS_TASK_ERROR,
+                                  "",
                                   "Errors to create process or threads.",
                                   EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_APPS_PROCESS_GROUP,

@@ -365,9 +365,9 @@ static void ebpf_obsolete_specific_fd_charts(char *type, ebpf_module_t *em);
  */
 static void ebpf_obsolete_fd_services(ebpf_module_t *em, char *id)
 {
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_SYSCALL_APPS_FILE_OPEN,
+                              "",
                               "Number of open files",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_FILE_GROUP,
@@ -377,9 +377,9 @@ static void ebpf_obsolete_fd_services(ebpf_module_t *em, char *id)
                               em->update_every);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                                  id,
+        ebpf_write_chart_obsolete(id,
                                   NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR,
+                                  "",
                                   "Fails to open files",
                                   EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_APPS_FILE_GROUP,
@@ -389,9 +389,9 @@ static void ebpf_obsolete_fd_services(ebpf_module_t *em, char *id)
                                   em->update_every);
     }
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_SYSCALL_APPS_FILE_CLOSED,
+                              "",
                               "Files closed",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_FILE_GROUP,
@@ -401,9 +401,9 @@ static void ebpf_obsolete_fd_services(ebpf_module_t *em, char *id)
                               em->update_every);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                                  id,
+        ebpf_write_chart_obsolete(id,
                                   NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
+                                  "",
                                   "Fails to close files",
                                   EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_APPS_FILE_GROUP,
