@@ -722,11 +722,11 @@ static void ebpf_send_systemd_swap_charts()
             continue;
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_MEM_SWAP_READ_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_MEM_SWAP_READ_CHART, "");
         write_chart_dimension("calls", (long long) ect->publish_systemd_swap.read);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_MEM_SWAP_WRITE_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_MEM_SWAP_WRITE_CHART, "");
         write_chart_dimension("calls", (long long) ect->publish_systemd_swap.write);
         ebpf_write_end_chart();
     }
