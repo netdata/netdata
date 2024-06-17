@@ -1888,70 +1888,70 @@ static void ebpf_send_systemd_vfs_charts(ebpf_module_t *em)
             continue;
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_FILE_DELETED);
+        ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_FILE_DELETED, "");
         write_chart_dimension("calls", ect->publish_systemd_vfs.unlink_call);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS);
+        ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS, "");
         write_chart_dimension("calls", ect->publish_systemd_vfs.write_call +
                                          ect->publish_systemd_vfs.writev_call);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR);
+            ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR, "");
             write_chart_dimension("calls", ect->publish_systemd_vfs.write_err +
                                              ect->publish_systemd_vfs.writev_err);
             ebpf_write_end_chart();
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
+        ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_VFS_READ_CALLS, "");
         write_chart_dimension("calls", ect->publish_systemd_vfs.read_call +
                                          ect->publish_systemd_vfs.readv_call);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR);
+            ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR, "");
             write_chart_dimension("calls", ect->publish_systemd_vfs.read_err +
                                              ect->publish_systemd_vfs.readv_err);
             ebpf_write_end_chart();
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES);
+        ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES, "");
         write_chart_dimension("bytes", ect->publish_systemd_vfs.write_bytes +
                                          ect->publish_systemd_vfs.writev_bytes);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_READ_BYTES);
+        ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_VFS_READ_BYTES, "");
         write_chart_dimension("bytes", ect->publish_systemd_vfs.read_bytes +
                                          ect->publish_systemd_vfs.readv_bytes);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_FSYNC);
+        ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_VFS_FSYNC, "");
         write_chart_dimension("calls", ect->publish_systemd_vfs.fsync_call);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR);
+            ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR, "");
             write_chart_dimension("calls", ect->publish_systemd_vfs.fsync_err);
             ebpf_write_end_chart();
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_OPEN);
+        ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_VFS_OPEN, "");
         write_chart_dimension("calls", ect->publish_systemd_vfs.open_call);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR);
+            ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR, "");
             write_chart_dimension("calls", ect->publish_systemd_vfs.open_err);
             ebpf_write_end_chart();
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_CREATE);
+        ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_VFS_CREATE, "");
         write_chart_dimension("calls", ect->publish_systemd_vfs.create_call);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR);
+            ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR, "");
             write_chart_dimension("calls", ect->publish_systemd_vfs.create_err);
             ebpf_write_end_chart();
         }
