@@ -941,19 +941,19 @@ static void ebpf_send_systemd_shm_charts()
             continue;
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SHMGET_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_SHMGET_CHART, "");
         write_chart_dimension("calls", (long long)ect->publish_shm.get);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SHMAT_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_SHMAT_CHART, "");
         write_chart_dimension("calls", (long long)ect->publish_shm.at);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SHMDT_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_SHMDT_CHART, "");
         write_chart_dimension("calls", (long long)ect->publish_shm.dt);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SHMCTL_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_SHMCTL_CHART, "");
         write_chart_dimension("calls", (long long)ect->publish_shm.ctl);
         ebpf_write_end_chart();
     }

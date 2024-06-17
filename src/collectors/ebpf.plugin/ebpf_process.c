@@ -1031,24 +1031,24 @@ static void ebpf_send_systemd_process_charts(ebpf_module_t *em)
             continue;
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_TASK_PROCESS);
+        ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_TASK_PROCESS, "");
         write_chart_dimension("calls", ect->publish_systemd_ps.create_process);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_TASK_THREAD);
+        ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_TASK_THREAD, "");
         write_chart_dimension("calls", ect->publish_systemd_ps.create_thread);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_TASK_EXIT);
+        ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_TASK_EXIT, "");
         write_chart_dimension("calls", ect->publish_systemd_ps.exit_call);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_TASK_CLOSE);
+        ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_TASK_CLOSE, "");
         write_chart_dimension("calls", ect->publish_systemd_ps.release_call);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_TASK_ERROR);
+            ebpf_write_begin_chart(ect->name, NETDATA_SYSCALL_APPS_TASK_ERROR, "");
             write_chart_dimension("calls", ect->publish_systemd_ps.task_err);
             ebpf_write_end_chart();
         }
