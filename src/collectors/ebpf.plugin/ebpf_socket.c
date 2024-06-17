@@ -509,9 +509,9 @@ static void ebpf_socket_free(ebpf_module_t *em )
 static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
 {
     int order = 20080;
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_NET_APPS_CONNECTION_TCP_V4,
+                              "",
                               "Calls to tcp_v4_connection",
                               EBPF_COMMON_UNITS_CONNECTIONS,
                               NETDATA_APPS_NET_GROUP,
@@ -521,9 +521,9 @@ static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
                               update_every);
 
     if (tcp_v6_connect_address.type == 'T') {
-        ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                                  id,
+        ebpf_write_chart_obsolete(id,
                                   NETDATA_NET_APPS_CONNECTION_TCP_V6,
+                                  "",
                                   "Calls to tcp_v6_connection",
                                   EBPF_COMMON_UNITS_CONNECTIONS,
                                   NETDATA_APPS_NET_GROUP,
@@ -533,9 +533,9 @@ static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
                                   update_every);
     }
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_NET_APPS_BANDWIDTH_RECV,
+                              "",
                               "Bits received",
                               EBPF_COMMON_UNITS_KILOBITS,
                               NETDATA_APPS_NET_GROUP,
@@ -544,9 +544,9 @@ static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
                               order++,
                               update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_NET_APPS_BANDWIDTH_SENT,
+                              "",
                               "Bits sent",
                               EBPF_COMMON_UNITS_KILOBITS,
                               NETDATA_APPS_NET_GROUP,
@@ -555,9 +555,9 @@ static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
                               order++,
                               update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
+                              "",
                               "Calls to tcp_cleanup_rbuf.",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_NET_GROUP,
@@ -566,9 +566,9 @@ static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
                               order++,
                               update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
+                              "",
                               "Calls to tcp_sendmsg.",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_NET_GROUP,
@@ -577,9 +577,9 @@ static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
                               order++,
                               update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
+                              "",
                               "Calls to tcp_retransmit",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_NET_GROUP,
@@ -588,9 +588,9 @@ static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
                               order++,
                               update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
+                              "",
                               "Calls to udp_sendmsg",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_NET_GROUP,
@@ -599,9 +599,9 @@ static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
                               order++,
                               update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
+                              "",
                               "Calls to udp_recvmsg",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_NET_GROUP,

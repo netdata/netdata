@@ -279,9 +279,9 @@ static void ebpf_obsolete_specific_dc_charts(char *type, int update_every);
  */
 static void ebpf_obsolete_dc_services(ebpf_module_t *em, char *id)
 {
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_DC_HIT_CHART,
+                              "",
                               "Percentage of files inside directory cache",
                               EBPF_COMMON_UNITS_PERCENTAGE,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
@@ -290,9 +290,9 @@ static void ebpf_obsolete_dc_services(ebpf_module_t *em, char *id)
                               21200,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_DC_REFERENCE_CHART,
+                              "",
                               "Count file access",
                               EBPF_COMMON_UNITS_FILES,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
@@ -301,9 +301,9 @@ static void ebpf_obsolete_dc_services(ebpf_module_t *em, char *id)
                               21201,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_DC_REQUEST_NOT_CACHE_CHART,
+                              "",
                               "Files not present inside directory cache",
                               EBPF_COMMON_UNITS_FILES,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
@@ -312,9 +312,9 @@ static void ebpf_obsolete_dc_services(ebpf_module_t *em, char *id)
                               21202,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_DC_REQUEST_NOT_FOUND_CHART,
+                              "",
                               "Files not found",
                               EBPF_COMMON_UNITS_FILES,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
