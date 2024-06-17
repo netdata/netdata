@@ -122,11 +122,12 @@ sudo ./edit-config go.d/intelgpu.conf
 The following options can be defined globally: update_every.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | update_every | Data collection frequency. | 1 | no |
+| device | Select a specific GPU using [supported filter](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html#DESCRIPTION). |  | no |
 
 </details>
 
@@ -136,7 +137,7 @@ The following options can be defined globally: update_every.
 
 Allows you to override the default data collection interval.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

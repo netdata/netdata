@@ -122,7 +122,7 @@
               },
               "after": {
                 "type": "integer",
-                "default": -600,
+                "default": 0,
                 "title": "From",
                 "description": "Relative to 'To'"
               },
@@ -467,6 +467,7 @@
       "ui:widget": "hidden"
     },
     "rules": {
+      "ui:openEmptyItem":  true,
       "items": {
         "ui:classNames": "dyncfg-grid dyncfg-grid-col-6",
         "enabled": {

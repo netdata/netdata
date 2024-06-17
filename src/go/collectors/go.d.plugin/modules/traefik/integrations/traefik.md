@@ -104,7 +104,7 @@ sudo ./edit-config go.d/traefik.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>All options</summary>
+<details open><summary>All options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -134,7 +134,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 An example configuration.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -148,7 +148,7 @@ jobs:
 
 Local server with basic HTTP authentication.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -167,7 +167,7 @@ jobs:
 Local and remote instances.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

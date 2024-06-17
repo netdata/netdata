@@ -142,7 +142,7 @@ sudo ./edit-config ebpf.d/filesystem.conf
 This configuration file have two different sections. The `[global]` overwrites default options, while `[filesystem]` allow user to select the filesystems to monitor.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

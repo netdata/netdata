@@ -1644,11 +1644,17 @@ bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx)
 
 void retention_timer_cb(uv_timer_t *handle)
 {
+    if (!localhost)
+        return;
+
     worker_is_busy(RRDENG_TIMER_CB);
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
     for (size_t tier = 0; tier < storage_tiers; tier++) {
+        STORAGE_ENGINE *eng = localhost->db[tier].eng;
+        if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
+            continue;
         bool cleanup = rrdeng_ctx_tier_cap_exceeded(multidb_ctx[tier]);
         if (cleanup)
             rrdeng_enq_cmd(multidb_ctx[tier], RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
@@ -1774,10 +1780,18 @@ uint64_t get_directory_free_bytes_space(struct rrdengine_instance *ctx)
 
 void calculate_tier_disk_space_percentage(void)
 {
-    static uint64_t tier_space[RRD_STORAGE_TIERS];
+    uint64_t tier_space[RRD_STORAGE_TIERS];
+
+    if (!localhost)
+        return;
 
     uint64_t total_diskspace = 0;
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        STORAGE_ENGINE *eng = localhost->db[tier].eng;
+        if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE) {
+            tier_space[tier] = 0;
+            continue;
+        }
         uint64_t tier_disk_space = multidb_ctx[tier]->config.max_disk_space ?
                                        multidb_ctx[tier]->config.max_disk_space :
                                        get_directory_free_bytes_space(multidb_ctx[tier]);
@@ -1797,9 +1811,16 @@ void dbengine_retention_statistics(void)
     static bool init = false;
     static DBENGINE_TIER_STATS stats[RRD_STORAGE_TIERS];
 
+    if (!localhost)
+        return;
+
     calculate_tier_disk_space_percentage();
 
     for (size_t tier = 0; tier < storage_tiers; tier++) {
+        STORAGE_ENGINE *eng = localhost->db[tier].eng;
+        if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
+            continue;
+
         if (init == false) {
             char id[200];
             snprintfz(id, sizeof(id) - 1, "dbengine_retention_tier%zu", tier);
@@ -1807,13 +1828,13 @@ void dbengine_retention_statistics(void)
                 "netdata",
                 id,
                 NULL,
-                "dbengine",
+                "dbengine retention",
                 "netdata.dbengine_tier_retention",
                 "dbengine space and time retention",
                 "%",
                 "netdata",
                 "stats",
-                200000,
+                134900, // before "dbengine memory" (dbengine2_statistics_charts)
                 10,
                 RRDSET_TYPE_LINE);
 
@@ -1829,7 +1850,6 @@ void dbengine_retention_statistics(void)
             rrdset_metadata_updated(stats[tier].st);
         }
 
-        STORAGE_ENGINE *eng = localhost->db[tier].eng;
         time_t first_time_s = storage_engine_global_first_time_s(eng->seb, localhost->db[tier].si);
         time_t retention = first_time_s ? now_realtime_sec() - first_time_s : 0;
 

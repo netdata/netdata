@@ -119,7 +119,7 @@ Additionally, the following collapsed table contains all the options that can be
 Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -150,7 +150,7 @@ localhost:
 
 Example using basic username and password in order to authenticate.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 localhost:
@@ -169,7 +169,7 @@ localhost:
 Collecting metrics from local and remote instances.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 localhost:

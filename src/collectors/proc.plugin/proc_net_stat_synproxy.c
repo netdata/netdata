@@ -53,8 +53,6 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
         conn_reopened   += strtoull(procfile_lineword(ff, l, 5), NULL, 16);
     }
 
-    unsigned long long events = syn_received + cookie_invalid + cookie_valid + cookie_retrans + conn_reopened;
-
     // --------------------------------------------------------------------
 
     if (do_syns == CONFIG_BOOLEAN_YES || do_syns == CONFIG_BOOLEAN_AUTO) {

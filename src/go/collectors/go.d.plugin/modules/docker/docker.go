@@ -68,7 +68,7 @@ type (
 	dockerClient interface {
 		NegotiateAPIVersion(context.Context)
 		Info(context.Context) (typesSystem.Info, error)
-		ImageList(context.Context, types.ImageListOptions) ([]typesImage.Summary, error)
+		ImageList(context.Context, typesImage.ListOptions) ([]typesImage.Summary, error)
 		ContainerList(context.Context, typesContainer.ListOptions) ([]types.Container, error)
 		Close() error
 	}

@@ -17,5 +17,5 @@ func (ig *IntelGPU) initIntelGPUTopExec() (intelGpuTop, error) {
 
 	}
 
-	return newIntelGpuTopExec(ndsudoPath, ig.UpdateEvery, ig.Logger)
+	return newIntelGpuTopExec(ig.Logger, ndsudoPath, ig.UpdateEvery, ig.Device)
 }

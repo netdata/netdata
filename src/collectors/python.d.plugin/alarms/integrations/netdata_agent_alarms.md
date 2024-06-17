@@ -107,7 +107,7 @@ Additionally, the following collapsed table contains all the options that can be
 Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -142,7 +142,7 @@ An advanced example configuration with multiple jobs collecting different subset
 "ML" job will collect status and values for all alarms with "ml_" in the name. Default job will collect status for all other alarms.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 ML:

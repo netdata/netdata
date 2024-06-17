@@ -106,6 +106,30 @@ The following alerts are available:
 See [Distro Support](https://github.com/linux-nvme/nvme-cli#distro-support). Install `nvme-cli` using your distribution's package manager.
 
 
+#### For Netdata running in a Docker container: grant NVMe device access
+
+Your NVMe devices need to be accessible within the Docker container for Netdata to monitor them.
+
+Include the following option in your `docker run` command or add the device mapping in your `docker-compose.yml` file:
+
+- `docker run`
+
+  ```bash
+  --device '/dev/nvme0n1:/dev/nvme0n1'
+  ```
+
+- `docker-compose.yml`
+
+  ```yaml
+  services:
+    netdata:
+      devices:
+        - "/dev/nvme0n1:/dev/nvme0n1"
+  ```
+
+**Note**: Replace `/dev/nvme0n1` with your actual NVMe device name.
+
+
 
 ### Configuration
 
@@ -126,7 +150,7 @@ sudo ./edit-config go.d/nvme.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -142,7 +166,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 Allows you to override the default data collection interval.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

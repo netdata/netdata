@@ -155,7 +155,7 @@ sudo ./edit-config go.d/scaleio.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -185,7 +185,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 An example configuration.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -205,7 +205,7 @@ jobs:
 Local and remote instance.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

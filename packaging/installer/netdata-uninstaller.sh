@@ -729,6 +729,7 @@ fi
 
 #### REMOVE NETDATA FILES
 rm_file /etc/logrotate.d/netdata
+rm_file /usr/lib/systemd/journald@netdata.conf.d/netdata.conf
 rm_file /etc/systemd/system/netdata.service
 rm_file /lib/systemd/system/netdata.service
 rm_file /usr/lib/systemd/system/netdata.service
@@ -764,6 +765,7 @@ else
   rm_dir "${NETDATA_PREFIX}/var/cache/netdata"
   rm_dir "${NETDATA_PREFIX}/var/log/netdata"
   rm_dir "${NETDATA_PREFIX}/etc/netdata"
+  rm_dir /usr/lib/systemd/journald@netdata.conf.d/
 fi
 
 if [ -n "${tmpdir}" ]; then

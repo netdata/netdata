@@ -103,7 +103,7 @@ sudo ./edit-config go.d/k8s_kubeproxy.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -144,7 +144,7 @@ jobs:
 Do not validate server certificate chain and hostname.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

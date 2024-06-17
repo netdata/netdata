@@ -99,6 +99,17 @@ AutoReqProv: yes
 %global _have_mongo_exporter 1
 %endif
 
+# log2journal can’t build on some systems
+%if 0%{?sle_version}
+%if %{sle_version} < 150600
+%global _have_log2journal 0
+%else
+%global _have_log2journal 1
+%endif
+%else
+%global _have_log2journal 1
+%endif
+
 # If ML hasn’t been explicitly disabled or enabled yet, enable it now.
 %if 0%{!?_have_ml:1}
 %global _have_ml 1
@@ -147,9 +158,7 @@ BuildRequires: pkgconfig(libcurl)
 BuildRequires: pkgconfig(liblz4)
 BuildRequires: pkgconfig(yaml-0.1)
 BuildRequires: pkgconfig(json-c)
-%if 0%{?suse_version}
-# log2journal is not available on these systems
-%else
+%if %{_have_log2journal}
 BuildRequires: pkgconfig(libpcre2-8)
 %endif
 %if 0%{?suse_version}
@@ -494,9 +503,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
-%if 0%{?suse_version}
-# log2journal is not available on these systems
-%else
+%if %{_have_log2journal}
 %{_sbindir}/log2journal
 %endif
 %{_sbindir}/systemd-cat-native

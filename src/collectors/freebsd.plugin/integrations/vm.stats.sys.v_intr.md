@@ -106,7 +106,7 @@ sudo ./edit-config netdata.conf
 
 
 
-<details><summary>Config option</summary>
+<details open><summary>Config option</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

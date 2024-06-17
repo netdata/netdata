@@ -109,12 +109,12 @@ void *freebsd_main(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    while (!netdata_exit) {
+    while(service_running(SERVICE_COLLECTORS))  {
         worker_is_idle();
 
         usec_t hb_dt = heartbeat_next(&hb, step);
 
-        if (unlikely(netdata_exit))
+       if (!service_running(SERVICE_COLLECTORS))
             break;
 
         for (i = 0; freebsd_modules[i].name; i++) {
@@ -127,7 +127,7 @@ void *freebsd_main(void *ptr)
             worker_is_busy(i);
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
 
-            if (unlikely(netdata_exit))
+           if (!service_running(SERVICE_COLLECTORS))
                 break;
         }
     }

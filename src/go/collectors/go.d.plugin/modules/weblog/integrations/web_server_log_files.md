@@ -206,7 +206,7 @@ Notes:
 - Don't use both `$bytes_sent` and `$body_bytes_sent` (`%O` and `%B` or `%b`). The module does not distinguish between these parameters.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

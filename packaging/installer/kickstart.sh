@@ -1816,9 +1816,15 @@ try_static_install() {
     opts="${opts} --accept"
   fi
 
+  env_cmd="env NETDATA_CERT_TEST_URL=${NETDATA_CLAIM_URL} NETDATA_CERT_MODE=check"
+
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    env_cmd="env NETDATA_CERT_TEST_URL=${NETDATA_CLAIM_URL} NETDATA_CERT_MODE=auto"
+  fi
+
   progress "Installing netdata"
   # shellcheck disable=SC2086
-  if ! run_as_root sh "${tmpdir}/${netdata_agent}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
+  if ! run_as_root ${env_cmd} /bin/sh "${tmpdir}/${netdata_agent}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
     warning "Failed to install static build of Netdata on ${SYSARCH}."
     run rm -rf /opt/netdata
     return 2

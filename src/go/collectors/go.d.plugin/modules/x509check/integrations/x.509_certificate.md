@@ -109,13 +109,13 @@ sudo ./edit-config go.d/x509check.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| source | Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file. |  | no |
+| source | Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file, smtp. |  | no |
 | days_until_expiration_warning | Number of days before the alarm status is warning. | 30 | no |
 | days_until_expiration_critical | Number of days before the alarm status is critical. | 15 | no |
 | check_revocation_status | Whether to check the revocation status of the certificate. | no | no |
@@ -133,7 +133,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 Website certificate.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -147,7 +147,7 @@ jobs:
 
 Local file certificate.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -161,7 +161,7 @@ jobs:
 
 SMTP certificate.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -178,7 +178,7 @@ jobs:
 Check the expiration status of the multiple websites' certificates.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:

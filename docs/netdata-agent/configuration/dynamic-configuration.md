@@ -9,7 +9,9 @@ The Dynamic Configuration Manager allows direct configuration of collectors and 
 
 **Cloud Connection and Security**: Nodes using Dynamic Configuration Manager require a connection to Netdata Cloud. This ensures proper permission handling and data security.
 
-**Permissions**: Admins and Managers can view, edit, and submit configurations within the UI.
+> **Info**
+>
+> To understand what actions users can perform based on their role, refer to the [Role Based Access documentation](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#dynamic-configuration-manager). 
 
 ## Collectors
 
