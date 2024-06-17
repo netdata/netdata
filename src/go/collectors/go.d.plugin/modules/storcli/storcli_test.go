@@ -19,15 +19,17 @@ var (
 
 	dataMegaControllerInfo, _ = os.ReadFile("testdata/megaraid-controllers-info.json")
 	dataMegaDrivesInfo, _     = os.ReadFile("testdata/megaraid-drives-info.json")
+
+	dataSasControllerInfo, _ = os.ReadFile("testdata/mpt3sas-controllers-info.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON": dataConfigJSON,
-		"dataConfigYAML": dataConfigYAML,
-
+		"dataConfigJSON":         dataConfigJSON,
+		"dataConfigYAML":         dataConfigYAML,
 		"dataMegaControllerInfo": dataMegaControllerInfo,
 		"dataMegaDrivesInfo":     dataMegaDrivesInfo,
+		"dataSasControllerInfo":  dataSasControllerInfo,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -147,12 +149,14 @@ func TestStorCli_Collect(t *testing.T) {
 	}{
 		"success MegaRAID controller": {
 			prepareMock: prepareMockMegaRaidOK,
-			wantCharts:  len(controllerChartsTmpl)*1 + len(physDriveChartsTmpl)*6 + len(bbuChartsTmpl)*1,
+			wantCharts:  len(controllerMegaraidChartsTmpl)*1 + len(physDriveChartsTmpl)*6 + len(bbuChartsTmpl)*1,
 			wantMetrics: map[string]int64{
 				"bbu_0_cntrl_0_temperature":                                       34,
 				"cntrl_0_bbu_status_healthy":                                      1,
 				"cntrl_0_bbu_status_na":                                           0,
 				"cntrl_0_bbu_status_unhealthy":                                    0,
+				"cntrl_0_health_status_healthy":                                   1,
+				"cntrl_0_health_status_unhealthy":                                 0,
 				"cntrl_0_status_degraded":                                         0,
 				"cntrl_0_status_failed":                                           0,
 				"cntrl_0_status_optimal":                                          1,
@@ -195,6 +199,14 @@ func TestStorCli_Collect(t *testing.T) {
 				"phys_drive_5000C500E5659BA7_cntrl_0_temperature":                 27,
 			},
 		},
+		"success SAS controller": {
+			prepareMock: prepareMockSasOK,
+			wantCharts:  len(controllerMpt3sasChartsTmpl) * 1,
+			wantMetrics: map[string]int64{
+				"cntrl_0_health_status_healthy":   1,
+				"cntrl_0_health_status_unhealthy": 0,
+			},
+		},
 		"err on exec": {
 			prepareMock: prepareMockErr,
 			wantMetrics: nil,
@@ -228,6 +240,13 @@ func prepareMockMegaRaidOK() *mockStorCliExec {
 	return &mockStorCliExec{
 		controllersInfoData: dataMegaControllerInfo,
 		drivesInfoData:      dataMegaDrivesInfo,
+	}
+}
+
+func prepareMockSasOK() *mockStorCliExec {
+	return &mockStorCliExec{
+		controllersInfoData: dataSasControllerInfo,
+		drivesInfoData:      nil,
 	}
 }
 
