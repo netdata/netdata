@@ -43,7 +43,7 @@ SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
     return rc;
 }
 
-static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database)
+static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database, int rc)
 {
 
     if (!res && !database)
@@ -54,7 +54,7 @@ static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database)
 
     if (db_meta == database) {
         char recover_file[FILENAME_MAX + 1];
-        snprintfz(recover_file, FILENAME_MAX, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
+        snprintfz(recover_file, FILENAME_MAX, "%s/.netdata-meta.db.%s", netdata_configured_cache_dir, SQLITE_CORRUPT == rc ? "recover" : "delete" );
         int fd = open(recover_file, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 444);
         if (fd >= 0) {
             close(fd);
@@ -69,7 +69,7 @@ int execute_insert(sqlite3_stmt *res)
     int rc;
     rc =  sqlite3_step_monitored(res);
     if (rc == SQLITE_CORRUPT) {
-        (void)mark_database_to_recover(res, NULL);
+        (void)mark_database_to_recover(res, NULL, rc);
         error_report("SQLite error %d", rc);
     }
     return rc;
@@ -229,8 +229,8 @@ int init_database_batch(sqlite3 *database, const char *batch[], const char *desc
                 analytics_set_data_str(&analytics_data.netdata_fail_reason, error_str);
             sqlite3_free(err_msg);
             freez(error_str);
-            if (SQLITE_CORRUPT == rc) {
-                if (mark_database_to_recover(NULL, database))
+            if (SQLITE_CORRUPT == rc || SQLITE_NOTADB == rc) {
+                if (mark_database_to_recover(NULL, database, rc))
                     error_report("Database is corrupted will attempt to fix");
                 return SQLITE_CORRUPT;
             }
@@ -263,7 +263,7 @@ int db_execute(sqlite3 *db, const char *cmd)
         }
 
         if (rc == SQLITE_CORRUPT)
-            mark_database_to_recover(NULL, db);
+            mark_database_to_recover(NULL, db, rc);
         break;
     }
     return (rc != SQLITE_OK);
