@@ -26,6 +26,7 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
 
     datafile->tier = tier;
     datafile->fileno = fileno;
+    datafile->flags = 0;
     fatal_assert(0 == uv_rwlock_init(&datafile->extent_rwlock));
     datafile->ctx = ctx;
 
@@ -38,10 +39,93 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
     return datafile;
 }
 
+static int open_data_file(struct rrdengine_datafile *datafile)
+{
+    struct rrdengine_instance *ctx = datafile->ctx;
+    uv_file file;
+    int fd;
+    char path[RRDENG_PATH_MAX];
+
+    generate_datafilepath(datafile, path, sizeof(path));
+
+    fd = open_file_for_io(path, O_RDWR, &file, use_direct_io);
+    if (fd < 0) {
+        ctx_fs_error(ctx);
+        return fd;
+    }
+
+    datafile->file = file;
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "DBENGINE: data file \"%s\" opened (size:%" PRIu64 ").", path, datafile->pos);
+
+    return 0;
+}
+
+static int check_data_file_superblock(uv_file file)
+{
+    int ret;
+    struct rrdeng_df_sb *superblock;
+    uv_buf_t iov;
+    uv_fs_t req;
+
+    ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
+    if (unlikely(ret))
+        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
+
+    iov = uv_buf_init((void *)superblock, sizeof(*superblock));
+
+    ret = uv_fs_read(NULL, &req, file, &iov, 1, 0, NULL);
+    if (ret < 0) {
+        netdata_log_error("DBENGINE: uv_fs_read: %s", uv_strerror(ret));
+        uv_fs_req_cleanup(&req);
+        goto error;
+    }
+    fatal_assert(req.result >= 0);
+    uv_fs_req_cleanup(&req);
+
+    if (strncmp(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ) ||
+        strncmp(superblock->version, RRDENG_DF_VER, RRDENG_VER_SZ) ||
+        superblock->tier != 1) {
+        netdata_log_error("DBENGINE: file has invalid superblock.");
+        ret = UV_EINVAL;
+    } else
+        ret = 0;
+error:
+    posix_memfree(superblock);
+    return ret;
+}
+
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
-    bool ret;
+    bool ret = false;
 
     spinlock_lock(&df->users.spinlock);
+
+    if (!(df->flags & DATAFILE_FLAG_IS_AVAILABLE)) {
+        if (reason != DATAFILE_ACQUIRE_RETENTION) {
+            usec_t started_ut, ended_ut;
+            started_ut = now_monotonic_usec();
+
+            if (open_data_file(df))
+                goto error;
+
+            int rc = check_data_file_superblock(df->file);
+            ended_ut = now_monotonic_usec();
+            if (rc)
+                goto error;
+
+            nd_log(
+                NDLS_DAEMON,
+                NDLP_DEBUG,
+                "Accessing datafile %u (tier %d) for superblock check in %0.2f ms ",
+                df->fileno,
+                df->ctx->config.tier,
+                reason,
+                (double)(ended_ut - started_ut) / USEC_PER_MS);
+
+            df->flags |= DATAFILE_FLAG_IS_AVAILABLE;
+            ctx_io_read_op_bytes(df->ctx, sizeof(struct rrdeng_df_sb));
+        }
+    }
 
     if(df->users.available) {
         ret = true;
@@ -51,6 +135,7 @@ bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS re
     else
         ret = false;
 
+error:
     spinlock_unlock(&df->users.spinlock);
 
     return ret;
@@ -171,6 +256,9 @@ int close_data_file(struct rrdengine_datafile *datafile)
     int ret;
     char path[RRDENG_PATH_MAX];
 
+    if (!(datafile->flags & DATAFILE_FLAG_IS_AVAILABLE))
+        return 0;
+
     generate_datafilepath(datafile, path, sizeof(path));
 
     ret = uv_fs_close(NULL, &req, datafile->file, NULL);
@@ -213,19 +301,21 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
 
     generate_datafilepath(datafile, path, sizeof(path));
 
-    ret = uv_fs_ftruncate(NULL, &req, datafile->file, 0, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
+    if (datafile->flags & DATAFILE_FLAG_IS_AVAILABLE) {
+        ret = uv_fs_ftruncate(NULL, &req, datafile->file, 0, NULL);
+        if (ret < 0) {
+            netdata_log_error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
+            ctx_fs_error(ctx);
+        }
+        uv_fs_req_cleanup(&req);
 
-    ret = uv_fs_close(NULL, &req, datafile->file, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
+        ret = uv_fs_close(NULL, &req, datafile->file, NULL);
+        if (ret < 0) {
+            netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
+            ctx_fs_error(ctx);
+        }
+        uv_fs_req_cleanup(&req);
     }
-    uv_fs_req_cleanup(&req);
 
     ret = uv_fs_unlink(NULL, &req, path, NULL);
     if (ret < 0) {
@@ -282,92 +372,40 @@ int create_data_file(struct rrdengine_datafile *datafile)
         return ret;
     }
 
+    datafile->flags |= DATAFILE_FLAG_IS_AVAILABLE;
     datafile->pos = sizeof(*superblock);
     ctx_io_write_op_bytes(ctx, sizeof(*superblock));
 
     return 0;
 }
 
-static int check_data_file_superblock(uv_file file)
-{
-    int ret;
-    struct rrdeng_df_sb *superblock;
-    uv_buf_t iov;
-    uv_fs_t req;
-
-    ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
-    if (unlikely(ret)) {
-        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
-    }
-    iov = uv_buf_init((void *)superblock, sizeof(*superblock));
-
-    ret = uv_fs_read(NULL, &req, file, &iov, 1, 0, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_read: %s", uv_strerror(ret));
-        uv_fs_req_cleanup(&req);
-        goto error;
-    }
-    fatal_assert(req.result >= 0);
-    uv_fs_req_cleanup(&req);
-
-    if (strncmp(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ) ||
-        strncmp(superblock->version, RRDENG_DF_VER, RRDENG_VER_SZ) ||
-        superblock->tier != 1) {
-        netdata_log_error("DBENGINE: file has invalid superblock.");
-        ret = UV_EINVAL;
-    } else {
-        ret = 0;
-    }
-    error:
-    posix_memfree(superblock);
-    return ret;
-}
-
 static int load_data_file(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile->ctx;
-    uv_fs_t req;
-    uv_file file;
-    int ret, fd, error;
-    uint64_t file_size;
+    int ret;
     char path[RRDENG_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_RDWR, &file, use_direct_io);
-    if (fd < 0) {
+
+    struct stat statbuf;
+    ret = stat(path, &statbuf);
+    if (ret) {
         ctx_fs_error(ctx);
-        return fd;
+        return ret;
     }
-    
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: initializing data file \"%s\".", path);
 
-    ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
-    if (ret)
-        goto error;
-    file_size = ALIGN_BYTES_CEILING(file_size);
+    if (!(statbuf.st_mode & S_IFREG)) {
+        netdata_log_error("Not a regular file.\n");
+        return 1;
+    }
 
-    ret = check_data_file_superblock(file);
-    if (ret)
-        goto error;
+    if (statbuf.st_size < (uint64_t) sizeof(struct rrdeng_df_sb)) {
+        netdata_log_error("File length is too short.\n");
+        return 1;
+    }
 
-    ctx_io_read_op_bytes(ctx, sizeof(struct rrdeng_df_sb));
-
-    datafile->file = file;
-    datafile->pos = file_size;
-
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: data file \"%s\" initialized (size:%" PRIu64 ").", path, file_size);
-
+    datafile->pos = ALIGN_BYTES_CEILING(statbuf.st_size);
     return 0;
-
-    error:
-    error = ret;
-    ret = uv_fs_close(NULL, &req, file, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
-    return error;
 }
 
 static int scan_data_files_cmp(const void *a, const void *b)
