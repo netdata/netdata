@@ -19,17 +19,25 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#ifdef ENABLE_OPENSSL
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#elif defined(ENABLE_WOLFSSL)
+#include <wolfssl/options.h>
+#include <wolfssl/openssl/err.h>
+#include <wolfssl/openssl/ssl.h>
+#endif
 
 #define PIPE_READ_END  0
 #define PIPE_WRITE_END 1
 #define POLLFD_SOCKET  0
 #define POLLFD_PIPE    1
 
+#if defined(ENABLE_OPENSSL)
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) && (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
 #include <openssl/conf.h>
 #endif
+#endif //ENABLE_OPENSSL
 
 //TODO MQTT_PUBLISH_RETAIN should not be needed anymore
 #define MQTT_PUBLISH_RETAIN 0x01
