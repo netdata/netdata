@@ -127,10 +127,10 @@ if(${DISTRO} IN_LIST DEB_DISTROS)
   configure_file(deb.changelog netdata-repo-edge/changelog @ONLY)
 
   install(FILES ${CMAKE_BINARY_DIR}/netdata.list
-          DESTINATION /etc/apt/sources.list.d/netdata.list
+          DESTINATION etc/apt/sources.list.d
           COMPONENT netdata-repo)
   install(FILES ${CMAKE_BINARY_DIR}/netdata-edge.list
-          DESTINATION /etc/apt/sources.list.d/netdata-edge.list
+          DESTINATION etc/apt/sources.list.d
           COMPONENT netdata-repo-edge)
 
   add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/netdatabot.gpg.key
@@ -147,17 +147,25 @@ if(${DISTRO} IN_LIST DEB_DISTROS)
                     DEPENDS ${CMAKE_BINARY_DIR}/netdata.gpg)
 
   install(FILES ${CMAKE_BINARY_DIR}/netdata.gpg
-          DESTINATION /etc/apt/trusted.gpg.d/netdata-archive-keyring.gpg
+          DESTINATION etc/apt/trusted.gpg.d
+          RENAME netdata-archive-keyring.gpg
+          PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
           COMPONENT netdata-repo)
   install(FILES ${CMAKE_BINARY_DIR}/netdata.gpg
-          DESTINATION /etc/apt/trusted.gpg.d/netdata-repoconfig-archive-keyring.gpg
+          DESTINATION etc/apt/trusted.gpg.d
+          RENAME netdata-repoconfig-archive-keyring.gpg
+          PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
           COMPONENT netdata-repo)
 
   install(FILES ${CMAKE_BINARY_DIR}/netdata.gpg
-          DESTINATION /etc/apt/trusted.gpg.d/netdata-edge-archive-keyring.gpg
+          DESTINATION etc/apt/trusted.gpg.d
+          RENAME netdata-edge-archive-keyring.gpg
+          PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
           COMPONENT netdata-repo-edge)
   install(FILES ${CMAKE_BINARY_DIR}/netdata.gpg
-          DESTINATION /etc/apt/trusted.gpg.d/netdata-repoconfig-archive-keyring.gpg
+          DESTINATION etc/apt/trusted.gpg.d
+          RENAME netdata-repoconfig-archive-keyring.gpg
+          PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
           COMPONENT netdata-repo-edge)
 
   set(CPACK_DEB_COMPONENT_INSTALL YES)
@@ -219,10 +227,10 @@ elseif(${DISTRO} IN_LIST RPM_DISTROS)
 
   install(FILES ${CMAKE_BINARY_DIR}/netdata.repo
           COMPONENT netdata-repo
-          DESTINATION /etc/${REPO_CFG_PATH}/netdata.repo)
+          DESTINATION etc/${REPO_CFG_PATH})
   install(FILES ${CMAKE_BINARY_DIR}/netdata-edge.repo
           COMPONENT netdata-repo-edge
-          DESTINATION /etc/${REPO_CFG_PATH}/netdata-edge.repo)
+          DESTINATION etc/${REPO_CFG_PATH})
 
   set(CPACK_RPM_COMPONENT_INSTALL ON)
   set(CPACK_RPM_PACAKGE_AUTOREQPROV OFF)
