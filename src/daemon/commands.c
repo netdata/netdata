@@ -305,11 +305,18 @@ static cmd_status_t cmd_ping_execute(char *args, char **message)
 
 static cmd_status_t cmd_aclk_state(char *args, char **message)
 {
+#ifdef ENABLE_ACLK
     netdata_log_info("COMMAND: Reopening aclk/cloud state.");
     if (strstr(args, "json"))
         *message = aclk_state_json();
     else
         *message = aclk_state();
+#else
+    if (strstr(args, "json"))
+        *message = strdupz("{\"aclk-available\":false}");
+    else
+        *message = strdupz("ACLK Available: No");
+#endif
 
     return CMD_STATUS_SUCCESS;
 }
