@@ -23,10 +23,10 @@
 #define NETDATA_CGROUP_SHM_DT_CONTEXT "cgroup.shmdt"
 #define NETDATA_CGROUP_SHM_CTL_CONTEXT "cgroup.shmctl"
 
-#define NETDATA_SYSTEMD_SHM_GET_CONTEXT "systemd.services.shmget"
-#define NETDATA_SYSTEMD_SHM_AT_CONTEXT "systemd.services.shmat"
-#define NETDATA_SYSTEMD_SHM_DT_CONTEXT "systemd.services.shmdt"
-#define NETDATA_SYSTEMD_SHM_CTL_CONTEXT "systemd.services.shmctl"
+#define NETDATA_SYSTEMD_SHM_GET_CONTEXT "systemd.service.shmget"
+#define NETDATA_SYSTEMD_SHM_AT_CONTEXT "systemd.service.shmat"
+#define NETDATA_SYSTEMD_SHM_DT_CONTEXT "systemd.service.shmdt"
+#define NETDATA_SYSTEMD_SHM_CTL_CONTEXT "systemd.service.shmctl"
 
 typedef struct netdata_publish_shm {
     uint64_t ct;
