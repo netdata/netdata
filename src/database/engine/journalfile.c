@@ -619,7 +619,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
 static int journalfile_check_superblock(uv_file file)
 {
     int ret;
-    struct rrdeng_jf_sb *superblock;
+    struct rrdeng_jf_sb *superblock = NULL;
     uv_buf_t iov;
     uv_fs_t req;
 
