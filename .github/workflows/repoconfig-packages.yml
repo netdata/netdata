@@ -103,7 +103,7 @@ jobs:
         env:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
         run: |
-          printf "Packages to upload:\n%s" "$(ls artifacts/*.${{ matrix.format }})"
+          printf "Packages to upload:\n%s" "$(ls packaging/repoconfig/artifacts/*.${{ matrix.format }})"
           for pkgfile in artifacts/*.${{ matrix.format }} ; do
             .github/scripts/package_cloud_wrapper.sh yank "${REPO_PREFIX}-repoconfig/${{ matrix.pkgclouddistro }}" \
                 "$(basename "${pkgfile}")" || true
@@ -129,7 +129,8 @@ jobs:
               "${{ matrix.pkgclouddistro }}" \
               "${arch}" \
               "${{ matrix.format }}" \
-              netdata/netdata-repoconfig
+              netdata/netdata-repoconfig \
+              packaging/repoconfig/artifacts
           done
       - name: Upload to packages2.netdata.cloud
         id: package2-upload
@@ -142,7 +143,8 @@ jobs:
               "${{ matrix.pkgclouddistro }}" \
               "${arch}" \
               "${{ matrix.format }}" \
-              netdata/netdata-repoconfig
+              netdata/netdata-repoconfig \
+              packaging/repoconfig/artifacts
           done
       - name: Failure Notification
         if: ${{ failure() && github.repository == 'netdata/netdata' }}
