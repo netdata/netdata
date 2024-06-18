@@ -38,6 +38,6 @@ Use the following configuration as a starting point. Copy and paste it into `exp
 
 Replace `my_opentsdb_http_instance` with an instance name of your choice, and change the `destination` setting to the IP address or hostname of your OpenTSDB database.
 
-[Restart your Agent](/docs/netdata-agent/start-stop-restart.md), to begin exporting to your OpenTSDB database. The Netdata Agent exports metrics _beginning from the time the process starts_, and because it exports as metrics are collected, you should start seeing data in your external database after only a few seconds.
+[Restart your Agent](/docs/netdata-agent/start-stop-restart.md) to initiate exporting to your OpenTSDB database. The Netdata Agent continuously exports metrics collected from the moment it starts. You can expect to see data appear in your OpenTSDB database within seconds of restarting the Agent.
 
 Any further configuration is optional, based on your needs and the configuration of your OpenTSDB database. See the [OpenTSDB connector doc](/src/exporting/opentsdb/README.md) and [exporting engine reference](/src/exporting/README.md#configuration) for details.
