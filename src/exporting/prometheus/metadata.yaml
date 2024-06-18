@@ -327,6 +327,18 @@
       - prometheus
       - remote write
 - <<: *promexport
+  id: 'export-opensearch'
+  meta:
+    <<: *meta
+    name: OpeanSearch
+    link: https://opensearch.org/
+    icon_filename: 'opensearch.svg'
+    keywords:
+      - export
+      - OpenSearch
+      - prometheus
+      - remote write
+- <<: *promexport
   id: 'export-gnocchi'
   meta:
     <<: *meta
