@@ -573,7 +573,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
     uv_fs_t req;
     uv_file file;
     int ret, fd;
-    struct rrdeng_jf_sb *superblock;
+    struct rrdeng_jf_sb *superblock = NULL;
     uv_buf_t iov;
     char path[RRDENG_PATH_MAX];
 
@@ -619,7 +619,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
 static int journalfile_check_superblock(uv_file file)
 {
     int ret;
-    struct rrdeng_jf_sb *superblock;
+    struct rrdeng_jf_sb *superblock = NULL;
     uv_buf_t iov;
     uv_fs_t req;
 
@@ -811,7 +811,7 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
     int ret;
     uint64_t pos, pos_i, max_id, id;
     unsigned size_bytes;
-    void *buf;
+    void *buf = NULL;
     uv_buf_t iov;
     uv_fs_t req;
 

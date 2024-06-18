@@ -245,7 +245,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     uv_fs_t req;
     uv_file file;
     int ret, fd;
-    struct rrdeng_df_sb *superblock;
+    struct rrdeng_df_sb *superblock = NULL;
     uv_buf_t iov;
     char path[RRDENG_PATH_MAX];
 
@@ -291,7 +291,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
 static int check_data_file_superblock(uv_file file)
 {
     int ret;
-    struct rrdeng_df_sb *superblock;
+    struct rrdeng_df_sb *superblock = NULL;
     uv_buf_t iov;
     uv_fs_t req;
 

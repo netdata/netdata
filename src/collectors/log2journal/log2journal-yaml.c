@@ -85,7 +85,7 @@ static void yaml_error_with_trace(yaml_parser_t *parser, yaml_event_t *event, si
 #define yaml_parse(parser, event) yaml_parse_with_trace(parser, event, __LINE__, __FUNCTION__, __FILE__)
 static bool yaml_parse_with_trace(yaml_parser_t *parser, yaml_event_t *event, size_t line __maybe_unused, const char *function __maybe_unused, const char *file __maybe_unused) {
     if (!yaml_parser_parse(parser, event)) {
-        yaml_error(parser, NULL, "YAML parser error %d", parser->error);
+        yaml_error(parser, NULL, "YAML parser error %u", parser->error);
         return false;
     }
 

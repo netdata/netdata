@@ -60,8 +60,11 @@ size_t dbengine_max_compressed_size(size_t uncompressed_size, uint8_t algorithm)
         case RRDENG_COMPRESSION_NONE:
             return uncompressed_size;
 
-        default:
+        default: {
             fatal("DBENGINE: unknown compression algorithm %u", algorithm);
+            //we will never reach this point, but we have warnings from compiler
+            return 0;
+        }
     }
 }
 
@@ -117,8 +120,11 @@ size_t dbengine_compress(void *payload, size_t uncompressed_size, uint8_t algori
         case RRDENG_COMPRESSION_NONE:
             return 0;
 
-        default:
+        default: {
             fatal("DBENGINE: unknown compression algorithm %u", algorithm);
+            //we will never reach this point, but we have warnings from compiler
+            return 0;
+        }
     }
 }
 
