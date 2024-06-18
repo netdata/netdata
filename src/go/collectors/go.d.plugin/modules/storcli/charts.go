@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	prioControllerStatus = module.Priority + iota
+	prioControllerHealthStatus = module.Priority + iota
+	prioControllerStatus
 	prioControllerBBUStatus
 
 	prioPhysDriveErrors
@@ -22,12 +23,30 @@ const (
 	prioBBUTemperature
 )
 
-var controllerChartsTmpl = module.Charts{
+var controllerMegaraidChartsTmpl = module.Charts{
+	controllerHealthStatusChartTmpl.Copy(),
 	controllerStatusChartTmpl.Copy(),
 	controllerBBUStatusChartTmpl.Copy(),
 }
 
+var controllerMpt3sasChartsTmpl = module.Charts{
+	controllerHealthStatusChartTmpl.Copy(),
+}
+
 var (
+	controllerHealthStatusChartTmpl = module.Chart{
+		ID:       "controller_%s_health_status",
+		Title:    "Controller health status",
+		Units:    "status",
+		Fam:      "cntrl status",
+		Ctx:      "storcli.controller_health_status",
+		Type:     module.Line,
+		Priority: prioControllerHealthStatus,
+		Dims: module.Dims{
+			{ID: "cntrl_%s_health_status_healthy", Name: "healthy"},
+			{ID: "cntrl_%s_health_status_unhealthy", Name: "unhealthy"},
+		},
+	}
 	controllerStatusChartTmpl = module.Chart{
 		ID:       "controller_%s_status",
 		Title:    "Controller status",
@@ -139,7 +158,16 @@ var (
 )
 
 func (s *StorCli) addControllerCharts(cntrl controllerInfo) {
-	charts := controllerChartsTmpl.Copy()
+	var charts *module.Charts
+
+	switch cntrl.Version.DriverName {
+	case driverNameMegaraid:
+		charts = controllerMegaraidChartsTmpl.Copy()
+	case driverNameSas:
+		charts = controllerMpt3sasChartsTmpl.Copy()
+	default:
+		return
+	}
 
 	num := strconv.Itoa(cntrl.Basics.Controller)
 
@@ -147,7 +175,8 @@ func (s *StorCli) addControllerCharts(cntrl controllerInfo) {
 		chart.ID = fmt.Sprintf(chart.ID, num)
 		chart.Labels = []module.Label{
 			{Key: "controller_number", Value: num},
-			{Key: "model", Value: cntrl.Basics.Model},
+			{Key: "model", Value: strings.TrimSpace(cntrl.Basics.Model)},
+			{Key: "driver_name", Value: cntrl.Version.DriverName},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, num)

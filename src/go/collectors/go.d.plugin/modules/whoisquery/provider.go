@@ -66,8 +66,12 @@ func (c *whoisClient) queryWhoisInfo() (*whoisparser.WhoisInfo, error) {
 }
 
 func parseWhoisInfoExpirationDate(info *whoisparser.WhoisInfo) (float64, error) {
-	if info == nil {
+	if info == nil || info.Domain == nil {
 		return 0, errors.New("nil Whois Info")
+	}
+
+	if info.Domain.ExpirationDateInTime != nil {
+		return time.Until(*info.Domain.ExpirationDateInTime).Seconds(), nil
 	}
 
 	date := info.Domain.ExpirationDate
