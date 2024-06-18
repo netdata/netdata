@@ -672,6 +672,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/required_dummies.h
         src/libnetdata/socket/security.c
         src/libnetdata/socket/security.h
+        src/libnetdata/ssl/ssl.h
         src/libnetdata/simple_pattern/simple_pattern.c
         src/libnetdata/simple_pattern/simple_pattern.h
         src/libnetdata/socket/socket.c
