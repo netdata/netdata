@@ -11,7 +11,7 @@ the OpenTSDB and Graphite connectors.
 > restart its process_, not the entire
 > [database of long-term metrics](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
 
-Once you understand the process of enabling a connector, you can carry that knowledge to any other connector.
+Once you understand how to enable a connector, you can apply that knowledge to any other connector.
 
 ## Enable the exporting engine
 
