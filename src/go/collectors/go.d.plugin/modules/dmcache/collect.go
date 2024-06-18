@@ -81,7 +81,7 @@ func (c *DmCache) collectCacheStatus(mx map[string]int64, data []byte) error {
 		mx[px+"metadata_free_bytes"] = (dev.metaTotalBlocks - dev.metaUsedBlocks) * metaMul
 		mx[px+"metadata_used_bytes"] = dev.metaUsedBlocks * metaMul
 		mx[px+"cache_free_bytes"] = (dev.cacheTotalBlocks - dev.cacheUsedBlocks) * cacheMul
-		mx[px+"cache_used_bytes"] = dev.metaUsedBlocks * cacheMul
+		mx[px+"cache_used_bytes"] = dev.cacheUsedBlocks * cacheMul
 		mx[px+"read_hits"] = dev.readHits
 		mx[px+"read_misses"] = dev.readMisses
 		mx[px+"write_hits"] = dev.writeHits

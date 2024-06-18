@@ -146,7 +146,7 @@ func TestLVM_Collect(t *testing.T) {
 			wantCharts:  len(deviceChartsTmpl) * 2,
 			wantMetrics: map[string]int64{
 				"dmcache_device_vg_raid1_md21-media_cache_free_bytes":    1252402397184,
-				"dmcache_device_vg_raid1_md21-media_cache_used_bytes":    4966055936,
+				"dmcache_device_vg_raid1_md21-media_cache_used_bytes":    396412059648,
 				"dmcache_device_vg_raid1_md21-media_demotions_bytes":     0,
 				"dmcache_device_vg_raid1_md21-media_dirty_bytes":         0,
 				"dmcache_device_vg_raid1_md21-media_metadata_free_bytes": 32243712,
@@ -157,7 +157,7 @@ func TestLVM_Collect(t *testing.T) {
 				"dmcache_device_vg_raid1_md21-media_write_hits":          26280342,
 				"dmcache_device_vg_raid1_md21-media_write_misses":        8017854,
 				"dmcache_device_vg_raid2_md22-media_cache_free_bytes":    1252402397184,
-				"dmcache_device_vg_raid2_md22-media_cache_used_bytes":    4966055936,
+				"dmcache_device_vg_raid2_md22-media_cache_used_bytes":    396412059648,
 				"dmcache_device_vg_raid2_md22-media_demotions_bytes":     0,
 				"dmcache_device_vg_raid2_md22-media_dirty_bytes":         0,
 				"dmcache_device_vg_raid2_md22-media_metadata_free_bytes": 32243712,
