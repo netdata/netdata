@@ -36,7 +36,7 @@ var (
 		Title:    "DMCache space usage",
 		Units:    "bytes",
 		Fam:      "space usage",
-		Ctx:      "dmcache.cache_space_usage",
+		Ctx:      "dmcache.device_cache_space_usage",
 		Type:     module.Stacked,
 		Priority: prioDeviceCacheSpaceUsage,
 		Dims: module.Dims{
@@ -49,7 +49,7 @@ var (
 		Title:    "DMCache metadata space usage",
 		Units:    "bytes",
 		Fam:      "space usage",
-		Ctx:      "dmcache.metadata_space_usage",
+		Ctx:      "dmcache.device_metadata_space_usage",
 		Type:     module.Stacked,
 		Priority: prioDeviceMetaSpaceUsage,
 		Dims: module.Dims{
@@ -65,7 +65,7 @@ var (
 		Title:    "DMCache read efficiency",
 		Units:    "requests/s",
 		Fam:      "efficiency",
-		Ctx:      "dmcache.cache_read_efficiency",
+		Ctx:      "dmcache.device_cache_read_efficiency",
 		Type:     module.Stacked,
 		Priority: prioDeviceReadEfficiency,
 		Dims: module.Dims{
@@ -78,7 +78,7 @@ var (
 		Title:    "DMCache write efficiency",
 		Units:    "requests/s",
 		Fam:      "efficiency",
-		Ctx:      "dmcache.cache_write_efficiency",
+		Ctx:      "dmcache.device_cache_write_efficiency",
 		Type:     module.Stacked,
 		Priority: prioDeviceWriteEfficiency,
 		Dims: module.Dims{
@@ -93,7 +93,7 @@ var chartDeviceActivityTmpl = module.Chart{
 	Title:    "DMCache activity",
 	Units:    "bytes/s",
 	Fam:      "activity",
-	Ctx:      "dmcache.cache_activity",
+	Ctx:      "dmcache.device_cache_activity",
 	Type:     module.Area,
 	Priority: prioDeviceActivity,
 	Dims: module.Dims{
@@ -107,7 +107,7 @@ var chartDeviceDirtySizeTmpl = module.Chart{
 	Title:    "DMCache dirty data size",
 	Units:    "bytes",
 	Fam:      "dirty size",
-	Ctx:      "dmcache.cache_dirty_size",
+	Ctx:      "dmcache.device_cache_dirty_size",
 	Type:     module.Area,
 	Priority: prioDeviceDirty,
 	Dims: module.Dims{

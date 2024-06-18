@@ -88,42 +88,42 @@ modules:
             - name: device
               description: Device name
           metrics:
-            - name: dmcache.cache_space_usage
+            - name: dmcache.device_cache_space_usage
               description: DMCache space usage
               unit: bytes
               chart_type: stacked
               dimensions:
                 - name: free
                 - name: used
-            - name: dmcache.metadata_space_usage
+            - name: dmcache.device_metadata_space_usage
               description: DMCache metadata space usage
               unit: bytes
               chart_type: stacked
               dimensions:
                 - name: free
                 - name: used
-            - name: dmcache.cache_read_efficiency
+            - name: dmcache.device_cache_read_efficiency
               description: DMCache read efficiency
               unit: requests/s
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
-            - name: dmcache.cache_write_efficiency
+            - name: dmcache.device_cache_write_efficiency
               description: DMCache write efficiency
               unit: requests/s
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
-            - name: dmcache.cache_activity
+            - name: dmcache.device_cache_activity
               description: DMCache activity
               unit: bytes/s
               chart_type: area
               dimensions:
                 - name: promotions
                 - name: demotions
-            - name: dmcache.cache_dirty_size
+            - name: dmcache.device_cache_dirty_size
               description: DMCache dirty data size
               unit: bytes
               chart_type: area
