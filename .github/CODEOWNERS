@@ -47,6 +47,7 @@ CMakeLists.txt @netdata/agent-sre @vkalintiris
 netdata.spec.in @netdata/agent-sre
 netdata-installer.sh @netdata/agent-sre
 packaging/version @netdatabot @netdata/agent-sre
+packaging/repoconfig/CMakelists.txt @netdata/agent-sre
 
 LICENSE.md @netdata/agent-sre @vkalintiris
 CHANGELOG.md @netdatabot @netdata/agent-sre
