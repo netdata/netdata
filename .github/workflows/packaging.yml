@@ -68,6 +68,7 @@ jobs:
             src/web/server/h2o/libh2o/
           files_ignore: |
             **/*.md
+            packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
         env:
