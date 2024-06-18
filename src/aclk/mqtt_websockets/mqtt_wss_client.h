@@ -155,8 +155,13 @@ struct mqtt_wss_stats {
 struct mqtt_wss_stats mqtt_wss_get_stats(mqtt_wss_client client);
 
 #ifdef MQTT_WSS_DEBUG
+#ifdef ENABLE_OPENSSL
 #include <openssl/ssl.h>
+#elif defined(ENABLE_WOLFSSL)
+#include <wolfssl/options.h>
+#include <wolfssl/openssl/ssl.h>
+#endif // ENABLE_OPENSSL
 void mqtt_wss_set_SSL_CTX_keylog_cb(mqtt_wss_client client, void (*ssl_ctx_keylog_cb)(const SSL *ssl, const char *line));
-#endif
+#endif // MQTT_WSS_DEBUG
 
 #endif /* MQTT_WSS_CLIENT_H */
