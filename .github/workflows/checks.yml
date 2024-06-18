@@ -59,6 +59,7 @@ jobs:
             packaging/*.checksums
           files_ignore: |
             **/*.md
+            packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
         env:
