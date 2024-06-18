@@ -125,10 +125,10 @@ static void local_socket_to_json_array(BUFFER *wb, LOCAL_SOCKET *n, uint64_t pro
         }
         buffer_json_add_array_item_string(wb, n->network_viewer.remote_address_space);
 
-        uint16_t server_port;
-        const char *server_address;
-        const char *client_address_space;
-        const char *server_address_space;
+        uint16_t server_port = 0;
+        const char *server_address = NULL;
+        const char *client_address_space = NULL;
+        const char *server_address_space = NULL;
         switch (n->direction) {
             case SOCKET_DIRECTION_LISTEN:
             case SOCKET_DIRECTION_INBOUND:
