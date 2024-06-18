@@ -837,6 +837,7 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
     buffer_json_object_close(wb); // streaming
 }
 
+#ifdef ENABLE_ACLK
 static void agent_capabilities_to_json(BUFFER *wb, RRDHOST *host, const char *key) {
     buffer_json_member_add_array(wb, key);
 
@@ -853,6 +854,7 @@ static void agent_capabilities_to_json(BUFFER *wb, RRDHOST *host, const char *ke
     buffer_json_array_close(wb);
     freez(capas);
 }
+#endif
 
 static inline void host_dyncfg_to_json_v2(BUFFER *wb, const char *key, RRDHOST_STATUS *s) {
     buffer_json_member_add_object(wb, key);
@@ -930,7 +932,9 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
             buffer_json_member_add_string(wb, "state", rrdhost_state_cloud_emulation(host) ? "reachable" : "stale");
 
             rrdhost_health_to_json_v2(wb, "health", &s);
+#ifdef ENABLE_ACLK
             agent_capabilities_to_json(wb, host, "capabilities");
+#endif
         }
 
         if (ctl->mode & (CONTEXTS_V2_NODE_INSTANCES)) {
@@ -974,7 +978,9 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
                 rrdhost_health_to_json_v2(wb, "health", &s);
 
                 host_functions2json(host, wb); // functions
+#ifdef ENABLE_ACLK
                 agent_capabilities_to_json(wb, host, "capabilities");
+#endif
 
                 host_dyncfg_to_json_v2(wb, "dyncfg", &s);
             }
