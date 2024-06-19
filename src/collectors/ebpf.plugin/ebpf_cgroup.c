@@ -341,7 +341,7 @@ void ebpf_create_charts_on_systemd(ebpf_systemd_args_t *chart)
                          chart->update_every,
                          chart->module);
     char service_name[512];
-    snprintfz(service_name, 511, "systemd_%s", chart->id);
+    snprintfz(service_name, 511, "%s", (!strstr(chart->id, "systemd_")) ? chart->id : (chart->id + 8));
     ebpf_create_chart_labels("service_name", service_name, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
     fprintf(stdout, "DIMENSION %s '' %s 1 1\n", chart->dimension, chart->algorithm);
