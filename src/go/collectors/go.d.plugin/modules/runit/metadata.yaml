@@ -90,7 +90,7 @@ modules:
                 > **Note**: When you define multiple jobs, their names must be unique.
 
                 Add directory with user services.
-               config: |
+              config: |
                 jobs:
                   - name: system
 
