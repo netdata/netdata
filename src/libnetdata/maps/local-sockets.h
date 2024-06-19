@@ -1139,7 +1139,9 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
 
     // if we don't get the spinlock, then other threads may have locks on strings,
     // dictionaries, etc, preventing us from finishing.
+    spinlock_lock(&ls->spinlock);
     pid_t pid = safe_fork();
+    spinlock_unlock(&ls->spinlock);
 
     if (pid == 0) {
         // Child process
