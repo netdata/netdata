@@ -117,6 +117,7 @@ see the appropriate collector readme.
 | [rabbitmq](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/rabbitmq)                     |           RabbitMQ            |
 | [redis](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/redis)                           |             Redis             |
 | [rspamd](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/rspamd)                         |            Rspamd             |
+| [runit](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/runit)                           |             Runit             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/scaleio)                       |       Dell EMC ScaleIO        |
 | [sensors](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules)                               |       Hardware Sensors        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/snmp)                             |             SNMP              |
