@@ -39,6 +39,8 @@ func TestNew(t *testing.T) {
 }
 
 func TestRunit_Init(t *testing.T) {
+	os.Setenv("SVDIR", "testdata") // Required to get working New().Config.
+
 	// 'Init() bool' initializes the module with an appropriate config, so to test it we need:
 	// - provide the config.
 	// - set module.Config field with the config.
