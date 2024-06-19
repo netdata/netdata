@@ -1,11 +1,18 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.46.0](https://github.com/netdata/netdata/tree/v1.46.0) (2024-06-19)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.6...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.6...v1.46.0)
 
 **Merged pull requests:**
 
+- fix apcupsd status "slave" [\#17961](https://github.com/netdata/netdata/pull/17961) ([ilyam8](https://github.com/ilyam8))
+- fix apcupsd status [\#17960](https://github.com/netdata/netdata/pull/17960) ([ilyam8](https://github.com/ilyam8))
+- docs: clarify setting time/disk limits to 0 [\#17958](https://github.com/netdata/netdata/pull/17958) ([ilyam8](https://github.com/ilyam8))
+- docs: add time-based retention to "Change how long Netdata stores metrics" [\#17957](https://github.com/netdata/netdata/pull/17957) ([ilyam8](https://github.com/ilyam8))
+- go.d systemdunits: remove "omitempty" tag from collect\_unit\_files [\#17956](https://github.com/netdata/netdata/pull/17956) ([ilyam8](https://github.com/ilyam8))
+- fix installing netdata journald conf for native packages [\#17954](https://github.com/netdata/netdata/pull/17954) ([ilyam8](https://github.com/ilyam8))
+- remove Discord badge \(rate limited by upstream service\) [\#17953](https://github.com/netdata/netdata/pull/17953) ([ilyam8](https://github.com/ilyam8))
 - rename env var for extended internal monitoring [\#17951](https://github.com/netdata/netdata/pull/17951) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17950](https://github.com/netdata/netdata/pull/17950) ([netdatabot](https://github.com/netdatabot))
 - fix indentation in go.d/dnsquery conf [\#17948](https://github.com/netdata/netdata/pull/17948) ([ilyam8](https://github.com/ilyam8))
@@ -398,12 +405,6 @@
 - Bump github.com/docker/docker from 26.0.0+incompatible to 26.0.1+incompatible in /src/go/collectors/go.d.plugin [\#17403](https://github.com/netdata/netdata/pull/17403) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations.js [\#17399](https://github.com/netdata/netdata/pull/17399) ([netdatabot](https://github.com/netdatabot))
 - apply first alarms, then alarm templates [\#17398](https://github.com/netdata/netdata/pull/17398) ([ktsaou](https://github.com/ktsaou))
-- Fix publishing Docker images to Docker Hub. [\#17397](https://github.com/netdata/netdata/pull/17397) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#17396](https://github.com/netdata/netdata/pull/17396) ([netdatabot](https://github.com/netdatabot))
-- go.d nvme meta: remove sudoers prereq [\#17395](https://github.com/netdata/netdata/pull/17395) ([ilyam8](https://github.com/ilyam8))
-- add simple collector to monitor lvm thin volumes space usage [\#17394](https://github.com/netdata/netdata/pull/17394) ([ilyam8](https://github.com/ilyam8))
-- fix percentages on alerts [\#17391](https://github.com/netdata/netdata/pull/17391) ([ktsaou](https://github.com/ktsaou))
-- Function docs edits [\#17390](https://github.com/netdata/netdata/pull/17390) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
