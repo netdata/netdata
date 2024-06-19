@@ -54,7 +54,7 @@ type Config struct {
 	Timeout               web.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	Include               []string     `yaml:"include,omitempty" json:"include"`
 	SkipTransient         bool         `yaml:"skip_transient" json:"skip_transient"`
-	CollectUnitFiles      bool         `yaml:"collect_unit_files,omitempty" json:"collect_unit_files"`
+	CollectUnitFiles      bool         `yaml:"collect_unit_files" json:"collect_unit_files"`
 	IncludeUnitFiles      []string     `yaml:"include_unit_files,omitempty" json:"include_unit_files"`
 	CollectUnitFilesEvery web.Duration `yaml:"collect_unit_files_every,omitempty" json:"collect_unit_files_every"`
 }
