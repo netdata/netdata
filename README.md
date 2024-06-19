@@ -39,21 +39,21 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 Netdata monitors all the following:
 
-|                                                                                           Component |                 Linux                 | FreeBSD | macOS |             Windows*             |
-|----------------------------------------------------------------------------------------------------:|:-------------------------------------:|:-------:|:-----:|:--------------------------------:|
-|                     **System Resources**<small><br/>CPU, Memory and system shared resources</small> |                 Full                  |   Yes   |  Yes  |               Yes                |
-|                        **Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small> |                 Full                  |  Basic  | Basic |              Basic               |
-|                         **Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small> |                 Full                  |  Basic  | Basic |              Basic               |
-|                **Hardware & Sensors**<small><br/>Fans, Temperatures, Controllers, GPUs, etc</small> |                 Full                  |  Some   | Some  |               Some               |
-|                               **O/S Services**<small><br/>Resources, Performance and Status</small> |    Yes<small><br/>`systemd`</small>   |    -    |   -   |              Basic               |
-|                                                                                            **Logs** |   Yes<small><br/>`systemd`-journal    |    -    |   -   |                -                 |
-|                              **Processes**<small><br/>Resources, Performance, OOM, and more</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
-|                         **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |                  Yes                  |    -    |   -   |                -                 |
-|                       **Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small> |                  Yes                  |    -    |   -   |                -                 |
-|                         **VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small> |   Yes<small><br/>`cgroups`</small>    |    -    |   -   | Yes<small><br/>`Hyper-V`</small> |
-|               **Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
-|  **Packaged Applications**<small><br/>nginx, apache, postgres, redis, mongodb,<br/>and hundreds more</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
-|                                      **Custom Applications**<small><br/>OpenMetrics, StatsD</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
+|                                                                                                   Component |              Linux               | FreeBSD | macOS |             Windows*             |
+|------------------------------------------------------------------------------------------------------------:|:--------------------------------:|:-------:|:-----:|:--------------------------------:|
+|                             **System Resources**<small><br/>CPU, Memory and system shared resources</small> |               Full               |   Yes   |  Yes  |               Yes                |
+|                                **Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small> |               Full               |  Basic  | Basic |              Basic               |
+|                                 **Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small> |               Full               |  Basic  | Basic |              Basic               |
+|                        **Hardware & Sensors**<small><br/>Fans, Temperatures, Controllers, GPUs, etc</small> |               Full               |  Some   | Some  |               Some               |
+|                                       **O/S Services**<small><br/>Resources, Performance and Status</small> | Yes<small><br/>`systemd`</small> |    -    |   -   |              Basic               |
+|                                                                                                    **Logs** | Yes<small><br/>`systemd`-journal |    -    |   -   |                -                 |
+|                                      **Processes**<small><br/>Resources, Performance, OOM, and more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
+|                                 **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |               Yes                |    -    |   -   |                -                 |
+|                               **Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small> |               Yes                |    -    |   -   |                -                 |
+|                                 **VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small> | Yes<small><br/>`cgroups`</small> |    -    |   -   | Yes<small><br/>`Hyper-V`</small> |
+|                       **Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small> |               Yes                |   Yes   |  Yes  |               Yes                |
+| **Packaged Applications**<small><br/>nginx, apache, postgres, redis, mongodb,<br/>and hundreds more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
+|                                              **Custom Applications**<small><br/>OpenMetrics, StatsD</small> |               Yes                |   Yes   |  Yes  |               Yes                |
 
 When Netdata runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies that can be monitored.
 
@@ -199,7 +199,7 @@ Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata
 |            More Customizable            |                           Set default settings for all charts and views!                            |     soon      |                                                       in progress                                                       |
 |         AWS Integrated billing          |       Run Netdata our your AWS instances and get your billing integrated on your AWS account.       |     soon      |                                                       in progress                                                       |
 |        Alert Silence Manager R2         |           Improvements to the Alert Silencing Manager with recurring schedules and more!            |     soon      |                                                       in progress                                                       |
-|                Okta SSO                 |        Facilitate the integration of Netdata into your organizations user management process.        |     soon      |                                                       in progress                                                       |
+|                Okta SSO                 |       Facilitate the integration of Netdata into your organizations user management process.        |     soon      |                                                       in progress                                                       |
 | Prometheus/OpenMetrics<br/>improvements |               Allow users to configure how metrics should be ingested and presented.                |     soon      |                                                       in progress                                                       |
 |                Loki logs                |                     Another Logs integration, bring your Loki logs onto the UI!                     |     soon      |                                                       in progress                                                       |
 |               UCUM Units                |                    Migrate all metrics to the Unified Code for Units of Measure.                    |     soon      |                                                       in progress                                                       |
