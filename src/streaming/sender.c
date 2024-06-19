@@ -634,6 +634,7 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
 #endif
 }
 
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
 static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
 
     char http[HTTP_HEADER_SIZE + 1];
@@ -731,6 +732,7 @@ err_cleanup:
     http_parse_ctx_destroy(&ctx);
     return 1;
 }
+#endif
 
 static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout, struct sender_state *s) {
 
@@ -869,6 +871,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(!rrdpush_sender_connect_ssl(s))
         return false;
 
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
     if (s->parent_using_h2o && rrdpush_http_upgrade_prelude(host, s)) {
         ND_LOG_STACK lgs[] = {
                 ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_CANT_UPGRADE_CONNECTION),
@@ -882,6 +885,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         host->destination->postpone_reconnection_until = now_realtime_sec() + 1 * 60;
         return false;
     }
+#endif
     
     ssize_t len = (ssize_t)strlen(http);
     ssize_t bytes = send_timeout(
