@@ -33,15 +33,15 @@ You can change these limits in `netdata.conf`:
     mode = dbengine	
     storage tiers = 3
 
-    # Tier 0, per second data
+    # Tier 0, per second data. Set to 0 for no limit.
     dbengine tier 0 disk space MB = 1024
     dbengine tier 0 retention days = 14
 
-    # Tier 1, per minute data
+    # Tier 1, per minute data. Set to 0 for no limit.
     dbengine tier 1 disk space MB = 1024
     dbengine tier 1 retention days = 90
 
-    # Tier 2, per hour data
+    # Tier 2, per hour data. Set to 0 for no limit.
     dbengine tier 2 disk space MB = 1024
     dbengine tier 2 retention days = 730
 ```
