@@ -31,6 +31,11 @@ Section "Install Netdata"
 	DetailPrint "Warning: Failed to create Netdata service."
 
 	ClearErrors
+	ExecWait '"$SYSDIR\sc.exe" description Netdata "Real-time system monitoring service"'
+	IfErrors 0 +2
+	DetailPrint "Warning: Failed to add Netdata service description."
+
+	ClearErrors
 	ExecWait '"$SYSDIR\sc.exe" start Netdata'
 	IfErrors 0 +2
 	DetailPrint "Warning: Failed to start Netdata service."
