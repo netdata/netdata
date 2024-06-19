@@ -22,8 +22,8 @@ retention strategies as shown in the table below:
 
 | Setting                        | Retention Behavior                                                                                                                        |
 |--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| Time Limit = 0, Size Limit > 0 | **Time-based only:** data is stored for a specific duration regardless of disk usage.                                                     |
-| Size Limit = 0, Time Limit > 0 | **Space-based only:** data is stored until it reaches a certain amount of disk space, regardless of time.                                 |
+| Size Limit = 0, Time Limit > 0 | **Time-based only:** data is stored for a specific duration regardless of disk usage.                                                     |
+| Time Limit = 0, Size Limit > 0 | **Space-based only:** data is stored until it reaches a certain amount of disk space, regardless of time.                                 |
 | Time Limit > 0, Size Limit > 0 | **Combined time and space limits:** data is deleted once it reaches either the time limit or the disk space limit, whichever comes first. |
 
 You can change these limits in `netdata.conf`:
