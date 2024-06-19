@@ -213,7 +213,7 @@ BEGIN {
                  status_LOWBATT = (\$0 ~ \"LOWBATT\") ? 1 : 0;
                  status_REPLACEBATT = (\$0 ~ \"REPLACEBATT\") ? 1 : 0;
                  status_NOBATT = (\$0 ~ \"NOBATT\") ? 1 : 0;
-                 status_SLAVE = (\$0 ~ \"SLAVE\") ? 1 : 0;
+                 status_SLAVE = (\$0 ~ \"SLAVE( |$)\") ? 1 : 0;
                  status_SLAVEDOWN = (\$0 ~ \"SLAVEDOWN\") ? 1 : 0;
                  status_COMMLOST = (\$0 ~ \"COMMLOST\") ? 1 : 0;
                  status_SHUTTING_DOWN = (\$0 ~ \"SHUTTING\") ? 1 : 0;
