@@ -128,7 +128,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
     rrdlabels_add(d->st_alloc_efficiency->rrdlabels, "device", name, RRDLABEL_SRC_AUTO);
 }
 
-static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_every) {
+static int init_devices(DICTIONARY *devices, int update_every) {
     int count = 0;
     struct dirent *de;
     struct stat st;
@@ -269,7 +269,7 @@ int do_sys_block_zram(int update_every, usec_t dt) {
         procfile_close(ff);
 
         devices = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED, &dictionary_stats_category_collectors, 0);
-        device_count = init_devices(devices, (unsigned int)zram_id, update_every);
+        device_count = init_devices(devices, update_every);
     }
 
     if (unlikely(device_count < 1))

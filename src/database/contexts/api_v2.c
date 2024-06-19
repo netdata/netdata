@@ -1182,11 +1182,13 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
             group_seconds *= storage_tiers_grouping_iterations[tier];
             uint64_t max = storage_engine_disk_space_max(eng->seb, localhost->db[tier].si);
-#ifdef ENABLE_DBENGINE
-            if (!max && eng->seb == STORAGE_ENGINE_BACKEND_DBENGINE)
-                max = get_directory_free_bytes_space(multidb_ctx[tier]);
-#endif
             uint64_t used = storage_engine_disk_space_used(eng->seb, localhost->db[tier].si);
+#ifdef ENABLE_DBENGINE
+            if (!max && eng->seb == STORAGE_ENGINE_BACKEND_DBENGINE) {
+                max = get_directory_free_bytes_space(multidb_ctx[tier]);
+                max += used;
+            }
+#endif
             time_t first_time_s = storage_engine_global_first_time_s(eng->seb, localhost->db[tier].si);
             size_t currently_collected_metrics = storage_engine_collected_metrics(eng->seb, localhost->db[tier].si);
 

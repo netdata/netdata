@@ -21,7 +21,6 @@
   <a href="https://scan.coverity.com/projects/netdata-netdata?tab=overview"><img alt="Coverity Scan" src="https://img.shields.io/coverity/scan/netdata"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg" alt="License: GPL v3+"></a>
   <br />
-  <a href="https://discord.com/invite/2mEmfW735j"><img alt="Discord" src="https://img.shields.io/discord/847502280503590932?logo=discord&logoColor=white&label=chat%20on%20discord"></a>
   <a href="https://community.netdata.cloud"><img alt="Discourse topics" src="https://img.shields.io/discourse/topics?server=https%3A%2F%2Fcommunity.netdata.cloud%2F&logo=discourse&label=discourse%20forum"></a>
   <a href="https://github.com/netdata/netdata/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/github/discussions/netdata/netdata?logo=github&label=github%20discussions"></a>
 </p>
@@ -40,21 +39,21 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 Netdata monitors all the following:
 
-|                                                                                           Component |                 Linux                 | FreeBSD | macOS |             Windows*             |
-|----------------------------------------------------------------------------------------------------:|:-------------------------------------:|:-------:|:-----:|:--------------------------------:|
-|                     **System Resources**<small><br/>CPU, Memory and system shared resources</small> |                 Full                  |   Yes   |  Yes  |               Yes                |
-|                        **Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small> |                 Full                  |  Basic  | Basic |              Basic               |
-|                         **Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small> |                 Full                  |  Basic  | Basic |              Basic               |
-|                **Hardware & Sensors**<small><br/>Fans, Temperatures, Controllers, GPUs, etc</small> |                 Full                  |  Some   | Some  |               Some               |
-|                               **O/S Services**<small><br/>Resources, Performance and Status</small> |    Yes<small><br/>`systemd`</small>   |    -    |   -   |              Basic               |
-|                                                                                            **Logs** |   Yes<small><br/>`systemd`-journal    |    -    |   -   |                -                 |
-|                              **Processes**<small><br/>Resources, Performance, OOM, and more</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
-|                         **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |                  Yes                  |    -    |   -   |                -                 |
-|                       **Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small> |                  Yes                  |    -    |   -   |                -                 |
-|                         **VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small> |   Yes<small><br/>`cgroups`</small>    |    -    |   -   | Yes<small><br/>`Hyper-V`</small> |
-|               **Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
-|  **Packaged Applications**<small><br/>nginx, apache, postgres, redis, mongodb,<br/>and hundreds more</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
-|                                      **Custom Applications**<small><br/>OpenMetrics, StatsD</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
+|                                                                                                   Component |              Linux               | FreeBSD | macOS |             Windows*             |
+|------------------------------------------------------------------------------------------------------------:|:--------------------------------:|:-------:|:-----:|:--------------------------------:|
+|                             **System Resources**<small><br/>CPU, Memory and system shared resources</small> |               Full               |   Yes   |  Yes  |               Yes                |
+|                                **Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small> |               Full               |  Basic  | Basic |              Basic               |
+|                                 **Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small> |               Full               |  Basic  | Basic |              Basic               |
+|                        **Hardware & Sensors**<small><br/>Fans, Temperatures, Controllers, GPUs, etc</small> |               Full               |  Some   | Some  |               Some               |
+|                                       **O/S Services**<small><br/>Resources, Performance and Status</small> | Yes<small><br/>`systemd`</small> |    -    |   -   |              Basic               |
+|                                                                                                    **Logs** | Yes<small><br/>`systemd`-journal |    -    |   -   |                -                 |
+|                                      **Processes**<small><br/>Resources, Performance, OOM, and more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
+|                                 **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |               Yes                |    -    |   -   |                -                 |
+|                               **Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small> |               Yes                |    -    |   -   |                -                 |
+|                                 **VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small> | Yes<small><br/>`cgroups`</small> |    -    |   -   | Yes<small><br/>`Hyper-V`</small> |
+|                       **Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small> |               Yes                |   Yes   |  Yes  |               Yes                |
+| **Packaged Applications**<small><br/>nginx, apache, postgres, redis, mongodb,<br/>and hundreds more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
+|                                              **Custom Applications**<small><br/>OpenMetrics, StatsD</small> |               Yes                |   Yes   |  Yes  |               Yes                |
 
 When Netdata runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies that can be monitored.
 
@@ -83,7 +82,7 @@ Netdata provides full **enterprise hardware** coverage, monitoring all component
   Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, zero-touch machine-learning, easy scalability and high availability, and CI/CD friendly.
 
 - :star: **Open and Extensible**<br/>
-  Netdata is a modular platform that can be extended in all possible ways and it also integrates nicely with other monitoring solutions.
+  Netdata is a modular platform that can be extended in all possible ways, and it also integrates nicely with other monitoring solutions.
 
 ---
 
@@ -97,9 +96,9 @@ This tool visualizes all the sockets each server has (IPv4 and IPv6, TCP and UDP
 The visualization has 4 sides:
 
 - `public` (ie. public IPs),
-- `private` (ie. private and reserved IPs),
-- `servers` (ie. listening and inbound sockets),
-- `clients` (ie. sockets towards other servers).
+- `private` (i.e. private and reserved IPs),
+- `servers` (i.e. listening and inbound sockets),
+- `clients` (i.e. sockets towards other servers).
 
 The position of each application on the chart is determined by the classification of the sockets it has. To the top are clients, to the bottom are servers, to the right are internet facing applications, to the left is internal network applications.
 
@@ -200,7 +199,7 @@ Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata
 |            More Customizable            |                           Set default settings for all charts and views!                            |     soon      |                                                       in progress                                                       |
 |         AWS Integrated billing          |       Run Netdata our your AWS instances and get your billing integrated on your AWS account.       |     soon      |                                                       in progress                                                       |
 |        Alert Silence Manager R2         |           Improvements to the Alert Silencing Manager with recurring schedules and more!            |     soon      |                                                       in progress                                                       |
-|                Okta SSO                 |        Facilitate the integration of Netdata into your organizations user management process.        |     soon      |                                                       in progress                                                       |
+|                Okta SSO                 |       Facilitate the integration of Netdata into your organizations user management process.        |     soon      |                                                       in progress                                                       |
 | Prometheus/OpenMetrics<br/>improvements |               Allow users to configure how metrics should be ingested and presented.                |     soon      |                                                       in progress                                                       |
 |                Loki logs                |                     Another Logs integration, bring your Loki logs onto the UI!                     |     soon      |                                                       in progress                                                       |
 |               UCUM Units                |                    Migrate all metrics to the Unified Code for Units of Measure.                    |     soon      |                                                       in progress                                                       |
@@ -258,7 +257,7 @@ Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata
    - Install on [Ubuntu, Debian CentOS, Fedora, Suse, Red Hat, Arch, Alpine, Gentoo, even BusyBox](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
    - Install with [Docker](/packaging/docker/README.md).<br/>
      Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
-   - Install on [MacOS](https://learn.netdata.cloud/docs/installing/macos) :metal:.
+   - Install on [macOS](https://learn.netdata.cloud/docs/installing/macos) :metal:.
    - Install on [FreeBSD](https://learn.netdata.cloud/docs/installing/freebsd) and [pfSense](https://learn.netdata.cloud/docs/installing/pfsense).
    - Install [from source](https://learn.netdata.cloud/docs/installing/build-the-netdata-agent-yourself/compile-from-source-code) ![github downloads](https://img.shields.io/github/downloads/netdata/netdata/total?color=success&logo=github)
    - For Kubernetes deployments [check here](https://learn.netdata.cloud/docs/installation/install-on-specific-environments/kubernetes/).
@@ -391,13 +390,13 @@ The core of Netdata is developed in C. We have our own `libnetdata`, that provid
   A high-performance algorithm to maintain both indexed and ordered pools of structures Netdata needs. It uses JudyHS arrays for indexing, although it is modular: any hashtable or tree can be integrated into it. Despite being in C, dictionaries follow object-oriented programming principles, so there are constructors, destructors, automatic memory management, garbage collection, and more. For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/dictionary).
   
 - **`ARAL`**<br/>
-  ARray ALlocator (ARAL) is used to minimize the system allocations made by Netdata. ARAL is optimized for maximum multi-threaded performance. It also allows all structures that use it to be allocated in memory-mapped files (shared memory) instead of RAM. For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/aral).
+  ARray ALlocator (ARAL) is used to minimize the system allocations made by Netdata. ARAL is optimized for maximum multithreaded performance. It also allows all structures that use it to be allocated in memory-mapped files (shared memory) instead of RAM. For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/aral).
 
 - **`PROCFILE`**<br/>
   A high-performance `/proc` (but also any) file parser and text tokenizer. It achieves its performance by keeping files open and adjusting its buffers to read the entire file in one call (which is also required by the Linux kernel). For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/procfile).
 
 - **`STRING`**<br/>
-  A string internet mechanism, for string deduplication and indexing (using JudyHS arrays), optimized for multi-threaded usage. For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/string).
+  A string internet mechanism, for string deduplication and indexing (using JudyHS arrays), optimized for multithreaded usage. For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/string).
 
 - **`ARL`**<br/>
   Adaptive Resortable List (ARL), is a very fast list iterator, that keeps the expected items on the list in the same order they are found in input list. So, the first iteration is somewhat slower, but all the following iterations are perfectly aligned for best performance. For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/adaptive_resortable_list).
@@ -421,7 +420,7 @@ Netdata data collection plugins can be developed in any language. Most of our ap
 
 ### :shield: Is Netdata secure?
 
-Of course it is! We do our best to ensure it is!
+Of course, it is! We do our best to ensure it is!
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
@@ -584,7 +583,7 @@ The distributed nature of Netdata helps scale this approach: your data is spread
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
-### :raised_eyebrow: How is Netdata different from Nagios, Icinga, Zabbix, etc?
+### :raised_eyebrow: How is Netdata different from Nagios, Icinga, Zabbix, etc.?
 
 Netdata offers real-time, comprehensive monitoring, with a user-friendly interface and the ability to monitor everything, without any custom configuration required.
 

@@ -979,6 +979,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Ceph](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/ceph/integrations/ceph.md)
 
+- [DMCache devices](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/dmcache/integrations/dmcache_devices.md)
+
 - [Dell EMC Isilon cluster](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/dell_emc_isilon_cluster.md)
 
 - [Dell EMC ScaleIO](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/scaleio/integrations/dell_emc_scaleio.md)

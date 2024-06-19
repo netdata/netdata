@@ -52,6 +52,7 @@ jobs:
           files_ignore: |
             netdata.spec.in
             **/*.md
+            packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
         env:
