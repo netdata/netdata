@@ -445,7 +445,9 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdpush_receiver_replication_reset(host);
 
         rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+#ifdef ENABLE_ACLK
         aclk_queue_node_info(rpt->host, true);
+#endif
 
         rrdpush_reset_destinations_postpone_time(host);
 
@@ -780,7 +782,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
         }
 
         netdata_log_debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
         if (is_h2o_rrdpush(rpt)) {
             h2o_stream_write(rpt->h2o_ctx, initial_response, strlen(initial_response));
         } else {
