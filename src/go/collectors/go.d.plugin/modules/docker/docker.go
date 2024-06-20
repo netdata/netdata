@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/dockerhost"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/docker/docker/api/types"
@@ -79,6 +80,10 @@ func (d *Docker) Configuration() any {
 }
 
 func (d *Docker) Init() error {
+	if addr := dockerhost.FromEnv(); addr != "" && d.Address == docker.DefaultDockerHost {
+		d.Infof("using docker host from environment: %s ", addr)
+		d.Address = addr
+	}
 	return nil
 }
 
