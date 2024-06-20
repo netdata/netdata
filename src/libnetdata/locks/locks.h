@@ -6,9 +6,9 @@
 #include "../libnetdata.h"
 #include "../clocks/clocks.h"
 
-#ifdef OS_WINDOWS
-#define SPINLOCK_IMPL_WITH_MUTEX
-#endif
+// #ifdef OS_WINDOWS
+// #define SPINLOCK_IMPL_WITH_MUTEX
+// #endif
 
 typedef pthread_mutex_t netdata_mutex_t;
 #define NETDATA_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
