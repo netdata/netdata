@@ -451,7 +451,12 @@ typedef enum {
 } OPEN_FD_EXCLUDE;
 void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds);
 
+#ifdef OS_WINDOWS
+void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data);
+#else
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) NORETURN;
+#endif
+
 extern char *netdata_configured_host_prefix;
 
 #include "os/os.h"

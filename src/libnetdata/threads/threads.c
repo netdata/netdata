@@ -418,8 +418,9 @@ bool nd_thread_signaled_to_cancel(void) {
 // ----------------------------------------------------------------------------
 // nd_thread_join
 
-void nd_thread_join(ND_THREAD *nti) {
-    if(!nti) return;
+int nd_thread_join(ND_THREAD *nti) {
+    if(!nti)
+        return ESRCH;
 
     int ret = pthread_join(nti->thread, NULL);
     if(ret != 0)
@@ -434,4 +435,6 @@ void nd_thread_join(ND_THREAD *nti) {
 
         freez(nti);
     }
+
+    return ret;
 }
