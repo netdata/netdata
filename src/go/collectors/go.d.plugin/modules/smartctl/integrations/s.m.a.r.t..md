@@ -102,6 +102,34 @@ There are no alerts configured by default for this integration.
 Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
 
 
+#### For Netdata running in a Docker container
+
+Netdata requires the `SYS_RAWIO` capability and access to the storage devices to run the `smartctl` collector inside a Docker container. Here's how you can achieve this:
+
+- `docker run`
+
+  ```bash
+  docker run --cap-add SYS_RAWIO --device /dev/sda:/dev/sda ...
+  ```
+
+- `docker-compose.yml`
+
+  ```yaml
+  services:
+    netdata:
+      cap_add:
+        - SYS_PTRACE
+        - SYS_ADMIN
+        - SYS_RAWIO # smartctl
+      devices:
+        - "/dev/sda:/dev/sda"
+  ```
+
+> **Multiple Devices**: These examples only show mapping of one device (/dev/sda). You'll need to add additional `--device` options (in docker run) or entries in the `devices` list (in docker-compose.yml) for each storage device you want Netdata's smartctl collector to monitor.
+
+> **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/nvme#readme) to monitor NVMe devices.
+
+
 
 ### Configuration
 
