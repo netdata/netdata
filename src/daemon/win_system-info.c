@@ -19,7 +19,7 @@ char *netdata_windows_arch(DWORD value)
         case 0:
             return "x86";
         default:
-            return NETDATA_DEFAULT_VALUE_SYSTEM_INFO;
+            return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
     }
 }
 
@@ -60,7 +60,7 @@ void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
 
     (void)rrdhost_set_system_info_variable(systemInfo,
                                            "NETDATA_SYSTEM_CPU_FREQ",
-                                           (!cpuFreq) ? NETDATA_DEFAULT_VALUE_SYSTEM_INFO : cpuData);
+                                           (!cpuFreq) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : cpuData);
 
     char *arch = netdata_windows_arch(sysInfo.wProcessorArchitecture);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
@@ -77,7 +77,7 @@ void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
 
     (void)rrdhost_set_system_info_variable(systemInfo,
                                            "NETDATA_SYSTEM_TOTAL_RAM",
-                                           (!size) ? NETDATA_DEFAULT_VALUE_SYSTEM_INFO : memSize);
+                                           (!size) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : memSize);
 }
 
 inline ULONGLONG netdata_windows_get_disk_size(char *cVolume)
@@ -207,7 +207,9 @@ static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo) 
     netdata_windows_discover_os_version(osVersion, 4095);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_ID", osVersion);
 
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_ID_LIKE", NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
+    (void)rrdhost_set_system_info_variable(systemInfo,
+                                           "NETDATA_HOST_OS_ID_LIKE",
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
 
     netdata_windows_os_version(osVersion, 4095);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION", osVersion);
@@ -215,36 +217,47 @@ static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo) 
 
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_DETECTION", "Windows API");
 
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_KERNEL_NAME", NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
+    (void)rrdhost_set_system_info_variable(systemInfo,
+                                           "NETDATA_SYSTEM_KERNEL_NAME",
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
 }
 
 // Cloud
 static inline void netdata_windows_cloud(struct rrdhost_system_info *systemInfo) {
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_INSTANCE_CLOUD_TYPE", NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
+    (void)rrdhost_set_system_info_variable(systemInfo,
+                                           "NETDATA_INSTANCE_CLOUD_TYPE",
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
     (void)rrdhost_set_system_info_variable(systemInfo,
                                            "NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE",
-                                           NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
     (void)rrdhost_set_system_info_variable(systemInfo,
                                            "NETDATA_INSTANCE_CLOUD_INSTANCE_REGION",
-                                           NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
 }
 
 // Container
 static inline void netdata_windows_container(struct rrdhost_system_info *systemInfo) {
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_CONTAINER_OS_NAME", NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_CONTAINER_OS_ID", NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
+    (void)rrdhost_set_system_info_variable(systemInfo,
+                                           "NETDATA_CONTAINER_OS_NAME",
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
+    (void)rrdhost_set_system_info_variable(systemInfo,
+                                           "NETDATA_CONTAINER_OS_ID",
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
     (void)rrdhost_set_system_info_variable(systemInfo,
                                            "NETDATA_CONTAINER_OS_ID_LIKE",
-                                           NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
     (void)rrdhost_set_system_info_variable(systemInfo,
                                            "NETDATA_CONTAINER_OS_VERSION",
-                                           NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
     (void)rrdhost_set_system_info_variable(systemInfo,
                                            "NETDATA_CONTAINER_OS_VERSION_ID",
-                                           NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
     (void)rrdhost_set_system_info_variable(systemInfo,
                                            "NETDATA_CONTAINER_OS_DETECTION",
-                                           NETDATA_DEFAULT_VALUE_SYSTEM_INFO);
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
+    (void)rrdhost_set_system_info_variable(systemInfo,
+                                           "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE",
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE);
 }
 
 void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo) {

@@ -4,7 +4,9 @@
 // the netdata database
 #include "database/rrd.h"
 
-#define NETDATA_DEFAULT_VALUE_SYSTEM_INFO "unknown"
+#define NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN "unknown"
+#define NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE "none"
+#define NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE "false"
 
 #ifdef OS_WINDOWS
 #include "windows.h"
