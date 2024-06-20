@@ -3,45 +3,52 @@ extern "C" {
 #include "daemon.h"
 #include "libnetdata/libnetdata.h"
 
+int netdata_main(int argc, char *argv[]);
+
 }
 
 #include <windows.h>
-#include <iostream>
-#include <fstream>
 
-extern "C" int netdata_main(int argc, char *argv[]);
+#ifdef NETDATA_INTERNAL_CHECKS
+__attribute__((format(printf, 1, 2)))
+static void netdata_service_log(const char *fmt, ...)
+{
+    char path[FILENAME_MAX + 1];
+    snprintfz(path, FILENAME_MAX, "%s/service.log", LOG_DIR);
+
+    FILE *fp = fopen(path, "a");
+    if (fp == NULL) {
+        return;
+    }
+
+    SYSTEMTIME time;
+    GetSystemTime(&time);
+    fprintf(fp, "%d:%d:%d - ", time.wHour, time.wMinute, time.wSecond);
+
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(fp, fmt, args);
+    va_end(args);
+
+    fprintf(fp, "\n");
+
+    fflush(fp);
+    fclose(fp);
+}
+
+#else
+__attribute__((format(printf, 1, 2)))
+static void netdata_service_log(const char *fmt, ...)
+{
+    UNUSED(fmt);
+}
+#endif
 
 static SERVICE_STATUS_HANDLE svc_status_handle = nullptr;
 static SERVICE_STATUS svc_status = {};
 static HANDLE svc_stop_event_handle = nullptr;
 
 static ND_THREAD *exit_thread = nullptr;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-static void WriteLog(const std::string &message)
-{
-    SYSTEMTIME time;
-    GetSystemTime(&time);
-
-    std::ofstream log("/var/log/netdata/service.log", std::ios_base::app);
-    log << time.wHour << ":" << time.wMinute << ":" << time.wSecond << " - " << message << std::endl;
-}
-#else
-static void WriteLog(const std::string &message)
-{
-    UNUSED(message);
-}
-#endif
-
-static void *call_netdata_main(void *arg)
-{
-    UNUSED(arg);
-
-    int nd_argc = 2;
-    char *nd_argv[] = {strdupz("/usr/bin/netdata"), strdupz("-D"), NULL};
-    netdata_main(nd_argc, nd_argv);
-    return nullptr;
-}
 
 static void *call_netdata_exit(void *arg)
 {
@@ -51,7 +58,7 @@ static void *call_netdata_exit(void *arg)
     WaitForSingleObject(svc_stop_event_handle, INFINITE);
 
     // Stop the agent
-    WriteLog("@call_netdata_exit() - calling netdata_cleanup_and_exit()");
+    netdata_service_log("@call_netdata_exit() - calling netdata_cleanup_and_exit()");
     netdata_cleanup_and_exit(0, NULL, NULL, NULL);
 
     // Set status to stopped
@@ -59,15 +66,14 @@ static void *call_netdata_exit(void *arg)
     svc_status.dwControlsAccepted = 0;
     svc_status.dwCurrentState = SERVICE_STOPPED;
     svc_status.dwWin32ExitCode = 0;
-    svc_status.dwCheckPoint = 3;
+    svc_status.dwCheckPoint++;
     if (!SetServiceStatus(svc_status_handle, &svc_status))
     {
-        WriteLog("@call_netdata_exit() - SetServiceStatus() to SERVICE_STOPPED failed...");
-        return nullptr;
+        netdata_service_log("@call_netdata_exit() - SetServiceStatus() to SERVICE_STOPPED failed...");
     }
 
-    // Exit - Start a new process instead of keeping alive the service.
-    exit(0);
+    netdata_service_log("@call_netdata_exit() - returning to god");
+    return nullptr;
 }
 
 static void WINAPI ServiceControlHandler(DWORD controlCode)
@@ -76,7 +82,7 @@ static void WINAPI ServiceControlHandler(DWORD controlCode)
     switch (controlCode)
     {
         case SERVICE_CONTROL_STOP: {
-            WriteLog("ServiceControlHandler(SERVICE_CONTROL_STOP)");
+            netdata_service_log("ServiceControlHandler(SERVICE_CONTROL_STOP)");
 
             if (svc_status.dwCurrentState != SERVICE_RUNNING)
                 break;
@@ -85,10 +91,10 @@ static void WINAPI ServiceControlHandler(DWORD controlCode)
             svc_status.dwControlsAccepted = 0;
             svc_status.dwCurrentState = SERVICE_STOP_PENDING;
             svc_status.dwWin32ExitCode = 0;
-            svc_status.dwCheckPoint = 4;
+            svc_status.dwCheckPoint++;
             if (!SetServiceStatus(svc_status_handle, &svc_status))
             {
-                WriteLog("@ServiceControlHandler() - SetServiceStatus() to SERVICE_STOP_PENDING failed...");
+                netdata_service_log("@ServiceControlHandler() - SetServiceStatus() to SERVICE_STOP_PENDING failed...");
             }
 
             SetEvent(svc_stop_event_handle);
@@ -107,7 +113,7 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     svc_status_handle = RegisterServiceCtrlHandler("Netdata", ServiceControlHandler);
     if (!svc_status_handle)
     {
-        WriteLog("@ServiceMain() - RegisterServiceCtrlHandler() failed...");
+        netdata_service_log("@ServiceMain() - RegisterServiceCtrlHandler() failed...");
         return;
     }
 
@@ -121,7 +127,7 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     svc_status.dwWaitHint = 5;
     if (!SetServiceStatus(svc_status_handle, &svc_status))
     {
-        WriteLog("@ServiceMain() - SetServiceStatus() to SERVICE_START_PENDING failed...");
+        netdata_service_log("@ServiceMain() - SetServiceStatus() to SERVICE_START_PENDING failed...");
         return;
     }
 
@@ -130,14 +136,14 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     if (svc_stop_event_handle == NULL)
     {
         // Set status to stopped if we failed to create the handle
-        WriteLog("@ServiceMain() - CreateEvent() failed...");
+        netdata_service_log("@ServiceMain() - CreateEvent() failed...");
         svc_status.dwControlsAccepted = 0;
         svc_status.dwCurrentState = SERVICE_STOPPED;
         svc_status.dwWin32ExitCode = GetLastError();
         svc_status.dwCheckPoint = 1;
         if (SetServiceStatus(svc_status_handle, &svc_status) == FALSE)
         {
-            WriteLog("@ServiceMain() - SetServiceStatus() to SERVICE_STOPPED failed...");
+            netdata_service_log("@ServiceMain() - SetServiceStatus() to SERVICE_STOPPED failed...");
         }
 
         return;
@@ -147,8 +153,9 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "WINSVC");
-        WriteLog("@ServiceMain() - Creating thread for handling stopping the agent service");
+        netdata_service_log("@ServiceMain() - Creating thread for handling stopping the agent service");
         exit_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, call_netdata_exit, NULL);
+        netdata_service_log("@ServiceMain(): Exit thread created (exit_thread=%p)", exit_thread);
     }
 
     // Set status to running
@@ -158,18 +165,19 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     svc_status.dwCheckPoint = 2;
     if (!SetServiceStatus(svc_status_handle, &svc_status))
     {
-        WriteLog("@ServiceMain() - SetServiceStatus() to SERVICE_RUNNING failed...");
+        netdata_service_log("@ServiceMain() - SetServiceStatus() to SERVICE_RUNNING failed...");
         return;
     }
 
     // Run the agent
     {
-        WriteLog("@ServiceMain() - calling netdata_main()...");
-
+        netdata_service_log("@ServiceMain() - calling netdata_main()...");
         int nd_argc = 2;
-        char *nd_argv[] = {strdupz("/usr/bin/netdata"), strdupz("-D"), NULL};
+        char *nd_argv[] = {strdupz("/usr/sbin/netdata"), strdupz("-D"), NULL};
         netdata_main(nd_argc, nd_argv);
     }
+
+    netdata_service_log("@ServiceMain() - returning to caller...");
 }
 
 int main()
@@ -178,6 +186,10 @@ int main()
     int nd_argc = 2;
     char *nd_argv[] = {strdupz("/usr/bin/netdata"), strdupz("-D"), NULL};
     netdata_main(nd_argc, nd_argv);
+
+    while (true) {
+        sleep(1);
+    }
 #else
     SERVICE_TABLE_ENTRY serviceTable[] = {
         { strdupz("Netdata"), ServiceMain },
@@ -186,7 +198,7 @@ int main()
 
     if (!StartServiceCtrlDispatcher(serviceTable))
     {
-        WriteLog("@main() - StartServiceCtrlDispatcher() failed...");
+        netdata_service_log("@main() - StartServiceCtrlDispatcher() failed...");
         return 1;
     }
 #endif
