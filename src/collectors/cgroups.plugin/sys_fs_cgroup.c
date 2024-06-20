@@ -131,6 +131,34 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
 
 static enum cgroups_type cgroups_try_detect_version()
 {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/fs/cgroup");
+    struct statfs fsinfo;
+
+    // https://github.com/systemd/systemd/blob/main/docs/CGROUP_DELEGATION.md#three-different-tree-setups-
+    // ├── statfs("/sys/fs/cgroup/")
+    // │   └── .f_type
+    // │       ├── CGROUP2_SUPER_MAGIC (Unified mode)
+    // │       └── TMPFS_MAGIC (Legacy or Hybrid mode)
+    //         ├── statfs("/sys/fs/cgroup/unified/")
+    //         │   └── .f_type
+    //         │       ├── CGROUP2_SUPER_MAGIC (Hybrid mode)
+    //         │       └── Otherwise, you're in legacy mode
+    if (!statfs(filename, &fsinfo)) {
+#if defined CGROUP2_SUPER_MAGIC
+        if (fsinfo.f_type == CGROUP2_SUPER_MAGIC)
+            return CGROUPS_V2;
+#endif
+#if defined TMPFS_MAGIC
+        if (fsinfo.f_type == TMPFS_MAGIC) {
+            // either hybrid or legacy
+            return CGROUPS_V1;
+        }
+#endif
+    }
+
+    collector_info("cgroups version: can't detect using statfs (fs type), falling back to heuristics.");
+
     pid_t command_pid;
     char buf[MAXSIZE_PROC_CMDLINE];
     enum cgroups_systemd_setting systemd_setting;
@@ -154,17 +182,6 @@ static enum cgroups_type cgroups_try_detect_version()
 
     if(!cgroups2_available)
         return CGROUPS_V1;
-
-#if defined CGROUP2_SUPER_MAGIC
-    // 2. check filesystem type for the default mountpoint
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/fs/cgroup");
-    struct statfs fsinfo;
-    if (!statfs(filename, &fsinfo)) {
-        if (fsinfo.f_type == CGROUP2_SUPER_MAGIC)
-            return CGROUPS_V2;
-    }
-#endif
 
     // 3. check systemd compiletime setting
     if ((systemd_setting = cgroups_detect_systemd("systemd --version")) == SYSTEMD_CGROUP_ERR)
