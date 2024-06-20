@@ -1736,7 +1736,7 @@ void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds){
             if(!(excluded_fds & OPEN_FD_EXCLUDE_STDERR)) (void)close(STDERR_FILENO);
 #if defined(HAVE_CLOSE_RANGE)
             if(close_range(STDERR_FILENO + 1, ~0U, 0) == 0) return;
-            netdata_log_error("close_range() failed, will try to close fds one by one");
+            nd_log(NDLS_DAEMON, NDLP_DEBUG, "close_range() failed, will try to close fds one by one");
 #endif
             break;
         case OPEN_FD_ACTION_FD_CLOEXEC:
@@ -1745,7 +1745,7 @@ void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds){
             if(!(excluded_fds & OPEN_FD_EXCLUDE_STDERR)) (void)fcntl(STDERR_FILENO, F_SETFD, FD_CLOEXEC);
 #if defined(HAVE_CLOSE_RANGE) && defined(CLOSE_RANGE_CLOEXEC) // Linux >= 5.11, FreeBSD >= 13.1
             if(close_range(STDERR_FILENO + 1, ~0U, CLOSE_RANGE_CLOEXEC) == 0) return;
-            netdata_log_error("close_range() failed, will try to mark fds for closing one by one");
+            nd_log(NDLS_DAEMON, NDLP_DEBUG, "close_range() failed, will try to mark fds for closing one by one");
 #endif
             break;
         default:
