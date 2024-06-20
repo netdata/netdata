@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -264,3 +265,9 @@ func calcPercentage(value, total int64) (v int64) {
 func calcDeltaPercentage(a, b incDelta) int64 {
 	return calcPercentage(a.delta(), a.delta()+b.delta())
 }
+
+func removeSpaces(s string) string {
+	return reSpace.ReplaceAllString(s, "_")
+}
+
+var reSpace = regexp.MustCompile(`\s+`)

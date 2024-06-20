@@ -1861,9 +1861,11 @@ void dbengine_retention_statistics(void)
         uint64_t disk_space = get_used_disk_space(multidb_ctx[tier]);
         //uint64_t disk_space = storage_engine_disk_space_used(eng->seb, localhost->db[tier].si);
 
-        uint64_t config_disk_space = multidb_ctx[tier]->config.max_disk_space;
-        if (!config_disk_space)
+        uint64_t config_disk_space = storage_engine_disk_space_max(eng->seb, localhost->db[tier].si);
+        if (!config_disk_space) {
             config_disk_space = get_directory_free_bytes_space(multidb_ctx[tier]);
+            config_disk_space += disk_space;
+        }
 
         collected_number disk_percentage = (collected_number) (config_disk_space ? 100 * disk_space / config_disk_space : 0);
 
