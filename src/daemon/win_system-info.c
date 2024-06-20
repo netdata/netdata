@@ -158,6 +158,7 @@ static DWORD netdata_windows_get_current_build()
 
 void netdata_windows_discover_os_version(char *os, size_t length) {
     char *commonName = { "Windows" };
+
     if (IsWindowsServer()) {
         (void)snprintf(os, length, "%s Server", commonName);
         return;
@@ -202,7 +203,7 @@ static inline void netdata_windows_os_version(char *out, DWORD length)
 
 static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo) {
     char osVersion[4096];
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_NAME", "Windows");
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_NAME", "Microsoft Windows");
 
     netdata_windows_discover_os_version(osVersion, 4095);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_ID", osVersion);
@@ -215,11 +216,11 @@ static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo) 
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION", osVersion);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION_ID", osVersion);
 
-    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_DETECTION", "Windows API");
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_DETECTION", "Windows API/Registry");
 
     (void)rrdhost_set_system_info_variable(systemInfo,
                                            "NETDATA_SYSTEM_KERNEL_NAME",
-                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
+                                           "Windows");
 }
 
 // Cloud
