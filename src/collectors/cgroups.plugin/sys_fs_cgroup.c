@@ -13,7 +13,7 @@ unsigned long long host_ram_total = 0;
 bool is_inside_k8s = false;
 long system_page_size = 4096; // system will be queried via sysconf() in configuration()
 
-bool cgroup_use_unified_cgroups = false;
+int cgroup_use_unified_cgroups = CONFIG_BOOLEAN_AUTO;
 bool cgroup_unified_exist = true;
 
 bool cgroup_enable_blkio = true;
@@ -170,6 +170,9 @@ static enum cgroups_type cgroups_try_detect_version()
     if ((systemd_setting = cgroups_detect_systemd("systemd --version")) == SYSTEMD_CGROUP_ERR)
         systemd_setting = cgroups_detect_systemd(SYSTEMD_CMD_RHEL);
 
+    if(systemd_setting == SYSTEMD_CGROUP_ERR)
+        return CGROUPS_AUTODETECT_FAIL;
+
     if(systemd_setting == SYSTEMD_CGROUP_LEGACY || systemd_setting == SYSTEMD_CGROUP_HYBRID) {
         // currently we prefer V1 if HYBRID is set as it seems to be more feature complete
         // in the future we might want to continue here if SYSTEMD_CGROUP_HYBRID
@@ -230,7 +233,9 @@ void read_cgroup_plugin_configuration() {
     if(cgroup_check_for_new_every < cgroup_update_every)
         cgroup_check_for_new_every = cgroup_update_every;
 
-    cgroup_use_unified_cgroups = (cgroups_try_detect_version() == CGROUPS_V2);
+    cgroup_use_unified_cgroups = config_get_boolean_ondemand("plugin:cgroups", "use unified cgroups", CONFIG_BOOLEAN_AUTO);
+    if (cgroup_use_unified_cgroups == CONFIG_BOOLEAN_AUTO)
+        cgroup_use_unified_cgroups = (cgroups_try_detect_version() == CGROUPS_V2);
     collector_info("use unified cgroups %s", cgroup_use_unified_cgroups ? "true" : "false");
 
     char filename[FILENAME_MAX + 1], *s;
