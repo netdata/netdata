@@ -283,7 +283,7 @@ void cgroup_discovery_worker(void *ptr);
 extern bool is_inside_k8s;
 extern long system_page_size;
 
-extern bool cgroup_use_unified_cgroups;
+extern int cgroup_use_unified_cgroups;
 extern bool cgroup_unified_exist;
 
 extern bool cgroup_enable_cpuacct;
