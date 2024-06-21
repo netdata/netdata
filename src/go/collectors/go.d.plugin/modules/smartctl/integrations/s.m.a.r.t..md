@@ -102,6 +102,34 @@ There are no alerts configured by default for this integration.
 Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
 
 
+#### For Netdata running in a Docker container
+
+Netdata requires the `SYS_RAWIO` capability and access to the storage devices to run the `smartctl` collector inside a Docker container. Here's how you can achieve this:
+
+- `docker run`
+
+  ```bash
+  docker run --cap-add SYS_RAWIO --device /dev/sda:/dev/sda ...
+  ```
+
+- `docker-compose.yml`
+
+  ```yaml
+  services:
+    netdata:
+      cap_add:
+        - SYS_PTRACE
+        - SYS_ADMIN
+        - SYS_RAWIO # smartctl
+      devices:
+        - "/dev/sda:/dev/sda"
+  ```
+
+> **Multiple Devices**: These examples only show mapping of one device (/dev/sda). You'll need to add additional `--device` options (in docker run) or entries in the `devices` list (in docker-compose.yml) for each storage device you want Netdata's smartctl collector to monitor.
+
+> **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/nvme#readme) to monitor NVMe devices.
+
+
 
 ### Configuration
 
@@ -131,6 +159,19 @@ The following options can be defined globally: update_every.
 | scan_every | interval for discovering new devices using `smartctl --scan`, measured in seconds. | 900 | no |
 | poll_devices_every | interval for gathering data for every device, measured in seconds. Data is cached for this interval. | 300 | no |
 | device_selector | Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
+| no_check_power_mode | Skip data collection when the device is in a low-power mode. Prevents unnecessary disk spin-up. | standby | no |
+
+##### no_check_power_mode
+
+The valid arguments to this option are:
+
+| Mode    | Description                                                                                                                                                                            |
+|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| never   | Check the device always.                                                                                                                                                               |
+| sleep   | Check the device unless it is in SLEEP mode.                                                                                                                                           |
+| standby | Check the device unless it is in SLEEP or STANDBY mode. In these modes most disks are not spinning, so if you want to prevent a disk from spinning up, this is probably what you want. |
+| idle    | Check the device unless it is in SLEEP, STANDBY or IDLE mode. In the IDLE state, most disks are still spinning, so this is probably not what you want.                                 |
+
 
 </details>
 

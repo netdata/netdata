@@ -15,8 +15,8 @@ import (
 type rspamdStats struct {
 	Version  string `json:"version"`
 	ConfigId string `json:"config_id"`
-	Scanned  int64  `json:"scanned" stm:"scanned"`
-	Learned  int64  `json:"learned" stm:"learned"`
+	Scanned  *int64 `json:"scanned" stm:"scanned"`
+	Learned  *int64 `json:"learned" stm:"learned"`
 	Actions  struct {
 		Reject           int64 `json:"reject" stm:"reject"`
 		SoftReject       int64 `json:"soft reject" stm:"soft_reject"`
@@ -62,7 +62,7 @@ func (r *Rspamd) queryRspamdStats() (*rspamdStats, error) {
 		return nil, err
 	}
 
-	if stats.Version == "" || stats.ConfigId == "" || len(stats.FuzzyHashes) == 0 {
+	if stats.Scanned == nil || stats.Learned == nil {
 		return nil, fmt.Errorf("unexpected response: not rspamd data")
 	}
 

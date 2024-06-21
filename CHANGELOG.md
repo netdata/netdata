@@ -1,5 +1,24 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.46.0...HEAD)
+
+**Merged pull requests:**
+
+- Change logging to debug  [\#17983](https://github.com/netdata/netdata/pull/17983) ([stelfrag](https://github.com/stelfrag))
+- improve ping\_host\_reachable alert calc [\#17982](https://github.com/netdata/netdata/pull/17982) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17981](https://github.com/netdata/netdata/pull/17981) ([netdatabot](https://github.com/netdatabot))
+- docs: add "For Netdata running in a Docker container" to go.d/smartcl [\#17980](https://github.com/netdata/netdata/pull/17980) ([ilyam8](https://github.com/ilyam8))
+- go.d docker respect DOCKER\_HOST env var [\#17979](https://github.com/netdata/netdata/pull/17979) ([ilyam8](https://github.com/ilyam8))
+- fix go.d rspamd unexpected response check [\#17974](https://github.com/netdata/netdata/pull/17974) ([ilyam8](https://github.com/ilyam8))
+- make cgroups version detection more reliable [\#17973](https://github.com/netdata/netdata/pull/17973) ([ilyam8](https://github.com/ilyam8))
+- go.d dyncfg add job name validation [\#17971](https://github.com/netdata/netdata/pull/17971) ([ilyam8](https://github.com/ilyam8))
+- cgroups: fix cgroups version detection on non-systemd nodes with cgroupv1 [\#17969](https://github.com/netdata/netdata/pull/17969) ([ilyam8](https://github.com/ilyam8))
+- go.d postgres index name replace space [\#17968](https://github.com/netdata/netdata/pull/17968) ([ilyam8](https://github.com/ilyam8))
+- go.d replace colon in job name [\#17967](https://github.com/netdata/netdata/pull/17967) ([ilyam8](https://github.com/ilyam8))
+- Fix space percentage calculation in dbengine retention chart [\#17963](https://github.com/netdata/netdata/pull/17963) ([stelfrag](https://github.com/stelfrag))
+
 ## [v1.46.0](https://github.com/netdata/netdata/tree/v1.46.0) (2024-06-19)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.45.6...v1.46.0)
@@ -393,18 +412,6 @@
 - go.d megacli fix meta metrics\_description [\#17418](https://github.com/netdata/netdata/pull/17418) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/megacli [\#17417](https://github.com/netdata/netdata/pull/17417) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17416](https://github.com/netdata/netdata/pull/17416) ([netdatabot](https://github.com/netdatabot))
-- go.d sd ll set max\_time\_series for prometheus/clickhouse [\#17415](https://github.com/netdata/netdata/pull/17415) ([ilyam8](https://github.com/ilyam8))
-- Support time based retention [\#17413](https://github.com/netdata/netdata/pull/17413) ([stelfrag](https://github.com/stelfrag))
-- rewrite megacli in go [\#17410](https://github.com/netdata/netdata/pull/17410) ([ilyam8](https://github.com/ilyam8))
-- dashboards doc edits [\#17409](https://github.com/netdata/netdata/pull/17409) ([Ancairon](https://github.com/Ancairon))
-- Logs tab docs in dashboard section [\#17408](https://github.com/netdata/netdata/pull/17408) ([Ancairon](https://github.com/Ancairon))
-- gh labeler: go.d.plugin rm suffix [\#17407](https://github.com/netdata/netdata/pull/17407) ([ilyam8](https://github.com/ilyam8))
-- Bump go.mongodb.org/mongo-driver from 1.14.0 to 1.15.0 in /src/go/collectors/go.d.plugin [\#17406](https://github.com/netdata/netdata/pull/17406) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/prometheus/common from 0.52.2 to 0.52.3 in /src/go/collectors/go.d.plugin [\#17405](https://github.com/netdata/netdata/pull/17405) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/vmware/govmomi from 0.36.3 to 0.37.0 in /src/go/collectors/go.d.plugin [\#17404](https://github.com/netdata/netdata/pull/17404) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/docker/docker from 26.0.0+incompatible to 26.0.1+incompatible in /src/go/collectors/go.d.plugin [\#17403](https://github.com/netdata/netdata/pull/17403) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Regenerate integrations.js [\#17399](https://github.com/netdata/netdata/pull/17399) ([netdatabot](https://github.com/netdatabot))
-- apply first alarms, then alarm templates [\#17398](https://github.com/netdata/netdata/pull/17398) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 

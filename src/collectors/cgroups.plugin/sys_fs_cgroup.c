@@ -13,7 +13,7 @@ unsigned long long host_ram_total = 0;
 bool is_inside_k8s = false;
 long system_page_size = 4096; // system will be queried via sysconf() in configuration()
 
-bool cgroup_use_unified_cgroups = false;
+int cgroup_use_unified_cgroups = CONFIG_BOOLEAN_AUTO;
 bool cgroup_unified_exist = true;
 
 bool cgroup_enable_blkio = true;
@@ -131,6 +131,34 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
 
 static enum cgroups_type cgroups_try_detect_version()
 {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/fs/cgroup");
+    struct statfs fsinfo;
+
+    // https://github.com/systemd/systemd/blob/main/docs/CGROUP_DELEGATION.md#three-different-tree-setups-
+    // ├── statfs("/sys/fs/cgroup/")
+    // │   └── .f_type
+    // │       ├── CGROUP2_SUPER_MAGIC (Unified mode)
+    // │       └── TMPFS_MAGIC (Legacy or Hybrid mode)
+    //         ├── statfs("/sys/fs/cgroup/unified/")
+    //         │   └── .f_type
+    //         │       ├── CGROUP2_SUPER_MAGIC (Hybrid mode)
+    //         │       └── Otherwise, you're in legacy mode
+    if (!statfs(filename, &fsinfo)) {
+#if defined CGROUP2_SUPER_MAGIC
+        if (fsinfo.f_type == CGROUP2_SUPER_MAGIC)
+            return CGROUPS_V2;
+#endif
+#if defined TMPFS_MAGIC
+        if (fsinfo.f_type == TMPFS_MAGIC) {
+            // either hybrid or legacy
+            return CGROUPS_V1;
+        }
+#endif
+    }
+
+    collector_info("cgroups version: can't detect using statfs (fs type), falling back to heuristics.");
+
     pid_t command_pid;
     char buf[MAXSIZE_PROC_CMDLINE];
     enum cgroups_systemd_setting systemd_setting;
@@ -155,20 +183,12 @@ static enum cgroups_type cgroups_try_detect_version()
     if(!cgroups2_available)
         return CGROUPS_V1;
 
-#if defined CGROUP2_SUPER_MAGIC
-    // 2. check filesystem type for the default mountpoint
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/fs/cgroup");
-    struct statfs fsinfo;
-    if (!statfs(filename, &fsinfo)) {
-        if (fsinfo.f_type == CGROUP2_SUPER_MAGIC)
-            return CGROUPS_V2;
-    }
-#endif
-
     // 3. check systemd compiletime setting
     if ((systemd_setting = cgroups_detect_systemd("systemd --version")) == SYSTEMD_CGROUP_ERR)
         systemd_setting = cgroups_detect_systemd(SYSTEMD_CMD_RHEL);
+
+    if(systemd_setting == SYSTEMD_CGROUP_ERR)
+        return CGROUPS_AUTODETECT_FAIL;
 
     if(systemd_setting == SYSTEMD_CGROUP_LEGACY || systemd_setting == SYSTEMD_CGROUP_HYBRID) {
         // currently we prefer V1 if HYBRID is set as it seems to be more feature complete
@@ -230,7 +250,9 @@ void read_cgroup_plugin_configuration() {
     if(cgroup_check_for_new_every < cgroup_update_every)
         cgroup_check_for_new_every = cgroup_update_every;
 
-    cgroup_use_unified_cgroups = (cgroups_try_detect_version() == CGROUPS_V2);
+    cgroup_use_unified_cgroups = config_get_boolean_ondemand("plugin:cgroups", "use unified cgroups", CONFIG_BOOLEAN_AUTO);
+    if (cgroup_use_unified_cgroups == CONFIG_BOOLEAN_AUTO)
+        cgroup_use_unified_cgroups = (cgroups_try_detect_version() == CGROUPS_V2);
     collector_info("use unified cgroups %s", cgroup_use_unified_cgroups ? "true" : "false");
 
     char filename[FILENAME_MAX + 1], *s;
