@@ -5,7 +5,7 @@
 #if defined(OS_WINDOWS)
 #include <windows.h>
 
-bool netdata_registry_get_dword(int *out, void *hKey, char *subKey, char *name)
+bool netdata_registry_get_dword(unsigned int *out, void *hKey, char *subKey, char *name)
 {
     HKEY lKey;
     bool status = true;
@@ -17,7 +17,7 @@ bool netdata_registry_get_dword(int *out, void *hKey, char *subKey, char *name)
     if (ret != ERROR_SUCCESS)
         return 0;
 
-    DWORD length = 260, value = 260, type;
+    DWORD length = 260, value = 260;
     ret = RegQueryValueEx(lKey, name, NULL, NULL, (LPBYTE) &value, &length);
     if (ret != ERROR_SUCCESS)
         status = false;
