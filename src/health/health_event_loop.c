@@ -105,7 +105,6 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
     health_plugin_init();
 
     RRDSET *st;
-//    bool must_postpone = false;
 
     if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)) return;
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
@@ -116,11 +115,8 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
         health_prototype_alerts_for_rrdset_incrementally(st);
-//        must_postpone = true;
     }
     rrdset_foreach_done(st);
-//    if (must_postpone)
-//        sql_health_postpone_queue_removed(host);
 }
 
 static void health_initialize_rrdhost(RRDHOST *host) {
@@ -654,8 +650,10 @@ static void health_event_loop(void) {
                 break;
             }
         }
+#ifdef ENABLE_ACLK
         if (process_alert_pending_queue(host))
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+#endif
 
         dfe_done(host);
 

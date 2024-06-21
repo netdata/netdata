@@ -67,15 +67,17 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
 
-    "CREATE TABLE IF NOT EXISTS health_pending_queue "
+#ifdef ENABLE_ACLK
+    "CREATE TABLE IF NOT EXISTS alert_queue "
     " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, status INT, date_scheduled INT, "
     " UNIQUE(host_id, health_log_id, alarm_id))",
-    "CREATE INDEX IF NOT EXISTS hpq_host ON health_pending_queue (host_id)",
 
-    "CREATE TABLE IF NOT EXISTS health_log_version (health_log_id INTEGER PRIMARY KEY, source_unique_id INT, unique_id INT, status INT, version INT, date_submitted INT)",
+    "CREATE TABLE IF NOT EXISTS alert_version (health_log_id INTEGER PRIMARY KEY, unique_id INT, status INT, "
+    "version INT, date_submitted INT)",
 
-    "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, unique_id INT, date_created INT)",
-    "CREATE INDEX IF NOT EXISTS aq_host ON aclk_queue (host_id)",
+    "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, "
+    "unique_id INT, date_created INT,  UNIQUE(host_id, health_log_id))",
+#endif
 
     NULL
 };
@@ -1467,6 +1469,9 @@ static void cleanup_health_log(struct metadata_wc *wc)
 
     (void) db_execute(db_meta,"DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)");
     (void) db_execute(db_meta,"DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
+#ifdef ENABLE_ACLK
+    (void) db_execute(db_meta,"DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
+#endif
 }
 
 //

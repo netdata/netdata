@@ -39,7 +39,6 @@ struct send_alarm_checkpoint parse_send_alarm_checkpoint(const char *data, size_
     ret.node_id = strdupz(msg.node_id().c_str());
     ret.claim_id = strdupz(msg.claim_id().c_str());
     ret.version = msg.version();
-    ret.when_end = msg.when_end();
 
     return ret;
 }

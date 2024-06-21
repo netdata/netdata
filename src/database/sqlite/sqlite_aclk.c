@@ -9,7 +9,6 @@ struct aclk_sync_config_s {
     uv_thread_t thread;
     uv_loop_t loop;
     uv_timer_t timer_req;
-    time_t cleanup_after;          // Start a cleanup after this timestamp
     uv_async_t async;
     bool initialized;
     SPINLOCK cmd_queue_lock;
@@ -176,70 +175,24 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 
 #ifdef ENABLE_ACLK
 
-#define SQL_SELECT_HOST_BY_UUID  "SELECT host_id FROM host WHERE host_id = @host_id"
-static int is_host_available(nd_uuid_t *host_id)
+#define SQL_SELECT_ACLK_ALERT_TABLES                                                                                   \
+    "SELECT 'DROP '||type||' IF EXISTS '||name||';' FROM sqlite_schema WHERE name LIKE 'aclk_alert_%' AND type IN ('table', 'trigger', 'index')"
+
+static void sql_delete_aclk_table_list(void)
 {
     sqlite3_stmt *res = NULL;
-    int rc = 0;
 
-    if (!REQUIRE_DB(db_meta))
-        return 1;
+    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, NULL);
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HOST_BY_UUID, &res))
-        return 1;
-
-    int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
-
-    param = 0;
-    rc = sqlite3_step_monitored(res);
-
-done:
-    REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
-    return (rc == SQLITE_ROW);
-}
-
-// OPCODE: ACLK_DATABASE_DELETE_HOST
-static void sql_delete_aclk_table_list(char *host_guid)
-{
-    char uuid_str[UUID_STR_LEN];
-    char host_str[UUID_STR_LEN];
-
-    int rc;
-    nd_uuid_t host_uuid;
-
-    if (unlikely(!host_guid))
-        return;
-
-    rc = uuid_parse(host_guid, host_uuid);
-    freez(host_guid);
-    if (rc)
-        return;
-
-    uuid_unparse_lower(host_uuid, host_str);
-    uuid_unparse_lower_fix(&host_uuid, uuid_str);
-
-    if (is_host_available(&host_uuid))
-        return;
-
-    sqlite3_stmt *res = NULL;
-    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, &netdata_buffers_statistics.buffers_sqlite);
-
-    buffer_sprintf(sql,"SELECT 'drop '||type||' IF EXISTS '||name||';' FROM sqlite_schema " \
-                        "WHERE name LIKE 'aclk_%%_%s' AND type IN ('table', 'trigger', 'index')", uuid_str);
-
-    if (!PREPARE_STATEMENT(db_meta, buffer_tostring(sql), &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ACLK_ALERT_TABLES, &res))
         goto fail;
-
-    buffer_flush(sql);
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW)
         buffer_strcat(sql, (char *) sqlite3_column_text(res, 0));
 
     SQLITE_FINALIZE(res);
 
-    rc = db_execute(db_meta, buffer_tostring(sql));
+    int rc = db_execute(db_meta, buffer_tostring(sql));
     if (unlikely(rc))
         netdata_log_error("Failed to drop unused ACLK tables");
 
@@ -285,53 +238,6 @@ skip:
     freez(machine_guid);
 }
 
-
-//static int sql_check_aclk_table(void *data __maybe_unused, int argc __maybe_unused, char **argv __maybe_unused, char **column __maybe_unused)
-//{
-//    struct aclk_database_cmd cmd;
-//    memset(&cmd, 0, sizeof(cmd));
-//    cmd.opcode = ACLK_DATABASE_DELETE_HOST;
-//    cmd.param[0] = strdupz((char *) argv[0]);
-//    aclk_database_enq_cmd(&cmd);
-//    return 0;
-//}
-
-#define SQL_SELECT_ACLK_ACTIVE_LIST "SELECT REPLACE(SUBSTR(name,19),'_','-') FROM sqlite_schema " \
-        "WHERE name LIKE 'aclk_chart_latest_%' AND type IN ('table')"
-
-//static void sql_check_aclk_table_list(void)
-//{
-//    char *err_msg = NULL;
-//    int rc = sqlite3_exec_monitored(db_meta, SQL_SELECT_ACLK_ACTIVE_LIST, sql_check_aclk_table, NULL, &err_msg);
-//    if (rc != SQLITE_OK) {
-//        error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
-//        sqlite3_free(err_msg);
-//    }
-//}
-
-#define SQL_ALERT_CLEANUP "DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND CAST(date_cloud_ack AS INT) < unixepoch()-%d"
-
-//static int sql_maint_aclk_sync_database(void *data __maybe_unused, int argc __maybe_unused, char **argv, char **column __maybe_unused)
-//{
-//    char sql[ACLK_SYNC_QUERY_SIZE];
-//    snprintfz(sql,sizeof(sql) - 1, SQL_ALERT_CLEANUP, (char *) argv[0], ACLK_DELETE_ACK_ALERTS_INTERNAL);
-//    if (unlikely(db_execute(db_meta, sql)))
-//        error_report("Failed to clean stale ACLK alert entries");
-//    return 0;
-//}
-
-#define SQL_SELECT_ACLK_ALERT_LIST "SELECT SUBSTR(name,12) FROM sqlite_schema WHERE name LIKE 'aclk_alert_%' AND type IN ('table')"
-
-//static void sql_maint_aclk_sync_database_all(void)
-//{
-//    char *err_msg = NULL;
-//    int rc = sqlite3_exec_monitored(db_meta, SQL_SELECT_ACLK_ALERT_LIST, sql_maint_aclk_sync_database, NULL, &err_msg);
-//    if (rc != SQLITE_OK) {
-//        error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
-//        sqlite3_free(err_msg);
-//    }
-//}
-
 static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_unused, char **argv, char **column __maybe_unused)
 {
     char uuid_str[UUID_STR_LEN];
@@ -360,12 +266,6 @@ static void timer_cb(uv_timer_t *handle)
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
 
-    if (config->cleanup_after < now_realtime_sec()) {
-        cmd.opcode = ACLK_DATABASE_CLEANUP;
-        aclk_database_enq_cmd(&cmd);
-        config->cleanup_after += ACLK_DATABASE_CLEANUP_INTERVAL;
-    }
-
     if (aclk_connected) {
         cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
         aclk_database_enq_cmd(&cmd);
@@ -381,8 +281,6 @@ static void aclk_synchronization(void *arg)
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
     worker_register_job_name(ACLK_DATABASE_NOOP,                 "noop");
-    worker_register_job_name(ACLK_DATABASE_CLEANUP,              "cleanup");
-    worker_register_job_name(ACLK_DATABASE_DELETE_HOST,          "node delete");
     worker_register_job_name(ACLK_DATABASE_NODE_STATE,           "node state");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
@@ -398,8 +296,9 @@ static void aclk_synchronization(void *arg)
 
     netdata_log_info("Starting ACLK synchronization thread");
 
-    config->cleanup_after = now_realtime_sec() + ACLK_DATABASE_CLEANUP_FIRST;
     config->initialized = true;
+
+    sql_delete_aclk_table_list();
 
     while (likely(service_running(SERVICE_ACLKSYNC))) {
         enum aclk_database_opcode opcode;
@@ -422,17 +321,6 @@ static void aclk_synchronization(void *arg)
                 default:
                 case ACLK_DATABASE_NOOP:
                     /* the command queue was empty, do nothing */
-                    break;
-// MAINTENANCE
-                case ACLK_DATABASE_CLEANUP:
-                    //TODO: ADD NEW CLEANUP CODE
-                    // Scan all aclk_alert_ tables and cleanup as needed
-//                    sql_maint_aclk_sync_database_all();
-                    //sql_check_aclk_table_list();
-                    break;
-
-                case ACLK_DATABASE_DELETE_HOST:
-                    sql_delete_aclk_table_list(cmd.param[0]);
                     break;
 // NODE STATE
                 case ACLK_DATABASE_NODE_STATE:;
@@ -541,7 +429,7 @@ void sql_aclk_sync_init(void)
     if (!number_of_children)
         aclk_queue_node_info(localhost, true);
 
-    rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_INSTANCES,aclk_config_parameters, NULL,&err_msg);
+    rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_INSTANCES, aclk_config_parameters, NULL, &err_msg);
 
     if (rc != SQLITE_OK) {
         error_report("SQLite error when configuring host ACLK synchonization parameters, rc = %d (%s)", rc, err_msg);
@@ -573,14 +461,6 @@ void aclk_push_alert_config(const char *node_id, const char *config_hash)
 
     queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_ALERT_CONFIG, strdupz(node_id), strdupz(config_hash));
 }
-
-//void aclk_push_node_alert_snapshot(const char *node_id)
-//{
-//    if (unlikely(!aclk_sync_config.initialized))
-//        return;
-//
-//    queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_ALERT_SNAPSHOT, strdupz(node_id), NULL);
-//}
 
 void schedule_node_info_update(RRDHOST *host __maybe_unused)
 {

@@ -361,7 +361,7 @@ int send_alarm_checkpoint(const char *msg, size_t msg_len)
         freez(sac.claim_id);
         return 1;
     }
-    aclk_alert_version_check(sac.node_id, sac.claim_id, sac.version, sac.when_end);
+    aclk_alert_version_check(sac.node_id, sac.claim_id, sac.version);
     freez(sac.node_id);
     freez(sac.claim_id);
     return 0;

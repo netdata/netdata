@@ -5,7 +5,6 @@
 
 #ifdef ENABLE_ACLK
 #include "../../aclk/aclk_alarm_api.h"
-#endif
 
 #define SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param)                                                                     \
     ({                                                                                                                 \
@@ -42,14 +41,14 @@ done:
 
 #define MAX_REMOVED_PERIOD 604800 //a week
 
-#define SQL_UPDATE_LAST_TRANSITION                                                                                     \
-    "UPDATE health_log_version SET unique_id = @unique_id WHERE health_log_id = @health_log_id"
+#define SQL_UPDATE_ALERT_VERSION_TRANSITION                                                                            \
+    "UPDATE alert_version SET unique_id = @unique_id WHERE health_log_id = @health_log_id"
 
 static void update_alert_version_transition(int64_t health_log_id, int64_t unique_id)
 {
     static __thread sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_LAST_TRANSITION, &res))
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION_TRANSITION, &res))
         return;
 
     int param = 0;
@@ -59,7 +58,7 @@ static void update_alert_version_transition(int64_t health_log_id, int64_t uniqu
     param = 0;
     int rc = sqlite3_step_monitored(res);
     if (rc != SQLITE_DONE)
-        error_report("Failed to update health_log_id to latest transition");
+        error_report("Failed to update alert_version to latest transition");
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -68,7 +67,7 @@ done:
 
 //decide if some events should be sent or not
 
-#define SQL_SELECT_LAST_ALERT_STATUS "SELECT status FROM health_log_version WHERE health_log_id = @health_log_id "
+#define SQL_SELECT_LAST_ALERT_STATUS "SELECT status FROM alert_version WHERE health_log_id = @health_log_id "
 
 static bool cloud_status_matches(int64_t health_log_id, RRDCALC_STATUS status)
 {
@@ -97,8 +96,17 @@ done:
 
 #define SQL_QUEUE_ALERT_TO_CLOUD                                                                                       \
     "INSERT INTO aclk_queue (host_id, health_log_id, unique_id, date_created)"                                         \
-    " VALUES (@host_id, @health_log_id, @unique_id, UNIXEPOCH())"
+    " VALUES (@host_id, @health_log_id, @unique_id, UNIXEPOCH())"                                                      \
+    " ON CONFLICT(host_id, health_log_id) DO UPDATE SET unique_id=excluded.unique_id, "                                \
+    " date_created=excluded.date_created"
 
+//
+// Attempt to insert an alert to the submit queue to reach the cloud
+//
+// The alert will NOT be added in the submit queue if
+// - Cloud is already aware of the alert status
+// - The transition refers to a variable
+//
 static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, uint32_t unique_id, RRDCALC_STATUS status)
 {
     static __thread sqlite3_stmt *res = NULL;
@@ -122,7 +130,7 @@ static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, ui
     param = 0;
     int rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to store alert event %"PRIu32", rc = %d", unique_id, rc);
+        error_report("Failed to insert alert in the submit queue %"PRIu32", rc = %d", unique_id, rc);
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -133,11 +141,14 @@ done:
 #define SQL_DELETE_QUEUE_ALERT_TO_CLOUD                                                                                \
     "DELETE FROM aclk_queue WHERE host_id = @host_id AND sequence_id BETWEEN @seq1 AND @seq2"
 
+//
+// Delete a range of alerts from the submit queue (after being sent to the the cloud)
+//
 static int delete_alert_from_submit_queue(RRDHOST *host, int64_t first_seq_id, int64_t last_seq_id)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_QUEUE_ALERT_TO_CLOUD, &res))
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_DELETE_QUEUE_ALERT_TO_CLOUD, &res))
         return -1;
 
     int param = 0;
@@ -152,13 +163,13 @@ static int delete_alert_from_submit_queue(RRDHOST *host, int64_t first_seq_id, i
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
+    SQLITE_RESET(res);
     return 0;
 }
 
 int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
 {
-#ifdef ENABLE_ACLK
+
     switch(status) {
         case RRDCALC_STATUS_REMOVED:
             return ALARM_STATUS_REMOVED;
@@ -178,10 +189,6 @@ int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
         default:
             return ALARM_STATUS_UNKNOWN;
     }
-#else
-    UNUSED(status);
-    return 1;
-#endif
 }
 
 static inline char *sqlite3_uuid_unparse_strdupz(sqlite3_stmt *res, int iCol) {
@@ -207,11 +214,15 @@ static inline char *sqlite3_text_strdupz_empty(sqlite3_stmt *res, int iCol) {
 }
 
 #define SQL_UPDATE_ALERT_VERSION                                                                                       \
-    "INSERT INTO health_log_version (health_log_id, source_unique_id, unique_id, status, version, date_submitted)"     \
-    " VALUES (@health_log_id, @unique_id, @unique_id, @status, @version, @date_submitted)"                             \
+    "INSERT INTO alert_version (health_log_id, unique_id, status, version, date_submitted)"                            \
+    " VALUES (@health_log_id, @unique_id, @status, @version, @date_submitted)"                                         \
     " ON CONFLICT(health_log_id) DO UPDATE SET status = excluded.status, version = excluded.version, "                 \
-    " unique_id=excluded.unique_id"
+    " unique_id=excluded.unique_id, date_submitted=excluded.date_submitted"
 
+//
+// Store a new alert transition along with the version after sending to the cloud
+//   - Update an existing alert with the updated version, status, transition and date submitted
+//
 static void sql_update_alert_version(int64_t health_log_id, int64_t unique_id, RRDCALC_STATUS status, uint64_t version)
 {
     static __thread sqlite3_stmt *res = NULL;
@@ -236,11 +247,11 @@ done:
     SQLITE_RESET(res);
 }
 
-#define SQL_SELECT_ALERT_TO_DUMMY                                                                                    \
-    "SELECT aa.sequence_id, hld.unique_id, hld.when_key, hld.new_status, hld.health_log_id"            \
-    " FROM health_log hl, aclk_queue aa, alert_hash ha, health_log_detail hld"                                       \
-    " WHERE hld.unique_id = aa.unique_id AND hl.config_hash_id = ha.hash_id"                                         \
-    " AND hl.host_id = @host_id AND aa.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                \
+#define SQL_SELECT_ALERT_TO_DUMMY                                                                                      \
+    "SELECT aa.sequence_id, hld.unique_id, hld.when_key, hld.new_status, hld.health_log_id"                            \
+    " FROM health_log hl, aclk_queue aa, alert_hash ha, health_log_detail hld"                                         \
+    " WHERE hld.unique_id = aa.unique_id AND hl.config_hash_id = ha.hash_id"                                           \
+    " AND hl.host_id = @host_id AND aa.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
     " ORDER BY aa.sequence_id ASC"
 
 //
@@ -248,10 +259,8 @@ done:
 // this will produce new versions as needed. We need this because we are about to send a
 // a snapshot so we can include the latest transition.
 //
-
-static void commit_alert_events(RRDHOST *host __maybe_unused)
+static void commit_alert_events(RRDHOST *host)
 {
-#ifdef ENABLE_ACLK
     sqlite3_stmt *res = NULL;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_DUMMY, &res))
@@ -270,7 +279,6 @@ static void commit_alert_events(RRDHOST *host __maybe_unused)
         if (first_sequence_id == 0)
             first_sequence_id = last_sequence_id;
 
-        last_sequence_id = sqlite3_column_int64(res, 0);
         int64_t unique_id = sqlite3_column_int(res, 1);
         int64_t version = sqlite3_column_int64(res, 2);
         RRDCALC_STATUS status = (RRDCALC_STATUS)sqlite3_column_int(res, 3);
@@ -285,53 +293,7 @@ static void commit_alert_events(RRDHOST *host __maybe_unused)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
-
-#endif
 }
-
-#ifdef ENABLE_ACLK
-
-
-//void log_alarm_log(struct alarm_log_entry *entry)
-//{
-//    netdata_log_info("DEBUG: ALARM LOG START");
-//    netdata_log_info("DEBUG: node_id: %s", entry->node_id);
-//    netdata_log_info("DEBUG: claim_id: %s", entry->claim_id);
-//    netdata_log_info("DEBUG: chart: %s", entry->chart);
-//    netdata_log_info("DEBUG: name: %s", entry->name);
-//    netdata_log_info("DEBUG: when: %" PRIu64, entry->when);
-//    netdata_log_info("DEBUG: config_hash: %s", entry->config_hash);
-//    netdata_log_info("DEBUG: utc_offset: %" PRId32, entry->utc_offset);
-//    netdata_log_info("DEBUG: timezone: %s", entry->timezone);
-//    netdata_log_info("DEBUG: exec_path: %s", entry->exec_path);
-//    netdata_log_info("DEBUG: conf_source: %s", entry->conf_source);
-//    netdata_log_info("DEBUG: command: %s", entry->command);
-//    netdata_log_info("DEBUG: duration: %" PRIu32, entry->duration);
-//    netdata_log_info("DEBUG: non_clear_duration: %" PRIu32, entry->non_clear_duration);
-//    netdata_log_info("DEBUG: status: %d", entry->status);
-//    netdata_log_info("DEBUG: old_status: %d", entry->old_status);
-//    netdata_log_info("DEBUG: delay: %" PRIu64, entry->delay);
-//    netdata_log_info("DEBUG: delay_up_to_timestamp: %" PRIu64, entry->delay_up_to_timestamp);
-//    netdata_log_info("DEBUG: last_repeat: %" PRIu64, entry->last_repeat);
-//    netdata_log_info("DEBUG: silenced: %d", entry->silenced);
-//    netdata_log_info("DEBUG: value_string: %s", entry->value_string);
-//    netdata_log_info("DEBUG: old_value_string: %s", entry->old_value_string);
-//    netdata_log_info("DEBUG: value: %f", entry->value);
-//    netdata_log_info("DEBUG: old_value: %f", entry->old_value);
-//    netdata_log_info("DEBUG: updated: %d", entry->updated);
-//    netdata_log_info("DEBUG: rendered_info: %s", entry->rendered_info);
-//    netdata_log_info("DEBUG: chart_context: %s", entry->chart_context);
-//    netdata_log_info("DEBUG: chart_name: %s", entry->chart_name);
-//    netdata_log_info("DEBUG: event_id: %" PRIu64, entry->event_id);
-//    netdata_log_info("DEBUG: version: %" PRIu64, entry->version);
-//    netdata_log_info("DEBUG: transition_id: %s", entry->transition_id);
-//    netdata_log_info("DEBUG: summary: %s", entry->summary);
-//    netdata_log_info("DEBUG: health_log_id: %" PRIu64, entry->health_log_id);
-//    netdata_log_info("DEBUG: alarm_id: %" PRIu64, entry->alarm_id);
-//    netdata_log_info("DEBUG: unique_id: %" PRIu64, entry->unique_id);
-//    netdata_log_info("DEBUG: sequence_id: %" PRIu64, entry->sequence_id);
-//    netdata_log_info("DEBUG: ALARM LOG END");
-//}
 
 typedef enum {
     SEQUENCE_ID,
@@ -449,7 +411,6 @@ void health_alarm_log_populate(
     alarm_log->alarm_id = sqlite3_column_int64(res, ALARM_ID);
     alarm_log->sequence_id = sqlite3_column_int64(res, SEQUENCE_ID);
 }
-#endif
 
 #define SQL_SELECT_ALERT_TO_PUSH                                                                                       \
     "SELECT aa.sequence_id, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key,"          \
@@ -464,7 +425,6 @@ void health_alarm_log_populate(
 
 static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
 {
-#ifdef ENABLE_ACLK
 
     char *claim_id = get_agent_claimid();
     if (!claim_id || !host->node_id)
@@ -496,8 +456,6 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
         health_alarm_log_populate(&alarm_log, res, host, &status);
         aclk_send_alarm_log_entry(&alarm_log);
 
-        //log_alarm_log(&alarm_log);
-
         last_id = alarm_log.sequence_id;
         if (first_id == 0)
             first_id = last_id;
@@ -511,7 +469,7 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
         nd_log(
             NDLS_ACCESS,
             NDLP_DEBUG,
-            "ACLK RES [%s (%s)]: ALERTS SENT from %ldd %ldd ",
+            "ACLK RES [%s (%s)]: ALERTS SENT from %ld - %ld",
             node_id_str,
             rrdhost_hostname(host),
             first_id,
@@ -527,11 +485,10 @@ done:
     SQLITE_FINALIZE(res);
 
     freez(claim_id);
-#endif
 }
 
 #define SQL_DELETE_PROCESSED_ROWS                                                                                      \
-    "DELETE FROM health_pending_queue WHERE host_id = @host_id AND rowid between @row1 AND @row2"
+    "DELETE FROM alert_queue WHERE host_id = @host_id AND rowid between @row1 AND @row2"
 
 static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row1, int64_t row2)
 {
@@ -548,7 +505,7 @@ static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row1, int64_t
     param = 0;
     int rc = sqlite3_step_monitored(res);
     if (rc != SQLITE_DONE)
-        error_report("Failed to update pending alerts rows, rc = %d", rc);
+        error_report("Failed to delete processed rows, rc = %d", rc);
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -557,7 +514,7 @@ done:
 
 #define SQL_PROCESS_ALERT_PENDING_QUEUE                                                                                \
     "SELECT health_log_id, unique_id, status, rowid"                                                                   \
-    " FROM health_pending_queue WHERE host_id = @host_id AND date_scheduled <= UNIXEPOCH() ORDER BY rowid ASC"
+    " FROM alert_queue WHERE host_id = @host_id AND date_scheduled <= UNIXEPOCH() ORDER BY rowid ASC"
 
 bool process_alert_pending_queue(RRDHOST *host)
 {
@@ -661,7 +618,6 @@ void aclk_send_alert_configuration(char *config_hash)
     aclk_push_alert_config(wc->node_id, config_hash);
 }
 
-#ifdef ENABLE_ACLK
 #define SQL_SELECT_ALERT_CONFIG                                                                                        \
     "SELECT alarm, template, on_key, class, type, component, os, hosts, plugin,"                                       \
     "module, charts, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info,"           \
@@ -772,11 +728,10 @@ done:
     freez(config_hash);
     freez(node_id);
 }
-#endif
 
 #define SQL_ALERT_VERSION_CALC                                                                                         \
-    "SELECT SUM(version) FROM health_log hl, health_log_version hlv"                                                   \
-    " WHERE hl.host_id = @host_uuid AND hl.health_log_id = hlv.health_log_id AND hlv.status <> -2"
+    "SELECT SUM(version) FROM health_log hl, alert_version av"                                                         \
+    " WHERE hl.host_id = @host_uuid AND hl.health_log_id = av.health_log_id AND av.status <> -2"
 
 static uint64_t calculate_node_alert_version(RRDHOST *host)
 {
@@ -800,19 +755,18 @@ done:
     return version;
 }
 
-static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *wc, uint64_t cloud_version, uint64_t when_key)
+static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *wc, uint64_t cloud_version)
 {
     uint64_t local_version = calculate_node_alert_version(wc->host);
     if (local_version != cloud_version) {
         nd_log(
             NDLS_ACCESS,
             NDLP_NOTICE,
-            "Scheduling alert snapshot for host \"%s\", node \"%s\" (version: cloud %zu, local %zu) PIT=%zu",
+            "Scheduling alert snapshot for host \"%s\", node \"%s\" (version: cloud %zu, local %zu)",
             rrdhost_hostname(wc->host),
             wc->node_id,
             cloud_version,
-            local_version,
-            when_key);
+            local_version);
 
         wc->send_snapshot = true;
         rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
@@ -821,12 +775,11 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *wc, uint64
         nd_log(
             NDLS_ACCESS,
             NDLP_DEBUG,
-            "Alert check on \"%s\", node \"%s\" (version: cloud %zu, local %zu) PIT=%zu",
+            "Alert check on \"%s\", node \"%s\" (version: cloud %zu, local %zu)",
             rrdhost_hostname(wc->host),
             wc->node_id,
             cloud_version,
-            local_version,
-            when_key);
+            local_version);
 }
 
 void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unused, char *snapshot_uuid)
@@ -860,11 +813,9 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unus
     //aclk_push_node_alert_snapshot(node_id);
 }
 
-#ifdef ENABLE_ACLK
-
 #define SQL_COUNT_SNAPSHOT_ENTRIES                                                                                     \
-    "SELECT COUNT(1) FROM health_log_version hlv, health_log hl "                                                      \
-    "WHERE hl.host_id = @host_id AND hl.health_log_id = hlv.health_log_id"
+    "SELECT COUNT(1) FROM alert_version av, health_log hl "                                                            \
+    "WHERE hl.host_id = @host_id AND hl.health_log_id = av.health_log_id"
 
 static int calculate_alert_snapshot_entries(nd_uuid_t *host_uuid)
 {
@@ -892,24 +843,20 @@ done:
     return count;
 }
 
-#endif
-
 #define SQL_GET_SNAPSHOT_ENTRIES                                                                                       \
     " SELECT 0, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key, "                     \
     " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,  "  \
     " hl.chart, hl.exec, hl.recipient, ha.source, hl.units, hld.info, hld.exec_code, hld.new_status,  "                \
     " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id, " \
-    " hld.alarm_event_id, hl.chart_name, hld.summary, hld.health_log_id, hlv.version "                                 \
-    " FROM health_log hl, alert_hash ha, health_log_detail hld, health_log_version hlv "                               \
+    " hld.alarm_event_id, hl.chart_name, hld.summary, hld.health_log_id, av.version "                                  \
+    " FROM health_log hl, alert_hash ha, health_log_detail hld, alert_version av "                                     \
     " WHERE hl.config_hash_id = ha.hash_id"                                                                            \
     " AND hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id "                                             \
-    " AND hld.health_log_id = hlv.health_log_id AND hlv.unique_id = hld.unique_id"
+    " AND hld.health_log_id = av.health_log_id AND av.unique_id = hld.unique_id"
 
 #define ALARM_EVENTS_PER_CHUNK 1000
 void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
 {
-#ifdef ENABLE_ACLK
-
     struct aclk_sync_cfg_t *wc = host->aclk_config;
 
     if (unlikely(!host)) {
@@ -1007,7 +954,6 @@ done:
     SQLITE_FINALIZE(res);
 
     freez(claim_id);
-#endif
 }
 
 /*
@@ -1071,12 +1017,12 @@ void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version)
     }
 
     nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED", node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
-    schedule_alert_snapshot_if_needed(wc, cloud_version, 0);
+    schedule_alert_snapshot_if_needed(wc, cloud_version);
     wc->stream_alerts = true;
 }
 
 // Do checkpoint alert version check
-void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_version, uint64_t when_key)
+void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_version)
 {
     nd_uuid_t node_uuid;
 
@@ -1095,8 +1041,10 @@ void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_vers
     if ((!host || !(wc = host->aclk_config)))
         nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT VALIDATION REQUEST RECEIVED FOR INVALID NODE", node_id);
     else
-        schedule_alert_snapshot_if_needed(wc, cloud_version, when_key);
+        schedule_alert_snapshot_if_needed(wc, cloud_version);
 
 done:
     freez(agent_claim_id);
 }
+
+#endif
