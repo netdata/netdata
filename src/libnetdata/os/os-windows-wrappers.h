@@ -8,4 +8,6 @@
 #if defined(OS_WINDOWS)
 #include <windows.h>
 
+bool netdata_registry_get_dword(DOWRD *out, HKEY hKey, char *subKey, char *name);
+#endif
 #endif //NETDATA_OS_WINDOWS_WRAPPERS_H
