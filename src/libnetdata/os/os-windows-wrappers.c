@@ -4,7 +4,7 @@
 
 #if defined(OS_WINDOWS)
 
-bool netdata_registry_get_dword(DOWRD *out, HKEY hKey, char *subKey, char *name)
+bool netdata_registry_get_dword(DWORD *out, HKEY hKey, char *subKey, char *name)
 {
     HKEY lKey;
     bool status = true;
