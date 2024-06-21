@@ -4,6 +4,7 @@ extern "C" {
 #include "libnetdata/libnetdata.h"
 
 int netdata_main(int argc, char *argv[]);
+void signals_handle(void);
 
 }
 
@@ -185,25 +186,37 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
 
     // Run the agent
     netdata_service_log("Running the agent...");
-    int nd_argc = 2;
-    char *nd_argv[] = {strdupz("/usr/sbin/netdata"), strdupz("-D"), NULL};
-    netdata_main(nd_argc, nd_argv);
+    netdata_main(argc, argv);
 
     netdata_service_log("Agent has been started...");
 }
 
-int main()
+int main(int argc, char *argv[])
 {
-    SERVICE_TABLE_ENTRY serviceTable[] = {
-        { strdupz("Netdata"), ServiceMain },
-        { nullptr, nullptr }
-    };
+    bool tty = isatty(fileno(stdout)) == 1;
 
-    if (!StartServiceCtrlDispatcher(serviceTable))
+    if (tty)
     {
-        netdata_service_log("@main() - StartServiceCtrlDispatcher() failed...");
+        int rc = netdata_main(argc, argv);
+        if (rc != 10)
+            return rc;
+
+        signals_handle();
         return 1;
     }
+    else
+    {
+        SERVICE_TABLE_ENTRY serviceTable[] = {
+            { strdupz("Netdata"), ServiceMain },
+            { nullptr, nullptr }
+        };
 
-    return 0;
+        if (!StartServiceCtrlDispatcher(serviceTable))
+        {
+            netdata_service_log("@main() - StartServiceCtrlDispatcher() failed...");
+            return 1;
+        }
+
+        return 0;
+    }
 }
