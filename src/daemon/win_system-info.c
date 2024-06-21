@@ -134,15 +134,19 @@ static inline bool netdata_windows_open_current_version(HKEY *hKey)
 static DWORD netdata_windows_get_current_build()
 {
     HKEY hKey;
-    if (!netdata_windows_open_current_version(&hKey))
+    char cBuild[64];
+    if (!netdata_registry_get_string(cBuild,
+                                     63,
+                                     HKEY_LOCAL_MACHINE,
+                                     "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                                     "CurrentBuild"))
         return 0;
 
-    DWORD length = 260, version = 260;
-    int ret = RegQueryValueEx(hKey, "CurrentBuild", NULL, NULL, (LPBYTE) &version, &length);
-    if (ret != ERROR_SUCCESS)
-        version = 0;
+    errno = 0;
 
-    RegCloseKey(hKey);
+    DWORD version = strtol(cBuild, NULL, 10);
+    if (errno == ERANGE)
+        return 0;
 
     return version;
 }
