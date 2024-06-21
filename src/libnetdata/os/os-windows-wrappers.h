@@ -7,6 +7,6 @@
 
 #if defined(OS_WINDOWS)
 
-bool netdata_registry_get_dword(DWORD *out, HKEY hKey, char *subKey, char *name);
+bool netdata_registry_get_dword(int *out, void *hKey, char *subKey, char *name);
 #endif
 #endif //NETDATA_OS_WINDOWS_WRAPPERS_H
