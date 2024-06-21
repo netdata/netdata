@@ -159,6 +159,19 @@ The following options can be defined globally: update_every.
 | scan_every | interval for discovering new devices using `smartctl --scan`, measured in seconds. | 900 | no |
 | poll_devices_every | interval for gathering data for every device, measured in seconds. Data is cached for this interval. | 300 | no |
 | device_selector | Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
+| no_check_power_mode | Skip data collection when the device is in a low-power mode. Prevents unnecessary disk spin-up. | standby | no |
+
+##### no_check_power_mode
+
+The valid arguments to this option are:
+
+| Mode    | Description                                                                                                                                                                            |
+|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| never   | Check the device always.                                                                                                                                                               |
+| sleep   | Check the device unless it is in SLEEP mode.                                                                                                                                           |
+| standby | Check the device unless it is in SLEEP or STANDBY mode. In these modes most disks are not spinning, so if you want to prevent a disk from spinning up, this is probably what you want. |
+| idle    | Check the device unless it is in SLEEP, STANDBY or IDLE mode. In the IDLE state, most disks are still spinning, so this is probably not what you want.                                 |
+
 
 </details>
 
