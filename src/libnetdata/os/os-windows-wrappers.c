@@ -29,7 +29,7 @@ bool netdata_registry_get_dword(unsigned int *out, void *hKey, char *subKey, cha
     return status;
 }
 
-bool netdata_registry_get_string(char *out, size_t length, void *hKey, char *subKey, char *name)
+bool netdata_registry_get_string(char *out, unsigned int length, void *hKey, char *subKey, char *name)
 {
     HKEY lKey;
     bool status = true;
@@ -41,7 +41,7 @@ bool netdata_registry_get_string(char *out, size_t length, void *hKey, char *sub
     if (ret != ERROR_SUCCESS)
         return false;
 
-    ret = RegQueryValueEx(lKey, name, NULL, NULL, out, &length);
+    ret = RegQueryValueEx(lKey, name, NULL, NULL, (LPBYTE) out, &length);
     if (ret != ERROR_SUCCESS)
         status = false;
 
