@@ -9,7 +9,6 @@ int netdata_main(int argc, char *argv[]);
 
 #include <windows.h>
 
-#ifdef NETDATA_INTERNAL_CHECKS
 __attribute__((format(printf, 1, 2)))
 static void netdata_service_log(const char *fmt, ...)
 {
@@ -36,68 +35,108 @@ static void netdata_service_log(const char *fmt, ...)
     fclose(fp);
 }
 
-#else
-__attribute__((format(printf, 1, 2)))
-static void netdata_service_log(const char *fmt, ...)
-{
-    UNUSED(fmt);
-}
-#endif
-
 static SERVICE_STATUS_HANDLE svc_status_handle = nullptr;
 static SERVICE_STATUS svc_status = {};
+
 static HANDLE svc_stop_event_handle = nullptr;
 
-static ND_THREAD *exit_thread = nullptr;
+static ND_THREAD *cleanup_thread = nullptr;
 
-static void *call_netdata_exit(void *arg)
+static bool ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint, DWORD dwControlsAccepted)
+{
+    static DWORD dwCheckPoint = 1;
+    svc_status.dwCurrentState = dwCurrentState;
+    svc_status.dwWin32ExitCode = dwWin32ExitCode;
+    svc_status.dwWaitHint = dwWaitHint;
+    svc_status.dwControlsAccepted = dwControlsAccepted;
+
+    if (dwCurrentState == SERVICE_RUNNING || dwCurrentState == SERVICE_STOPPED)
+    {
+        svc_status.dwCheckPoint = 0;
+    }
+    else
+    {
+        svc_status.dwCheckPoint = dwCheckPoint++;
+    }
+
+    if (!SetServiceStatus(svc_status_handle, &svc_status)) {
+        netdata_service_log("@ReportSvcStatus: SetServiceStatusFailed (%d)", GetLastError());
+        return false;
+    }
+
+    return true;
+}
+
+static HANDLE CreateEventHandle(const char *msg)
+{
+    HANDLE h = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+    if (!h)
+    {
+        netdata_service_log(msg);
+
+        if (!ReportSvcStatus(SERVICE_STOPPED, GetLastError(), 1000, 0))
+        {
+            netdata_service_log("Failed to set service status to stopped.");
+        }
+
+        return NULL;
+    }
+
+    return h;
+}
+
+static void *call_netdata_cleanup(void *arg)
 {
     UNUSED(arg);
 
     // Wait until we have to stop the service
+    netdata_service_log("Cleanup thread waiting for stop event...");
     WaitForSingleObject(svc_stop_event_handle, INFINITE);
 
     // Stop the agent
-    netdata_service_log("@call_netdata_exit() - calling netdata_cleanup_and_exit()");
+    netdata_service_log("Running netdata cleanup...");
     netdata_cleanup_and_exit(0, NULL, NULL, NULL);
 
-    // Set status to stopped
+    // Close event handle
+    netdata_service_log("Closing stop event handle...");
     CloseHandle(svc_stop_event_handle);
-    svc_status.dwControlsAccepted = 0;
-    svc_status.dwCurrentState = SERVICE_STOPPED;
-    svc_status.dwWin32ExitCode = 0;
-    svc_status.dwCheckPoint++;
-    if (!SetServiceStatus(svc_status_handle, &svc_status))
-    {
-        netdata_service_log("@call_netdata_exit() - SetServiceStatus() to SERVICE_STOPPED failed...");
-    }
 
-    netdata_service_log("@call_netdata_exit() - returning to god");
+    // Set status to stopped
+    netdata_service_log("Reporting the service as stopped...");
+    ReportSvcStatus(SERVICE_STOPPED, 0, 0, 0);
+
     return nullptr;
 }
 
 static void WINAPI ServiceControlHandler(DWORD controlCode)
 {
-
     switch (controlCode)
     {
-        case SERVICE_CONTROL_STOP: {
-            netdata_service_log("ServiceControlHandler(SERVICE_CONTROL_STOP)");
-
+        case SERVICE_CONTROL_STOP:
+        {
             if (svc_status.dwCurrentState != SERVICE_RUNNING)
-                break;
+                return;
 
-            // Set status to stop-pending
-            svc_status.dwControlsAccepted = 0;
-            svc_status.dwCurrentState = SERVICE_STOP_PENDING;
-            svc_status.dwWin32ExitCode = 0;
-            svc_status.dwCheckPoint++;
-            if (!SetServiceStatus(svc_status_handle, &svc_status))
-            {
-                netdata_service_log("@ServiceControlHandler() - SetServiceStatus() to SERVICE_STOP_PENDING failed...");
-            }
+            // Set service status to stop-pending
+            netdata_service_log("Setting service status to stop-pending...");
+            if (!ReportSvcStatus(SERVICE_STOP_PENDING, 0, 5000, 0))
+                return;
 
+            // Create cleanup thread
+            netdata_service_log("Creating cleanup thread...");
+            char tag[NETDATA_THREAD_TAG_MAX + 1];
+            snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "CLEANUP");
+            cleanup_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, call_netdata_cleanup, NULL);
+
+            // Signal the stop request
+            netdata_service_log("Signalling the cleanup thread...");
             SetEvent(svc_stop_event_handle);
+            break;
+        }
+        case SERVICE_CONTROL_INTERROGATE:
+        {
+            ReportSvcStatus(svc_status.dwCurrentState, svc_status.dwWin32ExitCode, svc_status.dwWaitHint, svc_status.dwControlsAccepted);
             break;
         }
         default:
@@ -110,6 +149,8 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     UNUSED(argc);
     UNUSED(argv);
 
+    // Create service status handle
+    netdata_service_log("Creating service status handle...");
     svc_status_handle = RegisterServiceCtrlHandler("Netdata", ServiceControlHandler);
     if (!svc_status_handle)
     {
@@ -118,79 +159,41 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     }
 
     // Set status to start-pending
+    netdata_service_log("Setting service status to start-pending...");
     svc_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
-    svc_status.dwCurrentState = SERVICE_START_PENDING;
-    svc_status.dwControlsAccepted = 0;
-    svc_status.dwWin32ExitCode = 0;
     svc_status.dwServiceSpecificExitCode = 0;
     svc_status.dwCheckPoint = 0;
-    svc_status.dwWaitHint = 5;
-    if (!SetServiceStatus(svc_status_handle, &svc_status))
+    if (!ReportSvcStatus(SERVICE_START_PENDING, 0, 5000, 0))
     {
-        netdata_service_log("@ServiceMain() - SetServiceStatus() to SERVICE_START_PENDING failed...");
+        netdata_service_log("Failed to set service status to start pending.");
         return;
     }
 
-    // Create stop event handle
-    svc_stop_event_handle = CreateEvent(NULL, TRUE, FALSE, NULL);
-    if (svc_stop_event_handle == NULL)
-    {
-        // Set status to stopped if we failed to create the handle
-        netdata_service_log("@ServiceMain() - CreateEvent() failed...");
-        svc_status.dwControlsAccepted = 0;
-        svc_status.dwCurrentState = SERVICE_STOPPED;
-        svc_status.dwWin32ExitCode = GetLastError();
-        svc_status.dwCheckPoint = 1;
-        if (SetServiceStatus(svc_status_handle, &svc_status) == FALSE)
-        {
-            netdata_service_log("@ServiceMain() - SetServiceStatus() to SERVICE_STOPPED failed...");
-        }
-
+    // Create stop service event handle
+    netdata_service_log("Creating stop service event handle...");
+    svc_stop_event_handle = CreateEventHandle("Failed to create stop event handle");
+    if (!svc_stop_event_handle)
         return;
-    }
-
-    // Create a thread for stopping/exiting the service
-    {
-        char tag[NETDATA_THREAD_TAG_MAX + 1];
-        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "WINSVC");
-        netdata_service_log("@ServiceMain() - Creating thread for handling stopping the agent service");
-        exit_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, call_netdata_exit, NULL);
-        netdata_service_log("@ServiceMain(): Exit thread created (exit_thread=%p)", exit_thread);
-    }
 
     // Set status to running
-    svc_status.dwControlsAccepted = SERVICE_ACCEPT_STOP;
-    svc_status.dwCurrentState = SERVICE_RUNNING;
-    svc_status.dwWin32ExitCode = 0;
-    svc_status.dwCheckPoint = 2;
-    if (!SetServiceStatus(svc_status_handle, &svc_status))
+    netdata_service_log("Setting service status to running...");
+    if (!ReportSvcStatus(SERVICE_RUNNING, 0, 5000, SERVICE_ACCEPT_STOP))
     {
-        netdata_service_log("@ServiceMain() - SetServiceStatus() to SERVICE_RUNNING failed...");
+        netdata_service_log("Failed to set service status to running.");
         return;
     }
 
     // Run the agent
-    {
-        netdata_service_log("@ServiceMain() - calling netdata_main()...");
-        int nd_argc = 2;
-        char *nd_argv[] = {strdupz("/usr/sbin/netdata"), strdupz("-D"), NULL};
-        netdata_main(nd_argc, nd_argv);
-    }
+    netdata_service_log("Running the agent...");
+    int nd_argc = 2;
+    char *nd_argv[] = {strdupz("/usr/sbin/netdata"), strdupz("-D"), NULL};
+    netdata_main(nd_argc, nd_argv);
 
-    netdata_service_log("@ServiceMain() - returning to caller...");
+    netdata_service_log("Agent has been started...");
 }
 
 int main()
 {
-#if RUN_FROM_CLI
-    int nd_argc = 2;
-    char *nd_argv[] = {strdupz("/usr/bin/netdata"), strdupz("-D"), NULL};
-    netdata_main(nd_argc, nd_argv);
-
-    while (true) {
-        sleep(1);
-    }
-#else
     SERVICE_TABLE_ENTRY serviceTable[] = {
         { strdupz("Netdata"), ServiceMain },
         { nullptr, nullptr }
@@ -201,7 +204,6 @@ int main()
         netdata_service_log("@main() - StartServiceCtrlDispatcher() failed...");
         return 1;
     }
-#endif
 
     return 0;
 }
