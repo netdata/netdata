@@ -114,7 +114,7 @@ modules:
               required: false
               detailed_description: |
                 The valid arguments to this option are:
-                
+
                 | Mode    | Description                                                                                                                                                                            |
                 |---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
                 | never   | Check the device always.                                                                                                                                                               |
