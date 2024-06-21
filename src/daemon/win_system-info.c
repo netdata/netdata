@@ -25,23 +25,14 @@ char *netdata_windows_arch(DWORD value)
 
 DWORD netdata_windows_cpu_frequency()
 {
-    HKEY hKey;
-    long ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-                            "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
-                            0,
-                            KEY_READ,
-                            &hKey);
-    if (ret != ERROR_SUCCESS)
-        return 0;
+    DWORD freq;
+    if (!netdata_registry_get_dword(&freq,
+                                    HKEY_LOCAL_MACHINE,
+                                    "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+                                    "~MHz"))
+        return freq;
 
-    DWORD length = 260, freq = 260;
-    ret = RegQueryValueEx(hKey, "~MHz", NULL, NULL, (LPBYTE) &freq, &length);
-    if (ret != ERROR_SUCCESS)
-        freq = 0;
-
-    RegCloseKey(hKey);
     freq *= 1000000;
-
     return freq;
 }
 

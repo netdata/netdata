@@ -20,6 +20,7 @@
 #include "setenv.h"
 #include "os-freebsd-wrappers.h"
 #include "os-macos-wrappers.h"
+#include "os-windows-wrappers.h"
 
 // =====================================================================================================================
 // common defs for Apple/FreeBSD/Linux

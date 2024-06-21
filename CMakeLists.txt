@@ -725,6 +725,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/os-freebsd-wrappers.h
         src/libnetdata/os/os-macos-wrappers.c
         src/libnetdata/os/os-macos-wrappers.h
+        src/libnetdata/os/os-windows-wrappers.c
+        src/libnetdata/os/os-windows-wrappers.h
         src/libnetdata/os/get_system_cpus.c
         src/libnetdata/os/get_system_cpus.h
         src/libnetdata/os/tinysleep.c
