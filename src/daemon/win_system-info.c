@@ -173,7 +173,7 @@ void netdata_windows_discover_os_version(char *os, size_t length) {
 
 static inline void netdata_windows_os_version(char *out, DWORD length)
 {
-    if (!netdata_registry_get_string(out,
+    if (netdata_registry_get_string(out,
                                      length,
                                      HKEY_LOCAL_MACHINE,
                                      "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
