@@ -117,20 +117,6 @@ void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo)
 }
 
 // Host
-static inline bool netdata_windows_open_current_version(HKEY *hKey)
-{
-    long ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-                            "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
-                            0,
-                            KEY_READ,
-                            hKey);
-
-    if (ret != ERROR_SUCCESS)
-        return false;
-
-    return true;
-}
-
 static DWORD netdata_windows_get_current_build()
 {
     HKEY hKey;
@@ -187,13 +173,14 @@ void netdata_windows_discover_os_version(char *os, size_t length) {
 
 static inline void netdata_windows_os_version(char *out, DWORD length)
 {
-    HKEY hKey;
-    if (!netdata_windows_open_current_version(&hKey))
+    if (!netdata_registry_get_string(out,
+                                     length,
+                                     HKEY_LOCAL_MACHINE,
+                                     "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                                     "ProductName"))
         return;
 
-    (void)RegQueryValueEx(hKey, "ProductName", NULL, NULL, out, &length);
-
-    RegCloseKey(hKey);
+    (void)snprintf(out, length, "%s", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
 }
 
 static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo) {
