@@ -203,6 +203,10 @@ static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo) 
     (void)rrdhost_set_system_info_variable(systemInfo,
                                            "NETDATA_SYSTEM_KERNEL_NAME",
                                            "Windows");
+
+    (void)rrdhost_set_system_info_variable(systemInfo,
+                                           "NETDATA_HOST_IS_K8S_NODE",
+                                           NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE);
 }
 
 // Cloud
