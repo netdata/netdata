@@ -52,6 +52,18 @@ void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
 
     char *arch = netdata_windows_arch(sysInfo.wProcessorArchitecture);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
+
+    (void)rrdhost_set_system_info_variable(
+        systemInfo, "NETDATA_SYSTEM_VIRTUALIZATION", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
+
+    (void)rrdhost_set_system_info_variable(
+        systemInfo, "NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
+
+    (void)rrdhost_set_system_info_variable(
+        systemInfo, "NETDATA_SYSTEM_CONTAINER", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
+
+    (void)rrdhost_set_system_info_variable(
+        systemInfo, "NETDATA_SYSTEM_CONTAINER_DETECTION", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
 }
 
 void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
