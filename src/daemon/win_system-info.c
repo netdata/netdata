@@ -196,7 +196,7 @@ static inline void netdata_windows_os_kernel_version(char *out, DWORD length, DW
                                     "CurrentVersion"))
         version[0] = '\0';
 
-    (void)snprintf(out, length, "%s %u", version, build);
+    (void)snprintf(out, length, "%s (build: %u)", version, build);
 }
 
 static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo)
