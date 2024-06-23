@@ -480,7 +480,7 @@ void netdata_ssl_initialize_openssl() {
 #endif
 }
 
-#if defined(ENABLE_OPENSSL) && (OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110)
+#if (defined(ENABLE_OPENSSL) && (OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110)) || defined(ENABLE_WOLFSSL)
 /**
  * TLS version
  *
