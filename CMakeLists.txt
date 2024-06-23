@@ -146,9 +146,13 @@ endif()
 option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" True)
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
+# openssl/crypto
+option(ENABLE_WOLFSSL "Compile netdata using WolfSSL." False)
+cmake_dependent_option(ENABLE_OPENSSL "Compile netdata using OpenSSL." True "NOT ENABLE_WOLFSSL" False)
+
 # High-level features
-option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE})
+cmake_dependent_option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE} "NOT ENABLE_WOLFSSL" False)
+cmake_dependent_option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE} "NOT ENABLE_WOLFSSL" False)
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
@@ -185,7 +189,7 @@ option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)
-option(ENABLE_H2O "Enable H2O web server (experimental)" True)
+cmake_dependent_option(ENABLE_H2O "Enable H2O web server (experimental)" True "NOT ENABLE_WOLFSSL" False)
 mark_as_advanced(ENABLE_H2O)
 
 # Other optional functionality
@@ -197,6 +201,20 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
+
+include(CheckFunctionExists)
+
+if(ENABLE_WOLFSSL)
+        pkg_check_modules(TLS IMPORTED_TARGET wolfssl)
+
+        list(APPEND CMAKE_REQUIRED_LIBRARIES wolfssl)
+        check_function_exists(wolfSSL_set_alpn_protos HAVE_WOLFSSL_SET_ALPN_PROTOS)
+        if(NOT HAVE_WOLFSSL_SET_ALPN_PROTOS)
+                message(FATAL_ERROR "Your WolfSSL library has not been compiled with the OPENSSL_EXTRA flag, which is necessary to create symbols for the OpenSSL API that Netdata uses.")
+        endif()
+else()
+        pkg_check_modules(TLS IMPORTED_TARGET openssl)
+endif()
 
 if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         set(NEED_PROTOBUF True)
@@ -264,11 +282,6 @@ endif()
 #
 # Libm
 #
-
-# checks link with cmake required libs
-cmake_policy(SET CMP0075 NEW)
-
-include(CheckFunctionExists)
 
 check_function_exists(log10 HAVE_LOG10)
 if(NOT HAVE_LOG10)
@@ -523,10 +536,6 @@ if(OS_FREEBSD OR OS_MACOS)
         set(HAVE_BUILTIN_ATOMICS True)
 endif()
 
-# openssl/crypto
-set(ENABLE_OPENSSL True)
-pkg_check_modules(TLS IMPORTED_TARGET openssl)
-
 if(NOT TARGET PkgConfig::TLS)
         if(OS_MACOS)
                 execute_process(COMMAND
@@ -553,7 +562,9 @@ if(NOT TARGET PkgConfig::TLS)
             message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
         endif()
 else()
-        pkg_check_modules(CRYPTO IMPORTED_TARGET REQUIRED libcrypto)
+        if (ENABLE_OPENSSL)
+                pkg_check_modules(CRYPTO IMPORTED_TARGET REQUIRED libcrypto)
+        endif()
 endif()
 
 #
@@ -1368,7 +1379,8 @@ set(NETDATA_FILES
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
-        ${ACLK_ALWAYS_BUILD}
+        "$<$<BOOL:${ENABLE_OPENSSL}>:${ACLK_ALWAYS_BUILD}>"
+        ${SPAWN_PLUGIN_FILES}
         ${PROFILE_PLUGIN_FILES}
 )
 
@@ -1662,7 +1674,9 @@ target_compile_options(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
 
 # crypto
-target_link_libraries(libnetdata PUBLIC PkgConfig::CRYPTO)
+if (ENABLE_OPENSSL)
+        target_link_libraries(libnetdata PUBLIC PkgConfig::CRYPTO)
+endif()
 
 # openssl
 target_link_libraries(libnetdata PUBLIC PkgConfig::TLS)
