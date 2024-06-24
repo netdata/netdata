@@ -110,8 +110,10 @@ void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
     else
         (void)snprintf(memSize, 255, "%llu", size);
 
-    (void)rrdhost_set_system_info_variable(
-        systemInfo, "NETDATA_SYSTEM_TOTAL_RAM", (!size) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : memSize);
+    (void)rrdhost_set_system_info_variable(systemInfo,
+                                           "NETDATA_SYSTEM_TOTAL_RAM",
+                                           (!size) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : memSize);
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD);
 }
 
 inline ULONGLONG netdata_windows_get_disk_size(char *cVolume)
@@ -155,6 +157,7 @@ void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo)
     char diskSize[256];
     (void)snprintf(diskSize, 255, "%llu", total);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_TOTAL_DISK_SIZE", diskSize);
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD);
 }
 
 // Host
