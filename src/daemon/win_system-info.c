@@ -23,18 +23,18 @@ char *netdata_windows_arch(DWORD value)
     }
 }
 
-DWORD netdata_windows_cpu_frequency()
+DWORD netdata_windows_cpu_frequency(HKEY lKey)
 {
-    DWORD freq;
-    if (!netdata_registry_get_dword(
-            &freq, HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", "~MHz"))
+    DWORD freq = 0;
+    long ret = netdata_registry_get_dword_from_open_key(&freq, lKey, "~MHz");
+    if (ret != ERROR_SUCCESS)
         return freq;
 
     freq *= 1000000;
     return freq;
 }
 
-void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_cpu_from_system_info(struct rrdhost_system_info *systemInfo)
 {
     SYSTEM_INFO sysInfo;
     GetSystemInfo(&sysInfo);
@@ -42,14 +42,6 @@ void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
     char cpuData[256];
     (void)snprintf(cpuData, 255, "%d", sysInfo.dwNumberOfProcessors);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", cpuData);
-
-    ULONGLONG cpuFreq = netdata_windows_cpu_frequency();
-    if (cpuFreq)
-        (void)snprintf(cpuData, 255, "%lu", (unsigned long)cpuFreq);
-
-    (void)rrdhost_set_system_info_variable(systemInfo,
-                                           "NETDATA_SYSTEM_CPU_FREQ",
-                                           (!cpuFreq) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : cpuData);
 
     char *arch = netdata_windows_arch(sysInfo.wProcessorArchitecture);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
@@ -65,6 +57,36 @@ void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
 
     (void)rrdhost_set_system_info_variable(
         systemInfo, "NETDATA_SYSTEM_CONTAINER_DETECTION", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
+
+}
+
+static void netdata_windows_cpu_from_registry(struct rrdhost_system_info *systemInfo)
+{
+    HKEY lKey;
+    bool status = true;
+    long ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+                            "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+                            0,
+                            KEY_READ,
+                            &lKey);
+    if (ret != ERROR_SUCCESS)
+        return;
+
+    ULONGLONG cpuFreq = netdata_windows_cpu_frequency(lkey);
+    if (cpuFreq)
+        (void)snprintf(cpuData, 255, "%lu", (unsigned long)cpuFreq);
+
+    (void)rrdhost_set_system_info_variable(systemInfo,
+                                           "NETDATA_SYSTEM_CPU_FREQ",
+                                           (!cpuFreq) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : cpuData);
+
+}
+
+void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
+{
+    netdata_windows_cpu_from_system_info(systemInfo);
+
+    netdata_windows_cpu_from_registry(systemInfo);
 }
 
 void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
