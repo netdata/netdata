@@ -63,7 +63,6 @@ static void netdata_windows_cpu_from_system_info(struct rrdhost_system_info *sys
 static void netdata_windows_cpu_from_registry(struct rrdhost_system_info *systemInfo)
 {
     HKEY lKey;
-    bool status = true;
     long ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
                             "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
                             0,
@@ -72,7 +71,8 @@ static void netdata_windows_cpu_from_registry(struct rrdhost_system_info *system
     if (ret != ERROR_SUCCESS)
         return;
 
-    ULONGLONG cpuFreq = netdata_windows_cpu_frequency(lkey);
+    ULONGLONG cpuFreq = netdata_windows_cpu_frequency(lKey);
+    char cpuData[256];
     if (cpuFreq)
         (void)snprintf(cpuData, 255, "%lu", (unsigned long)cpuFreq);
 
