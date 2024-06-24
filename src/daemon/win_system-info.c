@@ -47,8 +47,9 @@ void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
     if (cpuFreq)
         (void)snprintf(cpuData, 255, "%lu", (unsigned long)cpuFreq);
 
-    (void)rrdhost_set_system_info_variable(
-        systemInfo, "NETDATA_SYSTEM_CPU_FREQ", (!cpuFreq) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : cpuData);
+    (void)rrdhost_set_system_info_variable(systemInfo,
+                                           "NETDATA_SYSTEM_CPU_FREQ",
+                                           (!cpuFreq) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : cpuData);
 
     char *arch = netdata_windows_arch(sysInfo.wProcessorArchitecture);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
