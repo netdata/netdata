@@ -60,12 +60,15 @@ static void netdata_windows_cpu_from_system_info(struct rrdhost_system_info *sys
 
 }
 
-static inline void netdata_windows_cpu_vendor_model(HKEY lKey, char *variable, char *key)
+static inline void netdata_windows_cpu_vendor_model(struct rrdhost_system_info *systemInfo,
+                                                    HKEY lKey,
+                                                    char *variable,
+                                                    char *key)
 {
     char cpuData[256];
-    long ret = netdata_registry_get_string_from_open_key(cpuData, 255, lKey, "VendorIdentifier");
+    long ret = netdata_registry_get_string_from_open_key(cpuData, 255, lKey, key);
     (void)rrdhost_set_system_info_variable(systemInfo,
-                                           "NETDATA_SYSTEM_CPU_VENDOR",
+                                           variable,
                                            (ret == ERROR_SUCCESS) ? cpuData : NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
 }
 
@@ -89,8 +92,8 @@ static void netdata_windows_cpu_from_registry(struct rrdhost_system_info *system
                                            "NETDATA_SYSTEM_CPU_FREQ",
                                            (!cpuFreq) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : cpuData);
 
-    netdata_windows_cpu_vendor_model(lKey, "NETDATA_SYSTEM_CPU_VENDOR", "VendorIdentifier");
-    netdata_windows_cpu_vendor_model(lKey, "NETDATA_SYSTEM_CPU_MODEL", "ProcessorNameString");
+    netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_VENDOR", "VendorIdentifier");
+    netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_MODEL", "ProcessorNameString");
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD);
 }
 
