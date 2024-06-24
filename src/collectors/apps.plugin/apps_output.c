@@ -62,30 +62,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
                 "DIMENSION new_pids 'new pids' incremental 1 1\n"
                 , update_every
         );
-
-        fprintf(stdout,
-                "CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
-                "DIMENSION utime '' absolute 1 %2$llu\n"
-                "DIMENSION stime '' absolute 1 %2$llu\n"
-                "DIMENSION gtime '' absolute 1 %2$llu\n"
-                "DIMENSION minflt '' absolute 1 %2$llu\n"
-                "DIMENSION majflt '' absolute 1 %2$llu\n"
-                , update_every
-                , RATES_DETAIL
-        );
-
-        if(include_exited_childs)
-            fprintf(stdout,
-                    "CHART netdata.apps_children_fix '' 'Apps Plugin Exited Children Normalization Ratios' 'percentage' apps.plugin netdata.apps_children_fix line 140003 %1$d\n"
-                    "DIMENSION cutime '' absolute 1 %2$llu\n"
-                    "DIMENSION cstime '' absolute 1 %2$llu\n"
-                    "DIMENSION cgtime '' absolute 1 %2$llu\n"
-                    "DIMENSION cminflt '' absolute 1 %2$llu\n"
-                    "DIMENSION cmajflt '' absolute 1 %2$llu\n"
-                    , update_every
-                    , RATES_DETAIL
-            );
-
     }
 
     fprintf(stdout,
@@ -118,39 +94,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
             , apps_groups_targets_count
             , targets_assignment_counter
     );
-
-    fprintf(stdout,
-            "BEGIN netdata.apps_fix %"PRIu64"\n"
-            "SET utime = %u\n"
-            "SET stime = %u\n"
-            "SET gtime = %u\n"
-            "SET minflt = %u\n"
-            "SET majflt = %u\n"
-            "END\n"
-            , dt
-            , (unsigned int)(utime_fix_ratio   * 100 * RATES_DETAIL)
-                , (unsigned int)(stime_fix_ratio   * 100 * RATES_DETAIL)
-                , (unsigned int)(gtime_fix_ratio   * 100 * RATES_DETAIL)
-                , (unsigned int)(minflt_fix_ratio  * 100 * RATES_DETAIL)
-                , (unsigned int)(majflt_fix_ratio  * 100 * RATES_DETAIL)
-    );
-
-    if(include_exited_childs)
-        fprintf(stdout,
-                "BEGIN netdata.apps_children_fix %"PRIu64"\n"
-                "SET cutime = %u\n"
-                "SET cstime = %u\n"
-                "SET cgtime = %u\n"
-                "SET cminflt = %u\n"
-                "SET cmajflt = %u\n"
-                "END\n"
-                , dt
-                , (unsigned int)(cutime_fix_ratio  * 100 * RATES_DETAIL)
-                    , (unsigned int)(cstime_fix_ratio  * 100 * RATES_DETAIL)
-                    , (unsigned int)(cgtime_fix_ratio  * 100 * RATES_DETAIL)
-                    , (unsigned int)(cminflt_fix_ratio * 100 * RATES_DETAIL)
-                    , (unsigned int)(cmajflt_fix_ratio * 100 * RATES_DETAIL)
-        );
 }
 
 void send_collected_data_to_netdata(struct target *root, const char *type, usec_t dt) {
