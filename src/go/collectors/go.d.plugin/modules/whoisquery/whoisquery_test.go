@@ -105,8 +105,8 @@ func TestWhoisQuery_Collect(t *testing.T) {
 
 	expected := map[string]int64{
 		"expiry":                         12345,
-		"days_until_expiration_warning":  90,
-		"days_until_expiration_critical": 30,
+		"days_until_expiration_warning":  30,
+		"days_until_expiration_critical": 15,
 	}
 
 	assert.NotZero(t, collected)
