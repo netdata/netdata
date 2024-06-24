@@ -179,6 +179,8 @@ option(ENABLE_H2O "Enable H2O web server (experimental)" True)
 mark_as_advanced(ENABLE_H2O)
 
 # Other optional functionality
+cmake_dependent_option(USE_FILE_CAPABILITIES "Enable usage of file capabilities instead of SUID on Linux systems" True "OS_LINUX" False)
+
 option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
 mark_as_advanced(ENABLE_SENTRY)
 
@@ -270,6 +272,7 @@ endif()
 # Custom Modules
 #
 
+include(NetdataPermissions)
 include(NetdataJSONC)
 include(NetdataYAML)
 
@@ -1749,6 +1752,9 @@ if(ENABLE_PLUGIN_DEBUGFS)
     install(TARGETS debugfs.plugin
             COMPONENT plugin-debugfs
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d
+                            COMPONENT plugin-debufs
+                            CAPS DAC_READ_SEARCH)
 
     if(BUILD_FOR_PACKAGING)
         install(FILES
@@ -1787,6 +1793,9 @@ if(ENABLE_PLUGIN_APPS)
     install(TARGETS apps.plugin
             COMPONENT plugin-apps
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/apps.plugin
+                            COMPONENT plugin-apps
+                            CAPS DAC_READ_SEARCH SYS_PTRACE)
 
     install(FILES src/collectors/apps.plugin/apps_groups.conf
             COMPONENT plugin-apps
@@ -1817,6 +1826,9 @@ if(ENABLE_PLUGIN_FREEIPMI)
     install(TARGETS freeipmi.plugin
             COMPONENT plugin-freeipmi
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/freeipmi.plugin
+                            COMPONENT plugin-freeipmi
+                            SUID)
 
     if(BUILD_FOR_PACKAGING)
         install(FILES
@@ -1843,6 +1855,9 @@ if(ENABLE_PLUGIN_NFACCT)
     install(TARGETS nfacct.plugin
             COMPONENT plugin-nfacct
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/nfacct.plugin
+                            COMPONENT plugin-nfacct
+                            SUID)
 
     if(BUILD_FOR_PACKAGING)
         install(FILES
@@ -1866,6 +1881,9 @@ if(ENABLE_PLUGIN_XENSTAT)
     install(TARGETS xenstat.plugin
             COMPONENT plugin-xenstat
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/xenstat.plugin
+                            COMPONENT plugin-xenstat
+                            SUID)
 
     if(BUILD_FOR_PACKAGING)
         install(FILES
@@ -1884,6 +1902,9 @@ if(ENABLE_PLUGIN_PERF)
     install(TARGETS perf.plugin
             COMPONENT plugin-perf
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d
+                            COMPONENT plugin-perf
+                            CAPS PERFMON)
 
     if(BUILD_FOR_PACKAGING)
          install(FILES
@@ -1902,6 +1923,9 @@ if(ENABLE_PLUGIN_SLABINFO)
     install(TARGETS slabinfo.plugin
             COMPONENT plugin-slabinfo
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d
+                            COMPONENT plugin-slabinfo
+                            CAPS DAC_READ_SEARCH)
 
     if(BUILD_FOR_PACKAGING)
         install(FILES
@@ -1926,6 +1950,9 @@ if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
     install(TARGETS logs-management.plugin
             COMPONENT plugin-logs-management
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/logs-management.plugin
+                            COMPONENT plugin-logs-management
+                            CAPS DAC_READ_SEARCH SYSLOG)
 
     install(DIRECTORY src/logsmanagement/stock_conf/logsmanagement.d
             COMPONENT plugin-logs-management
@@ -1998,6 +2025,9 @@ add_executable(ndsudo ${NDSUDO_FILES})
 install(TARGETS ndsudo
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
+netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/ndsudo
+                        COMPONENT netdata
+                        SUID)
 
 if(ENABLE_PLUGIN_CGROUP_NETWORK)
     set(CGROUP_NETWORK_FILES src/collectors/cgroups.plugin/cgroup-network.c)
@@ -2008,6 +2038,9 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
     install(TARGETS cgroup-network
             COMPONENT netdata
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/cgroup-network
+                            COMPONENT netdata
+                            SUID)
 endif()
 
 if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
@@ -2021,6 +2054,9 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
         install(TARGETS systemd-journal.plugin
                 COMPONENT plugin-systemd-journal
                 DESTINATION usr/libexec/netdata/plugins.d)
+        netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/systemd-journal.plugin
+                                COMPONENT plugin-systemd-journal
+                                CAPS DAC_READ_SEARCH)
 
         if(BUILD_FOR_PACKAGING)
                 install(FILES
@@ -2084,6 +2120,9 @@ if(ENABLE_PLUGIN_EBPF)
     install(TARGETS ebpf.plugin
             COMPONENT plugin-ebpf
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/ebpf.plugin
+                            COMPONENT plugin-ebpf
+                            SUID)
 
     install(FILES
             src/collectors/ebpf.plugin/ebpf.d.conf
@@ -2141,6 +2180,9 @@ if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         install(TARGETS local-listeners
                 COMPONENT netdata
                 DESTINATION usr/libexec/netdata/plugins.d)
+        netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/local-listeners
+                                COMPONENT netdata
+                                SUID)
 endif()
 
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
@@ -2162,6 +2204,9 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         install(TARGETS network-viewer.plugin
                 COMPONENT plugin-network-viewer
                 DESTINATION usr/libexec/netdata/plugins.d)
+        netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/network-viewer.plugin
+                                COMPONENT plugin-network-viewer
+                                CAPS DAC_READ_SEARCH SYS_ADMIN SYS_PTRACE)
 
         if(BUILD_FOR_PACKAGING)
                 install(FILES
@@ -2338,6 +2383,9 @@ if(ENABLE_PLUGIN_GO)
     install(PROGRAMS ${CMAKE_BINARY_DIR}/go.d.plugin
             COMPONENT plugin-go
             DESTINATION usr/libexec/netdata/plugins.d)
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/go.d.plugin
+                            COMPONENT plugin-go
+                            CAPS DAC_READ_SEARCH NET_RAW NET_ADMIN)
 endif()
 
 #
@@ -2908,6 +2956,9 @@ configure_file(src/collectors/ioping.plugin/ioping.plugin.in src/collectors/iopi
 install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
+netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/ioping.plugin
+                        COMPONENT netdata
+                        SUID)
 
 #
 # go.d.plugin
@@ -3010,3 +3061,6 @@ if(NOT OS_WINDOWS)
 endif()
 
 include(Packaging)
+# Must come after including the Packaging module _and_ after all
+# `install()` directives in the file.
+netdata_install_extra_permissions()
