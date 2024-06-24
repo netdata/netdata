@@ -29,8 +29,8 @@ func New() *WhoisQuery {
 	return &WhoisQuery{
 		Config: Config{
 			Timeout:       web.Duration(time.Second * 5),
-			DaysUntilWarn: 90,
-			DaysUntilCrit: 30,
+			DaysUntilWarn: 30,
+			DaysUntilCrit: 15,
 		},
 	}
 }
