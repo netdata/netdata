@@ -2,10 +2,13 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.46.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.46.1...HEAD)
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#17986](https://github.com/netdata/netdata/pull/17986) ([netdatabot](https://github.com/netdatabot))
+- docs: smartctl: add the "no\_check\_power\_mode" option [\#17985](https://github.com/netdata/netdata/pull/17985) ([ilyam8](https://github.com/ilyam8))
+- docs: update "What's New and Coming?" [\#17984](https://github.com/netdata/netdata/pull/17984) ([ilyam8](https://github.com/ilyam8))
 - Change logging to debug  [\#17983](https://github.com/netdata/netdata/pull/17983) ([stelfrag](https://github.com/stelfrag))
 - improve ping\_host\_reachable alert calc [\#17982](https://github.com/netdata/netdata/pull/17982) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17981](https://github.com/netdata/netdata/pull/17981) ([netdatabot](https://github.com/netdatabot))
@@ -18,6 +21,10 @@
 - go.d postgres index name replace space [\#17968](https://github.com/netdata/netdata/pull/17968) ([ilyam8](https://github.com/ilyam8))
 - go.d replace colon in job name [\#17967](https://github.com/netdata/netdata/pull/17967) ([ilyam8](https://github.com/ilyam8))
 - Fix space percentage calculation in dbengine retention chart [\#17963](https://github.com/netdata/netdata/pull/17963) ([stelfrag](https://github.com/stelfrag))
+
+## [v1.46.1](https://github.com/netdata/netdata/tree/v1.46.1) (2024-06-21)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.46.0...v1.46.1)
 
 ## [v1.46.0](https://github.com/netdata/netdata/tree/v1.46.0) (2024-06-19)
 
@@ -405,13 +412,6 @@
 - go.d rewrite python.d/adaptec\_raid [\#17428](https://github.com/netdata/netdata/pull/17428) ([ilyam8](https://github.com/ilyam8))
 - cncf changed the url [\#17427](https://github.com/netdata/netdata/pull/17427) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Regenerate integrations.js [\#17425](https://github.com/netdata/netdata/pull/17425) ([netdatabot](https://github.com/netdatabot))
-- Fix coverity issue 425241 [\#17424](https://github.com/netdata/netdata/pull/17424) ([stelfrag](https://github.com/stelfrag))
-- Indent generated files [\#17423](https://github.com/netdata/netdata/pull/17423) ([vkalintiris](https://github.com/vkalintiris))
-- Associate sentry events with guid. [\#17420](https://github.com/netdata/netdata/pull/17420) ([vkalintiris](https://github.com/vkalintiris))
-- go.d megacli health fix megacli\_phys\_drive\_media\_errors [\#17419](https://github.com/netdata/netdata/pull/17419) ([ilyam8](https://github.com/ilyam8))
-- go.d megacli fix meta metrics\_description [\#17418](https://github.com/netdata/netdata/pull/17418) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/megacli [\#17417](https://github.com/netdata/netdata/pull/17417) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17416](https://github.com/netdata/netdata/pull/17416) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
