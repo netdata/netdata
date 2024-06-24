@@ -396,12 +396,12 @@ struct receiver_state {
     } instances;
 */
 
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
     void *h2o_ctx;
 #endif
 };
 
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
 #define is_h2o_rrdpush(x) ((x)->h2o_ctx != NULL)
 #define unless_h2o_rrdpush(x) if(!is_h2o_rrdpush(x))
 #endif
