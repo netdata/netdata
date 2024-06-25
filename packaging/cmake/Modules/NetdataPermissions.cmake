@@ -118,7 +118,7 @@ endfunction()
 # Must be called _after_ any CPack setup and _after_ all `install()`
 # directives, otherwise it won’t handle things correctly.
 function(netdata_install_extra_permissions)
-  if(OS_WINDOWS)
+  if(OS_WINDOWS OR PACKAGE_TYPE STREQUAL "docker")
     return()
   endif()
 
