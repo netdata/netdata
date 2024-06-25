@@ -2149,7 +2149,7 @@ int main(int argc, char **argv) {
         delta_startup_time("initialize ML");
         ml_init();
 
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
         delta_startup_time("initialize h2o server");
         for (int t = 0; static_threads[t].name; t++) {
             if (static_threads[t].start_routine == h2o_main)
