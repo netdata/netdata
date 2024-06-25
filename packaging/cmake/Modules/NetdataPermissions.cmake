@@ -146,7 +146,7 @@ function(netdata_install_extra_permissions)
     endif()
   endforeach()
 
-  if(BUILD_FOR_PACKAGING)
+  if(PACKAGE_TYPE STREQUAL "deb")
     nd_perms_prepare_deb_postinst_scripts("${extra_perms_entries}")
   endif()
 
