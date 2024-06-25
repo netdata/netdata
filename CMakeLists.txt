@@ -117,7 +117,10 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
         if(NOT "${CMAKE_INSTALL_PREFIX}" STREQUAL "/opt/netdata")
                 message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must be set to /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
         endif()
-        set(NETDATA_RUNTIME_PREFIX "/")
+
+        if(BUILD_FOR_PACKAGING)
+                set(NETDATA_RUNTIME_PREFIX "/")
+        endif()
 
         add_definitions(-D_GNU_SOURCE)
 
