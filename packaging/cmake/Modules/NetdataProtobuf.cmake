@@ -54,7 +54,7 @@ function(netdata_bundle_protobuf)
         FetchContent_MakeAvailable_NoInstall(protobuf)
         message(STATUS "Finished preparing bundled Protobuf.")
 
-        set(BUNDLED_PROTOBUF True PARENT_SCOPE)
+        set(ENABLE_BUNDLED_PROTOBUF True PARENT_SCOPE)
 endfunction()
 
 # Handle detection of Protobuf
@@ -168,7 +168,13 @@ endfunction()
 
 # Add protobuf to a specified target.
 function(netdata_add_protobuf _target)
+        if(ENABLE_BUNDLED_PROTOBUF)
+            set(include_order BEFORE)
+        else()
+            set(include_order AFTER)
+        endif()
+
         target_compile_options(${_target} PRIVATE ${PROTOBUF_CFLAGS_OTHER})
-        target_include_directories(${_target} PRIVATE ${PROTOBUF_INCLUDE_DIRS})
+        target_include_directories(${_target} ${include_order} PRIVATE ${PROTOBUF_INCLUDE_DIRS})
         target_link_libraries(${_target} PRIVATE ${PROTOBUF_LIBRARIES})
 endfunction()
