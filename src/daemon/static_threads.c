@@ -6,8 +6,7 @@ void *aclk_main(void *ptr);
 void *analytics_main(void *ptr);
 void *cpuidlejitter_main(void *ptr);
 void *global_statistics_main(void *ptr);
-void *global_statistics_workers_main(void *ptr);
-void *global_statistics_sqlite3_main(void *ptr);
+void *global_statistics_extended_main(void *ptr);
 void *health_main(void *ptr);
 void *pluginsd_main(void *ptr);
 void *service_main(void *ptr);
@@ -51,13 +50,13 @@ const struct netdata_static_thread static_threads_common[] = {
         .config_name = "netdata monitoring",
         .env_name = "NETDATA_INTERNALS_MONITORING",
         .global_variable = &global_statistics_enabled,
-        .enabled = 0,
+        .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = global_statistics_main
     },
     {
-        .name = "STATS_WORKERS",
+        .name = "STATS_GLOBAL_EXT",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "netdata monitoring extended",
         .env_name = "NETDATA_INTERNALS_EXTENDED_MONITORING",
@@ -65,18 +64,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .enabled = 0, // this is ignored - check main() for "netdata monitoring extended"
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = global_statistics_workers_main
-    },
-    {
-        .name = "STATS_SQLITE3",
-        .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "netdata monitoring extended",
-        .env_name = "NETDATA_INTERNALS_EXTENDED_MONITORING",
-        .global_variable = &global_statistics_enabled,
-        .enabled = 0, // this is ignored - check main() for "netdata monitoring extended"
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = global_statistics_sqlite3_main
+        .start_routine = global_statistics_extended_main
     },
     {
         .name = "PLUGINSD",
