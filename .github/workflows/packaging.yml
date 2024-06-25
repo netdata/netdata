@@ -310,6 +310,17 @@ jobs:
           ${{ matrix.arch }} \
           ${{ matrix.format }} \
           ${{ needs.version-check.outputs.repo }}
+      - name: Import GPG Keys
+        id: import-keys
+        if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
+      - name: Sign DEB Packages
+        id: sign-deb
+        if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
+        shell: bash
+        run: /netdata/.github/scripts/deb-sign.sh artifacts Netdatabot
       - name: Upload to packages2.netdata.cloud
         id: package2-upload
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
