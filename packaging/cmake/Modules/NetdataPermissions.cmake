@@ -6,7 +6,6 @@
 
 set(_nd_perms_list_file "${CMAKE_BINARY_DIR}/extra-perms-list")
 set(_nd_perms_hooks_dir "${CMAKE_BINARY_DIR}/extra-perms-hooks/")
-set(_nd_perms_hooks_flag "${CMAKE_BINARY_DIR}/extra-perms-hooks/.done")
 
 # Add the requested additional permissions to the specified path in the
 # specified component.
@@ -43,10 +42,10 @@ function(netdata_add_permissions)
   set(nd_perms_PATH "${CMAKE_INSTALL_PREFIX}/${nd_perms_PATH}")
 
   if(SUID)
-    file(APPEND "${nd_perms_list_file}" "${PATH}::${COMPONENT}::SUID\n")
+    file(APPEND "${_nd_perms_list_file}" "${PATH}::${COMPONENT}::SUID\n")
   elseif(DEFINED nd_perms_CAPS)
     list(JOIN "${nd_perms_CAPS}" "," nd_perms_CAPS_ITEMS)
-    file(APPEND "${nd_perms_list_file}" "${PATH}::${COMPONENT}::${nd_perms_CAPS_ITEMS}\n")
+    file(APPEND "${_nd_perms_list_file}" "${PATH}::${COMPONENT}::${nd_perms_CAPS_ITEMS}\n")
   else()
     message(FATAL_ERROR "No additional permissions specified")
   endif()
@@ -122,7 +121,7 @@ function(netdata_install_extra_permissions)
     return()
   endif()
 
-  file(STRINGS "${nd_perms_list_file}" extra_perms_entries REGEX "^.+::.+::.+$")
+  file(STRINGS "${_nd_perms_list_file}" extra_perms_entries REGEX "^.+::.+::.+$")
   set(completed_items)
 
   foreach(entry IN LISTS extra_perms_entries)
@@ -149,6 +148,4 @@ function(netdata_install_extra_permissions)
   if(PACKAGE_TYPE STREQUAL "deb")
     nd_perms_prepare_deb_postinst_scripts("${extra_perms_entries}")
   endif()
-
-  file(TOUCH "${_nd_perms_hooks_flag}")
 endfunction()
