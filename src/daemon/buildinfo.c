@@ -1125,7 +1125,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_DB_NONE, true);
 
     build_info_set_status(BIB_CONNECTIVITY_HTTPD_STATIC, true);
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
     build_info_set_status(BIB_CONNECTIVITY_HTTPD_H2O, true);
 #endif
 #ifdef ENABLE_WEBRTC
