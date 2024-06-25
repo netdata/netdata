@@ -201,7 +201,7 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 if(BUILD_FOR_PACKAGING)
     set(PACKAGE_TYPE "none" CACHE STRING "Specify the type of package to build for.")
     mark_as_advanced(PACKAGE_TYPE)
-    set(SUPPORTED_PACKAGE_TYPES "deb")
+    set(SUPPORTED_PACKAGE_TYPES "docker;deb")
     set(CHANGELOG_INCLUDE_TYPES "deb")
     string(TOLOWER "${PACKAGE_TYPE}" PACKAGE_TYPE)
 
