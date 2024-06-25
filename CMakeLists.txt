@@ -196,8 +196,22 @@ cmake_dependent_option(USE_FILE_CAPABILITIES "Enable usage of file capabilities 
 option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
 mark_as_advanced(ENABLE_SENTRY)
 
-option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
+option(BUILD_FOR_PACKAGING "Build for a packaging target." False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
+if(BUILD_FOR_PACKAGING)
+    set(PACKAGE_TYPE "none" CACHE STRING "Specify the type of package to build for.")
+    mark_as_advanced(PACKAGE_TYPE)
+    set(SUPPORTED_PACKAGE_TYPES "deb")
+    set(CHANGELOG_INCLUDE_TYPES "deb")
+    string(TOLOWER "${PACKAGE_TYPE}" PACKAGE_TYPE)
+
+    if(PACKAGE_TYPE STREQUAL "none")
+        message(FATAL_ERROR "Must specify a package bype when BUILD_FOR_PACKAGING is true.")
+    elseif(NOT PACKAGE_TYPE IN_LIST SUPPORTED_PACKAGE_TYPES)
+        list(JOIN SUPPORTED_PACKAGE_TYPES ", " SUPPORTED_TYPES)
+        message(FATAL_ERROR "Unknown package type '${PACKAGE_TYPE}'. Supported types are: ${SUPPORTED_TYPES}")
+    endif()
+endif()
 
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
@@ -1841,7 +1855,7 @@ if(ENABLE_PLUGIN_DEBUGFS)
                             COMPONENT plugin-debufs
                             CAPS DAC_READ_SEARCH)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-debugfs
@@ -1889,7 +1903,7 @@ if(ENABLE_PLUGIN_APPS)
             COMPONENT plugin-apps
             DESTINATION usr/lib/netdata/conf.d)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-apps
@@ -1918,7 +1932,7 @@ if(ENABLE_PLUGIN_FREEIPMI)
                             COMPONENT plugin-freeipmi
                             SUID)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-freeipmi
@@ -1947,7 +1961,7 @@ if(ENABLE_PLUGIN_NFACCT)
                             COMPONENT plugin-nfacct
                             SUID)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-nfacct
@@ -1973,7 +1987,7 @@ if(ENABLE_PLUGIN_XENSTAT)
                             COMPONENT plugin-xenstat
                             SUID)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-xenstat
@@ -1994,7 +2008,7 @@ if(ENABLE_PLUGIN_PERF)
                             COMPONENT plugin-perf
                             CAPS PERFMON)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
          install(FILES
                  ${PKG_FILES_PATH}/copyright
                  COMPONENT plugin-perf
@@ -2015,7 +2029,7 @@ if(ENABLE_PLUGIN_SLABINFO)
                             COMPONENT plugin-slabinfo
                             CAPS DAC_READ_SEARCH)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-slabinfo
@@ -2054,7 +2068,7 @@ if(ENABLE_PLUGIN_CUPS)
                 COMPONENT plugin-cups
                 DESTINATION usr/libexec/netdata/plugins.d)
 
-        if(BUILD_FOR_PACKAGING)
+        if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
                 install(FILES
                         ${PKG_FILES_PATH}/copyright
                         COMPONENT plugin-cups
@@ -2105,7 +2119,7 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                                 COMPONENT plugin-systemd-journal
                                 CAPS DAC_READ_SEARCH)
 
-        if(BUILD_FOR_PACKAGING)
+        if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
                 install(FILES
                         ${PKG_FILES_PATH}/copyright
                         COMPONENT plugin-systemd-journal
@@ -2197,7 +2211,7 @@ if(ENABLE_PLUGIN_EBPF)
             COMPONENT plugin-ebpf
             DESTINATION usr/lib/netdata/conf.d/ebpf.d)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-ebpf
@@ -2255,7 +2269,7 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                                 COMPONENT plugin-network-viewer
                                 CAPS DAC_READ_SEARCH SYS_ADMIN SYS_PTRACE)
 
-        if(BUILD_FOR_PACKAGING)
+        if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
                 install(FILES
                         ${PKG_FILES_PATH}/copyright
                         COMPONENT plugin-network-viewer
@@ -2673,6 +2687,24 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
+<<<<<<< HEAD
+=======
+if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
+        install(FILES
+                ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
+                COMPONENT netdata
+                DESTINATION lib/systemd/system)
+        install(DIRECTORY
+                COMPONENT netdata
+                DESTINATION usr/lib/systemd/journald@netdata.conf.d)
+        install(FILES
+                system/systemd/journald@netdata.conf
+                COMPONENT netdata
+                DESTINATION usr/lib/systemd/journald@netdata.conf.d
+                RENAME netdata.conf)
+endif()
+
+>>>>>>> 08701d7fc (Update package build handling to differentiate package type.)
 configure_file(system/systemd/netdata.service.v235.in system/systemd/netdata.service.v235 @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235
@@ -2715,7 +2747,7 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION etc/netdata)
 
-if(BUILD_FOR_PACKAGING)
+if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         set(NETDATA_CONF_DEST "etc/netdata")
 else()
         set(NETDATA_CONF_DEST "usr/lib/netdata/conf.d")
@@ -2724,7 +2756,7 @@ endif()
 #
 # misc files
 #
-if(BUILD_FOR_PACKAGING)
+if(PACKAGE_TYPE STREQUAL "deb")
         install(FILES
                 ${PKG_FILES_PATH}/deb/netdata/etc/default/netdata
                 COMPONENT netdata
@@ -2893,7 +2925,7 @@ install(FILES
         COMPONENT plugin-chartsd
         DESTINATION usr/lib/netdata/conf.d/charts.d)
 
-if(BUILD_FOR_PACKAGING)
+if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-chartsd
@@ -2962,7 +2994,7 @@ install(FILES
         COMPONENT plugin-pythond
         DESTINATION usr/libexec/netdata/python.d)
 
-if(BUILD_FOR_PACKAGING)
+if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-pythond
@@ -3005,7 +3037,7 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/sd)
 
-    if(BUILD_FOR_PACKAGING)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-go
