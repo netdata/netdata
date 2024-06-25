@@ -69,7 +69,7 @@ func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
 		return nil, errors.New("no devices found during scan")
 	}
 
-	s.Infof("smartctl scan found %d devices", len(devices))
+	s.Debugf("smartctl scan found %d devices", len(devices))
 
 	return devices, nil
 }

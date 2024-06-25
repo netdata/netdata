@@ -2582,7 +2582,8 @@ if(BUILD_FOR_PACKAGING)
         install(FILES
                 system/systemd/journald@netdata.conf
                 COMPONENT netdata
-                DESTINATION usr/lib/systemd/journald@netdata.conf.d/netdata.conf)
+                DESTINATION usr/lib/systemd/journald@netdata.conf.d
+                RENAME netdata.conf)
 endif()
 
 configure_file(system/systemd/netdata.service.v235.in system/systemd/netdata.service.v235 @ONLY)

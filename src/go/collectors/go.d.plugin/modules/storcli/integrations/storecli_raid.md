@@ -71,11 +71,13 @@ Labels:
 |:-----------|:----------------|
 | controller_number | Controller number (index) |
 | model | Controller model |
+| driver_name | Controller driver (megaraid_sas or mpt3sas) |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
+| storcli.controller_health_status | healthy, unhealthy | status |
 | storcli.controller_status | optimal, degraded, partially_degraded, failed | status |
 | storcli.controller_bbu_status | healthy, unhealthy, na | status |
 
@@ -128,7 +130,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ storcli_controller_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.controller_status | RAID controller ${label:controller_number} health status is not optimal |
+| [ storcli_controller_health_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.controller_health_status | RAID controller ${label:controller_number} is unhealthy |
 | [ storcli_controller_bbu_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.controller_bbu_status | RAID controller ${label:controller_number} BBU is unhealthy |
 | [ storcli_phys_drive_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.phys_drive_errors | RAID physical drive c${label:controller_number}/e${label:enclosure_number}/s${label:slot_number} errors |
 | [ storcli_phys_drive_predictive_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.phys_drive_predictive_failures | RAID physical drive c${label:controller_number}/e${label:enclosure_number}/s${label:slot_number} predictive failures |
@@ -211,5 +213,38 @@ should give you clues as to why the collector isn't working.
   ```bash
   ./go.d.plugin -d -m storcli
   ```
+
+### Getting Logs
+
+If you're encountering problems with the `storcli` collector, follow these steps to retrieve logs and identify potential issues:
+
+- **Run the command** specific to your system (systemd, non-systemd, or Docker container).
+- **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
+
+#### System with systemd
+
+Use the following command to view logs generated since the last Netdata service restart:
+
+```bash
+journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep storcli
+```
+
+#### System without systemd
+
+Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
+
+```bash
+grep storcli /var/log/netdata/collector.log
+```
+
+**Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
+
+#### Docker Container
+
+If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
+
+```bash
+docker logs netdata 2>&1 | grep storcli
+```
 
 

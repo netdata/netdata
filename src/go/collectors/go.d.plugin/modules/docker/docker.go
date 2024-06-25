@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/dockerhost"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/docker/docker/api/types"
@@ -68,7 +69,7 @@ type (
 	dockerClient interface {
 		NegotiateAPIVersion(context.Context)
 		Info(context.Context) (typesSystem.Info, error)
-		ImageList(context.Context, types.ImageListOptions) ([]typesImage.Summary, error)
+		ImageList(context.Context, typesImage.ListOptions) ([]typesImage.Summary, error)
 		ContainerList(context.Context, typesContainer.ListOptions) ([]types.Container, error)
 		Close() error
 	}
@@ -79,6 +80,10 @@ func (d *Docker) Configuration() any {
 }
 
 func (d *Docker) Init() error {
+	if addr := dockerhost.FromEnv(); addr != "" && d.Address == docker.DefaultDockerHost {
+		d.Infof("using docker host from environment: %s ", addr)
+		d.Address = addr
+	}
 	return nil
 }
 

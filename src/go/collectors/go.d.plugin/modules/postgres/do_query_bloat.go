@@ -52,7 +52,7 @@ func (p *Postgres) doDBQueryBloat(db *sql.DB) error {
 		case "wastedbytes":
 			tableWasted = parseFloat(value)
 		case "iname":
-			iname = value
+			iname = removeSpaces(value)
 		case "wastedibytes":
 			idxWasted = parseFloat(value)
 		}

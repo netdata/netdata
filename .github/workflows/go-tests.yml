@@ -36,6 +36,7 @@ jobs:
           files_ignore: |
             **/*.md
             src/go/**/metadata.yaml
+            packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
         env:

@@ -42,7 +42,7 @@ func (p *Postgres) doDBQueryStatUserIndexes(db *sql.DB) error {
 		case "relname":
 			table = value
 		case "indexrelname":
-			name = value
+			name = removeSpaces(value)
 			p.getIndexMetrics(name, table, dbname, schema).updated = true
 		case "parent_relname":
 			p.getIndexMetrics(name, table, dbname, schema).parentTable = value

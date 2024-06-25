@@ -9,7 +9,7 @@
         "description": "Data collection interval, measured in seconds.",
         "type": "integer",
         "minimum": 1,
-        "default": 1
+        "default": 60
       },
       "source": {
         "title": "Domain",
@@ -21,7 +21,7 @@
         "description": "The timeout in seconds for the WHOIS query.",
         "type": "number",
         "minimum": 0.5,
-        "default": 1
+        "default": 5
       },
       "days_until_expiration_warning": {
         "title": "Days until warning",

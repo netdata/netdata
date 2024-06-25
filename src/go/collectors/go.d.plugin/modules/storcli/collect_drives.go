@@ -55,6 +55,10 @@ type storNumber string // some int values can be 'N/A'
 func (n *storNumber) UnmarshalJSON(b []byte) error { *n = storNumber(b); return nil }
 
 func (s *StorCli) collectMegaRaidDrives(mx map[string]int64, resp *drivesInfoResponse) error {
+	if resp == nil {
+		return nil
+	}
+
 	for _, cntrl := range resp.Controllers {
 		var ids []string
 		for k := range cntrl.ResponseData {

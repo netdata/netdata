@@ -61,6 +61,7 @@ see the appropriate collector readme.
 | [coredns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/coredns)                       |            CoreDNS            |
 | [couchbase](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/couchbase)                   |           Couchbase           |
 | [couchdb](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/couchdb)                       |            CouchDB            |
+| [dmcache](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/dmcache)                       |            DMCache            |
 | [dnsdist](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/dnsdist)                       |            Dnsdist            |
 | [dnsmasq](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/dnsmasq)                       |     Dnsmasq DNS Forwarder     |
 | [dnsmasq_dhcp](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/dnsmasq_dhcp)             |         Dnsmasq DHCP          |

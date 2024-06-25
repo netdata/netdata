@@ -825,7 +825,7 @@ func (m *mockClient) ContainerList(_ context.Context, opts typesContainer.ListOp
 	return containers, nil
 }
 
-func (m *mockClient) ImageList(_ context.Context, _ types.ImageListOptions) ([]typesImage.Summary, error) {
+func (m *mockClient) ImageList(_ context.Context, _ typesImage.ListOptions) ([]typesImage.Summary, error) {
 	if m.errOnImageList {
 		return nil, errors.New("mockClient.ImageList() error")
 	}

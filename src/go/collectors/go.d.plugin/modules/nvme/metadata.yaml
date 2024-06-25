@@ -45,6 +45,28 @@ modules:
           - title: Install nvme-cli
             description: |
               See [Distro Support](https://github.com/linux-nvme/nvme-cli#distro-support). Install `nvme-cli` using your distribution's package manager.
+          - title: "For Netdata running in a Docker container: grant NVMe device access"
+            description: |
+              Your NVMe devices need to be accessible within the Docker container for Netdata to monitor them.
+
+              Include the following option in your `docker run` command or add the device mapping in your `docker-compose.yml` file:
+
+              - `docker run`
+
+                ```bash
+                --device '/dev/nvme0n1:/dev/nvme0n1'
+                ```
+
+              - `docker-compose.yml`
+
+                ```yaml
+                services:
+                  netdata:
+                    devices:
+                      - "/dev/nvme0n1:/dev/nvme0n1"
+                ```
+
+              **Note**: Replace `/dev/nvme0n1` with your actual NVMe device name.
       configuration:
         file:
           name: go.d/nvme.conf

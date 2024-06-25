@@ -1,9 +1,9 @@
 {
   "app.css": "/app.cb2e9f9a81cf9533384e.css",
-  "app.js": "/app.a996ea7a2e777ec2ca96.js",
-  "runtime.js": "/runtime.e92eab5174b3f9f3a987.js",
-  "npm.react.dom.js": "/npm.react.dom.3b8ac0084f0df7fafa16.js",
-  "netdata.ui.js": "/netdata.ui.2302dd7e8d44097f16b2.js",
-  "netdata.charts.js": "/netdata.charts.17c24b92e5f64de9c7a1.js",
-  "8637.js": "/8637.c8c09890493acf4e9685.js"
+  "app.js": "/app.08c9fe3ead1d43ff769b.js",
+  "runtime.js": "/runtime.ceccffb089cc539b1c1f.js",
+  "npm.react.dom.js": "/npm.react.dom.2994f1b4604bd8ce80f6.js",
+  "netdata.ui.js": "/netdata.ui.647a4c3303ee8ec0da64.js",
+  "netdata.charts.js": "/netdata.charts.fdfd27674ac5533bbcc2.js",
+  "8637.js": "/8637.0958494526e838a60d2b.js"
 }

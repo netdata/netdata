@@ -64,7 +64,7 @@ static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, LOCAL_SOCKE
            (n->direction & (SOCKET_DIRECTION_LOCAL_INBOUND|SOCKET_DIRECTION_LOCAL_OUTBOUND)) ? "LOCAL," : "",
            (n->direction == 0) ? "NONE," : "",
            n->pid,
-           n->state,
+           (unsigned int)n->state,
            n->net_ns_inode,
            local_address, n->local.port,
            remote_address, n->remote.port,

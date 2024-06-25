@@ -125,7 +125,7 @@ func (c Config) ApplyDefaults(def Default) {
 	}
 }
 
-var reInvalidCharacters = regexp.MustCompile(`\s+|\.+`)
+var reInvalidCharacters = regexp.MustCompile(`\s+|\.+|:+`)
 
 func cleanName(name string) string {
 	return reInvalidCharacters.ReplaceAllString(name, "_")

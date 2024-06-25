@@ -5,21 +5,17 @@ database](/docs/exporting-metrics/README.md#supported-databases), you can now en
 connector itself. We'll walk through the process of enabling the exporting engine itself, followed by two examples using
 the OpenTSDB and Graphite connectors.
 
+> **Note**
+>
 > When you enable the exporting engine and a connector, the Netdata Agent exports metrics _beginning from the time you
 > restart its process_, not the entire
 > [database of long-term metrics](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
 
-Once you understand the process of enabling a connector, you can translate that knowledge to any other connector.
+Once you understand how to enable a connector, you can apply that knowledge to any other connector.
 
 ## Enable the exporting engine
 
-Use `edit-config` from your
-[Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory)
-to open `exporting.conf`:
-
-```bash
-sudo ./edit-config exporting.conf
-```
+Use `edit-config` from your [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory) to edit `exporting.conf`.
 
 Enable the exporting engine itself by setting `enabled` to `yes`:
 
@@ -40,56 +36,8 @@ Use the following configuration as a starting point. Copy and paste it into `exp
     destination = localhost:4242
 ```
 
-Replace `my_opentsdb_http_instance` with an instance name of your choice, and change the `destination` setting to the IP
-address or hostname of your OpenTSDB database.
+Replace `my_opentsdb_http_instance` with an instance name of your choice, and change the `destination` setting to the IP address or hostname of your OpenTSDB database.
 
-Restart your Agent with `sudo systemctl restart netdata`, or
-the [appropriate method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, to begin exporting to your OpenTSDB
-database. The
-Netdata Agent exports metrics _beginning from the time the process starts_, and because it exports as metrics are
-collected, you should start seeing data in your external database after only a few seconds.
+[Restart your Agent](/docs/netdata-agent/start-stop-restart.md) to initiate exporting to your OpenTSDB database. The Netdata Agent continuously exports metrics collected from the moment it starts. You can expect to see data appear in your OpenTSDB database within seconds of restarting the Agent.
 
-Any further configuration is optional, based on your needs and the configuration of your OpenTSDB database. See the
-[OpenTSDB connector doc](/src/exporting/opentsdb/README.md)
-and [exporting engine reference](/src/exporting/README.md#configuration) for
-details.
-
-## Example: Enable the Graphite connector
-
-Use the following configuration as a starting point. Copy and paste it into `exporting.conf`.
-
-```conf
-[graphite:my_graphite_instance]
-    enabled = yes
-    destination = 203.0.113.0:2003
-```
-
-Replace `my_graphite_instance` with an instance name of your choice, and change the `destination` setting to the IP
-address or hostname of your Graphite-supported database.
-
-Restart your Agent with `sudo systemctl restart netdata`, or
-the [appropriate method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, to begin exporting to your
-Graphite-supported database.
-Because the Agent exports metrics as they're collected, you should start seeing data in your external database after
-only a few seconds.
-
-Any further configuration is optional, based on your needs and the configuration of your Graphite-supported database.
-See [exporting engine reference](/src/exporting/README.md#configuration) for
-details.
-
-## What's next?
-
-If you want to further configure your exporting connectors, see
-the [exporting engine reference](/src/exporting/README.md#configuration).
-
-For a comprehensive example of using the Graphite connector, read our documentation on 
-[exporting metrics to Graphite providers](/src/exporting/graphite/README.md). Or, start
-[using host labels](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md) on exported metrics.
-
-### Related reference documentation
-
-- [Exporting engine reference](/src/exporting/README.md)
-- [OpenTSDB connector](/src/exporting/opentsdb/README.md)
-- [Graphite connector](/src/exporting/graphite/README.md)
-
-
+Any further configuration is optional, based on your needs and the configuration of your OpenTSDB database. See the [OpenTSDB connector doc](/src/exporting/opentsdb/README.md) and [exporting engine reference](/src/exporting/README.md#configuration) for details.
