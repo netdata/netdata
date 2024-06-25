@@ -32,7 +32,7 @@ function(netdata_add_permissions)
   set(options SUID)
   set(oneValueArgs PATH COMPONENT)
   set(multiValueArgs CAPS)
-  cmake_parse_args(nd_perms "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+  cmake_parse_arguments(nd_perms "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   if(NOT DEFINED nd_perms_PATH)
     message(FATAL_ERROR "A file path must be specified when adding additional permissions")
