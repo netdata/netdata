@@ -10,9 +10,8 @@ set(_nd_perms_hooks_dir "${CMAKE_BINARY_DIR}/extra-perms-hooks/")
 # Add the requested additional permissions to the specified path in the
 # specified component.
 #
-# The permissions may be either `SUID`, in which case the binary will
-# be marked SUID, or `CAPS` followed by one or more LINUX capability names
-# in all caps with the `CAP_` prefix removed.
+# The permissions may be either `SUID`, or one or more Linux capability
+# names in all caps with the `CAP_` prefix removed.
 #
 # In either case, the specified file will have ownership updated to
 # root:netdata and be marked with permissions of 0750.
@@ -28,27 +27,22 @@ set(_nd_perms_hooks_dir "${CMAKE_BINARY_DIR}/extra-perms-hooks/")
 # If this is ever called, `netdata_install_extra_permissions` must also
 # be called.
 function(netdata_add_permissions)
-  set(options SUID)
   set(oneValueArgs PATH COMPONENT)
-  set(multiValueArgs CAPS)
-  cmake_parse_arguments(nd_perms "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+  set(multiValueArgs PERMISSIONS)
+  cmake_parse_arguments(nd_perms "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   if(NOT DEFINED nd_perms_PATH)
     message(FATAL_ERROR "A file path must be specified when adding additional permissions")
   elseif(NOT DEFINED nd_perms_COMPONENT)
     message(FATAL_ERROR "An install component must be specified when adding additional permissions")
+  elseif(NOT DEFINED nd_perms_PERMISSIONS)
+    message(FATAL_ERROR "No additional permissions specified")
   endif()
 
   set(nd_perms_PATH "${CMAKE_INSTALL_PREFIX}/${nd_perms_PATH}")
 
-  if(SUID)
-    file(APPEND "${_nd_perms_list_file}" "${PATH}::${COMPONENT}::SUID\n")
-  elseif(DEFINED nd_perms_CAPS)
-    list(JOIN "${nd_perms_CAPS}" "," nd_perms_CAPS_ITEMS)
-    file(APPEND "${_nd_perms_list_file}" "${PATH}::${COMPONENT}::${nd_perms_CAPS_ITEMS}\n")
-  else()
-    message(FATAL_ERROR "No additional permissions specified")
-  endif()
+  list(JOIN "${nd_perms_CAPS}" "," nd_perms_CAPS_ITEMS)
+  file(APPEND "${_nd_perms_list_file}" "${PATH}::${COMPONENT}::${nd_perms_CAPS_ITEMS}\n")
 endfunction()
 
 # Prepare an install hook for the specified path in the specified component
