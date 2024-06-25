@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18006](https://github.com/netdata/netdata/pull/18006) ([netdatabot](https://github.com/netdatabot))
+- docs: add Troubleshoot-\>Getting Logs section to collectors [\#18005](https://github.com/netdata/netdata/pull/18005) ([ilyam8](https://github.com/ilyam8))
+- apps.plugin: remove "Normalization Ratio" internal charts [\#18004](https://github.com/netdata/netdata/pull/18004) ([ilyam8](https://github.com/ilyam8))
+- go.d whoisquery change  default days until expiration 90/30 =\> 30/15 [\#18000](https://github.com/netdata/netdata/pull/18000) ([ilyam8](https://github.com/ilyam8))
+- health convert value to days in calc in whoisquery/x509check alarms [\#17999](https://github.com/netdata/netdata/pull/17999) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17986](https://github.com/netdata/netdata/pull/17986) ([netdatabot](https://github.com/netdatabot))
 - docs: smartctl: add the "no\_check\_power\_mode" option [\#17985](https://github.com/netdata/netdata/pull/17985) ([ilyam8](https://github.com/ilyam8))
 - docs: update "What's New and Coming?" [\#17984](https://github.com/netdata/netdata/pull/17984) ([ilyam8](https://github.com/ilyam8))
@@ -405,13 +410,6 @@
 - Regenerate integrations.js [\#17437](https://github.com/netdata/netdata/pull/17437) ([netdatabot](https://github.com/netdatabot))
 - Start watcher thread after fork [\#17436](https://github.com/netdata/netdata/pull/17436) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#17434](https://github.com/netdata/netdata/pull/17434) ([netdatabot](https://github.com/netdatabot))
-- go.d fix adaptec/megacli meta name [\#17433](https://github.com/netdata/netdata/pull/17433) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17432](https://github.com/netdata/netdata/pull/17432) ([netdatabot](https://github.com/netdatabot))
-- go.d adaptec fix meta [\#17430](https://github.com/netdata/netdata/pull/17430) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/adaptec\_raid [\#17429](https://github.com/netdata/netdata/pull/17429) ([ilyam8](https://github.com/ilyam8))
-- go.d rewrite python.d/adaptec\_raid [\#17428](https://github.com/netdata/netdata/pull/17428) ([ilyam8](https://github.com/ilyam8))
-- cncf changed the url [\#17427](https://github.com/netdata/netdata/pull/17427) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Regenerate integrations.js [\#17425](https://github.com/netdata/netdata/pull/17425) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
