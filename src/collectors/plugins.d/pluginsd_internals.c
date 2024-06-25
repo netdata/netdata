@@ -8,7 +8,7 @@ ssize_t send_to_plugin(const char *txt, void *data) {
     if(!txt || !*txt)
         return 0;
 
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
     if(parser->h2o_ctx)
         return h2o_stream_write(parser->h2o_ctx, txt, strlen(txt));
 #endif
