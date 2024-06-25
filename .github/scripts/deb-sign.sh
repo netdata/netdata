@@ -6,9 +6,9 @@ pkgdir="${1}"
 keyid="${2}"
 
 echo "::group::Installing Dependencies"
-apt update
-apt upgrade -y
-apt install -y debsigs
+sudo apt-get update
+sudo apt-get upgrade -y
+sudo apt-get install -y debsigs
 echo "::endgroup::"
 
 echo "::group::Signing packages"
