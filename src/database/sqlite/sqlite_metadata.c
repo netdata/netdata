@@ -668,6 +668,18 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
             if (rebuild & DB_CHECK_RECOVER)
                 return 0;
         }
+
+        snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/.netdata-meta.db.delete", netdata_configured_cache_dir);
+        rc = unlink(sqlite_database);
+        snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
+        if (rc == 0) {
+            char new_sqlite_database[FILENAME_MAX + 1];
+            snprintfz(new_sqlite_database, sizeof(new_sqlite_database) - 1, "%s/netdata-meta.bad", netdata_configured_cache_dir);
+            rc = rename(sqlite_database, new_sqlite_database);
+            if (rc)
+                error_report("Failed to rename %s to %s", sqlite_database, new_sqlite_database);
+        }
+        // note: sqlite_database contains the right name
     }
     else
         strncpyz(sqlite_database, ":memory:", sizeof(sqlite_database) - 1);
