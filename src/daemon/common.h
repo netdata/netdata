@@ -48,7 +48,7 @@
 #include "web/server/web_server.h"
 
 // the new h2o based netdata webserver
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
 #include "web/server/h2o/http_server.h"
 #endif
 

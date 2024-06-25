@@ -121,7 +121,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = socket_listen_main_static_threaded
     },
 
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
     {
         .name = "h2o",
         .config_section = NULL,
