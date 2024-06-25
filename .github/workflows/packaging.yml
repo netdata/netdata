@@ -349,6 +349,8 @@ jobs:
               Publish to PackageCloud: ${{ steps.upload.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
               Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
+              Import GPG Keys: ${{ steps.import-keys.outcome }}
+              Sign DEB Packages: ${{ steps.sign-deb.outcome }}
               Publish to packages2.netdata.cloud: ${{ steps.package2-upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
