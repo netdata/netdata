@@ -1,3 +1,9 @@
+@PKG_NAME@ (3-2) unstable; urgency=medium
+
+  * Version bump to keep in sync with RPM repo packages
+
+ -- Netdata Builder <bot@netdata.cloud>  Mon, 24 Jun 2024 07:54:00 -0400
+
 @PKG_NAME@ (3-1) unstable; urgency=medium
 
   * Migrate to CPack for package builds
