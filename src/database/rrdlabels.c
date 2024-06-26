@@ -412,32 +412,6 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
         label_names_char_map[i] = label_values_char_map[i];
 
     // apply overrides to the label names map
-    label_names_char_map['A'] = 'a';
-    label_names_char_map['B'] = 'b';
-    label_names_char_map['C'] = 'c';
-    label_names_char_map['D'] = 'd';
-    label_names_char_map['E'] = 'e';
-    label_names_char_map['F'] = 'f';
-    label_names_char_map['G'] = 'g';
-    label_names_char_map['H'] = 'h';
-    label_names_char_map['I'] = 'i';
-    label_names_char_map['J'] = 'j';
-    label_names_char_map['K'] = 'k';
-    label_names_char_map['L'] = 'l';
-    label_names_char_map['M'] = 'm';
-    label_names_char_map['N'] = 'n';
-    label_names_char_map['O'] = 'o';
-    label_names_char_map['P'] = 'p';
-    label_names_char_map['Q'] = 'q';
-    label_names_char_map['R'] = 'r';
-    label_names_char_map['S'] = 's';
-    label_names_char_map['T'] = 't';
-    label_names_char_map['U'] = 'u';
-    label_names_char_map['V'] = 'v';
-    label_names_char_map['W'] = 'w';
-    label_names_char_map['X'] = 'x';
-    label_names_char_map['Y'] = 'y';
-    label_names_char_map['Z'] = 'z';
     label_names_char_map['='] = '_';
     label_names_char_map[':'] = '_';
     label_names_char_map['+'] = '_';
