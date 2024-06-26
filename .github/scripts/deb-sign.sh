@@ -12,5 +12,5 @@ sudo apt-get install -y debsigs
 echo "::endgroup::"
 
 echo "::group::Signing packages"
-debsigs --sign=origin --default-keyid="${keyid}" "${pkgdir}"/*.{,d}deb
+debsigs --sign=origin --default-key="${keyid}" "${pkgdir}"/*.{,d}deb
 echo "::endgroup::"
