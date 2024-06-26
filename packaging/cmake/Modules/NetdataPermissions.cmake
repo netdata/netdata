@@ -6,12 +6,13 @@
 
 set(_nd_perms_list_file "${CMAKE_BINARY_DIR}/extra-perms-list")
 set(_nd_perms_hooks_dir "${CMAKE_BINARY_DIR}/extra-perms-hooks/")
+file(REMOVE "${_nd_perms_list_file}")
 
 # Add the requested additional permissions to the specified path in the
 # specified component.
 #
-# The permissions may be either `SUID`, or one or more Linux capability
-# names in all caps with the `CAP_` prefix removed.
+# The permissions may be either `suid`, or one or more Linux capability
+# names in lowercase with the `cap_` prefix removed.
 #
 # In either case, the specified file will have ownership updated to
 # root:netdata and be marked with permissions of 0750.
@@ -20,7 +21,7 @@ set(_nd_perms_hooks_dir "${CMAKE_BINARY_DIR}/extra-perms-hooks/")
 # special fallback handling when needed) and not disabled, otherwise the
 # binary will be marked SUID.
 #
-# If SUID is specified, the binary will simply be marked SUID.
+# If suid is specified, the binary will simply be marked SUID.
 #
 # This will have no net effect on Windows systems.
 #
@@ -35,14 +36,14 @@ function(netdata_add_permissions)
     message(FATAL_ERROR "A file path must be specified when adding additional permissions")
   elseif(NOT DEFINED nd_perms_COMPONENT)
     message(FATAL_ERROR "An install component must be specified when adding additional permissions")
-  elseif(NOT DEFINED nd_perms_PERMISSIONS)
+  elseif(NOT DEFINED nd_perms_PERMISSIONS OR NOT nd_perms_PERMISSIONS)
     message(FATAL_ERROR "No additional permissions specified")
   endif()
 
   set(nd_perms_PATH "${CMAKE_INSTALL_PREFIX}/${nd_perms_PATH}")
 
-  list(JOIN "${nd_perms_CAPS}" "," nd_perms_CAPS_ITEMS)
-  file(APPEND "${_nd_perms_list_file}" "${PATH}::${COMPONENT}::${nd_perms_CAPS_ITEMS}\n")
+  list(JOIN nd_perms_PERMISSIONS "," nd_perms_PERMISSIONS_ITEMS)
+  file(APPEND "${_nd_perms_list_file}" "${nd_perms_PATH}::${nd_perms_COMPONENT}::${nd_perms_PERMISSIONS_ITEMS}\n")
 endfunction()
 
 # Prepare an install hook for the specified path in the specified component
@@ -51,9 +52,8 @@ function(nd_perms_generate_cmake_install_hook path component perms)
   file(MAKE_DIRECTORY "${_nd_perms_hooks_dir}")
   string(REPLACE "/" "_" hook_name "${path}")
 
-  if(USE_FILE_CAPABILITIES AND NOT "${perms}" STREQUAL "SUID")
-    list(TRANSFORM perms TOLOWER OUTPUT_VARIABLE caps)
-    install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-linux-caps-hook.sh ${path} ${NETDATA_GROUP} ${caps})" COMPONENT "${component}")
+  if(USE_FILE_CAPABILITIES AND NOT "${perms}" STREQUAL "suid")
+    install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-linux-caps-hook.sh ${path} ${NETDATA_GROUP} ${perms})" COMPONENT "${component}")
   else()
     install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-suid-hook.sh ${path} ${NETDATA_GROUP})" COMPONENT "${component}")
   endif()
@@ -79,14 +79,13 @@ function(nd_perms_prepare_deb_postinst_scripts entries)
 
       set(ND_APPLY_PERMISSIONS "${ND_APPLY_PERMISSIONS}chown -f 'root:${NETDATA_USER}' '${entry_path}'\n")
 
-      list(TRANSFORM TOLOWER entry_perms OUTPUT_VARIABLE capse)
-      list(TRANSFORM PREPEND "cap_" caps)
-      list(JOIN caps "," capset)
+      list(TRANSFORM PREPEND "cap_" entry_perms)
+      list(JOIN entry_perms "," capset)
       set(capset "${capset}+eip")
 
-      if("${entry_perms}" STREQUAL SUID OR NOT USE_FILE_CAPABILITIES)
+      if("${entry_perms}" STREQUAL "suid" OR NOT USE_FILE_CAPABILITIES)
         set(ND_APPLY_PERMISSIONS "${ND_APPLY_PERMISSIONS}chmod -f 4750 '${entry_path}'\n")
-      elseif("PERFMON" IN_LIST entry_perms)
+      elseif("perfmon" IN_LIST entry_perms)
         string(REPLACE "perfmon" "sys_admin" capset2 "${capset}")
         set(ND_APPLY_PERMISSIONS "${ND_APPLY_PERMISSIONS}chmod -f 0750 '${entry_path}'\n")
         set(ND_APPLY_PERMISSIONS "${ND_APPLY_PERMISSIONS}if ! capset '${capset}' '${entry_path}' 2>/dev/null; then\n")
