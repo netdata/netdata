@@ -11,8 +11,6 @@ import (
 	"github.com/gosnmp/gosnmp"
 )
 
-var newSNMPClient = gosnmp.NewHandler
-
 func (s *SNMP) validateConfig() error {
 	if s.Hostname == "" {
 		return errors.New("SNMP hostname is required")
@@ -21,7 +19,7 @@ func (s *SNMP) validateConfig() error {
 }
 
 func (s *SNMP) initSNMPClient() (gosnmp.Handler, error) {
-	client := newSNMPClient()
+	client := s.newSnmpClient()
 
 	client.SetTarget(s.Hostname)
 	client.SetPort(uint16(s.Options.Port))
@@ -41,6 +39,9 @@ func (s *SNMP) initSNMPClient() (gosnmp.Handler, error) {
 		client.SetCommunity(comm)
 		client.SetVersion(gosnmp.Version2c)
 	case gosnmp.Version3:
+		if s.User.Name == "" {
+			return nil, errors.New("username is required for SNMPv3")
+		}
 		client.SetVersion(gosnmp.Version3)
 		client.SetSecurityModel(gosnmp.UserSecurityModel)
 		client.SetMsgFlags(parseSNMPv3SecurityLevel(s.User.SecurityLevel))
@@ -139,12 +140,12 @@ func parseSNMPv3PrivProtocol(protocol string) gosnmp.SnmpV3PrivProtocol {
 
 func snmpClientConnInfo(c gosnmp.Handler) string {
 	var info strings.Builder
-	info.WriteString(fmt.Sprintf("hostname=%s,port=%d,snmp_version=%s", c.Target(), c.Port(), c.Version()))
+	info.WriteString(fmt.Sprintf("hostname='%s',port='%d',snmp_version='%s'", c.Target(), c.Port(), c.Version()))
 	switch c.Version() {
 	case gosnmp.Version1, gosnmp.Version2c:
-		info.WriteString(fmt.Sprintf(",community=%s", c.Community()))
+		info.WriteString(fmt.Sprintf(",community='%s'", c.Community()))
 	case gosnmp.Version3:
-		info.WriteString(fmt.Sprintf(",security_level=%d,%s", c.MsgFlags(), c.SecurityParameters().Description()))
+		info.WriteString(fmt.Sprintf(",security_level='%d,%s'", c.MsgFlags(), c.SecurityParameters().Description()))
 	}
 	return info.String()
 }

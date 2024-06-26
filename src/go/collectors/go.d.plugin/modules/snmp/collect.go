@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	oidSysUptime     = "1.3.6.1.2.1.1.3.0"
-	oidSysName       = "1.3.6.1.2.1.1.5.0"
-	oidIfMibIfTable  = "1.3.6.1.2.1.2.2"
-	oidIfMibIfXTable = "1.3.6.1.2.1.31.1.1"
+	oidSysUptime         = "1.3.6.1.2.1.1.3.0"
+	oidSysName           = "1.3.6.1.2.1.1.5.0"
+	rootOidIfMibIfTable  = "1.3.6.1.2.1.2.2"
+	rootOidIfMibIfXTable = "1.3.6.1.2.1.31.1.1"
 )
 
 func (s *SNMP) collect() (map[string]int64, error) {
@@ -82,12 +82,12 @@ func (s *SNMP) collectSysUptime(mx map[string]int64) error {
 }
 
 func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
-	ifMibTable, err := s.snmpClient.BulkWalkAll(oidIfMibIfTable)
+	ifMibTable, err := s.walkAll(rootOidIfMibIfTable)
 	if err != nil {
 		return err
 	}
 
-	ifMibXTable, err := s.snmpClient.BulkWalkAll(oidIfMibIfXTable)
+	ifMibXTable, err := s.walkAll(rootOidIfMibIfXTable)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,8 @@ func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
 		if len(s.oids) == 0 {
 			return errors.New("no IF-MIB data returned, try decreasing 'max_repetitions'")
 		}
-		s.Warningf("no IF-MIB data returned, try decreasing 'max_repetitions' (current: %d)", s.Options.MaxRepetitions)
+
+		s.Warningf("no IF-MIB data returned, try decreasing 'max_repetitions' (current: %d)", s.snmpClient.MaxRepetitions())
 		s.collectIfMib = false
 		return nil
 	}
@@ -116,13 +117,14 @@ func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
 		}
 
 		idx := pdu.Name[i+1:]
+		oid := strings.TrimPrefix(pdu.Name[:i], ".")
 
 		iface, ok := s.netInterfaces[idx]
 		if !ok {
 			iface = &netInterface{idx: idx}
 		}
 
-		switch pdu.Name[1:i] {
+		switch oid {
 		case oidIfIndex:
 			iface.ifIndex, err = pduToInt(pdu)
 		case oidIfDescr:
@@ -189,10 +191,12 @@ func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
 			iface.ifHighSpeed, err = pduToInt(pdu)
 		case oidIfAlias:
 			iface.ifAlias, err = pduToString(pdu)
+		default:
+			continue
 		}
 
 		if err != nil {
-			return err
+			return fmt.Errorf("OID '%s': %v", pdu.Name, err)
 		}
 
 		s.netInterfaces[idx] = iface
@@ -255,13 +259,20 @@ func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
 	return nil
 }
 
+func (s *SNMP) walkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {
+	if s.snmpClient.Version() == gosnmp.Version1 {
+		return s.snmpClient.WalkAll(rootOid)
+	}
+	return s.snmpClient.BulkWalkAll(rootOid)
+}
+
 func pduToString(pdu gosnmp.SnmpPDU) (string, error) {
 	switch pdu.Type {
 	case gosnmp.OctetString:
-		// TODO: this isn't reliable at all (e.g. doesn't work for oidIfPhysAddress)
+		// TODO: this isn't reliable (e.g. physAddress we need hex.EncodeToString())
 		bs, ok := pdu.Value.([]byte)
 		if !ok {
-			return "", errors.New("OctetString is not a []byte")
+			return "", fmt.Errorf("OctetString is not a []byte but %T", pdu.Value)
 		}
 		return strings.ToValidUTF8(string(bs), "�"), nil
 	case gosnmp.Counter32, gosnmp.Counter64, gosnmp.Integer, gosnmp.Gauge32:
@@ -279,6 +290,18 @@ func pduToInt(pdu gosnmp.SnmpPDU) (int64, error) {
 		return 0, fmt.Errorf("unussported type: '%v'", pdu.Type)
 	}
 }
+
+//func physAddressToString(pdu gosnmp.SnmpPDU) (string, error) {
+//	address, ok := pdu.Value.([]uint8)
+//	if !ok {
+//		return "", errors.New("physAddress is not a []uint8")
+//	}
+//	parts := make([]string, 0, 6)
+//	for _, v := range address {
+//		parts = append(parts, fmt.Sprintf("%02X", v))
+//	}
+//	return strings.Join(parts, ":"), nil
+//}
 
 func (s *SNMP) collectOIDs(mx map[string]int64) error {
 	for i, end := 0, 0; i < len(s.oids); i += s.Options.MaxOIDs {

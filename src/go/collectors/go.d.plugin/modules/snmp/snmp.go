@@ -43,6 +43,8 @@ func New() *SNMP {
 			},
 		},
 
+		newSnmpClient: gosnmp.NewHandler,
+
 		collectIfMib:  true,
 		netInterfaces: make(map[string]*netInterface),
 	}
@@ -54,7 +56,8 @@ type SNMP struct {
 
 	charts *module.Charts
 
-	snmpClient gosnmp.Handler
+	newSnmpClient func() gosnmp.Handler
+	snmpClient    gosnmp.Handler
 
 	collectIfMib  bool
 	netInterfaces map[string]*netInterface
