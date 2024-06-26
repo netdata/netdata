@@ -5,71 +5,31 @@ package snmp
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
 )
 
-var newSNMPClient = gosnmp.NewHandler
-
 func (s *SNMP) validateConfig() error {
-	if len(s.ChartsInput) == 0 {
-		return errors.New("'charts' are required but not set")
+	if s.Hostname == "" {
+		return errors.New("SNMP hostname is required")
 	}
-
-	if s.Options.Version == gosnmp.Version3.String() {
-		if s.User.Name == "" {
-			return errors.New("'user.name' is required when using SNMPv3 but not set")
-		}
-		if _, err := parseSNMPv3SecurityLevel(s.User.SecurityLevel); err != nil {
-			return err
-		}
-		if _, err := parseSNMPv3AuthProtocol(s.User.AuthProto); err != nil {
-			return err
-		}
-		if _, err := parseSNMPv3PrivProtocol(s.User.PrivProto); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
 func (s *SNMP) initSNMPClient() (gosnmp.Handler, error) {
-	client := newSNMPClient()
+	client := s.newSnmpClient()
 
-	if client.SetTarget(s.Hostname); client.Target() == "" {
-		s.Warningf("'hostname' not set, using the default value: '%s'", defaultHostname)
-		client.SetTarget(defaultHostname)
-	}
-	if client.SetPort(uint16(s.Options.Port)); client.Port() <= 0 || client.Port() > 65535 {
-		s.Warningf("'options.port' is invalid, changing to the default value: '%d' => '%d'", s.Options.Port, defaultPort)
-		client.SetPort(defaultPort)
-	}
-	if client.SetRetries(s.Options.Retries); client.Retries() < 1 || client.Retries() > 10 {
-		s.Warningf("'options.retries' is invalid, changing to the default value: '%d' => '%d'", s.Options.Retries, defaultRetries)
-		client.SetRetries(defaultRetries)
-	}
-	if client.SetTimeout(time.Duration(s.Options.Timeout) * time.Second); client.Timeout().Seconds() < 1 {
-		s.Warningf("'options.timeout' is invalid, changing to the default value: '%d' => '%d'", s.Options.Timeout, defaultTimeout)
-		client.SetTimeout(defaultTimeout * time.Second)
-	}
-	if client.SetMaxOids(s.Options.MaxOIDs); client.MaxOids() < 1 {
-		s.Warningf("'options.max_request_size' is invalid, changing to the default value: '%d' => '%d'", s.Options.MaxOIDs, defaultMaxOIDs)
-		client.SetMaxOids(defaultMaxOIDs)
-	}
+	client.SetTarget(s.Hostname)
+	client.SetPort(uint16(s.Options.Port))
+	client.SetRetries(s.Options.Retries)
+	client.SetTimeout(time.Duration(s.Options.Timeout) * time.Second)
+	client.SetMaxOids(s.Options.MaxOIDs)
+	client.SetMaxRepetitions(uint32(s.Options.MaxRepetitions))
 
-	ver, err := parseSNMPVersion(s.Options.Version)
-	if err != nil {
-		s.Warningf("'options.version' is invalid, changing to the default value: '%s' => '%s'",
-			s.Options.Version, defaultVersion)
-		ver = defaultVersion
-	}
+	ver := parseSNMPVersion(s.Options.Version)
 	comm := s.Community
-	if comm == "" && (ver <= gosnmp.Version2c) {
-		s.Warningf("'community' not set, using the default value: '%s'", defaultCommunity)
-		comm = defaultCommunity
-	}
 
 	switch ver {
 	case gosnmp.Version1:
@@ -79,19 +39,24 @@ func (s *SNMP) initSNMPClient() (gosnmp.Handler, error) {
 		client.SetCommunity(comm)
 		client.SetVersion(gosnmp.Version2c)
 	case gosnmp.Version3:
+		if s.User.Name == "" {
+			return nil, errors.New("username is required for SNMPv3")
+		}
 		client.SetVersion(gosnmp.Version3)
 		client.SetSecurityModel(gosnmp.UserSecurityModel)
-		client.SetMsgFlags(safeParseSNMPv3SecurityLevel(s.User.SecurityLevel))
+		client.SetMsgFlags(parseSNMPv3SecurityLevel(s.User.SecurityLevel))
 		client.SetSecurityParameters(&gosnmp.UsmSecurityParameters{
 			UserName:                 s.User.Name,
-			AuthenticationProtocol:   safeParseSNMPv3AuthProtocol(s.User.AuthProto),
+			AuthenticationProtocol:   parseSNMPv3AuthProtocol(s.User.AuthProto),
 			AuthenticationPassphrase: s.User.AuthKey,
-			PrivacyProtocol:          safeParseSNMPv3PrivProtocol(s.User.PrivProto),
+			PrivacyProtocol:          parseSNMPv3PrivProtocol(s.User.PrivProto),
 			PrivacyPassphrase:        s.User.PrivKey,
 		})
 	default:
 		return nil, fmt.Errorf("invalid SNMP version: %s", s.Options.Version)
 	}
+
+	s.Info(snmpClientConnInfo(client))
 
 	return client, nil
 }
@@ -105,85 +70,82 @@ func (s *SNMP) initOIDs() (oids []string) {
 	return oids
 }
 
-func parseSNMPVersion(version string) (gosnmp.SnmpVersion, error) {
+func parseSNMPVersion(version string) gosnmp.SnmpVersion {
 	switch version {
 	case "0", "1":
-		return gosnmp.Version1, nil
+		return gosnmp.Version1
 	case "2", "2c", "":
-		return gosnmp.Version2c, nil
+		return gosnmp.Version2c
 	case "3":
-		return gosnmp.Version3, nil
+		return gosnmp.Version3
 	default:
-		return gosnmp.Version2c, fmt.Errorf("invalid snmp version value (%s)", version)
+		return gosnmp.Version2c
 	}
 }
 
-func safeParseSNMPv3SecurityLevel(level string) gosnmp.SnmpV3MsgFlags {
-	v, _ := parseSNMPv3SecurityLevel(level)
-	return v
-}
-
-func parseSNMPv3SecurityLevel(level string) (gosnmp.SnmpV3MsgFlags, error) {
+func parseSNMPv3SecurityLevel(level string) gosnmp.SnmpV3MsgFlags {
 	switch level {
 	case "1", "none", "noAuthNoPriv", "":
-		return gosnmp.NoAuthNoPriv, nil
+		return gosnmp.NoAuthNoPriv
 	case "2", "authNoPriv":
-		return gosnmp.AuthNoPriv, nil
+		return gosnmp.AuthNoPriv
 	case "3", "authPriv":
-		return gosnmp.AuthPriv, nil
+		return gosnmp.AuthPriv
 	default:
-		return gosnmp.NoAuthNoPriv, fmt.Errorf("invalid snmpv3 user security level value (%s)", level)
+		return gosnmp.NoAuthNoPriv
 	}
 }
 
-func safeParseSNMPv3AuthProtocol(protocol string) gosnmp.SnmpV3AuthProtocol {
-	v, _ := parseSNMPv3AuthProtocol(protocol)
-	return v
-}
-
-func parseSNMPv3AuthProtocol(protocol string) (gosnmp.SnmpV3AuthProtocol, error) {
+func parseSNMPv3AuthProtocol(protocol string) gosnmp.SnmpV3AuthProtocol {
 	switch protocol {
 	case "1", "none", "noAuth", "":
-		return gosnmp.NoAuth, nil
+		return gosnmp.NoAuth
 	case "2", "md5":
-		return gosnmp.MD5, nil
+		return gosnmp.MD5
 	case "3", "sha":
-		return gosnmp.SHA, nil
+		return gosnmp.SHA
 	case "4", "sha224":
-		return gosnmp.SHA224, nil
+		return gosnmp.SHA224
 	case "5", "sha256":
-		return gosnmp.SHA256, nil
+		return gosnmp.SHA256
 	case "6", "sha384":
-		return gosnmp.SHA384, nil
+		return gosnmp.SHA384
 	case "7", "sha512":
-		return gosnmp.SHA512, nil
+		return gosnmp.SHA512
 	default:
-		return gosnmp.NoAuth, fmt.Errorf("invalid snmpv3 user auth protocol value (%s)", protocol)
+		return gosnmp.NoAuth
 	}
 }
 
-func safeParseSNMPv3PrivProtocol(protocol string) gosnmp.SnmpV3PrivProtocol {
-	v, _ := parseSNMPv3PrivProtocol(protocol)
-	return v
-}
-
-func parseSNMPv3PrivProtocol(protocol string) (gosnmp.SnmpV3PrivProtocol, error) {
+func parseSNMPv3PrivProtocol(protocol string) gosnmp.SnmpV3PrivProtocol {
 	switch protocol {
 	case "1", "none", "noPriv", "":
-		return gosnmp.NoPriv, nil
+		return gosnmp.NoPriv
 	case "2", "des":
-		return gosnmp.DES, nil
+		return gosnmp.DES
 	case "3", "aes":
-		return gosnmp.AES, nil
+		return gosnmp.AES
 	case "4", "aes192":
-		return gosnmp.AES192, nil
+		return gosnmp.AES192
 	case "5", "aes256":
-		return gosnmp.AES256, nil
+		return gosnmp.AES256
 	case "6", "aes192c":
-		return gosnmp.AES192C, nil
+		return gosnmp.AES192C
 	case "7", "aes256c":
-		return gosnmp.AES256C, nil
+		return gosnmp.AES256C
 	default:
-		return gosnmp.NoPriv, fmt.Errorf("invalid snmpv3 user priv protocol value (%s)", protocol)
+		return gosnmp.NoPriv
 	}
+}
+
+func snmpClientConnInfo(c gosnmp.Handler) string {
+	var info strings.Builder
+	info.WriteString(fmt.Sprintf("hostname='%s',port='%d',snmp_version='%s'", c.Target(), c.Port(), c.Version()))
+	switch c.Version() {
+	case gosnmp.Version1, gosnmp.Version2c:
+		info.WriteString(fmt.Sprintf(",community='%s'", c.Community()))
+	case gosnmp.Version3:
+		info.WriteString(fmt.Sprintf(",security_level='%d,%s'", c.MsgFlags(), c.SecurityParameters().Description()))
+	}
+	return info.String()
 }
