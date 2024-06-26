@@ -61,10 +61,10 @@ endfunction()
 
 # Handle generation of postinstall scripts for DEB packages.
 function(nd_perms_prepare_deb_postinst_scripts entries)
-  foreach(component IN LISTS CPACK_ALL_COMPONENTS)
+  foreach(component IN LISTS CPACK_COMPONENTS_ALL)
     set(ND_APPLY_PERMISSIONS "\n")
-    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/deb/${component}")
-    set(postinst "${CMAKE_BINARY_DIR}/deb/${component}/postinst")
+    file(MAKE_DIRECTORY "${_nd_perms_hooks_dir}/deb/${component}")
+    set(postinst "${_nd_perms_hooks_dir}/deb/${component}/postinst")
     set(postinst_src "${PKG_FILES_PATH}/deb/${component}/postinst")
     set(compoment_entries "${entries}")
 

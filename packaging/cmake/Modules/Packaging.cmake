@@ -99,7 +99,7 @@ list(JOIN _main_deps ", " CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS)
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/netdata/conffiles;"
 	  "${PKG_FILES_PATH}/deb/netdata/preinst"
-	  "${PKG_FILES_PATH}/deb/netdata/postinst"
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/netdata/postinst"
 	  "${PKG_FILES_PATH}/deb/netdata/postrm")
 
 set(CPACK_DEBIAN_NETDATA_DEBUGINFO_PACKAGE On)
@@ -121,7 +121,7 @@ set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 
 set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-apps/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-apps/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-apps/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-APPS_DEBUGINFO_PACKAGE On)
 
@@ -146,7 +146,7 @@ set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_SUGGESTS "apcupsd, iw, sudo")
 
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-chartsd/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-chartsd/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-chartsd/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_DEBUGINFO_PACKAGE Off)
 
@@ -164,7 +164,7 @@ set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_PREDEPENDS "adduser")
 set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-cups/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-cups/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-cups/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-CUPS_DEBUGINFO_PACKAGE On)
 
@@ -184,7 +184,7 @@ set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-debugfs/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-debugfs/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-debugfs/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-DEBUGFS_DEBUGINFO_PACKAGE On)
 
@@ -206,7 +206,7 @@ set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_RECOMMENDS "netdata-plugin-apps (= ${CPACK_
 
 set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-ebpf/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-ebpf/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-ebpf/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-EBPF_DEBUGINFO_PACKAGE On)
 
@@ -230,7 +230,7 @@ set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_RECOMMENDS  "netdata-plugin-ebpf (= ${
 
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/ebpf-code-legacy/preinst;"
-	  "${PKG_FILES_PATH}/deb/ebpf-code-legacy/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/ebpf-code-legacy/postinst")
 
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_DEBUGINFO_PACKAGE Off)
 
@@ -250,7 +250,7 @@ set(CPACK_DEBIAN_PLUGIN-FREEIPMI_PACKAGE_PREDEPENDS "adduser")
 
 set(CPACK_DEBIAN_PLUGIN-FREEIPMI_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-freeipmi/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-freeipmi/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-freeipmi/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-FREEIPMI_DEBUGINFO_PACKAGE On)
 
@@ -274,7 +274,7 @@ set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_SUGGESTS "nvme-cli")
 
 set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-go/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-go/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-go/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 
@@ -296,7 +296,7 @@ set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_RECOMMENDS "netdata-plugin-ebpf (
 
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-network-viewer/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-network-viewer/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-network-viewer/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_DEBUGINFO_PACKAGE On)
 
@@ -317,7 +317,7 @@ set(CPACK_DEBIAN_PLUGIN-NFACCT_PACKAGE_PREDEPENDS "adduser")
 
 set(CPACK_DEBIAN_PLUGIN-NFACCT_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-nfacct/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-nfacct/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-nfacct/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-NFACCT_DEBUGINFO_PACKAGE On)
 
@@ -338,7 +338,7 @@ set(CPACK_DEBIAN_PLUGIN-PERF_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 
 set(CPACK_DEBIAN_PLUGIN-PERF_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-perf/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-perf/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-perf/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-PERF_DEBUGINFO_PACKAGE On)
 
@@ -363,7 +363,7 @@ set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_ARCHITECTURE "all")
 
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-pythond/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-pythond/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-pythond/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_DEBUGINFO_PACKAGE Off)
 
@@ -384,7 +384,7 @@ set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 
 set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-slabinfo/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-slabinfo/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-slabinfo/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-SLABINFO_DEBUGINFO_PACKAGE On)
 
@@ -404,7 +404,7 @@ set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_PREDEPENDS "libcap2-bin, adduser
 
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-systemd-journal/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-systemd-journal/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-systemd-journal/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD_JOURNAL_DEBUGINFO_PACKAGE On)
 
@@ -425,7 +425,7 @@ set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_PREDEPENDS "adduser")
 
 set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-xenstat/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-xenstat/postinst")
+	  "${CMAKE_BINARY_DIR}/extra-perms-hooks/deb/plugin-xenstat/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-XENSTAT_DEBUGINFO_PACKAGE On)
 
