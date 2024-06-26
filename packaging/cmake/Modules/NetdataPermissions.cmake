@@ -155,7 +155,7 @@ function(netdata_install_extra_permissions)
     endif()
 
     if(NOT BUILD_FOR_PACKAGING)
-      _nd_extract_entry_component(entry_component "${entry}")
+      _nd_extract_component(entry_component "${entry}")
       _nd_extract_permissions(entry_perms "${entry}")
       nd_perms_generate_cmake_install_hook("${entry_path}" "${entry_component}" "${entry_perms}")
     endif()
