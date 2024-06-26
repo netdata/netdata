@@ -9,6 +9,8 @@
 - Regenerate integrations.js [\#18006](https://github.com/netdata/netdata/pull/18006) ([netdatabot](https://github.com/netdatabot))
 - docs: add Troubleshoot-\>Getting Logs section to collectors [\#18005](https://github.com/netdata/netdata/pull/18005) ([ilyam8](https://github.com/ilyam8))
 - apps.plugin: remove "Normalization Ratio" internal charts [\#18004](https://github.com/netdata/netdata/pull/18004) ([ilyam8](https://github.com/ilyam8))
+- Fix RPM repoconfig naming [\#18003](https://github.com/netdata/netdata/pull/18003) ([Ferroin](https://github.com/Ferroin))
+- update netdata global stats and enable them by default [\#18001](https://github.com/netdata/netdata/pull/18001) ([ilyam8](https://github.com/ilyam8))
 - go.d whoisquery change  default days until expiration 90/30 =\> 30/15 [\#18000](https://github.com/netdata/netdata/pull/18000) ([ilyam8](https://github.com/ilyam8))
 - health convert value to days in calc in whoisquery/x509check alarms [\#17999](https://github.com/netdata/netdata/pull/17999) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17986](https://github.com/netdata/netdata/pull/17986) ([netdatabot](https://github.com/netdatabot))
@@ -26,6 +28,10 @@
 - go.d postgres index name replace space [\#17968](https://github.com/netdata/netdata/pull/17968) ([ilyam8](https://github.com/ilyam8))
 - go.d replace colon in job name [\#17967](https://github.com/netdata/netdata/pull/17967) ([ilyam8](https://github.com/ilyam8))
 - Fix space percentage calculation in dbengine retention chart [\#17963](https://github.com/netdata/netdata/pull/17963) ([stelfrag](https://github.com/stelfrag))
+- Tidy-up build related CI jobs. [\#17962](https://github.com/netdata/netdata/pull/17962) ([Ferroin](https://github.com/Ferroin))
+- Sign DEB packages in the GHA runners that build them. [\#17949](https://github.com/netdata/netdata/pull/17949) ([Ferroin](https://github.com/Ferroin))
+- Detect on startup if the netdata-meta.db file is not a valid database file [\#17924](https://github.com/netdata/netdata/pull/17924) ([stelfrag](https://github.com/stelfrag))
+- Fix small typo [\#17875](https://github.com/netdata/netdata/pull/17875) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.46.1](https://github.com/netdata/netdata/tree/v1.46.1) (2024-06-21)
 
@@ -405,11 +411,6 @@
 - timex is not supported on windows. [\#17443](https://github.com/netdata/netdata/pull/17443) ([vkalintiris](https://github.com/vkalintiris))
 - Clean up CMake build options. [\#17442](https://github.com/netdata/netdata/pull/17442) ([Ferroin](https://github.com/Ferroin))
 - Fix maintainer documentation to reflect the new build system. [\#17441](https://github.com/netdata/netdata/pull/17441) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#17439](https://github.com/netdata/netdata/pull/17439) ([netdatabot](https://github.com/netdatabot))
-- go.d mega/adaptec meta add alerts [\#17438](https://github.com/netdata/netdata/pull/17438) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17437](https://github.com/netdata/netdata/pull/17437) ([netdatabot](https://github.com/netdatabot))
-- Start watcher thread after fork [\#17436](https://github.com/netdata/netdata/pull/17436) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#17434](https://github.com/netdata/netdata/pull/17434) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
