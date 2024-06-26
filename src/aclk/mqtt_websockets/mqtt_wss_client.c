@@ -314,7 +314,7 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
 
 #define PROXY_CONNECT "CONNECT"
 #define PROXY_HTTP "HTTP/1.1"
-`#define PROXY_HTTP10 "HTTP/1.0"
+#define PROXY_HTTP10 "HTTP/1.0"
 #define HTTP_ENDLINE "\x0D\x0A"
 #define HTTP_HDR_TERMINATOR "\x0D\x0A\x0D\x0A"
 #define HTTP_CODE_LEN 4
