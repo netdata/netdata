@@ -51,15 +51,15 @@ type netInterface struct {
 	hasCharts bool
 	idx       string
 
-	ifIndex              int64
-	ifDescr              string
-	ifType               int64
-	ifMtu                int64
-	ifSpeed              int64
-	ifPhysAddress        string
-	ifAdminStatus        int64
-	ifOperStatus         int64
-	ifLastChange         string
+	ifIndex int64
+	ifDescr string
+	ifType  int64
+	ifMtu   int64
+	ifSpeed int64
+	//ifPhysAddress        string
+	ifAdminStatus int64
+	ifOperStatus  int64
+	//ifLastChange         string
 	ifInOctets           int64
 	ifInUcastPkts        int64
 	ifInNUcastPkts       int64
