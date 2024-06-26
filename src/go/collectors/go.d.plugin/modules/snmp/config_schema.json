@@ -8,7 +8,7 @@
         "description": "Data collection interval, measured in seconds.",
         "type": "integer",
         "minimum": 1,
-        "default": 1
+        "default": 10
       },
       "hostname": {
         "title": "Hostname",
@@ -46,23 +46,30 @@
             "exclusiveMinimum": 0,
             "default": 161
           },
-          "retries": {
-            "title": "Retries",
-            "description": "The number of retries to attempt for SNMP requests.",
-            "type": "integer",
-            "minimum": 0,
-            "default": 161
-          },
           "timeout": {
             "title": "Timeout",
             "description": "The timeout duration in seconds for SNMP requests.",
             "type": "integer",
             "minimum": 1,
+            "default": 5
+          },
+          "retries": {
+            "title": "Retries",
+            "description": "The number of retries to attempt for SNMP requests.",
+            "type": "integer",
+            "minimum": 0,
             "default": 1
           },
+          "max_repetitions": {
+            "title": "Max repetitions",
+            "description": "Controls how many SNMP variables to retrieve in a single GETBULK request.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 25
+          },
           "max_request_size": {
-            "title": "Max OIDs in request",
-            "description": "The maximum number of OIDs allowed in a single SNMP request.",
+            "title": "Max OIDs",
+            "description": "The maximum number of OIDs allowed in a single GET request.",
             "type": "integer",
             "minimum": 1,
             "default": 60
@@ -144,7 +151,6 @@
           "null"
         ],
         "uniqueItems": true,
-        "minItems": 1,
         "items": {
           "title": "Chart",
           "type": [
@@ -284,8 +290,7 @@
     "required": [
       "hostname",
       "community",
-      "options",
-      "charts"
+      "options"
     ],
     "additionalProperties": false,
     "patternProperties": {
@@ -302,6 +307,9 @@
         "ui:options": {
           "inline": true
         }
+      },
+      "max_repetitions": {
+        "ui:help": "A higher value retrieves more data in fewer round trips, potentially improving efficiency. This reduces network overhead compared to sending multiple individual requests. **Important**: Setting a value too high might cause the target device to return no data."
       }
     },
     "user": {
@@ -357,7 +365,12 @@
           "fields": [
             "update_every",
             "hostname",
-            "community",
+            "community"
+          ]
+        },
+        {
+          "title": "Conn Options",
+          "fields": [
             "options"
           ]
         },

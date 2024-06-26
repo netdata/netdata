@@ -136,7 +136,7 @@
             return false;                                                                                       \
         }                                                                                                       \
     } else if(required) {                                                                                       \
-        buffer_sprintf(error, "missing or invalid type (expected double value or null) for '%s.%s'", path, member); \
+        buffer_sprintf(error, "missing or invalid type (expected int value or null) for '%s.%s'", path, member); \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)

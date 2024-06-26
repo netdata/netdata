@@ -14,6 +14,7 @@ options:
   timeout: 123
   version: "ok"
   max_request_size: 123
+  max_repetitions: 123
 charts:
   - id: "ok"
     title: "ok"
