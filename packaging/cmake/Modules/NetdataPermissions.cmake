@@ -8,6 +8,32 @@ set(_nd_perms_list_file "${CMAKE_BINARY_DIR}/extra-perms-list")
 set(_nd_perms_hooks_dir "${CMAKE_BINARY_DIR}/extra-perms-hooks/")
 file(REMOVE "${_nd_perms_list_file}")
 
+# Extract the path from a supplementary permissions entry.
+function(_nd_extract_path var entry)
+  string(REGEX MATCH "^.+::" entry_path "${entry}")
+  string(REGEX REPLACE "::$" "" entry_path "${entry_path}")
+  string(REGEX MATCH "^.+::" entry_path "${entry_path}")
+  string(REPLACE "::" "" entry_path "${entry_path}")
+  set(${var} "${entry_path}" PARENT_SCOPE)
+endfunction()
+
+# Extract the component from a supplementary permissions entry.
+function(_nd_extract_component var entry)
+  string(REGEX MATCH "::.+::" entry_component "${entry}")
+  string(REPLACE "::" "" entry_component "${entry_component}")
+  set(${var} "${entry_component}" PARENT_SCOPE)
+endfunction()
+
+# Extract the permissions list from a supplementary permissions entry.
+function(_nd_extract_permissions var entry)
+  string(REGEX MATCH "::.+$" entry_perms "${entry}")
+  string(REGEX REPLACE "^::" "" entry_perms "${entry_perms}")
+  string(REGEX MATCH "::.+$" entry_perms "${entry_perms}")
+  string(REPLACE "::" "" entry_perms "${entry_perms}")
+  string(REPLACE "," ";" entry_perms "${entry_perms}")
+  set(${var} "${entry_perms}" PARENT_SCOPE)
+endfunction()
+
 # Add the requested additional permissions to the specified path in the
 # specified component.
 #
@@ -52,6 +78,8 @@ function(nd_perms_generate_cmake_install_hook path component perms)
   file(MAKE_DIRECTORY "${_nd_perms_hooks_dir}")
   string(REPLACE "/" "_" hook_name "${path}")
 
+  message(STATUS "Adding post-install hook for supplementary permissions for ${path}")
+
   if(USE_FILE_CAPABILITIES AND NOT "${perms}" STREQUAL "suid")
     install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-linux-caps-hook.sh ${path} ${NETDATA_GROUP} ${perms})" COMPONENT "${component}")
   else()
@@ -66,20 +94,19 @@ function(nd_perms_prepare_deb_postinst_scripts entries)
     file(MAKE_DIRECTORY "${_nd_perms_hooks_dir}/deb/${component}")
     set(postinst "${_nd_perms_hooks_dir}/deb/${component}/postinst")
     set(postinst_src "${PKG_FILES_PATH}/deb/${component}/postinst")
-    set(compoment_entries "${entries}")
+    set(component_entries "${entries}")
 
-    list(FILTER component_entries INCLUDE "::${component}::")
+    message(STATUS "Generating ${postinst}")
+
+    list(FILTER component_entries INCLUDE REGEX "^.+::${component}::.+$")
 
     foreach(item IN LISTS component_entries)
-      string(REGEX MATCH "^.+::" entry_path "${entry}")
-      string(REPLACE "::" "" entry_path "${entry_path}")
-      string(REGEX MATCH "::.+$" entry_perms "${entry}")
-      string(REPLACE "::" "" entry_perms "${entry_perms}")
-      string(REPLACE "," ";" entry_perms "${entry_perms}")
+      _nd_extract_path(entry_path "${item}")
+      _nd_extract_permissions(entry_perms "${item}")
 
       set(ND_APPLY_PERMISSIONS "${ND_APPLY_PERMISSIONS}chown -f 'root:${NETDATA_USER}' '${entry_path}'\n")
 
-      list(TRANSFORM PREPEND "cap_" entry_perms)
+      list(TRANSFORM entry_perms PREPEND "cap_")
       list(JOIN entry_perms "," capset)
       set(capset "${capset}+eip")
 
@@ -118,8 +145,7 @@ function(netdata_install_extra_permissions)
   set(completed_items)
 
   foreach(entry IN LISTS extra_perms_entries)
-    string(REGEX MATCH "^.+::" entry_path "${entry}")
-    string(REPLACE "::" "" entry_path "${entry_path}")
+    _nd_extract_path(entry_path "${entry}")
 
     if(entry_path IN_LIST completed_items)
       message(AUTHOR_WARNING "Duplicate supplementary permissions entry for ${entry_path}, ignoring it")
@@ -129,11 +155,8 @@ function(netdata_install_extra_permissions)
     endif()
 
     if(NOT BUILD_FOR_PACKAGING)
-      string(REGEX MATCH "::.+::" entry_component "${entry}")
-      string(REPLACE "::" "" entry_component "${entry_component}")
-      string(REGEX MATCH "::.+$" entry_perms "${entry}")
-      string(REPLACE "::" "" entry_perms "${entry_perms}")
-      string(REPLACE "," ";" entry_perms "${entry_perms}")
+      _nd_extract_entry_component(entry_component "${entry}")
+      _nd_extract_permissions(entry_perms "${entry}")
       nd_perms_generate_cmake_install_hook("${entry_path}" "${entry_component}" "${entry_perms}")
     endif()
   endforeach()
