@@ -21,22 +21,22 @@ Module: snmp
 
 ## Overview
 
-This collector monitors any SNMP devices and uses the [gosnmp](https://github.com/gosnmp/gosnmp) package.
+This SNMP collector discovers and gathers statistics for network interfaces on SNMP-enabled devices:
 
-It supports:
+- Traffic
+- Packets (unicast, multicast, broadcast)
+- Errors
+- Discards
+- Administrative and operational status
 
-- all SNMP versions: SNMPv1, SNMPv2c and SNMPv3.
-- any number of SNMP devices.
-- each SNMP device can be used to collect data for any number of charts.
-- each chart may have any number of dimensions.
-- each SNMP device may have a different update frequency.
-- each SNMP device will accept one or more batches to report values (you can set `max_request_size` per SNMP server, to control the size of batches).
+Additionally, it collects overall device uptime.
 
-Keep in mind that many SNMP switches and routers are very slow. They may not be able to report values per second.
-`go.d.plugin` reports the time it took for the SNMP device to respond when executed in the debug mode.
+It is compatible with all SNMP versions (v1, v2c, and v3) and uses the [gosnmp](https://github.com/gosnmp/gosnmp) package.
 
-Also, if many SNMP clients are used on the same SNMP device at the same time, values may be skipped.
-This is a problem of the SNMP device, not this collector. In this case, consider reducing the frequency of data collection (increasing `update_every`).
+**For advanced users**:
+
+- You can manually specify custom OIDs (Object Identifiers) to retrieve specific data points beyond the default metrics.
+- However, defining custom charts with dimensions for these OIDs requires manual configuration.
 
 
 
@@ -58,12 +58,64 @@ The default configuration for this integration does not impose any limits on dat
 
 #### Performance Impact
 
-The default configuration for this integration is not expected to impose a significant performance impact on the system.
+**Performance Considerations**:
+
+- **Device limitations**: Many SNMP switches and routers have limited processing power. They might not be able to report data as frequently as desired. You can monitor response times using go.d.plugin in debug mode to identify potential bottlenecks.
+
+- **Concurrent access**: If multiple collectors or tools access the same SNMP device simultaneously, data points might be skipped. This is a limitation of the device itself, not this collector. To mitigate this, consider increasing the collection interval (update_every) to reduce the frequency of requests.
+
 
 
 ## Metrics
 
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 The metrics that will be collected are defined in the configuration file.
+
+### Per snmp device
+
+These metrics refer to the SNMP device.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| sysName | SNMP device's system name (OID: [1.3.6.1.2.1.1.5](https://oidref.com/1.3.6.1.2.1.1.5)). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| snmp.device_uptime | uptime | seconds |
+
+### Per network interface
+
+Network interfaces of the SNMP device being monitored. These metrics refer to each interface.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| sysName | SNMP device's system name (OID: [1.3.6.1.2.1.1.5](https://oidref.com/1.3.6.1.2.1.1.5)). |
+| ifDescr | Network interface description (OID: [1.3.6.1.2.1.2.2.1.2](https://cric.grenoble.cnrs.fr/Administrateurs/Outils/MIBS/?oid=1.3.6.1.2.1.2.2.1.2)). |
+| ifName | Network interface name (OID: [1.3.6.1.2.1.2.2.1.2](https://cric.grenoble.cnrs.fr/Administrateurs/Outils/MIBS/?oid=1.3.6.1.2.1.31.1.1.1.1)). |
+| ifType | Network interface type (OID: [1.3.6.1.2.1.2.2.1.2](https://cric.grenoble.cnrs.fr/Administrateurs/Outils/MIBS/?oid=1.3.6.1.2.1.2.2.1.3)). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| snmp.device_net_interface_traffic | received, sent | kilobits/s |
+| snmp.device_net_interface_unicast | received, sent | packets/s |
+| snmp.device_net_interface_multicast | received, sent | packets/s |
+| snmp.device_net_interface_broadcast | received, sent | packets/s |
+| snmp.device_net_interface_errors | inbound, outbound | errors/s |
+| snmp.device_net_interface_discards | inbound, outbound | discards/s |
+| snmp.device_net_interface_admin_status | up, down, testing | status |
+| snmp.device_net_interface_oper_status | up, down, testing, unknown, dormant, not_present, lower_layer_down | status |
+
 
 
 ## Alerts
@@ -75,21 +127,7 @@ There are no alerts configured by default for this integration.
 
 ### Prerequisites
 
-#### Find OIDs
-
-Use `snmpwalk`, like this:
-
-```sh
-snmpwalk -t 20 -O fn -v 2c -c public 192.0.2.1
-```
-
-- `-t 20` is the timeout in seconds.
-- `-O fn` will display full OIDs in numeric format.
-- `-v 2c` is the SNMP version.
-- `-c public` is the SNMP community.
-- `192.0.2.1` is the SNMP device.
-
-
+No action required.
 
 ### Configuration
 
@@ -114,15 +152,16 @@ The following options can be defined globally: update_every, autodetection_retry
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
+| update_every | Data collection frequency. | 10 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| hostname | Target ipv4 address. | 127.0.0.1 | yes |
+| hostname | Target ipv4 address. |  | yes |
 | community | SNMPv1/2 community string. | public | no |
 | options.version | SNMP version. Available versions: 1, 2, 3. | 2 | no |
 | options.port | Target port. | 161 | no |
 | options.retries | Retries to attempt. | 1 | no |
-| options.timeout | SNMP request/response timeout. | 10 | no |
-| options.max_request_size | Maximum number of OIDs allowed in one one SNMP request. | 60 | no |
+| options.timeout | SNMP request/response timeout. | 5 | no |
+| options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
+| options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
 | user.name | SNMPv3 user name. |  | no |
 | user.name | Security level of SNMPv3 messages. |  | no |
 | user.auth_proto | Security level of SNMPv3 messages. |  | no |
@@ -198,10 +237,58 @@ In this example:
 - the SNMP version is `2`.
 - the SNMP community is `public`.
 - we will update the values every 10 seconds.
-- we define 2 charts `bandwidth_port1` and `bandwidth_port2`, each having 2 dimensions: `in` and `out`.
 
-> **SNMPv1**: just set `options.version` to 1.
-> **Note**: the algorithm chosen is `incremental`, because the collected values show the total number of bytes transferred, which we need to transform into kbps. To chart gauges (e.g. temperature), use `absolute` instead.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: switch
+    update_every: 10
+    hostname: 192.0.2.1
+    community: public
+    options:
+      version: 2
+
+```
+</details>
+
+##### SNMPv3
+
+To use SNMPv3:
+
+- use `user` instead of `community`.
+- set `options.version` to 3.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: switch
+    update_every: 10
+    hostname: 192.0.2.1
+    options:
+      version: 3
+    user:
+      name: username
+      level: authPriv
+      auth_proto: sha256
+      auth_key: auth_protocol_passphrase
+      priv_proto: aes256
+      priv_key: priv_protocol_passphrase
+
+```
+</details>
+
+##### Custom OIDs
+
+In this example:
+
+- the SNMP device is `192.0.2.1`.
+- the SNMP version is `2`.
+- the SNMP community is `public`.
+- we will update the values every 10 seconds.
 
 
 <details open><summary>Config</summary>
@@ -249,37 +336,7 @@ jobs:
 ```
 </details>
 
-##### SNMPv3
-
-To use SNMPv3:
-
-- use `user` instead of `community`.
-- set `options.version` to 3.
-
-The rest of the configuration is the same as in the SNMPv1/2 example.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: switch
-    update_every: 10
-    hostname: 192.0.2.1
-    options:
-      version: 3
-    user:
-      name: username
-      level: authPriv
-      auth_proto: sha256
-      auth_key: auth_protocol_passphrase
-      priv_proto: aes256
-      priv_key: priv_protocol_passphrase
-
-```
-</details>
-
-##### Multiply range
+##### Custom OIDs with multiply range
 
 If you need to define many charts using incremental OIDs, you can use the `charts.multiply_range` option.
 
