@@ -1748,8 +1748,8 @@ if(ENABLE_PLUGIN_DEBUGFS)
     install(TARGETS debugfs.plugin
             COMPONENT plugin-debugfs
             DESTINATION usr/libexec/netdata/plugins.d)
-    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d
-                            COMPONENT plugin-debufs
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/debugfs.plugin
+                            COMPONENT plugin-debugfs
                             PERMISSIONS dac_read_search)
 
     if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
@@ -1898,7 +1898,7 @@ if(ENABLE_PLUGIN_PERF)
     install(TARGETS perf.plugin
             COMPONENT plugin-perf
             DESTINATION usr/libexec/netdata/plugins.d)
-    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/perf.plugin
                             COMPONENT plugin-perf
                             PERMISSIONS perfmon)
 
@@ -1919,7 +1919,7 @@ if(ENABLE_PLUGIN_SLABINFO)
     install(TARGETS slabinfo.plugin
             COMPONENT plugin-slabinfo
             DESTINATION usr/libexec/netdata/plugins.d)
-    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/slabinfo.plugin
                             COMPONENT plugin-slabinfo
                             PERMISSIONS dac_read_search)
 
