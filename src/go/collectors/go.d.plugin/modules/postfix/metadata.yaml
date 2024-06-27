@@ -1,7 +1,7 @@
-plugin_name: python.d.plugin
+plugin_name: go.d.plugin
 modules:
   - meta:
-      plugin_name: python.d.plugin
+      plugin_name: go.d.plugin
       module_name: postfix
       monitored_instance:
         name: Postfix
@@ -23,22 +23,21 @@ modules:
       data_collection:
         metrics_description: >
           Keep an eye on Postfix metrics for efficient mail server operations. 
-          
+
           Improve your mail server performance with Netdata's real-time metrics and built-in alerts.
         method_description: >
           Monitors MTA email queue statistics using [postqueue](http://www.postfix.org/postqueue.1.html) tool.
+
+          Runs `postqueue -p` every 10 seconds.
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
         description: >
-          Postfix has internal access controls that limit activities on the mail queue. By default, all users are allowed to view
-          the queue. If your system is configured with stricter access controls, you need to grant the `netdata` user access to
-          view the mail queue. In order to do it, add `netdata` to `authorized_mailq_users` in the `/etc/postfix/main.cf` file.
-          
-          See the `authorized_mailq_users` setting in
-          the [Postfix documentation](https://www.postfix.org/postconf.5.html) for more details.
+          Postfix has internal access controls that limit activities on the mail queue. By default, all users are allowed to view the queue. If your system is configured with more strict access controls, you need to grant the `netdata` user access to view the mail queue. In order to do it, add `netdata` to `authorized_mailq_users` in the `/etc/postfix/main.cf` file.
+
+          See the `authorized_mailq_users` setting in the [Postfix documentation](https://www.postfix.org/postconf.5.html) for more details.
       default_behavior:
         auto_detection:
           description: "The collector executes  `postqueue -p` to get Postfix queue statistics."
@@ -56,14 +55,14 @@ modules:
         options:
           description: |
             There are 2 sections:
-            
+
             * Global variables
             * One or more JOBS that can define multiple different instances to monitor.
-            
+
             The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
-            
+
             Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
-            
+
             Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
           folding:
             title: Config options
