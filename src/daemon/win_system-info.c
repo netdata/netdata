@@ -5,7 +5,7 @@
 #include "win_system-info.h"
 
 // Hardware
-char *netdata_windows_arch(DWORD value)
+static char *netdata_windows_arch(DWORD value)
 {
     switch (value) {
         case 9:
@@ -23,7 +23,7 @@ char *netdata_windows_arch(DWORD value)
     }
 }
 
-DWORD netdata_windows_cpu_frequency(HKEY lKey)
+static DWORD netdata_windows_cpu_frequency(HKEY lKey)
 {
     DWORD freq = 0;
     long ret = netdata_registry_get_dword_from_open_key(&freq, lKey, "~MHz");
@@ -60,7 +60,7 @@ static void netdata_windows_cpu_from_system_info(struct rrdhost_system_info *sys
 
 }
 
-static inline void netdata_windows_cpu_vendor_model(struct rrdhost_system_info *systemInfo,
+static void netdata_windows_cpu_vendor_model(struct rrdhost_system_info *systemInfo,
                                                     HKEY lKey,
                                                     char *variable,
                                                     char *key)
@@ -97,14 +97,14 @@ static void netdata_windows_cpu_from_registry(struct rrdhost_system_info *system
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD);
 }
 
-void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
 {
     netdata_windows_cpu_from_system_info(systemInfo);
 
     netdata_windows_cpu_from_registry(systemInfo);
 }
 
-void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
 {
     ULONGLONG size;
     char memSize[256];
@@ -119,7 +119,7 @@ void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD);
 }
 
-inline ULONGLONG netdata_windows_get_disk_size(char *cVolume)
+static ULONGLONG netdata_windows_get_disk_size(char *cVolume)
 {
     HANDLE disk = CreateFile(cVolume, GENERIC_READ, FILE_SHARE_VALID_FLAGS, 0, OPEN_EXISTING, 0, 0);
     if (!disk)
@@ -181,7 +181,7 @@ static DWORD netdata_windows_get_current_build()
     return version;
 }
 
-void netdata_windows_discover_os_version(char *os, size_t length, DWORD build)
+static void netdata_windows_discover_os_version(char *os, size_t length, DWORD build)
 {
     char *commonName = {"Windows"};
 
@@ -215,7 +215,7 @@ void netdata_windows_discover_os_version(char *os, size_t length, DWORD build)
     (void)snprintf(os, length, "%s %s Client", commonName, version);
 }
 
-static inline void netdata_windows_os_version(char *out, DWORD length)
+static void netdata_windows_os_version(char *out, DWORD length)
 {
     if (netdata_registry_get_string(out,
                                     length,
@@ -227,7 +227,7 @@ static inline void netdata_windows_os_version(char *out, DWORD length)
     (void)snprintf(out, length, "%s", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
 }
 
-static inline void netdata_windows_os_kernel_version(char *out, DWORD length, DWORD build)
+static void netdata_windows_os_kernel_version(char *out, DWORD length, DWORD build)
 {
     char version[8];
     if (!netdata_registry_get_string(version,
@@ -240,7 +240,7 @@ static inline void netdata_windows_os_kernel_version(char *out, DWORD length, DW
     (void)snprintf(out, length, "%s (build: %u)", version, build);
 }
 
-static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_host(struct rrdhost_system_info *systemInfo)
 {
     char osVersion[4096];
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_NAME", "Microsoft Windows");
@@ -269,7 +269,7 @@ static inline void netdata_windows_host(struct rrdhost_system_info *systemInfo)
 }
 
 // Cloud
-static inline void netdata_windows_cloud(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_cloud(struct rrdhost_system_info *systemInfo)
 {
     (void)rrdhost_set_system_info_variable(
         systemInfo, "NETDATA_INSTANCE_CLOUD_TYPE", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
@@ -280,7 +280,7 @@ static inline void netdata_windows_cloud(struct rrdhost_system_info *systemInfo)
 }
 
 // Container
-static inline void netdata_windows_container(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_container(struct rrdhost_system_info *systemInfo)
 {
     (void)rrdhost_set_system_info_variable(
         systemInfo, "NETDATA_CONTAINER_OS_NAME", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
