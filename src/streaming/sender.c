@@ -672,7 +672,7 @@ static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
     rbuf_push(buf, http, bytes);
 
     http_parse_ctx ctx;
-    http_parse_ctx_create(&ctx);
+    http_parse_ctx_create(&ctx, HTTP_PARSE_INITIAL);
     ctx.flags |= HTTP_PARSE_FLAG_DONT_WAIT_FOR_CONTENT;
 
     int rc;
