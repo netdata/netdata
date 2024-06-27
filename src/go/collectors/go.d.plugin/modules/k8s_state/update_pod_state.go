@@ -149,13 +149,6 @@ func (ks *KubeState) updatePodState(r resource) {
 	}
 }
 
-func max(a, b int64) int64 {
-	if a < b {
-		return b
-	}
-	return a
-}
-
 func extractContainerID(id string) string {
 	// docker://d98...
 	if i := strings.LastIndexByte(id, '/'); i != -1 {
