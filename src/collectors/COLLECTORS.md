@@ -753,7 +753,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Maildir](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/maildir.md)
 
-- [Postfix](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/postfix/integrations/postfix.md)
+- [Postfix](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/postfix/integrations/postfix.md)
 
 ### Media Services
 
