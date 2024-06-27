@@ -191,9 +191,39 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     netdata_service_log("Agent has been started...");
 }
 
+static bool update_path() {
+    const char *old_path = getenv("PATH");
+
+    if (!old_path) {
+        if (setenv("PATH", "/usr/bin", 1) != 0) {
+            netdata_service_log("Failed to set PATH to /usr/bin");
+            return false;
+        }
+
+        return true;
+    }
+
+    size_t new_path_length = strlen(old_path) + strlen("/usr/bin") + 2;
+    char *new_path = (char *) callocz(new_path_length, sizeof(char));
+    snprintfz(new_path, new_path_length, "/usr/bin:%s", old_path);
+
+    if (setenv("PATH", new_path, 1) != 0) {
+        netdata_service_log("Failed to add /usr/bin to PATH");
+        freez(new_path);
+        return false;
+    }
+
+    freez(new_path);
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
     bool tty = isatty(fileno(stdout)) == 1;
+
+    if (!update_path()) {
+        return 1;
+    }
 
     if (tty)
     {

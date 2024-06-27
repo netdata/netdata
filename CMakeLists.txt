@@ -3033,19 +3033,22 @@ if(NOT OS_WINDOWS)
 endif()
 
 if(OS_WINDOWS)
-        install(FILES /usr/bin/awk
-                      /usr/bin/bash
-                      /usr/bin/cat
-                      /usr/bin/chown
-                      /usr/bin/curl
-                      /usr/bin/grep
-                      /usr/bin/mkdir
-                      /usr/bin/rm
-                      /usr/bin/sed
-                      /usr/bin/tail
-                      /usr/bin/tr
-                      /usr/bin/uuidgen
-                      /usr/bin/whoami
+        install(FILES /usr/bin/awk.exe
+                      /usr/bin/bash.exe
+                      /usr/bin/cat.exe
+                      /usr/bin/chown.exe
+                      /usr/bin/curl.exe
+                      /usr/bin/env.exe
+                      /usr/bin/grep.exe
+                      /usr/bin/mkdir.exe
+                      /usr/bin/openssl.exe
+                      /usr/bin/rm.exe
+                      /usr/bin/sed.exe
+                      /usr/bin/sh.exe
+                      /usr/bin/tail.exe
+                      /usr/bin/tr.exe
+                      /usr/bin/uuidgen.exe
+                      /usr/bin/whoami.exe
                 DESTINATION "${BINDIR}")
 
         install(FILES /usr/bin/msys-2.0.dll
@@ -3088,6 +3091,12 @@ if(OS_WINDOWS)
                       /usr/bin/msys-z.dll
                       /usr/bin/msys-zstd-1.dll
                 DESTINATION "${BINDIR}")
+
+        # Make bash & netdata happy
+        install(DIRECTORY DESTINATION tmp)
+
+        # Make curl work with ssl
+        install(DIRECTORY /usr/ssl DESTINATION usr)
 endif()
 
 include(Packaging)
