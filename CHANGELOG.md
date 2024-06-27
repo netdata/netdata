@@ -6,10 +6,16 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18016](https://github.com/netdata/netdata/pull/18016) ([netdatabot](https://github.com/netdatabot))
+- go.d snmp: add collecting network interface stats [\#18014](https://github.com/netdata/netdata/pull/18014) ([ilyam8](https://github.com/ilyam8))
+- rrdlabels: allow uppercase A-Z in label name [\#18013](https://github.com/netdata/netdata/pull/18013) ([ilyam8](https://github.com/ilyam8))
+- Fix Slack error reporting for packaging workflows. [\#18011](https://github.com/netdata/netdata/pull/18011) ([Ferroin](https://github.com/Ferroin))
+- Enforce proper include ordering for vendored libraries. [\#18008](https://github.com/netdata/netdata/pull/18008) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#18006](https://github.com/netdata/netdata/pull/18006) ([netdatabot](https://github.com/netdatabot))
 - docs: add Troubleshoot-\>Getting Logs section to collectors [\#18005](https://github.com/netdata/netdata/pull/18005) ([ilyam8](https://github.com/ilyam8))
 - apps.plugin: remove "Normalization Ratio" internal charts [\#18004](https://github.com/netdata/netdata/pull/18004) ([ilyam8](https://github.com/ilyam8))
 - Fix RPM repoconfig naming [\#18003](https://github.com/netdata/netdata/pull/18003) ([Ferroin](https://github.com/Ferroin))
+- Explicitly disable logsmanagement plugin on known-broken environments. [\#18002](https://github.com/netdata/netdata/pull/18002) ([Ferroin](https://github.com/Ferroin))
 - update netdata global stats and enable them by default [\#18001](https://github.com/netdata/netdata/pull/18001) ([ilyam8](https://github.com/ilyam8))
 - go.d whoisquery change  default days until expiration 90/30 =\> 30/15 [\#18000](https://github.com/netdata/netdata/pull/18000) ([ilyam8](https://github.com/ilyam8))
 - health convert value to days in calc in whoisquery/x509check alarms [\#17999](https://github.com/netdata/netdata/pull/17999) ([ilyam8](https://github.com/ilyam8))
@@ -403,14 +409,6 @@
 - go.d add storcli collector [\#17454](https://github.com/netdata/netdata/pull/17454) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/vmware/govmomi from 0.37.0 to 0.37.1 in /src/go/collectors/go.d.plugin [\#17451](https://github.com/netdata/netdata/pull/17451) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/miekg/dns from 1.1.58 to 1.1.59 in /src/go/collectors/go.d.plugin [\#17449](https://github.com/netdata/netdata/pull/17449) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/prometheus/common from 0.52.3 to 0.53.0 in /src/go/collectors/go.d.plugin [\#17448](https://github.com/netdata/netdata/pull/17448) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/docker/docker from 26.0.1+incompatible to 26.0.2+incompatible in /src/go/collectors/go.d.plugin [\#17447](https://github.com/netdata/netdata/pull/17447) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Regenerate integrations.js [\#17446](https://github.com/netdata/netdata/pull/17446) ([netdatabot](https://github.com/netdatabot))
-- Add documentation for VictorOps cloud notifications [\#17445](https://github.com/netdata/netdata/pull/17445) ([juacker](https://github.com/juacker))
-- Reconnect to the cloud when resuming from suspension [\#17444](https://github.com/netdata/netdata/pull/17444) ([stelfrag](https://github.com/stelfrag))
-- timex is not supported on windows. [\#17443](https://github.com/netdata/netdata/pull/17443) ([vkalintiris](https://github.com/vkalintiris))
-- Clean up CMake build options. [\#17442](https://github.com/netdata/netdata/pull/17442) ([Ferroin](https://github.com/Ferroin))
-- Fix maintainer documentation to reflect the new build system. [\#17441](https://github.com/netdata/netdata/pull/17441) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
