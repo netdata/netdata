@@ -4,12 +4,17 @@ package snmp
 
 type (
 	Config struct {
-		UpdateEvery int           `yaml:"update_every,omitempty" json:"update_every"`
-		Hostname    string        `yaml:"hostname" json:"hostname"`
-		Community   string        `yaml:"community,omitempty" json:"community"`
-		User        User          `yaml:"user,omitempty" json:"user"`
-		Options     Options       `yaml:"options,omitempty" json:"options"`
-		ChartsInput []ChartConfig `yaml:"charts,omitempty" json:"charts"`
+		UpdateEvery            int                    `yaml:"update_every,omitempty" json:"update_every"`
+		Hostname               string                 `yaml:"hostname" json:"hostname"`
+		Community              string                 `yaml:"community,omitempty" json:"community"`
+		User                   User                   `yaml:"user,omitempty" json:"user"`
+		Options                Options                `yaml:"options,omitempty" json:"options"`
+		ChartsInput            []ChartConfig          `yaml:"charts,omitempty" json:"charts"`
+		NetworkInterfaceFilter NetworkInterfaceFilter `yaml:"network_interface_filter,omitempty" json:"network_interface_filter"`
+	}
+	NetworkInterfaceFilter struct {
+		ByName string `yaml:"by_name,omitempty" json:"by_name"`
+		ByType string `yaml:"by_type,omitempty" json:"by_type"`
 	}
 	User struct {
 		Name          string `yaml:"name,omitempty" json:"name"`

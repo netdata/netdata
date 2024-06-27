@@ -106,7 +106,7 @@ func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
 		i.updated = false
 	}
 
-	pdus := make([]gosnmp.SnmpPDU, 0, len(ifMibXTable)+len(ifMibXTable))
+	pdus := make([]gosnmp.SnmpPDU, 0, len(ifMibTable)+len(ifMibXTable))
 	pdus = append(pdus, ifMibTable...)
 	pdus = append(pdus, ifMibXTable...)
 
@@ -205,6 +205,11 @@ func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
 
 	for _, iface := range s.netInterfaces {
 		if iface.ifName == "" {
+			continue
+		}
+
+		typeStr := ifTypeMapping[iface.ifType]
+		if s.netIfaceFilterByName.MatchString(iface.ifName) || s.netIfaceFilterByType.MatchString(typeStr) {
 			continue
 		}
 

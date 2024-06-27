@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"errors"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 
 	"github.com/gosnmp/gosnmp"
 )
@@ -59,6 +60,9 @@ type SNMP struct {
 	newSnmpClient func() gosnmp.Handler
 	snmpClient    gosnmp.Handler
 
+	netIfaceFilterByName matcher.Matcher
+	netIfaceFilterByType matcher.Matcher
+
 	collectIfMib  bool
 	netInterfaces map[string]*netInterface
 	sysName       string
@@ -89,6 +93,14 @@ func (s *SNMP) Init() error {
 		return err
 	}
 	s.snmpClient = snmpClient
+
+	byName, byType, err := s.initNetIfaceFilters()
+	if err != nil {
+		s.Errorf("failed to initialize network interface filters: %v", err)
+		return err
+	}
+	s.netIfaceFilterByName = byName
+	s.netIfaceFilterByType = byType
 
 	charts, err := newUserInputCharts(s.ChartsInput)
 	if err != nil {
