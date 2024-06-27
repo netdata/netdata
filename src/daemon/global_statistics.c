@@ -4229,6 +4229,7 @@ void *global_statistics_main(void *ptr)
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
+    usec_t real_step = USEC_PER_SEC;
 
     // keep the randomness at zero
     // to make sure we are not close to any other thread
@@ -4236,7 +4237,12 @@ void *global_statistics_main(void *ptr)
 
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
-        heartbeat_next(&hb, step);
+        heartbeat_next(&hb, USEC_PER_SEC);
+        if (real_step < step) {
+            real_step += USEC_PER_SEC;
+            continue;
+        }
+        real_step = USEC_PER_SEC;
 
         worker_is_busy(WORKER_JOB_GLOBAL);
         global_statistics_charts();
@@ -4279,10 +4285,16 @@ void *global_statistics_extended_main(void *ptr)
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
+    usec_t real_step = USEC_PER_SEC;
 
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
-        heartbeat_next(&hb, step);
+        heartbeat_next(&hb, USEC_PER_SEC);
+        if (real_step < step) {
+            real_step += USEC_PER_SEC;
+            continue;
+        }
+        real_step = USEC_PER_SEC;
 
         worker_is_busy(WORKER_JOB_HEARTBEAT);
         update_heartbeat_charts();
