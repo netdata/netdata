@@ -16,7 +16,6 @@
 #endif
 
 bool unittest_running = false;
-int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
 int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
@@ -122,7 +121,11 @@ bool service_running(SERVICE_TYPE service) {
 
     sth->services |= service;
 
-    return !sth->stop_immediately && !netdata_exit && !nd_thread_signaled_to_cancel();
+	bool cancelled = false;
+	if (sth->type == SERVICE_THREAD_TYPE_NETDATA)
+		cancelled = nd_thread_signaled_to_cancel();
+
+    return !sth->stop_immediately && !netdata_exit && !cancelled;
 }
 
 void service_signal_exit(SERVICE_TYPE service) {
@@ -137,8 +140,16 @@ void service_signal_exit(SERVICE_TYPE service) {
         if((sth->services & service)) {
             sth->stop_immediately = true;
 
-            // this does not harm - it just raises a flag
-            nd_thread_signal_cancel(sth->netdata_thread);
+			switch(sth->type) {
+               default:
+               case SERVICE_THREAD_TYPE_NETDATA:
+                  nd_thread_signal_cancel(sth->netdata_thread);
+                  break;
+
+               case SERVICE_THREAD_TYPE_EVENT_LOOP:
+               case SERVICE_THREAD_TYPE_LIBUV:
+                  break;
+            }
 
             if(sth->request_quit_callback) {
                 spinlock_unlock(&service_globals.lock);
@@ -1044,6 +1055,24 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_GLOBAL,  "dbengine multihost disk space",
                 CONFIG_SECTION_DB,      "dbengine multihost disk space MB");
 
+    config_move(CONFIG_SECTION_DB,      "dbengine disk space MB",
+                CONFIG_SECTION_DB,      "dbengine multihost disk space MB");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine multihost disk space MB",
+                CONFIG_SECTION_DB,      "dbengine tier 0 disk space MB");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine tier 1 multihost disk space MB",
+                CONFIG_SECTION_DB,      "dbengine tier 1 disk space MB");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine tier 2 multihost disk space MB",
+                CONFIG_SECTION_DB,      "dbengine tier 2 disk space MB");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine tier 3 multihost disk space MB",
+                CONFIG_SECTION_DB,      "dbengine tier 3 disk space MB");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine tier 4 multihost disk space MB",
+                CONFIG_SECTION_DB,      "dbengine tier 4 disk space MB");
+
     config_move(CONFIG_SECTION_GLOBAL,  "memory deduplication (ksm)",
                 CONFIG_SECTION_DB,      "memory deduplication (ksm)");
 
@@ -1100,7 +1129,16 @@ static int get_hostname(char *buf, size_t buf_size) {
     return gethostname(buf, buf_size);
 }
 
-static void get_netdata_configured_variables() {
+static void get_netdata_configured_variables()
+{
+#ifdef ENABLE_DBENGINE
+    legacy_multihost_db_space = config_exists(CONFIG_SECTION_DB, "dbengine multihost disk space MB");
+    if (!legacy_multihost_db_space)
+        legacy_multihost_db_space = config_exists(CONFIG_SECTION_GLOBAL, "dbengine multihost disk space");
+    if (!legacy_multihost_db_space)
+        legacy_multihost_db_space = config_exists(CONFIG_SECTION_GLOBAL, "dbengine disk space");
+#endif
+
     backwards_compatible_config();
 
     // ------------------------------------------------------------------------
@@ -1202,20 +1240,23 @@ static void get_netdata_configured_variables() {
 
     // ------------------------------------------------------------------------
     // get default Database Engine disk space quota in MiB
+//
+//    //    if (!config_exists(CONFIG_SECTION_DB, "dbengine disk space MB") && !config_exists(CONFIG_SECTION_DB, "dbengine multihost disk space MB"))
+//
+//    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
+//    if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+//        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+//        default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+//        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
+//    }
+//
+//    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
+//    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+//        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
+//        default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
+//        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
+//    }
 
-    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
-    if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
-        default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
-    }
-
-    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
-    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
-        default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
-        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
-    }
 #else
     if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
        error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
@@ -2240,8 +2281,6 @@ int main(int argc, char **argv) {
     delta_startup_time("start the static threads");
 
     web_server_config_options();
-
-    netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_DB, "enable zero metrics", CONFIG_BOOLEAN_NO);
 
     set_late_global_environment(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {

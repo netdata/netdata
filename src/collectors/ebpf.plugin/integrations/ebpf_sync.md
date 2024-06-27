@@ -67,7 +67,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | mem.file_sync | fsync, fdatasync | calls/s |
-| mem.meory_map | msync | calls/s |
+| mem.memory_map | msync | calls/s |
 | mem.sync | sync, syncfs | calls/s |
 | mem.file_segment | sync_file_range | calls/s |
 
@@ -129,7 +129,7 @@ sudo ./edit-config ebpf.d/sync.conf
 This configuration file have two different sections. The `[global]` overwrites all default options, while `[syscalls]` allow user to select the syscall to monitor.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

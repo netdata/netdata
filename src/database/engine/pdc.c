@@ -1179,7 +1179,7 @@ static bool epdl_populate_pages_from_extent_data(
 
 static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file file, unsigned pos, unsigned size_bytes)
 {
-    void *buffer;
+    void *buffer = NULL;
     uv_fs_t request;
 
     unsigned real_io_size = ALIGN_BYTES_CEILING(size_bytes);

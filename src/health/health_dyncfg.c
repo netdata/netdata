@@ -53,112 +53,114 @@ static void data_source_to_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
     }
 }
 
-static bool parse_match(json_object *jobj, const char *path, struct rrd_alert_match *match, BUFFER *error) {
+static bool parse_match(json_object *jobj, const char *path, struct rrd_alert_match *match, BUFFER *error, bool strict) {
     STRING *on = NULL;
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "on", on, error, true);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "on", on, error, strict);
     if(match->is_template)
         match->on.context = on;
     else
         match->on.chart = on;
 
-    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, "host_labels", match->host_labels, error);
-    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, "instance_labels", match->chart_labels, error);
+    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, "host_labels", match->host_labels, error, strict);
+    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, "instance_labels", match->chart_labels, error, strict);
 
     return true;
 }
 
-static bool parse_config_value_database_lookup(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "after", config->after, error);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "before", config->before, error);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group", time_grouping_txt2id, config->time_group, error);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "dims_group", alerts_dims_grouping2id, config->dims_group, error);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "data_source", alerts_data_sources2id, config->data_source, error);
+static bool parse_config_value_database_lookup(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, bool strict) {
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "after", config->after, error, strict);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "before", config->before, error, strict);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group", time_grouping_txt2id, config->time_group, error, strict);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "dims_group", alerts_dims_grouping2id, config->dims_group, error, strict);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "data_source", alerts_data_sources2id, config->data_source, error, strict);
 
     switch(config->time_group) {
         default:
             break;
 
         case RRDR_GROUPING_COUNTIF:
-            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group_condition", alerts_group_condition2id, config->time_group_condition, error);
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group_condition", alerts_group_condition2id, config->time_group_condition, error, strict);
             // fall through
 
         case RRDR_GROUPING_TRIMMED_MEAN:
         case RRDR_GROUPING_TRIMMED_MEDIAN:
         case RRDR_GROUPING_PERCENTILE:
-            JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "time_group_value", config->time_group_value, error);
+            JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "time_group_value", config->time_group_value, error, strict);
             break;
     }
 
-    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", rrdr_options_parse_one, config->options, error);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "dimensions", config->dimensions, error, true);
-    return true;
-}
-static bool parse_config_value(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_SUBOBJECT(jobj, path, "database_lookup", config, parse_config_value_database_lookup, error);
-    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "calculation", config->calculation, error);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "units", config->units, error, true);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "update_every", config->update_every, error);
+    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", rrdr_options_parse_one, config->options, error, strict);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "dimensions", config->dimensions, error, strict);
     return true;
 }
 
-static bool parse_config_conditions(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "warning_condition", config->warning, error);
-    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "critical_condition", config->critical, error);
+static bool parse_config_value(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, bool strict) {
+    JSONC_PARSE_SUBOBJECT(jobj, path, "database_lookup", config, parse_config_value_database_lookup, error, strict);
+    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "calculation", config->calculation, error, false);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "units", config->units, error, false);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "update_every", config->update_every, error, strict);
     return true;
 }
 
-static bool parse_config_action_delay(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "up", config->delay_up_duration, error);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "down", config->delay_down_duration, error);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "max", config->delay_max_duration, error);
-    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "multiplier", config->delay_multiplier, error);
-    return true;
-}
-static bool parse_config_action_repeat(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "enabled", config->has_custom_repeat_config, error);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "warning", config->warn_repeat_every, error);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "critical", config->crit_repeat_every, error);
+static bool parse_config_conditions(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, bool strict) {
+    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "warning_condition", config->warning, error, strict);
+    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "critical_condition", config->critical, error, strict);
     return true;
 }
 
-static bool parse_config_action(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", alert_action_options_parse_one, config->alert_action_options, error);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "execute", config->exec, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "recipient", config->recipient, error, true);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "delay", config, parse_config_action_delay, error);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "repeat", config, parse_config_action_repeat, error);
+static bool parse_config_action_delay(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, bool strict) {
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "up", config->delay_up_duration, error, strict);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "down", config->delay_down_duration, error, strict);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "max", config->delay_max_duration, error, strict);
+    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "multiplier", config->delay_multiplier, error, strict);
     return true;
 }
 
-static bool parse_config(json_object *jobj, const char *path, RRD_ALERT_PROTOTYPE *ap, BUFFER *error) {
+static bool parse_config_action_repeat(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, bool strict) {
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "enabled", config->has_custom_repeat_config, error, strict);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "warning", config->warn_repeat_every, error, strict);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "critical", config->crit_repeat_every, error, strict);
+    return true;
+}
+
+static bool parse_config_action(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, bool strict) {
+    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", alert_action_options_parse_one, config->alert_action_options, error, strict);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "execute", config->exec, error, strict);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "recipient", config->recipient, error, strict);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "delay", config, parse_config_action_delay, error, strict);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "repeat", config, parse_config_action_repeat, error, strict);
+    return true;
+}
+
+static bool parse_config(json_object *jobj, const char *path, RRD_ALERT_PROTOTYPE *ap, BUFFER *error, bool strict) {
     // we shouldn't parse these from the payload - they are given to us via the function call
-    // JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "source_type", dyncfg_source_type2id, ap->config.source_type, error);
-    // JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "source", ap->config.source, error, true);
+    // JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "source_type", dyncfg_source_type2id, ap->config.source_type, error, strict);
+    // JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "source", ap->config.source, error, strict);
 
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "summary", ap->config.summary, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "info", ap->config.info, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "type", ap->config.type, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "component", ap->config.component, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "classification", ap->config.classification, error, true);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "summary", ap->config.summary, error, false);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "info", ap->config.info, error, false);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "type", ap->config.type, error, false);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "component", ap->config.component, error, false);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "classification", ap->config.classification, error, false);
 
-    JSONC_PARSE_SUBOBJECT(jobj, path, "value", &ap->config, parse_config_value, error);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "conditions", &ap->config, parse_config_conditions, error);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "action", &ap->config, parse_config_action, error);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "match", &ap->match, parse_match, error);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "value", &ap->config, parse_config_value, error, strict);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "conditions", &ap->config, parse_config_conditions, error, false);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "action", &ap->config, parse_config_action, error, false);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "match", &ap->match, parse_match, error, strict);
 
     return true;
 }
 
-static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTOTYPE *base, BUFFER *error, const char *name) {
-    int64_t version;
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "format_version", version, error);
+static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTOTYPE *base, BUFFER *error, const char *name, bool strict) {
+    int64_t version = 0;
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "format_version", version, error, strict);
 
     if(version != 1) {
         buffer_sprintf(error, "unsupported document version");
         return false;
     }
 
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "name", base->config.name, error, !name && !*name);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "name", base->config.name, error, !name && !*name && strict);
 
     json_object *rules;
     if (json_object_object_get_ex(jobj, "rules", &rules)) {
@@ -174,10 +176,10 @@ static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTO
 
             json_object *rule = json_object_array_get_idx(rules, i);
 
-            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(rule, path, "enabled", ap->match.enabled, error);
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(rule, path, "enabled", ap->match.enabled, error, strict);
 
             STRING *type = NULL;
-            JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(rule, path, "type", type, error, true);
+            JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(rule, path, "type", type, error, strict);
             if(string_strcmp(type, "template") == 0)
                 ap->match.is_template = true;
             else if(string_strcmp(type, "instance") == 0)
@@ -187,7 +189,7 @@ static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTO
                 return false;
             }
 
-            JSONC_PARSE_SUBOBJECT(rule, path, "config", ap, parse_config, error);
+            JSONC_PARSE_SUBOBJECT(rule, path, "config", ap, parse_config, error, strict);
 
             ap = NULL; // so that we will create another one, if available
         }
@@ -200,7 +202,7 @@ static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTO
     return true;
 }
 
-static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, size_t payload_len, BUFFER *error, const char *name) {
+static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, size_t payload_len, BUFFER *error, const char *name, bool strict) {
     RRD_ALERT_PROTOTYPE *base = callocz(1, sizeof(*base));
     CLEAN_JSON_OBJECT *jobj = NULL;
 
@@ -219,11 +221,16 @@ static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, 
     }
     json_tokener_free(tokener);
 
-    if(!parse_prototype(jobj, "", base, error, name))
+    if(!parse_prototype(jobj, "", base, error, name, strict))
         goto cleanup;
 
     if(!base->config.name && name)
         base->config.name = string_strdupz(name);
+
+    if(name && *name && string_strcmp(base->config.name, name) != 0) {
+        string_freez(base->config.name);
+        base->config.name = string_strdupz(name);
+    }
 
     int i = 1;
     for(RRD_ALERT_PROTOTYPE *ap = base; ap; ap = ap->_internal.next, i++) {
@@ -232,8 +239,8 @@ static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, 
             ap->config.name = string_dup(base->config.name);
         }
 
-        if(!RRDCALC_HAS_DB_LOOKUP(ap) && !ap->config.calculation) {
-            buffer_sprintf(error, "the rule No %d has neither database lookup nor calculation", i);
+        if(!RRDCALC_HAS_DB_LOOKUP(ap) && !ap->config.calculation && strict) {
+            buffer_sprintf(error, "Item %d has neither database lookup nor calculation", i - 1);
             goto cleanup;
         }
 
@@ -242,13 +249,6 @@ static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, 
 
         if(ap->match.enabled)
             base->_internal.enabled = true;
-    }
-
-    if(string_strcmp(base->config.name, name) != 0) {
-        buffer_sprintf(error,
-                       "name parsed ('%s') does not match the name of the alert prototype ('%s')",
-                       string2str(base->config.name), name);
-        goto cleanup;
     }
 
     return base;
@@ -384,13 +384,17 @@ int dyncfg_health_prototype_to_conf(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, const c
     wb->content_type = CT_TEXT_PLAIN;
     wb->expires = now_realtime_sec();
 
+    int n = 0;
     for(RRD_ALERT_PROTOTYPE *nap = ap; nap ; nap = nap->_internal.next) {
+        if(++n > 1)
+            buffer_sprintf(wb, "\n");
+
         if(nap->match.is_template) {
-            buffer_sprintf(wb, "\n%13s: %s\n", "template", name);
+            buffer_sprintf(wb, "%13s: %s\n", "template", name);
             buffer_sprintf(wb, "%13s: %s\n", "on", string2str(nap->match.on.context));
         }
         else {
-            buffer_sprintf(wb, "\n%13s: %s\n", "alarm", name);
+            buffer_sprintf(wb, "%13s: %s\n", "alarm", name);
             buffer_sprintf(wb, "%13s: %s\n", "on", string2str(nap->match.on.chart));
         }
 
@@ -542,16 +546,19 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
     switch(cmd) {
         case DYNCFG_CMD_ADD: {
             CLEAN_BUFFER *error = buffer_create(0, NULL);
-            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, add_name);
+            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, add_name, true);
             if(!nap)
                 code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
             else {
+                char *msg = "";
+
                 nap->config.source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
-                bool added = health_prototype_add(nap); // this swaps ap <-> nap
+                bool added = health_prototype_add(nap, &msg); // this swaps ap <-> nap
 
                 if(!added) {
                     health_prototype_free(nap);
-                    return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "required attributes are missing");
+                    if(!msg || !*msg) msg = "required attributes are missing";
+                    return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
                 }
                 else
                     freez(nap);
@@ -574,7 +581,7 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
 
         case DYNCFG_CMD_USERCONFIG: {
             CLEAN_BUFFER *error = buffer_create(0, NULL);
-            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, add_name);
+            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, add_name, false);
             if(!nap)
                 code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
             else {
@@ -667,16 +674,18 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
 
         case DYNCFG_CMD_UPDATE: {
                 CLEAN_BUFFER *error = buffer_create(0, NULL);
-                RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, alert_name);
+                RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, alert_name, true);
                 if(!nap)
                     code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
                 else {
+                    char *msg = "";
                     nap->config.source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
-                    bool added = health_prototype_add(nap); // this swaps ap <-> nap
+                    bool added = health_prototype_add(nap, &msg); // this swaps ap <-> nap
 
                     if(!added) {
                         health_prototype_free(nap);
-                        return dyncfg_default_response( result, HTTP_RESP_BAD_REQUEST, "required attributes are missing");
+                        if(!msg || !*msg) msg = "required attributes are missing";
+                        return dyncfg_default_response( result, HTTP_RESP_BAD_REQUEST, msg);
                     }
                     else
                         freez(nap);
@@ -690,7 +699,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
 
         case DYNCFG_CMD_USERCONFIG: {
             CLEAN_BUFFER *error = buffer_create(0, NULL);
-            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, alert_name);
+            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, alert_name, false);
             if(!nap)
                 code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
             else {

@@ -113,7 +113,12 @@ static inline int check_http_enviroment(const char **proxy)
 
 const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
 {
-    const char *proxy = config_get(CONFIG_SECTION_CLOUD, ACLK_PROXY_CONFIG_VAR, ACLK_PROXY_ENV);
+    const char *proxy = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, ACLK_PROXY_CONFIG_VAR, ACLK_PROXY_ENV);
+
+    // backward compatibility: "proxy" was in "netdata.conf"
+    if (config_exists(CONFIG_SECTION_CLOUD, ACLK_PROXY_CONFIG_VAR))
+        proxy = config_get(CONFIG_SECTION_CLOUD, ACLK_PROXY_CONFIG_VAR, ACLK_PROXY_ENV);
+
     *type = PROXY_DISABLED;
 
     if (strcmp(proxy, "none") == 0)

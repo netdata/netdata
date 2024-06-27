@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	fcgiclient "github.com/kanocz/fcgi_client"
@@ -96,17 +97,21 @@ func (c *httpClient) getStatus() (*status, error) {
 	if err := c.dec(resp.Body, st); err != nil {
 		return nil, fmt.Errorf("error parsing HTTP response from '%s': %v", req.URL, err)
 	}
+
 	return st, nil
 }
 
 type socketClient struct {
+	*logger.Logger
+
 	socket  string
 	timeout time.Duration
 	env     map[string]string
 }
 
-func newSocketClient(socket string, timeout time.Duration, fcgiPath string) *socketClient {
+func newSocketClient(log *logger.Logger, socket string, timeout time.Duration, fcgiPath string) *socketClient {
 	return &socketClient{
+		Logger:  log,
 		socket:  socket,
 		timeout: timeout,
 		env: map[string]string{
@@ -142,8 +147,13 @@ func (c *socketClient) getStatus() (*status, error) {
 		return nil, fmt.Errorf("error on reading response from socket '%s': %v", c.socket, err)
 	}
 
+	if len(content) == 0 {
+		return nil, fmt.Errorf("no data returned from socket '%s'", c.socket)
+	}
+
 	st := &status{}
 	if err := json.Unmarshal(content, st); err != nil {
+		c.Debugf("failed to JSON decode data: %s", string(content))
 		return nil, fmt.Errorf("error on decoding response from socket '%s': %v", c.socket, err)
 	}
 
@@ -151,13 +161,16 @@ func (c *socketClient) getStatus() (*status, error) {
 }
 
 type tcpClient struct {
+	*logger.Logger
+
 	address string
 	timeout time.Duration
 	env     map[string]string
 }
 
-func newTcpClient(address string, timeout time.Duration, fcgiPath string) *tcpClient {
+func newTcpClient(log *logger.Logger, address string, timeout time.Duration, fcgiPath string) *tcpClient {
 	return &tcpClient{
+		Logger:  log,
 		address: address,
 		timeout: timeout,
 		env: map[string]string{
@@ -189,9 +202,15 @@ func (c *tcpClient) getStatus() (*status, error) {
 		return nil, fmt.Errorf("error on reading response from address '%s': %v", c.address, err)
 	}
 
+	if len(content) == 0 {
+		return nil, fmt.Errorf("no data returned from address '%s'", c.address)
+	}
+
 	st := &status{}
 	if err := json.Unmarshal(content, st); err != nil {
+		c.Debugf("failed to JSON decode data: %s", string(content))
 		return nil, fmt.Errorf("error on decoding response from address '%s': %v", c.address, err)
 	}
+
 	return st, nil
 }

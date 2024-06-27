@@ -14,6 +14,14 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "dmsetup-status-cache",
+        .params = "status --target cache --noflush",
+        .search = {
+            [0] = "dmsetup",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "ssacli-controllers-info",
         .params = "ctrl all show config detail",
         .search = {
@@ -74,6 +82,22 @@ struct command {
         .params = "--reportformat json --units b --nosuffix -o {{options}}",
         .search = {
             [0] = "lvs",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "igt-list-gpus",
+        .params = "-L",
+        .search = {
+            [0] = "intel_gpu_top",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "igt-device-json",
+        .params = "-d {{device}} -J -s {{interval}}",
+        .search = {
+            [0] = "intel_gpu_top",
             [1] = NULL,
         },
     },
@@ -181,7 +205,8 @@ bool check_string(const char *str, size_t index, char *err, size_t err_size) {
         if(!((c >= 'A' && c <= 'Z') ||
              (c >= 'a' && c <= 'z') ||
              (c >= '0' && c <= '9') ||
-              c == ' ' || c == '_' || c == '-' || c == '/' || c == '.' || c == ',')) {
+              c == ' ' || c == '_' || c == '-' || c == '/' || 
+              c == '.' || c == ',' || c == ':' || c == '=')) {
             snprintf(err, err_size, "command line argument No %zu includes invalid character '%c'", index, c);
             return false;
         }

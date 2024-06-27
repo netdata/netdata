@@ -1,116 +1,122 @@
 
-    install(FILES src/web/gui/v2/1220.866e5f8ef6dd53cc1146.chunk.js
-src/web/gui/v2/1396.3ea7b55a3bffeef95530.chunk.js
-src/web/gui/v2/1396.3ea7b55a3bffeef95530.chunk.js.LICENSE.txt
-src/web/gui/v2/1418.a399f41ec9789d008612.chunk.js
-src/web/gui/v2/1726.e4f235562d58cb4f4044.chunk.js
-src/web/gui/v2/1782.31d84c467a8446cb3c47.chunk.js
-src/web/gui/v2/1839.1dcd23c81c97fb79bfdb.chunk.js
-src/web/gui/v2/185.7461f65d16b20fe83fc1.chunk.js
-src/web/gui/v2/1875.e736e046980cb8eb4cda.chunk.js
-src/web/gui/v2/1876.ba66fdbcfb1b55334646.chunk.js
-src/web/gui/v2/195.3898e2d9ea61ff1d4a4f.chunk.js
-src/web/gui/v2/2007.3c73c91371062be4c05e.chunk.js
-src/web/gui/v2/2414.38b580f70a86a4f94b83.chunk.js
-src/web/gui/v2/3104.dfd9b1f79c9550ab8493.chunk.js
-src/web/gui/v2/3296.66994eada739315fc37e.chunk.js
-src/web/gui/v2/3350.24934ec57134cbef07bf.chunk.js
-src/web/gui/v2/3584.7b6df71f431fe58061ad.chunk.js
-src/web/gui/v2/3624.b8b5bc981ae890a8a5b8.chunk.js
-src/web/gui/v2/3705.38e023af816fb6ce8fc9.chunk.js
-src/web/gui/v2/3731.40bfabd5c5a12309b1a9.chunk.js
-src/web/gui/v2/3731.40bfabd5c5a12309b1a9.chunk.js.LICENSE.txt
-src/web/gui/v2/3736.b247e40ccbdc039b9877.chunk.js
-src/web/gui/v2/3750.6f01a0becb7db332b4ce.chunk.js
-src/web/gui/v2/3968.a5f7366160b7ac086dba.chunk.js
+    install(FILES src/web/gui/v2/1220.01d6bbaab869c74f4437.chunk.js
+src/web/gui/v2/1396.56f70d7c659ac0b694cd.chunk.js
+src/web/gui/v2/1396.56f70d7c659ac0b694cd.chunk.js.LICENSE.txt
+src/web/gui/v2/1418.16d53ba5cce2c6a8143a.chunk.js
+src/web/gui/v2/1782.d82eb301aa81b380dd0c.chunk.js
+src/web/gui/v2/1839.a4196d2a87ac0fdd9f34.chunk.js
+src/web/gui/v2/185.42bab351ba68de7ca4aa.chunk.js
+src/web/gui/v2/1876.e610906417b961290730.chunk.js
+src/web/gui/v2/195.4cdbea6af54d14a95949.chunk.js
+src/web/gui/v2/2007.b33ce2b4b736228fd681.chunk.js
+src/web/gui/v2/252.40edc9b0f6da1422f40b.chunk.js
+src/web/gui/v2/3104.3b70865e21a81a616af3.chunk.js
+src/web/gui/v2/3350.ae7151980981854dc3d1.chunk.js
+src/web/gui/v2/3455.f9ca876de57244386773.chunk.js
+src/web/gui/v2/3455.f9ca876de57244386773.chunk.js.LICENSE.txt
+src/web/gui/v2/3621.01ee70ee9c311ac163d9.chunk.js
+src/web/gui/v2/3624.bfeb1fdc3057ba82ddac.chunk.js
+src/web/gui/v2/3736.e572adfdf7951f74a741.chunk.js
+src/web/gui/v2/3750.4ad02f036f2a7c520b1c.chunk.js
+src/web/gui/v2/3843.89070793921be1288bb5.css
+src/web/gui/v2/3843.ffbb6f614ba4f7b77570.chunk.js
+src/web/gui/v2/3968.483ca2ad3b300293e655.chunk.js
 src/web/gui/v2/3D_PARTY_LICENSES.txt
-src/web/gui/v2/4034.9c82e72b081978919942.chunk.js
-src/web/gui/v2/4414.60a74c3b7534b4a25469.chunk.js
-src/web/gui/v2/4680.0c75b44bbc80f4591fdd.chunk.js
-src/web/gui/v2/5171.2a848991a41e02f24c8d.js
-src/web/gui/v2/5171.2a848991a41e02f24c8d.js.LICENSE.txt
-src/web/gui/v2/5246.a7c78643acccf04d7268.chunk.js
-src/web/gui/v2/5304.dcb81c99fcb90f8ee8cc.chunk.js
-src/web/gui/v2/5426.1235a7a39c1b0923b071.chunk.js
-src/web/gui/v2/5596.8280cb325a103342aa30.chunk.js
-src/web/gui/v2/5598.99e492f7ae4d391df96f.chunk.js
-src/web/gui/v2/5700.313f7b9c7005d2022b03.chunk.js
-src/web/gui/v2/5709.6fc5fd48f639100fa6ad.chunk.js
-src/web/gui/v2/5709.6fc5fd48f639100fa6ad.chunk.js.LICENSE.txt
-src/web/gui/v2/5794.719f2daca8b8f3a118fe.chunk.js
-src/web/gui/v2/6008.07f03fb5dba476a12f91.chunk.js
-src/web/gui/v2/6121.8c25bb62d82381e90df8.chunk.js
-src/web/gui/v2/6121.8c25bb62d82381e90df8.chunk.js.LICENSE.txt
-src/web/gui/v2/6218.26fc25279f45fbcf29f7.chunk.js
-src/web/gui/v2/6323.425683f5bf71a51caf65.chunk.js
+src/web/gui/v2/4034.35199d2809d318eed690.chunk.js
+src/web/gui/v2/4140.46221d08bcda08826c78.chunk.js
+src/web/gui/v2/4140.89070793921be1288bb5.css
+src/web/gui/v2/4414.590ba07d470ba2ce7dd0.chunk.js
+src/web/gui/v2/4631.158982e127e11bdc6a45.chunk.js
+src/web/gui/v2/4680.7d8122d91e9d4582836a.chunk.js
+src/web/gui/v2/4958.5969fedc1ff7dc82775e.chunk.js
+src/web/gui/v2/5246.07c5a1649f0805c140fe.chunk.js
+src/web/gui/v2/5304.cc797fdd343c7e873b2f.chunk.js
+src/web/gui/v2/5426.254557ad3e1f2d14ad29.chunk.js
+src/web/gui/v2/5596.2036706750ff4028cff2.chunk.js
+src/web/gui/v2/5598.07ff43a6b96bd41e8637.chunk.js
+src/web/gui/v2/5700.b7c9908dc7f30a5a57e7.chunk.js
+src/web/gui/v2/5709.c494eb62187917e2f2f6.chunk.js
+src/web/gui/v2/5709.c494eb62187917e2f2f6.chunk.js.LICENSE.txt
+src/web/gui/v2/5794.252ff787d58d64eb4988.chunk.js
+src/web/gui/v2/6008.3d0636fe17f4f6274485.chunk.js
+src/web/gui/v2/6121.f7286809e53e1c6d655a.chunk.js
+src/web/gui/v2/6121.f7286809e53e1c6d655a.chunk.js.LICENSE.txt
+src/web/gui/v2/6323.26d4d949c9b6f8674c2e.chunk.js
 src/web/gui/v2/6331.89070793921be1288bb5.css
-src/web/gui/v2/6331.ccfaab2b17a28e1b6aa2.chunk.js
-src/web/gui/v2/6760.fe4a9b58186542294e85.chunk.js
-src/web/gui/v2/683.95b7a3193b43fd5dbe51.chunk.js
+src/web/gui/v2/6331.c91b5d104cdff1be3b80.chunk.js
+src/web/gui/v2/6384.0fad56b0bc902f186c98.chunk.js
+src/web/gui/v2/6469.47926fa38028dc7d0d41.chunk.js
+src/web/gui/v2/6469.89070793921be1288bb5.css
+src/web/gui/v2/6661.72f782bd78fea8c2d836.chunk.js
+src/web/gui/v2/6760.370b9780120c145da28f.chunk.js
+src/web/gui/v2/683.02c173493ef257c210fa.chunk.js
 src/web/gui/v2/683.cc9fa5f3bdc0bf3ab2fc.css
-src/web/gui/v2/7144.72da82bc4f112d1e6d31.chunk.js
-src/web/gui/v2/7144.72da82bc4f112d1e6d31.chunk.js.LICENSE.txt
-src/web/gui/v2/7146.43b5125ff0b41138f0bc.chunk.js
-src/web/gui/v2/7208.3c255b9641ab4d451747.chunk.js
-src/web/gui/v2/7332.8f89f4887946c129ea01.chunk.js
-src/web/gui/v2/7340.c563ddaad6c68dab9088.chunk.js
-src/web/gui/v2/7410.cb47519a7a5187208b28.chunk.js
-src/web/gui/v2/7436.6d4c25c5ff7d2e65734c.chunk.js
-src/web/gui/v2/7471.d61aa69f317a13bd1b86.chunk.js
-src/web/gui/v2/749.8ce93b3d6d67d600e8c8.chunk.js
-src/web/gui/v2/749.8ce93b3d6d67d600e8c8.chunk.js.LICENSE.txt
-src/web/gui/v2/7519.8a99c6b9370779196847.chunk.js
-src/web/gui/v2/7529.75d71f48d8d6ea454b6d.chunk.js
-src/web/gui/v2/7789.89070793921be1288bb5.css
-src/web/gui/v2/7789.f00b7764a97a7dadff97.chunk.js
-src/web/gui/v2/7840.e1af907905ff10afb069.chunk.js
-src/web/gui/v2/785.c45abbb1e2a4915d85df.chunk.js
-src/web/gui/v2/7857.0d6fb5e4a2c2b8996e0f.chunk.js
-src/web/gui/v2/7959.3995671185f9720b5454.chunk.js
-src/web/gui/v2/8011.3f8282bb427ea06e9408.chunk.js
-src/web/gui/v2/8059.c88ad65e1926faee2379.chunk.js
-src/web/gui/v2/8323.61daef62d0036dd19dbf.chunk.js
-src/web/gui/v2/8323.61daef62d0036dd19dbf.chunk.js.LICENSE.txt
+src/web/gui/v2/6944.ab3e70c9ac0f05013b5f.chunk.js
+src/web/gui/v2/7144.382c341e09540fdebaa6.chunk.js
+src/web/gui/v2/7144.382c341e09540fdebaa6.chunk.js.LICENSE.txt
+src/web/gui/v2/7146.79304e386ac9238b7cf1.chunk.js
+src/web/gui/v2/7170.5d6047bb6ce9d77d53db.chunk.js
+src/web/gui/v2/7208.1d75cf5d007de32e403b.chunk.js
+src/web/gui/v2/7304.ed4690ec296b59fbe7fd.chunk.js
+src/web/gui/v2/7332.3acf93dcfa52c7f1bc18.chunk.js
+src/web/gui/v2/7340.25dce1c5cc66b613700f.chunk.js
+src/web/gui/v2/7436.1ebd371d70e6a87c5499.chunk.js
+src/web/gui/v2/7471.f96c4d04a73fb7551c03.chunk.js
+src/web/gui/v2/7487.89070793921be1288bb5.css
+src/web/gui/v2/7487.db63c95c27d973a07d9b.chunk.js
+src/web/gui/v2/749.e44087ac3a2e3a994318.chunk.js
+src/web/gui/v2/749.e44087ac3a2e3a994318.chunk.js.LICENSE.txt
+src/web/gui/v2/7519.7982a2e0fcdf82ba78dd.chunk.js
+src/web/gui/v2/7529.658d363e12e73df83b60.chunk.js
+src/web/gui/v2/7840.2f2023f2eb1dcc943d94.chunk.js
+src/web/gui/v2/785.d016913841bcc0209d5b.chunk.js
+src/web/gui/v2/7857.813ae058cca579e05462.chunk.js
+src/web/gui/v2/7959.4f20f4b203e2bad8af39.chunk.js
+src/web/gui/v2/8059.4fdc76bb2cac1f74b41b.chunk.js
+src/web/gui/v2/8239.c85fc9f3599f198a9efb.chunk.js
+src/web/gui/v2/8323.437406936b642e8f6cb3.chunk.js
+src/web/gui/v2/8323.437406936b642e8f6cb3.chunk.js.LICENSE.txt
 src/web/gui/v2/8323.e22de33686bb2f34063c.css
-src/web/gui/v2/8473.757c1686b1578c6813c8.chunk.js
-src/web/gui/v2/8505.b10bf3549c213fe15d55.chunk.js
-src/web/gui/v2/8507.89070793921be1288bb5.css
-src/web/gui/v2/8507.e30db778518756ef63fa.chunk.js
-src/web/gui/v2/86.167efe55b22f02c3155a.chunk.js
-src/web/gui/v2/8676.a3d687b3b339a72ab66e.chunk.js
-src/web/gui/v2/8784.c51d36fede97c85313e9.chunk.js
-src/web/gui/v2/9297.394c9cbf0a1e402384a6.chunk.js
-src/web/gui/v2/934.aadd4297c0cd646a1038.chunk.js
-src/web/gui/v2/9473.3693c06a873280f11bd6.chunk.js
-src/web/gui/v2/9510.58c95eb5f0290291b5a9.chunk.js
-src/web/gui/v2/966.89070793921be1288bb5.css
-src/web/gui/v2/966.8f0a484a79552c192bc1.chunk.js
-src/web/gui/v2/9818.ca4131b4d88d20e88f72.chunk.js
-src/web/gui/v2/9843.75b313f97c4d363a4959.chunk.js
-src/web/gui/v2/9912.b952e26497a284ac37b2.chunk.js
+src/web/gui/v2/8505.c330f2104fefd71717da.chunk.js
+src/web/gui/v2/86.2c88d4d37b88e2620051.chunk.js
+src/web/gui/v2/8637.0958494526e838a60d2b.js
+src/web/gui/v2/8637.0958494526e838a60d2b.js.LICENSE.txt
+src/web/gui/v2/8784.a04e9c07186e1f057f56.chunk.js
+src/web/gui/v2/8842.406028f523a00acb97bd.chunk.js
+src/web/gui/v2/8910.019974f8675d8834dd07.chunk.js
+src/web/gui/v2/8938.5116982f737a2ef85330.chunk.js
+src/web/gui/v2/9292.cc5055091db9a0826933.chunk.js
+src/web/gui/v2/934.24d6fdc5f60aa6493962.chunk.js
+src/web/gui/v2/9400.6250bbf86c4fd3173de2.chunk.js
+src/web/gui/v2/9473.4fd4742ffb6b5348bea8.chunk.js
+src/web/gui/v2/963.35da4a3c4e49aac29dae.chunk.js
+src/web/gui/v2/979.3e5fddf93c977e6c71c3.chunk.js
+src/web/gui/v2/9818.3ce64e0b472412bfbc97.chunk.js
+src/web/gui/v2/9843.93f8c71c64ef97b9905e.chunk.js
+src/web/gui/v2/9912.702300c2dd9616289606.chunk.js
 src/web/gui/v2/LICENSE.md
 src/web/gui/v2/agent.html
-src/web/gui/v2/allFiles.6.104.1.json
+src/web/gui/v2/allFiles.6.138.3.json
 src/web/gui/v2/allFiles.6.json
-src/web/gui/v2/app.7443b231e52789baa643.js
+src/web/gui/v2/app.08c9fe3ead1d43ff769b.js
 src/web/gui/v2/app.cb2e9f9a81cf9533384e.css
 src/web/gui/v2/apple-app-site-association
 src/web/gui/v2/bundlesManifest.6.json
 src/web/gui/v2/favicon.ico
 src/web/gui/v2/index.html
 src/web/gui/v2/local-agent.html
-src/web/gui/v2/netdata.charts.f0b9e2b96837688d2aab.js
-src/web/gui/v2/netdata.ui.f50ab375c8daf7a2a547.js
-src/web/gui/v2/netdata.ui.f50ab375c8daf7a2a547.js.LICENSE.txt
-src/web/gui/v2/npm.react.dom.b2a6a30db3d683abdb32.js
-src/web/gui/v2/npm.react.dom.b2a6a30db3d683abdb32.js.LICENSE.txt
+src/web/gui/v2/netdata.charts.fdfd27674ac5533bbcc2.js
+src/web/gui/v2/netdata.ui.647a4c3303ee8ec0da64.js
+src/web/gui/v2/netdata.ui.647a4c3303ee8ec0da64.js.LICENSE.txt
+src/web/gui/v2/npm.react.dom.2994f1b4604bd8ce80f6.js
+src/web/gui/v2/npm.react.dom.2994f1b4604bd8ce80f6.js.LICENSE.txt
 src/web/gui/v2/registry-access.html
 src/web/gui/v2/registry-alert-redirect.html
 src/web/gui/v2/registry-hello.html
-src/web/gui/v2/runtime.30ce76c6e7acf60ebf83.js
-src/web/gui/v2/sw.js DESTINATION ${WEB_DEST}/v2)
+src/web/gui/v2/runtime.ceccffb089cc539b1c1f.js
+src/web/gui/v2/sw.js COMPONENT netdata DESTINATION ${WEB_DEST}/v2)
     install(FILES src/web/gui/v2/static/apple-app-site-association
-src/web/gui/v2/static/splash.css DESTINATION ${WEB_DEST}/v2/static)
+src/web/gui/v2/static/splash.css COMPONENT netdata DESTINATION ${WEB_DEST}/v2/static)
     install(FILES src/web/gui/v2/static/email/img/clea_badge.png
 src/web/gui/v2/static/email/img/clea_siren.png
 src/web/gui/v2/static/email/img/community_icon.png
@@ -126,12 +132,12 @@ src/web/gui/v2/static/email/img/label_recovered.png
 src/web/gui/v2/static/email/img/label_warning.png
 src/web/gui/v2/static/email/img/reachability_siren.png
 src/web/gui/v2/static/email/img/warn_badge.png
-src/web/gui/v2/static/email/img/warn_siren.png DESTINATION ${WEB_DEST}/v2/static/email/img)
+src/web/gui/v2/static/email/img/warn_siren.png COMPONENT netdata DESTINATION ${WEB_DEST}/v2/static/email/img)
     install(FILES src/web/gui/v2/static/img/list-style-image.svg
 src/web/gui/v2/static/img/new-dashboard.svg
 src/web/gui/v2/static/img/no-filter-results.png
 src/web/gui/v2/static/img/no-nodes-room.svg
-src/web/gui/v2/static/img/rack.png DESTINATION ${WEB_DEST}/v2/static/img)
+src/web/gui/v2/static/img/rack.png COMPONENT netdata DESTINATION ${WEB_DEST}/v2/static/img)
     install(FILES src/web/gui/v2/static/img/logos/os/alpine.svg
 src/web/gui/v2/static/img/logos/os/arch.svg
 src/web/gui/v2/static/img/logos/os/centos.svg
@@ -157,7 +163,7 @@ src/web/gui/v2/static/img/logos/os/raspberry-pi.svg
 src/web/gui/v2/static/img/logos/os/redhat.svg
 src/web/gui/v2/static/img/logos/os/rocky.svg
 src/web/gui/v2/static/img/logos/os/suse.svg
-src/web/gui/v2/static/img/logos/os/ubuntu.svg DESTINATION ${WEB_DEST}/v2/static/img/logos/os)
+src/web/gui/v2/static/img/logos/os/ubuntu.svg COMPONENT netdata DESTINATION ${WEB_DEST}/v2/static/img/logos/os)
     install(FILES src/web/gui/v2/static/img/logos/services/access-point.svg
 src/web/gui/v2/static/img/logos/services/activemq.svg
 src/web/gui/v2/static/img/logos/services/adaptec.svg
@@ -284,14 +290,14 @@ src/web/gui/v2/static/img/logos/services/unbound.svg
 src/web/gui/v2/static/img/logos/services/uwsgi.svg
 src/web/gui/v2/static/img/logos/services/varnish.svg
 src/web/gui/v2/static/img/logos/services/veritas.svg
-src/web/gui/v2/static/img/logos/services/xen.svg DESTINATION ${WEB_DEST}/v2/static/img/logos/services)
+src/web/gui/v2/static/img/logos/services/xen.svg COMPONENT netdata DESTINATION ${WEB_DEST}/v2/static/img/logos/services)
     install(FILES src/web/gui/v2/static/img/mail/isotype.png
 src/web/gui/v2/static/img/mail/isotype.svg
 src/web/gui/v2/static/img/mail/logotype.png
-src/web/gui/v2/static/img/mail/logotype.svg DESTINATION ${WEB_DEST}/v2/static/img/mail)
+src/web/gui/v2/static/img/mail/logotype.svg COMPONENT netdata DESTINATION ${WEB_DEST}/v2/static/img/mail)
     install(FILES src/web/gui/v2/static/site/pages/holding-page-503/holding-page-503.css
 src/web/gui/v2/static/site/pages/holding-page-503/holding-page-503.svg
 src/web/gui/v2/static/site/pages/holding-page-503/index.html
 src/web/gui/v2/static/site/pages/holding-page-503/multiple-logos-group.svg
 src/web/gui/v2/static/site/pages/holding-page-503/netdata-logo-white.svg
-src/web/gui/v2/static/site/pages/holding-page-503/reset.svg DESTINATION ${WEB_DEST}/v2/static/site/pages/holding-page-503)
+src/web/gui/v2/static/site/pages/holding-page-503/reset.svg COMPONENT netdata DESTINATION ${WEB_DEST}/v2/static/site/pages/holding-page-503)

@@ -60,7 +60,7 @@ typedef struct rrd_alert_prototype {
         struct rrd_alert_prototype *prev, *next;
     } _internal;
 } RRD_ALERT_PROTOTYPE;
-bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap);
+bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, char **msg);
 void health_prototype_cleanup(RRD_ALERT_PROTOTYPE *ap);
 void health_prototype_free(RRD_ALERT_PROTOTYPE *ap);
 

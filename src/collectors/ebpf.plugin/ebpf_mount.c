@@ -235,10 +235,10 @@ static void ebpf_obsolete_mount_global(ebpf_module_t *em)
                               NETDATA_EBPF_MOUNT_CALLS,
                               "",
                               "Calls to mount and umount syscalls",
-                              EBPF_COMMON_DIMENSION_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_EBPF_MOUNT_FAMILY,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "mount_points.call",
                               NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
                               em->update_every);
 
@@ -246,10 +246,10 @@ static void ebpf_obsolete_mount_global(ebpf_module_t *em)
                               NETDATA_EBPF_MOUNT_ERRORS,
                               "",
                               "Errors to mount and umount file systems",
-                              EBPF_COMMON_DIMENSION_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_EBPF_MOUNT_FAMILY,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "mount_points.error",
                               NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
                               em->update_every);
 }
@@ -411,8 +411,8 @@ static void ebpf_create_mount_charts(int update_every)
 {
     ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_CALLS,
                       "Calls to mount and umount syscalls",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_MOUNT_FAMILY,
-                      NULL,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_EBPF_MOUNT_FAMILY,
+                      "mount_points.call",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
                       ebpf_create_global_dimension,
@@ -421,8 +421,8 @@ static void ebpf_create_mount_charts(int update_every)
 
     ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_ERRORS,
                       "Errors to mount and umount file systems",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_MOUNT_FAMILY,
-                      NULL,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_EBPF_MOUNT_FAMILY,
+                      "mount_points.error",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
                       ebpf_create_global_dimension,

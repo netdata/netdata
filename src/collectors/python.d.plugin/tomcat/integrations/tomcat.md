@@ -117,7 +117,7 @@ The following options can be defined globally: priority, penalty, autodetection_
 Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
 
 
-<details><summary>Config options per job</summary>
+<details open><summary>Config options per job</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -148,7 +148,7 @@ localhost:
 
 A typical configuration using an IPv4 endpoint
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 local_ipv4:
@@ -162,7 +162,7 @@ local_ipv4:
 
 A typical configuration using an IPv6 endpoint
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 local_ipv6:
@@ -199,5 +199,38 @@ should give you clues as to why the collector isn't working.
   ```bash
   ./python.d.plugin tomcat debug trace
   ```
+
+### Getting Logs
+
+If you're encountering problems with the `tomcat` collector, follow these steps to retrieve logs and identify potential issues:
+
+- **Run the command** specific to your system (systemd, non-systemd, or Docker container).
+- **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
+
+#### System with systemd
+
+Use the following command to view logs generated since the last Netdata service restart:
+
+```bash
+journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep tomcat
+```
+
+#### System without systemd
+
+Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
+
+```bash
+grep tomcat /var/log/netdata/collector.log
+```
+
+**Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
+
+#### Docker Container
+
+If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
+
+```bash
+docker logs netdata 2>&1 | grep tomcat
+```
 
 

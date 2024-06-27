@@ -72,6 +72,9 @@
 // ARAL name
 #define NETDATA_EBPF_VFS_ARAL_NAME "ebpf_vfs"
 
+// dimension
+#define EBPF_COMMON_UNITS_BYTES "bytes/s"
+
 typedef struct netdata_publish_vfs {
     uint64_t ct;
     uint32_t tgid;

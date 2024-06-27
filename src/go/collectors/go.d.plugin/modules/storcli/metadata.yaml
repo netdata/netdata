@@ -81,9 +81,9 @@ modules:
       problems:
         list: []
     alerts:
-      - name: storcli_controller_status
-        metric: storcli.controller_status
-        info: RAID controller ${label:controller_number} health status is not optimal
+      - name: storcli_controller_health_status
+        metric: storcli.controller_health_status
+        info: RAID controller ${label:controller_number} is unhealthy
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf
       - name: storcli_controller_bbu_status
         metric: storcli.controller_bbu_status
@@ -111,7 +111,16 @@ modules:
               description: Controller number (index)
             - name: model
               description: Controller model
+            - name: driver_name
+              description: Controller driver (megaraid_sas or mpt3sas)
           metrics:
+            - name: storcli.controller_health_status
+              description: Controller health status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: healthy
+                - name: unhealthy
             - name: storcli.controller_status
               description: Controller status
               unit: status

@@ -50,7 +50,7 @@ sudo ./edit-config exporting.conf
 The following options can be defined for this exporter.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|

@@ -141,7 +141,8 @@ func prepareNginxContainer(name string) types.Container {
 		},
 		Labels: map[string]string{"key1": "value1"},
 		HostConfig: struct {
-			NetworkMode string `json:",omitempty"`
+			NetworkMode string            `json:",omitempty"`
+			Annotations map[string]string `json:",omitempty"`
 		}{
 			NetworkMode: "default",
 		},

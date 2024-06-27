@@ -206,41 +206,54 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
 }
 
 static inline void tc_device_commit(struct tc_device *d) {
-    static int enable_new_interfaces = -1, enable_bytes = -1, enable_packets = -1, enable_dropped = -1, enable_tokens = -1, enable_ctokens = -1, enabled_all_classes_qdiscs = -1;
+    static int enable_tokens = -1, enable_ctokens = -1, enabled_all_classes_qdiscs = -1;
 
-    if(unlikely(enable_new_interfaces == -1)) {
-        enable_new_interfaces      = config_get_boolean_ondemand("plugin:tc", "enable new interfaces detected at runtime", CONFIG_BOOLEAN_YES);
-        enable_bytes               = config_get_boolean_ondemand("plugin:tc", "enable traffic charts for all interfaces", CONFIG_BOOLEAN_AUTO);
-        enable_packets             = config_get_boolean_ondemand("plugin:tc", "enable packets charts for all interfaces", CONFIG_BOOLEAN_AUTO);
-        enable_dropped             = config_get_boolean_ondemand("plugin:tc", "enable dropped charts for all interfaces", CONFIG_BOOLEAN_AUTO);
+    if(unlikely(enabled_all_classes_qdiscs == -1)) {
         enable_tokens              = config_get_boolean_ondemand("plugin:tc", "enable tokens charts for all interfaces", CONFIG_BOOLEAN_NO);
         enable_ctokens             = config_get_boolean_ondemand("plugin:tc", "enable ctokens charts for all interfaces", CONFIG_BOOLEAN_NO);
         enabled_all_classes_qdiscs = config_get_boolean_ondemand("plugin:tc", "enable show all classes and qdiscs for all interfaces", CONFIG_BOOLEAN_NO);
     }
 
     if(unlikely(d->enabled == (char)-1)) {
-        char var_name[CONFIG_MAX_NAME + 1];
-        snprintfz(var_name, CONFIG_MAX_NAME, "qos for %s", string2str(d->id));
+        d->enabled = CONFIG_BOOLEAN_YES;
+        d->enabled_bytes = CONFIG_BOOLEAN_YES;
+        d->enabled_packets = CONFIG_BOOLEAN_YES;
+        d->enabled_dropped = CONFIG_BOOLEAN_YES;
+        d->enabled_tokens = enable_tokens;
+        d->enabled_ctokens = enable_ctokens;
+        d->enabled_all_classes_qdiscs = enabled_all_classes_qdiscs;
 
-        d->enabled                    = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_new_interfaces);
+
+        char var_name[CONFIG_MAX_NAME + 1];
+
+        snprintfz(var_name, CONFIG_MAX_NAME, "qos for %s", string2str(d->id));
+        if (config_exists("plugin:tc", var_name))
+            d->enabled = (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "traffic chart for %s", string2str(d->id));
-        d->enabled_bytes              = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_bytes);
+        if (config_exists("plugin:tc", var_name))
+            d->enabled_bytes = (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled_bytes);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "packets chart for %s", string2str(d->id));
-        d->enabled_packets            = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_packets);
+        if (config_exists("plugin:tc", var_name))
+            d->enabled_packets = (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled_packets);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "dropped packets chart for %s", string2str(d->id));
-        d->enabled_dropped            = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_dropped);
+        if (config_exists("plugin:tc", var_name))
+            d->enabled_dropped = (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled_dropped);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "tokens chart for %s", string2str(d->id));
-        d->enabled_tokens             = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_tokens);
+        if (config_exists("plugin:tc", var_name))
+            d->enabled_tokens = (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled_tokens);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "ctokens chart for %s", string2str(d->id));
-        d->enabled_ctokens            = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_ctokens);
+        if (config_exists("plugin:tc", var_name))
+            d->enabled_ctokens = (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled_ctokens);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "show all classes for %s", string2str(d->id));
-        d->enabled_all_classes_qdiscs = (char)config_get_boolean_ondemand("plugin:tc", var_name, enabled_all_classes_qdiscs);
+        if (config_exists("plugin:tc", var_name))
+            d->enabled_all_classes_qdiscs =
+                (char)config_get_boolean_ondemand("plugin:tc", var_name, d->enabled_all_classes_qdiscs);
     }
 
     // we only need to add leaf classes
@@ -379,27 +392,10 @@ static inline void tc_device_commit(struct tc_device *d) {
         return;
     }
 
-    netdata_log_debug(D_TC_LOOP, "TC: evaluating TC device '%s'. enabled = %d/%d (bytes: %d/%d, packets: %d/%d, dropped: %d/%d, tokens: %d/%d, ctokens: %d/%d, all_classes_qdiscs: %d/%d), classes: (bytes = %llu, packets = %llu, dropped = %llu, tokens = %llu, ctokens = %llu).",
-        string2str(d->name?d->name:d->id),
-        d->enabled, enable_new_interfaces,
-        d->enabled_bytes, enable_bytes,
-        d->enabled_packets, enable_packets,
-        d->enabled_dropped, enable_dropped,
-        d->enabled_tokens, enable_tokens,
-        d->enabled_ctokens, enable_ctokens,
-        d->enabled_all_classes_qdiscs, enabled_all_classes_qdiscs,
-        bytes_sum,
-        packets_sum,
-        dropped_sum,
-        tokens_sum,
-        ctokens_sum
-        );
-
     // --------------------------------------------------------------------
     // bytes
 
-    if(d->enabled_bytes == CONFIG_BOOLEAN_YES || (d->enabled_bytes == CONFIG_BOOLEAN_AUTO &&
-                                                  (bytes_sum || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (d->enabled_bytes == CONFIG_BOOLEAN_YES || d->enabled_bytes == CONFIG_BOOLEAN_AUTO) {
         d->enabled_bytes = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_bytes)) {
@@ -453,9 +449,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // packets
 
-    if(d->enabled_packets == CONFIG_BOOLEAN_YES || (d->enabled_packets == CONFIG_BOOLEAN_AUTO &&
-                                                    (packets_sum ||
-                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (d->enabled_packets == CONFIG_BOOLEAN_YES || d->enabled_packets == CONFIG_BOOLEAN_AUTO) {
         d->enabled_packets = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_packets)) {
@@ -517,9 +511,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // dropped
 
-    if(d->enabled_dropped == CONFIG_BOOLEAN_YES || (d->enabled_dropped == CONFIG_BOOLEAN_AUTO &&
-                                                    (dropped_sum ||
-                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (d->enabled_dropped == CONFIG_BOOLEAN_YES || d->enabled_dropped == CONFIG_BOOLEAN_AUTO) {
         d->enabled_dropped = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_dropped)) {
@@ -581,9 +573,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // tokens
 
-    if(d->enabled_tokens == CONFIG_BOOLEAN_YES || (d->enabled_tokens == CONFIG_BOOLEAN_AUTO &&
-                                                   (tokens_sum ||
-                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (d->enabled_tokens == CONFIG_BOOLEAN_YES || d->enabled_tokens == CONFIG_BOOLEAN_AUTO) {
         d->enabled_tokens = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_tokens)) {
@@ -646,9 +636,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // ctokens
 
-    if(d->enabled_ctokens == CONFIG_BOOLEAN_YES || (d->enabled_ctokens == CONFIG_BOOLEAN_AUTO &&
-                                                    (ctokens_sum ||
-                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (d->enabled_ctokens == CONFIG_BOOLEAN_YES || d->enabled_ctokens == CONFIG_BOOLEAN_AUTO) {
         d->enabled_ctokens = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_ctokens)) {

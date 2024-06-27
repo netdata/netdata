@@ -5,12 +5,14 @@ package jobmgr
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/functions"
@@ -209,6 +211,12 @@ func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 	jn := "test"
 	if len(fn.Args) > 2 {
 		jn = fn.Args[2]
+	}
+
+	if err := validateJobName(jn); err != nil {
+		m.Warningf("dyncfg: test: module %s: unacceptable job name '%s': %v", mn, jn, err)
+		m.dyncfgRespf(fn, 400, "Unacceptable job name '%s': %v.", jn, err)
+		return
 	}
 
 	creator, ok := m.Modules.Lookup(mn)
@@ -547,6 +555,12 @@ func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
 		return
 	}
 
+	if err := validateJobName(jn); err != nil {
+		m.Warningf("dyncfg: add: module %s: unacceptable job name '%s': %v", mn, jn, err)
+		m.dyncfgRespf(fn, 400, "Unacceptable job name '%s': %v.", jn, err)
+		return
+	}
+
 	cfg, err := configFromPayload(fn)
 	if err != nil {
 		m.Warningf("dyncfg: add: module %s job %s: failed to create config from payload: %v", mn, jn, err)
@@ -822,4 +836,17 @@ func extractJobName(id string) (string, bool) {
 		return "", false
 	}
 	return id[i+1:], true
+}
+
+func validateJobName(jobName string) error {
+	for _, r := range jobName {
+		if unicode.IsSpace(r) {
+			return errors.New("contains spaces")
+		}
+		switch r {
+		case '.', ':':
+			return fmt.Errorf("contains '%c'", r)
+		}
+	}
+	return nil
 }

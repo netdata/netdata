@@ -327,6 +327,18 @@
       - prometheus
       - remote write
 - <<: *promexport
+  id: 'export-opensearch'
+  meta:
+    <<: *meta
+    name: OpeanSearch
+    link: https://opensearch.org/
+    icon_filename: 'opensearch.svg'
+    keywords:
+      - export
+      - OpenSearch
+      - prometheus
+      - remote write
+- <<: *promexport
   id: 'export-gnocchi'
   meta:
     <<: *meta
@@ -432,5 +444,17 @@
     keywords:
       - export
       - TimescaleDB
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-greptimedb'
+  meta:
+    <<: *meta
+    name: GreptimeDB
+    link: https://greptime.com/product/db
+    icon_filename: 'greptimedb.png'
+    keywords:
+      - export
+      - GreptimeDB
       - prometheus
       - remote write

@@ -1124,6 +1124,30 @@ void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings
 
 void build_info_to_json_object(BUFFER *b);
 
+static void convert_seconds_to_dhms(time_t seconds, char *result, int result_size) {
+    int days, hours, minutes;
+
+    days = (int) (seconds / (24 * 3600));
+    seconds = (int) (seconds % (24 * 3600));
+    hours = (int) (seconds / 3600);
+    seconds %= 3600;
+    minutes = (int) (seconds / 60);
+    seconds %= 60;
+
+    // Format the result into the provided string buffer
+    BUFFER *buf = buffer_create(128, NULL);
+    if (days)
+        buffer_sprintf(buf,"%d day%s%s", days, days==1 ? "" : "s", hours || minutes ? ", " : "");
+    if (hours)
+        buffer_sprintf(buf,"%d hour%s%s", hours, hours==1 ? "" : "s", minutes ? ", " : "");
+    if (minutes)
+        buffer_sprintf(buf,"%d minute%s%s", minutes, minutes==1 ? "" : "s", seconds ? ", " : "");
+    if (seconds)
+        buffer_sprintf(buf,"%d second%s", (int) seconds, seconds==1 ? "" : "s");
+    strncpyz(result, buffer_tostring(buf), result_size);
+    buffer_free(buf);
+}
+
 void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info, bool array) {
     if(!now_s)
         now_s = now_realtime_sec();
@@ -1151,12 +1175,20 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
         buffer_json_cloud_status(wb, now_s);
 
         buffer_json_member_add_array(wb, "db_size");
+        size_t group_seconds = localhost->rrd_update_every;
         for (size_t tier = 0; tier < storage_tiers; tier++) {
             STORAGE_ENGINE *eng = localhost->db[tier].eng;
             if (!eng) continue;
 
+            group_seconds *= storage_tiers_grouping_iterations[tier];
             uint64_t max = storage_engine_disk_space_max(eng->seb, localhost->db[tier].si);
             uint64_t used = storage_engine_disk_space_used(eng->seb, localhost->db[tier].si);
+#ifdef ENABLE_DBENGINE
+            if (!max && eng->seb == STORAGE_ENGINE_BACKEND_DBENGINE) {
+                max = get_directory_free_bytes_space(multidb_ctx[tier]);
+                max += used;
+            }
+#endif
             time_t first_time_s = storage_engine_global_first_time_s(eng->seb, localhost->db[tier].si);
             size_t currently_collected_metrics = storage_engine_collected_metrics(eng->seb, localhost->db[tier].si);
 
@@ -1168,6 +1200,10 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_uint64(wb, "tier", tier);
+            char human_retention[128];
+            convert_seconds_to_dhms((time_t) group_seconds, human_retention, sizeof(human_retention) - 1);
+            buffer_json_member_add_string(wb, "point_every", human_retention);
+
             buffer_json_member_add_uint64(wb, "metrics", storage_engine_metrics(eng->seb, localhost->db[tier].si));
             buffer_json_member_add_uint64(wb, "samples", storage_engine_samples(eng->seb, localhost->db[tier].si));
 
@@ -1178,13 +1214,33 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             }
 
             if(first_time_s) {
+                time_t retention = now_s - first_time_s;
+
                 buffer_json_member_add_time_t(wb, "from", first_time_s);
                 buffer_json_member_add_time_t(wb, "to", now_s);
-                buffer_json_member_add_time_t(wb, "retention", now_s - first_time_s);
+                buffer_json_member_add_time_t(wb, "retention", retention);
 
-                if(used || max) // we have disk space information
-                    buffer_json_member_add_time_t(wb, "expected_retention",
-                                                  (time_t) ((NETDATA_DOUBLE) (now_s - first_time_s) * 100.0 / percent));
+                convert_seconds_to_dhms(retention, human_retention, sizeof(human_retention) - 1);
+                buffer_json_member_add_string(wb, "retention_human", human_retention);
+
+                if(used || max) { // we have disk space information
+                    time_t time_retention = 0;
+#ifdef ENABLE_DBENGINE
+                    time_retention = multidb_ctx[tier]->config.max_retention_s;
+#endif
+                    time_t space_retention = (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent);
+                    time_t actual_retention = MIN(space_retention, time_retention ? time_retention : space_retention);
+
+                    if (time_retention) {
+                        convert_seconds_to_dhms(time_retention, human_retention, sizeof(human_retention) - 1);
+                        buffer_json_member_add_time_t(wb, "requested_retention", time_retention);
+                        buffer_json_member_add_string(wb, "requested_retention_human", human_retention);
+                    }
+
+                    convert_seconds_to_dhms(actual_retention, human_retention, sizeof(human_retention) - 1);
+                    buffer_json_member_add_time_t(wb, "expected_retention", actual_retention);
+                    buffer_json_member_add_string(wb, "expected_retention_human", human_retention);
+                }
             }
 
             if(currently_collected_metrics)
@@ -1580,6 +1636,16 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
                         buffer_json_add_array_item_object(wb);
                         {
                             buffer_json_member_add_uint64(wb, "ati", t->ati);
+
+                            buffer_json_member_add_array(wb, "ni");
+                            void *host_guid;
+                            dfe_start_read(t->nodes, host_guid) {
+                                struct contexts_v2_node *cn = dictionary_get(ctl->nodes.dict,host_guid_dfe.name);
+                                buffer_json_add_array_item_int64(wb, (int64_t) cn->ni);
+                            }
+                            dfe_done(host_guid);
+                            buffer_json_array_close(wb);
+
                             buffer_json_member_add_string(wb, "nm", string2str(t->name));
                             buffer_json_member_add_string(wb, "sum", string2str(t->summary));
 
@@ -1596,9 +1662,9 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
                             rrdlabels_key_to_buffer_array_item(t->context, wb);
                             buffer_json_array_close(wb); // ctx
 
-                            buffer_json_member_add_array(wb, "cl");
+                            buffer_json_member_add_array(wb, "cls");
                             rrdlabels_key_to_buffer_array_item(t->classification, wb);
-                            buffer_json_array_close(wb); // ctx
+                            buffer_json_array_close(wb); // classification
 
 
                             buffer_json_member_add_array(wb, "cp");

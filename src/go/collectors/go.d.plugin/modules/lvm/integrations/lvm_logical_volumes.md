@@ -77,7 +77,13 @@ Metrics:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ lvm_lv_data_space_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/lvm.conf) | lvm.lv_data_space_utilization | LVM logical volume high data space usage (LV ${label:lv_name} VG ${label:vg_name} Type ${label:volume_type}) |
+| [ lvm_lv_metadata_space_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/lvm.conf) | lvm.lv_metadata_space_utilization | LVM logical volume high metadata space usage (LV ${label:lv_name} VG ${label:vg_name} Type ${label:volume_type}) |
 
 
 ## Setup
@@ -105,7 +111,7 @@ sudo ./edit-config go.d/lvm.conf
 The following options can be defined globally: update_every.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -120,7 +126,7 @@ The following options can be defined globally: update_every.
 
 Allows you to override the default data collection interval.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -157,5 +163,38 @@ should give you clues as to why the collector isn't working.
   ```bash
   ./go.d.plugin -d -m lvm
   ```
+
+### Getting Logs
+
+If you're encountering problems with the `lvm` collector, follow these steps to retrieve logs and identify potential issues:
+
+- **Run the command** specific to your system (systemd, non-systemd, or Docker container).
+- **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
+
+#### System with systemd
+
+Use the following command to view logs generated since the last Netdata service restart:
+
+```bash
+journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep lvm
+```
+
+#### System without systemd
+
+Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
+
+```bash
+grep lvm /var/log/netdata/collector.log
+```
+
+**Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
+
+#### Docker Container
+
+If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
+
+```bash
+docker logs netdata 2>&1 | grep lvm
+```
 
 

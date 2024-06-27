@@ -28,6 +28,7 @@ function(netdata_bundle_protobuf)
         if(NEED_ABSL)
                 set(ABSL_PROPAGATE_CXX_STD On)
                 set(ABSL_ENABLE_INSTALL Off)
+                set(BUILD_SHARED_LIBS Off)
 
                 message(STATUS "Preparing bundled Abseil (required by bundled Protobuf)")
                 FetchContent_Declare(absl

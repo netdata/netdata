@@ -231,7 +231,7 @@ if(NEED_PROTOBUF)
         endif()
 endif()
 
-set(PKG_FILES_PATH "packaging/cmake/pkg-files")
+set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
 
 if(ENABLE_PLUGIN_EBPF)
         include(NetdataLibBPF)
@@ -2566,11 +2566,24 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
+install(FILES
+        system/systemd/journald@netdata.conf
+        COMPONENT netdata
+        DESTINATION usr/lib/netdata/system/systemd)
+
 if(BUILD_FOR_PACKAGING)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
                 COMPONENT netdata
                 DESTINATION lib/systemd/system)
+        install(DIRECTORY
+                COMPONENT netdata
+                DESTINATION usr/lib/systemd/journald@netdata.conf.d)
+        install(FILES
+                system/systemd/journald@netdata.conf
+                COMPONENT netdata
+                DESTINATION usr/lib/systemd/journald@netdata.conf.d
+                RENAME netdata.conf)
 endif()
 
 configure_file(system/systemd/netdata.service.v235.in system/systemd/netdata.service.v235 @ONLY)

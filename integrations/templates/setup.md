@@ -60,7 +60,7 @@ There is no configuration file.
 
 [% if entry.setup.configuration.options.list %]
 [% if entry.setup.configuration.options.folding.enabled and not clean %]
-{% details summary="[[ entry.setup.configuration.options.folding.title ]]" %}
+{% details open=true summary="[[ entry.setup.configuration.options.folding.title ]]" %}
 [% endif %]
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -92,7 +92,7 @@ There are no configuration options.
 [[ example.description ]]
 
 [% if example.folding.enabled and not clean %]
-{% details summary="[[ entry.setup.configuration.examples.folding.title ]]" %}
+{% details open=true summary="[[ entry.setup.configuration.examples.folding.title ]]" %}
 [% endif %]
 ```yaml
 [[ example.config ]]

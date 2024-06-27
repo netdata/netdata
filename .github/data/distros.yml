@@ -40,13 +40,18 @@ include:
     test:
       ebpf-core: true
   - <<: *alpine
+    version: "3.20"
+    support_type: Core
+    notes: ''
+    eol_check: true
+  - <<: *alpine
     version: "3.19"
     support_type: Core
     notes: ''
     eol_check: true
   - <<: *alpine
     version: "3.18"
-    support_type: Core
+    support_type: Intermediate
     notes: ''
     eol_check: true
   - <<: *alpine
@@ -130,12 +135,6 @@ include:
         - aarch64
     test:
       ebpf-core: true
-  - <<: *centos_stream
-    version: '8'
-    base_image: 'quay.io/centos/centos:stream8'
-    packages:
-      <<: *cs_packages
-      repo_distro: el/c8s
 
   - &debian
     distro: debian
@@ -208,23 +207,29 @@ include:
 
   - &opensuse
     distro: opensuse
-    version: "15.5"
+    version: "15.6"
     support_type: Core
     notes: ''
     eol_check: true
     bundle_sentry: *default_sentry
-    base_image: opensuse/leap:15.5
+    base_image: opensuse/leap:15.6
     jsonc_removal: |
       zypper rm -y libjson-c-devel
     packages: &opensuse_packages
       type: rpm
-      repo_distro: opensuse/15.5
+      repo_distro: opensuse/15.6
       builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
     test:
       ebpf-core: true
+  - <<: *opensuse
+    version: "15.5"
+    base_image: opensuse/leap:15.5
+    packages:
+      <<: *opensuse_packages
+      repo_distro: opensuse/15.5
 
   - &oracle
     distro: oraclelinux
@@ -336,6 +341,12 @@ legacy: # Info for platforms we used to support and still need to handle package
     packages:
       <<: *opensuse_packages
       repo_distro: opensuse/15.4
+  - <<: *centos_stream
+    version: '8'
+    base_image: 'quay.io/centos/centos:stream8'
+    packages:
+      <<: *cs_packages
+      repo_distro: el/c8s
 no_include: # Info for platforms not covered in CI
   - distro: docker
     version: "19.03 or newer"

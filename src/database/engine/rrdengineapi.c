@@ -26,8 +26,10 @@ uint8_t tier_page_type[RRD_STORAGE_TIERS] = {
 
 #if defined(ENV32BIT)
 size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
+size_t tier_quota_mb[RRD_STORAGE_TIERS] = {512, 512, 512, 0, 0};
 #else
 size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
+size_t tier_quota_mb[RRD_STORAGE_TIERS] = {1024, 1024, 1024, 128, 64};
 #endif
 
 #if RRDENG_PAGE_TYPE_MAX != 2
@@ -58,8 +60,11 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
 }
 
 int db_engine_journal_check = 0;
-int default_rrdeng_disk_quota_mb = 256;
-int default_multidb_disk_quota_mb = 256;
+bool new_dbengine_defaults = false;
+bool legacy_multihost_db_space = false;
+int default_rrdeng_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
+int default_multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
+RRD_BACKFILL default_backfill = RRD_BACKFILL_NEW;
 
 #if defined(ENV32BIT)
 int default_rrdeng_page_cache_mb = 16;
@@ -1129,8 +1134,13 @@ void rrdeng_exit_mode(struct rrdengine_instance *ctx) {
 /*
  * Returns 0 on success, negative on error
  */
-int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
-                unsigned disk_space_mb, size_t tier) {
+int rrdeng_init(
+    struct rrdengine_instance **ctxp,
+    const char *dbfiles_path,
+    unsigned disk_space_mb,
+    size_t tier,
+    time_t max_retention_s)
+{
     struct rrdengine_instance *ctx;
     uint32_t max_open_files;
 
@@ -1159,11 +1169,16 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tier_page_type[tier];
     ctx->config.global_compress_alg = dbengine_default_compression();
-    if (disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
-        disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
-    ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
+
     strncpyz(ctx->config.dbfiles_path, dbfiles_path, sizeof(ctx->config.dbfiles_path) - 1);
     ctx->config.dbfiles_path[sizeof(ctx->config.dbfiles_path) - 1] = '\0';
+
+    if (disk_space_mb && disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
+        disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
+
+    ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
+
+    ctx->config.max_retention_s = max_retention_s;
 
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;

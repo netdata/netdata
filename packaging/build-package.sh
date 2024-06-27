@@ -84,10 +84,6 @@ if [ "${ENABLE_SENTRY}" = "true" ]; then
     add_cmake_option NETDATA_SENTRY_ENVIRONMENT "${RELEASE_PIPELINE:-Unknown}"
     add_cmake_option NETDATA_SENTRY_DIST "${BUILD_DESTINATION:-Unknown}"
     add_cmake_option NETDATA_SENTRY_DSN "${SENTRY_DSN}"
-
-    if [ -n "${VERSION}" ]; then
-        add_cmake_option NETDATA_SENTRY_RELEASE "${VERSION}"
-    fi
 else
     add_cmake_option ENABLE_SENTRY Off
 fi

@@ -720,6 +720,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
     ar->config.mmap.enabled = mmap;
     strncpyz(ar->config.name, name, ARAL_MAX_NAME);
     spinlock_init(&ar->aral_lock.spinlock);
+    spinlock_init(&ar->adders.spinlock);
 
     if(stats) {
         ar->stats = stats;

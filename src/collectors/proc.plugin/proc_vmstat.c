@@ -177,9 +177,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         else
             do_oom_kill = CONFIG_BOOLEAN_NO;
 
-        if(do_numa == CONFIG_BOOLEAN_YES || (do_numa == CONFIG_BOOLEAN_AUTO &&
-                                             (get_numa_node_count() >= 2 ||
-                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (do_numa == CONFIG_BOOLEAN_YES || (do_numa == CONFIG_BOOLEAN_AUTO && get_numa_node_count() >= 2)) {
             arl_expect(arl_base, "numa_foreign", &numa_foreign);
             arl_expect(arl_base, "numa_hint_faults_local", &numa_hint_faults_local);
             arl_expect(arl_base, "numa_hint_faults", &numa_hint_faults);
@@ -189,8 +187,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             arl_expect(arl_base, "numa_other", &numa_other);
             arl_expect(arl_base, "numa_pages_migrated", &numa_pages_migrated);
             arl_expect(arl_base, "numa_pte_updates", &numa_pte_updates);
-        }
-        else {
+        } else {
             // Do not expect numa metrics when they are not needed.
             // By not adding them, the ARL will stop processing the file
             // when all the expected metrics are collected.

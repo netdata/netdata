@@ -227,9 +227,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             pgl = &pagelines[p];
 
             // Skip invalid, refused or empty pagelines if not explicitly requested
-            if (!pgl
-                || do_detail == CONFIG_BOOLEAN_NO
-                || (do_detail == CONFIG_BOOLEAN_AUTO && pageline_total_count(pgl) == 0 && netdata_zero_metrics_enabled != CONFIG_BOOLEAN_YES))
+            if (!pgl || do_detail == CONFIG_BOOLEAN_NO ||
+                (do_detail == CONFIG_BOOLEAN_AUTO && pageline_total_count(pgl) == 0))
                 continue;
 
             // "pagetype Node" + NUMA-NodeId + ZoneName + TypeName

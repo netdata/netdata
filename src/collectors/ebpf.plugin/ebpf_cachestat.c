@@ -334,7 +334,7 @@ static void ebpf_obsolete_cachestat_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_CACHESTAT_HIT_RATIO_CHART,
                               "Hit ratio",
-                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              EBPF_COMMON_UNITS_PERCENTAGE,
                               NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT,
@@ -345,7 +345,7 @@ static void ebpf_obsolete_cachestat_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_CACHESTAT_DIRTY_CHART,
                               "Number of dirty pages",
-                              EBPF_CACHESTAT_DIMENSION_PAGE,
+                              EBPF_CACHESTAT_UNITS_PAGE,
                               NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT,
@@ -356,7 +356,7 @@ static void ebpf_obsolete_cachestat_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_CACHESTAT_HIT_CHART,
                               "Number of accessed files",
-                              EBPF_CACHESTAT_DIMENSION_HITS,
+                              EBPF_CACHESTAT_UNITS_HITS,
                               NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT,
@@ -367,7 +367,7 @@ static void ebpf_obsolete_cachestat_services(ebpf_module_t *em, char *id)
                               id,
                               NETDATA_CACHESTAT_MISSES_CHART,
                               "Files out of page cache",
-                              EBPF_CACHESTAT_DIMENSION_MISSES,
+                              EBPF_CACHESTAT_UNITS_MISSES,
                               NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT,
@@ -411,10 +411,10 @@ static void ebpf_obsolete_cachestat_global(ebpf_module_t *em)
                               NETDATA_CACHESTAT_HIT_RATIO_CHART,
                               "",
                               "Hit ratio",
-                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              EBPF_COMMON_UNITS_PERCENTAGE,
                               NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              NETDATA_MEM_CACHESTAT_HIT_RATIO_CONTEXT,
                               21100,
                               em->update_every);
 
@@ -422,10 +422,10 @@ static void ebpf_obsolete_cachestat_global(ebpf_module_t *em)
                               NETDATA_CACHESTAT_DIRTY_CHART,
                               "",
                               "Number of dirty pages",
-                              EBPF_CACHESTAT_DIMENSION_PAGE,
+                              EBPF_CACHESTAT_UNITS_PAGE,
                               NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              NETDATA_MEM_CACHESTAT_MODIFIED_CACHE_CONTEXT,
                               21101,
                               em->update_every);
 
@@ -433,10 +433,10 @@ static void ebpf_obsolete_cachestat_global(ebpf_module_t *em)
                               NETDATA_CACHESTAT_HIT_CHART,
                               "",
                               "Number of accessed files",
-                              EBPF_CACHESTAT_DIMENSION_HITS,
+                              EBPF_CACHESTAT_UNITS_HITS,
                               NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              NETDATA_MEM_CACHESTAT_HIT_FILES_CONTEXT,
                               21102,
                               em->update_every);
 
@@ -444,10 +444,10 @@ static void ebpf_obsolete_cachestat_global(ebpf_module_t *em)
                               NETDATA_CACHESTAT_MISSES_CHART,
                               "",
                               "Files out of page cache",
-                              EBPF_CACHESTAT_DIMENSION_MISSES,
+                              EBPF_CACHESTAT_UNITS_MISSES,
                               NETDATA_CACHESTAT_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              NETDATA_MEM_CACHESTAT_MISS_FILES_CONTEXT,
                               21103,
                               em->update_every);
 }
@@ -472,7 +472,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_cachestat_hit_ratio",
                                   "Hit ratio",
-                                  EBPF_COMMON_DIMENSION_PERCENTAGE,
+                                  EBPF_COMMON_UNITS_PERCENTAGE,
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   "app.ebpf_cachestat_hit_ratio",
@@ -483,7 +483,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_cachestat_dirty_pages",
                                   "Number of dirty pages",
-                                  EBPF_CACHESTAT_DIMENSION_PAGE,
+                                  EBPF_CACHESTAT_UNITS_PAGE,
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_cachestat_dirty_pages",
@@ -494,7 +494,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_cachestat_access",
                                   "Number of accessed files",
-                                  EBPF_CACHESTAT_DIMENSION_HITS,
+                                  EBPF_CACHESTAT_UNITS_HITS,
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_cachestat_access",
@@ -505,7 +505,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_cachestat_misses",
                                   "Files out of page cache",
-                                  EBPF_CACHESTAT_DIMENSION_MISSES,
+                                  EBPF_CACHESTAT_UNITS_MISSES,
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_cachestat_misses",
@@ -886,7 +886,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_cachestat_hit_ratio",
                              "Hit ratio",
-                             EBPF_COMMON_DIMENSION_PERCENTAGE,
+                             EBPF_COMMON_UNITS_PERCENTAGE,
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_LINE,
                              "app.ebpf_cachestat_hit_ratio",
@@ -902,7 +902,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_cachestat_dirty_pages",
                              "Number of dirty pages",
-                             EBPF_CACHESTAT_DIMENSION_PAGE,
+                             EBPF_CACHESTAT_UNITS_PAGE,
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_LINE,
                              "app.ebpf_cachestat_dirty_pages",
@@ -917,7 +917,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_cachestat_access",
                              "Number of accessed files",
-                             EBPF_CACHESTAT_DIMENSION_HITS,
+                             EBPF_CACHESTAT_UNITS_HITS,
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_cachestat_access",
@@ -932,7 +932,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_cachestat_misses",
                              "Files out of page cache",
-                             EBPF_CACHESTAT_DIMENSION_MISSES,
+                             EBPF_CACHESTAT_UNITS_MISSES,
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_cachestat_misses",
@@ -1115,7 +1115,7 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
 {
     static ebpf_systemd_args_t data_hit_ratio = {
         .title = "Hit ratio",
-        .units = EBPF_COMMON_DIMENSION_PERCENTAGE,
+        .units = EBPF_COMMON_UNITS_PERCENTAGE,
         .family = NETDATA_CACHESTAT_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
         .order = 21100,
@@ -1129,7 +1129,7 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
 
     static ebpf_systemd_args_t data_dirty = {
         .title = "Number of dirty pages",
-        .units = EBPF_CACHESTAT_DIMENSION_PAGE,
+        .units = EBPF_CACHESTAT_UNITS_PAGE,
         .family = NETDATA_CACHESTAT_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
         .order = 21101,
@@ -1142,8 +1142,8 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
     };
 
     static ebpf_systemd_args_t data_hit = {
-        .title = "Number of accessed pages",
-        .units = EBPF_CACHESTAT_DIMENSION_HITS,
+        .title = "Number of accessed files",
+        .units = EBPF_CACHESTAT_UNITS_HITS,
         .family = NETDATA_CACHESTAT_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
         .order = 21102,
@@ -1157,7 +1157,7 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
 
     static ebpf_systemd_args_t data_miss = {
         .title = "Files out of page cache",
-        .units = EBPF_CACHESTAT_DIMENSION_MISSES,
+        .units = EBPF_CACHESTAT_UNITS_MISSES,
         .family = NETDATA_CACHESTAT_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
         .order = 21103,
@@ -1260,7 +1260,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
     char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                       "Hit ratio",
-                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
+                      EBPF_COMMON_UNITS_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200,
                       ebpf_create_global_dimension,
@@ -1270,7 +1270,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_DIRTY_CHART,
                       "Number of dirty pages",
-                      EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
+                      EBPF_CACHESTAT_UNITS_PAGE, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201,
                       ebpf_create_global_dimension,
@@ -1281,7 +1281,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_CHART,
                       "Number of accessed files",
-                      EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
+                      EBPF_CACHESTAT_UNITS_HITS, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202,
                       ebpf_create_global_dimension,
@@ -1292,7 +1292,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_MISSES_CHART,
                       "Files out of page cache",
-                      EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
+                      EBPF_CACHESTAT_UNITS_MISSES, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203,
                       ebpf_create_global_dimension,
@@ -1314,31 +1314,31 @@ static void ebpf_obsolete_specific_cachestat_charts(char *type, int update_every
 {
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                               "",
-                      "Hit ratio",
-                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
-                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200, update_every);
+                              "Hit ratio",
+                              EBPF_COMMON_UNITS_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_DIRTY_CHART,
                               "",
-                      "Number of dirty pages",
-                      EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
-                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201, update_every);
+                              "Number of dirty pages",
+                              EBPF_CACHESTAT_UNITS_PAGE, NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_HIT_CHART,
                               "",
-                      "Number of accessed files",
-                      EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
-                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202, update_every);
+                              "Number of accessed files",
+                              EBPF_CACHESTAT_UNITS_HITS, NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_CACHESTAT_MISSES_CHART,
                               "",
-                      "Files out of page cache",
-                      EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
-                      NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
-                      NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203, update_every);
+                              "Files out of page cache",
+                              EBPF_CACHESTAT_UNITS_MISSES, NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
+                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203, update_every);
 }
 
 /**
@@ -1453,8 +1453,8 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                       "Hit ratio",
-                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
-                      NULL,
+                      EBPF_COMMON_UNITS_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
+                      NETDATA_MEM_CACHESTAT_HIT_RATIO_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21100,
                       ebpf_create_global_dimension,
@@ -1462,8 +1462,8 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART,
                       "Number of dirty pages",
-                      EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
-                      NULL,
+                      EBPF_CACHESTAT_UNITS_PAGE, NETDATA_CACHESTAT_SUBMENU,
+                      NETDATA_MEM_CACHESTAT_MODIFIED_CACHE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21101,
                       ebpf_create_global_dimension,
@@ -1472,8 +1472,8 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_CHART,
                       "Number of accessed files",
-                      EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
-                      NULL,
+                      EBPF_CACHESTAT_UNITS_HITS, NETDATA_CACHESTAT_SUBMENU,
+                      NETDATA_MEM_CACHESTAT_HIT_FILES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21102,
                       ebpf_create_global_dimension,
@@ -1482,8 +1482,8 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
 
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_MISSES_CHART,
                       "Files out of page cache",
-                      EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
-                      NULL,
+                      EBPF_CACHESTAT_UNITS_MISSES, NETDATA_CACHESTAT_SUBMENU,
+                      NETDATA_MEM_CACHESTAT_MISS_FILES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       21103,
                       ebpf_create_global_dimension,

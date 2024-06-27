@@ -105,7 +105,7 @@ sudo ./edit-config ioping.conf
 
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -122,7 +122,7 @@ sudo ./edit-config ioping.conf
 
 This example has the minimum configuration necessary to have the plugin running.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 destination="/dev/sda"

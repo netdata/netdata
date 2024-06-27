@@ -13,6 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/dockerhost"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/docker/docker/api/types"
@@ -41,6 +42,11 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		timeout:        time.Second * 2,
 		seenTggSources: make(map[string]bool),
 		started:        make(chan struct{}),
+	}
+
+	if addr := dockerhost.FromEnv(); addr != "" && d.addr == docker.DefaultDockerHost {
+		d.Infof("using docker host from environment: %s ", addr)
+		d.addr = addr
 	}
 
 	d.Tags().Merge(tags)

@@ -68,6 +68,7 @@ jobs:
             src/web/server/h2o/libh2o/
           files_ignore: |
             **/*.md
+            packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
         env:
@@ -300,9 +301,32 @@ jobs:
           known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
       - name: Upload to packages.netdata.cloud
         id: package-upload
+        continue-on-error: true
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
         run: |
           .github/scripts/package-upload.sh \
+          packages.netdata.cloud \
+          ${{ matrix.repo_distro }} \
+          ${{ matrix.arch }} \
+          ${{ matrix.format }} \
+          ${{ needs.version-check.outputs.repo }}
+      - name: Import GPG Keys
+        id: import-keys
+        if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
+      - name: Sign DEB Packages
+        id: sign-deb
+        if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
+        shell: bash
+        run: .github/scripts/deb-sign.sh artifacts Netdatabot
+      - name: Upload to packages2.netdata.cloud
+        id: package2-upload
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
+        run: |
+          .github/scripts/package-upload.sh \
+          packages2.netdata.cloud \
           ${{ matrix.repo_distro }} \
           ${{ matrix.arch }} \
           ${{ matrix.format }} \
@@ -325,6 +349,7 @@ jobs:
               Publish to PackageCloud: ${{ steps.upload.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
               Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
+              Publish to packages2.netdata.cloud: ${{ steps.package2-upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{

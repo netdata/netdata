@@ -910,6 +910,28 @@ install_netdata_logrotate() {
 }
 
 # -----------------------------------------------------------------------------
+# install netdata journald configuration
+
+install_netdata_journald_conf() {
+  src="${NETDATA_PREFIX}/usr/lib/netdata/system/systemd/journald@netdata.conf"
+
+  [ ! -d /usr/lib/systemd/ ] && return 0
+  [ "${UID}" -ne 0 ] && return 1
+
+  if [ ! -d /usr/lib/systemd/journald@netdata.conf.d/ ]; then
+    run mkdir /usr/lib/systemd/journald@netdata.conf.d/
+  fi
+
+  run cp "${src}" /usr/lib/systemd/journald@netdata.conf.d/netdata.conf
+
+  if [ -f /usr/lib/systemd/journald@netdata.conf.d/netdata.conf ]; then
+    run chmod 644 /usr/lib/systemd/journald@netdata.conf.d/netdata.conf
+  fi
+
+  return 0
+}
+
+# -----------------------------------------------------------------------------
 # create netdata.conf
 
 create_netdata_conf() {

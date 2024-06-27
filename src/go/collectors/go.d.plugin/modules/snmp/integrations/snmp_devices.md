@@ -110,7 +110,7 @@ sudo ./edit-config go.d/snmp.conf
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -204,7 +204,7 @@ In this example:
 > **Note**: the algorithm chosen is `incremental`, because the collected values show the total number of bytes transferred, which we need to transform into kbps. To chart gauges (e.g. temperature), use `absolute` instead.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -259,7 +259,7 @@ To use SNMPv3:
 The rest of the configuration is the same as in the SNMPv1/2 example.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -293,7 +293,7 @@ Each of the 24 new charts will have its id (1-24) appended at:
 - its `priority` will be incremented for each chart so that the charts will appear on the dashboard in this order.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -336,7 +336,7 @@ The following example:
 - injects (copies) the first job configuration to the third and updates `name` and `hostname` parameters.
 
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 jobs:
@@ -400,5 +400,38 @@ should give you clues as to why the collector isn't working.
   ```bash
   ./go.d.plugin -d -m snmp
   ```
+
+### Getting Logs
+
+If you're encountering problems with the `snmp` collector, follow these steps to retrieve logs and identify potential issues:
+
+- **Run the command** specific to your system (systemd, non-systemd, or Docker container).
+- **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
+
+#### System with systemd
+
+Use the following command to view logs generated since the last Netdata service restart:
+
+```bash
+journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep snmp
+```
+
+#### System without systemd
+
+Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
+
+```bash
+grep snmp /var/log/netdata/collector.log
+```
+
+**Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
+
+#### Docker Container
+
+If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
+
+```bash
+docker logs netdata 2>&1 | grep snmp
+```
 
 
