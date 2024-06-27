@@ -7,6 +7,10 @@
 
 #include "database/engine/page_test.h"
 
+#ifdef OS_WINDOWS
+#include "win_system-info.h"
+#endif
+
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
 #endif
@@ -1362,6 +1366,7 @@ static inline void coverity_remove_taint(char *s)
 }
 
 int get_system_info(struct rrdhost_system_info *system_info) {
+#if !defined(OS_WINDOWS)
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
@@ -1401,6 +1406,9 @@ int get_system_info(struct rrdhost_system_info *system_info) {
         netdata_pclose(fp_child_input, fp_child_output, command_pid);
     }
     freez(script);
+#else
+    netdata_windows_get_system_info(system_info);
+#endif
     return 0;
 }
 

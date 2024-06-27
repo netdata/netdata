@@ -2,6 +2,10 @@
   "update_every": 123,
   "hostname": "ok",
   "community": "ok",
+  "network_interface_filter": {
+    "by_name": "ok",
+    "by_type": "ok"
+  },
   "user": {
     "name": "ok",
     "level": "ok",
@@ -15,7 +19,8 @@
     "retries": 123,
     "timeout": 123,
     "version": "ok",
-    "max_request_size": 123
+    "max_request_size": 123,
+    "max_repetitions": 123
   },
   "charts": [
     {

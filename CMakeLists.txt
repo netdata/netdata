@@ -90,6 +90,7 @@ set(OS_FREEBSD     False)
 set(OS_LINUX       False)
 set(OS_MACOS       False)
 set(OS_WINDOWS     False)
+set(ALLOW_PLATFORM_SENSITIVE_OPTIONS True)
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
         set(OS_MACOS True)
@@ -103,6 +104,11 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
         set(OS_LINUX True)
         add_definitions(-D_GNU_SOURCE)
         message(INFO " Compiling for Linux... ")
+        include(NetdataUtil)
+        netdata_identify_libc(LIBC_IMPLEMENTATION)
+        if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND LIBC_IMPLEMENTATION STREQUAL "musl")
+            set(ALLOW_PLATFORM_SENSITIVE_OPTIONS False)
+        endif()
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
         set(OS_WINDOWS True)
         add_definitions(-D_GNU_SOURCE)
@@ -151,7 +157,7 @@ cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" 
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
-cmake_dependent_option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" False "OS_LINUX AND ALLOW_PLATFORM_SENSITIVE_OPTIONS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
@@ -719,6 +725,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/os-freebsd-wrappers.h
         src/libnetdata/os/os-macos-wrappers.c
         src/libnetdata/os/os-macos-wrappers.h
+        src/libnetdata/os/os-windows-wrappers.c
+        src/libnetdata/os/os-windows-wrappers.h
         src/libnetdata/os/get_system_cpus.c
         src/libnetdata/os/get_system_cpus.h
         src/libnetdata/os/tinysleep.c
@@ -835,6 +843,8 @@ set(DAEMON_FILES
         src/daemon/analytics.h
         src/daemon/main.c
         src/daemon/main.h
+        src/daemon/win_system-info.c
+        src/daemon/win_system-info.h
         src/daemon/signals.c
         src/daemon/signals.h
         src/daemon/service.c
