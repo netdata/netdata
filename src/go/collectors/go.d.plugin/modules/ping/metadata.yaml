@@ -39,7 +39,7 @@ modules:
             ```bash
             sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
             ```
-            To persist the change add `net.ipv4.ping_group_range="0 2147483647"` to `/etc/sysctl.conf` and
+            To persist the change add `net.ipv4.ping_group_range=0 2147483647` to `/etc/sysctl.conf` and
             execute `sudo sysctl -p`.
         method_description: ""
       supported_platforms:
