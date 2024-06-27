@@ -1,4 +1,4 @@
-#include "win_system-info.h"
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifdef OS_WINDOWS
 

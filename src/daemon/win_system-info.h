@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef _NETDATA_WIN_SYSTEM_INFO_H_
 #define _NETDATA_WIN_SYSTEM_INFO_H_
 
