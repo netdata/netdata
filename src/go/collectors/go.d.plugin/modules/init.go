@@ -64,6 +64,7 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/pika"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/ping"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/portcheck"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/postfix"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/postgres"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/powerdns"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/powerdns_recursor"
