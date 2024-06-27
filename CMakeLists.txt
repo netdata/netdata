@@ -725,6 +725,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/os-freebsd-wrappers.h
         src/libnetdata/os/os-macos-wrappers.c
         src/libnetdata/os/os-macos-wrappers.h
+        src/libnetdata/os/os-windows-wrappers.c
+        src/libnetdata/os/os-windows-wrappers.h
         src/libnetdata/os/get_system_cpus.c
         src/libnetdata/os/get_system_cpus.h
         src/libnetdata/os/tinysleep.c
@@ -841,6 +843,8 @@ set(DAEMON_FILES
         src/daemon/analytics.h
         src/daemon/main.c
         src/daemon/main.h
+        src/daemon/win_system-info.c
+        src/daemon/win_system-info.h
         src/daemon/signals.c
         src/daemon/signals.h
         src/daemon/service.c
