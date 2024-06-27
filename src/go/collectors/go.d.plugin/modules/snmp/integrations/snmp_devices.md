@@ -58,11 +58,9 @@ The default configuration for this integration does not impose any limits on dat
 
 #### Performance Impact
 
-**Performance Considerations**:
+**Device limitations**: Many SNMP switches and routers have limited processing power. They might not be able to report data as frequently as desired. You can monitor response times using go.d.plugin in debug mode to identify potential bottlenecks.
 
-- **Device limitations**: Many SNMP switches and routers have limited processing power. They might not be able to report data as frequently as desired. You can monitor response times using go.d.plugin in debug mode to identify potential bottlenecks.
-
-- **Concurrent access**: If multiple collectors or tools access the same SNMP device simultaneously, data points might be skipped. This is a limitation of the device itself, not this collector. To mitigate this, consider increasing the collection interval (update_every) to reduce the frequency of requests.
+**Concurrent access**: If multiple collectors or tools access the same SNMP device simultaneously, data points might be skipped. This is a limitation of the device itself, not this collector. To mitigate this, consider increasing the collection interval (update_every) to reduce the frequency of requests.
 
 
 
@@ -162,6 +160,8 @@ The following options can be defined globally: update_every, autodetection_retry
 | options.timeout | SNMP request/response timeout. | 5 | no |
 | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
 | options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
+| network_interface_filter.by_name | Filter interfaces by their names using [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
+| network_interface_filter.by_type | Filter interfaces by their types using [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
 | user.name | SNMPv3 user name. |  | no |
 | user.name | Security level of SNMPv3 messages. |  | no |
 | user.auth_proto | Security level of SNMPv3 messages. |  | no |
