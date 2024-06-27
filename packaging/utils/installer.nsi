@@ -26,7 +26,7 @@ Section "Install Netdata"
 	File /r "C:\msys64\opt\netdata\*.*"
 
 	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" create Netdata binPath= "$INSTDIR\usr\sbin\netdata.exe" start= delayed-auto'
+	ExecWait '"$SYSDIR\sc.exe" create Netdata binPath= "$INSTDIR\usr\bin\netdata.exe" start= delayed-auto'
 	IfErrors 0 +2
 	DetailPrint "Warning: Failed to create Netdata service."
 
