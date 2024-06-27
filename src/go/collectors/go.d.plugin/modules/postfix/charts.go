@@ -7,55 +7,38 @@ import (
 )
 
 const (
-	prioPostfixQEmailsChartTmpl = 1000 + iota
-	prioPostfixQSizeChartTmpl
+	prioPostfixQueueEmailsCount = module.Priority + iota
+	prioPostfixQueueSize
 )
 
-var postfixChartsTmpl = module.Charts{
-	postfixQEmailsChartTmpl.Copy(),
-	postfixQSizeChartTmpl.Copy(),
+var charts = module.Charts{
+	queueEmailsCountChart.Copy(),
+	queueSizeChart.Copy(),
 }
 
 var (
-	postfixQEmailsChartTmpl = module.Chart{
+	queueEmailsCountChart = module.Chart{
 		ID:       "postfix_queue_emails",
 		Title:    "Postfix Queue Emails",
 		Units:    "emails",
 		Fam:      "queue",
 		Ctx:      "postfix.qemails",
-		Type:     module.Area,
-		Priority: prioPostfixQEmailsChartTmpl,
+		Type:     module.Line,
+		Priority: prioPostfixQueueEmailsCount,
 		Dims: module.Dims{
-			{ID: "emails", Name: "emails"},
+			{ID: "emails"},
 		},
 	}
-	postfixQSizeChartTmpl = module.Chart{
+	queueSizeChart = module.Chart{
 		ID:       "postfix_queue_size",
 		Title:    "Postfix Queue Size",
 		Units:    "KiB",
 		Fam:      "queue",
 		Ctx:      "postfix.qsize",
 		Type:     module.Area,
-		Priority: prioPostfixQSizeChartTmpl,
+		Priority: prioPostfixQueueSize,
 		Dims: module.Dims{
-			{ID: "size", Name: "size"},
+			{ID: "size"},
 		},
 	}
 )
-
-func (p *Postfix) addPostfixCharts() {
-	charts := postfixChartsTmpl.Copy()
-
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
-	}
-}
-
-// func (p *Postfix) removePostfixCharts(name string) {
-// 	for _, chart := range *p.Charts() {
-// 		if strings.HasPrefix(chart.ID, name) {
-// 			chart.MarkRemove()
-// 			chart.MarkNotCreated()
-// 		}
-// 	}
-// }

@@ -31,8 +31,7 @@ func New() *Postfix {
 			BinaryPath: "/usr/sbin/postqueue",
 			Timeout:    web.Duration(time.Second * 2),
 		},
-		charts: &module.Charts{},
-		// zpools: make(map[string]bool),
+		charts: charts.Copy(),
 	}
 }
 
@@ -49,11 +48,9 @@ type (
 
 		charts *module.Charts
 
-		exec postqueue
-
-		seen_metrics bool
+		exec postqueueBinary
 	}
-	postqueue interface {
+	postqueueBinary interface {
 		list() ([]byte, error)
 	}
 )
@@ -68,12 +65,12 @@ func (p *Postfix) Init() error {
 		return err
 	}
 
-	postfixExec, err := p.initPostfixExec()
+	pq, err := p.initPostqueueExec()
 	if err != nil {
-		p.Errorf("postfix exec initialization: %v", err)
+		p.Errorf("postqueue exec initialization: %v", err)
 		return err
 	}
-	p.exec = postfixExec
+	p.exec = pq
 
 	return nil
 }

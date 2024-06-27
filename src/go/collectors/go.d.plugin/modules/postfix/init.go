@@ -16,7 +16,7 @@ func (p *Postfix) validateConfig() error {
 	return nil
 }
 
-func (p *Postfix) initPostfixExec() (postqueue, error) {
+func (p *Postfix) initPostqueueExec() (postqueueBinary, error) {
 	binPath := p.BinaryPath
 
 	if !strings.HasPrefix(binPath, "/") {
@@ -31,8 +31,8 @@ func (p *Postfix) initPostfixExec() (postqueue, error) {
 		return nil, err
 	}
 
-	postqueueExec := newPostqueueExec(binPath, p.Timeout.Duration())
-	postqueueExec.Logger = p.Logger
+	pq := newPostqueueExec(binPath, p.Timeout.Duration())
+	pq.Logger = p.Logger
 
-	return postqueueExec, nil
+	return pq, nil
 }
