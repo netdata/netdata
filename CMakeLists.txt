@@ -93,6 +93,7 @@ set(OS_WINDOWS     False)
 set(ALLOW_PLATFORM_SENSITIVE_OPTIONS True)
 
 set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
+set(BINDIR usr/sbin)
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
         set(OS_MACOS True)
@@ -122,6 +123,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
                 set(NETDATA_RUNTIME_PREFIX "/")
         endif()
 
+        set(BINDIR usr/bin)
         add_definitions(-D_GNU_SOURCE)
 
         if($ENV{CLION_IDE})
@@ -2290,7 +2292,7 @@ target_link_libraries(systemd-cat-native libnetdata)
 
 install(TARGETS systemd-cat-native
         COMPONENT netdata
-        DESTINATION usr/sbin)
+        DESTINATION "${BINDIR}")
 
 #
 # build log2journal
@@ -2325,7 +2327,7 @@ if(PCRE2_FOUND)
 
         install(TARGETS log2journal
                 COMPONENT netdata
-                DESTINATION usr/sbin)
+                DESTINATION "${BINDIR}")
 
         install(DIRECTORY src/collectors/log2journal/log2journal.d
                 COMPONENT netdata
@@ -2348,7 +2350,7 @@ target_link_libraries(netdatacli libnetdata)
 
 install(TARGETS netdatacli
         COMPONENT netdata
-        DESTINATION usr/sbin)
+        DESTINATION "${BINDIR}")
 
 #
 # Build go.d.plugin
@@ -2397,7 +2399,7 @@ configure_file(packaging/cmake/config.cmake.h.in config.h)
 # install
 #
 
-install(TARGETS netdata COMPONENT netdata DESTINATION usr/sbin)
+install(TARGETS netdata COMPONENT netdata DESTINATION "${BINDIR}")
 
 install(DIRECTORY COMPONENT netdata DESTINATION var/cache/netdata)
 install(DIRECTORY COMPONENT netdata DESTINATION var/log/netdata)
@@ -2419,7 +2421,7 @@ install(DIRECTORY COMPONENT netdata DESTINATION ${WEB_DEST})
 set(libsysdir_POST "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/system")
 set(pkglibexecdir_POST "${NETDATA_RUNTIME_PREFIX}/usr/libexec/netdata")
 set(localstatedir_POST "${NETDATA_RUNTIME_PREFIX}/var")
-set(sbindir_POST "${NETDATA_RUNTIME_PREFIX}/usr/sbin")
+set(sbindir_POST "${NETDATA_RUNTIME_PREFIX}/${BINDIR}")
 set(configdir_POST "${NETDATA_RUNTIME_PREFIX}/etc/netdata")
 set(libconfigdir_POST "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/conf.d")
 set(cachedir_POST "${NETDATA_RUNTIME_PREFIX}/var/cache/netdata")
@@ -2444,7 +2446,7 @@ configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh
         COMPONENT netdata
-        DESTINATION usr/sbin)
+        DESTINATION "${BINDIR}")
 
 #
 # We don't check ENABLE_PLUGIN_CGROUP_NETWORK because rpm builds assume
@@ -3031,22 +3033,61 @@ if(NOT OS_WINDOWS)
 endif()
 
 if(OS_WINDOWS)
-        set(DLL_FILES /usr/bin/msys-gcc_s-seh-1.dll
+        install(FILES /usr/bin/awk
+                      /usr/bin/bash
+                      /usr/bin/cat
+                      /usr/bin/chown
+                      /usr/bin/curl
+                      /usr/bin/grep
+                      /usr/bin/mkdir
+                      /usr/bin/rm
+                      /usr/bin/sed
+                      /usr/bin/tail
+                      /usr/bin/tr
+                      /usr/bin/uuidgen
+                      /usr/bin/whoami
+                DESTINATION "${BINDIR}")
+
+        install(FILES /usr/bin/msys-2.0.dll
+                      /usr/bin/msys-asn1-8.dll
+                      /usr/bin/msys-brotlicommon-1.dll
                       /usr/bin/msys-brotlidec-1.dll
-                      /usr/bin/msys-stdc++-6.dll
                       /usr/bin/msys-brotlienc-1.dll
+                      /usr/bin/msys-com_err-1.dll
+                      /usr/bin/msys-crypt-2.dll
                       /usr/bin/msys-crypto-3.dll
+                      /usr/bin/msys-curl-4.dll
+                      /usr/bin/msys-gcc_s-seh-1.dll
+                      /usr/bin/msys-gmp-10.dll
+                      /usr/bin/msys-gssapi-3.dll
+                      /usr/bin/msys-hcrypto-4.dll
+                      /usr/bin/msys-heimbase-1.dll
+                      /usr/bin/msys-heimntlm-0.dll
+                      /usr/bin/msys-hx509-5.dll
+                      /usr/bin/msys-iconv-2.dll
+                      /usr/bin/msys-idn2-0.dll
+                      /usr/bin/msys-intl-8.dll
+                      /usr/bin/msys-krb5-26.dll
                       /usr/bin/msys-lz4-1.dll
-                      /usr/bin/msys-2.0.dll
+                      /usr/bin/msys-mpfr-6.dll
+                      /usr/bin/msys-ncursesw6.dll
+                      /usr/bin/msys-nghttp2-14.dll
+                      /usr/bin/msys-pcre-1.dll
                       /usr/bin/msys-protobuf-32.dll
+                      /usr/bin/msys-psl-5.dll
+                      /usr/bin/msys-readline8.dll
+                      /usr/bin/msys-roken-18.dll
+                      /usr/bin/msys-sqlite3-0.dll
+                      /usr/bin/msys-ssh2-1.dll
                       /usr/bin/msys-ssl-3.dll
+                      /usr/bin/msys-stdc++-6.dll
+                      /usr/bin/msys-unistring-5.dll
+                      /usr/bin/msys-uuid-1.dll
                       /usr/bin/msys-uv-1.dll
+                      /usr/bin/msys-wind-0.dll
                       /usr/bin/msys-z.dll
                       /usr/bin/msys-zstd-1.dll
-                      /usr/bin/msys-brotlicommon-1.dll
-                      /usr/bin/msys-brotlicommon-1.dll)
-
-        install(FILES ${DLL_FILES} DESTINATION usr/sbin)
+                DESTINATION "${BINDIR}")
 endif()
 
 include(Packaging)
