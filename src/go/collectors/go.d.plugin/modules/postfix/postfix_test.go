@@ -9,8 +9,6 @@ import (
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
-	"fmt"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,13 +24,10 @@ func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
 		"dataConfigJSON": dataConfigJSON,
 		"dataConfigYAML": dataConfigYAML,
-
-		"dataPostqueue": dataPostqueue,
+		"dataPostqueue":  dataPostqueue,
 	} {
 		require.NotNil(t, data, name)
-
 	}
-	// fmt.Println(string(dataPostqueue))
 }
 
 func TestPostfix_Configuration(t *testing.T) {
@@ -118,20 +113,24 @@ func TestPostfix_Check(t *testing.T) {
 		wantFail    bool
 	}{
 		"success case": {
-			prepareMock: prepareMockOK,
 			wantFail:    false,
+			prepareMock: prepareMockOK,
+		},
+		"mail queue is empty": {
+			wantFail:    false,
+			prepareMock: prepareMockEmptyMailQueue,
 		},
 		"error on list call": {
-			prepareMock: prepareMockErrOnList,
 			wantFail:    true,
+			prepareMock: prepareMockErrOnList,
 		},
 		"empty response": {
-			prepareMock: prepareMockEmptyResponse,
 			wantFail:    true,
+			prepareMock: prepareMockEmptyResponse,
 		},
 		"unexpected response": {
-			prepareMock: prepareMockUnexpectedResponse,
 			wantFail:    true,
+			prepareMock: prepareMockUnexpectedResponse,
 		},
 	}
 
@@ -158,8 +157,15 @@ func TestPostfix_Collect(t *testing.T) {
 		"success case": {
 			prepareMock: prepareMockOK,
 			wantMetrics: map[string]int64{
-				"qemails": 12991,
-				"qsize":   132422,
+				"emails": 12991,
+				"size":   132422,
+			},
+		},
+		"mail queue is empty": {
+			prepareMock: prepareMockEmptyMailQueue,
+			wantMetrics: map[string]int64{
+				"emails": 0,
+				"size":   0,
 			},
 		},
 		"error on list call": {
@@ -185,12 +191,6 @@ func TestPostfix_Collect(t *testing.T) {
 			mx := pf.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
-
-			fmt.Println(assert.Equal(t, test.wantMetrics, mx))
-
-			if len(test.wantMetrics) > 0 {
-				assert.Len(t, *pf.Charts(), len(postfixChartsTmpl))
-			}
 		})
 	}
 }
@@ -198,6 +198,12 @@ func TestPostfix_Collect(t *testing.T) {
 func prepareMockOK() *mockPostqueueExec {
 	return &mockPostqueueExec{
 		listData: dataPostqueue,
+	}
+}
+
+func prepareMockEmptyMailQueue() *mockPostqueueExec {
+	return &mockPostqueueExec{
+		listData: []byte("Mail queue is empty"),
 	}
 }
 

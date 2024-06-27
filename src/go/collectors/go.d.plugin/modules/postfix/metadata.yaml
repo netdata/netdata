@@ -22,22 +22,17 @@ modules:
     overview:
       data_collection:
         metrics_description: >
-          Keep an eye on Postfix metrics for efficient mail server operations. 
-
-          Improve your mail server performance with Netdata's real-time metrics and built-in alerts.
+          This collector retrieves statistics about the Postfix mail queue using the [postqueue](https://www.postfix.org/postqueue.1.html) command-line tool.
         method_description: >
-          Monitors MTA email queue statistics using [postqueue](http://www.postfix.org/postqueue.1.html) tool.
-
-          Runs `postqueue -p` every 10 seconds.
+          It periodically executes the `postqueue -p` command. The collection interval is set to 10 seconds by default, but this can be configurable.
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: >
-          Postfix has internal access controls that limit activities on the mail queue. By default, all users are allowed to view the queue. If your system is configured with more strict access controls, you need to grant the `netdata` user access to view the mail queue. In order to do it, add `netdata` to `authorized_mailq_users` in the `/etc/postfix/main.cf` file.
-
-          See the `authorized_mailq_users` setting in the [Postfix documentation](https://www.postfix.org/postconf.5.html) for more details.
+          Postfix has internal access controls for the mail queue. By default, all users can view the queue. If your system has stricter controls, grant the `netdata` user access by adding it to `authorized_mailq_users` in the `/etc/postfix/main.cf `file.
+          For more details, refer to the `authorized_mailq_users` setting in the [Postfix documentation](https://www.postfix.org/postconf.5.html).
       default_behavior:
         auto_detection:
           description: "The collector executes  `postqueue -p` to get Postfix queue statistics."
@@ -54,39 +49,22 @@ modules:
           description: ""
         options:
           description: |
-            There are 2 sections:
-
-            * Global variables
-            * One or more JOBS that can define multiple different instances to monitor.
-
-            The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
-
-            Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
-
-            Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
+            The following options can be defined globally: update_every.
           folding:
             title: Config options
             enabled: true
           list:
             - name: update_every
-              description: Sets the default data collection frequency.
-              default_value: 1
+              description: Data collection frequency.
+              default_value: 10
               required: false
-            - name: priority
-              description: Controls the order of charts at the netdata dashboard.
-              default_value: 60000
-              required: false
-            - name: autodetection_retry
-              description: Sets the job re-check interval in seconds.
-              default_value: 0
-              required: false
-            - name: penalty
-              description: Indicates whether to apply penalty to update_every in case of failures.
-              default_value: yes
-              required: false
-            - name: name
-              description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-              default_value: ""
+            - name: binary_path
+              description: Path to the `postqueue` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable.
+              default_value: /usr/sbin/postqueue
+              required: true
+            - name: timeout
+              description: Timeout for executing the binary, specified in seconds.
+              default_value: 2
               required: false
         examples:
           folding:
@@ -111,13 +89,13 @@ modules:
           metrics:
             - name: postfix.qemails
               description: Postfix Queue Emails
-              unit: "emails"
+              unit: emails
               chart_type: line
               dimensions:
                 - name: emails
             - name: postfix.qsize
               description: Postfix Queue Emails Size
-              unit: "KiB"
+              unit: KiB
               chart_type: area
               dimensions:
                 - name: size
