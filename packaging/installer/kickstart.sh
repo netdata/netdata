@@ -1371,7 +1371,7 @@ set_auto_updates() {
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would have attempted to enable automatic updates."
     # This first case is for catching using a new kickstart script with an old build. It can be safely removed after v1.34.0 is released.
-    elif ! run_as_root grep -q '\-\-enable-auto-updates' "${updater}"; then
+    elif ! run_as_root grep -q '\--enable-auto-updates' "${updater}"; then
       echo
     elif ! run_as_root "${updater}" --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
       warning "Failed to enable auto updates. Netdata will still work, but you will need to update manually."
