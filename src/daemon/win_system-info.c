@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifdef OS_WINDOWS
-
 #include "win_system-info.h"
+
+#ifdef OS_WINDOWS
 
 // Hardware
 static char *netdata_windows_arch(DWORD value)
@@ -136,7 +136,7 @@ static ULONGLONG netdata_windows_get_disk_size(char *cVolume)
     return length.Length.QuadPart;
 }
 
-void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo)
 {
     ULONGLONG total = 0;
     char cVolume[8];
