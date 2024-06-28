@@ -2582,21 +2582,6 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
-if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
-                COMPONENT netdata
-                DESTINATION lib/systemd/system)
-        install(DIRECTORY
-                COMPONENT netdata
-                DESTINATION usr/lib/systemd/journald@netdata.conf.d)
-        install(FILES
-                system/systemd/journald@netdata.conf
-                COMPONENT netdata
-                DESTINATION usr/lib/systemd/journald@netdata.conf.d
-                RENAME netdata.conf)
-endif()
-
 configure_file(system/systemd/netdata.service.v235.in system/systemd/netdata.service.v235 @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235
@@ -2613,6 +2598,29 @@ install(FILES
         system/systemd/netdata-updater.timer
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
+
+if(BUILD_FOR_PACKAGING)
+        install(FILES
+                ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
+                COMPONENT netdata
+                DESTINATION lib/systemd/system)
+        install(FILES
+                ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
+                COMPONENT netdata
+                DESTINATION lib/systemd/system)
+        install(FILES
+                system/systemd/netdata-updater.timer
+                COMPONENT netdata
+                DESTINATION lib/systemd/system)
+        install(DIRECTORY
+                COMPONENT netdata
+                DESTINATION usr/lib/systemd/journald@netdata.conf.d)
+        install(FILES
+                system/systemd/journald@netdata.conf
+                COMPONENT netdata
+                DESTINATION usr/lib/systemd/journald@netdata.conf.d
+                RENAME netdata.conf)
+endif()
 
 install(FILES
         system/systemd/50-netdata.preset
