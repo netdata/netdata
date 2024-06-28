@@ -24,6 +24,10 @@
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
+#define _COMMON_PLUGIN_NAME "freebsd.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "freebsd"
+#include "../common-contexts/common-contexts.h"
+
 // --------------------------------------------------------------------------------------------------------------------
 // common definitions and variables
 
@@ -574,28 +578,7 @@ int do_hw_intcnt(int update_every, usec_t dt) {
             static RRDSET *st_intr = NULL;
             static RRDDIM *rd_intr = NULL;
 
-            if (unlikely(!st_intr)) {
-                st_intr = rrdset_create_localhost(
-                        "system",
-                        "intr",
-                        NULL,
-                        "interrupts",
-                        NULL,
-                        "Total Hardware Interrupts",
-                        "interrupts/s",
-                        "freebsd.plugin",
-                        "hw.intrcnt",
-                        NETDATA_CHART_PRIO_SYSTEM_INTR,
-                        update_every,
-                        RRDSET_TYPE_LINE
-                );
-                rrdset_flag_set(st_intr, RRDSET_FLAG_DETAIL);
-
-                rd_intr = rrddim_add(st_intr, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
-
-            rrddim_set_by_pointer(st_intr, rd_intr, totalintr);
-            rrdset_done(st_intr);
+            common_interrupts(totalintr, update_every, "hw.intrcnt");
 
             size_t size;
             static int mib_hw_intrnames[2] = {0, 0};

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
+
 	"github.com/gosnmp/gosnmp"
 )
 
@@ -59,6 +61,28 @@ func (s *SNMP) initSNMPClient() (gosnmp.Handler, error) {
 	s.Info(snmpClientConnInfo(client))
 
 	return client, nil
+}
+
+func (s *SNMP) initNetIfaceFilters() (matcher.Matcher, matcher.Matcher, error) {
+	byName, byType := matcher.FALSE(), matcher.FALSE()
+
+	if v := s.NetworkInterfaceFilter.ByName; v != "" {
+		m, err := matcher.NewSimplePatternsMatcher(v)
+		if err != nil {
+			return nil, nil, err
+		}
+		byName = m
+	}
+
+	if v := s.NetworkInterfaceFilter.ByType; v != "" {
+		m, err := matcher.NewSimplePatternsMatcher(v)
+		if err != nil {
+			return nil, nil, err
+		}
+		byType = m
+	}
+
+	return byName, byType, nil
 }
 
 func (s *SNMP) initOIDs() (oids []string) {

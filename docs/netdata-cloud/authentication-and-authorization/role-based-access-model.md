@@ -11,7 +11,7 @@ being able to join any Room. We also aligned the offered roles to the target aud
 |:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------|:-------------------|:-------------------|:--------------------------|
 | **Admins**<p>Users with this role can control Spaces, Rooms, Nodes, Users and Billing.</p><p>They can also access any Room in the Space.</p>                                              | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
 | **Managers**<p>Users with this role can manage Rooms and Users.</p><p>They can access any Room in the Space.</p>                                                                          | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
-| **Troubleshooters**<p>Users with this role can use Netdata to troubleshoot, not manage entities.</p><p>They can access any Room in the Space.</p>                                         | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
+| **Troubleshooters**<p>Users with this role can use Netdata to troubleshoot, not manage entities.</p><p>They need to be assigned to Rooms in the Space.</p>                                | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
 | **Observers**<p>Users with this role can only view data in specific Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p>                        | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
 | **Billing**<p>Users with this role can handle billing options and invoices.</p>                                                                                                           | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
 | **Member** ⚠️ Legacy role<p>Users with this role you can create Rooms and invite other Members.</p><p>They can only see the Rooms they belong to and all Nodes in the All Nodes Room.</p> | -                  | -                  | -                  | -                         |
@@ -62,8 +62,8 @@ In more detail, you can find on the following tables which functionalities are a
 
 | **Functionality**            |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     | Notes                                                                              |
 |:-----------------------------|:------------------:|:------------------:|:------------------:|:------------------:|:-----------:|:------------------:|:-----------------------------------------------------------------------------------|
-| See all Rooms in a Space     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |         -          |                                                                                    |
-| Join any Room in a Space     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |         -          | By joining a Room you will be enabled to get notifications from nodes on that Room |
+| See all Rooms in a Space     | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |         -          |                                                                                    |
+| Join any Room in a Space     | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |         -          | By joining a Room you will be enabled to get notifications from nodes on that Room |
 | Leave Room                   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      | :heavy_check_mark: |                                                                                    |
 | Create a new Room in a Space | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      | :heavy_check_mark: |                                                                                    |
 | Delete Room                  | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |         -          |                                                                                    |
@@ -144,7 +144,6 @@ Netdata Cloud paid subscription required for all action except "List All".
 | Test                                  | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |         -          |         -          |
 | View                                  | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |         -          |         -          |
 | View File Format                      | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |         -          |         -          |
-
 
 ### Other permissions
 

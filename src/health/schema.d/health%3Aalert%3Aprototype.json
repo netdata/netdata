@@ -122,7 +122,7 @@
               },
               "after": {
                 "type": "integer",
-                "default": 0,
+                "default": -600,
                 "title": "From",
                 "description": "Relative to 'To'"
               },

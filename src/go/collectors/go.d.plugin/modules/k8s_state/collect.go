@@ -68,6 +68,13 @@ func (ks *KubeState) collectKubeState(mx map[string]int64) {
 func (ks *KubeState) collectPodsState(mx map[string]int64) {
 	now := time.Now()
 	for _, ps := range ks.state.pods {
+		// Skip cronjobs (each of them is a unique container because name contains hash)
+		// to avoid overwhelming Netdata with high cardinality metrics.
+		// Related issue https://github.com/netdata/netdata/issues/16412
+		if ps.controllerKind == "Job" {
+			continue
+		}
+
 		if ps.deleted {
 			delete(ks.state.pods, podSource(ps.namespace, ps.name))
 			ks.removePodCharts(ps)

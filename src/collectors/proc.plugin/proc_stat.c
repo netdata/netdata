@@ -752,33 +752,8 @@ int do_proc_stat(int update_every, usec_t dt) {
         }
         else if(unlikely(hash == hash_intr && strcmp(row_key, "intr") == 0)) {
             if(likely(do_interrupts)) {
-                static RRDSET *st_intr = NULL;
-                static RRDDIM *rd_interrupts = NULL;
                 unsigned long long value = str2ull(procfile_lineword(ff, l, 1), NULL);
-
-                if(unlikely(!st_intr)) {
-                    st_intr = rrdset_create_localhost(
-                            "system"
-                            , "intr"
-                            , NULL
-                            , "interrupts"
-                            , NULL
-                            , "CPU Interrupts"
-                            , "interrupts/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_STAT_NAME
-                            , NETDATA_CHART_PRIO_SYSTEM_INTR
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rrdset_flag_set(st_intr, RRDSET_FLAG_DETAIL);
-
-                    rd_interrupts = rrddim_add(st_intr, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-
-                rrddim_set_by_pointer(st_intr, rd_interrupts, value);
-                rrdset_done(st_intr);
+                common_interrupts(value, update_every, NULL);
             }
         }
         else if(unlikely(hash == hash_ctxt && strcmp(row_key, "ctxt") == 0)) {
