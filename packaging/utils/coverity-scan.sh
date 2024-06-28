@@ -38,7 +38,7 @@
 set -e
 
 if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
-  echo "This script can only be used on a 64-bit x856 Linux system."
+  echo "This script can only be used on a 64-bit x86 Linux system."
   exit 1
 fi
 
