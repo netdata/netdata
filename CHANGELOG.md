@@ -6,6 +6,17 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18030](https://github.com/netdata/netdata/pull/18030) ([netdatabot](https://github.com/netdatabot))
+- go.d/postfix: simplify and fix tests [\#18029](https://github.com/netdata/netdata/pull/18029) ([ilyam8](https://github.com/ilyam8))
+- go.d k8state: skip jobs/cronjobs Pods [\#18028](https://github.com/netdata/netdata/pull/18028) ([ilyam8](https://github.com/ilyam8))
+- Port postfix collector from python to go [\#18026](https://github.com/netdata/netdata/pull/18026) ([Ancairon](https://github.com/Ancairon))
+- alert prototype: set default "after" to -600 [\#18025](https://github.com/netdata/netdata/pull/18025) ([ilyam8](https://github.com/ilyam8))
+- go.d snmp: add config options to filter interfaces by name and type [\#18023](https://github.com/netdata/netdata/pull/18023) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18022](https://github.com/netdata/netdata/pull/18022) ([netdatabot](https://github.com/netdatabot))
+- fix grep warning in kickstart [\#18021](https://github.com/netdata/netdata/pull/18021) ([ilyam8](https://github.com/ilyam8))
+- ping meta fix configuring ping\_group\_range [\#18020](https://github.com/netdata/netdata/pull/18020) ([ilyam8](https://github.com/ilyam8))
+- Improve global statistics thread shutdown [\#18018](https://github.com/netdata/netdata/pull/18018) ([stelfrag](https://github.com/stelfrag))
+- Fix proxy connect response [\#18017](https://github.com/netdata/netdata/pull/18017) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18016](https://github.com/netdata/netdata/pull/18016) ([netdatabot](https://github.com/netdatabot))
 - go.d snmp: add collecting network interface stats [\#18014](https://github.com/netdata/netdata/pull/18014) ([ilyam8](https://github.com/ilyam8))
 - rrdlabels: allow uppercase A-Z in label name [\#18013](https://github.com/netdata/netdata/pull/18013) ([ilyam8](https://github.com/ilyam8))
@@ -38,6 +49,8 @@
 - Sign DEB packages in the GHA runners that build them. [\#17949](https://github.com/netdata/netdata/pull/17949) ([Ferroin](https://github.com/Ferroin))
 - Detect on startup if the netdata-meta.db file is not a valid database file [\#17924](https://github.com/netdata/netdata/pull/17924) ([stelfrag](https://github.com/stelfrag))
 - Fix small typo [\#17875](https://github.com/netdata/netdata/pull/17875) ([stelfrag](https://github.com/stelfrag))
+- sysinfo \(WinAPI\) [\#17857](https://github.com/netdata/netdata/pull/17857) ([thiagoftsm](https://github.com/thiagoftsm))
+- add Win CPU interrupts [\#17753](https://github.com/netdata/netdata/pull/17753) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.46.1](https://github.com/netdata/netdata/tree/v1.46.1) (2024-06-21)
 
@@ -398,17 +411,6 @@
 - Bump github.com/likexian/whois-parser from 1.24.12 to 1.24.15 in /src/go/collectors/go.d.plugin [\#17469](https://github.com/netdata/netdata/pull/17469) ([dependabot[bot]](https://github.com/apps/dependabot))
 - go.d add sensors [\#17466](https://github.com/netdata/netdata/pull/17466) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17465](https://github.com/netdata/netdata/pull/17465) ([netdatabot](https://github.com/netdatabot))
-- Regenerate integrations.js [\#17464](https://github.com/netdata/netdata/pull/17464) ([netdatabot](https://github.com/netdatabot))
-- remove python.d/hddtemp [\#17463](https://github.com/netdata/netdata/pull/17463) ([ilyam8](https://github.com/ilyam8))
-- go.d add hddtemp [\#17462](https://github.com/netdata/netdata/pull/17462) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17461](https://github.com/netdata/netdata/pull/17461) ([netdatabot](https://github.com/netdatabot))
-- go.d storcli update [\#17460](https://github.com/netdata/netdata/pull/17460) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17458](https://github.com/netdata/netdata/pull/17458) ([netdatabot](https://github.com/netdatabot))
-- add section for regenerate claiming token [\#17457](https://github.com/netdata/netdata/pull/17457) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- ndsudo add storcli [\#17455](https://github.com/netdata/netdata/pull/17455) ([ilyam8](https://github.com/ilyam8))
-- go.d add storcli collector [\#17454](https://github.com/netdata/netdata/pull/17454) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/vmware/govmomi from 0.37.0 to 0.37.1 in /src/go/collectors/go.d.plugin [\#17451](https://github.com/netdata/netdata/pull/17451) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/miekg/dns from 1.1.58 to 1.1.59 in /src/go/collectors/go.d.plugin [\#17449](https://github.com/netdata/netdata/pull/17449) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
