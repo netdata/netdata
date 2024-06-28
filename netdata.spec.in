@@ -54,6 +54,8 @@ AutoReqProv: yes
 %define _libexecdir /usr/libexec
 %define _libdir /usr/lib
 
+%{!?_systemd_util_dir:%global _systemd_util_dir /usr/lib/systemd}
+
 # Fedora doesn’t define this, but other distros do
 %{!?_presetdir:%global _presetdir %{_libdir}/systemd/system-preset}
 
