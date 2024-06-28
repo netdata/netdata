@@ -152,6 +152,7 @@ static void free_basic_mountinfo(struct basic_mountinfo *bmi)
     if (bmi) {
         freez(bmi->persistent_id);
         freez(bmi->root);
+        freez(bmi->mount_point_stat_path);
         freez(bmi->mount_point);
         freez(bmi->filesystem);
 
