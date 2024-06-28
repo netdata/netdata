@@ -700,12 +700,12 @@ static inline int local_sockets_libmnl_cb_data(const struct nlmsghdr *nlh, void 
         .local = {
             .protocol = ls->tmp_protocol,
             .family = diag_msg->idiag_family,
-            .port = diag_msg->id.idiag_sport,
+            .port = ntohs(diag_msg->id.idiag_sport),
         },
         .remote = {
             .protocol = ls->tmp_protocol,
             .family = diag_msg->idiag_family,
-            .port = diag_msg->id.idiag_dport,
+            .port = ntohs(diag_msg->id.idiag_dport),
         },
         .timer = diag_msg->idiag_timer,
         .retransmits = diag_msg->idiag_retrans,
