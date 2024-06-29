@@ -199,39 +199,7 @@ fi
 
 progress "changing plugins ownership and permissions"
 
-for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin ioping.plugin cgroup-network-helper.sh; do
-  f="usr/libexec/netdata/plugins.d/${x}"
-  if [ -f "${f}" ]; then
-    run chown root:${NETDATA_GROUP} "${f}"
-  fi
-done
-
-if command -v setcap >/dev/null 2>&1; then
-    run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"
-    run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"
-    run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"
-
-    if command -v capsh >/dev/null 2>&1 && capsh --supports=cap_perfmon 2>/dev/null ; then
-        run setcap "cap_perfmon=ep" "usr/libexec/netdata/plugins.d/perf.plugin"
-    else
-        run setcap "cap_sys_admin=ep" "usr/libexec/netdata/plugins.d/perf.plugin"
-    fi
-
-    run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"
-else
-  for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
-    f="usr/libexec/netdata/plugins.d/${x}"
-    run chmod 4750 "${f}"
-  done
-fi
-
-for x in ndsudo freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin; do
-  f="usr/libexec/netdata/plugins.d/${x}"
-
-  if [ -f "${f}" ]; then
-    run chmod 4750 "${f}"
-  fi
-done
+./bin/bash /opt/netdata/system/apply-filecaps.sh
 
 # -----------------------------------------------------------------------------
 
