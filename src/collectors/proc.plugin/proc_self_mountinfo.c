@@ -113,6 +113,7 @@ struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *ro
 
 static void mountinfo_free(struct mountinfo *mi) {
     freez(mi->root);
+    freez(mi->mount_point_stat_path);
     freez(mi->mount_point);
     freez(mi->mount_options);
     freez(mi->persistent_id);
@@ -212,13 +213,23 @@ static inline int mount_point_is_protected(char *mount_point)
 // read the whole mountinfo into a linked list
 struct mountinfo *mountinfo_read(int do_statvfs) {
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/self/mountinfo", netdata_configured_host_prefix);
-    procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-    if(unlikely(!ff)) {
+
+    snprintfz(filename, FILENAME_MAX, "%s/root/proc/1/mountinfo", netdata_configured_host_prefix);
+    procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+
+    // Inside docker with '-v "/:/host/root:ro'
+    bool host_root_prefix = ff != NULL;
+
+    if (!ff) {
+        snprintfz(filename, FILENAME_MAX, "%s/proc/self/mountinfo", netdata_configured_host_prefix);
+        ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+    }
+    if (!ff) {
         snprintfz(filename, FILENAME_MAX, "%s/proc/1/mountinfo", netdata_configured_host_prefix);
         ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return NULL;
     }
+    if (!ff)
+        return NULL;
 
     ff = procfile_readall(ff);
     if(unlikely(!ff))
@@ -269,8 +280,15 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
         mi->root = strdupz(procfile_lineword(ff, l, w)); w++;
         mi->root_hash = simple_hash(mi->root);
 
-        mi->mount_point = strdupz_decoding_octal(procfile_lineword(ff, l, w)); w++;
+        mi->mount_point = strdupz_decoding_octal(procfile_lineword(ff, l, w));w++;
         mi->mount_point_hash = simple_hash(mi->mount_point);
+
+        if (host_root_prefix) {
+            snprintfz(filename, FILENAME_MAX, "%s/root%s", netdata_configured_host_prefix, mi->mount_point);
+            mi->mount_point_stat_path = strdupz(filename);
+        } else {
+            mi->mount_point_stat_path = strdupz(mi->mount_point);
+        }
 
         mi->persistent_id = strdupz(mi->mount_point);
         netdata_fix_chart_id(mi->persistent_id);
@@ -339,7 +357,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
             // mark as BIND the duplicates (i.e. same filesystem + same source)
             if(do_statvfs) {
                 struct stat buf;
-                if(unlikely(stat(mi->mount_point, &buf) == -1)) {
+                if(unlikely(stat(mi->mount_point_stat_path, &buf) == -1)) {
                     mi->st_dev = 0;
                     mi->flags |= MOUNTINFO_NO_STAT;
                 }
@@ -391,7 +409,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
         // check if it has size
         if(do_statvfs && !(mi->flags & MOUNTINFO_IS_DUMMY)) {
             struct statvfs buff_statvfs;
-            if(unlikely(statvfs(mi->mount_point, &buff_statvfs) < 0)) {
+            if(unlikely(statvfs(mi->mount_point_stat_path, &buff_statvfs) < 0)) {
                 mi->flags |= MOUNTINFO_NO_STAT;
             }
             else if(unlikely(!buff_statvfs.f_blocks /* || !buff_statvfs.f_files */)) {
