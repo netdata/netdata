@@ -111,6 +111,7 @@ void mountpoint_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *entr
 struct basic_mountinfo {
     char *persistent_id;    
     char *root;             
+    char *mount_point_stat_path;
     char *mount_point;      
     char *filesystem;       
 
@@ -123,12 +124,13 @@ static netdata_mutex_t slow_mountinfo_mutex;
 static struct basic_mountinfo *basic_mountinfo_create_and_copy(struct mountinfo* mi)
 {
     struct basic_mountinfo *bmi = callocz(1, sizeof(struct basic_mountinfo));
-    
+
     if (mi) {
         bmi->persistent_id = strdupz(mi->persistent_id);
-        bmi->root          = strdupz(mi->root);
-        bmi->mount_point   = strdupz(mi->mount_point);
-        bmi->filesystem    = strdupz(mi->filesystem);
+        bmi->root = strdupz(mi->root);
+        bmi->mount_point_stat_path = strdupz(mi->mount_point_stat_path);
+        bmi->mount_point = strdupz(mi->mount_point);
+        bmi->filesystem = strdupz(mi->filesystem);
     }
 
     return bmi;
@@ -150,6 +152,7 @@ static void free_basic_mountinfo(struct basic_mountinfo *bmi)
     if (bmi) {
         freez(bmi->persistent_id);
         freez(bmi->root);
+        freez(bmi->mount_point_stat_path);
         freez(bmi->mount_point);
         freez(bmi->filesystem);
 
@@ -359,9 +362,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             usec_t start_time = now_monotonic_high_precision_usec();
             struct stat bs;
 
-            if(stat(mi->mount_point, &bs) == -1) {
+            if(stat(mi->mount_point_stat_path, &bs) == -1) {
                 collector_error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
-                               , mi->mount_point
+                               , mi->mount_point_stat_path
                                , disk
                                , mi->filesystem?mi->filesystem:""
                                , mi->root?mi->root:""
@@ -372,7 +375,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             else {
                 if((bs.st_mode & S_IFMT) != S_IFDIR) {
                     collector_error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
-                                   , mi->mount_point
+                                   , mi->mount_point_stat_path
                                    , disk
                                    , mi->filesystem?mi->filesystem:""
                                    , mi->root?mi->root:""
@@ -451,10 +454,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     usec_t start_time = now_monotonic_high_precision_usec();
     struct statvfs buff_statvfs;
 
-    if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
+    if (statvfs(mi->mount_point_stat_path, &buff_statvfs) < 0) {
         if(!m->shown_error) {
             collector_error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
-                            , mi->mount_point
+                            , mi->mount_point_stat_path
                             , disk
                             , mi->filesystem?mi->filesystem:""
                             , mi->root?mi->root:""
@@ -489,10 +492,10 @@ static inline void do_slow_disk_space_stats(struct basic_mountinfo *mi, int upda
     m->updated = true;
 
     struct statvfs buff_statvfs;
-    if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
+    if (statvfs(mi->mount_point_stat_path, &buff_statvfs) < 0) {
         if(!m->shown_error) {
             collector_error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
-                            , mi->mount_point
+                            , mi->mount_point_stat_path
                             , mi->persistent_id
                             , mi->filesystem?mi->filesystem:""
                             , mi->root?mi->root:""
