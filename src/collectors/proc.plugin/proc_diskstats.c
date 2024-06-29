@@ -1946,14 +1946,17 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     rrdset_flag_set(d->st_await, RRDSET_FLAG_DETAIL);
 
-                    d->rd_await_reads  = rrddim_add(d->st_await, "reads",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    d->rd_await_writes = rrddim_add(d->st_await, "writes", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_await_reads  = rrddim_add(d->st_await, "reads",  NULL,  1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_await_writes = rrddim_add(d->st_await, "writes", NULL, -1, 1000, RRD_ALGORITHM_ABSOLUTE);
 
                     add_labels_to_disk(d, d->st_await);
                 }
 
-                rrddim_set_by_pointer(d->st_await, d->rd_await_reads,  (reads  - last_reads)  ? (readms  - last_readms)  / (reads  - last_reads)  : 0);
-                rrddim_set_by_pointer(d->st_await, d->rd_await_writes, (writes - last_writes) ? (writems - last_writems) / (writes - last_writes) : 0);
+                double read_avg = (reads - last_reads) ? (double)(readms - last_readms) / (reads - last_reads) : 0;
+                double write_avg = (writes - last_writes) ? (double)(writems - last_writems) / (writes - last_writes) : 0;
+
+                rrddim_set_by_pointer(d->st_await, d->rd_await_reads, (collected_number)(read_avg * 1000));
+                rrddim_set_by_pointer(d->st_await, d->rd_await_writes, (collected_number)(write_avg * 1000));
                 rrdset_done(d->st_await);
             }
 
@@ -1976,21 +1979,22 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     rrdset_flag_set(d->st_ext_await, RRDSET_FLAG_DETAIL);
 
-                    d->rd_await_discards = rrddim_add(d->st_ext_await, "discards", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_await_discards = rrddim_add(d->st_ext_await, "discards", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                     if (do_fl_stats)
-                        d->rd_await_flushes = rrddim_add(d->st_ext_await, "flushes", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                        d->rd_await_flushes = rrddim_add(d->st_ext_await, "flushes", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
 
                     add_labels_to_disk(d, d->st_ext_await);
                 }
 
-                rrddim_set_by_pointer(
-                    d->st_ext_await, d->rd_await_discards,
-                    (discards - last_discards) ? (discardms - last_discardms) / (discards - last_discards) : 0);
+                double discard_avg =
+                    (discards - last_discards) ? (double)(discardms - last_discardms) / (discards - last_discards) : 0;
+                double flushe_avg =
+                    (flushes - last_flushes) ? (double)(flushms - last_flushms) / (flushes - last_flushes) : 0;
+
+                rrddim_set_by_pointer(d->st_ext_await, d->rd_await_discards, (collected_number)(discard_avg * 1000));
 
                 if (do_fl_stats)
-                    rrddim_set_by_pointer(
-                        d->st_ext_await, d->rd_await_flushes,
-                        (flushes - last_flushes) ? (flushms - last_flushms) / (flushes - last_flushes) : 0);
+                    rrddim_set_by_pointer(d->st_ext_await, d->rd_await_flushes, (collected_number)(flushe_avg * 1000));
 
                 rrdset_done(d->st_ext_await);
             }
@@ -2077,12 +2081,17 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     rrdset_flag_set(d->st_svctm, RRDSET_FLAG_DETAIL);
 
-                    d->rd_svctm_svctm = rrddim_add(d->st_svctm, "svctm", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_svctm_svctm = rrddim_add(d->st_svctm, "svctm", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
 
                     add_labels_to_disk(d, d->st_svctm);
                 }
 
-                rrddim_set_by_pointer(d->st_svctm, d->rd_svctm_svctm, ((reads - last_reads) + (writes - last_writes)) ? (busy_ms - last_busy_ms) / ((reads - last_reads) + (writes - last_writes)) : 0);
+                double svctm_avg =
+                    ((reads - last_reads) + (writes - last_writes)) ?
+                        (double)(busy_ms - last_busy_ms) / ((reads - last_reads) + (writes - last_writes)) :
+                        0;
+
+                rrddim_set_by_pointer(d->st_svctm, d->rd_svctm_svctm, (collected_number)(svctm_avg * 1000));
                 rrdset_done(d->st_svctm);
             }
         }
