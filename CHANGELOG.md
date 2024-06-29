@@ -6,11 +6,14 @@
 
 **Merged pull requests:**
 
+- Bump repository config fetched by kickstart to latest version. [\#18034](https://github.com/netdata/netdata/pull/18034) ([Ferroin](https://github.com/Ferroin))
+- Troubleshooter must be assigned to rooms docs [\#18031](https://github.com/netdata/netdata/pull/18031) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#18030](https://github.com/netdata/netdata/pull/18030) ([netdatabot](https://github.com/netdatabot))
 - go.d/postfix: simplify and fix tests [\#18029](https://github.com/netdata/netdata/pull/18029) ([ilyam8](https://github.com/ilyam8))
 - go.d k8state: skip jobs/cronjobs Pods [\#18028](https://github.com/netdata/netdata/pull/18028) ([ilyam8](https://github.com/ilyam8))
 - Port postfix collector from python to go [\#18026](https://github.com/netdata/netdata/pull/18026) ([Ancairon](https://github.com/Ancairon))
 - alert prototype: set default "after" to -600 [\#18025](https://github.com/netdata/netdata/pull/18025) ([ilyam8](https://github.com/ilyam8))
+- Fix Coverity scan CI. [\#18024](https://github.com/netdata/netdata/pull/18024) ([Ferroin](https://github.com/Ferroin))
 - go.d snmp: add config options to filter interfaces by name and type [\#18023](https://github.com/netdata/netdata/pull/18023) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18022](https://github.com/netdata/netdata/pull/18022) ([netdatabot](https://github.com/netdatabot))
 - fix grep warning in kickstart [\#18021](https://github.com/netdata/netdata/pull/18021) ([ilyam8](https://github.com/ilyam8))
@@ -408,9 +411,6 @@
 - Regenerate integrations.js [\#17472](https://github.com/netdata/netdata/pull/17472) ([netdatabot](https://github.com/netdatabot))
 - k8s doc edits [\#17471](https://github.com/netdata/netdata/pull/17471) ([Ancairon](https://github.com/Ancairon))
 - Update Libbpf to 1.4 [\#17470](https://github.com/netdata/netdata/pull/17470) ([thiagoftsm](https://github.com/thiagoftsm))
-- Bump github.com/likexian/whois-parser from 1.24.12 to 1.24.15 in /src/go/collectors/go.d.plugin [\#17469](https://github.com/netdata/netdata/pull/17469) ([dependabot[bot]](https://github.com/apps/dependabot))
-- go.d add sensors [\#17466](https://github.com/netdata/netdata/pull/17466) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17465](https://github.com/netdata/netdata/pull/17465) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
