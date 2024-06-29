@@ -5,7 +5,7 @@
 
 #include "common-contexts.h"
 
-static inline void common_ipc(uint64_t semathore, NETDATA_DOUBLE red, char *module, int update_every) {
+static inline void common_semaphore_ipc(uint64_t semaphore, NETDATA_DOUBLE red, char *module, int update_every) {
     static RRDSET *st_semaphores = NULL;
     static RRDDIM *rd_semaphores = NULL;
     if(unlikely(!st_semaphores)) {
@@ -25,7 +25,7 @@ static inline void common_ipc(uint64_t semathore, NETDATA_DOUBLE red, char *modu
         rd_semaphores = rrddim_add(st_semaphores, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set_by_pointer(st_semaphores, rd_semaphores, semathore);
+    rrddim_set_by_pointer(st_semaphores, rd_semaphores, semaphore);
     rrdset_done(st_semaphores);
     if (!strcmp(module, "ipc"))
         st_semaphores->red = red;
