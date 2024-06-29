@@ -217,19 +217,18 @@ Notes:
 | url_patterns | List of URL patterns. | [] | no |
 | url_patterns.name | Used as a dimension name. |  | yes |
 | url_patterns.pattern | Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#supported-format). |  | yes |
-| parser | Log parser configuration. |  | no |
-| parser.log_type | Log parser type. | auto | no |
-| parser.csv_config | CSV log parser config. |  | no |
-| parser.csv_config.delimiter | CSV field delimiter. | , | no |
-| parser.csv_config.format | CSV log format. |  | no |
-| parser.ltsv_config | LTSV log parser config. |  | no |
-| parser.ltsv_config.field_delimiter | LTSV field delimiter. | \t | no |
-| parser.ltsv_config.value_delimiter | LTSV value delimiter. | : | no |
-| parser.ltsv_config.mapping | LTSV fields mapping to **known fields**. |  | yes |
-| parser.json_config | JSON log parser config. |  | no |
-| parser.json_config.mapping | JSON fields mapping to **known fields**. |  | yes |
-| parser.regexp_config | RegExp log parser config. |  | no |
-| parser.regexp_config.pattern | RegExp pattern with named groups. |  | yes |
+| log_type | Log parser type. | auto | no |
+| csv_config | CSV log parser config. |  | no |
+| csv_config.delimiter | CSV field delimiter. | , | no |
+| csv_config.format | CSV log format. |  | no |
+| ltsv_config | LTSV log parser config. |  | no |
+| ltsv_config.field_delimiter | LTSV field delimiter. | \t | no |
+| ltsv_config.value_delimiter | LTSV value delimiter. | : | no |
+| ltsv_config.mapping | LTSV fields mapping to **known fields**. |  | yes |
+| json_config | JSON log parser config. |  | no |
+| json_config.mapping | JSON fields mapping to **known fields**. |  | yes |
+| regexp_config | RegExp log parser config. |  | no |
+| regexp_config.pattern | RegExp pattern with named groups. |  | yes |
 
 ##### url_patterns
 
@@ -246,7 +245,7 @@ url_patterns:
 ```
 
 
-##### parser.log_type
+##### log_type
 
 Weblog supports 5 different log parsers:
 
@@ -261,8 +260,7 @@ Weblog supports 5 different log parsers:
 Syntax:
 
 ```yaml
-parser:
-  log_type: auto
+log_type: auto
 ```
 
 If `log_type` parameter set to `auto` (which is default), weblog will try to auto-detect appropriate log parser and log format using the last line of the log file.
@@ -287,43 +285,41 @@ If `log_type` parameter set to `auto` (which is default), weblog will try to aut
   If you're using the default Apache/NGINX log format, auto-detect will work for you. If it doesn't work you need to set the format manually.
 
 
-##### parser.csv_config.format
+##### csv_config.format
 
 
 
-##### parser.ltsv_config.mapping
-
-The mapping is a dictionary where the key is a field, as in logs, and the value is the corresponding **known field**.
-
-> **Note**: don't use `$` and `%` prefixes for mapped field names.
-
-```yaml
-parser:
-  log_type: ltsv
-  ltsv_config:
-    mapping:
-      label1: field1
-      label2: field2
-```
-
-
-##### parser.json_config.mapping
+##### ltsv_config.mapping
 
 The mapping is a dictionary where the key is a field, as in logs, and the value is the corresponding **known field**.
 
 > **Note**: don't use `$` and `%` prefixes for mapped field names.
 
 ```yaml
-parser:
-  log_type: json
-  json_config:
-    mapping:
-      label1: field1
-      label2: field2
+log_type: ltsv
+ltsv_config:
+  mapping:
+    label1: field1
+    label2: field2
 ```
 
 
-##### parser.regexp_config.pattern
+##### json_config.mapping
+
+The mapping is a dictionary where the key is a field, as in logs, and the value is the corresponding **known field**.
+
+> **Note**: don't use `$` and `%` prefixes for mapped field names.
+
+```yaml
+log_type: json
+json_config:
+  mapping:
+    label1: field1
+    label2: field2
+```
+
+
+##### regexp_config.pattern
 
 Use pattern with subexpressions names. These names should be **known fields**.
 
@@ -332,10 +328,9 @@ Use pattern with subexpressions names. These names should be **known fields**.
 Syntax:
 
 ```yaml
-parser:
-  log_type: regexp
-  regexp_config:
-    pattern: PATTERN
+log_type: regexp
+regexp_config:
+  pattern: PATTERN
 ```
 
 
