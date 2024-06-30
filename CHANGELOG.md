@@ -6,7 +6,13 @@
 
 **Merged pull requests:**
 
+- proc/diskstats: Increase accuracy of average IO operation time [\#18040](https://github.com/netdata/netdata/pull/18040) ([ilyam8](https://github.com/ilyam8))
+- diskspace: update exclude paths/filesystems [\#18039](https://github.com/netdata/netdata/pull/18039) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18038](https://github.com/netdata/netdata/pull/18038) ([netdatabot](https://github.com/netdatabot))
+- docs: fix go.d/weblog parser config [\#18037](https://github.com/netdata/netdata/pull/18037) ([ilyam8](https://github.com/ilyam8))
+- fix diskspace plugin in Docker [\#18035](https://github.com/netdata/netdata/pull/18035) ([ilyam8](https://github.com/ilyam8))
 - Bump repository config fetched by kickstart to latest version. [\#18034](https://github.com/netdata/netdata/pull/18034) ([Ferroin](https://github.com/Ferroin))
+- fix installing netdata-updater svc/timer for native packages [\#18032](https://github.com/netdata/netdata/pull/18032) ([ilyam8](https://github.com/ilyam8))
 - Troubleshooter must be assigned to rooms docs [\#18031](https://github.com/netdata/netdata/pull/18031) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#18030](https://github.com/netdata/netdata/pull/18030) ([netdatabot](https://github.com/netdatabot))
 - go.d/postfix: simplify and fix tests [\#18029](https://github.com/netdata/netdata/pull/18029) ([ilyam8](https://github.com/ilyam8))
@@ -403,14 +409,6 @@
 - go.d pkg prometheus improve parsing err msg [\#17480](https://github.com/netdata/netdata/pull/17480) ([ilyam8](https://github.com/ilyam8))
 - move dashboards file [\#17479](https://github.com/netdata/netdata/pull/17479) ([Ancairon](https://github.com/Ancairon))
 - go.d windows add "vnode" to config schema [\#17478](https://github.com/netdata/netdata/pull/17478) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17477](https://github.com/netdata/netdata/pull/17477) ([netdatabot](https://github.com/netdatabot))
-- move dashboards file [\#17476](https://github.com/netdata/netdata/pull/17476) ([Ancairon](https://github.com/Ancairon))
-- Use CPack to generate Debian packages [\#17475](https://github.com/netdata/netdata/pull/17475) ([vkalintiris](https://github.com/vkalintiris))
-- bump go toolchain to v1.22.0 in check-for-go-toolchain.sh [\#17474](https://github.com/netdata/netdata/pull/17474) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/sensors [\#17473](https://github.com/netdata/netdata/pull/17473) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17472](https://github.com/netdata/netdata/pull/17472) ([netdatabot](https://github.com/netdatabot))
-- k8s doc edits [\#17471](https://github.com/netdata/netdata/pull/17471) ([Ancairon](https://github.com/Ancairon))
-- Update Libbpf to 1.4 [\#17470](https://github.com/netdata/netdata/pull/17470) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
