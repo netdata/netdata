@@ -36,7 +36,7 @@ In more detail, you can find on the following tables which functionalities are a
 
 | **Functionality**                         |     **Admin**      |    **Manager**     | **Troubleshooter** | **Observer** | **Billing** |     **Member**     | Notes                                      |
 |:------------------------------------------|:------------------:|:------------------:|:------------------:|:------------:|:-----------:|:------------------:|:-------------------------------------------|
-| See all Nodes in Space (_All Nodes_ Room) | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -       |      -      | :heavy_check_mark: | Members are always on the _All Nodes_ Room |
+| See all Nodes in Space (_All Nodes_ Room) | :heavy_check_mark: | :heavy_check_mark: |         -          |      -       |      -      | :heavy_check_mark: | Members are always on the _All Nodes_ Room |
 | Connect Node to Space                     | :heavy_check_mark: |         -          |         -          |      -       |      -      |         -          | -                                          |
 | Delete Node from Space                    | :heavy_check_mark: |         -          |         -          |      -       |      -      |         -          | -                                          |
 
