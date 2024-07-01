@@ -678,23 +678,12 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_ebpf_sock_bytes_sent",
-                                  "Bits sent.",
+                                  "_ebpf_sock_bandwidth",
+                                  "Bandwidth.",
                                   EBPF_COMMON_UNITS_KILOBITS,
                                   NETDATA_APPS_NET_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "app.ebpf_sock_bytes_sent",
-                                  order++,
-                                  update_every);
-
-        ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
-                                  w->clean_name,
-                                  "_ebpf_sock_bytes_received",
-                                  "Bits received.",
-                                  EBPF_COMMON_UNITS_KILOBITS,
-                                  NETDATA_APPS_NET_GROUP,
-                                  NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "app.ebpf_sock_bytes_received",
+                                  "app.ebpf_sock_total_bandwidth",
                                   order++,
                                   update_every);
 
@@ -1060,14 +1049,10 @@ void ebpf_socket_send_apps_data()
             ebpf_write_end_chart();
         }
 
-        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bytes_sent");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bandwidth");
         // We multiply by 0.008, because we read bytes, but we display bits
-        write_chart_dimension("bandwidth", ebpf_socket_bytes2bits(values->bytes_sent));
-        ebpf_write_end_chart();
-
-        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bytes_received");
-        // We multiply by 0.008, because we read bytes, but we display bits
-        write_chart_dimension("bandwidth", ebpf_socket_bytes2bits(values->bytes_received));
+        write_chart_dimension("sent", ebpf_socket_bytes2bits(values->bytes_sent));
+        write_chart_dimension("received", ebpf_socket_bytes2bits(values->bytes_received));
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_sendmsg");
@@ -1273,33 +1258,19 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_ebpf_sock_bytes_sent",
-                             "Bits sent.",
+                             "_ebpf_sock_bandwidth",
+                             "Bandwidth.",
                              EBPF_COMMON_UNITS_KILOBITS,
                              NETDATA_APPS_NET_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "app.ebpf_sock_bytes_sent",
+                             "app.ebpf_sock_total_bandwidth",
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SOCKET);
         ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
-        fprintf(stdout, "DIMENSION bandwidth '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
-
-        ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
-                             w->clean_name,
-                             "_ebpf_sock_bytes_received",
-                             "Bits received.",
-                             EBPF_COMMON_UNITS_KILOBITS,
-                             NETDATA_APPS_NET_GROUP,
-                             NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "app.ebpf_sock_bytes_received",
-                             order++,
-                             update_every,
-                             NETDATA_EBPF_MODULE_NAME_SOCKET);
-        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
-        ebpf_commit_label();
-        fprintf(stdout, "DIMENSION bandwidth '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+        fprintf(stdout, "DIMENSION received '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+        fprintf(stdout, "DIMENSION sent '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
