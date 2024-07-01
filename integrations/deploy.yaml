@@ -249,6 +249,7 @@
             -v netdataconfig:/etc/netdata \
             -v netdatalib:/var/lib/netdata \
             -v netdatacache:/var/cache/netdata \
+            -v /:/host/root:ro,rslave \
             -v /etc/passwd:/host/etc/passwd:ro \
             -v /etc/group:/host/etc/group:ro \
             -v /etc/localtime:/etc/localtime:ro \
@@ -314,6 +315,7 @@
                   - netdataconfig:/etc/netdata
                   - netdatalib:/var/lib/netdata
                   - netdatacache:/var/cache/netdata
+                  - /:/host/root:ro,rslave
                   - /etc/passwd:/host/etc/passwd:ro
                   - /etc/group:/host/etc/group:ro
                   - /etc/localtime:/etc/localtime:ro
@@ -388,6 +390,7 @@
                   - netdataconfig:/etc/netdata
                   - netdatalib:/var/lib/netdata
                   - netdatacache:/var/cache/netdata
+                  - /:/host/root:ro,rslave
                   - /etc/passwd:/host/etc/passwd:ro
                   - /etc/group:/host/etc/group:ro
                   - /etc/localtime:/etc/localtime:ro

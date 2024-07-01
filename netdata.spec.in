@@ -54,6 +54,8 @@ AutoReqProv: yes
 %define _libexecdir /usr/libexec
 %define _libdir /usr/lib
 
+%{!?_systemd_util_dir:%global _systemd_util_dir /usr/lib/systemd}
+
 # Fedora doesn’t define this, but other distros do
 %{!?_presetdir:%global _presetdir %{_libdir}/systemd/system-preset}
 
@@ -447,8 +449,12 @@ install -m 644 -p "%{__cmake_builddir}/system/systemd/%{name}.service" "${RPM_BU
 %else
 install -m 644 -p "%{__cmake_builddir}/system/systemd/%{name}.service.v235" "${RPM_BUILD_ROOT}%{_unitdir}/%{name}.service"
 %endif
+install -m 644 -p "system/systemd/netdata-updater.timer" "${RPM_BUILD_ROOT}%{_unitdir}/%{name}-updater.timer"
+install -m 644 -p "%{__cmake_builddir}/system/systemd/%{name}-updater.service" "${RPM_BUILD_ROOT}%{_unitdir}/%{name}-updater.service"
 install -m 755 -d "${RPM_BUILD_ROOT}%{_presetdir}"
 install -m 644 -p "system/systemd/50-%{name}.preset" "${RPM_BUILD_ROOT}%{_presetdir}/50-%{name}.preset"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_systemd_util_dir}/journald@%{name}.conf.d"
+install -m 644 -p "system/systemd/journald@%{name}.conf" "${RPM_BUILD_ROOT}%{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf"
 
 %pre
 
@@ -510,7 +516,10 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_sbindir}/%{name}-claim.sh
 
 %{_unitdir}/%{name}.service
+%{_unitdir}/%{name}-updater.timer
+%{_unitdir}/%{name}-updater.service
 %{_presetdir}/50-%{name}.preset
+%{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf
 
 %dir %{_libexecdir}/%{name}
 %dir %{_libexecdir}/%{name}/plugins.d

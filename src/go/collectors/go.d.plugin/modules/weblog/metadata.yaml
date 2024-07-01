@@ -127,11 +127,7 @@ modules:
               description: Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#supported-format).
               default_value: ""
               required: true
-            - name: parser
-              description: Log parser configuration.
-              default_value: ""
-              required: false
-            - name: parser.log_type
+            - name: log_type
               description: Log parser type.
               default_value: auto
               required: false
@@ -149,8 +145,7 @@ modules:
                 Syntax:
 
                 ```yaml
-                parser:
-                  log_type: auto
+                log_type: auto
                 ```
 
                 If `log_type` parameter set to `auto` (which is default), weblog will try to auto-detect appropriate log parser and log format using the last line of the log file.
@@ -173,32 +168,32 @@ modules:
                   ```
                 
                   If you're using the default Apache/NGINX log format, auto-detect will work for you. If it doesn't work you need to set the format manually.
-            - name: parser.csv_config
+            - name: csv_config
               description: CSV log parser config.
               default_value: ""
               required: false
-            - name: parser.csv_config.delimiter
+            - name: csv_config.delimiter
               description: CSV field delimiter.
               default_value: ","
               required: false
-            - name: parser.csv_config.format
+            - name: csv_config.format
               description: CSV log format.
               default_value: ""
               required: false
               detailed_description: ""
-            - name: parser.ltsv_config
+            - name: ltsv_config
               description: LTSV log parser config.
               default_value: ""
               required: false
-            - name: parser.ltsv_config.field_delimiter
+            - name: ltsv_config.field_delimiter
               description: LTSV field delimiter.
               default_value: "\\t"
               required: false
-            - name: parser.ltsv_config.value_delimiter
+            - name: ltsv_config.value_delimiter
               description: LTSV value delimiter.
               default_value: ":"
               required: false
-            - name: parser.ltsv_config.mapping
+            - name: ltsv_config.mapping
               description: LTSV fields mapping to **known fields**.
               default_value: ""
               required: true
@@ -208,18 +203,17 @@ modules:
                 > **Note**: don't use `$` and `%` prefixes for mapped field names.
 
                 ```yaml
-                parser:
-                  log_type: ltsv
-                  ltsv_config:
-                    mapping:
-                      label1: field1
-                      label2: field2
+                log_type: ltsv
+                ltsv_config:
+                  mapping:
+                    label1: field1
+                    label2: field2
                 ```
-            - name: parser.json_config
+            - name: json_config
               description: JSON log parser config.
               default_value: ""
               required: false
-            - name: parser.json_config.mapping
+            - name: json_config.mapping
               description: JSON fields mapping to **known fields**.
               default_value: ""
               required: true
@@ -229,18 +223,17 @@ modules:
                 > **Note**: don't use `$` and `%` prefixes for mapped field names.
 
                 ```yaml
-                parser:
-                  log_type: json
-                  json_config:
-                    mapping:
-                      label1: field1
-                      label2: field2
+                log_type: json
+                json_config:
+                  mapping:
+                    label1: field1
+                    label2: field2
                 ```
-            - name: parser.regexp_config
+            - name: regexp_config
               description: RegExp log parser config.
               default_value: ""
               required: false
-            - name: parser.regexp_config.pattern
+            - name: regexp_config.pattern
               description: RegExp pattern with named groups.
               default_value: ""
               required: true
@@ -252,10 +245,9 @@ modules:
                 Syntax:
 
                 ```yaml
-                parser:
-                  log_type: regexp
-                  regexp_config:
-                    pattern: PATTERN
+                log_type: regexp
+                regexp_config:
+                  pattern: PATTERN
                 ```
         examples:
           folding:
