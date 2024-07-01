@@ -112,16 +112,16 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_UDP_FUNCTION_BITS "total_udp_bandwidth"
 #define NETDATA_UDP_FUNCTION_ERROR "udp_error"
 
-// Charts created on Apps submenu
-#define NETDATA_NET_APPS_CONNECTION_TCP_V4 "outbound_conn_v4"
-#define NETDATA_NET_APPS_CONNECTION_TCP_V6 "outbound_conn_v6"
-#define NETDATA_NET_APPS_BANDWIDTH_SENT "total_bandwidth_sent"
-#define NETDATA_NET_APPS_BANDWIDTH_RECV "total_bandwidth_recv"
-#define NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS "bandwidth_tcp_send"
-#define NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS "bandwidth_tcp_recv"
-#define NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT "bandwidth_tcp_retransmit"
-#define NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS "bandwidth_udp_send"
-#define NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS "bandwidth_udp_recv"
+// Charts created (id or suffix)
+#define NETDATA_SOCK_ID_OR_SUFFIX_CONNECTION_TCP_V4 "outbound_conn_v4"
+#define NETDATA_SOCK_ID_OR_SUFFIX_CONNECTION_TCP_V6 "outbound_conn_v6"
+#define NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_SENT "total_bandwidth_sent"
+#define NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_RECV "total_bandwidth_recv"
+#define NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_TCP_SEND_CALLS "bandwidth_tcp_send"
+#define NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_TCP_RECV_CALLS "bandwidth_tcp_recv"
+#define NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_TCP_RETRANSMIT "bandwidth_tcp_retransmit"
+#define NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_UDP_SEND_CALLS "bandwidth_udp_send"
+#define NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_UDP_RECV_CALLS "bandwidth_udp_recv"
 
 // Port range
 #define NETDATA_MINIMUM_PORT_VALUE 1
