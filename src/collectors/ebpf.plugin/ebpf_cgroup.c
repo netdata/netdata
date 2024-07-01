@@ -344,7 +344,19 @@ void ebpf_create_charts_on_systemd(ebpf_systemd_args_t *chart)
     snprintfz(service_name, 511, "%s", (!strstr(chart->id, "systemd_")) ? chart->id : (chart->id + 8));
     ebpf_create_chart_labels("service_name", service_name, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
-    fprintf(stdout, "DIMENSION %s '' %s 1 1\n", chart->dimension, chart->algorithm);
+    // Let us keep original string that can be used in another place. Chart creation does not happen frequently.
+    char *move = strdupz(chart->dimension);
+    while (move) {
+        char *next_dim = strchr(move, ',');
+        if (next_dim) {
+            *next_dim = '\0';
+            next_dim++;
+        }
+
+        fprintf(stdout, "DIMENSION %s '' %s 1 1\n", move, chart->algorithm);
+        move = next_dim;
+    }
+    freez(move);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

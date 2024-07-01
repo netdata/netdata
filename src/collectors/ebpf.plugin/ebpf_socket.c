@@ -534,24 +534,13 @@ static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
     }
 
     ebpf_write_chart_obsolete(id,
-                              NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_RECV,
+                              NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH,
                               "",
-                              "Bits received",
+                              "Bandwidth.",
                               EBPF_COMMON_UNITS_KILOBITS,
                               NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
                               NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT,
-                              order++,
-                              update_every);
-
-    ebpf_write_chart_obsolete(id,
-                              NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_SENT,
-                              "",
-                              "Bits sent",
-                              EBPF_COMMON_UNITS_KILOBITS,
-                              NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT,
                               order++,
                               update_every);
 
@@ -1051,8 +1040,8 @@ void ebpf_socket_send_apps_data()
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bandwidth");
         // We multiply by 0.008, because we read bytes, but we display bits
-        write_chart_dimension("sent", ebpf_socket_bytes2bits(values->bytes_sent));
         write_chart_dimension("received", ebpf_socket_bytes2bits(values->bytes_received));
+        write_chart_dimension("sent", ebpf_socket_bytes2bits(values->bytes_sent));
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_sendmsg");
@@ -2125,9 +2114,9 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
     }
 
     ebpf_write_chart_cmd(type,
-                         NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_RECV,
+                         NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH,
                          "",
-                         "Bits received.",
+                         "Bandwidth.",
                          EBPF_COMMON_UNITS_KILOBITS,
                          NETDATA_CGROUP_NET_GROUP,
                          NETDATA_EBPF_CHART_TYPE_LINE,
@@ -2137,22 +2126,8 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                          NETDATA_EBPF_MODULE_NAME_SOCKET);
     ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
-    fprintf(stdout, "DIMENSION bandwidth '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
-
-    ebpf_write_chart_cmd(type,
-                         NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_SENT,
-                         "",
-                         "Bits sent.",
-                         EBPF_COMMON_UNITS_KILOBITS,
-                         NETDATA_CGROUP_NET_GROUP,
-                         NETDATA_EBPF_CHART_TYPE_LINE,
-                         NETDATA_CGROUP_SOCKET_BYTES_SEND_CONTEXT,
-                         NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
-                         update_every,
-                         NETDATA_EBPF_MODULE_NAME_SOCKET);
-    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
-    ebpf_commit_label();
-    fprintf(stdout, "DIMENSION bandwidth '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+    fprintf(stdout, "DIMENSION received '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+    fprintf(stdout, "DIMENSION sent '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
     ebpf_write_chart_cmd(type,
                          NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_TCP_RECV_CALLS,
@@ -2265,16 +2240,11 @@ static void ebpf_obsolete_specific_socket_charts(char *type, int update_every)
                                   update_every);
     }
 
-    ebpf_write_chart_obsolete(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_RECV,
+    ebpf_write_chart_obsolete(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH,
                               "",
-                              "Bits received",
+                              "Bandwidth.",
                               EBPF_COMMON_UNITS_KILOBITS, NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
-
-    ebpf_write_chart_obsolete(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_SENT, "","Bits sent",
-                              EBPF_COMMON_UNITS_KILOBITS, NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_TCP_RECV_CALLS, "",
@@ -2328,13 +2298,9 @@ static void ebpf_send_specific_socket_data(char *type, ebpf_socket_publish_apps_
         ebpf_write_end_chart();
     }
 
-    ebpf_write_begin_chart(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_RECV, "");
-    write_chart_dimension("bandwidth",
-                          (long long) ebpf_socket_bytes2bits(values->bytes_received));
-    ebpf_write_end_chart();
-
-    ebpf_write_begin_chart(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_SENT, "");
-    write_chart_dimension("bandwidth", (long long) ebpf_socket_bytes2bits(values->bytes_sent));
+    ebpf_write_begin_chart(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH, "");
+    write_chart_dimension("received", (long long) ebpf_socket_bytes2bits(values->bytes_received));
+    write_chart_dimension("sent", (long long) ebpf_socket_bytes2bits(values->bytes_sent));
     ebpf_write_end_chart();
 
     ebpf_write_begin_chart(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_TCP_RECV_CALLS, "");
@@ -2395,32 +2361,18 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .dimension = "connections"
     };
 
-    static ebpf_systemd_args_t data_bandwith_recv = {
-        .title = "Bits received",
+    static ebpf_systemd_args_t data_bandwidth = {
+        .title = "Bandwidth.",
         .units = EBPF_COMMON_UNITS_KILOBITS,
         .family = NETDATA_APPS_NET_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20082,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
-        .context = NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT,
+        .context = NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH,
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
-        .suffix = NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_RECV,
-        .dimension = "bandwidth"
-    };
-
-    static ebpf_systemd_args_t data_bandwith_sent = {
-        .title = "Bits sent",
-        .units = EBPF_COMMON_UNITS_KILOBITS,
-        .family = NETDATA_APPS_NET_GROUP,
-        .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
-        .order = 20083,
-        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
-        .context = NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT,
-        .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
-        .update_every = 0,
-        .suffix = NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_SENT,
-        .dimension = "bandwidth"
+        .suffix = NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH,
+        .dimension = "received,sent"
     };
 
     static ebpf_systemd_args_t data_tcp_cleanup = {
@@ -2494,8 +2446,8 @@ static void ebpf_create_systemd_socket_charts(int update_every)
     };
 
     if (!data_tcp_v4.update_every)
-        data_tcp_v4.update_every = data_tcp_v6.update_every = data_bandwith_recv.update_every =
-        data_bandwith_sent.update_every = data_tcp_cleanup.update_every = data_tcp_sendmsg.update_every =
+        data_tcp_v4.update_every = data_tcp_v6.update_every = data_bandwidth.update_every =
+        data_tcp_cleanup.update_every = data_tcp_sendmsg.update_every =
         data_tcp_retransmit.update_every = data_udp_send.update_every = data_udp_recv.update_every = update_every;
 
     ebpf_cgroup_target_t *w;
@@ -2503,8 +2455,8 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         if (unlikely(!w->systemd || w->flags & NETDATA_EBPF_SERVICES_HAS_SOCKET_CHART))
             continue;
 
-        data_tcp_v4.id = data_tcp_v6.id = data_bandwith_recv.id =
-        data_bandwith_sent.id = data_tcp_cleanup.id = data_tcp_sendmsg.id =
+        data_tcp_v4.id = data_tcp_v6.id = data_bandwidth.id =
+        data_tcp_cleanup.id = data_tcp_sendmsg.id =
         data_tcp_retransmit.id = data_udp_send.id = data_udp_recv.id = w->name;
 
         ebpf_create_charts_on_systemd(&data_tcp_v4);
@@ -2512,8 +2464,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
             ebpf_create_charts_on_systemd(&data_tcp_v6);
         }
 
-        ebpf_create_charts_on_systemd(&data_bandwith_recv);
-        ebpf_create_charts_on_systemd(&data_bandwith_sent);
+        ebpf_create_charts_on_systemd(&data_bandwidth);
 
         ebpf_create_charts_on_systemd(&data_tcp_cleanup);
 
@@ -2552,12 +2503,9 @@ static void ebpf_send_systemd_socket_charts()
             ebpf_write_end_chart();
         }
 
-        ebpf_write_begin_chart(ect->name, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_SENT, "");
-        write_chart_dimension("bandwidth", (long long)ect->publish_socket.bytes_sent);
-        ebpf_write_end_chart();
-
-        ebpf_write_begin_chart(ect->name, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_RECV, "");
-        write_chart_dimension("bandwidth", (long long)ect->publish_socket.bytes_received);
+        ebpf_write_begin_chart(ect->name, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH, "");
+        write_chart_dimension("received", (long long)ect->publish_socket.bytes_received);
+        write_chart_dimension("sent", (long long)ect->publish_socket.bytes_sent);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(ect->name, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_TCP_SEND_CALLS, "");
