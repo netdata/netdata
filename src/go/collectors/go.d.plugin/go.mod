@@ -10,14 +10,14 @@ require (
 	github.com/Wing924/ltsv v0.3.1
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
-	github.com/axiomhq/hyperloglog v0.0.0-20240319100328-84253e514e02
+	github.com/axiomhq/hyperloglog v0.0.0-20240507144631-af9851f82b27
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/docker/docker v27.0.2+incompatible
-	github.com/facebook/time v0.0.0-20240419201005-e4f24e18edf7
+	github.com/docker/docker v27.0.3+incompatible
+	github.com/facebook/time v0.0.0-20240626113945-18207c5d8ddc
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.8.1
@@ -43,7 +43,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/tidwall/gjson v1.17.1
 	github.com/valyala/fastjson v1.6.4
-	github.com/vmware/govmomi v0.37.3
+	github.com/vmware/govmomi v0.38.0
 	go.mongodb.org/mongo-driver v1.16.0
 	golang.org/x/net v0.26.0
 	golang.org/x/text v0.16.0
