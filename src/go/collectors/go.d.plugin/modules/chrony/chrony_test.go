@@ -240,9 +240,10 @@ func prepareChronyWithMock(m *mockClient) *Chrony {
 }
 
 type mockClient struct {
-	errOnTracking bool
-	errOnActivity bool
-	closeCalled   bool
+	errOnTracking    bool
+	errOnActivity    bool
+	errOnServerStats bool
+	closeCalled      bool
 }
 
 func (m *mockClient) Tracking() (*chrony.ReplyTracking, error) {
@@ -283,6 +284,30 @@ func (m *mockClient) Activity() (*chrony.ReplyActivity, error) {
 			Unresolved:   1,
 		},
 	}
+	return &reply, nil
+}
+
+func (m *mockClient) ServerStats() (*serverStats, error) {
+	if m.errOnServerStats {
+		return nil, errors.New("mockClient.ServerStats call error")
+	}
+
+	reply := serverStats{
+		v3: &chrony.ServerStats3{
+			NTPHits:            10,
+			NKEHits:            10,
+			CMDHits:            10,
+			NTPDrops:           1,
+			NKEDrops:           1,
+			CMDDrops:           1,
+			LogDrops:           1,
+			NTPAuthHits:        10,
+			NTPInterleavedHits: 10,
+			NTPTimestamps:      0,
+			NTPSpanSeconds:     0,
+		},
+	}
+
 	return &reply, nil
 }
 
