@@ -512,6 +512,7 @@ extern char *netdata_configured_host_prefix;
 #include "functions_evloop/functions_evloop.h"
 #include "query_progress/progress.h"
 #include "safe_fork/safe_fork.h"
+#include "spawn_server/spawn_server.h"
 
 // BEWARE: this exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
