@@ -14,9 +14,9 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
-	"github.com/netdata/netdata/go/plugins/logger"
 
 	"gopkg.in/yaml.v2"
 )

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 )
 
 func newTargetClassificator(cfg []ClassifyRuleConfig) (*targetClassificator, error) {

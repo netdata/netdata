@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/safewriter"
-	"github.com/netdata/netdata/go/plugins/logger"
 
 	"github.com/mattn/go-isatty"
 	"github.com/muesli/cancelreader"
