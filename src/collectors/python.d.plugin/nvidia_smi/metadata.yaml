@@ -1,5 +1,5 @@
 # This collector will not appear in documentation, as the go version is preferred,
-# /src/go/collectors/go.d.plugin/modules/nvidia_smi/README.md
+# /src/go/plugin/go.d/modules/nvidia_smi/README.md
 #
 # meta:
 #   plugin_name: python.d.plugin
