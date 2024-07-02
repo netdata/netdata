@@ -87,6 +87,18 @@ struct rrdcalc {
     size_t labels_version;
     struct rrdset *rrdset;
 
+    // ------------------------------------------------------------------------
+    // the chart for maintaining the status history of this alert
+
+    struct {
+        struct rrdset *rrdset;
+        struct rrddim *value;
+        struct rrddim *undefined;
+        struct rrddim *clear;
+        struct rrddim *warning;
+        struct rrddim *critical;
+    } history;
+
     struct rrdcalc *next;
     struct rrdcalc *prev;
 };

@@ -378,6 +378,8 @@ static void rrdcalc_free_internals(RRDCALC *rc) {
 
     string_freez(rc->info);
     string_freez(rc->summary);
+
+    rrdcalc_history_chart_destroy(rc);
 }
 
 static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *rrdhost __maybe_unused) {
