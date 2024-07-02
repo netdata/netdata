@@ -29,7 +29,7 @@ COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'charts.d.plugin', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'python.d.plugin', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'collectors' / 'go.d.plugin' / 'modules', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'modules', True),
 ]
 
 DEPLOY_SOURCES = [

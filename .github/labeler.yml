@@ -75,7 +75,7 @@ area/collectors:
       - changed-files:
           - any-glob-to-any-file:
               - src/collectors/**
-              - src/go/collectors/go.d.plugin/**
+              - src/go/**
 
 collectors/plugins.d:
   - any:
@@ -141,7 +141,7 @@ collectors/go.d:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - src/go/collectors/go.d.plugin/**
+              - src/go/**
 
 collectors/idlejitter:
   - any:

@@ -2358,7 +2358,7 @@ install(TARGETS netdatacli
 #
 
 if(ENABLE_PLUGIN_GO)
-    add_go_target(go-plugin go.d.plugin src/go/collectors/go.d.plugin cmd/godplugin)
+    add_go_target(go-plugin go.d.plugin src/go cmd/godplugin)
 
     install(PROGRAMS ${CMAKE_BINARY_DIR}/go.d.plugin
             COMPONENT plugin-go
@@ -2943,14 +2943,14 @@ install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
 # go.d.plugin
 #
 if(ENABLE_PLUGIN_GO)
-    install(FILES src/go/collectors/go.d.plugin/config/go.d.conf
+    install(FILES src/go/plugin/go.d/config/go.d.conf
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d)
 
     install(DIRECTORY
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d)
-    file(GLOB GO_CONF_FILES src/go/collectors/go.d.plugin/config/go.d/*.conf)
+    file(GLOB GO_CONF_FILES src/go/plugin/go.d/config/go.d/*.conf)
     install(FILES ${GO_CONF_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d)
@@ -2958,7 +2958,7 @@ if(ENABLE_PLUGIN_GO)
     install(DIRECTORY
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/sd)
-    file(GLOB GO_SD_CONF_FILES src/go/collectors/go.d.plugin/config/go.d/sd/*.conf)
+    file(GLOB GO_SD_CONF_FILES src/go/plugin/go.d/config/go.d/sd/*.conf)
     install(FILES ${GO_SD_CONF_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/sd)
