@@ -24,6 +24,7 @@ static struct proc_module {
     {.name = "PerflibMemory",       .dim = "PerflibMemory",           .func = do_PerflibMemory},
     {.name = "PerflibStorage",      .dim = "PerflibStorage",          .func = do_PerflibStorage},
     {.name = "PerflibNetwork",      .dim = "PerflibNetwork",          .func = do_PerflibNetwork},
+    {.name = "PerflibObjects",      .dim = "PerflibObjects",          .func = do_PerflibObjects},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}
