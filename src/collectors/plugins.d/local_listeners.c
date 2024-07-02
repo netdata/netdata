@@ -291,7 +291,16 @@ int main(int argc, char **argv) {
         }
     }
 
+    SPAWN_SERVER *spawn_server = spawn_server_create(local_sockets_spawn_server_callback, argc, argv);
+    if(spawn_server == NULL) {
+        fprintf(stderr, "Cannot create spawn server.\n");
+        exit(1);
+    }
+    ls.spawn_server = spawn_server;
+
     local_sockets_process(&ls);
+
+    spawn_server_destroy(spawn_server);
 
     getrusage(RUSAGE_SELF, &ended);
 

@@ -4,6 +4,8 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+static SPAWN_SERVER *spawn_srv = NULL;
+
 #define ENABLE_DETAILED_VIEW
 
 #define LOCAL_SOCKETS_EXTENDED_MEMBERS struct { \
@@ -495,6 +497,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                 .max_errors = 10,
                 .max_concurrent_namespaces = 5,
             },
+            .spawn_server = spawn_srv,
             .stats = { 0 },
             .sockets_hashtable = { 0 },
             .local_ips_hashtable = { 0 },
@@ -937,6 +940,12 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     uc = system_usernames_cache_init();
 
+    spawn_srv = spawn_server_create(local_sockets_spawn_server_callback, argc, argv);
+    if(spawn_srv == NULL) {
+        fprintf(stderr, "Cannot create spawn server.\n");
+        exit(1);
+    }
+
     // ----------------------------------------------------------------------------------------------------------------
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
@@ -951,6 +960,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
             network_viewer_function("123", buf2, &stop_monotonic_ut, &cancelled,
                                     NULL, HTTP_ACCESS_ALL, NULL, NULL);
 //        }
+
+        spawn_server_destroy(spawn_srv);
         exit(1);
     }
 
@@ -990,6 +1001,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
             send_newline_ut = 0;
         }
     }
+
+    spawn_server_destroy(spawn_srv);
+    spawn_srv = NULL;
 
     return 0;
 }

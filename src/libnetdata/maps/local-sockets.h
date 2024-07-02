@@ -65,31 +65,36 @@ struct local_port;
 struct local_socket_state;
 typedef void (*local_sockets_cb_t)(struct local_socket_state *state, struct local_socket *n, void *data);
 
+struct local_sockets_config {
+    bool listening;
+    bool inbound;
+    bool outbound;
+    bool local;
+    bool tcp4;
+    bool tcp6;
+    bool udp4;
+    bool udp6;
+    bool pid;
+    bool cmdline;
+    bool comm;
+    bool uid;
+    bool namespaces;
+    bool tcp_info;
+
+    size_t max_errors;
+    size_t max_concurrent_namespaces;
+
+    local_sockets_cb_t cb;
+    void *data;
+
+    const char *host_prefix;
+
+    // internal use
+    uint64_t net_ns_inode;
+};
+
 typedef struct local_socket_state {
-    struct {
-        bool listening;
-        bool inbound;
-        bool outbound;
-        bool local;
-        bool tcp4;
-        bool tcp6;
-        bool udp4;
-        bool udp6;
-        bool pid;
-        bool cmdline;
-        bool comm;
-        bool uid;
-        bool namespaces;
-        bool tcp_info;
-
-        size_t max_errors;
-        size_t max_concurrent_namespaces;
-
-        local_sockets_cb_t cb;
-        void *data;
-
-        const char *host_prefix;
-    } config;
+    struct local_sockets_config config;
 
     struct {
         size_t mnl_sends;
@@ -101,6 +106,9 @@ typedef struct local_socket_state {
         size_t pid_fds_parse_failed;
         size_t errors_encountered;
     } stats;
+
+    bool spawn_server_is_mine;
+    SPAWN_SERVER *spawn_server;
 
 #ifdef HAVE_LIBMNL
     bool use_nl;
@@ -214,6 +222,8 @@ typedef struct local_socket {
     LOCAL_SOCKETS_EXTENDED_MEMBERS
 #endif
 } LOCAL_SOCKET;
+
+static inline void local_sockets_spawn_server_callback(SPAWN_REQUEST *request);
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -972,6 +982,8 @@ static inline void local_sockets_detect_directions(LS_STATE *ls) {
 // --------------------------------------------------------------------------------------------------------------------
 
 static inline void local_sockets_init(LS_STATE *ls) {
+    ls->config.host_prefix = netdata_configured_host_prefix;
+
     spinlock_init(&ls->spinlock);
 
     simple_hashtable_init_NET_NS(&ls->ns_hashtable, 1024);
@@ -993,9 +1005,36 @@ static inline void local_sockets_init(LS_STATE *ls) {
         65536,
         65536,
         NULL, NULL, NULL, false, true);
+
+    memset(&ls->stats, 0, sizeof(ls->stats));
+
+#ifdef HAVE_LIBMNL
+    ls->use_nl = false;
+    ls->nl = NULL;
+    ls->tmp_protocol = 0;
+    local_sockets_libmnl_init(ls);
+#endif
+
+    if(ls->config.namespaces && ls->spawn_server == NULL) {
+        ls->spawn_server = spawn_server_create(local_sockets_spawn_server_callback, 0, NULL);
+        ls->spawn_server_is_mine = true;
+    }
+    else
+        ls->spawn_server_is_mine = false;
 }
 
 static inline void local_sockets_cleanup(LS_STATE *ls) {
+
+    if(ls->spawn_server_is_mine) {
+        spawn_server_destroy(ls->spawn_server);
+        ls->spawn_server = NULL;
+        ls->spawn_server_is_mine = false;
+    }
+
+#ifdef HAVE_LIBMNL
+    local_sockets_libmnl_cleanup(ls);
+#endif
+
     // free the sockets hashtable data
     for(SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_first_read_only_LOCAL_SOCKET(&ls->sockets_hashtable);
          sl;
@@ -1106,6 +1145,51 @@ static inline void local_sockets_send_to_parent(struct local_socket_state *ls __
             local_sockets_log(ls, "failed to write cmdline to pipe");
 }
 
+static inline void local_sockets_spawn_server_callback(SPAWN_REQUEST *request) {
+    LS_STATE ls = { 0 };
+    ls.config = *((struct local_sockets_config *)request->data);
+
+    // we don't need these inside namespaces
+    ls.config.cmdline = false;
+    ls.config.comm = false;
+    ls.config.pid = false;
+    ls.config.namespaces = false;
+
+    // initialize local sockets
+    local_sockets_init(&ls);
+
+    ls.config.host_prefix = ""; // we need the /proc of the container
+
+    struct local_sockets_child_work cw = {
+        .net_ns_inode = ls.proc_self_net_ns_inode,
+        .fd = request->fds[1], // stdout
+    };
+
+    ls.config.cb = local_sockets_send_to_parent;
+    ls.config.data = &cw;
+    ls.proc_self_net_ns_inode = ls.config.net_ns_inode;
+
+    // switch namespace using the custom fd passed via the spawn server
+    if (setns(request->fds[3], CLONE_NEWNET) == -1) {
+        local_sockets_log(&ls, "failed to switch network namespace at child process using fd %d", request->fds[3]);
+        exit(EXIT_FAILURE);
+    }
+
+    // read all sockets from /proc
+    local_sockets_read_all_system_sockets(&ls);
+
+    // send all sockets to parent
+    local_sockets_foreach_local_socket_call_cb(&ls);
+
+    // send the terminating socket
+    struct local_socket zero = {
+        .net_ns_inode = ls.config.net_ns_inode,
+    };
+    local_sockets_send_to_parent(&ls, &zero, &cw);
+
+    exit(EXIT_SUCCESS);
+}
+
 static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, struct pid_socket *ps) {
     char filename[1024];
     snprintfz(filename, sizeof(filename), "%s/proc/%d/ns/net", ls->config.host_prefix, ps->pid);
@@ -1130,89 +1214,35 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         return false;
     }
 
-    int pipefd[2];
-    if (pipe(pipefd) != 0) {
-        local_sockets_log(ls, "cannot create pipe");
+    if(ls->spawn_server == NULL) {
         close(fd);
+        local_sockets_log(ls, "spawn server is not available");
         return false;
     }
 
-    // if we don't get the spinlock, then other threads may have locks on strings,
-    // dictionaries, etc, preventing us from finishing.
-    spinlock_lock(&ls->spinlock);
-    pid_t pid = safe_fork();
-    spinlock_unlock(&ls->spinlock);
+    struct local_sockets_config config = ls->config;
+    config.net_ns_inode = ps->net_ns_inode;
+    SPAWN_INSTANCE *instance = spawn_server_exec(ls->spawn_server, STDERR_FILENO, fd, NULL, &config, sizeof(config), SPAWN_INSTANCE_TYPE_CALLBACK);
+    close(fd); fd = -1;
 
-    if (pid == 0) {
-        // Child process
-        close(pipefd[0]);
-
-        // local_sockets_log(ls, "child is here for inode %"PRIu64" and namespace %"PRIu64, ps->inode, ps->net_ns_inode);
-
-        struct local_sockets_child_work cw = {
-            .net_ns_inode = ps->net_ns_inode,
-            .fd = pipefd[1],
-        };
-
-        ls->config.host_prefix = ""; // we need the /proc of the container
-        ls->config.cb = local_sockets_send_to_parent;
-        ls->config.data = &cw;
-        ls->config.cmdline = false; // we have these already
-        ls->config.comm = false; // we have these already
-        ls->config.pid = false; // we have these already
-        ls->config.namespaces = false;
-        ls->proc_self_net_ns_inode = ps->net_ns_inode;
-
-
-        // switch namespace
-        if (setns(fd, CLONE_NEWNET) == -1) {
-            local_sockets_log(ls, "failed to switch network namespace at child process");
-            exit(EXIT_FAILURE);
-        }
-
-#ifdef HAVE_LIBMNL
-        local_sockets_libmnl_cleanup(ls);
-        local_sockets_libmnl_init(ls);
-#endif
-
-        // read all sockets from /proc
-        local_sockets_read_all_system_sockets(ls);
-
-        // send all sockets to parent
-        local_sockets_foreach_local_socket_call_cb(ls);
-
-        // send the terminating socket
-        struct local_socket zero = {
-            .net_ns_inode = ps->net_ns_inode,
-        };
-        local_sockets_send_to_parent(ls, &zero, &cw);
-
-#ifdef HAVE_LIBMNL
-        local_sockets_libmnl_cleanup(ls);
-#endif
-
-        close(pipefd[1]); // Close write end of pipe
-        exit(EXIT_SUCCESS);
+    if(instance == NULL) {
+        local_sockets_log(ls, "cannot create spawn instance");
+        return false;
     }
-    // parent
-
-    close(fd);
-    close(pipefd[1]);
 
     size_t received = 0;
     struct local_socket buf;
-    while(read(pipefd[0], &buf, sizeof(buf)) == sizeof(buf)) {
+    while(read(instance->read_fd, &buf, sizeof(buf)) == sizeof(buf)) {
         size_t len = 0;
-        if(read(pipefd[0], &len, sizeof(len)) != sizeof(len))
+        if(read(instance->read_fd, &len, sizeof(len)) != sizeof(len))
             local_sockets_log(ls, "failed to read cmdline length from pipe");
 
         if(len) {
             char cmdline[len + 1];
-            if(read(pipefd[0], cmdline, len) != (ssize_t)len)
+            if(read(instance->read_fd, cmdline, len) != (ssize_t)len)
                 local_sockets_log(ls, "failed to read cmdline from pipe");
             else {
                 cmdline[len] = '\0';
-
                 buf.cmdline = string_strdupz(cmdline);
             }
         }
@@ -1250,15 +1280,7 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         spinlock_unlock(&ls->spinlock);
     }
 
-    close(pipefd[0]);
-
-    int status;
-    waitpid(pid, &status, 0);
-    if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
-        local_sockets_log(ls, "Child exited with status %d", WEXITSTATUS(status));
-    else if (WIFSIGNALED(status))
-        local_sockets_log(ls, "Child terminated by signal %d", WTERMSIG(status));
-
+    spawn_server_stop(ls->spawn_server, instance);
     return received > 0;
 }
 
@@ -1352,13 +1374,6 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
 // --------------------------------------------------------------------------------------------------------------------
 
 static inline void local_sockets_process(LS_STATE *ls) {
-
-#ifdef HAVE_LIBMNL
-    local_sockets_libmnl_init(ls);
-#endif
-
-    ls->config.host_prefix = netdata_configured_host_prefix;
-
     // initialize our hashtables
     local_sockets_init(ls);
 
@@ -1378,10 +1393,6 @@ static inline void local_sockets_process(LS_STATE *ls) {
 
     // free all memory
     local_sockets_cleanup(ls);
-
-#ifdef HAVE_LIBMNL
-    local_sockets_libmnl_cleanup(ls);
-#endif
 }
 
 static inline void ipv6_address_to_txt(struct in6_addr *in6_addr, char *dst) {

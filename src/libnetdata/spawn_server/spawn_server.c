@@ -7,6 +7,23 @@
 static size_t spawn_server_id = 0;
 
 // --------------------------------------------------------------------------------------------------------------------
+
+static void set_process_name(SPAWN_SERVER *server, const char *comm __maybe_unused) {
+
+#ifdef HAVE_SYS_PRCTL_H
+    // Set the process name (comm)
+    prctl(PR_SET_NAME, comm, 0, 0, 0);
+#endif
+
+    if(server->argv && server->argv[0] && server->argv0_size) {
+        size_t len = strlen(comm);
+        strncpyz(server->argv[0], comm, MIN(server->argv0_size, len));
+        while(len < server->argv0_size)
+            server->argv[0][len++] = ' ';
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // the child created by the spawn server
 
 #define STATUS_REPORT_OK     0x0C0FFEE0
@@ -41,9 +58,12 @@ static void spawn_server_send_status_failure(int fd) {
 }
 
 static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *request) {
+    fprintf(stderr, "CHILD: running request %zu on pid %d\n", request->request_id, getpid());
+
     int stdin_fd = request->fds[0];
     int stdout_fd = request->fds[1];
     int stderr_fd = request->fds[2];
+    int custom_fd = request->fds[3]; (void)custom_fd;
 
     if (dup2(stdin_fd, STDIN_FILENO) == -1) {
         spawn_server_send_status_failure(stdout_fd);
@@ -58,9 +78,9 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *request)
         exit(1);
     }
 
-    close(stdin_fd); stdin_fd = STDIN_FILENO;
-    close(stdout_fd); stdout_fd = STDOUT_FILENO;
-    close(stderr_fd); stderr_fd = STDERR_FILENO;
+    close(stdin_fd); stdin_fd = request->fds[0] = STDIN_FILENO;
+    close(stdout_fd); stdout_fd = request->fds[1] = STDOUT_FILENO;
+    close(stderr_fd); stderr_fd = request->fds[2] = STDERR_FILENO;
 
     environ = (char **)request->environment;
 
@@ -95,33 +115,34 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *request)
 
 // Function to encode argv or envp
 static void* encode_argv(const char **argv, size_t *out_size) {
-    size_t total_size = 1; // Start with 1 for the final empty string
-    size_t buffer_size = 128; // Initial buffer size
+    size_t buffer_size = 1024; // Initial buffer size
+    size_t buffer_used = 0;
     char *buffer = mallocz(buffer_size);
 
-    char *ptr = buffer;
     if(argv) {
         for (const char **p = argv; *p != NULL; p++) {
             if (strlen(*p) == 0)
                 continue; // Skip empty strings
 
             size_t len = strlen(*p) + 1;
-            total_size += len;
+            size_t wanted_size = buffer_used + len + 1;
 
-            if (total_size > buffer_size) {
+            if (wanted_size >= buffer_size) {
                 buffer_size *= 2;
-                char *new_buffer = reallocz(buffer, buffer_size);
-                ptr = new_buffer + (ptr - buffer);
-                buffer = new_buffer;
+
+                if(buffer_size < wanted_size)
+                    buffer_size = wanted_size;
+
+                buffer = reallocz(buffer, buffer_size);
             }
 
-            memcpy(ptr, *p, len);
-            ptr += len;
+            memcpy(&buffer[buffer_used], *p, len);
+            buffer_used += len;
         }
     }
 
-    *ptr = '\0'; // Final empty string
-    *out_size = total_size;
+    buffer[buffer_used++] = '\0'; // Final empty string
+    *out_size = buffer_used;
 
     return buffer;
 }
@@ -150,7 +171,7 @@ static const char** decode_argv(const char *buffer, size_t size) {
 // --------------------------------------------------------------------------------------------------------------------
 // Sending and receiving requests
 
-static bool spawn_server_send_request(SPAWN_REQUEST *request) {
+static bool spawn_server_send_request_unsafe(SPAWN_REQUEST *request) {
     bool ret = false;
 
     size_t env_size = 0;
@@ -217,12 +238,17 @@ static bool spawn_server_send_request(SPAWN_REQUEST *request) {
 
     memcpy(CMSG_DATA(cmsg), request->fds, sizeof(int) * SPAWN_SERVER_TRANSFER_FDS);
 
-    if (sendmsg(request->socket, &msg, 0) < 0) {
+    int rc = sendmsg(request->socket, &msg, 0);
+
+    if (rc < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN PARENT: Failed to sendmsg() request to spawn server.");
         goto cleanup;
     }
-    else
+    else {
         ret = true;
+        fprintf(stderr, "PARENT: sent request %zu on socket %d (fds: %d, %d, %d, %d) from pid %d\n",
+            request->request_id, request->socket, request->fds[0], request->fds[1], request->fds[2], request->fds[3], gettid());
+    }
 
 cleanup:
     freez(encoded_env);
@@ -230,7 +256,7 @@ cleanup:
     return ret;
 }
 
-static void spawn_server_receive_request(SPAWN_SERVER *server) {
+static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     struct msghdr msg = {0};
     struct iovec iov[6];  // Increased size to 6
     char buf[1];
@@ -241,7 +267,7 @@ static void spawn_server_receive_request(SPAWN_SERVER *server) {
     SPAWN_INSTANCE_TYPE type;  // Added this line
     char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)];
     char *envp = NULL, *argv = NULL, *data = NULL;
-    int stdin_fd = -1, stdout_fd = -1, stderr_fd = -1;
+    int stdin_fd = -1, stdout_fd = -1, stderr_fd = -1, custom_fd = -1;
 
     // First recvmsg() to read sizes and control message
     iov[0].iov_base = buf;
@@ -262,7 +288,7 @@ static void spawn_server_receive_request(SPAWN_SERVER *server) {
     msg.msg_control = cmsgbuf;
     msg.msg_controllen = sizeof(cmsgbuf);
 
-    if (recvmsg(server->client_sock, &msg, 0) < 0) {
+    if (recvmsg(sock, &msg, 0) < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: failed to recvmsg() the first part of the request.");
         return;
     }
@@ -272,7 +298,7 @@ static void spawn_server_receive_request(SPAWN_SERVER *server) {
     if (cmsg == NULL || cmsg->cmsg_len != CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
             "SPAWN SERVER: Received invalid control message (expected %zu bytes, received %zu bytes)",
-            CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS), cmsg->cmsg_len);
+            CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS), cmsg?cmsg->cmsg_len:0);
         return;
     }
 
@@ -285,6 +311,7 @@ static void spawn_server_receive_request(SPAWN_SERVER *server) {
     stdin_fd = fds[0];
     stdout_fd = fds[1];
     stderr_fd = fds[2];
+    custom_fd = fds[3];
 
     if (stdin_fd < 0 || stdout_fd < 0 || stderr_fd < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -306,24 +333,34 @@ static void spawn_server_receive_request(SPAWN_SERVER *server) {
     msg.msg_control = NULL;
     msg.msg_controllen = 0;
 
-    ssize_t total_bytes_received = recvmsg(server->client_sock, &msg, 0);
+    ssize_t total_bytes_received = recvmsg(sock, &msg, 0);
     if (total_bytes_received < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: failed to recvmsg() the second part of the request.");
         goto cleanup;
     }
+
+    fprintf(stderr, "SPAWN SERVER: received request %zu (fds: %d, %d, %d, %d)\n", request_id,
+        stdin_fd, stdout_fd, stderr_fd, custom_fd);
 
     pid_t pid = fork();
     if (pid == 0) {
         // In child process
         close(server->server_sock); server->server_sock = -1;
 
+        {
+            char buf[15];
+            snprintfz(buf, sizeof(buf), "chld-%zu-r%zu", server->id, request_id);
+            set_process_name(server, buf);
+        }
+
         SPAWN_REQUEST request = {
             .request_id = request_id,
-            .socket = server->client_sock,
+            .socket = sock,
             .fds = {
                 [0] = stdin_fd,
                 [1] = stdout_fd,
                 [2] = stderr_fd,
+                [3] = custom_fd,
             },
             .environment = decode_argv(envp, env_size),
             .argv = decode_argv(argv, argv_size),
@@ -350,6 +387,7 @@ cleanup:
     if(stdin_fd != -1) close(stdin_fd);
     if(stdout_fd != -1) close(stdout_fd);
     if(stderr_fd != -1) close(stderr_fd);
+    if(custom_fd != -1) close(custom_fd);
     freez(envp);
     freez(argv);
     freez(data);
@@ -358,10 +396,20 @@ cleanup:
 // --------------------------------------------------------------------------------------------------------------------
 // the spawn server main event loop
 
-volatile sig_atomic_t child_terminated = 0;
-
 static void spawn_server_sigchld_handler(int signo __maybe_unused) {
-    child_terminated = 1;
+    int status;
+    pid_t pid;
+
+    // Loop to check for exited child processes
+    while ((pid = waitpid((pid_t)(-1), &status, WNOHANG)) != -1) {
+        if (pid > 0) {
+            if (WIFEXITED(status))
+                fprintf(stderr, "Child %d exited with status %d\n", pid, WEXITSTATUS(status));
+
+            else if (WIFSIGNALED(status))
+                fprintf(stderr, "Child %d killed by signal %d\n", pid, WTERMSIG(status));
+        }
+    }
 }
 
 static void spawn_server_event_loop(SPAWN_SERVER *server) {
@@ -389,25 +437,18 @@ static void spawn_server_event_loop(SPAWN_SERVER *server) {
     close(pipe_fd); pipe_fd = server->pipe[1] = -1;
 
     while (1) {
-        server->client_sock = accept(server->server_sock, NULL, NULL);
-        if (server->client_sock == -1) {
-            if (errno == EINTR) {
-                // Check if we need to handle any child termination
-                if (child_terminated) {
-                    while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) { ; }
-                    child_terminated = 0;
-                }
+        int client_sock = accept(server->server_sock, NULL, NULL);
+        if (client_sock == -1) {
+            if (errno == EINTR)
                 continue;
-            }
             else {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: accept() failed");
                 continue;
             }
         }
 
-        spawn_server_receive_request(server);
-        close(server->client_sock);
-        server->client_sock = -1;
+        spawn_server_receive_request(client_sock, server);
+        close(client_sock);
     }
 
     exit(1);
@@ -420,7 +461,6 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
     if(server->pipe[0] != -1) close(server->pipe[0]);
     if(server->pipe[1] != -1) close(server->pipe[1]);
     if(server->server_sock != -1) close(server->server_sock);
-    if(server->client_sock != -1) close(server->client_sock);
 
     if(server->path) {
         unlink(server->path);
@@ -437,8 +477,8 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
 
 static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
     char path[256];
-
-    snprintf(path, sizeof(path), "/tmp/.netdata-spawn-server-%d-%zu.sock", getpid(), __atomic_add_fetch(&spawn_server_id, 1, __ATOMIC_RELAXED));
+    server->id = __atomic_add_fetch(&spawn_server_id, 1, __ATOMIC_RELAXED);
+    snprintf(path, sizeof(path), "/tmp/.netdata-spawn-server-%d-%zu.sock", getpid(), server->id);
     server->path = strdup(path);
 
     if ((server->server_sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -466,13 +506,14 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
     return true;
 }
 
-SPAWN_SERVER* spawn_server_create(spawn_request_callback_t child_callback) {
+SPAWN_SERVER* spawn_server_create(spawn_request_callback_t child_callback, int argc, char **argv) {
     SPAWN_SERVER *server = callocz(1, sizeof(SPAWN_SERVER));
     server->pipe[0] = -1;
     server->pipe[1] = -1;
     server->server_sock = -1;
-    server->client_sock = -1;
     server->cb = child_callback;
+    server->argv = argv;
+    server->argv0_size = (argv && argv[0]) ? strlen(argv[0]) : 0;
 
     if (!spawn_server_create_listening_socket(server))
         goto cleanup;
@@ -485,6 +526,16 @@ SPAWN_SERVER* spawn_server_create(spawn_request_callback_t child_callback) {
     pid_t pid = fork();
     if (pid == 0) {
         // the child - the spawn server
+        if(argc && argv) {
+            for(int i = 1; i < argc ;i++)
+                argv[i][0] = '\0';
+        }
+
+        {
+            char buf[15];
+            snprintfz(buf, sizeof(buf), "spawn-server-%zu", server->id);
+            set_process_name(server, buf);
+        }
         spawn_server_event_loop(server);
     }
     else if (pid > 0) {
@@ -510,22 +561,6 @@ SPAWN_SERVER* spawn_server_create(spawn_request_callback_t child_callback) {
             goto cleanup;
         }
 
-        // Initialize the client socket and connect to the server
-        if ((server->client_sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot create socket() to connect to spawn server.");
-            goto cleanup;
-        }
-
-        struct sockaddr_un server_addr = {
-            .sun_family = AF_UNIX,
-        };
-        strcpy(server_addr.sun_path, server->path);
-
-        if (connect(server->client_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: Cannot connect() to spawn server.");
-            goto cleanup;
-        }
-
         // Initialize the mutex
         spinlock_init(&server->spinlock);
         return server;
@@ -541,12 +576,28 @@ cleanup:
 // --------------------------------------------------------------------------------------------------------------------
 // creating spawn server instances
 
-SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type) {
+SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type) {
     int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 };
 
     SPAWN_INSTANCE *instance = callocz(1, sizeof(SPAWN_INSTANCE));
     instance->read_fd = -1;
     instance->write_fd = -1;
+
+    // Initialize the client socket and connect to the server
+    if ((instance->client_sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot create socket() to connect to spawn server.");
+        goto cleanup;
+    }
+
+    struct sockaddr_un server_addr = {
+        .sun_family = AF_UNIX,
+    };
+    strcpy(server_addr.sun_path, server->path);
+
+    if (connect(instance->client_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: Cannot connect() to spawn server.");
+        goto cleanup;
+    }
 
     if (pipe(pipe_stdin) == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot create stdin pipe()");
@@ -562,11 +613,12 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, const cha
 
     SPAWN_REQUEST request = {
         .request_id = ++server->request_id,
-        .socket = server->client_sock,
+        .socket = instance->client_sock,
         .fds = {
             [0] = pipe_stdin[0],
             [1] = pipe_stdout[1],
             [2] = stderr_fd,
+            [3] = custom_fd,
         },
         .environment = (const char **)environ,
         .argv = argv,
@@ -575,7 +627,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, const cha
         .type = type
     };
 
-    bool sent = spawn_server_send_request(&request);
+    bool sent = spawn_server_send_request_unsafe(&request);
 
     spinlock_unlock(&server->spinlock);
 
@@ -623,6 +675,7 @@ void spawn_server_stop(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *inst
     if(instance->child_pid) kill(instance->child_pid, SIGTERM);
     if(instance->write_fd != -1) close(instance->write_fd);
     if(instance->read_fd != -1) close(instance->read_fd);
+    if(instance->client_sock != -1) close(instance->client_sock);
 
     freez(instance);
 }

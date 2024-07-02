@@ -3,7 +3,7 @@
 #ifndef SPAWN_SERVER_H
 #define SPAWN_SERVER_H
 
-#define SPAWN_SERVER_TRANSFER_FDS 3
+#define SPAWN_SERVER_TRANSFER_FDS 4
 
 typedef enum {
     SPAWN_INSTANCE_TYPE_EXEC = 0,
@@ -14,7 +14,7 @@ typedef enum {
 typedef struct {
     size_t request_id;
     int socket;
-    int fds[SPAWN_SERVER_TRANSFER_FDS]; // 0 = stdin, 1 = stdout, 2 = stderr
+    int fds[SPAWN_SERVER_TRANSFER_FDS]; // 0 = stdin, 1 = stdout, 2 = stderr, 3 = custom
     const char **environment;
     const char **argv;
     const void *data;
@@ -27,6 +27,7 @@ typedef void (*spawn_request_callback_t)(SPAWN_REQUEST *request);
 // the request at the parent process
 typedef struct {
     size_t request_id;
+    int client_sock;
     int write_fd;
     int read_fd;
     pid_t child_pid;
@@ -34,17 +35,23 @@ typedef struct {
 
 // the spawn server at the parent process
 typedef struct {
+    size_t id;
     int pipe[2];
     int server_sock;
-    int client_sock;
     pid_t server_pid;
     char *path;
     size_t request_id;
     SPINLOCK spinlock;
     spawn_request_callback_t cb;
+
+    char **argv;
+    size_t argv0_size;
 } SPAWN_SERVER;
 
-SPAWN_SERVER* spawn_server_create(spawn_request_callback_t child_callback);
+SPAWN_SERVER* spawn_server_create(spawn_request_callback_t child_callback, int argc, char **argv);
 void spawn_server_destroy(SPAWN_SERVER *server);
+
+SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type);
+void spawn_server_stop(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance);
 
 #endif //SPAWN_SERVER_H
