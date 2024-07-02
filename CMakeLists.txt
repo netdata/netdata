@@ -92,6 +92,9 @@ set(OS_MACOS       False)
 set(OS_WINDOWS     False)
 set(ALLOW_PLATFORM_SENSITIVE_OPTIONS True)
 
+set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
+set(BINDIR usr/sbin)
+
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
         set(OS_MACOS True)
         find_library(IOKIT IOKit)
@@ -111,6 +114,16 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
         endif()
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
         set(OS_WINDOWS True)
+
+        if(NOT "${CMAKE_INSTALL_PREFIX}" STREQUAL "/opt/netdata")
+                message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must be set to /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
+        endif()
+
+        if(BUILD_FOR_PACKAGING)
+                set(NETDATA_RUNTIME_PREFIX "/")
+        endif()
+
+        set(BINDIR usr/bin)
         add_definitions(-D_GNU_SOURCE)
 
         if($ENV{CLION_IDE})
@@ -1434,6 +1447,7 @@ elseif(OS_FREEBSD)
 elseif(OS_WINDOWS)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_windows.c
+                src/daemon/winsvc.cc
                 ${WINDOWS_PLUGIN_FILES}
                 ${INTERNAL_COLLECTORS_FILES}
         )
@@ -2279,7 +2293,7 @@ target_link_libraries(systemd-cat-native libnetdata)
 
 install(TARGETS systemd-cat-native
         COMPONENT netdata
-        DESTINATION usr/sbin)
+        DESTINATION "${BINDIR}")
 
 #
 # build log2journal
@@ -2314,7 +2328,7 @@ if(PCRE2_FOUND)
 
         install(TARGETS log2journal
                 COMPONENT netdata
-                DESTINATION usr/sbin)
+                DESTINATION "${BINDIR}")
 
         install(DIRECTORY src/collectors/log2journal/log2journal.d
                 COMPONENT netdata
@@ -2337,7 +2351,7 @@ target_link_libraries(netdatacli libnetdata)
 
 install(TARGETS netdatacli
         COMPONENT netdata
-        DESTINATION usr/sbin)
+        DESTINATION "${BINDIR}")
 
 #
 # Build go.d.plugin
@@ -2354,17 +2368,16 @@ endif()
 #
 # Generate config file
 #
-
-if(NOT CMAKE_INSTALL_PREFIX STREQUAL "")
-  string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+if(NOT NETDATA_RUNTIME_PREFIX STREQUAL "")
+  string(REGEX REPLACE "/$" "" NETDATA_RUNTIME_PREFIX "${NETDATA_RUNTIME_PREFIX}")
 endif()
 
-set(CACHE_DIR "${CMAKE_INSTALL_PREFIX}/var/cache/netdata")
-set(CONFIG_DIR "${CMAKE_INSTALL_PREFIX}/etc/netdata")
-set(LIBCONFIG_DIR "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d")
-set(LOG_DIR "${CMAKE_INSTALL_PREFIX}/var/log/netdata")
-set(PLUGINS_DIR "${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d")
-set(VARLIB_DIR "${CMAKE_INSTALL_PREFIX}/var/lib/netdata")
+set(CACHE_DIR "${NETDATA_RUNTIME_PREFIX}/var/cache/netdata")
+set(CONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/etc/netdata")
+set(LIBCONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/conf.d")
+set(LOG_DIR "${NETDATA_RUNTIME_PREFIX}/var/log/netdata")
+set(PLUGINS_DIR "${NETDATA_RUNTIME_PREFIX}/usr/libexec/netdata/plugins.d")
+set(VARLIB_DIR "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 
 # A non-default value is only used when building Debian packages (/var/lib/netdata/www)
 if(NOT DEFINED WEB_DIR)
@@ -2373,7 +2386,7 @@ else()
   string(REGEX REPLACE "^/" "" WEB_DIR "${WEB_DIR}")
 endif()
 set(WEB_DEST "${WEB_DIR}")
-set(WEB_DIR "${CMAKE_INSTALL_PREFIX}/${WEB_DEST}")
+set(WEB_DIR "${NETDATA_RUNTIME_PREFIX}/${WEB_DEST}")
 
 
 set(CONFIGURE_COMMAND "dummy-configure-command")
@@ -2387,7 +2400,7 @@ configure_file(packaging/cmake/config.cmake.h.in config.h)
 # install
 #
 
-install(TARGETS netdata COMPONENT netdata DESTINATION usr/sbin)
+install(TARGETS netdata COMPONENT netdata DESTINATION "${BINDIR}")
 
 install(DIRECTORY COMPONENT netdata DESTINATION var/cache/netdata)
 install(DIRECTORY COMPONENT netdata DESTINATION var/log/netdata)
@@ -2406,15 +2419,15 @@ install(DIRECTORY COMPONENT netdata DESTINATION usr/lib/netdata/conf.d/schema.d)
 install(DIRECTORY COMPONENT netdata DESTINATION usr/libexec/netdata/plugins.d)
 install(DIRECTORY COMPONENT netdata DESTINATION ${WEB_DEST})
 
-set(libsysdir_POST "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/system")
-set(pkglibexecdir_POST "${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata")
-set(localstatedir_POST "${CMAKE_INSTALL_PREFIX}/var")
-set(sbindir_POST "${CMAKE_INSTALL_PREFIX}/usr/sbin")
-set(configdir_POST "${CMAKE_INSTALL_PREFIX}/etc/netdata")
-set(libconfigdir_POST "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d")
-set(cachedir_POST "${CMAKE_INSTALL_PREFIX}/var/cache/netdata")
-set(registrydir_POST "${CMAKE_INSTALL_PREFIX}/var/lib/netdata/registry")
-set(varlibdir_POST "${CMAKE_INSTALL_PREFIX}/var/lib/netdata")
+set(libsysdir_POST "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/system")
+set(pkglibexecdir_POST "${NETDATA_RUNTIME_PREFIX}/usr/libexec/netdata")
+set(localstatedir_POST "${NETDATA_RUNTIME_PREFIX}/var")
+set(sbindir_POST "${NETDATA_RUNTIME_PREFIX}/${BINDIR}")
+set(configdir_POST "${NETDATA_RUNTIME_PREFIX}/etc/netdata")
+set(libconfigdir_POST "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/conf.d")
+set(cachedir_POST "${NETDATA_RUNTIME_PREFIX}/var/cache/netdata")
+set(registrydir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata/registry")
+set(varlibdir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(netdata_user_POST "${NETDATA_USER}")
 
 # netdata-claim.sh
@@ -2434,7 +2447,7 @@ configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh
         COMPONENT netdata
-        DESTINATION usr/sbin)
+        DESTINATION "${BINDIR}")
 
 #
 # We don't check ENABLE_PLUGIN_CGROUP_NETWORK because rpm builds assume
@@ -3024,6 +3037,73 @@ if(NOT OS_WINDOWS)
                 src/web/gui/v0/index.html
                 COMPONENT netdata
                 DESTINATION ${WEB_DEST}/v0)
+endif()
+
+if(OS_WINDOWS)
+        install(FILES /usr/bin/awk.exe
+                      /usr/bin/bash.exe
+                      /usr/bin/cat.exe
+                      /usr/bin/chown.exe
+                      /usr/bin/curl.exe
+                      /usr/bin/env.exe
+                      /usr/bin/grep.exe
+                      /usr/bin/mkdir.exe
+                      /usr/bin/openssl.exe
+                      /usr/bin/rm.exe
+                      /usr/bin/sed.exe
+                      /usr/bin/sh.exe
+                      /usr/bin/tail.exe
+                      /usr/bin/tr.exe
+                      /usr/bin/uuidgen.exe
+                      /usr/bin/whoami.exe
+                DESTINATION "${BINDIR}")
+
+        install(FILES /usr/bin/msys-2.0.dll
+                      /usr/bin/msys-asn1-8.dll
+                      /usr/bin/msys-brotlicommon-1.dll
+                      /usr/bin/msys-brotlidec-1.dll
+                      /usr/bin/msys-brotlienc-1.dll
+                      /usr/bin/msys-com_err-1.dll
+                      /usr/bin/msys-crypt-2.dll
+                      /usr/bin/msys-crypto-3.dll
+                      /usr/bin/msys-curl-4.dll
+                      /usr/bin/msys-gcc_s-seh-1.dll
+                      /usr/bin/msys-gmp-10.dll
+                      /usr/bin/msys-gssapi-3.dll
+                      /usr/bin/msys-hcrypto-4.dll
+                      /usr/bin/msys-heimbase-1.dll
+                      /usr/bin/msys-heimntlm-0.dll
+                      /usr/bin/msys-hx509-5.dll
+                      /usr/bin/msys-iconv-2.dll
+                      /usr/bin/msys-idn2-0.dll
+                      /usr/bin/msys-intl-8.dll
+                      /usr/bin/msys-krb5-26.dll
+                      /usr/bin/msys-lz4-1.dll
+                      /usr/bin/msys-mpfr-6.dll
+                      /usr/bin/msys-ncursesw6.dll
+                      /usr/bin/msys-nghttp2-14.dll
+                      /usr/bin/msys-pcre-1.dll
+                      /usr/bin/msys-protobuf-32.dll
+                      /usr/bin/msys-psl-5.dll
+                      /usr/bin/msys-readline8.dll
+                      /usr/bin/msys-roken-18.dll
+                      /usr/bin/msys-sqlite3-0.dll
+                      /usr/bin/msys-ssh2-1.dll
+                      /usr/bin/msys-ssl-3.dll
+                      /usr/bin/msys-stdc++-6.dll
+                      /usr/bin/msys-unistring-5.dll
+                      /usr/bin/msys-uuid-1.dll
+                      /usr/bin/msys-uv-1.dll
+                      /usr/bin/msys-wind-0.dll
+                      /usr/bin/msys-z.dll
+                      /usr/bin/msys-zstd-1.dll
+                DESTINATION "${BINDIR}")
+
+        # Make bash & netdata happy
+        install(DIRECTORY DESTINATION tmp)
+
+        # Make curl work with ssl
+        install(DIRECTORY /usr/ssl DESTINATION usr)
 endif()
 
 include(Packaging)

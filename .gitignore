@@ -197,3 +197,6 @@ build/
 # ignore rules for go plugin code
 src/go/plugin/go.d/bin/
 src/go/plugin/go.d/vendor
+
+# ignore nsis installer
+packaging/utils/netdata-installer.exe

@@ -34,4 +34,6 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
 
 int string_unittest(size_t entries);
 
+void string_init(void);
+
 #endif

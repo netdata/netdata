@@ -935,7 +935,13 @@ void dbengine_init(char *hostname) {
         config_set_number(CONFIG_SECTION_DB, "dbengine tier 0 disk space MB", default_multidb_disk_quota_mb);
     }
 
+#ifdef OS_WINDOWS
+    // FIXME: for whatever reason joining the initialization threads
+    // fails on Windows.
+    bool parallel_initialization = false;
+#else
     bool parallel_initialization = (storage_tiers <= (size_t)get_netdata_cpus()) ? true : false;
+#endif
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
 
