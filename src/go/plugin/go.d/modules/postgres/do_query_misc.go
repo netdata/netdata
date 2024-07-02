@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"strconv"
 
-	"github.com/jackc/pgx/v4/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 func (p *Postgres) doQueryServerVersion() (int, error) {

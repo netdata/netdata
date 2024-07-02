@@ -14,8 +14,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 
-	"github.com/jackc/pgx/v4/stdlib"
-	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 //go:embed "config_schema.json"
