@@ -343,7 +343,6 @@ prepare_cmake_options() {
   enable_feature PLUGIN_LOGS_MANAGEMENT "${ENABLE_LOGS_MANAGEMENT:-0}"
   enable_feature LOGS_MANAGEMENT_TESTS "${ENABLE_LOGS_MANAGEMENT_TESTS:-0}"
 
-  enable_feature ACLK "${ENABLE_CLOUD:-1}"
   enable_feature CLOUD "${ENABLE_CLOUD:-1}"
   enable_feature BUNDLED_JSONC "${NETDATA_BUILD_JSON_C:-0}"
   enable_feature DBENGINE "${ENABLE_DBENGINE:-1}"
