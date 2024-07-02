@@ -1739,18 +1739,13 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: connections
-            - name: app.ebpf_sock_bytes_sent
+            - name: app.ebpf_sock_total_bandwidth
               description: Bytes sent
               unit: "kilobits/s"
               chart_type: stacked
               dimensions:
-                - name: bandwidth
-            - name: app.ebpf_sock_bytes_received
-              description: bytes received
-              unit: "kilobits/s"
-              chart_type: stacked
-              dimensions:
-                - name: bandwidth
+                - name: received
+                - name: sent
             - name: app.ebpf_call_tcp_sendmsg
               description: Calls for tcp_sendmsg
               unit: "calls/s"
@@ -1797,24 +1792,13 @@ modules:
               chart_type: line
               dimensions:
                 - name: connected_v6
-            - name: cgroup.net_bytes_recv
+            - name: cgroup.net_bandwidth_total
               description: Bytes received
-              unit: "calls/s"
+              unit: "kilobits/s"
               chart_type: line
               dimensions:
                 - name: received
-            - name: cgroup.net_bytes_sent
-              description: Bytes sent
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
                 - name: sent
-            - name: cgroup.net_tcp_recv
-              description: Calls to tcp_cleanup_rbuf.
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: received
             - name: cgroup.net_tcp_send
               description: Calls to tcp_sendmsg.
               unit: "calls/s"
@@ -1845,18 +1829,13 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
-            - name: services.net_bytes_recv
+            - name: services.net_total_bandwidth
               description: Bytes received
               unit: "kilobits/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per systemd service
-            - name: services.net_bytes_sent
-              description: Bytes sent
-              unit: "kilobits/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per systemd service
+                - name: received
+                - name: sent
             - name: services.net_tcp_recv
               description: Calls to tcp_cleanup_rbuf.
               unit: "calls/s"

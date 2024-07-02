@@ -279,9 +279,9 @@ static void ebpf_obsolete_specific_dc_charts(char *type, int update_every);
  */
 static void ebpf_obsolete_dc_services(ebpf_module_t *em, char *id)
 {
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_DC_HIT_CHART,
+                              "",
                               "Percentage of files inside directory cache",
                               EBPF_COMMON_UNITS_PERCENTAGE,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
@@ -290,9 +290,9 @@ static void ebpf_obsolete_dc_services(ebpf_module_t *em, char *id)
                               21200,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_DC_REFERENCE_CHART,
+                              "",
                               "Count file access",
                               EBPF_COMMON_UNITS_FILES,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
@@ -301,9 +301,9 @@ static void ebpf_obsolete_dc_services(ebpf_module_t *em, char *id)
                               21201,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_DC_REQUEST_NOT_CACHE_CHART,
+                              "",
                               "Files not present inside directory cache",
                               EBPF_COMMON_UNITS_FILES,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
@@ -312,9 +312,9 @@ static void ebpf_obsolete_dc_services(ebpf_module_t *em, char *id)
                               21202,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_DC_REQUEST_NOT_FOUND_CHART,
+                              "",
                               "Files not found",
                               EBPF_COMMON_UNITS_FILES,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
@@ -1139,22 +1139,22 @@ static void ebpf_send_systemd_dc_charts()
             continue;
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_DC_HIT_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_DC_HIT_CHART, "");
         write_chart_dimension("percentage", (long long) ect->publish_dc.ratio);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_DC_REFERENCE_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_DC_REFERENCE_CHART, "");
         write_chart_dimension("files", (long long) ect->publish_dc.cache_access);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_DC_REQUEST_NOT_CACHE_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_DC_REQUEST_NOT_CACHE_CHART, "");
         value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
                 (long long )ect->publish_dc.curr.file_system - (long long)ect->publish_dc.prev.file_system;
         ect->publish_dc.prev.file_system = ect->publish_dc.curr.file_system;
         write_chart_dimension("files", (long long) value);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_DC_REQUEST_NOT_FOUND_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_DC_REQUEST_NOT_FOUND_CHART, "");
         value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
                 (long long)ect->publish_dc.curr.not_found - (long long)ect->publish_dc.prev.not_found;
 
