@@ -104,7 +104,7 @@ typedef struct parser {
 #ifdef ENABLE_HTTPS
     NETDATA_SSL *ssl_output;
 #endif
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
     void *h2o_ctx;                  // if set we use h2o_stream functions to send data
 #endif
 
