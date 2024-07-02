@@ -44,7 +44,7 @@ modules:
         list:
           - title: Enable in go.d.conf.
             description: |
-              This collector is disabled by default. You need to explicitly enable it in [go.d.conf](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d.conf).
+              This collector is disabled by default. You need to explicitly enable it in [go.d.conf](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d.conf).
               
               From the documentation for the OpenVPN Management Interface:
               > Currently, the OpenVPN daemon can at most support a single management client any one time.
@@ -84,7 +84,7 @@ modules:
                 Metrics of users matching the selector will be collected.
 
                 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
-                - Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#supported-format).
+                - Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format).
                 - Syntax:
 
                   ```yaml
