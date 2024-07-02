@@ -1,0 +1,61 @@
+198.51.100.1:82 203.0.113.1 - - [22/Mar/2009:09:30:31 +0100] "GET /example.net HTTP/2" 301 4715 4113 174 465 https TLSv1.2 ECDHE-RSA-AES256-SHA dark beer
+Unmatched! The rat the cat the dog chased killed ate the malt!
+2001:db8:1ce::1:82 203.0.113.1 - - [22/Mar/2009:09:30:31 +0100] "GET /example.net HTTP/1.1" 301 1130 1202 409 450 https TLSv1 DHE-RSA-AES256-SHA light beer
+198.51.100.1:83 203.0.113.1 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.org HTTP/1.1" 201 4020 1217 492 135 https TLSv1.2 PSK-RC4-SHA light wine
+test.example.org:82 localhost - - [22/Mar/2009:09:30:31 +0100] "GET /example.other HTTP/2.0" 401 3784 2349 266 63 http TLSv1 ECDHE-RSA-AES256-SHA dark wine
+localhost:83 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "GET /example.net HTTP/1.1" 201 2149 3834 178 197 https TLSv1.1 AES256-SHA dark wine
+198.51.100.1:80 2001:db8:2ce:1 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.com HTTP/1.1" 200 1442 4125 23 197 https TLSv1.3 DHE-RSA-AES256-SHA light wine
+test.example.com:82 203.0.113.1 - - [22/Mar/2009:09:30:31 +0100] "POST /example.net HTTP/2.0" 300 4134 3965 259 296 https TLSv1.3 PSK-RC4-SHA dark wine
+test.example.com:84 localhost - - [22/Mar/2009:09:30:31 +0100] "GET /example.com HTTP/1.1" 401 1224 3352 135 468 http SSLv2 PSK-RC4-SHA light wine
+localhost:82 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "POST /example.org HTTP/2.0" 200 2504 4754 58 371 http TLSv1.1 DHE-RSA-AES256-SHA dark beer
+Unmatched! The rat the cat the dog chased killed ate the malt!
+Unmatched! The rat the cat the dog chased killed ate the malt!
+2001:db8:1ce::1:84 203.0.113.1 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.other HTTP/1.1" 200 4898 2787 398 476 http SSLv2 DHE-RSA-AES256-SHA dark beer
+test.example.org:83 localhost - - [22/Mar/2009:09:30:31 +0100] "GET /example.other HTTP/2.0" 100 4957 1848 324 158 https TLSv1.2 AES256-SHA dark wine
+test.example.org:80 localhost - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.com HTTP/2" 301 1752 1717 75 317 https SSLv3 PSK-RC4-SHA dark wine
+Unmatched! The rat the cat the dog chased killed ate the malt!
+test.example.com:82 localhost - - [22/Mar/2009:09:30:31 +0100] "GET /example.com HTTP/2.0" 301 3799 4120 71 17 http TLSv1.3 ECDHE-RSA-AES256-SHA dark beer
+198.51.100.1:80 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "POST /example.com HTTP/1.1" 101 1870 3945 392 323 http TLSv1.1 PSK-RC4-SHA light beer
+test.example.com:84 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "POST /example.other HTTP/2.0" 200 1261 3535 52 271 https TLSv1.1 DHE-RSA-AES256-SHA dark wine
+test.example.com:83 2001:db8:2ce:1 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.org HTTP/1.1" 101 3228 3545 476 168 http TLSv1.1 AES256-SHA light beer
+test.example.com:80 203.0.113.1 - - [22/Mar/2009:09:30:31 +0100] "POST /example.other HTTP/2" 300 4731 1574 362 184 https SSLv2 ECDHE-RSA-AES256-SHA light wine
+198.51.100.1:80 203.0.113.2 - - [22/Mar/2009:09:30:31 +0100] "POST /example.org HTTP/1.1" 300 4868 1803 23 388 https TLSv1.3 DHE-RSA-AES256-SHA dark beer
+Unmatched! The rat the cat the dog chased killed ate the malt!
+test.example.org:83 localhost - - [22/Mar/2009:09:30:31 +0100] "GET /example.other HTTP/1.1" 100 3744 3546 296 437 http SSLv2 DHE-RSA-AES256-SHA light beer
+test.example.org:80 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "GET /example.com HTTP/2.0" 401 4858 1493 151 240 http SSLv2 AES256-SHA light wine
+Unmatched! The rat the cat the dog chased killed ate the malt!
+test.example.com:81 2001:db8:2ce:1 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.other HTTP/2.0" 300 1367 4284 45 443 https TLSv1.1 AES256-SHA light beer
+localhost:81 2001:db8:2ce:1 - - [22/Mar/2009:09:30:31 +0100] "GET /example.net HTTP/2" 100 4392 4982 143 110 http SSLv3 AES256-SHA light beer
+2001:db8:1ce::1:84 localhost - - [22/Mar/2009:09:30:31 +0100] "POST /example.other HTTP/1.1" 101 4606 3311 410 273 https TLSv1 PSK-RC4-SHA dark beer
+198.51.100.1:81 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.net HTTP/2.0" 100 1163 1526 10 186 https SSLv2 AES256-SHA light beer
+test.example.org:83 localhost - - [22/Mar/2009:09:30:31 +0100] "POST /example.other HTTP/2" 301 3262 3789 144 124 https TLSv1.3 DHE-RSA-AES256-SHA light wine
+198.51.100.1:84 203.0.113.1 - - [22/Mar/2009:09:30:31 +0100] "GET /example.org HTTP/2.0" 400 1365 1447 325 186 http TLSv1.2 PSK-RC4-SHA dark beer
+Unmatched! The rat the cat the dog chased killed ate the malt!
+2001:db8:1ce::1:84 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "GET /example.net HTTP/1.1" 301 4546 4409 295 153 http SSLv3 ECDHE-RSA-AES256-SHA light beer
+localhost:81 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "GET /example.other HTTP/2.0" 300 2297 3318 139 227 https TLSv1 ECDHE-RSA-AES256-SHA dark wine
+localhost:81 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "GET /example.net HTTP/1.1" 100 4671 4285 371 7 https SSLv3 ECDHE-RSA-AES256-SHA dark beer
+test.example.org:83 203.0.113.2 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.other HTTP/2" 400 3651 1135 172 159 https TLSv1.1 DHE-RSA-AES256-SHA light beer
+localhost:82 2001:db8:2ce:1 - - [22/Mar/2009:09:30:31 +0100] "POST /example.com HTTP/1.1" 101 3958 3959 350 121 https SSLv2 DHE-RSA-AES256-SHA dark beer
+localhost:84 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "GET /example.org HTTP/2.0" 200 1652 3813 190 11 https SSLv3 AES256-SHA dark wine
+test.example.org:83 2001:db8:2ce:1 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.other HTTP/2" 101 1228 2344 251 366 https TLSv1 ECDHE-RSA-AES256-SHA light beer
+test.example.org:80 203.0.113.2 - - [22/Mar/2009:09:30:31 +0100] "POST /example.net HTTP/2.0" 200 1860 3118 187 419 https TLSv1 PSK-RC4-SHA light wine
+Unmatched! The rat the cat the dog chased killed ate the malt!
+localhost:82 localhost - - [22/Mar/2009:09:30:31 +0100] "POST /example.other HTTP/1.1" 401 4518 3837 18 219 http TLSv1.3 DHE-RSA-AES256-SHA dark beer
+localhost:81 2001:db8:2ce:1 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.net HTTP/2" 201 2108 2472 257 470 http TLSv1.1 PSK-RC4-SHA dark beer
+2001:db8:1ce::1:82 localhost - - [22/Mar/2009:09:30:31 +0100] "GET /example.other HTTP/2" 101 2020 1076 262 106 https TLSv1.3 PSK-RC4-SHA light wine
+localhost:83 2001:db8:2ce:1 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.other HTTP/1.1" 100 4815 3052 49 322 https TLSv1.3 DHE-RSA-AES256-SHA light beer
+2001:db8:1ce::1:82 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "GET /example.net HTTP/2" 300 1642 4001 421 194 https TLSv1 PSK-RC4-SHA light wine
+Unmatched! The rat the cat the dog chased killed ate the malt!
+2001:db8:1ce::1:84 2001:db8:2ce:1 - - [22/Mar/2009:09:30:31 +0100] "GET /example.other HTTP/2" 201 3805 2597 25 187 http TLSv1.1 AES256-SHA dark wine
+2001:db8:1ce::1:84 localhost - - [22/Mar/2009:09:30:31 +0100] "POST /example.org HTTP/2.0" 301 3435 1760 474 318 https TLSv1.2 ECDHE-RSA-AES256-SHA light wine
+localhost:84 2001:db8:2ce:1 - - [22/Mar/2009:09:30:31 +0100] "POST /example.other HTTP/2.0" 101 1911 4082 356 301 https TLSv1 DHE-RSA-AES256-SHA light beer
+2001:db8:1ce::1:80 203.0.113.2 - - [22/Mar/2009:09:30:31 +0100] "GET /example.com HTTP/2" 100 2536 1664 115 474 http SSLv3 PSK-RC4-SHA dark beer
+Unmatched! The rat the cat the dog chased killed ate the malt!
+test.example.com:82 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "GET /example.com HTTP/1.1" 401 3757 3987 441 469 http SSLv2 ECDHE-RSA-AES256-SHA dark wine
+Unmatched! The rat the cat the dog chased killed ate the malt!
+2001:db8:1ce::1:83 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.com HTTP/1.1" 400 1221 4244 232 421 https TLSv1.1 ECDHE-RSA-AES256-SHA dark wine
+localhost:84 203.0.113.1 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.com HTTP/1.1" 101 2001 2405 6 140 http TLSv1 DHE-RSA-AES256-SHA light wine
+Unmatched! The rat the cat the dog chased killed ate the malt!
+198.51.100.1:81 localhost - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.org HTTP/2.0" 400 4442 4396 64 49 https TLSv1.1 AES256-SHA light beer
+2001:db8:1ce::1:81 2001:db8:2ce:2 - - [22/Mar/2009:09:30:31 +0100] "HEAD /example.org HTTP/1.1" 401 1461 4623 46 47 https TLSv1.3 ECDHE-RSA-AES256-SHA light beer
+Unmatched! The rat the cat the dog chased killed ate the malt!
