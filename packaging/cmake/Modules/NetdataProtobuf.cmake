@@ -3,6 +3,8 @@
 # Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+include(NetdataAbseil)
+
 # Prepare a vendored copy of Protobuf for use with Netdata.
 function(netdata_bundle_protobuf)
         include(FetchContent)
@@ -26,18 +28,12 @@ function(netdata_bundle_protobuf)
         set(FETCHCONTENT_FULLY_DISCONNECTED Off)
 
         if(NEED_ABSL)
-                set(ABSL_PROPAGATE_CXX_STD On)
-                set(ABSL_ENABLE_INSTALL Off)
-                set(BUILD_SHARED_LIBS Off)
+                if(HAVE_ABSEIL AND NOT BUNDLED_ABSEIL)
+                        message(FATAL_ERROR "Using a system copy of Abseil is not supported if vendoring Protobuf")
+                endif()
 
-                message(STATUS "Preparing bundled Abseil (required by bundled Protobuf)")
-                FetchContent_Declare(absl
-                        GIT_REPOSITORY https://github.com/abseil/abseil-cpp
-                        GIT_TAG ${ABSL_TAG}
-                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
-                )
-                FetchContent_MakeAvailable_NoInstall(absl)
-                message(STATUS "Finished preparing bundled Abseil")
+                netdata_bundle_abseil()
+                set(BUNDLED_ABSEIL PARENT_SCOPE)
         endif()
 
         set(protobuf_INSTALL Off)
