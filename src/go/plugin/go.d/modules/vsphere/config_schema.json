@@ -220,6 +220,9 @@
     "method": {
       "ui:widget": "hidden"
     },
+    "update_every": {
+      "ui:help": "**Important**: vSphere generates real-time statistics every 20 seconds. Setting this value lower won't improve data accuracy. For larger vSphere deployments, consider increasing this value to ensure complete data collection during each cycle. To find the optimal value, run the collector in debug mode and see how long it takes to collect metrics."
+    },
     "url": {
       "ui:placeholder": "https://203.0.113.0"
     },
