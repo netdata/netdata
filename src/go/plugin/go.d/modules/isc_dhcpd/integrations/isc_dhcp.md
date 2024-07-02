@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/isc_dhcpd/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/isc_dhcpd/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/isc_dhcpd/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/isc_dhcpd/metadata.yaml"
 sidebar_label: "ISC DHCP"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/DNS and DHCP Servers"
@@ -128,7 +128,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 List of IP pools to monitor.
 
-- IP range syntax: see [supported formats](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/iprange#supported-formats).
+- IP range syntax: see [supported formats](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/iprange#supported-formats).
 - Syntax:
 
 ```yaml

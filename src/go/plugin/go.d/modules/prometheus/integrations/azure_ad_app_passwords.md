@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/azure_ad_app_passwords.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/prometheus/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/prometheus/integrations/azure_ad_app_passwords.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/prometheus/metadata.yaml"
 sidebar_label: "Azure AD App passwords"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Cloud Provider Managed"
@@ -37,7 +37,6 @@ This collector supports collecting metrics from multiple instances of this integ
 #### Auto-Detection
 
 By default, it detects instances running on the local host by trying to connect to known ports that are [allocated to exporters](https://github.com/prometheus/prometheus/wiki/Default-port-allocations).
-The full list of endpoints is available in the collector's [configuration file](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d/prometheus.conf).
 
 
 #### Limits
@@ -138,7 +137,7 @@ The following options can be defined globally: update_every, autodetection_retry
 This option allows you to filter out unwanted time series. Only metrics matching the selector will be collected.
 
 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
-- Pattern syntax: [selector](/src/go/plugin/pkgctor/README.md).
+- Pattern syntax: [selector](/src/go/plugin/go.d/pkg/prometheus/selector/README.md).
 - Option syntax:
 
 ```yaml

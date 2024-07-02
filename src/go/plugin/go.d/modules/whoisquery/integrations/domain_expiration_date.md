@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/whoisquery/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/whoisquery/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/whoisquery/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/whoisquery/metadata.yaml"
 sidebar_label: "Domain expiration date"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Synthetic Checks"

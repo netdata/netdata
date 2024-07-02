@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/smartctl/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/smartctl/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/smartctl/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/smartctl/metadata.yaml"
 sidebar_label: "S.M.A.R.T."
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Hardware Devices and Sensors"
@@ -127,7 +127,7 @@ Netdata requires the `SYS_RAWIO` capability and access to the storage devices to
 
 > **Multiple Devices**: These examples only show mapping of one device (/dev/sda). You'll need to add additional `--device` options (in docker run) or entries in the `devices` list (in docker-compose.yml) for each storage device you want Netdata's smartctl collector to monitor.
 
-> **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/nvme#readme) to monitor NVMe devices.
+> **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nvme#readme) to monitor NVMe devices.
 
 
 

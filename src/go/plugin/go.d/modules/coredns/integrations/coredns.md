@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/coredns/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/coredns/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/coredns/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/coredns/metadata.yaml"
 sidebar_label: "CoreDNS"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/DNS and DHCP Servers"
@@ -177,7 +177,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 Metrics of servers matching the selector will be collected.
 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
-- Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#supported-format).
+- Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format).
 - Syntax:
 
 ```yaml
@@ -195,7 +195,7 @@ per_server_stats:
 
 Metrics of zones matching the selector will be collected.
 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
-- Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#supported-format).
+- Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format).
 - Syntax:
 
 ```yaml

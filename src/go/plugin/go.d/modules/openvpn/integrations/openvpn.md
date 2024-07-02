@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/openvpn/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/openvpn/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/openvpn/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/openvpn/metadata.yaml"
 sidebar_label: "OpenVPN"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/VPNs"
@@ -99,7 +99,7 @@ There are no alerts configured by default for this integration.
 
 #### Enable in go.d.conf.
 
-This collector is disabled by default. You need to explicitly enable it in [go.d.conf](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d.conf).
+This collector is disabled by default. You need to explicitly enable it in [go.d.conf](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d.conf).
 
 From the documentation for the OpenVPN Management Interface:
 > Currently, the OpenVPN daemon can at most support a single management client any one time.

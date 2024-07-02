@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/httpcheck/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/httpcheck/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/httpcheck/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/httpcheck/metadata.yaml"
 sidebar_label: "HTTP Endpoints"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Synthetic Checks"
@@ -117,7 +117,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | headers_match | This option defines a set of rules that check for specific key-value pairs in the HTTP headers of the response. | [] | no |
 | headers_match.exclude | This option determines whether the rule should check for the presence of the specified key-value pair or the absence of it. | no | no |
 | headers_match.key | The exact name of the HTTP header to check for. |  | yes |
-| headers_match.value | The [pattern](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#supported-format) to match against the value of the specified header. |  | no |
+| headers_match.value | The [pattern](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format) to match against the value of the specified header. |  | no |
 | cookie_file | Path to cookie file. See [cookie file format](https://everything.curl.dev/http/cookies/fileformat). |  | no |
 | timeout | HTTP request timeout. | 1 | no |
 | username | Username for basic HTTP authentication. |  | no |
@@ -189,7 +189,7 @@ jobs:
 
 ##### With `header_match`
 
-Example configurations with `header_match`. See the value [pattern](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#supported-format) syntax.
+Example configurations with `header_match`. See the value [pattern](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format) syntax.
 
 <details open><summary>Config</summary>
 
