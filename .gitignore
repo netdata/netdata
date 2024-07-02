@@ -199,3 +199,6 @@ src/go/collectors/go.d.plugin/mocks/springboot2/.gradle/
 src/go/collectors/go.d.plugin/mocks/tmp/*
 !src/go/collectors/go.d.plugin/mocks/tmp/.gitkeep
 src/go/collectors/go.d.plugin/vendor
+
+# ignore nsis installer
+packaging/utils/netdata-installer.exe

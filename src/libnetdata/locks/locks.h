@@ -6,19 +6,34 @@
 #include "../libnetdata.h"
 #include "../clocks/clocks.h"
 
+// #ifdef OS_WINDOWS
+// #define SPINLOCK_IMPL_WITH_MUTEX
+// #endif
+
 typedef pthread_mutex_t netdata_mutex_t;
 #define NETDATA_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 
-typedef struct netdata_spinlock {
-    bool locked;
-#ifdef NETDATA_INTERNAL_CHECKS
-    pid_t locker_pid;
-    size_t spins;
+#ifdef SPINLOCK_IMPL_WITH_MUTEX
+    typedef struct netdata_spinlock
+    {
+        netdata_mutex_t inner;
+    } SPINLOCK;
+#else
+    typedef struct netdata_spinlock
+    {
+        bool locked;
+    #ifdef NETDATA_INTERNAL_CHECKS
+        pid_t locker_pid;
+        size_t spins;
+    #endif
+    } SPINLOCK;
 #endif
-} SPINLOCK;
 
-#define NETDATA_SPINLOCK_INITIALIZER \
-    { .locked = false }
+#ifdef SPINLOCK_IMPL_WITH_MUTEX
+#define NETDATA_SPINLOCK_INITIALIZER { .inner = PTHREAD_MUTEX_INITIALIZER }
+#else
+#define NETDATA_SPINLOCK_INITIALIZER { .locked = false }
+#endif
 
 void spinlock_init(SPINLOCK *spinlock);
 void spinlock_lock(SPINLOCK *spinlock);
