@@ -11,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/executable"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
 // DefaultDir returns default service directory in a way used by runit sv(8) tool.

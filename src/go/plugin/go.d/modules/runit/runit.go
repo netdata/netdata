@@ -10,7 +10,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 //go:embed "config_schema.json"

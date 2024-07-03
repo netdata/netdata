@@ -8,7 +8,7 @@ package runit
 import (
 	"fmt"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 type (

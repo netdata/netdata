@@ -13,7 +13,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/plugins/logger"
 )
 
 func newSvCliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *svCliExec {

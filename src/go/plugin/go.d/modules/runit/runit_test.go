@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/executable"
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
