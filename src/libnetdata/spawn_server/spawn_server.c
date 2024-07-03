@@ -601,8 +601,11 @@ SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t chi
     if (pid == 0) {
         // the child - the spawn server
         if(argc && argv) {
-            for(int i = 1; i < argc ;i++)
-                argv[i][0] = '\0';
+            // replace with spaces all parameters found
+            for(int i = 1; i < argc ;i++) {
+                char *s = &argv[i][0];
+                while(*s != '\0') *s++ = ' ';
+            }
         }
 
         {
