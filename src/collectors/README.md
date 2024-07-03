@@ -50,7 +50,7 @@ specifics of what a given collector does.
 -   **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
     The Go orchestrator is in active development.
 
-    -   [go.d.plugin](/src/go/collectors/go.d.plugin/README.md): An orchestrator for data
+    -   [go.d.plugin](/src/go/plugin/go.d/README.md): An orchestrator for data
         collection modules written in `go`.
 
     -   [python.d.plugin](/src/collectors/python.d.plugin/README.md): 

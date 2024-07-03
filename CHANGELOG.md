@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- go.d postgres github.com/jackc/pgx/v5 [\#18062](https://github.com/netdata/netdata/pull/18062) ([ilyam8](https://github.com/ilyam8))
+- fix prometeus export: missing comma before "instance" label [\#18061](https://github.com/netdata/netdata/pull/18061) ([ilyam8](https://github.com/ilyam8))
+- go.d vsphere add update\_every ui:help [\#18060](https://github.com/netdata/netdata/pull/18060) ([ilyam8](https://github.com/ilyam8))
+- restructure go.d [\#18058](https://github.com/netdata/netdata/pull/18058) ([ilyam8](https://github.com/ilyam8))
 - freeipmi: add "no-restart" \(workaround \#17931\) [\#18057](https://github.com/netdata/netdata/pull/18057) ([ilyam8](https://github.com/ilyam8))
 - ndsudo add 'chronyc serverstats' [\#18056](https://github.com/netdata/netdata/pull/18056) ([ilyam8](https://github.com/ilyam8))
 - go.d chrony add serverstats query \(disabled for now\) [\#18055](https://github.com/netdata/netdata/pull/18055) ([ilyam8](https://github.com/ilyam8))
@@ -71,6 +75,7 @@
 - Detect on startup if the netdata-meta.db file is not a valid database file [\#17924](https://github.com/netdata/netdata/pull/17924) ([stelfrag](https://github.com/stelfrag))
 - Fix small typo [\#17875](https://github.com/netdata/netdata/pull/17875) ([stelfrag](https://github.com/stelfrag))
 - sysinfo \(WinAPI\) [\#17857](https://github.com/netdata/netdata/pull/17857) ([thiagoftsm](https://github.com/thiagoftsm))
+- Run the agent as a Windows service. [\#17766](https://github.com/netdata/netdata/pull/17766) ([vkalintiris](https://github.com/vkalintiris))
 - add Win CPU interrupts [\#17753](https://github.com/netdata/netdata/pull/17753) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.46.1](https://github.com/netdata/netdata/tree/v1.46.1) (2024-06-21)
@@ -402,11 +407,6 @@
 - remove python.d/fail2ban [\#17502](https://github.com/netdata/netdata/pull/17502) ([ilyam8](https://github.com/ilyam8))
 - add go.d fail2ban [\#17501](https://github.com/netdata/netdata/pull/17501) ([ilyam8](https://github.com/ilyam8))
 - better redirect [\#17500](https://github.com/netdata/netdata/pull/17500) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- add fail2ban-client to ndsudo [\#17499](https://github.com/netdata/netdata/pull/17499) ([ilyam8](https://github.com/ilyam8))
-- Windows Support Phase 1 [\#17497](https://github.com/netdata/netdata/pull/17497) ([ktsaou](https://github.com/ktsaou))
-- Update CMake to request new behavior for all policies through v3.28.0. [\#17496](https://github.com/netdata/netdata/pull/17496) ([Ferroin](https://github.com/Ferroin))
-- Fix usage of sha256sum in static builds. [\#17495](https://github.com/netdata/netdata/pull/17495) ([Ferroin](https://github.com/Ferroin))
-- add generic sso authenciation page and SP-initiated SSO on Okta [\#17494](https://github.com/netdata/netdata/pull/17494) ([hugovalente-pm](https://github.com/hugovalente-pm))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 

@@ -22,7 +22,7 @@ Module: sensors
 ## Overview
 
 Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperatures).
-For all other cases use the [Go collector](/src/go/collectors/go.d.plugin/modules/sensors/README.md), which supports multiple jobs, is more efficient and performs calculations on top of the kernel provided values."
+For all other cases use the [Go collector](/src/go/plugin/go.d/modules/sensors/README.md), which supports multiple jobs, is more efficient and performs calculations on top of the kernel provided values."
 
 
 It will provide charts for all configured system sensors, by reading sensors directly from the kernel.
