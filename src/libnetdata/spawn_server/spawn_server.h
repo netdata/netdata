@@ -36,6 +36,7 @@ typedef struct {
 // the spawn server at the parent process
 typedef struct {
     size_t id;
+    const char *name;
     int pipe[2];
     int server_sock;
     pid_t server_pid;
@@ -48,7 +49,7 @@ typedef struct {
     size_t argv0_size;
 } SPAWN_SERVER;
 
-SPAWN_SERVER* spawn_server_create(spawn_request_callback_t child_callback, int argc, char **argv);
+SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t child_callback, int argc, char **argv);
 void spawn_server_destroy(SPAWN_SERVER *server);
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type);
