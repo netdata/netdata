@@ -172,7 +172,7 @@ static const char** decode_argv(const char *buffer, size_t size) {
 // --------------------------------------------------------------------------------------------------------------------
 // Sending and receiving requests
 
-static bool spawn_server_send_request_unsafe(SPAWN_REQUEST *request) {
+static bool spawn_server_send_request(SPAWN_REQUEST *request) {
     bool ret = false;
 
     size_t env_size = 0;
@@ -636,8 +636,6 @@ SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t chi
             goto cleanup;
         }
 
-        // Initialize the mutex
-        spinlock_init(&server->spinlock);
         return server;
     }
 
@@ -693,10 +691,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         goto cleanup;
     }
 
-    spinlock_lock(&server->spinlock);
-
     SPAWN_REQUEST request = {
-        .request_id = ++server->request_id,
+        .request_id = __atomic_add_fetch(&server->request_id, 1, __ATOMIC_RELAXED),
         .socket = instance->client_sock,
         .fds = {
             [0] = pipe_stdin[0],
@@ -711,11 +707,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         .type = type
     };
 
-    bool sent = spawn_server_send_request_unsafe(&request);
-
-    spinlock_unlock(&server->spinlock);
-
-    if (!sent)
+    if(!spawn_server_send_request(&request))
         goto cleanup;
 
     close(pipe_stdin[0]); pipe_stdin[0] = -1;

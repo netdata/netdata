@@ -42,7 +42,6 @@ typedef struct {
     pid_t server_pid;
     char *path;
     size_t request_id;
-    SPINLOCK spinlock;
     spawn_request_callback_t cb;
 
     char **argv;
