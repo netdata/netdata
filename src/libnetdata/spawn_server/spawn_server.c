@@ -540,6 +540,31 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
     return true;
 }
 
+static void replace_stdio_with_dev_null() {
+    int dev_null_fd = open("/dev/null", O_RDWR);
+    if (dev_null_fd == -1) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to open /dev/null: %s", strerror(errno));
+        return;
+    }
+
+    // Redirect stdin (fd 0)
+    if (dup2(dev_null_fd, STDIN_FILENO) == -1) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to redirect stdin to /dev/null: %s", strerror(errno));
+        close(dev_null_fd);
+        return;
+    }
+
+    // Redirect stdout (fd 1)
+    if (dup2(dev_null_fd, STDOUT_FILENO) == -1) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to redirect stdout to /dev/null: %s", strerror(errno));
+        close(dev_null_fd);
+        return;
+    }
+
+    // Close the original /dev/null file descriptor
+    close(dev_null_fd);
+}
+
 SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t child_callback, int argc, char **argv) {
     SPAWN_SERVER *server = callocz(1, sizeof(SPAWN_SERVER));
     server->pipe[0] = -1;
@@ -585,6 +610,8 @@ SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t chi
             snprintfz(buf, sizeof(buf), "spawn-%s", server->name);
             set_process_name(server, buf);
         }
+
+        replace_stdio_with_dev_null();
         spawn_server_event_loop(server);
     }
     else if (pid > 0) {
@@ -623,6 +650,15 @@ cleanup:
 
 // --------------------------------------------------------------------------------------------------------------------
 // creating spawn server instances
+
+void spawn_server_stop(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
+    if(instance->child_pid) kill(instance->child_pid, SIGTERM);
+    if(instance->write_fd != -1) close(instance->write_fd);
+    if(instance->read_fd != -1) close(instance->read_fd);
+    if(instance->client_sock != -1) close(instance->client_sock);
+
+    freez(instance);
+}
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type) {
     int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 };
@@ -683,10 +719,10 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         goto cleanup;
 
     close(pipe_stdin[0]); pipe_stdin[0] = -1;
-    instance->write_fd = pipe_stdin[1];
+    instance->write_fd = pipe_stdin[1]; pipe_stdin[1] = -1;
 
     close(pipe_stdout[1]); pipe_stdout[1] = -1;
-    instance->read_fd = pipe_stdout[0];
+    instance->read_fd = pipe_stdout[0]; pipe_stdout[0] = -1;
 
     struct status_report sr = { 0 };
     if(read(instance->read_fd, &sr, sizeof(sr)) != sizeof(sr)) {
@@ -715,15 +751,6 @@ cleanup:
     if (pipe_stdin[1] >= 0) close(pipe_stdin[1]);
     if (pipe_stdout[0] >= 0) close(pipe_stdout[0]);
     if (pipe_stdout[1] >= 0) close(pipe_stdout[1]);
-    freez(instance);
+    spawn_server_stop(server, instance);
     return NULL;
-}
-
-void spawn_server_stop(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
-    if(instance->child_pid) kill(instance->child_pid, SIGTERM);
-    if(instance->write_fd != -1) close(instance->write_fd);
-    if(instance->read_fd != -1) close(instance->read_fd);
-    if(instance->client_sock != -1) close(instance->client_sock);
-
-    freez(instance);
 }
