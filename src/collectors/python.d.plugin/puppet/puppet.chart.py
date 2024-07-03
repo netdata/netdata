@@ -75,7 +75,7 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.url = 'https://{0}:8140'.format(socket.getfqdn())
+        self.url = self.configuration.get('url', 'https://{0}:8140'.format(socket.getfqdn()))
 
     def _get_data(self):
         # NOTE: there are several ways to retrieve data
