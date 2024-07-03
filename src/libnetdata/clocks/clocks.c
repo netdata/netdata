@@ -368,6 +368,35 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
     return dt;
 }
 
+#ifdef OS_WINDOWS
+
+#include "windows.h"
+
+void sleep_usec_with_now(usec_t usec, usec_t started_ut)
+{
+    if (!started_ut)
+        started_ut = now_realtime_usec();
+
+    usec_t end_ut = started_ut + usec;
+    usec_t remaining_ut = usec;
+
+    timeBeginPeriod(1);
+
+    while (remaining_ut >= 1000)
+    {
+        DWORD sleep_ms = (DWORD) (remaining_ut / USEC_PER_MS);
+        Sleep(sleep_ms);
+
+        usec_t now_ut = now_realtime_usec();
+        if (now_ut >= end_ut)
+            break;
+
+        remaining_ut = end_ut - now_ut;
+    }
+
+    timeEndPeriod(1);
+}
+#else
 void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
     // we expect microseconds (1.000.000 per second)
     // but timespec is nanoseconds (1.000.000.000 per second)
@@ -411,6 +440,7 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
         }
     }
 }
+#endif
 
 static inline collected_number uptime_from_boottime(void) {
 #ifdef CLOCK_BOOTTIME_IS_AVAILABLE

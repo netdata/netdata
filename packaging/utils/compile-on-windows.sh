@@ -16,7 +16,8 @@ install_dependencies() {
         msys/pcre2-devel mingw64/mingw-w64-x86_64-pcre2 ucrt64/mingw-w64-ucrt-x86_64-pcre2 \
         msys/brotli-devel mingw64/mingw-w64-x86_64-brotli ucrt64/mingw-w64-ucrt-x86_64-brotli \
         msys/ccache ucrt64/mingw-w64-ucrt-x86_64-ccache mingw64/mingw-w64-x86_64-ccache \
-        mingw64/mingw-w64-x86_64-go ucrt64/mingw-w64-ucrt-x86_64-go
+        mingw64/mingw-w64-x86_64-go ucrt64/mingw-w64-ucrt-x86_64-go \
+        mingw64/mingw-w64-x86_64-nsis
 }
 
 if [ "${1}" = "install" ]
@@ -52,7 +53,9 @@ fi
     -G Ninja \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-    -DCMAKE_C_FLAGS="-O0 -ggdb -Wall -Wextra -Wno-char-subscripts -Wa,-mbig-obj -pipe -DNETDATA_INTERNAL_CHECKS=1 -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1" \
+    -DCMAKE_C_FLAGS="-fstack-protector-all -O0 -ggdb -Wall -Wextra -Wno-char-subscripts -Wa,-mbig-obj -pipe -DNETDATA_INTERNAL_CHECKS=1 -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1" \
+    -DBUILD_FOR_PACKAGING=On \
+    -DUSE_MOLD=Off \
     -DNETDATA_USER="${USER}" \
     -DDEFAULT_FEATURE_STATE=Off \
     -DENABLE_H2O=Off \

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "analytics.h"
 #include "common.h"
 #include "buildinfo.h"
 
@@ -470,8 +471,6 @@ void analytics_alarms(void)
  */
 void analytics_misc(void)
 {
-    spinlock_init(&analytics_data.spinlock);
-
 #ifdef ENABLE_ACLK
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "true");
     analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");
@@ -1080,4 +1079,9 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
                as_script);
 
     freez(command_to_run);
+}
+
+void analytics_init(void)
+{
+    spinlock_init(&analytics_data.spinlock);
 }

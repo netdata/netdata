@@ -37,10 +37,12 @@
 
 set -e
 
-INSTALL_DIR="/opt"
+if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
+  echo "This script can only be used on a 64-bit x86 Linux system."
+  exit 1
+fi
 
-# the version of coverity to use
-COVERITY_BUILD_VERSION="${COVERITY_BUILD_VERSION:-cov-analysis-linux64-2023.6.2}"
+INSTALL_DIR="/opt"
 
 SCRIPT_SOURCE="$(
     self=${0}
@@ -165,12 +167,18 @@ installit() {
 
   debugrun curl --remote-name --remote-header-name --show-error --location --data "token=${token}&project=${repo}" https://scan.coverity.com/download/linux64
 
-  if [ -f "${COVERITY_BUILD_VERSION}.tar.gz" ]; then
+  if [ -z "${COVERITY_BUILD_VERSION}" ]; then
+    COVERITY_ARCHIVE="$(find  "${TMP_DIR}" -maxdepth 0 -name 'cov-analysis-linux64-*.tar.gz' | cut -f 2 -d '/' | head -n 1)"
+  else
+    COVERITY_ARCHIVE="${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz"
+  fi
+
+  if [ -f "${COVERITY_ARCHIVE}" ]; then
     progress "Installing coverity..."
     cd "${INSTALL_DIR}"
 
-    run sudo tar -z -x -f "${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz" || exit 1
-    rm "${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz"
+    run sudo tar -z -x -f "${COVERITY_ARCHIVE}" || exit 1
+    rm -f "${COVERITY_ARCHIVE}"
     COVERITY_PATH=$(find "${INSTALL_DIR}" -maxdepth 1 -name 'cov*linux*')
     export PATH=${PATH}:${COVERITY_PATH}/bin/
   elif find . -name "*.tar.gz" > /dev/null 2>&1; then

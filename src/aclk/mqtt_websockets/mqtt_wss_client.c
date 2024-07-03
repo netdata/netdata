@@ -314,6 +314,7 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
 
 #define PROXY_CONNECT "CONNECT"
 #define PROXY_HTTP "HTTP/1.1"
+#define PROXY_HTTP10 "HTTP/1.0"
 #define HTTP_ENDLINE "\x0D\x0A"
 #define HTTP_HDR_TERMINATOR "\x0D\x0A\x0D\x0A"
 #define HTTP_CODE_LEN 4
@@ -326,14 +327,16 @@ static int http_parse_reply(mqtt_wss_client client, rbuf_t buf)
     int idx;
 
     if (rbuf_memcmp_n(buf, PROXY_HTTP, strlen(PROXY_HTTP))) {
-        mws_error(client->log, "http_proxy expected reply with \"" PROXY_HTTP "\"");
-        return 1;
+        if (rbuf_memcmp_n(buf, PROXY_HTTP10, strlen(PROXY_HTTP10))) {
+            mws_error(client->log, "http_proxy expected reply with \"" PROXY_HTTP "\" or \"" PROXY_HTTP10  "\"");
+            return 1;
+        }
     }
 
     rbuf_bump_tail(buf, strlen(PROXY_HTTP));
 
     if (!rbuf_pop(buf, http_code_s, 1) || http_code_s[0] != 0x20) {
-        mws_error(client->log, "http_proxy missing space after \"" PROXY_HTTP "\"");
+        mws_error(client->log, "http_proxy missing space after \"" PROXY_HTTP "\" or \"" PROXY_HTTP10  "\"");
         return 2;
     }
 

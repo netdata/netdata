@@ -63,7 +63,6 @@ Note: If an administrator has disabled a Personal [service level](/docs/alerts-a
 2. You are presented with:
    - The Personal [service level](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#service-level) notification methods you can manage.
    - The list of Spaces and Rooms inside those where you have access to.
-   - If you're an Administrator, Manager, or Troubleshooter, you'll also see the Rooms from a Space you don't have access to on the **All Rooms** tab, and you can activate notifications for them by joining the Room.
 3. On this modal you will be able to:
    1. **Enable/Disable** the notification method for you; this applies across all Spaces and Rooms.
       - Use the toggle to enable or disable the notification method.

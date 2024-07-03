@@ -14,6 +14,14 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "chronyc-serverstats",
+        .params = "serverstats",
+        .search = {
+            [0] = "chronyc",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "sv-status-all",
         .params = "-p -c $*/* - exec sv status {{serviceDir}}",
         .search = {

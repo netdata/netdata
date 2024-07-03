@@ -90,6 +90,10 @@ set(OS_FREEBSD     False)
 set(OS_LINUX       False)
 set(OS_MACOS       False)
 set(OS_WINDOWS     False)
+set(ALLOW_PLATFORM_SENSITIVE_OPTIONS True)
+
+set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
+set(BINDIR usr/sbin)
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
         set(OS_MACOS True)
@@ -103,8 +107,23 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
         set(OS_LINUX True)
         add_definitions(-D_GNU_SOURCE)
         message(INFO " Compiling for Linux... ")
+        include(NetdataUtil)
+        netdata_identify_libc(LIBC_IMPLEMENTATION)
+        if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND LIBC_IMPLEMENTATION STREQUAL "musl")
+            set(ALLOW_PLATFORM_SENSITIVE_OPTIONS False)
+        endif()
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
         set(OS_WINDOWS True)
+
+        if(NOT "${CMAKE_INSTALL_PREFIX}" STREQUAL "/opt/netdata")
+                message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must be set to /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
+        endif()
+
+        if(BUILD_FOR_PACKAGING)
+                set(NETDATA_RUNTIME_PREFIX "/")
+        endif()
+
+        set(BINDIR usr/bin)
         add_definitions(-D_GNU_SOURCE)
 
         if($ENV{CLION_IDE})
@@ -151,7 +170,7 @@ cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" 
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
-cmake_dependent_option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" False "OS_LINUX AND ALLOW_PLATFORM_SENSITIVE_OPTIONS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
@@ -719,6 +738,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/os-freebsd-wrappers.h
         src/libnetdata/os/os-macos-wrappers.c
         src/libnetdata/os/os-macos-wrappers.h
+        src/libnetdata/os/os-windows-wrappers.c
+        src/libnetdata/os/os-windows-wrappers.h
         src/libnetdata/os/get_system_cpus.c
         src/libnetdata/os/get_system_cpus.h
         src/libnetdata/os/tinysleep.c
@@ -835,6 +856,8 @@ set(DAEMON_FILES
         src/daemon/analytics.h
         src/daemon/main.c
         src/daemon/main.h
+        src/daemon/win_system-info.c
+        src/daemon/win_system-info.h
         src/daemon/signals.c
         src/daemon/signals.h
         src/daemon/service.c
@@ -1007,6 +1030,7 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/common-contexts.h
         src/collectors/common-contexts/disk.io.h
         src/collectors/common-contexts/system.io.h
+        src/collectors/common-contexts/system.interrupts.h
         src/collectors/common-contexts/system.processes.h
         src/collectors/common-contexts/system.ram.h
         src/collectors/common-contexts/mem.swap.h
@@ -1423,6 +1447,7 @@ elseif(OS_FREEBSD)
 elseif(OS_WINDOWS)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_windows.c
+                src/daemon/winsvc.cc
                 ${WINDOWS_PLUGIN_FILES}
                 ${INTERNAL_COLLECTORS_FILES}
         )
@@ -2268,7 +2293,7 @@ target_link_libraries(systemd-cat-native libnetdata)
 
 install(TARGETS systemd-cat-native
         COMPONENT netdata
-        DESTINATION usr/sbin)
+        DESTINATION "${BINDIR}")
 
 #
 # build log2journal
@@ -2303,7 +2328,7 @@ if(PCRE2_FOUND)
 
         install(TARGETS log2journal
                 COMPONENT netdata
-                DESTINATION usr/sbin)
+                DESTINATION "${BINDIR}")
 
         install(DIRECTORY src/collectors/log2journal/log2journal.d
                 COMPONENT netdata
@@ -2326,14 +2351,14 @@ target_link_libraries(netdatacli libnetdata)
 
 install(TARGETS netdatacli
         COMPONENT netdata
-        DESTINATION usr/sbin)
+        DESTINATION "${BINDIR}")
 
 #
 # Build go.d.plugin
 #
 
 if(ENABLE_PLUGIN_GO)
-    add_go_target(go-plugin go.d.plugin src/go/collectors/go.d.plugin cmd/godplugin)
+    add_go_target(go-plugin go.d.plugin src/go cmd/godplugin)
 
     install(PROGRAMS ${CMAKE_BINARY_DIR}/go.d.plugin
             COMPONENT plugin-go
@@ -2343,17 +2368,16 @@ endif()
 #
 # Generate config file
 #
-
-if(NOT CMAKE_INSTALL_PREFIX STREQUAL "")
-  string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+if(NOT NETDATA_RUNTIME_PREFIX STREQUAL "")
+  string(REGEX REPLACE "/$" "" NETDATA_RUNTIME_PREFIX "${NETDATA_RUNTIME_PREFIX}")
 endif()
 
-set(CACHE_DIR "${CMAKE_INSTALL_PREFIX}/var/cache/netdata")
-set(CONFIG_DIR "${CMAKE_INSTALL_PREFIX}/etc/netdata")
-set(LIBCONFIG_DIR "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d")
-set(LOG_DIR "${CMAKE_INSTALL_PREFIX}/var/log/netdata")
-set(PLUGINS_DIR "${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d")
-set(VARLIB_DIR "${CMAKE_INSTALL_PREFIX}/var/lib/netdata")
+set(CACHE_DIR "${NETDATA_RUNTIME_PREFIX}/var/cache/netdata")
+set(CONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/etc/netdata")
+set(LIBCONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/conf.d")
+set(LOG_DIR "${NETDATA_RUNTIME_PREFIX}/var/log/netdata")
+set(PLUGINS_DIR "${NETDATA_RUNTIME_PREFIX}/usr/libexec/netdata/plugins.d")
+set(VARLIB_DIR "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 
 # A non-default value is only used when building Debian packages (/var/lib/netdata/www)
 if(NOT DEFINED WEB_DIR)
@@ -2362,7 +2386,7 @@ else()
   string(REGEX REPLACE "^/" "" WEB_DIR "${WEB_DIR}")
 endif()
 set(WEB_DEST "${WEB_DIR}")
-set(WEB_DIR "${CMAKE_INSTALL_PREFIX}/${WEB_DEST}")
+set(WEB_DIR "${NETDATA_RUNTIME_PREFIX}/${WEB_DEST}")
 
 
 set(CONFIGURE_COMMAND "dummy-configure-command")
@@ -2376,7 +2400,7 @@ configure_file(packaging/cmake/config.cmake.h.in config.h)
 # install
 #
 
-install(TARGETS netdata COMPONENT netdata DESTINATION usr/sbin)
+install(TARGETS netdata COMPONENT netdata DESTINATION "${BINDIR}")
 
 install(DIRECTORY COMPONENT netdata DESTINATION var/cache/netdata)
 install(DIRECTORY COMPONENT netdata DESTINATION var/log/netdata)
@@ -2395,15 +2419,15 @@ install(DIRECTORY COMPONENT netdata DESTINATION usr/lib/netdata/conf.d/schema.d)
 install(DIRECTORY COMPONENT netdata DESTINATION usr/libexec/netdata/plugins.d)
 install(DIRECTORY COMPONENT netdata DESTINATION ${WEB_DEST})
 
-set(libsysdir_POST "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/system")
-set(pkglibexecdir_POST "${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata")
-set(localstatedir_POST "${CMAKE_INSTALL_PREFIX}/var")
-set(sbindir_POST "${CMAKE_INSTALL_PREFIX}/usr/sbin")
-set(configdir_POST "${CMAKE_INSTALL_PREFIX}/etc/netdata")
-set(libconfigdir_POST "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d")
-set(cachedir_POST "${CMAKE_INSTALL_PREFIX}/var/cache/netdata")
-set(registrydir_POST "${CMAKE_INSTALL_PREFIX}/var/lib/netdata/registry")
-set(varlibdir_POST "${CMAKE_INSTALL_PREFIX}/var/lib/netdata")
+set(libsysdir_POST "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/system")
+set(pkglibexecdir_POST "${NETDATA_RUNTIME_PREFIX}/usr/libexec/netdata")
+set(localstatedir_POST "${NETDATA_RUNTIME_PREFIX}/var")
+set(sbindir_POST "${NETDATA_RUNTIME_PREFIX}/${BINDIR}")
+set(configdir_POST "${NETDATA_RUNTIME_PREFIX}/etc/netdata")
+set(libconfigdir_POST "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/conf.d")
+set(cachedir_POST "${NETDATA_RUNTIME_PREFIX}/var/cache/netdata")
+set(registrydir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata/registry")
+set(varlibdir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(netdata_user_POST "${NETDATA_USER}")
 
 # netdata-claim.sh
@@ -2423,7 +2447,7 @@ configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh
         COMPONENT netdata
-        DESTINATION usr/sbin)
+        DESTINATION "${BINDIR}")
 
 #
 # We don't check ENABLE_PLUGIN_CGROUP_NETWORK because rpm builds assume
@@ -2571,21 +2595,6 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
-if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
-                COMPONENT netdata
-                DESTINATION lib/systemd/system)
-        install(DIRECTORY
-                COMPONENT netdata
-                DESTINATION usr/lib/systemd/journald@netdata.conf.d)
-        install(FILES
-                system/systemd/journald@netdata.conf
-                COMPONENT netdata
-                DESTINATION usr/lib/systemd/journald@netdata.conf.d
-                RENAME netdata.conf)
-endif()
-
 configure_file(system/systemd/netdata.service.v235.in system/systemd/netdata.service.v235 @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235
@@ -2602,6 +2611,29 @@ install(FILES
         system/systemd/netdata-updater.timer
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
+
+if(BUILD_FOR_PACKAGING)
+        install(FILES
+                ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
+                COMPONENT netdata
+                DESTINATION lib/systemd/system)
+        install(FILES
+                ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
+                COMPONENT netdata
+                DESTINATION lib/systemd/system)
+        install(FILES
+                system/systemd/netdata-updater.timer
+                COMPONENT netdata
+                DESTINATION lib/systemd/system)
+        install(DIRECTORY
+                COMPONENT netdata
+                DESTINATION usr/lib/systemd/journald@netdata.conf.d)
+        install(FILES
+                system/systemd/journald@netdata.conf
+                COMPONENT netdata
+                DESTINATION usr/lib/systemd/journald@netdata.conf.d
+                RENAME netdata.conf)
+endif()
 
 install(FILES
         system/systemd/50-netdata.preset
@@ -2834,7 +2866,6 @@ install(FILES
         src/collectors/python.d.plugin/openldap/openldap.conf
         src/collectors/python.d.plugin/oracledb/oracledb.conf
         src/collectors/python.d.plugin/pandas/pandas.conf
-        src/collectors/python.d.plugin/postfix/postfix.conf
         src/collectors/python.d.plugin/puppet/puppet.conf
         src/collectors/python.d.plugin/rethinkdbs/rethinkdbs.conf
         src/collectors/python.d.plugin/retroshare/retroshare.conf
@@ -2875,7 +2906,6 @@ install(FILES
         src/collectors/python.d.plugin/openldap/openldap.chart.py
         src/collectors/python.d.plugin/oracledb/oracledb.chart.py
         src/collectors/python.d.plugin/pandas/pandas.chart.py
-        src/collectors/python.d.plugin/postfix/postfix.chart.py
         src/collectors/python.d.plugin/puppet/puppet.chart.py
         src/collectors/python.d.plugin/rethinkdbs/rethinkdbs.chart.py
         src/collectors/python.d.plugin/retroshare/retroshare.chart.py
@@ -2913,14 +2943,14 @@ install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
 # go.d.plugin
 #
 if(ENABLE_PLUGIN_GO)
-    install(FILES src/go/collectors/go.d.plugin/config/go.d.conf
+    install(FILES src/go/plugin/go.d/config/go.d.conf
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d)
 
     install(DIRECTORY
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d)
-    file(GLOB GO_CONF_FILES src/go/collectors/go.d.plugin/config/go.d/*.conf)
+    file(GLOB GO_CONF_FILES src/go/plugin/go.d/config/go.d/*.conf)
     install(FILES ${GO_CONF_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d)
@@ -2928,7 +2958,7 @@ if(ENABLE_PLUGIN_GO)
     install(DIRECTORY
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/sd)
-    file(GLOB GO_SD_CONF_FILES src/go/collectors/go.d.plugin/config/go.d/sd/*.conf)
+    file(GLOB GO_SD_CONF_FILES src/go/plugin/go.d/config/go.d/sd/*.conf)
     install(FILES ${GO_SD_CONF_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/sd)
@@ -3007,6 +3037,73 @@ if(NOT OS_WINDOWS)
                 src/web/gui/v0/index.html
                 COMPONENT netdata
                 DESTINATION ${WEB_DEST}/v0)
+endif()
+
+if(OS_WINDOWS)
+        install(FILES /usr/bin/awk.exe
+                      /usr/bin/bash.exe
+                      /usr/bin/cat.exe
+                      /usr/bin/chown.exe
+                      /usr/bin/curl.exe
+                      /usr/bin/env.exe
+                      /usr/bin/grep.exe
+                      /usr/bin/mkdir.exe
+                      /usr/bin/openssl.exe
+                      /usr/bin/rm.exe
+                      /usr/bin/sed.exe
+                      /usr/bin/sh.exe
+                      /usr/bin/tail.exe
+                      /usr/bin/tr.exe
+                      /usr/bin/uuidgen.exe
+                      /usr/bin/whoami.exe
+                DESTINATION "${BINDIR}")
+
+        install(FILES /usr/bin/msys-2.0.dll
+                      /usr/bin/msys-asn1-8.dll
+                      /usr/bin/msys-brotlicommon-1.dll
+                      /usr/bin/msys-brotlidec-1.dll
+                      /usr/bin/msys-brotlienc-1.dll
+                      /usr/bin/msys-com_err-1.dll
+                      /usr/bin/msys-crypt-2.dll
+                      /usr/bin/msys-crypto-3.dll
+                      /usr/bin/msys-curl-4.dll
+                      /usr/bin/msys-gcc_s-seh-1.dll
+                      /usr/bin/msys-gmp-10.dll
+                      /usr/bin/msys-gssapi-3.dll
+                      /usr/bin/msys-hcrypto-4.dll
+                      /usr/bin/msys-heimbase-1.dll
+                      /usr/bin/msys-heimntlm-0.dll
+                      /usr/bin/msys-hx509-5.dll
+                      /usr/bin/msys-iconv-2.dll
+                      /usr/bin/msys-idn2-0.dll
+                      /usr/bin/msys-intl-8.dll
+                      /usr/bin/msys-krb5-26.dll
+                      /usr/bin/msys-lz4-1.dll
+                      /usr/bin/msys-mpfr-6.dll
+                      /usr/bin/msys-ncursesw6.dll
+                      /usr/bin/msys-nghttp2-14.dll
+                      /usr/bin/msys-pcre-1.dll
+                      /usr/bin/msys-protobuf-32.dll
+                      /usr/bin/msys-psl-5.dll
+                      /usr/bin/msys-readline8.dll
+                      /usr/bin/msys-roken-18.dll
+                      /usr/bin/msys-sqlite3-0.dll
+                      /usr/bin/msys-ssh2-1.dll
+                      /usr/bin/msys-ssl-3.dll
+                      /usr/bin/msys-stdc++-6.dll
+                      /usr/bin/msys-unistring-5.dll
+                      /usr/bin/msys-uuid-1.dll
+                      /usr/bin/msys-uv-1.dll
+                      /usr/bin/msys-wind-0.dll
+                      /usr/bin/msys-z.dll
+                      /usr/bin/msys-zstd-1.dll
+                DESTINATION "${BINDIR}")
+
+        # Make bash & netdata happy
+        install(DIRECTORY DESTINATION tmp)
+
+        # Make curl work with ssl
+        install(DIRECTORY /usr/ssl DESTINATION usr)
 endif()
 
 include(Packaging)

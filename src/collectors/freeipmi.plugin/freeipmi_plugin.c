@@ -1652,6 +1652,10 @@ int main (int argc, char **argv) {
 
     bool debug = false;
 
+    // TODO: Workaround for https://github.com/netdata/netdata/issues/17931
+    // This variable will be removed once the issue is fixed.
+    bool restart_every = true;
+
     // ------------------------------------------------------------------------
     // parse command line parameters
 
@@ -1670,6 +1674,10 @@ int main (int argc, char **argv) {
         }
         else if(strcmp("debug", argv[i]) == 0) {
             debug = true;
+            continue;
+        }
+        else if(strcmp("no-restart", argv[i]) == 0) {
+            restart_every = false;
             continue;
         }
         else if(strcmp("sel", argv[i]) == 0) {
@@ -2100,7 +2108,7 @@ int main (int argc, char **argv) {
                 "END\n");
 
         // restart check (14400 seconds)
-        if (now_monotonic_sec() - started_t > IPMI_RESTART_EVERY_SECONDS) {
+        if (restart_every && (now_monotonic_sec() - started_t > IPMI_RESTART_EVERY_SECONDS)) {
             collector_info("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
             fprintf(stdout, "EXIT\n");
             plugin_exit(0);

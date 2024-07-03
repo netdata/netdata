@@ -7,6 +7,10 @@
 
 #include "database/engine/page_test.h"
 
+#ifdef OS_WINDOWS
+#include "win_system-info.h"
+#endif
+
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
 #endif
@@ -491,6 +495,10 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     
     watcher_shutdown_end();
     watcher_thread_stop();
+
+#ifdef OS_WINDOWS
+    return;
+#endif
 
 #ifdef ENABLE_SENTRY
     if (ret)
@@ -1362,6 +1370,7 @@ static inline void coverity_remove_taint(char *s)
 }
 
 int get_system_info(struct rrdhost_system_info *system_info) {
+#if !defined(OS_WINDOWS)
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
@@ -1401,6 +1410,9 @@ int get_system_info(struct rrdhost_system_info *system_info) {
         netdata_pclose(fp_child_input, fp_child_output, command_pid);
     }
     freez(script);
+#else
+    netdata_windows_get_system_info(system_info);
+#endif
     return 0;
 }
 
@@ -1452,7 +1464,11 @@ int unittest_prepare_rrd(char **user) {
     return 0;
 }
 
-int main(int argc, char **argv) {
+int netdata_main(int argc, char **argv)
+{
+    analytics_init();
+    string_init();
+
     // initialize the system clocks
     clocks_init();
     netdata_start_time = now_realtime_sec();
@@ -1463,10 +1479,15 @@ int main(int argc, char **argv) {
 
     int i;
     int config_loaded = 0;
-    int dont_fork = 0;
     bool close_open_fds = true;
     size_t default_stacksize;
     char *user = NULL;
+
+#ifdef OS_WINDOWS
+    int dont_fork = 1;
+#else
+    int dont_fork = 0;
+#endif
 
     static_threads = static_threads_get();
 
@@ -2206,7 +2227,10 @@ int main(int argc, char **argv) {
 
     // fork the spawn server
     delta_startup_time("fork the spawn server");
+
+#ifndef OS_WINDOWS
     spawn_init();
+#endif
 
     /*
      * Libuv uv_spawn() uses SIGCHLD internally:
@@ -2349,22 +2373,21 @@ int main(int argc, char **argv) {
     }
 #endif
 
-    // ------------------------------------------------------------------------
-    // initialize WebRTC
-
     webrtc_initialize();
-
-    // ------------------------------------------------------------------------
-    // unblock signals
 
     signals_unblock();
 
-    // ------------------------------------------------------------------------
-    // Handle signals
+    return 10;
+}
+
+#ifndef OS_WINDOWS
+int main(int argc, char *argv[])
+{
+    int rc = netdata_main(argc, argv);
+    if (rc != 10)
+        return rc;
 
     signals_handle();
-
-    // should never reach this point
-    // but we need it for rpmlint #2752
     return 1;
 }
+#endif

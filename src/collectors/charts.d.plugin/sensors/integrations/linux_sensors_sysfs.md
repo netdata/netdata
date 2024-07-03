@@ -22,7 +22,7 @@ Module: sensors
 ## Overview
 
 Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperatures).
-For all other cases use the [Go collector](/src/go/collectors/go.d.plugin/modules/sensors/README.md), which supports multiple jobs, is more efficient and performs calculations on top of the kernel provided values."
+For all other cases use the [Go collector](/src/go/plugin/go.d/modules/sensors/README.md), which supports multiple jobs, is more efficient and performs calculations on top of the kernel provided values."
 
 
 It will provide charts for all configured system sensors, by reading sensors directly from the kernel.
@@ -197,5 +197,38 @@ should give you clues as to why the collector isn't working.
   ```bash
   ./charts.d.plugin debug 1 sensors
   ```
+
+### Getting Logs
+
+If you're encountering problems with the `sensors` collector, follow these steps to retrieve logs and identify potential issues:
+
+- **Run the command** specific to your system (systemd, non-systemd, or Docker container).
+- **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
+
+#### System with systemd
+
+Use the following command to view logs generated since the last Netdata service restart:
+
+```bash
+journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep sensors
+```
+
+#### System without systemd
+
+Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
+
+```bash
+grep sensors /var/log/netdata/collector.log
+```
+
+**Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
+
+#### Docker Container
+
+If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
+
+```bash
+docker logs netdata 2>&1 | grep sensors
+```
 
 

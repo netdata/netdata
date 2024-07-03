@@ -1,34 +1,58 @@
-Outfile "netdata-installer.exe"
-InstallDir "C:\netdata"
+!include "MUI2.nsh"
 
+Name "Netdata"
+Outfile "netdata-installer.exe"
+InstallDir "$PROGRAMFILES\netdata"
 RequestExecutionLevel admin
 
-Section
-	SetOutPath $INSTDIR
-	WriteUninstaller $INSTDIR\uninstaller.exe
-SectionEnd
+!define MUI_ABORTWARNING
+!define MUI_UNABORTWARNING
 
-Section "Install MSYS2 environment"
-	SetOutPath $TEMP
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
 
-	SetCompress off
-	File "C:\msys64\msys2-installer.exe"
-    nsExec::ExecToLog 'cmd.exe /C "$TEMP\msys2-installer.exe" in --confirm-command --accept-messages --root $INSTDIR'
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_UNPAGE_FINISH
 
-	Delete "$TEMP\msys2-installer.exe"
-SectionEnd
-
-Section "Install MSYS2 packages"
-	ExecWait '"$INSTDIR\usr\bin\bash.exe" -lc "pacman -S --noconfirm msys/libuv msys/protobuf"'
-SectionEnd
+!insertmacro MUI_LANGUAGE "English"
 
 Section "Install Netdata"
-	SetOutPath $INSTDIR\opt\netdata
-
+	SetOutPath $INSTDIR
 	SetCompress off
+
 	File /r "C:\msys64\opt\netdata\*.*"
+
+	ClearErrors
+	ExecWait '"$SYSDIR\sc.exe" create Netdata binPath= "$INSTDIR\usr\bin\netdata.exe" start= delayed-auto'
+	IfErrors 0 +2
+	DetailPrint "Warning: Failed to create Netdata service."
+
+	ClearErrors
+	ExecWait '"$SYSDIR\sc.exe" description Netdata "Real-time system monitoring service"'
+	IfErrors 0 +2
+	DetailPrint "Warning: Failed to add Netdata service description."
+
+	ClearErrors
+	ExecWait '"$SYSDIR\sc.exe" start Netdata'
+	IfErrors 0 +2
+	DetailPrint "Warning: Failed to start Netdata service."
+
+	WriteUninstaller "$INSTDIR\Uninstall.exe"
 SectionEnd
 
 Section "Uninstall"
-	nsExec::ExecToLog 'cmd.exe /C "$INSTDIR\uninstall.exe" pr --confirm-command'
+	ClearErrors
+	ExecWait '"$SYSDIR\sc.exe" stop Netdata'
+	IfErrors 0 +2
+	DetailPrint "Warning: Failed to stop Netdata service."
+
+	ClearErrors
+	ExecWait '"$SYSDIR\sc.exe" delete Netdata'
+	IfErrors 0 +2
+	DetailPrint "Warning: Failed to delete Netdata service."
+
+	RMDir /r "$INSTDIR"
 SectionEnd

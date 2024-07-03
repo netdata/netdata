@@ -3,6 +3,10 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
+#define _COMMON_PLUGIN_NAME "windows.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "PerflibProcesses"
+#include "../common-contexts/common-contexts.h"
+
 struct processor {
     bool collected_metadata;
 
@@ -22,6 +26,8 @@ struct processor {
     COUNTER_DATA percentDPCTime;
     COUNTER_DATA percentInterruptTime;
     COUNTER_DATA percentIdleTime;
+
+    COUNTER_DATA interruptsPerSec;
 };
 
 struct processor total = { 0 };
@@ -33,6 +39,7 @@ void initialize_processor_keys(struct processor *p) {
     p->percentDPCTime.key = "% DPC Time";
     p->percentInterruptTime.key = "% Interrupt Time";
     p->percentIdleTime.key = "% Idle Time";
+    p->interruptsPerSec.key = "Interrupts/sec";
 }
 
 void dict_processor_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -57,6 +64,7 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     static const RRDVAR_ACQUIRED *cpus_var = NULL;
     int cores_found = 0;
+    uint64_t totalIPC = 0;
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for(LONG i = 0; i < pObjectType->NumInstances ; i++) {
@@ -96,6 +104,8 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->percentInterruptTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->percentIdleTime);
 
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->interruptsPerSec);
+
         if(!p->st) {
             p->st = rrdset_create_localhost(
                 is_total ? "system" : "cpu"
@@ -129,6 +139,8 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         uint64_t dpc = p->percentDPCTime.current.Data;
         uint64_t irq = p->percentInterruptTime.current.Data;
         uint64_t idle = p->percentIdleTime.current.Data;
+
+        totalIPC += p->interruptsPerSec.current.Data;
 
         rrddim_set_by_pointer(p->st, p->rd_user, (collected_number)user);
         rrddim_set_by_pointer(p->st, p->rd_system, (collected_number)system);
@@ -166,6 +178,8 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     if(cpus_var)
         rrdvar_host_variable_set(localhost, cpus_var, cores_found);
+
+    common_interrupts(totalIPC, update_every, NULL);
 
     return true;
 }

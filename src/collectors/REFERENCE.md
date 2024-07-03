@@ -93,7 +93,7 @@ metrics, will automatically enable data collection for the application in questi
 
 When Netdata starts up, each collector searches for exposed metrics on the default endpoint established by that service
 or application's standard installation procedure. For example, 
-the [Nginx collector](/src/go/collectors/go.d.plugin/modules/nginx/README.md) searches at
+the [Nginx collector](/src/go/plugin/go.d/modules/nginx/README.md) searches at
 `http://127.0.0.1/stub_status` for exposed metrics in the correct format. If an Nginx web server is running and exposes
 metrics on that endpoint, the collector begins gathering them.
 
