@@ -8,157 +8,192 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-type ipfsBW struct {
-	TotalIn  int64 `json:"TotalIn" stm:"TotalIn,8,1000"`
-	TotalOut int64 `json:"TotalOut" stm:"TotalOut,8,1000"`
-}
+type (
+	ipfsStatsBw struct {
+		TotalIn  int64    `json:"TotalIn"`
+		TotalOut int64    `json:"TotalOut"`
+		RateIn   *float64 `json:"RateIn"`
+		RateOut  *float64 `json:"RateOut"`
+	}
+	ipfsStatsRepo struct {
+		RepoSize   int64 `json:"RepoSize"`
+		StorageMax int64 `json:"StorageMax"`
+		NumObjects int64 `json:"NumObjects"`
+	}
+	ipfsSwarmPeers struct {
+		Peers []any `json:"Peers"`
+	}
+	ipfsPinsLs struct {
+		Keys map[string]struct {
+			Type string `json:"type"`
+		} `json:"Keys"`
+	}
+)
 
-type ipfsPeers struct {
-	Peers []interface{} `json:"Peers"`
-}
+const (
+	urlPathStatsBandwidth = "/api/v0/stats/bw"    // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-stats-bw
+	urlPathStatsRepo      = "/api/v0/stats/repo"  // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-stats-repo
+	urlPathSwarmPeers     = "/api/v0/swarm/peers" // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-swarm-peers
+	urlPathPinLs          = "/api/v0/pin/ls"      // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-pin-ls
+)
 
-type ipfsPins struct {
-	Keys map[string]interface{} `json:"Keys"`
-}
+func (ip *IPFS) collect() (map[string]int64, error) {
+	mx := make(map[string]int64)
 
-type ipfsRepo struct {
-	RepoSize   int64 `json:"RepoSize" stm:"RepoSize"`
-	StorageMax int64 `json:"StorageMax" stm:"StorageMax"`
-	NumObjects int64 `json:"NumObjects" stm:"NumObjects"`
-	// RepoPath   string `json:"RepoPath" stm:"RepoPath"`
-	// Version    string `json:"Version" stm:"Version"`
-}
-
-func (ipfs *IPFS) collect() (map[string]int64, error) {
-	statsBw, err := ipfs.requestIPFSBW()
-	if err != nil {
+	if err := ip.collectStatsBandwidth(mx); err != nil {
 		return nil, err
 	}
-
-	mx := stm.ToMap(statsBw)
-
-	statsPeers, err := ipfs.requestIPFSPeers()
-	if err != nil {
+	if err := ip.collectSwarmPeers(mx); err != nil {
 		return nil, err
 	}
-	mx["peers"] = int64(len(statsPeers.Peers))
-
-	if !ipfs.Pinapi && !ipfs.Repoapi {
-		ipfs.charts.Remove("repo_objects")
-	} else {
-		statsPins, err := ipfs.requestIPFSPinapi()
-		if err != nil {
+	if ip.QueryRepoApi {
+		// https://github.com/netdata/netdata/pull/9687
+		// TODO: collect by default with "size-only"
+		// https://github.com/ipfs/kubo/issues/7528#issuecomment-657398332
+		if err := ip.collectStatsRepo(mx); err != nil {
 			return nil, err
 		}
-		mx["pinned"] = int64(len(statsPins.Keys))
-
-		count := 0
-		for _, v := range statsPins.Keys {
-			if keyData, ok := v.(map[string]interface{}); ok {
-				if keyType, ok := keyData["Type"].(string); ok && keyType == "recursive" {
-					count++
-				}
-			}
-		}
-		mx["recursive_pins"] = int64(count)
-
 	}
-
-	if !ipfs.Repoapi {
-		ipfs.charts.Remove("repo_size")
-
-	} else {
-		statsRepo, err := ipfs.requestIPFSRepoapi()
-		if err != nil {
+	if ip.QueryPinApi {
+		if err := ip.collectPinLs(mx); err != nil {
 			return nil, err
 		}
-
-		mx["avail"] = int64(statsRepo.StorageMax)
-		mx["size"] = int64(statsRepo.RepoSize)
-		mx["objects"] = int64(statsRepo.NumObjects)
 	}
 
 	return mx, nil
 }
 
-func (ipfs *IPFS) requestIPFSBW() (*ipfsBW, error) {
-	req, err := web.NewHTTPRequest(ipfs.Request)
+func (ip *IPFS) collectStatsBandwidth(mx map[string]int64) error {
+	stats, err := ip.queryStatsBandwidth()
+	if err != nil {
+		return err
+	}
+
+	mx["in"] = stats.TotalIn
+	mx["out"] = stats.TotalOut
+
+	return nil
+}
+
+func (ip *IPFS) collectSwarmPeers(mx map[string]int64) error {
+	stats, err := ip.querySwarmPeers()
+	if err != nil {
+		return err
+	}
+
+	mx["peers"] = int64(len(stats.Peers))
+
+	return nil
+}
+
+func (ip *IPFS) collectStatsRepo(mx map[string]int64) error {
+	stats, err := ip.queryStatsRepo()
+	if err != nil {
+		return err
+	}
+
+	mx["used_percent"] = 0
+	if stats.StorageMax > 0 {
+		mx["used_percent"] = stats.RepoSize * 100 / stats.StorageMax
+	}
+	mx["size"] = stats.RepoSize
+	mx["objects"] = stats.NumObjects
+
+	return nil
+}
+
+func (ip *IPFS) collectPinLs(mx map[string]int64) error {
+	stats, err := ip.queryPinLs()
+	if err != nil {
+		return err
+	}
+
+	var n int64
+	for _, v := range stats.Keys {
+		if v.Type == "recursive" {
+			n++
+		}
+	}
+
+	mx["pinned"] = int64(len(stats.Keys))
+	mx["recursive_pins"] = n
+
+	return nil
+}
+
+func (ip *IPFS) queryStatsBandwidth() (*ipfsStatsBw, error) {
+	req, err := web.NewHTTPRequest(ip.Request)
 	if err != nil {
 		return nil, err
 	}
 
-	req.URL.Path = "/api/v0/stats/bw"
-	req.Method = http.MethodPost
+	req.URL.Path = urlPathStatsBandwidth
 
-	var stats ipfsBW
-	if err := ipfs.doOKDecode(req, &stats); err != nil {
+	var stats ipfsStatsBw
+	if err := ip.doOKDecode(req, &stats); err != nil {
 		return nil, err
 	}
 
-	if &(stats.TotalIn) == nil || &(stats.TotalOut) == nil {
+	if stats.RateIn == nil || stats.RateOut == nil {
 		return nil, fmt.Errorf("unexpected response: not ipfs data")
 	}
 
 	return &stats, nil
 }
 
-func (ipfs *IPFS) requestIPFSPeers() (*ipfsPeers, error) {
-	req, err := web.NewHTTPRequest(ipfs.Request)
+func (ip *IPFS) querySwarmPeers() (*ipfsSwarmPeers, error) {
+	req, err := web.NewHTTPRequest(ip.Request)
 	if err != nil {
 		return nil, err
 	}
 
-	req.URL.Path = "/api/v0/swarm/peers"
-	req.Method = http.MethodPost
+	req.URL.Path = urlPathSwarmPeers
 
-	var stats ipfsPeers
-	if err := ipfs.doOKDecode(req, &stats); err != nil {
+	var stats ipfsSwarmPeers
+	if err := ip.doOKDecode(req, &stats); err != nil {
 		return nil, err
 	}
 
 	return &stats, nil
 }
 
-func (ipfs *IPFS) requestIPFSPinapi() (*ipfsPins, error) {
-	req, err := web.NewHTTPRequest(ipfs.Request)
+func (ip *IPFS) queryStatsRepo() (*ipfsStatsRepo, error) {
+	req, err := web.NewHTTPRequest(ip.Request)
 	if err != nil {
 		return nil, err
 	}
 
-	req.URL.Path = "/api/v0/pin/ls"
-	req.Method = http.MethodPost
+	req.URL.Path = urlPathStatsRepo
 
-	var stats ipfsPins
-	if err := ipfs.doOKDecode(req, &stats); err != nil {
+	var stats ipfsStatsRepo
+	if err := ip.doOKDecode(req, &stats); err != nil {
 		return nil, err
 	}
 
 	return &stats, nil
 }
 
-func (ipfs *IPFS) requestIPFSRepoapi() (*ipfsRepo, error) {
-	req, err := web.NewHTTPRequest(ipfs.Request)
+func (ip *IPFS) queryPinLs() (*ipfsPinsLs, error) {
+	req, err := web.NewHTTPRequest(ip.Request)
 	if err != nil {
 		return nil, err
 	}
 
-	req.URL.Path = "/api/v0/stats/repo"
-	req.Method = http.MethodPost
+	req.URL.Path = urlPathPinLs
 
-	var stats ipfsRepo
-	if err := ipfs.doOKDecode(req, &stats); err != nil {
+	var stats ipfsPinsLs
+	if err := ip.doOKDecode(req, &stats); err != nil {
 		return nil, err
 	}
 
 	return &stats, nil
 }
 
-func (ipfs *IPFS) doOKDecode(req *http.Request, in interface{}) error {
-	resp, err := ipfs.httpClient.Do(req)
+func (ip *IPFS) doOKDecode(req *http.Request, in interface{}) error {
+	resp, err := ip.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}

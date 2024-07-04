@@ -7,57 +7,72 @@ import (
 )
 
 const (
-	prioBW = module.Priority + iota
-	prioPeers
+	prioBandwidth = module.Priority + iota
+	prioSwarmPeers
+	prioDatastoreSpaceUtilization
 	prioRepoSize
 	prioRepoObj
+	prioRepoPinnedObj
 )
 
 var charts = module.Charts{
-	bwChart.Copy(),
+	bandwidthChart.Copy(),
 	peersChart.Copy(),
+	datastoreUtilizationChart.Copy(),
 	repoSizeChart.Copy(),
 	repoObjChart.Copy(),
+	repoPinnedObjChart.Copy(),
 }
 
 var (
-	bwChart = module.Chart{
+	bandwidthChart = module.Chart{
 		ID:       "bandwidth",
-		Title:    "Bandwidth",
-		Units:    "Kilobits/s",
-		Fam:      "test",
+		Title:    "IPFS Bandwidth",
+		Units:    "bytes/s",
+		Fam:      "bandwidth",
 		Ctx:      "ipfs.bandwidth",
 		Type:     module.Area,
-		Priority: prioBW,
+		Priority: prioBandwidth,
 		Dims: module.Dims{
-			{ID: "TotalIn", Name: "in", Algo: module.Incremental},
-			{ID: "TotalOut", Name: "out", Mul: -1, Algo: module.Incremental},
+			{ID: "in", Algo: module.Incremental},
+			{ID: "out", Mul: -1, Algo: module.Incremental},
 		},
 	}
 
 	peersChart = module.Chart{
 		ID:       "peers",
-		Title:    "Peers",
+		Title:    "IPFS Peers",
 		Units:    "peers",
-		Fam:      "test",
+		Fam:      "peers",
 		Ctx:      "ipfs.peers",
 		Type:     module.Line,
-		Priority: prioPeers,
+		Priority: prioSwarmPeers,
 		Dims: module.Dims{
 			{ID: "peers"},
 		},
 	}
 
+	datastoreUtilizationChart = module.Chart{
+		ID:       "datastore_space_utilization",
+		Title:    "IPFS Datastore Space Utilization",
+		Units:    "percent",
+		Fam:      "size",
+		Ctx:      "ipfs.datastore_space_utilization",
+		Type:     module.Line,
+		Priority: prioDatastoreSpaceUtilization,
+		Dims: module.Dims{
+			{ID: "used_percent", Name: "used"},
+		},
+	}
 	repoSizeChart = module.Chart{
 		ID:       "repo_size",
 		Title:    "IPFS Repo Size",
 		Units:    "bytes",
-		Fam:      "test",
+		Fam:      "size",
 		Ctx:      "ipfs.repo_size",
 		Type:     module.Line,
 		Priority: prioRepoSize,
 		Dims: module.Dims{
-			{ID: "avail"},
 			{ID: "size"},
 		},
 	}
@@ -66,14 +81,25 @@ var (
 		ID:       "repo_objects",
 		Title:    "IPFS Repo Objects",
 		Units:    "objects",
-		Fam:      "test",
+		Fam:      "objects",
 		Ctx:      "ipfs.repo_objects",
 		Type:     module.Line,
 		Priority: prioRepoObj,
 		Dims: module.Dims{
+			{ID: "objects"},
+		},
+	}
+	repoPinnedObjChart = module.Chart{
+		ID:       "repo_pinned_objects",
+		Title:    "IPFS Repo Pinned Objects",
+		Units:    "objects",
+		Fam:      "objects",
+		Ctx:      "ipfs.repo_pinned_objects",
+		Type:     module.Line,
+		Priority: prioRepoPinnedObj,
+		Dims: module.Dims{
 			{ID: "pinned"},
 			{ID: "recursive_pins"},
-			{ID: "objects"},
 		},
 	}
 )

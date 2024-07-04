@@ -19,14 +19,20 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	ipfstestdata, _ = os.ReadFile("testdata/stats_bw.json")
+	apiv0PinLsData, _      = os.ReadFile("testdata/api_v0_pin_ls.json")
+	apiv0StatsBwData, _    = os.ReadFile("testdata/api_v0_stats_bw.json")
+	apiv0StatsRepoData, _  = os.ReadFile("testdata/api_v0_stats_repo.json")
+	apiv0SwarmPeersData, _ = os.ReadFile("testdata/api_v0_swarm_peers.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON": dataConfigJSON,
-		"dataConfigYAML": dataConfigYAML,
-		"ipfstestdata":   ipfstestdata,
+		"dataConfigJSON":      dataConfigJSON,
+		"dataConfigYAML":      dataConfigYAML,
+		"apiv0PinLsData":      apiv0PinLsData,
+		"apiv0StatsBwData":    apiv0StatsBwData,
+		"apiv0StatsRepoData":  apiv0StatsRepoData,
+		"apiv0SwarmPeersData": apiv0SwarmPeersData,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -78,9 +84,13 @@ func TestIPFS_Check(t *testing.T) {
 		wantFail bool
 		prepare  func(t *testing.T) (*IPFS, func())
 	}{
-		"success on valid response": {
+		"success default config": {
 			wantFail: false,
-			prepare:  prepareCaseOk,
+			prepare:  prepareCaseOkDefault,
+		},
+		"success all queries enabled": {
+			wantFail: false,
+			prepare:  prepareCaseOkDefault,
 		},
 		"fails on unexpected json response": {
 			wantFail: true,
@@ -115,11 +125,26 @@ func TestIPFS_Collect(t *testing.T) {
 		prepare     func(t *testing.T) (*IPFS, func())
 		wantMetrics map[string]int64
 	}{
-		"success on valid response": {
-			prepare: prepareCaseOk,
+		"success default config": {
+			prepare: prepareCaseOkDefault,
 			wantMetrics: map[string]int64{
-				"TotalIn":  20113594,
-				"TotalOut": 3113852,
+				"in":    20113594,
+				"out":   3113852,
+				"peers": 6,
+			},
+		},
+		"success all queries enabled": {
+			prepare: prepareCaseOkAllQueriesEnabled,
+			wantMetrics: map[string]int64{
+				"avail":          10000000000,
+				"in":             20113594,
+				"objects":        1,
+				"out":            3113852,
+				"peers":          6,
+				"pinned":         1,
+				"recursive_pins": 1,
+				"size":           25495,
+				"used_percent":   0,
 			},
 		},
 		"fails on unexpected json response": {
@@ -164,13 +189,19 @@ func testMetricsHasAllChartsDims(t *testing.T, ipfs *IPFS, mx map[string]int64) 
 	}
 }
 
-func prepareCaseOk(t *testing.T) (*IPFS, func()) {
+func prepareCaseOkDefault(t *testing.T) (*IPFS, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
-			case "/api/v0/stats/bw":
-				_, _ = w.Write(ipfstestdata)
+			case urlPathStatsBandwidth:
+				_, _ = w.Write(apiv0StatsBwData)
+			case urlPathStatsRepo:
+				_, _ = w.Write(apiv0StatsRepoData)
+			case urlPathSwarmPeers:
+				_, _ = w.Write(apiv0SwarmPeersData)
+			case urlPathPinLs:
+				_, _ = w.Write(apiv0PinLsData)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -181,6 +212,16 @@ func prepareCaseOk(t *testing.T) (*IPFS, func()) {
 	require.NoError(t, ipfs.Init())
 
 	return ipfs, srv.Close
+}
+
+func prepareCaseOkAllQueriesEnabled(t *testing.T) (*IPFS, func()) {
+	t.Helper()
+	ipfs, cleanup := prepareCaseOkDefault(t)
+
+	ipfs.QueryRepoApi = true
+	ipfs.QueryPinApi = true
+
+	return ipfs, cleanup
 }
 
 func prepareCaseUnexpectedJsonResponse(t *testing.T) (*IPFS, func()) {
@@ -204,12 +245,7 @@ func prepareCaseUnexpectedJsonResponse(t *testing.T) (*IPFS, func()) {
 `
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			switch r.URL.Path {
-			case "/stat":
-				_, _ = w.Write([]byte(resp))
-			default:
-				w.WriteHeader(http.StatusNotFound)
-			}
+			_, _ = w.Write([]byte(resp))
 		}))
 
 	ipfs := New()
@@ -236,7 +272,7 @@ func prepareCaseInvalidFormatResponse(t *testing.T) (*IPFS, func()) {
 func prepareCaseConnectionRefused(t *testing.T) (*IPFS, func()) {
 	t.Helper()
 	ipfs := New()
-	ipfs.URL = "http://127.0.0.1:5002"
+	ipfs.URL = "http://127.0.0.1:65001"
 	require.NoError(t, ipfs.Init())
 
 	return ipfs, func() {}

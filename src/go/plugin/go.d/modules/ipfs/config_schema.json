@@ -11,16 +11,6 @@
         "minimum": 1,
         "default": 1
       },
-      "repoapi": {
-        "title": "Repo API",
-        "description": "Collect IPFS repo metrics.",
-        "type": "boolean"
-      },
-      "pinapi": {
-        "title": "Pin API",
-        "description": "Set status of IPFS pinned object polling.",
-        "type": "boolean"
-      },
       "url": {
         "title": "URL",
         "description": "The base URL where the IPFS API can be accessed.",
@@ -38,6 +28,16 @@
       "not_follow_redirects": {
         "title": "Not follow redirects",
         "description": "If set, the client will not follow HTTP redirects automatically.",
+        "type": "boolean"
+      },
+      "repoapi": {
+        "title": "Query Repo API",
+        "description": "Enables querying the [/api/v0/stats/repo](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-repo-stat) endpoint for repository statistics. **Disabled by default** due to potential high CPU usage.",
+        "type": "boolean"
+      },
+      "pinapi": {
+        "title": "Query Pin API",
+        "description": "Enables querying the [/api/v0/pin/ls](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-pin-ls) endpoint to retrieve a list of all pinned objects. **Consider enabling only if necessary**.",
         "type": "boolean"
       },
       "username": {
@@ -133,6 +133,12 @@
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     },
+    "repoapi": {
+      "ui:help": "This endpoint retrieves the number of objects in the local repository, which is not cached and can be computationally expensive for IPFS to calculate, especially with frequent collection intervals. See [#7528](https://github.com/ipfs/go-ipfs/issues/7528)."
+    },
+    "pinapi": {
+      "ui:help": "Performance may decrease as the number of pinned objects grows, as the entire list needs to be retrieved. See [#3874](https://github.com/ipfs/go-ipfs/issues/3874)."
+    },
     "password": {
       "ui:widget": "password"
     },
@@ -148,6 +154,8 @@
             "update_every",
             "url",
             "timeout",
+            "repoapi",
+            "pinapi",
             "not_follow_redirects"
           ]
         },

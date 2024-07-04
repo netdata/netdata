@@ -82,6 +82,7 @@ see the appropriate collector readme.
 | [hpssa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hpssa)                           |        HPE Smart Array        |
 | [httpcheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/httpcheck)                   |       Any HTTP Endpoint       |
 | [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/intelgpu)                     |     Intel integrated GPU      |
+| [ipfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ipfs)                             |             IPFS              |
 | [isc_dhcpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/isc_dhcpd)                   |           ISC DHCP            |
 | [k8s_kubelet](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/k8s_kubelet)               |            Kubelet            |
 | [k8s_kubeproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/k8s_kubeproxy)           |          Kube-proxy           |

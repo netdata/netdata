@@ -28,24 +28,25 @@ func New() *IPFS {
 		Config: Config{
 			HTTP: web.HTTP{
 				Request: web.Request{
-					URL: "http://127.0.0.1:5001",
+					URL:    "http://127.0.0.1:5001",
+					Method: http.MethodPost,
 				},
 				Client: web.Client{
 					Timeout: web.Duration(time.Second * 1),
 				},
 			},
-			Repoapi: false,
-			Pinapi:  false,
+			QueryRepoApi: false,
+			QueryPinApi:  false,
 		},
 		charts: charts.Copy(),
 	}
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
-	Pinapi      bool `yaml:"pinapi" json:"pinapi"`
-	Repoapi     bool `yaml:"repoapi" json:"repoapi"`
+	UpdateEvery  int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTP     `yaml:",inline" json:""`
+	QueryPinApi  bool `yaml:"pinapi" json:"pinapi"`
+	QueryRepoApi bool `yaml:"repoapi" json:"repoapi"`
 }
 
 type IPFS struct {
@@ -57,33 +58,42 @@ type IPFS struct {
 	httpClient *http.Client
 }
 
-func (i *IPFS) Configuration() any {
-	return i.Config
+func (ip *IPFS) Configuration() any {
+	return ip.Config
 }
 
-func (i *IPFS) Init() error {
-	if i.URL == "" {
-		i.Error("URL not set")
+func (ip *IPFS) Init() error {
+	if ip.URL == "" {
+		ip.Error("URL not set")
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(i.Client)
+	client, err := web.NewHTTPClient(ip.Client)
 	if err != nil {
-		i.Error(err)
+		ip.Error(err)
 		return err
 	}
-	i.httpClient = client
+	ip.httpClient = client
 
-	i.Debugf("using URL %s", i.URL)
-	i.Debugf("using timeout: %s", i.Timeout)
+	if !ip.QueryPinApi {
+		_ = ip.Charts().Remove(repoPinnedObjChart.ID)
+	}
+	if !ip.QueryRepoApi {
+		_ = ip.Charts().Remove(datastoreUtilizationChart.ID)
+		_ = ip.Charts().Remove(repoSizeChart.ID)
+		_ = ip.Charts().Remove(repoObjChart.ID)
+	}
+
+	ip.Debugf("using URL %s", ip.URL)
+	ip.Debugf("using timeout: %s", ip.Timeout)
 
 	return nil
 }
 
-func (i *IPFS) Check() error {
-	mx, err := i.collect()
+func (ip *IPFS) Check() error {
+	mx, err := ip.collect()
 	if err != nil {
-		i.Error(err)
+		ip.Error(err)
 		return err
 	}
 
@@ -94,14 +104,14 @@ func (i *IPFS) Check() error {
 	return nil
 }
 
-func (i *IPFS) Charts() *module.Charts {
-	return i.charts
+func (ip *IPFS) Charts() *module.Charts {
+	return ip.charts
 }
 
-func (i *IPFS) Collect() map[string]int64 {
-	mx, err := i.collect()
+func (ip *IPFS) Collect() map[string]int64 {
+	mx, err := ip.collect()
 	if err != nil {
-		i.Error(err)
+		ip.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -111,8 +121,8 @@ func (i *IPFS) Collect() map[string]int64 {
 	return mx
 }
 
-func (i *IPFS) Cleanup() {
-	if i.httpClient != nil {
-		i.httpClient.CloseIdleConnections()
+func (ip *IPFS) Cleanup() {
+	if ip.httpClient != nil {
+		ip.httpClient.CloseIdleConnections()
 	}
 }
