@@ -1,7 +1,7 @@
-plugin_name: python.d.plugin
+plugin_name: go.d.plugin
 modules:
   - meta:
-      plugin_name: python.d.plugin
+      plugin_name: go.d.plugin
       module_name: ipfs
       monitored_instance:
         name: IPFS
@@ -42,7 +42,7 @@ modules:
         list: []
       configuration:
         file:
-          name: "python.d/ipfs.conf"
+          name: "go.d/ipfs.conf"
         options:
           description: |
             There are 2 sections:
