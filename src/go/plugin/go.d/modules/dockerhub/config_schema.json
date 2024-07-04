@@ -187,6 +187,12 @@
     "repositories": {
       "ui:listFlavour": "list"
     },
+    "username": {
+      "ui:widget": "password"
+    },
+    "proxy_username": {
+      "ui:widget": "password"
+    },
     "password": {
       "ui:widget": "password"
     },

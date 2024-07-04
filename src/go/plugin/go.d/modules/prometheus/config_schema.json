@@ -289,6 +289,12 @@
     "selector": {
       "ui:help": "The logic is as follows: `(allow1 OR allow2) AND !(deny1 OR deny2)`."
     },
+    "username": {
+      "ui:widget": "password"
+    },
+    "proxy_username": {
+      "ui:widget": "password"
+    },
     "password": {
       "ui:widget": "password"
     },

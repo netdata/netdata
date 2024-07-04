@@ -254,6 +254,12 @@
       "ui:help": "The logic for inclusion and exclusion is as follows: `(include1 OR include2) AND !(exclude1 OR exclude2)`.",
       "ui:collapsible": true
     },
+    "username": {
+      "ui:widget": "password"
+    },
+    "proxy_username": {
+      "ui:widget": "password"
+    },
     "password": {
       "ui:widget": "password"
     },

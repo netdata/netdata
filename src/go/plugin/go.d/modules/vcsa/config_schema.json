@@ -170,7 +170,11 @@
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     },
     "username": {
-      "ui:placeholder": "admin@vsphere.local"
+      "ui:placeholder": "admin@vsphere.local",
+      "ui:widget": "password"
+    },
+    "proxy_username": {
+      "ui:widget": "password"
     },
     "password": {
       "ui:widget": "password"
