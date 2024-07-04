@@ -1,5 +1,5 @@
 update_every: 123
-url: "http://localhost:5001"
+url: "ok"
 body: "ok"
 method: "ok"
 headers:

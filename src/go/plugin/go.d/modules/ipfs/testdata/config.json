@@ -1,6 +1,6 @@
 {
   "update_every": 123,
-  "url": "http://localhost:5001",
+  "url": "ok",
   "body": "ok",
   "method": "ok",
   "headers": {
@@ -17,6 +17,6 @@
   "tls_cert": "ok",
   "tls_key": "ok",
   "tls_skip_verify": true,
-  "pinapi":false,
-  "repoapi":false
+  "pinapi": false,
+  "repoapi": false
 }
