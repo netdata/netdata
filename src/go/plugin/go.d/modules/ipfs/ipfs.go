@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -35,7 +35,7 @@ func New() *IPFS {
 				},
 			},
 			Repoapi: false,
-			Pinapi: false,
+			Pinapi:  false,
 		},
 		charts: charts.Copy(),
 	}
@@ -44,8 +44,8 @@ func New() *IPFS {
 type Config struct {
 	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP    `yaml:",inline" json:""`
-	Pinapi bool `yaml:"pinapi" json:"pinapi"`
-	Repoapi bool `yaml:"repoapi" json:"repoapi"`
+	Pinapi      bool `yaml:"pinapi" json:"pinapi"`
+	Repoapi     bool `yaml:"repoapi" json:"repoapi"`
 }
 
 type IPFS struct {

@@ -8,8 +8,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/stm"
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 type ipfsBW struct {
@@ -26,9 +26,9 @@ type ipfsPins struct {
 }
 
 type ipfsRepo struct {
-	RepoSize   int64  `json:"RepoSize" stm:"RepoSize"`
-	StorageMax int64  `json:"StorageMax" stm:"StorageMax"`
-	NumObjects int64  `json:"NumObjects" stm:"NumObjects"`
+	RepoSize   int64 `json:"RepoSize" stm:"RepoSize"`
+	StorageMax int64 `json:"StorageMax" stm:"StorageMax"`
+	NumObjects int64 `json:"NumObjects" stm:"NumObjects"`
 	// RepoPath   string `json:"RepoPath" stm:"RepoPath"`
 	// Version    string `json:"Version" stm:"Version"`
 }
@@ -47,9 +47,8 @@ func (ipfs *IPFS) collect() (map[string]int64, error) {
 	}
 	mx["peers"] = int64(len(statsPeers.Peers))
 
-
 	if !ipfs.Pinapi && !ipfs.Repoapi {
-	ipfs.charts.Remove("repo_objects")
+		ipfs.charts.Remove("repo_objects")
 	} else {
 		statsPins, err := ipfs.requestIPFSPinapi()
 		if err != nil {
@@ -68,7 +67,7 @@ func (ipfs *IPFS) collect() (map[string]int64, error) {
 		mx["recursive_pins"] = int64(count)
 
 	}
-	
+
 	if !ipfs.Repoapi {
 		ipfs.charts.Remove("repo_size")
 
@@ -81,9 +80,7 @@ func (ipfs *IPFS) collect() (map[string]int64, error) {
 		mx["avail"] = int64(statsRepo.StorageMax)
 		mx["size"] = int64(statsRepo.RepoSize)
 		mx["objects"] = int64(statsRepo.NumObjects)
-	}	
-
-
+	}
 
 	return mx, nil
 }
@@ -143,8 +140,7 @@ func (ipfs *IPFS) requestIPFSPinapi() (*ipfsPins, error) {
 	return &stats, nil
 }
 
-
-func (ipfs *IPFS) requestIPFSRepoapi () (*ipfsRepo, error) {
+func (ipfs *IPFS) requestIPFSRepoapi() (*ipfsRepo, error) {
 	req, err := web.NewHTTPRequest(ipfs.Request)
 	if err != nil {
 		return nil, err
@@ -160,8 +156,6 @@ func (ipfs *IPFS) requestIPFSRepoapi () (*ipfsRepo, error) {
 
 	return &stats, nil
 }
-
-
 
 func (ipfs *IPFS) doOKDecode(req *http.Request, in interface{}) error {
 	resp, err := ipfs.httpClient.Do(req)

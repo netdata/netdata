@@ -2,7 +2,9 @@
 
 package ipfs
 
-import "github.com/netdata/netdata/go/go.d.plugin/agent/module"
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+)
 
 const (
 	prioBW = module.Priority + iota
@@ -57,7 +59,6 @@ var (
 		Dims: module.Dims{
 			{ID: "avail"},
 			{ID: "size"},
-			
 		},
 	}
 

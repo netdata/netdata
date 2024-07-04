@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -118,8 +118,8 @@ func TestIPFS_Collect(t *testing.T) {
 		"success on valid response": {
 			prepare: prepareCaseOk,
 			wantMetrics: map[string]int64{
-				"TotalIn":         20113594,
-				"TotalOut":             3113852,
+				"TotalIn":  20113594,
+				"TotalOut": 3113852,
 			},
 		},
 		"fails on unexpected json response": {
