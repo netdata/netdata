@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Disable health thread on windows [\#18066](https://github.com/netdata/netdata/pull/18066) ([stelfrag](https://github.com/stelfrag))
+- Remove hard-coded url from python.d puppet chart plugin [\#18064](https://github.com/netdata/netdata/pull/18064) ([Hufschmidt](https://github.com/Hufschmidt))
 - go.d postgres github.com/jackc/pgx/v5 [\#18062](https://github.com/netdata/netdata/pull/18062) ([ilyam8](https://github.com/ilyam8))
 - fix prometeus export: missing comma before "instance" label [\#18061](https://github.com/netdata/netdata/pull/18061) ([ilyam8](https://github.com/ilyam8))
 - go.d vsphere add update\_every ui:help [\#18060](https://github.com/netdata/netdata/pull/18060) ([ilyam8](https://github.com/ilyam8))
@@ -404,9 +406,6 @@
 - Sso improvements [\#17506](https://github.com/netdata/netdata/pull/17506) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Regenerate integrations.js [\#17505](https://github.com/netdata/netdata/pull/17505) ([netdatabot](https://github.com/netdatabot))
 - Additional SQL code cleanup [\#17503](https://github.com/netdata/netdata/pull/17503) ([stelfrag](https://github.com/stelfrag))
-- remove python.d/fail2ban [\#17502](https://github.com/netdata/netdata/pull/17502) ([ilyam8](https://github.com/ilyam8))
-- add go.d fail2ban [\#17501](https://github.com/netdata/netdata/pull/17501) ([ilyam8](https://github.com/ilyam8))
-- better redirect [\#17500](https://github.com/netdata/netdata/pull/17500) ([hugovalente-pm](https://github.com/hugovalente-pm))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
