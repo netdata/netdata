@@ -218,6 +218,12 @@
     "topics_filter": {
       "ui:help": "Use `*` to collect all topics. To exclude all topics from collection, use `!*`."
     },
+    "username": {
+      "ui:widget": "password"
+    },
+    "proxy_username": {
+      "ui:widget": "password"
+    },
     "password": {
       "ui:widget": "password"
     },
