@@ -1003,7 +1003,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [IBM Spectrum](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/ibm_spectrum.md)
 
-- [IPFS](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/ipfs/integrations/ipfs.md)
+- [IPFS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/ipfs/integrations/ipfs.md)
 
 - [LVM logical volumes](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/lvm/integrations/lvm_logical_volumes.md)
 
