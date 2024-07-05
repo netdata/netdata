@@ -187,7 +187,7 @@ modules:
             - name: ipfs.bandwidth
               description: IPFS Bandwidth
               unit: "bytes/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: in
                 - name: out
@@ -197,10 +197,16 @@ modules:
               chart_type: line
               dimensions:
                 - name: peers
+            - name: ipfs.datastore_space_utilization
+              description: IPFS Datastore Space Utilization
+              unit: "percent"
+              chart_type: area
+              dimensions:
+                - name: used
             - name: ipfs.repo_size
               description: IPFS Repo Size
-              unit: "GiB"
-              chart_type: area
+              unit: "bytes"
+              chart_type: line
               dimensions:
                 - name: size
             - name: ipfs.repo_objects
@@ -214,4 +220,5 @@ modules:
               unit: "objects"
               chart_type: line
               dimensions:
+                - name: pinned
                 - name: recursive_pins
