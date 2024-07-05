@@ -136,7 +136,6 @@ func TestIPFS_Collect(t *testing.T) {
 		"success all queries enabled": {
 			prepare: prepareCaseOkAllQueriesEnabled,
 			wantMetrics: map[string]int64{
-				"avail":          10000000000,
 				"in":             20113594,
 				"objects":        1,
 				"out":            3113852,
