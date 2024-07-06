@@ -5,13 +5,17 @@
 SPAWN_SERVER *netdata_main_spawn_server = NULL;
 
 bool netdata_main_spawn_server_init(const char *name, int argc, char **argv) {
-    netdata_main_spawn_server = spawn_server_create(name, NULL, argc, argv);
+    if(!netdata_main_spawn_server)
+        netdata_main_spawn_server = spawn_server_create(name, NULL, argc, argv);
+
     return netdata_main_spawn_server != NULL;
 }
 
 void netdata_main_spawn_server_cleanup(void) {
-    if(netdata_main_spawn_server)
+    if(netdata_main_spawn_server) {
         spawn_server_destroy(netdata_main_spawn_server);
+        netdata_main_spawn_server = NULL;
+    }
 }
 
 // ----------------------------------------------------------------------------

@@ -1290,9 +1290,18 @@ static void populate_system_info(void) {
         system_info = localhost->system_info;
     }
     else {
+        bool started_spawn_server = false;
+        if(!netdata_main_spawn_server) {
+            started_spawn_server = true;
+            netdata_main_spawn_server_init(NULL, 0, NULL);
+        }
+
         system_info = callocz(1, sizeof(struct rrdhost_system_info));
         get_system_info(system_info);
         free_system_info = true;
+
+        if(started_spawn_server)
+            netdata_main_spawn_server_cleanup();
     }
 
     build_info_set_value_strdupz(BIB_OS_KERNEL_NAME, system_info->kernel_name);
