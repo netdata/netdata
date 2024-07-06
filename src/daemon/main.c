@@ -2289,6 +2289,7 @@ int netdata_main(int argc, char **argv) {
 
     if (claiming_pending_arguments)
          claim_agent(claiming_pending_arguments, false, NULL);
+
     load_claiming_state();
 
     // ------------------------------------------------------------------------
