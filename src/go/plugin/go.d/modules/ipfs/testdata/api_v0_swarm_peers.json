@@ -1,0 +1,70 @@
+{
+  "Peers": [
+    {
+      "Addr": "/ip4/1/tcp/27963",
+      "Peer": "a",
+      "Identify": {
+        "ID": "",
+        "PublicKey": "",
+        "Addresses": null,
+        "AgentVersion": "",
+        "Protocols": null
+      }
+    },
+    {
+      "Addr": "/ip4/1/udp/4001/quic-v1",
+      "Peer": "b",
+      "Identify": {
+        "ID": "",
+        "PublicKey": "",
+        "Addresses": null,
+        "AgentVersion": "",
+        "Protocols": null
+      }
+    },
+    {
+      "Addr": "/ip4/1/udp/4001/quic-v1/p2p/12D3KooWCqocoHdBANn2hH5acYAU4NdjEeBqERYk1MMTX49s1syY/p2p-circuit",
+      "Peer": "c",
+      "Identify": {
+        "ID": "",
+        "PublicKey": "",
+        "Addresses": null,
+        "AgentVersion": "",
+        "Protocols": null
+      }
+    },
+    {
+      "Addr": "/ip4/1/tcp/4001",
+      "Peer": "c",
+      "Identify": {
+        "ID": "",
+        "PublicKey": "",
+        "Addresses": null,
+        "AgentVersion": "",
+        "Protocols": null
+      }
+    },
+    {
+      "Addr": "/ip4/1/udp/33556/quic-v1",
+      "Peer": "e",
+      "Identify": {
+        "ID": "",
+        "PublicKey": "",
+        "Addresses": null,
+        "AgentVersion": "",
+        "Protocols": null
+      }
+    },
+    {
+      "Addr": "/ip6/1::1/udp/4001/quic-v1",
+      "Peer": "f",
+      "Identify": {
+        "ID": "",
+        "PublicKey": "",
+        "Addresses": null,
+        "AgentVersion": "",
+        "Protocols": null
+      }
+    }
+  ]
+}

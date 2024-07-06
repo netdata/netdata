@@ -324,6 +324,9 @@
     "network_interface_filter": {
       "ui:collapsible": true
     },
+    "community": {
+      "ui:widget": "password"
+    },
     "options": {
       "version": {
         "ui:widget": "radio",
@@ -336,6 +339,9 @@
       }
     },
     "user": {
+      "name": {
+        "ui:widget": "password"
+      },
       "level": {
         "ui:widget": "radio",
         "ui:options": {
