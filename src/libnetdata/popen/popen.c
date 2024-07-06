@@ -327,35 +327,28 @@ int netdata_popene_variadic_internal_dont_use_directly(volatile pid_t *pidptr, c
     // convert the variable list arguments into what posix_spawn() needs
     // all arguments are expected strings
     va_list args;
-    int args_count;
+    va_list args_copy;
+    int argc = 0;
+
+    va_start(args, command);
 
     // count the number variable parameters
     // the variable parameters are expected NULL terminated
-    {
-        const char *s;
-
-        va_start(args, command);
-        args_count = 0;
-        while ((s = va_arg(args, const char *))) args_count++;
-        va_end(args);
-    }
+    va_copy(args_copy, args);
+    while (va_arg(args_copy, char *) != NULL) argc++;
+    va_end(args_copy);
 
     // create a string pointer array as needed by posix_spawn()
     // variable array in the stack
-    const char *spawn_argv[args_count + 1];
-    {
-        const char *s;
-        va_start(args, command);
-        int i;
-        for (i = 0; i < args_count; i++) {
-            s = va_arg(args, const char *);
-            spawn_argv[i] = s;
-        }
-        spawn_argv[args_count] = NULL;
-        va_end(args);
-    }
+    const char *argv[argc + 1];
 
-    return popene_internal(pidptr, env, flags, fpp_child_input, fpp_child_output, command, spawn_argv);
+    for (int i = 0; i < argc; i++)
+        argv[i] = va_arg(args, const char *);
+
+    argv[argc] = NULL;
+    va_end(args);
+
+    return popene_internal(pidptr, env, flags, fpp_child_input, fpp_child_output, command, argv);
 }
 
 // See man environ
@@ -461,14 +454,7 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
     return 0;
 }
 
-POPEN_INSTANCE *netdata_popen_run(const char *cmd) {
-    const char *argv[] = {
-        "/bin/sh",
-        "-c",
-        cmd,
-        NULL,
-    };
-
+POPEN_INSTANCE *netdata_popen_run_argv(const char **argv) {
     SPAWN_INSTANCE *instance = spawn_server_exec(netdata_main_spawn_server, nd_log_collectors_fd(),
         0, argv, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
 
@@ -480,6 +466,46 @@ POPEN_INSTANCE *netdata_popen_run(const char *cmd) {
     pi->child_stdout_fp = fdopen(instance->read_fd, "r");
 
     return pi;
+}
+
+POPEN_INSTANCE *netdata_popen_run_variadic(const char *cmd, ...) {
+    va_list args;
+    va_list args_copy;
+    int argc = 0;
+
+    // Start processing variadic arguments
+    va_start(args, cmd);
+
+    // Make a copy of args to count the number of arguments
+    va_copy(args_copy, args);
+    while (va_arg(args_copy, char *) != NULL) argc++;
+    va_end(args_copy);
+
+    // Allocate memory for argv array (+2 for cmd and NULL terminator)
+    const char *argv[argc + 2];
+
+    // Populate the argv array
+    argv[0] = cmd;
+
+    for (int i = 1; i <= argc; i++)
+        argv[i] = va_arg(args, const char *);
+
+    argv[argc + 1] = NULL; // NULL-terminate the array
+
+    // End processing variadic arguments
+    va_end(args);
+
+    return netdata_popen_run_argv(argv);
+}
+
+POPEN_INSTANCE *netdata_popen_run(const char *cmd) {
+    const char *argv[] = {
+        "/bin/sh",
+        "-c",
+        cmd,
+        NULL
+    };
+    return netdata_popen_run_argv(argv);
 }
 
 int netdata_popen_stop(POPEN_INSTANCE *pi) {

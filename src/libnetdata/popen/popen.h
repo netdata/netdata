@@ -14,6 +14,8 @@ typedef struct {
 } POPEN_INSTANCE;
 
 POPEN_INSTANCE *netdata_popen_run(const char *cmd);
+POPEN_INSTANCE *netdata_popen_run_argv(const char **argv);
+POPEN_INSTANCE *netdata_popen_run_variadic(const char *cmd, ...);
 int netdata_popen_stop(POPEN_INSTANCE *pi);
 
 #include "../os/waitid.h"
