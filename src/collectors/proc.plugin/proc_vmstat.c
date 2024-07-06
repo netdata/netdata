@@ -19,6 +19,16 @@ static bool is_ksm_enabled() {
     return !read_single_number_file(filename, &ksm_run) && ksm_run == 1;
 }
 
+static bool is_zswap_enabled() {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "/sys/module/zswap/parameters/enabled"); // host prefix is not needed here
+    char state[1 + 1];                                                         // Y or N
+
+    int ret = read_txt_file(filename, state, sizeof(state));
+
+    return !ret && !strcmp(state, "Y");
+}
+
 static bool is_swap_enabled() {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/meminfo", netdata_configured_host_prefix);
@@ -202,6 +212,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
         do_ksm = is_ksm_enabled() ? do_ksm : CONFIG_BOOLEAN_NO;
         do_swapio = is_swap_enabled() ? do_swapio : CONFIG_BOOLEAN_NO;
+        do_zswapio = is_zswap_enabled() ? do_zswapio : CONFIG_BOOLEAN_NO;
 
         arl_base = arl_create("vmstat", NULL, 60);
         arl_expect(arl_base, "pgfault", &pgfault);
