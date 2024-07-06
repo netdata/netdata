@@ -53,11 +53,8 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
     }
 
 #ifndef DISABLE_CLOUD
-    int exit_code;
-    pid_t command_pid;
     char command_exec_buffer[CLAIMING_COMMAND_LENGTH + 1];
     char command_line_buffer[CLAIMING_COMMAND_LENGTH + 1];
-    FILE *fp_child_output, *fp_child_input;
 
     // This is guaranteed to be set early in main via post_conf_load()
     char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
@@ -92,17 +89,17 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
               claiming_arguments);
 
     netdata_log_info("Executing agent claiming command: %s", command_exec_buffer);
-    fp_child_output = netdata_popen(command_line_buffer, &command_pid, &fp_child_input);
-    if(!fp_child_output) {
+    POPEN_INSTANCE *instance = netdata_popen_run(command_exec_buffer);
+    if(!instance) {
         netdata_log_error("Cannot popen(\"%s\").", command_exec_buffer);
         return CLAIM_AGENT_CANNOT_EXECUTE_CLAIM_SCRIPT;
     }
 
     netdata_log_info("Waiting for claiming command '%s' to finish.", command_exec_buffer);
     char read_buffer[100 + 1];
-    while (fgets(read_buffer, 100, fp_child_output) != NULL) ;
+    while (fgets(read_buffer, 100, instance->child_stdout_fp) != NULL) ;
 
-    exit_code = netdata_pclose(fp_child_input, fp_child_output, command_pid);
+    int exit_code = netdata_popen_stop(instance);
 
     netdata_log_info("Agent claiming command '%s' returned with code %d", command_exec_buffer, exit_code);
     if (0 == exit_code) {
