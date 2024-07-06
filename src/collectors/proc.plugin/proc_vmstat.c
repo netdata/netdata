@@ -13,6 +13,18 @@
 int do_proc_vmstat(int update_every, usec_t dt) {
     (void)dt;
 
+    static int ksm_enabled = -1;
+
+    if (ksm_enabled == -1) {
+        unsigned long long ksm_run = 0;
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s/sys/kernel/mm/ksm/run", netdata_configured_host_prefix);
+
+        read_single_number_file(filename, &ksm_run);
+
+        ksm_enabled = ksm_run == 1 ? 1 : 0;
+    }
+
     static procfile *ff = NULL;
     static int do_swapio = -1, do_io = -1, do_pgfaults = -1, do_oom_kill = -1, do_numa = -1, do_thp = -1, do_zswapio = -1, do_balloon = -1, do_ksm = -1;
     static int has_numa = -1;
@@ -154,6 +166,9 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         do_zswapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "zswap i/o", CONFIG_BOOLEAN_AUTO);
         do_balloon = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "memory ballooning", CONFIG_BOOLEAN_AUTO);
         do_ksm = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "kernel same memory", CONFIG_BOOLEAN_AUTO);
+        if (!ksm_enabled) {
+            do_ksm = CONFIG_BOOLEAN_NO;
+        }
 
         arl_base = arl_create("vmstat", NULL, 60);
         arl_expect(arl_base, "pgfault", &pgfault);
