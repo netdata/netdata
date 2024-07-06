@@ -483,6 +483,8 @@ extern char *netdata_configured_host_prefix;
 #include "datetime/rfc3339.h"
 #include "datetime/rfc7231.h"
 #include "completion/completion.h"
+#include "log/log.h"
+#include "spawn_server/spawn_server.h"
 #include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"
 #ifdef ENABLE_HTTPS
@@ -491,7 +493,6 @@ extern char *netdata_configured_host_prefix;
 #include "socket/socket.h"
 #include "config/appconfig.h"
 #include "log/journal.h"
-#include "log/log.h"
 #include "buffered_reader/buffered_reader.h"
 #include "procfile/procfile.h"
 #include "string/string.h"
@@ -517,7 +518,6 @@ extern char *netdata_configured_host_prefix;
 #include "functions_evloop/functions_evloop.h"
 #include "query_progress/progress.h"
 #include "safe_fork/safe_fork.h"
-#include "spawn_server/spawn_server.h"
 
 // BEWARE: this exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"

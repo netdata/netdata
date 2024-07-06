@@ -1727,6 +1727,8 @@ static int fd_is_valid(int fd) {
 }
 
 void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds){
+    return;
+
     int fd;
 
     switch(action){

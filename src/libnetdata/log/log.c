@@ -514,6 +514,13 @@ int nd_log_health_fd(void) {
     return STDERR_FILENO;
 }
 
+int nd_log_collectors_fd(void) {
+    if(nd_log.sources[NDLS_COLLECTORS].method == NDLM_FILE && nd_log.sources[NDLS_COLLECTORS].fd != -1)
+        return nd_log.sources[NDLS_COLLECTORS].fd;
+
+    return STDERR_FILENO;
+}
+
 void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
     char buf[FILENAME_MAX + 100];
     if(setting && *setting)

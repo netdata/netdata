@@ -194,11 +194,9 @@ int sock_setreuse(int fd, int reuse) {
 void sock_setcloexec(int fd)
 {
     UNUSED(fd);
-#ifndef SOCK_CLOEXEC
     int flags = fcntl(fd, F_GETFD);
     if (flags != -1)
         (void) fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
-#endif
 }
 
 int sock_setreuse_port(int fd __maybe_unused, int reuse __maybe_unused) {

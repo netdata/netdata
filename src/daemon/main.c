@@ -490,9 +490,12 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 #endif
     watcher_step_complete(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
 
+    netdata_main_spawn_server_cleanup();
+    watcher_step_complete(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER);
+
     (void) unlink(agent_incomplete_shutdown_file);
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE);
-    
+
     watcher_shutdown_end();
     watcher_thread_stop();
 
@@ -1464,15 +1467,12 @@ int unittest_prepare_rrd(char **user) {
     return 0;
 }
 
-int netdata_main(int argc, char **argv)
-{
-    analytics_init();
-    string_init();
-
-    // initialize the system clocks
+int netdata_main(int argc, char **argv) {
     clocks_init();
-    netdata_start_time = now_realtime_sec();
+    string_init();
+    analytics_init();
 
+    netdata_start_time = now_realtime_sec();
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;
@@ -2196,6 +2196,7 @@ int netdata_main(int argc, char **argv)
     (void)dont_fork;
 #endif
 
+    netdata_main_spawn_server_init("plugins", argc, argv);
     watcher_thread_start();
 
     // init sentry

@@ -3,6 +3,19 @@
 #ifndef NETDATA_POPEN_H
 #define NETDATA_POPEN_H 1
 
+extern SPAWN_SERVER *netdata_main_spawn_server;
+bool netdata_main_spawn_server_init(const char *name, int argc, char **argv);
+void netdata_main_spawn_server_cleanup(void);
+
+typedef struct {
+    SPAWN_INSTANCE *instance;
+    FILE *child_stdin_fp;
+    FILE *child_stdout_fp;
+} POPEN_INSTANCE;
+
+POPEN_INSTANCE *netdata_popen_run(const char *cmd);
+int netdata_popen_stop(POPEN_INSTANCE *pi);
+
 #include "../os/waitid.h"
 int netdata_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
 

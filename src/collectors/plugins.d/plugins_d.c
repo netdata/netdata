@@ -160,14 +160,13 @@ static void *pluginsd_worker_thread(void *arg) {
     size_t count = 0;
 
     while(service_running(SERVICE_COLLECTORS)) {
-        FILE *fp_child_input = NULL;
-        FILE *fp_child_output = netdata_popen(cd->cmd, &cd->unsafe.pid, &fp_child_input);
-
-        if(unlikely(!fp_child_input || !fp_child_output)) {
+        POPEN_INSTANCE *pi = netdata_popen_run(cd->cmd);
+        if(!pi) {
             netdata_log_error("PLUGINSD: 'host:%s', cannot popen(\"%s\", \"r\").",
                               rrdhost_hostname(cd->host), cd->cmd);
             break;
         }
+        cd->unsafe.pid = pi->instance->child_pid;
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: 'host:%s' connected to '%s' running on pid %d",
@@ -190,15 +189,14 @@ static void *pluginsd_worker_thread(void *arg) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        count = pluginsd_process(cd->host, cd, fp_child_input, fp_child_output, 0);
+        count = pluginsd_process(cd->host, cd, pi->child_stdin_fp, pi->child_stdout_fp, 0);
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",
                rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, count);
 
-        killpid(cd->unsafe.pid);
-
-        int worker_ret_code = netdata_pclose(fp_child_input, fp_child_output, cd->unsafe.pid);
+        int worker_ret_code = netdata_popen_stop(pi);
+        pi = NULL;
 
         if(likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);

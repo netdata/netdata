@@ -2,6 +2,18 @@
 
 #include "../libnetdata.h"
 
+SPAWN_SERVER *netdata_main_spawn_server = NULL;
+
+bool netdata_main_spawn_server_init(const char *name, int argc, char **argv) {
+    netdata_main_spawn_server = spawn_server_create(name, NULL, argc, argv);
+    return netdata_main_spawn_server != NULL;
+}
+
+void netdata_main_spawn_server_cleanup(void) {
+    if(netdata_main_spawn_server)
+        spawn_server_destroy(netdata_main_spawn_server);
+}
+
 // ----------------------------------------------------------------------------
 // popen with tracking
 
@@ -443,4 +455,49 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
         netdata_log_error("Cannot waitid() for pid %d", pid);
     
     return 0;
+}
+
+POPEN_INSTANCE *netdata_popen_run(const char *cmd) {
+    const char *argv[] = {
+        "/bin/sh",
+        "-c",
+        cmd,
+        NULL,
+    };
+
+    SPAWN_INSTANCE *instance = spawn_server_exec(netdata_main_spawn_server, nd_log_collectors_fd(),
+        0, argv, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
+
+    if(instance == NULL) return NULL;
+
+    POPEN_INSTANCE *pi = mallocz(sizeof(*pi));
+    pi->instance = instance;
+    pi->child_stdin_fp = fdopen(instance->write_fd, "w");
+    pi->child_stdout_fp = fdopen(instance->read_fd, "r");
+
+    return pi;
+}
+
+int netdata_popen_stop(POPEN_INSTANCE *pi) {
+    int status = spawn_server_stop(netdata_main_spawn_server, pi->instance);
+    fclose(pi->child_stdin_fp);
+    fclose(pi->child_stdout_fp);
+    freez(pi);
+
+    if(WIFEXITED(status))
+        return WEXITSTATUS(status);
+
+    if(WIFSIGNALED(status)) {
+        int sig = WTERMSIG(status);
+        switch(sig) {
+            case SIGTERM:
+            case SIGPIPE:
+                return 0;
+
+            default:
+                return -1;
+        }
+    }
+
+    return -1;
 }
