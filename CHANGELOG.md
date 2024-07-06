@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- health add alarm docker container down [\#18075](https://github.com/netdata/netdata/pull/18075) ([ilyam8](https://github.com/ilyam8))
+- go.d ipfs fix tests [\#18074](https://github.com/netdata/netdata/pull/18074) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18073](https://github.com/netdata/netdata/pull/18073) ([netdatabot](https://github.com/netdatabot))
+- Port ipfs from python to Go [\#18070](https://github.com/netdata/netdata/pull/18070) ([Ancairon](https://github.com/Ancairon))
 - update golang version in netdata.spec [\#18069](https://github.com/netdata/netdata/pull/18069) ([ilyam8](https://github.com/ilyam8))
 - go.d set sensitive props to "password" widget [\#18068](https://github.com/netdata/netdata/pull/18068) ([ilyam8](https://github.com/ilyam8))
 - Disable health thread on windows [\#18066](https://github.com/netdata/netdata/pull/18066) ([stelfrag](https://github.com/stelfrag))
@@ -402,9 +406,6 @@
 - Fix handling of kernel version detection in CMake. [\#17514](https://github.com/netdata/netdata/pull/17514) ([Ferroin](https://github.com/Ferroin))
 - Work around MS’s broken infra in CI. [\#17513](https://github.com/netdata/netdata/pull/17513) ([Ferroin](https://github.com/Ferroin))
 - Move handling of legacy eBPF programs into CMake. [\#17512](https://github.com/netdata/netdata/pull/17512) ([Ferroin](https://github.com/Ferroin))
-- go.d traefik fix "got a SET but dimension does not exist" [\#17511](https://github.com/netdata/netdata/pull/17511) ([ilyam8](https://github.com/ilyam8))
-- Documentation edits [\#17509](https://github.com/netdata/netdata/pull/17509) ([Ancairon](https://github.com/Ancairon))
-- Report correct error code when data insert fails [\#17508](https://github.com/netdata/netdata/pull/17508) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
