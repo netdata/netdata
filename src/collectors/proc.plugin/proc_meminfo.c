@@ -285,7 +285,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             rrdset_done(st_mem_swap_cached);
         }
 
-        if(arl_zswapped->flags & ARL_ENTRY_FLAG_FOUND) {
+        if (is_mem_zswap_enabled && (arl_zswapped->flags & ARL_ENTRY_FLAG_FOUND)) {
             static RRDSET *st_mem_zswap = NULL;
             static RRDDIM *rd_zswap = NULL, *rd_zswapped = NULL;
 
