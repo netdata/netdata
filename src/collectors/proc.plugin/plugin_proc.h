@@ -53,6 +53,10 @@ int get_numa_node_count(void);
 extern unsigned long long zfs_arcstats_shrinkable_cache_size_bytes;
 extern bool inside_lxc_container;
 
+extern bool is_mem_swap_enabled;
+extern bool is_mem_zswap_enabled;
+extern bool is_mem_ksm_enabled;
+
 // netdev renames
 void cgroup_rename_task_add(
     const char *host_device,
