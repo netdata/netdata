@@ -9,6 +9,7 @@
 #include <io.h>
 #include <fcntl.h>
 #include <process.h>
+#include <sys/cygwin.h>
 #endif
 
 struct spawn_server {
@@ -36,6 +37,8 @@ struct spawm_instance {
 
 #if defined(OS_WINDOWS)
     HANDLE process_handle;
+    HANDLE read_handle;
+    HANDLE write_handle;
 #endif
 };
 
@@ -61,12 +64,63 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
     }
 }
 
-SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type) {
+static BUFFER *argv_to_windows(const char **argv) {
+    BUFFER *wb = buffer_create(0, NULL);
+
+    // argv[0] is the path
+    char b[strlen(argv[0]) * 2 + 1024];
+    cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, sizeof(b));
+
+    for(size_t i = 0; argv[i] ;i++) {
+        const char *s = (i == 0) ? b : argv[i];
+        size_t len = strlen(s);
+        buffer_need_bytes(wb, len * 2 + 1);
+
+        bool needs_quotes = false;
+        for(const char *c = s; !needs_quotes && *c ; c++) {
+            switch(*c) {
+                case ' ':
+                case '\v':
+                case '\t':
+                case '\n':
+                case '"':
+                    needs_quotes = true;
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        if(needs_quotes && buffer_strlen(wb))
+            buffer_strcat(wb, " \"");
+
+        for(const char *c = s; !needs_quotes && *c ; c++) {
+            switch(*c) {
+                case '"':
+                    buffer_putc(wb, '\\');
+                    // fall through
+
+                default:
+                    buffer_putc(wb, *c);
+                    break;
+            }
+        }
+
+        if(needs_quotes)
+            buffer_strcat(wb, "\"");
+    }
+
+    return wb;
+}
+
+SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
     if (type != SPAWN_INSTANCE_TYPE_EXEC)
         return NULL;
 
     SPAWN_INSTANCE *instance = (SPAWN_INSTANCE*)callocz(1, sizeof(SPAWN_INSTANCE));
 
+    instance->request_id = __atomic_add_fetch(&server->request_id, 1, __ATOMIC_RELAXED);
     HANDLE stdin_read_handle, stdin_write_handle;
     HANDLE stdout_read_handle, stdout_write_handle;
     SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
@@ -92,15 +146,10 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     si.hStdOutput = stdout_write_handle;
     si.hStdError = (HANDLE)_get_osfhandle(stderr_fd);
 
-    // Convert POSIX path to Windows path
-    char cmdline[1024] = "";
-    for (int i = 0; argv[i] != NULL; ++i) {
-        strcat(cmdline, argv[i]);
-        strcat(cmdline, " ");
-    }
+    CLEAN_BUFFER *wb = argv_to_windows(argv);
 
     // Spawn the process
-    if (!CreateProcess(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
+    if (!CreateProcess(NULL, (char *)buffer_tostring(wb), NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
         CloseHandle(stdin_read_handle);
         CloseHandle(stdin_write_handle);
         CloseHandle(stdout_read_handle);
@@ -120,18 +169,22 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     instance->process_handle = pi.hProcess;
 
     // Convert handles to POSIX file descriptors
-    instance->write_fd = _open_osfhandle((intptr_t)stdin_write_handle, _O_WRONLY);
-    instance->read_fd = _open_osfhandle((intptr_t)stdout_read_handle, _O_RDONLY);
+    instance->write_fd = cygwin_attach_handle_to_fd("pipe_write", -1, stdin_write_handle, O_WRONLY, 0);
+    instance->read_fd = cygwin_attach_handle_to_fd("pipe_write", -1, stdout_read_handle, O_RDONLY, 0);
+
+    instance->read_handle = stdout_read_handle;
+    instance->write_handle = stdin_write_handle;
 
     return instance;
 }
 
-int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance) {
-    if(instance->read_fd != -1) { _close(instance->read_fd); instance->read_fd = -1; }
-    if(instance->write_fd != -1) { _close(instance->write_fd); instance->write_fd = -1; }
+int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
+    if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
+    if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
+    CloseHandle(instance->read_handle); instance->read_handle = NULL;
+    CloseHandle(instance->write_handle); instance->write_handle = NULL;
 
-    if (!TerminateProcess(instance->process_handle, 0))
-        return -1;
+    TerminateProcess(instance->process_handle, 0);
 
     DWORD exit_code;
     GetExitCodeProcess(instance->process_handle, &exit_code);
@@ -141,9 +194,11 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance) {
     return (int)exit_code;
 }
 
-int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *instance) {
-    if(instance->read_fd != -1) { _close(instance->read_fd); instance->read_fd = -1; }
-    if(instance->write_fd != -1) { _close(instance->write_fd); instance->write_fd = -1; }
+int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
+    if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
+    if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
+    CloseHandle(instance->read_handle); instance->read_handle = NULL;
+    CloseHandle(instance->write_handle); instance->write_handle = NULL;
 
     WaitForSingleObject(instance->process_handle, INFINITE);
 
