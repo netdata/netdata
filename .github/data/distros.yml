@@ -144,6 +144,7 @@ include:
     notes: ''
     base_image: debian:bookworm
     eol_check: true
+    eol_lts: true
     bundle_sentry:
       <<: *default_sentry
       amd64: true
