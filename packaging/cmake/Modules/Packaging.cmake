@@ -56,43 +56,43 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_NAME "netdata")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_PREDEPENDS "adduser, libcap2-bin")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
-		"netdata-plugin-cups (= ${CPACK_PACKAGE_VERSION}), netdata-plugin-freeipmi (= ${CPACK_PACKAGE_VERSION})")
+		"netdata-plugin-cups, netdata-plugin-freeipmi")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
-		"netdata-plugin-systemd-journal (= ${CPACK_PACKAGE_VERSION}), \
-netdata-plugin-logs-management (= ${CPACK_PACKAGE_VERSION}), \
-netdata-plugin-network-viewer (= ${CPACK_PACKAGE_VERSION})")
+		"netdata-plugin-systemd-journal, \
+netdata-plugin-logs-management, \
+netdata-plugin-network-viewer")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
 
-list(APPEND _main_deps "netdata-plugin-chartsd (= ${CPACK_PACKAGE_VERSION})")
-list(APPEND _main_deps "netdata-plugin-pythond (= ${CPACK_PACKAGE_VERSION})")
+list(APPEND _main_deps "netdata-plugin-chartsd")
+list(APPEND _main_deps "netdata-plugin-pythond")
 
 if(ENABLE_PLUGIN_APPS)
-        list(APPEND _main_deps "netdata-plugin-apps (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-apps")
 endif()
 
 if(ENABLE_PLUGIN_GO)
-        list(APPEND _main_deps "netdata-plugin-go (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-go")
 endif()
 
 if(ENABLE_PLUGIN_DEBUGFS)
-        list(APPEND _main_deps "netdata-plugin-debugfs (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-debugfs")
 endif()
 
 if(ENABLE_PLUGIN_NFACCT)
-        list(APPEND _main_deps "netdata-plugin-nfacct (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-nfacct")
 endif()
 
 if(ENABLE_PLUGIN_SLABINFO)
-        list(APPEND _main_deps "netdata-plugin-slabinfo (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-slabinfo")
 endif()
 
 if(ENABLE_PLUGIN_PERF)
-        list(APPEND _main_deps "netdata-plugin-perf (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-perf")
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
-        list(APPEND _main_deps "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-ebpf")
 endif()
 
 list(JOIN _main_deps ", " CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS)
