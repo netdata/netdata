@@ -820,6 +820,9 @@ Conflicts: %{name} < %{version}
 Suggests: nvme-cli
 Suggests: sudo
 %endif
+%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+Recommends: lm_sensors
+%endif
 
 %description plugin-go
  This plugin adds a selection of additional collectors written in Go to the Netdata Agent
@@ -1021,6 +1024,8 @@ fi
 %caps(cap_sys_admin,cap_sys_ptrace,cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
 
 %changelog
+* Wed Jul 03 2024 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-26
+- Added lm_sensors as weak dependency for plugin-go package
 * Tue Feb 06 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-25
 - Add package for network-viewer plugin
 * Thu Oct 26 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-24
