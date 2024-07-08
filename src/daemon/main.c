@@ -2182,7 +2182,7 @@ int netdata_main(int argc, char **argv) {
     (void)dont_fork;
 #endif
 
-    netdata_main_spawn_server_init("plugins", argc, argv);
+    netdata_main_spawn_server_init("plugins", argc, (const char **)argv);
     watcher_thread_start();
 
     // init sentry

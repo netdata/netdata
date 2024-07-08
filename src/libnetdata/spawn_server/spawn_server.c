@@ -23,7 +23,7 @@ struct spawn_server {
     char *path;
     spawn_request_callback_t cb;
 
-    char **argv;
+    const char **argv;
     size_t argv0_size;
 #endif
 };
@@ -237,9 +237,9 @@ static void set_process_name(SPAWN_SERVER *server, const char *comm __maybe_unus
 
     if(server->argv && server->argv[0] && server->argv0_size) {
         size_t len = strlen(comm);
-        strncpyz(server->argv[0], comm, MIN(server->argv0_size, len));
+        strncpyz((char *)server->argv[0], comm, MIN(server->argv0_size, len));
         while(len < server->argv0_size)
-            server->argv[0][len++] = ' ';
+            ((char *)server->argv[0])[len++] = ' ';
     }
 }
 

@@ -4,7 +4,7 @@
 
 SPAWN_SERVER *netdata_main_spawn_server = NULL;
 
-bool netdata_main_spawn_server_init(const char *name, int argc, char **argv) {
+bool netdata_main_spawn_server_init(const char *name, int argc, const char **argv) {
     if(!netdata_main_spawn_server)
         netdata_main_spawn_server = spawn_server_create(name, NULL, argc, argv);
 

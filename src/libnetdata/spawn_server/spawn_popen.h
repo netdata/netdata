@@ -6,7 +6,7 @@
 #include "../libnetdata.h"
 
 extern SPAWN_SERVER *netdata_main_spawn_server;
-bool netdata_main_spawn_server_init(const char *name, int argc, char **argv);
+bool netdata_main_spawn_server_init(const char *name, int argc, const char **argv);
 void netdata_main_spawn_server_cleanup(void);
 
 typedef struct {
