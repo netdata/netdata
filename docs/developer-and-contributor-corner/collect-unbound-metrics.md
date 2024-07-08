@@ -58,9 +58,7 @@ configuring the collector.
 You may not need to do any more configuration to have Netdata collect your Unbound metrics.
 
 If you followed the steps above to enable `remote-control` and make your Unbound files readable by Netdata, that should
-be enough. Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system. You should see Unbound metrics in your Netdata
-dashboard!
+be enough. Restart Netdata with `sudo systemctl restart netdata`, or the appropriate method for your system. You should see Unbound metrics in your Netdata dashboard!
 
 ![Some charts showing Unbound metrics in real-time](https://user-images.githubusercontent.com/1153921/69659974-93160f00-103c-11ea-88e6-27e9efcf8c0d.png)
 
@@ -93,7 +91,7 @@ jobs:
     tls_skip_verify: yes
     tls_cert: /path/to/unbound_control.pem
     tls_key: /path/to/unbound_control.key
-  
+
   - name: local
     address: 127.0.0.1:8953
     cumulative: yes
@@ -101,10 +99,9 @@ jobs:
 ```
 
 Netdata will attempt to read `unbound.conf` to get the appropriate `address`, `cumulative`, `use_tls`, `tls_cert`, and
-`tls_key` parameters. 
+`tls_key` parameters.
 
-Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
+Restart Netdata with `sudo systemctl restart netdata`, or the appropriate method for your system.
 
 ### Manual setup for a remote Unbound server
 

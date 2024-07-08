@@ -51,10 +51,7 @@ The steps are:
   our [documentation](/src/collectors/plugins.d/README.md#external-plugins-api).
 - If you want to test the collector with the actual Netdata Agent, you need to replace the `go.d.plugin` binary that
   exists in the Netdata Agent installation directory with the one you just compiled. Once
-  you [restart](/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
-  the Netdata Agent, it will detect and run
-  it, creating all the charts. It is advised not to remove the default `go.d.plugin` binary, but simply rename it
-  to `go.d.plugin.old` so that the Agent doesn't run it, but you can easily rename it back once you are done.
+  you restart the Netdata Agent, it will detect and run it, creating all the charts. It is advised not to remove the default `go.d.plugin` binary, but simply rename it to `go.d.plugin.old` so that the Agent doesn't run it, but you can easily rename it back once you are done.
 - Run `make clean` when you are done with testing.
 
 ## Module Interface
