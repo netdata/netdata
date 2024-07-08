@@ -88,22 +88,6 @@ func (ppt *Puppet) collect() (map[string]int64, error) {
 	if err := ppt.collectStatsService(mx); err != nil {
 		return nil, err
 	}
-	// if err := ppt.collectSwarmPeers(mx); err != nil {
-	// 	return nil, err
-	// }
-	// if ppt.QueryRepoApi {
-	// 	// https://github.com/netdata/netdata/pull/9687
-	// 	// TODO: collect by default with "size-only"
-	// 	// https://github.com/puppet/kubo/issues/7528#issuecomment-657398332
-	// 	if err := ppt.collectStatsRepo(mx); err != nil {
-	// 		return nil, err
-	// 	}
-	// }
-	// if ppt.QueryPinApi {
-	// 	if err := ppt.collectPinLs(mx); err != nil {
-	// 		return nil, err
-	// 	}
-	// }
 
 	return mx, nil
 }
@@ -131,52 +115,6 @@ func (ppt *Puppet) collectStatsService(mx map[string]int64) error {
 
 	return nil
 }
-
-// func (ppt *Puppet) collectSwarmPeers(mx map[string]int64) error {
-// 	stats, err := ppt.querySwarmPeers()
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	mx["peers"] = int64(len(stats.Peers))
-
-// 	return nil
-// }
-
-// func (ppt *Puppet) collectStatsRepo(mx map[string]int64) error {
-// 	stats, err := ppt.queryStatsRepo()
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	mx["used_percent"] = 0
-// 	if stats.StorageMax > 0 {
-// 		mx["used_percent"] = stats.RepoSize * 100 / stats.StorageMax
-// 	}
-// 	mx["size"] = stats.RepoSize
-// 	mx["objects"] = stats.NumObjects
-
-// 	return nil
-// }
-
-// func (ppt *Puppet) collectPinLs(mx map[string]int64) error {
-// 	stats, err := ppt.queryPinLs()
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	var n int64
-// 	for _, v := range stats.Keys {
-// 		if v.Type == "recursive" {
-// 			n++
-// 		}
-// 	}
-
-// 	mx["pinned"] = int64(len(stats.Keys))
-// 	mx["recursive_pins"] = n
-
-// 	return nil
-// }
 
 func (ppt *Puppet) queryStatsService() (*PuppetStatsService, error) {
 	req, err := web.NewHTTPRequest(ppt.Request)
