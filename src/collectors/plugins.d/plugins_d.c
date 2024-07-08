@@ -68,23 +68,15 @@ static void pluginsd_worker_thread_cleanup(void *pptr) {
     cd->unsafe.running = false;
     cd->unsafe.thread = 0;
 
-    pid_t pid = cd->unsafe.pid;
     cd->unsafe.pid = 0;
+
+    POPEN_INSTANCE *pi = cd->unsafe.pi;
+    cd->unsafe.pi = NULL;
 
     spinlock_unlock(&cd->unsafe.spinlock);
 
-    if (pid) {
-        siginfo_t info;
-        netdata_log_info("PLUGINSD: 'host:%s', killing data collection child process with pid %d",
-             rrdhost_hostname(cd->host), pid);
-
-        if (killpid(pid) != -1) {
-            netdata_log_info("PLUGINSD: 'host:%s', waiting for data collection child process pid %d to exit...",
-                 rrdhost_hostname(cd->host), pid);
-
-            netdata_waitid(P_PID, (id_t)pid, &info, WEXITED);
-        }
-    }
+    if (pi)
+        spawn_popen_kill(pi);
 }
 
 #define SERIAL_FAILURES_THRESHOLD 10
@@ -160,13 +152,13 @@ static void *pluginsd_worker_thread(void *arg) {
     size_t count = 0;
 
     while(service_running(SERVICE_COLLECTORS)) {
-        POPEN_INSTANCE *pi = spawn_popen_run(cd->cmd);
-        if(!pi) {
+        cd->unsafe.pi = spawn_popen_run(cd->cmd);
+        if(!cd->unsafe.pi) {
             netdata_log_error("PLUGINSD: 'host:%s', cannot popen(\"%s\", \"r\").",
                               rrdhost_hostname(cd->host), cd->cmd);
             break;
         }
-        cd->unsafe.pid = pi->instance->child_pid;
+        cd->unsafe.pid = cd->unsafe.pi->instance->child_pid;
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: 'host:%s' connected to '%s' running on pid %d",
@@ -189,14 +181,14 @@ static void *pluginsd_worker_thread(void *arg) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        count = pluginsd_process(cd->host, cd, pi->child_stdin_fp, pi->child_stdout_fp, 0);
+        count = pluginsd_process(cd->host, cd, cd->unsafe.pi->child_stdin_fp, cd->unsafe.pi->child_stdout_fp, 0);
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",
                rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, count);
 
-        int worker_ret_code = spawn_popen_kill(pi);
-        pi = NULL;
+        int worker_ret_code = spawn_popen_kill(cd->unsafe.pi);
+        cd->unsafe.pi = NULL;
 
         if(likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);

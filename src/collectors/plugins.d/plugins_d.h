@@ -34,6 +34,7 @@ struct plugind {
         bool running;                  // do not touch this structure after setting this to 1
         bool enabled;                   // if this is enabled or not
         ND_THREAD *thread;
+        POPEN_INSTANCE *pi;
         pid_t pid;
     } unsafe;
 
