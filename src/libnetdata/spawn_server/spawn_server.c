@@ -118,29 +118,52 @@ static BUFFER *argv_to_windows(const char **argv) {
     return wb;
 }
 
-SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_unused, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
+SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+
     if (type != SPAWN_INSTANCE_TYPE_EXEC)
         return NULL;
 
-    SPAWN_INSTANCE *instance = (SPAWN_INSTANCE*)callocz(1, sizeof(SPAWN_INSTANCE));
+    int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 };
 
+    SPAWN_INSTANCE *instance = callocz(1, sizeof(*instance));
     instance->request_id = __atomic_add_fetch(&server->request_id, 1, __ATOMIC_RELAXED);
-    HANDLE stdin_read_handle, stdin_write_handle;
-    HANDLE stdout_read_handle, stdout_write_handle;
-    SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
 
-    if (!CreatePipe(&stdin_read_handle, &stdin_write_handle, &sa, 0)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot CreatePipe() for stdin");
-        freez(instance);
-        return NULL;
+    CLEAN_BUFFER *wb = argv_to_windows(argv);
+    char *command = (char *)buffer_tostring(wb);
+
+    if (pipe(pipe_stdin) == -1) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN PARENT: Cannot create stdin pipe()");
+        goto cleanup;
     }
 
-    if (!CreatePipe(&stdout_read_handle, &stdout_write_handle, &sa, 0)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot CreatePipe() for stdout");
-        CloseHandle(stdin_read_handle);
-        CloseHandle(stdin_write_handle);
-        freez(instance);
-        return NULL;
+    if (pipe(pipe_stdout) == -1) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN PARENT: Cannot create stdout pipe()");
+        goto cleanup;
+    }
+
+    // do not run multiple times this section
+    // to prevent handles leaking
+    spinlock_lock(&spinlock);
+
+    // Convert POSIX file descriptors to Windows handles
+    HANDLE stdin_read_handle = (HANDLE)_get_osfhandle(pipe_stdin[0]);
+    HANDLE stdout_write_handle = (HANDLE)_get_osfhandle(pipe_stdout[1]);
+    HANDLE stderr_handle = (HANDLE)_get_osfhandle(stderr_fd);
+
+    if (stdin_read_handle == INVALID_HANDLE_VALUE || stdout_write_handle == INVALID_HANDLE_VALUE || stderr_handle == INVALID_HANDLE_VALUE) {
+        spinlock_unlock(&spinlock);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN PARENT: Invalid handle value(s)");
+        goto cleanup;
+    }
+
+    // Set handle inheritance
+    if (!SetHandleInformation(stdin_read_handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT) ||
+        !SetHandleInformation(stdout_write_handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT) ||
+        !SetHandleInformation(stderr_handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT)) {
+        spinlock_unlock(&spinlock);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN PARENT: Cannot set handle inheritance");
+        goto cleanup;
     }
 
     // Set up the STARTUPINFO structure
@@ -151,30 +174,26 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     si.dwFlags = STARTF_USESTDHANDLES;
     si.hStdInput = stdin_read_handle;
     si.hStdOutput = stdout_write_handle;
-    si.hStdError = (HANDLE)_get_osfhandle(stderr_fd);
+    si.hStdError = stderr_handle;
 
-    CLEAN_BUFFER *wb = argv_to_windows(argv);
-    char *command = (char *)buffer_tostring(wb);
-
-    nd_log(NDLS_DAEMON, NDLP_INFO, "SPAWN SERVER: command to run: %s", command);
+    nd_log(NDLS_DAEMON, NDLP_INFO, "SPAWN PARENT: command to run: %s", command);
 
     // Spawn the process
     if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
+        spinlock_unlock(&spinlock);
         DWORD error_code = GetLastError();
-        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot CreateProcess(), error code: %u", error_code);
-        CloseHandle(stdin_read_handle);
-        CloseHandle(stdin_write_handle);
-        CloseHandle(stdout_read_handle);
-        CloseHandle(stdout_write_handle);
-        freez(instance);
-        return NULL;
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN PARENT: cannot CreateProcess(), error code: %u", error_code);
+        goto cleanup;
     }
 
     CloseHandle(pi.hThread);
 
+    // end of the critical section
+    spinlock_unlock(&spinlock);
+
     // Close unused pipe ends
-    CloseHandle(stdin_read_handle);
-    CloseHandle(stdout_write_handle);
+    close(pipe_stdin[0]); pipe_stdin[0] = -1;
+    close(pipe_stdout[1]); pipe_stdout[1] = -1;
 
     // Store process information in instance
     instance->child_pid = cygwin_winpid_to_pid(pi.dwProcessId);
@@ -183,15 +202,20 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     instance->process_handle = pi.hProcess;
 
     // Convert handles to POSIX file descriptors
-    instance->write_fd = cygwin_attach_handle_to_fd("pipe_write", -1, stdin_write_handle, O_WRONLY, 0);
-    instance->read_fd = cygwin_attach_handle_to_fd("pipe_read", -1, stdout_read_handle, O_RDONLY, 0);
+    instance->write_fd = pipe_stdin[1];
+    instance->read_fd = pipe_stdout[0];
 
-    instance->read_handle = stdout_read_handle;
-    instance->write_handle = stdin_write_handle;
-
-    nd_log(NDLS_DAEMON, NDLP_INFO, "SPAWN SERVER: created process: %s", command);
+    nd_log(NDLS_DAEMON, NDLP_INFO, "SPAWN PARENT: created process: %s", command);
 
     return instance;
+
+cleanup:
+    if (pipe_stdin[0] >= 0) close(pipe_stdin[0]);
+    if (pipe_stdin[1] >= 0) close(pipe_stdin[1]);
+    if (pipe_stdout[0] >= 0) close(pipe_stdout[0]);
+    if (pipe_stdout[1] >= 0) close(pipe_stdout[1]);
+    freez(instance);
+    return NULL;
 }
 
 int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
