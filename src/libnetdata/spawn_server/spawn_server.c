@@ -4,6 +4,10 @@
 
 #include "spawn_server.h"
 
+#if defined(OS_WINDOWS)
+#include <windows.h>
+#endif
+
 struct spawn_server {
     size_t id;
     size_t request_id;
@@ -40,24 +44,22 @@ void spawn_server_instance_write_fd_unset(SPAWN_INSTANCE *si) { si->write_fd = -
 
 #if defined(OS_WINDOWS)
 
-SPAWN_SERVER* spawn_server_create(const char *name, void (*child_callback)(void), int argc, char **argv) {
+SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t cb  __maybe_unused, int argc __maybe_unused, const char **argv __maybe_unused) {
     SPAWN_SERVER* server = callocz(1, sizeof(SPAWN_SERVER));
     if(name)
         server->name = strdupz(name);
     return server;
 }
 
-
 void spawn_server_destroy(SPAWN_SERVER *server) {
     if (server) {
-        if(server->name) freez(server->name);
+        if(server->name) freez((void *)server->name);
         freez(server);
     }
 }
 
-
-SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type) {
-    if (type == SPAWN_INSTANCE_TYPE_CALLBACK) {
+SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
+    if (type != SPAWN_INSTANCE_TYPE_EXEC) {
         return NULL;
     }
 
@@ -95,7 +97,6 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     return instance;
 }
-
 
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance) {
     if (!instance) {
@@ -911,7 +912,7 @@ static void replace_stdio_with_dev_null() {
     close(dev_null_fd);
 }
 
-SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t child_callback, int argc, char **argv) {
+SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t child_callback, int argc, const char **argv) {
     SPAWN_SERVER *server = callocz(1, sizeof(SPAWN_SERVER));
     server->pipe[0] = -1;
     server->pipe[1] = -1;

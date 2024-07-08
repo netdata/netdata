@@ -12,7 +12,6 @@ typedef enum {
 #endif
 } SPAWN_INSTANCE_TYPE;
 
-#if !defined(OS_WINDOWS)
 // this is only used publicly for SPAWN_INSTANCE_TYPE_CALLBACK
 // which is not available in Windows
 typedef struct spawn_request {
@@ -29,12 +28,11 @@ typedef struct spawn_request {
 } SPAWN_REQUEST;
 
 typedef void (*spawn_request_callback_t)(SPAWN_REQUEST *request);
-#endif
 
 typedef struct spawm_instance SPAWN_INSTANCE;
 typedef struct spawn_server SPAWN_SERVER;
 
-SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t child_callback, int argc, char **argv);
+SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t child_callback, int argc, const char **argv);
 void spawn_server_destroy(SPAWN_SERVER *server);
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type);
