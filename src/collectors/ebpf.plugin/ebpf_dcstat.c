@@ -549,6 +549,9 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
             goto end_dc_loop;
         }
 
+        if (ebpf_is_wrong_pid_jump(key, pid_max))
+            goto end_dc_loop;
+
         ebpf_dcstat_apps_accumulator(cv, maps_per_core);
 
         ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(key, cv->tgid);

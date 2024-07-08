@@ -375,6 +375,9 @@ static uint32_t oomkill_read_data(int32_t *keys)
     while (bpf_map_get_next_key(mapfd, &curr_key, &key) == 0) {
         curr_key = key;
 
+        if (ebpf_is_wrong_pid_jump(key, pid_max))
+            continue;
+
         keys[i] = (int32_t)key;
         i += 1;
 

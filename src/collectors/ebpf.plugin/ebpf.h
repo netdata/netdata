@@ -390,4 +390,9 @@ extern netdata_ebpf_judy_pid_t ebpf_judy_pid;
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300
 
+// On Kernel 6.9.8 we observe an anomalous PID inside hash table. We are adding this avoiding issues
+static inline bool ebpf_is_wrong_pid_jump(uint32_t pid, uint32_t limit){
+    return (pid >= limit) ? true : false;
+}
+
 #endif /* NETDATA_COLLECTOR_EBPF_H */

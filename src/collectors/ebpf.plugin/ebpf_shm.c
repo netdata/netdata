@@ -573,6 +573,9 @@ static void ebpf_read_shm_apps_table(int maps_per_core, int max_period)
             goto end_shm_loop;
         }
 
+        if (ebpf_is_wrong_pid_jump(key, pid_max))
+            goto end_shm_loop;
+
         shm_apps_accumulator(cv, maps_per_core);
 
         ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, 0);

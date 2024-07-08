@@ -547,6 +547,9 @@ static void ebpf_read_swap_apps_table(int maps_per_core, int max_period)
             goto end_swap_loop;
         }
 
+        if (ebpf_is_wrong_pid_jump(key, pid_max))
+            goto end_swap_loop;
+
         swap_apps_accumulator(cv, maps_per_core);
 
         ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, cv->tgid);

@@ -1118,6 +1118,9 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
 
         uint32_t key = 0, next_key = 0;
         while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
+            if (ebpf_is_wrong_pid_jump(key, pid_max))
+                goto end_process_loop;
+
             ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, 0);
             if (!local_pid)
                 goto end_process_loop;

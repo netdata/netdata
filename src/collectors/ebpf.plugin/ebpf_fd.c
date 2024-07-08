@@ -686,6 +686,9 @@ static void ebpf_read_fd_apps_table(int maps_per_core, int max_period)
             goto end_fd_loop;
         }
 
+        if (ebpf_is_wrong_pid_jump(key, pid_max))
+            goto end_fd_loop;
+
         fd_apps_accumulator(fv, maps_per_core);
 
         ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(key, fv->tgid);

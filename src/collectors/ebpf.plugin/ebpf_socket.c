@@ -1718,6 +1718,9 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
             goto end_socket_loop;
         }
 
+        if (ebpf_is_wrong_pid_jump(key.pid, pid_max))
+            goto end_socket_loop;
+
         if (key.pid > (uint32_t)pid_max) {
             goto end_socket_loop;
         }
