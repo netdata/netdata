@@ -6,6 +6,9 @@
 
 #if defined(OS_WINDOWS)
 #include <windows.h>
+#include <io.h>
+#include <fcntl.h>
+#include <process.h>
 #endif
 
 struct spawn_server {
@@ -58,27 +61,38 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
     }
 }
 
-SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
-    if (type != SPAWN_INSTANCE_TYPE_EXEC) {
+SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type) {
+    if (type != SPAWN_INSTANCE_TYPE_EXEC)
+        return NULL;
+
+    SPAWN_INSTANCE *instance = (SPAWN_INSTANCE*)callocz(1, sizeof(SPAWN_INSTANCE));
+
+    HANDLE stdin_read_handle, stdin_write_handle;
+    HANDLE stdout_read_handle, stdout_write_handle;
+    SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+
+    if (!CreatePipe(&stdin_read_handle, &stdin_write_handle, &sa, 0)) {
+        freez(instance);
+        return NULL;
+    }
+    if (!CreatePipe(&stdout_read_handle, &stdout_write_handle, &sa, 0)) {
+        CloseHandle(stdin_read_handle);
+        CloseHandle(stdin_write_handle);
+        freez(instance);
         return NULL;
     }
 
-    SPAWN_INSTANCE *instance = (SPAWN_INSTANCE*)calloc(1, sizeof(SPAWN_INSTANCE));
-    if (!instance) {
-        return NULL;
-    }
-
-    // Prepare to spawn the process using Windows API
+    // Set up the STARTUPINFO structure
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof(si));
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = stdin_read_handle;
+    si.hStdOutput = stdout_write_handle;
     si.hStdError = (HANDLE)_get_osfhandle(stderr_fd);
-    si.hStdOutput = (HANDLE)_get_osfhandle(custom_fd);
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 
-    // Create command line
+    // Convert POSIX path to Windows path
     char cmdline[1024] = "";
     for (int i = 0; argv[i] != NULL; ++i) {
         strcat(cmdline, argv[i]);
@@ -87,45 +101,56 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     // Spawn the process
     if (!CreateProcess(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
-        free(instance);
+        CloseHandle(stdin_read_handle);
+        CloseHandle(stdin_write_handle);
+        CloseHandle(stdout_read_handle);
+        CloseHandle(stdout_write_handle);
+        freez(instance);
         return NULL;
     }
 
+    CloseHandle(pi.hThread);
+
+    // Close unused pipe ends
+    CloseHandle(stdin_read_handle);
+    CloseHandle(stdout_write_handle);
+
+    // Store process information in instance
     instance->child_pid = pi.dwProcessId;
     instance->process_handle = pi.hProcess;
-    CloseHandle(pi.hThread);
+
+    // Convert handles to POSIX file descriptors
+    instance->write_fd = _open_osfhandle((intptr_t)stdin_write_handle, _O_WRONLY);
+    instance->read_fd = _open_osfhandle((intptr_t)stdout_read_handle, _O_RDONLY);
 
     return instance;
 }
 
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance) {
-    if (!instance) {
-        return -1;
-    }
+    if(instance->read_fd != -1) { _close(instance->read_fd); instance->read_fd = -1; }
+    if(instance->write_fd != -1) { _close(instance->write_fd); instance->write_fd = -1; }
 
-    if (!TerminateProcess(instance->process_handle, 0)) {
+    if (!TerminateProcess(instance->process_handle, 0))
         return -1;
-    }
 
     DWORD exit_code;
     GetExitCodeProcess(instance->process_handle, &exit_code);
     CloseHandle(instance->process_handle);
-    free(instance);
+    freez(instance);
 
     return (int)exit_code;
 }
 
 int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *instance) {
-    if (!instance) {
-        return -1;
-    }
+    if(instance->read_fd != -1) { _close(instance->read_fd); instance->read_fd = -1; }
+    if(instance->write_fd != -1) { _close(instance->write_fd); instance->write_fd = -1; }
 
     WaitForSingleObject(instance->process_handle, INFINITE);
 
-    DWORD exit_code;
+    DWORD exit_code = -1;
     GetExitCodeProcess(instance->process_handle, &exit_code);
     CloseHandle(instance->process_handle);
-    free(instance);
+    freez(instance);
 
     return (int)exit_code;
 }
@@ -1041,7 +1066,7 @@ void spawn_server_exec_destroy(SPAWN_INSTANCE *instance) {
 }
 
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
-    int rc = 255;
+    int rc = -1;
 
     // close the child pipes, to make it exit
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
