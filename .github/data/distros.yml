@@ -169,15 +169,6 @@ include:
       repo_distro: debian/bullseye
     test:
       ebpf-core: false
-  - <<: *debian
-    version: "10"
-    base_image: debian:buster
-    bundle_sentry: *default_sentry
-    packages:
-      <<: *debian_packages
-      repo_distro: debian/buster
-    test:
-      ebpf-core: false
 
   - &fedora
     distro: fedora
@@ -326,6 +317,11 @@ include:
       <<: *ubuntu_packages
       repo_distro: ubuntu/focal
 legacy: # Info for platforms we used to support and still need to handle packages for
+  - <<: *debian
+    version: "10"
+    packages:
+      <<: *debian_packages
+      repo_distro: debian/buster
   - <<: *fedora
     version: "37"
     packages:
