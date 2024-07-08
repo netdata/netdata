@@ -148,6 +148,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     CLEAN_BUFFER *wb = argv_to_windows(argv);
 
+    nd_log(NDLS_DAEMON, NDLP_INFO, "SPAWN SERVER: command to run: %s", buffer_tostring(wb));
+
     // Spawn the process
     if (!CreateProcess(NULL, (char *)buffer_tostring(wb), NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
         CloseHandle(stdin_read_handle);
