@@ -99,6 +99,7 @@ include:
 
   - distro: centos
     version: "7"
+    base_image: "netdata/legacy:centos7"
     support_type: Core
     notes: ''
     eol_check: false
