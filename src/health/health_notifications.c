@@ -24,7 +24,7 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
         return;
 
     if(!ae->popen_instance) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "attempted to wait for the execution of alert that has not spawn a notification");
+        // nd_log(NDLS_DAEMON, NDLP_ERR, "attempted to wait for the execution of alert that has not spawn a notification");
         return;
     }
 

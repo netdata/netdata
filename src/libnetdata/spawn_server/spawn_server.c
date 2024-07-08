@@ -94,8 +94,10 @@ static BUFFER *argv_to_windows(const char **argv) {
 
         if(needs_quotes && buffer_strlen(wb))
             buffer_strcat(wb, " \"");
+        else
+            buffer_putc(wb, ' ');
 
-        for(const char *c = s; !needs_quotes && *c ; c++) {
+        for(const char *c = s; *c ; c++) {
             switch(*c) {
                 case '"':
                     buffer_putc(wb, '\\');
@@ -126,10 +128,12 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
 
     if (!CreatePipe(&stdin_read_handle, &stdin_write_handle, &sa, 0)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot CreatePipe()");
         freez(instance);
         return NULL;
     }
     if (!CreatePipe(&stdout_read_handle, &stdout_write_handle, &sa, 0)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot CreatePipe()");
         CloseHandle(stdin_read_handle);
         CloseHandle(stdin_write_handle);
         freez(instance);
@@ -152,6 +156,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     // Spawn the process
     if (!CreateProcess(NULL, (char *)buffer_tostring(wb), NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot CreateProcess()");
         CloseHandle(stdin_read_handle);
         CloseHandle(stdin_write_handle);
         CloseHandle(stdout_read_handle);
@@ -167,7 +172,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     CloseHandle(stdout_write_handle);
 
     // Store process information in instance
-    instance->child_pid = pi.dwProcessId;
+    instance->child_pid = cygwin_winpid_to_pid(pi.dwProcessId);
     instance->process_handle = pi.hProcess;
 
     // Convert handles to POSIX file descriptors
@@ -176,6 +181,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     instance->read_handle = stdout_read_handle;
     instance->write_handle = stdin_write_handle;
+
+    nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: created process: %s", buffer_tostring(wb));
 
     return instance;
 }
@@ -193,6 +200,8 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     CloseHandle(instance->process_handle);
     freez(instance);
 
+    nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: child killed and exited with code %d", (int)exit_code);
+
     return (int)exit_code;
 }
 
@@ -208,6 +217,8 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     GetExitCodeProcess(instance->process_handle, &exit_code);
     CloseHandle(instance->process_handle);
     freez(instance);
+
+    nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: child waited and exited with code %d", (int)exit_code);
 
     return (int)exit_code;
 }

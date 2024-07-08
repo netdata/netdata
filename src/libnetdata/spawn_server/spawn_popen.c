@@ -80,6 +80,8 @@ POPEN_INSTANCE *spawn_popen_run_variadic(const char *cmd, ...) {
 }
 
 POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
+    if(!cmd || !*cmd) return NULL;
+    
     const char *argv[] = {
         "/bin/sh",
         "-c",
