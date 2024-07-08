@@ -450,8 +450,8 @@ static void health_event_loop(void) {
                     if (rc->run_flags & RRDCALC_FLAG_DISABLED) {
                         continue;
                     }
-                    RRDCALC_STATUS warning_status = RRDCALC_STATUS_UNDEFINED;
-                    RRDCALC_STATUS critical_status = RRDCALC_STATUS_UNDEFINED;
+                    RRDCALC_STATUS warning_status = RRDCALC_STATUS_UNINITIALIZED;
+                    RRDCALC_STATUS critical_status = RRDCALC_STATUS_UNINITIALIZED;
 
                     // --------------------------------------------------------
                     // check the warning expression
@@ -461,15 +461,16 @@ static void health_event_loop(void) {
 
                         if (unlikely(!expression_evaluate(rc->config.warning))) {
                             // calculation failed
-                            rc->run_flags |= RRDCALC_FLAG_WARN_ERROR;
-
                             netdata_log_debug(D_HEALTH,
                                               "Health on host '%s', alarm '%s.%s': warning expression failed with error: %s",
                                               rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
                                               expression_error_msg(rc->config.warning)
                             );
-                        } else {
-                            rc->run_flags &= ~RRDCALC_FLAG_WARN_ERROR;
+
+                            rc->run_flags |= RRDCALC_FLAG_WARN_ERROR;
+                            warning_status = RRDCALC_STATUS_UNDEFINED;
+                        }
+                        else {
                             netdata_log_debug(D_HEALTH,
                                               "Health on host '%s', alarm '%s.%s': warning expression gave value "
                                               NETDATA_DOUBLE_FORMAT ": %s (source: %s)",
@@ -480,6 +481,8 @@ static void health_event_loop(void) {
                                               expression_error_msg(rc->config.warning),
                                               rrdcalc_source(rc)
                             );
+
+                            rc->run_flags &= ~RRDCALC_FLAG_WARN_ERROR;
                             warning_status = rrdcalc_value2status(expression_result(rc->config.warning));
                         }
                     }
@@ -492,15 +495,16 @@ static void health_event_loop(void) {
 
                         if (unlikely(!expression_evaluate(rc->config.critical))) {
                             // calculation failed
-                            rc->run_flags |= RRDCALC_FLAG_CRIT_ERROR;
-
                             netdata_log_debug(D_HEALTH,
                                               "Health on host '%s', alarm '%s.%s': critical expression failed with error: %s",
                                               rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
                                               expression_error_msg(rc->config.critical)
                             );
-                        } else {
-                            rc->run_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
+
+                            rc->run_flags |= RRDCALC_FLAG_CRIT_ERROR;
+                            critical_status = RRDCALC_STATUS_UNDEFINED;
+                        }
+                        else {
                             netdata_log_debug(D_HEALTH,
                                               "Health on host '%s', alarm '%s.%s': critical expression gave value "
                                               NETDATA_DOUBLE_FORMAT ": %s (source: %s)",
@@ -509,6 +513,8 @@ static void health_event_loop(void) {
                                               expression_error_msg(rc->config.critical),
                                               rrdcalc_source(rc)
                             );
+
+                            rc->run_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
                             critical_status = rrdcalc_value2status(expression_result(rc->config.critical));
                         }
                     }
@@ -516,7 +522,7 @@ static void health_event_loop(void) {
                     // --------------------------------------------------------
                     // decide the final alarm status
 
-                    RRDCALC_STATUS status = RRDCALC_STATUS_UNDEFINED;
+                    RRDCALC_STATUS status = RRDCALC_STATUS_UNINITIALIZED;
 
                     switch (warning_status) {
                         case RRDCALC_STATUS_CLEAR:
@@ -533,7 +539,7 @@ static void health_event_loop(void) {
 
                     switch (critical_status) {
                         case RRDCALC_STATUS_CLEAR:
-                            if (status == RRDCALC_STATUS_UNDEFINED)
+                            if (status == RRDCALC_STATUS_UNINITIALIZED)
                                 status = RRDCALC_STATUS_CLEAR;
                             break;
 
@@ -545,11 +551,17 @@ static void health_event_loop(void) {
                             break;
                     }
 
+                    if(status == RRDCALC_STATUS_UNINITIALIZED) {
+                        if(isnan(rc->value) || isinf(rc->value) || (rc->run_flags & (RRDCALC_FLAG_DB_ERROR|RRDCALC_FLAG_DB_NAN|RRDCALC_FLAG_CALC_ERROR|RRDCALC_FLAG_WARN_ERROR|RRDCALC_FLAG_CRIT_ERROR)))
+                            status = RRDCALC_STATUS_UNDEFINED;
+                        else
+                            status = RRDCALC_STATUS_CLEAR;
+                    }
+
                     // --------------------------------------------------------
                     // check if the new status and the old differ
 
                     if (status != rc->status) {
-
                         worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                         int delay;
 
@@ -622,6 +634,8 @@ static void health_event_loop(void) {
 
                     rc->last_updated = now;
                     rc->next_update = now + rc->config.update_every;
+
+                    rrdcalc_history_chart_update(rc);
 
                     if (next_run > rc->next_update)
                         next_run = rc->next_update;
