@@ -485,6 +485,7 @@ extern char *netdata_configured_host_prefix;
 #include "completion/completion.h"
 #include "log/log.h"
 #include "spawn_server/spawn_server.h"
+#include "spawn_server/spawn_popen.h"
 #include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"
 #ifdef ENABLE_HTTPS

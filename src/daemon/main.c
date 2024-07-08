@@ -1383,7 +1383,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
         return 1;
     }
 
-    POPEN_INSTANCE *instance = netdata_popen_run(script);
+    POPEN_INSTANCE *instance = spawn_popen_run(script);
     if(instance) {
         char line[200 + 1];
         // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
@@ -1407,7 +1407,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 }
             }
         }
-        netdata_popen_stop(instance);
+        spawn_popen_stop(instance);
     }
     freez(script);
 #else

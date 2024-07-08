@@ -160,7 +160,7 @@ static void *pluginsd_worker_thread(void *arg) {
     size_t count = 0;
 
     while(service_running(SERVICE_COLLECTORS)) {
-        POPEN_INSTANCE *pi = netdata_popen_run(cd->cmd);
+        POPEN_INSTANCE *pi = spawn_popen_run(cd->cmd);
         if(!pi) {
             netdata_log_error("PLUGINSD: 'host:%s', cannot popen(\"%s\", \"r\").",
                               rrdhost_hostname(cd->host), cd->cmd);
@@ -195,7 +195,7 @@ static void *pluginsd_worker_thread(void *arg) {
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",
                rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, count);
 
-        int worker_ret_code = netdata_popen_stop(pi);
+        int worker_ret_code = spawn_popen_kill(pi);
         pi = NULL;
 
         if(likely(worker_ret_code == 0))

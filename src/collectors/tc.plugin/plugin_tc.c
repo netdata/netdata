@@ -849,7 +849,7 @@ static void tc_main_cleanup(void *pptr) {
 
     if(tc_child_instance) {
         collector_info("TC: stopping the running tc-qos-helper script");
-        int code = netdata_popen_stop(tc_child_instance); (void)code;
+        int code = spawn_popen_stop(tc_child_instance); (void)code;
         tc_child_instance = NULL;
     }
 
@@ -921,7 +921,7 @@ void *tc_main(void *ptr) {
         snprintfz(command, TC_LINE_MAX, "exec %s %d", tc_script, localhost->rrd_update_every);
         netdata_log_debug(D_TC_LOOP, "executing '%s'", command);
 
-        tc_child_instance = netdata_popen_run(command);
+        tc_child_instance = spawn_popen_run(command);
         if(!tc_child_instance) {
             collector_error("TC: Cannot popen(\"%s\", \"r\").", command);
             goto cleanup;
@@ -1135,7 +1135,7 @@ void *tc_main(void *ptr) {
         }
 
         // fgets() failed or loop broke
-        int code = netdata_popen_stop(tc_child_instance);
+        int code = spawn_popen_kill(tc_child_instance);
         tc_child_instance = NULL;
 
         if(unlikely(device)) {

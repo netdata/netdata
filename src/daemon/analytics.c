@@ -330,7 +330,7 @@ void analytics_alarms_notifications(void)
 
     BUFFER *b = buffer_create(1000, NULL);
     int cnt = 0;
-    POPEN_INSTANCE *instance = netdata_popen_run(script);
+    POPEN_INSTANCE *instance = spawn_popen_run(script);
     if (instance) {
         char line[200 + 1];
 
@@ -347,7 +347,7 @@ void analytics_alarms_notifications(void)
 
             cnt++;
         }
-        netdata_popen_stop(instance);
+        spawn_popen_stop(instance);
     }
     freez(script);
 
@@ -1050,11 +1050,11 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
            "%s '%s' '%s' '%s'",
            as_script, statistic->action, action_result, action_data);
 
-    POPEN_INSTANCE *instance = netdata_popen_run(command_to_run);
+    POPEN_INSTANCE *instance = spawn_popen_run(command_to_run);
     if (instance) {
         char buffer[4 + 1];
         char *s = fgets(buffer, 4, instance->child_stdout_fp);
-        int exit_code = netdata_popen_stop(instance);
+        int exit_code = spawn_popen_stop(instance);
         if (exit_code)
 
             nd_log(NDLS_DAEMON, NDLP_NOTICE,

@@ -179,7 +179,7 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     netdata_log_debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s'", cg->id, cg->chart_id);
     netdata_log_debug(D_CGROUP, "executing command %s \"%s\" for cgroup '%s'", cgroups_rename_script, cg->intermediate_id, cg->chart_id);
 
-    POPEN_INSTANCE *instance = netdata_popen_run_variadic(cgroups_rename_script, cg->id, cg->intermediate_id, NULL);
+    POPEN_INSTANCE *instance = spawn_popen_run_variadic(cgroups_rename_script, cg->id, cg->intermediate_id, NULL);
     if (!instance) {
         collector_error("CGROUP: cannot popen(%s \"%s\", \"r\").", cgroups_rename_script, cg->intermediate_id);
         cg->pending_renames = 0;
@@ -189,7 +189,7 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
 
     char buffer[CGROUP_CHARTID_LINE_MAX + 1];
     char *new_name = fgets(buffer, CGROUP_CHARTID_LINE_MAX, instance->child_stdout_fp);
-    int exit_code = netdata_popen_stop(instance);
+    int exit_code = spawn_popen_stop(instance);
 
     switch (exit_code) {
         case 0:
@@ -1093,7 +1093,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     }
 
     netdata_log_debug(D_CGROUP, "executing cgroup_identifier %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, cgroup_identifier, cg->id);
-    POPEN_INSTANCE *instance = netdata_popen_run_variadic(cgroups_network_interface_script, "--cgroup", cgroup_identifier, NULL);
+    POPEN_INSTANCE *instance = spawn_popen_run_variadic(cgroups_network_interface_script, "--cgroup", cgroup_identifier, NULL);
     if(!instance) {
         collector_error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, cgroup_identifier);
         return;
@@ -1141,7 +1141,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
         }
     }
 
-    netdata_popen_stop(instance);
+    spawn_popen_stop(instance);
 }
 
 static inline void discovery_process_cgroup(struct cgroup *cg) {

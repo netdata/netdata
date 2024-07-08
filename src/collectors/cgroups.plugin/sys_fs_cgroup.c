@@ -77,7 +77,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     char buf[MAXSIZE_PROC_CMDLINE];
     char *begin, *end;
 
-    POPEN_INSTANCE *instance = netdata_popen_run(exec);
+    POPEN_INSTANCE *instance = spawn_popen_run(exec);
     if(!instance)
         return retval;
 
@@ -112,7 +112,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
         }
     }
 
-    if(netdata_popen_stop(instance) != 0)
+    if(spawn_popen_stop(instance) != 0)
         return SYSTEMD_CGROUP_ERR;
 
     return retval;
@@ -153,7 +153,7 @@ static enum cgroups_type cgroups_try_detect_version()
     int cgroups2_available = 0;
 
     // 1. check if cgroups2 available on system at all
-    POPEN_INSTANCE *instance = netdata_popen_run("grep cgroup /proc/filesystems");
+    POPEN_INSTANCE *instance = spawn_popen_run("grep cgroup /proc/filesystems");
     if(!instance) {
         collector_error("cannot run 'grep cgroup /proc/filesystems'");
         return CGROUPS_AUTODETECT_FAIL;
@@ -164,7 +164,7 @@ static enum cgroups_type cgroups_try_detect_version()
             break;
         }
     }
-    if(netdata_popen_stop(instance) != 0)
+    if(spawn_popen_stop(instance) != 0)
         return CGROUPS_AUTODETECT_FAIL;
 
     if(!cgroups2_available)

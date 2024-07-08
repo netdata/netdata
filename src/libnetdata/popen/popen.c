@@ -2,22 +2,6 @@
 
 #include "../libnetdata.h"
 
-SPAWN_SERVER *netdata_main_spawn_server = NULL;
-
-bool netdata_main_spawn_server_init(const char *name, int argc, char **argv) {
-    if(!netdata_main_spawn_server)
-        netdata_main_spawn_server = spawn_server_create(name, NULL, argc, argv);
-
-    return netdata_main_spawn_server != NULL;
-}
-
-void netdata_main_spawn_server_cleanup(void) {
-    if(netdata_main_spawn_server) {
-        spawn_server_destroy(netdata_main_spawn_server);
-        netdata_main_spawn_server = NULL;
-    }
-}
-
 // ----------------------------------------------------------------------------
 // popen with tracking
 
@@ -452,82 +436,4 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
         netdata_log_error("Cannot waitid() for pid %d", pid);
     
     return 0;
-}
-
-POPEN_INSTANCE *netdata_popen_run_argv(const char **argv) {
-    SPAWN_INSTANCE *instance = spawn_server_exec(netdata_main_spawn_server, nd_log_collectors_fd(),
-        0, argv, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
-
-    if(instance == NULL) return NULL;
-
-    POPEN_INSTANCE *pi = mallocz(sizeof(*pi));
-    pi->instance = instance;
-    pi->child_stdin_fp = fdopen(instance->write_fd, "w");
-    pi->child_stdout_fp = fdopen(instance->read_fd, "r");
-
-    return pi;
-}
-
-POPEN_INSTANCE *netdata_popen_run_variadic(const char *cmd, ...) {
-    va_list args;
-    va_list args_copy;
-    int argc = 0;
-
-    // Start processing variadic arguments
-    va_start(args, cmd);
-
-    // Make a copy of args to count the number of arguments
-    va_copy(args_copy, args);
-    while (va_arg(args_copy, char *) != NULL) argc++;
-    va_end(args_copy);
-
-    // Allocate memory for argv array (+2 for cmd and NULL terminator)
-    const char *argv[argc + 2];
-
-    // Populate the argv array
-    argv[0] = cmd;
-
-    for (int i = 1; i <= argc; i++)
-        argv[i] = va_arg(args, const char *);
-
-    argv[argc + 1] = NULL; // NULL-terminate the array
-
-    // End processing variadic arguments
-    va_end(args);
-
-    return netdata_popen_run_argv(argv);
-}
-
-POPEN_INSTANCE *netdata_popen_run(const char *cmd) {
-    const char *argv[] = {
-        "/bin/sh",
-        "-c",
-        cmd,
-        NULL
-    };
-    return netdata_popen_run_argv(argv);
-}
-
-int netdata_popen_stop(POPEN_INSTANCE *pi) {
-    int status = spawn_server_stop(netdata_main_spawn_server, pi->instance);
-    fclose(pi->child_stdin_fp);
-    fclose(pi->child_stdout_fp);
-    freez(pi);
-
-    if(WIFEXITED(status))
-        return WEXITSTATUS(status);
-
-    if(WIFSIGNALED(status)) {
-        int sig = WTERMSIG(status);
-        switch(sig) {
-            case SIGTERM:
-            case SIGPIPE:
-                return 0;
-
-            default:
-                return -1;
-        }
-    }
-
-    return -1;
 }

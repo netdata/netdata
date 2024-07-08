@@ -1280,7 +1280,7 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         spinlock_unlock(&ls->spinlock);
     }
 
-    spawn_server_stop(ls->spawn_server, instance);
+    spawn_server_exec_kill(ls->spawn_server, instance);
     return received > 0;
 }
 

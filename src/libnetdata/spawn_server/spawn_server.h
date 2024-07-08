@@ -54,6 +54,7 @@ SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t chi
 void spawn_server_destroy(SPAWN_SERVER *server);
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type);
-int spawn_server_stop(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance);
+int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance);
+int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *instance);
 
 #endif //SPAWN_SERVER_H

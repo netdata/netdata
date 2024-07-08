@@ -904,7 +904,7 @@ cleanup:
 // --------------------------------------------------------------------------------------------------------------------
 // creating spawn server instances
 
-void spawn_server_instance_destroy(SPAWN_INSTANCE *instance) {
+void spawn_server_exec_destroy(SPAWN_INSTANCE *instance) {
     if(instance->child_pid) kill(instance->child_pid, SIGTERM);
     if(instance->write_fd != -1) close(instance->write_fd);
     if(instance->read_fd != -1) close(instance->read_fd);
@@ -912,11 +912,12 @@ void spawn_server_instance_destroy(SPAWN_INSTANCE *instance) {
     freez(instance);
 }
 
-int spawn_server_stop(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
+int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
     int rc = 255;
 
-    // kill the child, if it is still running
-    if(instance->child_pid) kill(instance->child_pid, SIGTERM);
+    // close the child pipes, to make it exit
+    if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
+    if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
 
     // get the result
     struct status_report sr = { 0 };
@@ -937,8 +938,14 @@ int spawn_server_stop(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *insta
     }
 
     instance->child_pid = 0;
-    spawn_server_instance_destroy(instance);
+    spawn_server_exec_destroy(instance);
     return rc;
+}
+
+int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance) {
+    // kill the child, if it is still running
+    if(instance->child_pid) kill(instance->child_pid, SIGTERM);
+    return spawn_server_exec_wait(server, instance);
 }
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type) {
@@ -1021,6 +1028,6 @@ cleanup:
     if (pipe_stdin[1] >= 0) close(pipe_stdin[1]);
     if (pipe_stdout[0] >= 0) close(pipe_stdout[0]);
     if (pipe_stdout[1] >= 0) close(pipe_stdout[1]);
-    spawn_server_instance_destroy(instance);
+    spawn_server_exec_destroy(instance);
     return NULL;
 }
