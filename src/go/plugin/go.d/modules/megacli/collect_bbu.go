@@ -29,6 +29,11 @@ func (m *MegaCli) collectBBU(mx map[string]int64) error {
 		return err
 	}
 
+	if len(bbus) == 0 {
+		m.Debugf("no BBUs found")
+		return nil
+	}
+
 	for _, bbu := range bbus {
 		if !m.bbu[bbu.adapterNumber] {
 			m.bbu[bbu.adapterNumber] = true
@@ -42,6 +47,8 @@ func (m *MegaCli) collectBBU(mx map[string]int64) error {
 		writeInt(mx, px+"absolute_state_of_charge", bbu.absoluteStateOfCharge)
 		writeInt(mx, px+"cycle_count", bbu.cycleCount)
 	}
+
+	m.Debugf("found %d BBUs", len(m.bbu))
 
 	return nil
 }

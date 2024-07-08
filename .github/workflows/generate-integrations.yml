@@ -7,7 +7,7 @@ on:
       - master
     paths: # If any of these files change, we need to regenerate integrations.js.
       - 'src/collectors/**/metadata.yaml'
-      - 'src/go/collectors/**/metadata.yaml'
+      - 'src/go/plugin/**/metadata.yaml'
       - 'src/exporting/**/metadata.yaml'
       - 'src/health/notifications/**/metadata.yaml'
       - 'integrations/templates/**'

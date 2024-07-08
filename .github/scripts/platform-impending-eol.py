@@ -16,6 +16,7 @@ LEAD_DAYS = datetime.timedelta(days=30)
 
 DISTRO = sys.argv[1]
 RELEASE = sys.argv[2]
+LTS = sys.argv[3]
 
 EXIT_NOT_IMPENDING = 0
 EXIT_IMPENDING = 1
@@ -49,10 +50,19 @@ except urllib.error.HTTPError as e:
 
 eol = datetime.date.fromisoformat(data['eol'])
 
+if LTS == '1' and 'extendedSupport' in data:
+    datetime.date.fromisoformat(data['extendedSupport'])
+else:
+    LTS = False
+
 offset = abs(eol - NOW)
 
 if offset <= LEAD_DAYS:
-    print(data['eol'])
+    if LTS:
+        print(data['extendedSupport'])
+    else:
+        print(data['eol'])
+
     sys.exit(EXIT_IMPENDING)
 else:
     sys.exit(EXIT_NOT_IMPENDING)

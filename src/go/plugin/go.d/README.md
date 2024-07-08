@@ -1,7 +1,7 @@
 <!--
 title: go.d.plugin
 description: "go.d.plugin is an external plugin for Netdata, responsible for running individual data collectors written in Go."
-custom_edit_url: "/src/go/collectors/go.d.plugin/README.md"
+custom_edit_url: "/src/go/plugin/go.d/README.md"
 sidebar_label: "go.d.plugin"
 learn_status: "Published"
 learn_topic_type: "Tasks"
@@ -119,8 +119,8 @@ see the appropriate collector readme.
 | [redis](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/redis)                           |             Redis             |
 | [rspamd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/rspamd)                         |            Rspamd             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/scaleio)                       |       Dell EMC ScaleIO        |
-| [sensors](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules)                    |       Hardware Sensors        |
-| [SNMP](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/snmp)                  |             SNMP              |
+| [sensors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/sensors)                       |       Hardware Sensors        |
+| [SNMP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/snmp)                             |             SNMP              |
 | [squidlog](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/squidlog)                     |             Squid             |
 | [smartctl](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/smartctl)                     |   S.M.A.R.T Storage Devices   |
 | [storcli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/storcli)                       |    Broadcom Hardware RAID     |
@@ -154,8 +154,8 @@ sudo ./edit-config go.d.conf
 
 Configurations are written in [YAML](http://yaml.org/).
 
-- [plugin configuration](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d.conf)
-- [specific module configuration](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/config/go.d)
+- [plugin configuration](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d.conf)
+- [specific module configuration](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d)
 
 ### Enable a collector
 
