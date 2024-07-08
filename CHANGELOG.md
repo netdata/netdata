@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Bump golang.org/x/net from 0.26.0 to 0.27.0 in /src/go [\#18078](https://github.com/netdata/netdata/pull/18078) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/gofrs/flock from 0.11.0 to 0.12.0 in /src/go [\#18077](https://github.com/netdata/netdata/pull/18077) ([dependabot[bot]](https://github.com/apps/dependabot))
+- proc: collect ksm/swap/cma/zswap only when feature enabled [\#18076](https://github.com/netdata/netdata/pull/18076) ([ilyam8](https://github.com/ilyam8))
 - health add alarm docker container down [\#18075](https://github.com/netdata/netdata/pull/18075) ([ilyam8](https://github.com/ilyam8))
 - go.d ipfs fix tests [\#18074](https://github.com/netdata/netdata/pull/18074) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18073](https://github.com/netdata/netdata/pull/18073) ([netdatabot](https://github.com/netdatabot))
@@ -403,9 +406,6 @@
 - Make CMake options for platform-dependent plugins depend on being build for a supported platform. [\#17517](https://github.com/netdata/netdata/pull/17517) ([Ferroin](https://github.com/Ferroin))
 - Support to WolfSSL \(Step 1\) [\#17516](https://github.com/netdata/netdata/pull/17516) ([thiagoftsm](https://github.com/thiagoftsm))
 - add smartctl to ndsudo [\#17515](https://github.com/netdata/netdata/pull/17515) ([ilyam8](https://github.com/ilyam8))
-- Fix handling of kernel version detection in CMake. [\#17514](https://github.com/netdata/netdata/pull/17514) ([Ferroin](https://github.com/Ferroin))
-- Work around MS’s broken infra in CI. [\#17513](https://github.com/netdata/netdata/pull/17513) ([Ferroin](https://github.com/Ferroin))
-- Move handling of legacy eBPF programs into CMake. [\#17512](https://github.com/netdata/netdata/pull/17512) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
