@@ -1,6 +1,6 @@
 <!--
 title: "Helper Packages"
-custom_edit_url: "/src/go/collectors/go.d.plugin/pkg/README.md"
+custom_edit_url: "/src/go/plugin/go.d/pkg/README.md"
 sidebar_label: "Helper Packages"
 learn_status: "Published"
 learn_rel_path: "Developers/External plugins/go.d.plugin/Helper Packages"
@@ -10,13 +10,13 @@ learn_rel_path: "Developers/External plugins/go.d.plugin/Helper Packages"
 
 - if you need IP ranges consider to
   use [`iprange`](/src/go/plugin/pkgmd).
-- if you parse an application log files, then [`log`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/logs) is
+- if you parse an application log files, then [`log`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/logs) is
   handy.
 - if you need filtering
   check [`matcher`](/src/go/plugin/pkgmd).
-- if you collect metrics from an HTTP endpoint use [`web`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/web).
+- if you collect metrics from an HTTP endpoint use [`web`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/web).
 - if you collect metrics from a prometheus endpoint,
-  then [`prometheus`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/prometheus)
-  and [`web`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/web) is what you need.
-- [`tlscfg`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/tlscfg) provides TLS support.
-- [`stm`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/stm) helps you to convert any struct to a `map[string]int64`.
+  then [`prometheus`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus)
+  and [`web`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/web) is what you need.
+- [`tlscfg`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/tlscfg) provides TLS support.
+- [`stm`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/stm) helps you to convert any struct to a `map[string]int64`.

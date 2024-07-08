@@ -34,7 +34,7 @@
         "properties": {
           "includes": {
             "title": "Include",
-            "description": "Include databases that match any of the specified include [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
+            "description": "Include databases that match any of the specified include [patterns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#readme).",
             "type": [
               "array",
               "null"
@@ -47,7 +47,7 @@
           },
           "excludes": {
             "title": "Exclude",
-            "description": "Exclude databases that match any of the specified exclude [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
+            "description": "Exclude databases that match any of the specified exclude [patterns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#readme).",
             "type": [
               "array",
               "null"

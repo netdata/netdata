@@ -27,7 +27,7 @@ You are responsible only for __creating modules__.
 
 ## Custom plugin example
 
-[Yep! So easy!](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/examples/simple/main.go)
+[Yep! So easy!](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/examples/simple/main.go)
 
 ## How to write a Module
 
@@ -71,7 +71,7 @@ func (b *Base) SetLogger(l *logger.Logger) { b.Logger = l }
 
 Since plugin is a set of modules all you need is:
  - write module(s)
- - add module(s) to the plugins [registry](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/plugin/module/registry.go)
+ - add module(s) to the plugins [registry](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/plugin/module/registry.go)
  - start the plugin
 
 
