@@ -1222,24 +1222,24 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
 
     struct local_sockets_config config = ls->config;
     config.net_ns_inode = ps->net_ns_inode;
-    SPAWN_INSTANCE *instance = spawn_server_exec(ls->spawn_server, STDERR_FILENO, fd, NULL, &config, sizeof(config), SPAWN_INSTANCE_TYPE_CALLBACK);
+    SPAWN_INSTANCE *si = spawn_server_exec(ls->spawn_server, STDERR_FILENO, fd, NULL, &config, sizeof(config), SPAWN_INSTANCE_TYPE_CALLBACK);
     close(fd); fd = -1;
 
-    if(instance == NULL) {
+    if(si == NULL) {
         local_sockets_log(ls, "cannot create spawn instance");
         return false;
     }
 
     size_t received = 0;
     struct local_socket buf;
-    while(read(instance->read_fd, &buf, sizeof(buf)) == sizeof(buf)) {
+    while(read(spawn_server_instance_read_fd(si), &buf, sizeof(buf)) == sizeof(buf)) {
         size_t len = 0;
-        if(read(instance->read_fd, &len, sizeof(len)) != sizeof(len))
+        if(read(spawn_server_instance_read_fd(si), &len, sizeof(len)) != sizeof(len))
             local_sockets_log(ls, "failed to read cmdline length from pipe");
 
         if(len) {
             char cmdline[len + 1];
-            if(read(instance->read_fd, cmdline, len) != (ssize_t)len)
+            if(read(spawn_server_instance_read_fd(si), cmdline, len) != (ssize_t)len)
                 local_sockets_log(ls, "failed to read cmdline from pipe");
             else {
                 cmdline[len] = '\0';
@@ -1280,7 +1280,7 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         spinlock_unlock(&ls->spinlock);
     }
 
-    spawn_server_exec_kill(ls->spawn_server, instance);
+    spawn_server_exec_kill(ls->spawn_server, si);
     return received > 0;
 }
 

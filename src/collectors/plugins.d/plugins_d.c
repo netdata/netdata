@@ -158,7 +158,7 @@ static void *pluginsd_worker_thread(void *arg) {
                               rrdhost_hostname(cd->host), cd->cmd);
             break;
         }
-        cd->unsafe.pid = cd->unsafe.pi->instance->child_pid;
+        cd->unsafe.pid = spawn_server_instance_pid(cd->unsafe.pi->si);
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: 'host:%s' connected to '%s' running on pid %d",

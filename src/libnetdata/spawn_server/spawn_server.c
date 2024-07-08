@@ -4,6 +4,133 @@
 
 #include "spawn_server.h"
 
+struct spawn_server {
+    size_t id;
+    size_t request_id;
+    const char *name;
+#if !defined(OS_WINDOWS)
+    int pipe[2];
+    int server_sock;
+    pid_t server_pid;
+    char *path;
+    spawn_request_callback_t cb;
+
+    char **argv;
+    size_t argv0_size;
+#endif
+};
+
+struct spawm_instance {
+    size_t request_id;
+    int client_sock;
+    int write_fd;
+    int read_fd;
+    pid_t child_pid;
+
+#if defined(OS_WINDOWS)
+    HANDLE process_handle;
+#endif
+};
+
+int spawn_server_instance_read_fd(SPAWN_INSTANCE *si) { return si->read_fd; }
+int spawn_server_instance_write_fd(SPAWN_INSTANCE *si) { return si->write_fd; }
+pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si) { return si->child_pid; }
+void spawn_server_instance_read_fd_unset(SPAWN_INSTANCE *si) { si->read_fd = -1; }
+void spawn_server_instance_write_fd_unset(SPAWN_INSTANCE *si) { si->write_fd = -1; }
+
+#if defined(OS_WINDOWS)
+
+SPAWN_SERVER* spawn_server_create(const char *name, void (*child_callback)(void), int argc, char **argv) {
+    SPAWN_SERVER* server = callocz(1, sizeof(SPAWN_SERVER));
+    if(name)
+        server->name = strdupz(name);
+    return server;
+}
+
+
+void spawn_server_destroy(SPAWN_SERVER *server) {
+    if (server) {
+        if(server->name) freez(server->name);
+        freez(server);
+    }
+}
+
+
+SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type) {
+    if (type == SPAWN_INSTANCE_TYPE_CALLBACK) {
+        return NULL;
+    }
+
+    SPAWN_INSTANCE *instance = (SPAWN_INSTANCE*)calloc(1, sizeof(SPAWN_INSTANCE));
+    if (!instance) {
+        return NULL;
+    }
+
+    // Prepare to spawn the process using Windows API
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdError = (HANDLE)_get_osfhandle(stderr_fd);
+    si.hStdOutput = (HANDLE)_get_osfhandle(custom_fd);
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+
+    // Create command line
+    char cmdline[1024] = "";
+    for (int i = 0; argv[i] != NULL; ++i) {
+        strcat(cmdline, argv[i]);
+        strcat(cmdline, " ");
+    }
+
+    // Spawn the process
+    if (!CreateProcess(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
+        free(instance);
+        return NULL;
+    }
+
+    instance->child_pid = pi.dwProcessId;
+    instance->process_handle = pi.hProcess;
+    CloseHandle(pi.hThread);
+
+    return instance;
+}
+
+
+int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance) {
+    if (!instance) {
+        return -1;
+    }
+
+    if (!TerminateProcess(instance->process_handle, 0)) {
+        return -1;
+    }
+
+    DWORD exit_code;
+    GetExitCodeProcess(instance->process_handle, &exit_code);
+    CloseHandle(instance->process_handle);
+    free(instance);
+
+    return (int)exit_code;
+}
+
+int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *instance) {
+    if (!instance) {
+        return -1;
+    }
+
+    WaitForSingleObject(instance->process_handle, INFINITE);
+
+    DWORD exit_code;
+    GetExitCodeProcess(instance->process_handle, &exit_code);
+    CloseHandle(instance->process_handle);
+    free(instance);
+
+    return (int)exit_code;
+}
+
+#else // !OS_WINDOWS
+
 #ifdef __APPLE__
 #include <crt_externs.h>
 #define environ (*_NSGetEnviron())
@@ -1031,3 +1158,5 @@ cleanup:
     spawn_server_exec_destroy(instance);
     return NULL;
 }
+
+#endif // !OS_WINDOWS

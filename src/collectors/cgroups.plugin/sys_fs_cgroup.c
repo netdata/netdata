@@ -77,12 +77,12 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     char buf[MAXSIZE_PROC_CMDLINE];
     char *begin, *end;
 
-    POPEN_INSTANCE *instance = spawn_popen_run(exec);
-    if(!instance)
+    POPEN_INSTANCE *pi = spawn_popen_run(exec);
+    if(!pi)
         return retval;
 
     struct pollfd pfd;
-    pfd.fd = instance->instance->read_fd;
+    pfd.fd = spawn_server_instance_read_fd(pi->si);
     pfd.events = POLLIN;
 
     int timeout = 3000; // milliseconds
@@ -93,7 +93,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     } else if (ret == 0) {
         collector_info("Cannot get the output of \"%s\" within timeout (%d ms)", exec, timeout);
     } else {
-        while (fgets(buf, MAXSIZE_PROC_CMDLINE, instance->child_stdout_fp) != NULL) {
+        while (fgets(buf, MAXSIZE_PROC_CMDLINE, pi->child_stdout_fp) != NULL) {
             if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
                 end = begin = begin + strlen(SYSTEMD_HIERARCHY_STRING);
                 if (!*begin)
@@ -112,7 +112,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
         }
     }
 
-    if(spawn_popen_wait(instance) != 0)
+    if(spawn_popen_wait(pi) != 0)
         return SYSTEMD_CGROUP_ERR;
 
     return retval;

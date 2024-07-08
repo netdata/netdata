@@ -10,7 +10,7 @@ bool netdata_main_spawn_server_init(const char *name, int argc, char **argv);
 void netdata_main_spawn_server_cleanup(void);
 
 typedef struct {
-    SPAWN_INSTANCE *instance;
+    SPAWN_INSTANCE *si;
     FILE *child_stdin_fp;
     FILE *child_stdout_fp;
 } POPEN_INSTANCE;

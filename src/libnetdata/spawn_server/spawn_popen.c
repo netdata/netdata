@@ -19,32 +19,32 @@ void netdata_main_spawn_server_cleanup(void) {
 }
 
 POPEN_INSTANCE *spawn_popen_run_argv(const char **argv) {
-    SPAWN_INSTANCE *instance = spawn_server_exec(netdata_main_spawn_server, nd_log_collectors_fd(),
+    SPAWN_INSTANCE *si = spawn_server_exec(netdata_main_spawn_server, nd_log_collectors_fd(),
         0, argv, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
 
-    if(instance == NULL) return NULL;
+    if(si == NULL) return NULL;
 
     POPEN_INSTANCE *pi = mallocz(sizeof(*pi));
-    pi->instance = instance;
-    pi->child_stdin_fp = fdopen(instance->write_fd, "w");
-    pi->child_stdout_fp = fdopen(instance->read_fd, "r");
+    pi->si = si;
+    pi->child_stdin_fp = fdopen(spawn_server_instance_write_fd(si), "w");
+    pi->child_stdout_fp = fdopen(spawn_server_instance_read_fd(si), "r");
 
     if(!pi->child_stdin_fp) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open FILE on child's stdin on fd %d.", instance->write_fd);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open FILE on child's stdin on fd %d.", spawn_server_instance_write_fd(si));
         goto cleanup;
     }
 
     if(!pi->child_stdout_fp) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open FILE on child's stdout on fd %d.", instance->read_fd);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open FILE on child's stdout on fd %d.", spawn_server_instance_read_fd(si));
         goto cleanup;
     }
 
     return pi;
 
 cleanup:
-    if(pi->child_stdin_fp) { fclose(pi->child_stdin_fp); close(instance->write_fd); instance->write_fd = -1; }
-    if(pi->child_stdout_fp) { fclose(pi->child_stdout_fp); close(instance->read_fd); instance->read_fd = -1; }
-    spawn_server_exec_kill(netdata_main_spawn_server, instance);
+    if(pi->child_stdin_fp) { fclose(pi->child_stdin_fp); spawn_server_instance_write_fd(si); }
+    if(pi->child_stdout_fp) { fclose(pi->child_stdout_fp); spawn_server_instance_read_fd_unset(si); }
+    spawn_server_exec_kill(netdata_main_spawn_server, si);
     freez(pi);
     return NULL;
 }
@@ -109,17 +109,17 @@ static int spawn_popen_status_rc(int status) {
 }
 
 int spawn_popen_wait(POPEN_INSTANCE *pi) {
-    fclose(pi->child_stdin_fp); pi->child_stdin_fp = NULL; pi->instance->write_fd = -1;
-    fclose(pi->child_stdout_fp); pi->child_stdout_fp = NULL; pi->instance->read_fd = -1;
-    int status = spawn_server_exec_wait(netdata_main_spawn_server, pi->instance);
+    fclose(pi->child_stdin_fp); pi->child_stdin_fp = NULL; spawn_server_instance_write_fd_unset(pi->si);
+    fclose(pi->child_stdout_fp); pi->child_stdout_fp = NULL; spawn_server_instance_read_fd_unset(pi->si);
+    int status = spawn_server_exec_wait(netdata_main_spawn_server, pi->si);
     freez(pi);
     return spawn_popen_status_rc(status);
 }
 
 int spawn_popen_kill(POPEN_INSTANCE *pi) {
-    fclose(pi->child_stdin_fp); pi->child_stdin_fp = NULL; pi->instance->write_fd = -1;
-    fclose(pi->child_stdout_fp); pi->child_stdout_fp = NULL; pi->instance->read_fd = -1;
-    int status = spawn_server_exec_kill(netdata_main_spawn_server, pi->instance);
+    fclose(pi->child_stdin_fp); pi->child_stdin_fp = NULL; spawn_server_instance_write_fd_unset(pi->si);
+    fclose(pi->child_stdout_fp); pi->child_stdout_fp = NULL; spawn_server_instance_read_fd_unset(pi->si);
+    int status = spawn_server_exec_kill(netdata_main_spawn_server, pi->si);
     freez(pi);
     return spawn_popen_status_rc(status);
 }
