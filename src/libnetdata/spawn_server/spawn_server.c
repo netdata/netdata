@@ -71,6 +71,8 @@ static BUFFER *argv_to_windows(const char **argv) {
     char b[strlen(argv[0]) * 2 + 1024];
     cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, sizeof(b));
 
+    buffer_strcat(wb, "cmd.exe /C ");
+
     for(size_t i = 0; argv[i] ;i++) {
         const char *s = (i == 0) ? b : argv[i];
         size_t len = strlen(s);
@@ -116,7 +118,7 @@ static BUFFER *argv_to_windows(const char **argv) {
     return wb;
 }
 
-SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
+SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_unused, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
     if (type != SPAWN_INSTANCE_TYPE_EXEC)
         return NULL;
 
@@ -128,12 +130,13 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
 
     if (!CreatePipe(&stdin_read_handle, &stdin_write_handle, &sa, 0)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot CreatePipe()");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot CreatePipe() for stdin");
         freez(instance);
         return NULL;
     }
+
     if (!CreatePipe(&stdout_read_handle, &stdout_write_handle, &sa, 0)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot CreatePipe()");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot CreatePipe() for stdout");
         CloseHandle(stdin_read_handle);
         CloseHandle(stdin_write_handle);
         freez(instance);
@@ -151,12 +154,14 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     si.hStdError = (HANDLE)_get_osfhandle(stderr_fd);
 
     CLEAN_BUFFER *wb = argv_to_windows(argv);
+    char *command = (char *)buffer_tostring(wb);
 
-    nd_log(NDLS_DAEMON, NDLP_INFO, "SPAWN SERVER: command to run: %s", buffer_tostring(wb));
+    nd_log(NDLS_DAEMON, NDLP_INFO, "SPAWN SERVER: command to run: %s", command);
 
     // Spawn the process
-    if (!CreateProcess(NULL, (char *)buffer_tostring(wb), NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot CreateProcess()");
+    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
+        DWORD error_code = GetLastError();
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: cannot CreateProcess(), error code: %u", error_code);
         CloseHandle(stdin_read_handle);
         CloseHandle(stdin_write_handle);
         CloseHandle(stdout_read_handle);
@@ -173,16 +178,18 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     // Store process information in instance
     instance->child_pid = cygwin_winpid_to_pid(pi.dwProcessId);
+    if(instance->child_pid == -1) instance->child_pid = pi.dwProcessId;
+
     instance->process_handle = pi.hProcess;
 
     // Convert handles to POSIX file descriptors
     instance->write_fd = cygwin_attach_handle_to_fd("pipe_write", -1, stdin_write_handle, O_WRONLY, 0);
-    instance->read_fd = cygwin_attach_handle_to_fd("pipe_write", -1, stdout_read_handle, O_RDONLY, 0);
+    instance->read_fd = cygwin_attach_handle_to_fd("pipe_read", -1, stdout_read_handle, O_RDONLY, 0);
 
     instance->read_handle = stdout_read_handle;
     instance->write_handle = stdin_write_handle;
 
-    nd_log(NDLS_DAEMON, NDLP_ERR, "SPAWN SERVER: created process: %s", buffer_tostring(wb));
+    nd_log(NDLS_DAEMON, NDLP_INFO, "SPAWN SERVER: created process: %s", command);
 
     return instance;
 }
