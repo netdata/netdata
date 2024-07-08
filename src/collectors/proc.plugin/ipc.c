@@ -6,6 +6,9 @@
 #include <sys/msg.h>
 #include <sys/shm.h>
 
+#define _COMMON_PLUGIN_NAME PLUGIN_PROC_NAME
+#define _COMMON_PLUGIN_MODULE_NAME "ipc"
+#include "../common-contexts/common-contexts.h"
 
 #ifndef SEMVMX
 #define SEMVMX  32767  /* <= 32767 semaphore maximum value */
@@ -282,8 +285,8 @@ int do_ipc(int update_every, usec_t dt) {
     static struct ipc_limits limits;
     static struct ipc_status status;
     static const RRDVAR_ACQUIRED *arrays_max = NULL, *semaphores_max = NULL;
-    static RRDSET *st_semaphores = NULL, *st_arrays = NULL;
-    static RRDDIM *rd_semaphores = NULL, *rd_arrays = NULL;
+    static RRDSET *st_arrays = NULL;
+    static RRDDIM *rd_arrays = NULL;
     static char *msg_filename = NULL;
     static struct message_queue *message_queue_root = NULL;
     static long long dimensions_limit;
@@ -314,25 +317,7 @@ int do_ipc(int update_every, usec_t dt) {
             do_sem = CONFIG_BOOLEAN_NO;
         }
         else {
-            // create the charts
-            if(unlikely(!st_semaphores)) {
-                st_semaphores = rrdset_create_localhost(
-                        "system"
-                        , "ipc_semaphores"
-                        , NULL
-                        , "ipc semaphores"
-                        , NULL
-                        , "IPC Semaphores"
-                        , "semaphores"
-                        , PLUGIN_PROC_NAME
-                        , "ipc"
-                        , NETDATA_CHART_PRIO_SYSTEM_IPC_SEMAPHORES
-                        , localhost->rrd_update_every
-                        , RRDSET_TYPE_AREA
-                );
-                rd_semaphores = rrddim_add(st_semaphores, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            }
-
+            // create the chart
             if(unlikely(!st_arrays)) {
                 st_arrays = rrdset_create_localhost(
                         "system"
@@ -379,7 +364,6 @@ int do_ipc(int update_every, usec_t dt) {
                     rrdvar_host_variable_set(localhost, arrays_max, limits.semmni);
 
                 st_arrays->red = limits.semmni;
-                st_semaphores->red = limits.semmns;
 
                 read_limits_next = 60 / update_every;
             }
@@ -392,8 +376,7 @@ int do_ipc(int update_every, usec_t dt) {
             return 0;
         }
 
-        rrddim_set_by_pointer(st_semaphores, rd_semaphores, status.semaem);
-        rrdset_done(st_semaphores);
+        common_semaphore_ipc(status.semaem, limits.semmns, "ipc", localhost->rrd_update_every);
 
         rrddim_set_by_pointer(st_arrays, rd_arrays, status.semusz);
         rrdset_done(st_arrays);
