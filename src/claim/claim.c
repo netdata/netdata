@@ -99,7 +99,7 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
     char read_buffer[100 + 1];
     while (fgets(read_buffer, 100, instance->child_stdout_fp) != NULL) ;
 
-    int exit_code = spawn_popen_stop(instance);
+    int exit_code = spawn_popen_wait(instance);
 
     netdata_log_info("Agent claiming command '%s' returned with code %d", command_exec_buffer, exit_code);
     if (0 == exit_code) {

@@ -347,7 +347,7 @@ void analytics_alarms_notifications(void)
 
             cnt++;
         }
-        spawn_popen_stop(instance);
+        spawn_popen_wait(instance);
     }
     freez(script);
 
@@ -1054,7 +1054,7 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
     if (instance) {
         char buffer[4 + 1];
         char *s = fgets(buffer, 4, instance->child_stdout_fp);
-        int exit_code = spawn_popen_stop(instance);
+        int exit_code = spawn_popen_wait(instance);
         if (exit_code)
 
             nd_log(NDLS_DAEMON, NDLP_NOTICE,

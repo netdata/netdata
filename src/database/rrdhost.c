@@ -1503,7 +1503,7 @@ static void rrdhost_load_kubernetes_labels(void) {
 
     // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
     // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
-    int rc = spawn_popen_stop(instance);
+    int rc = spawn_popen_wait(instance);
     if(rc)
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "%s exited abnormally. Failed to get kubernetes labels.",

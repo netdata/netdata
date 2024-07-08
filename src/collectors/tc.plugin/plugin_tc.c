@@ -849,7 +849,7 @@ static void tc_main_cleanup(void *pptr) {
 
     if(tc_child_instance) {
         collector_info("TC: stopping the running tc-qos-helper script");
-        int code = spawn_popen_stop(tc_child_instance); (void)code;
+        int code = spawn_popen_wait(tc_child_instance); (void)code;
         tc_child_instance = NULL;
     }
 

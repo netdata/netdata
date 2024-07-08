@@ -42,9 +42,9 @@ POPEN_INSTANCE *spawn_popen_run_argv(const char **argv) {
     return pi;
 
 cleanup:
+    if(pi->child_stdin_fp) { fclose(pi->child_stdin_fp); close(instance->write_fd); instance->write_fd = -1; }
+    if(pi->child_stdout_fp) { fclose(pi->child_stdout_fp); close(instance->read_fd); instance->read_fd = -1; }
     spawn_server_exec_kill(netdata_main_spawn_server, instance);
-    if(pi->child_stdin_fp) fclose(pi->child_stdin_fp);
-    if(pi->child_stdout_fp) fclose(pi->child_stdout_fp);
     freez(pi);
     return NULL;
 }
@@ -108,18 +108,18 @@ static int spawn_popen_status_rc(int status) {
     return -1;
 }
 
-int spawn_popen_stop(POPEN_INSTANCE *pi) {
+int spawn_popen_wait(POPEN_INSTANCE *pi) {
+    fclose(pi->child_stdin_fp); pi->child_stdin_fp = NULL; pi->instance->write_fd = -1;
+    fclose(pi->child_stdout_fp); pi->child_stdout_fp = NULL; pi->instance->read_fd = -1;
     int status = spawn_server_exec_wait(netdata_main_spawn_server, pi->instance);
-    fclose(pi->child_stdin_fp);
-    fclose(pi->child_stdout_fp);
     freez(pi);
     return spawn_popen_status_rc(status);
 }
 
 int spawn_popen_kill(POPEN_INSTANCE *pi) {
+    fclose(pi->child_stdin_fp); pi->child_stdin_fp = NULL; pi->instance->write_fd = -1;
+    fclose(pi->child_stdout_fp); pi->child_stdout_fp = NULL; pi->instance->read_fd = -1;
     int status = spawn_server_exec_kill(netdata_main_spawn_server, pi->instance);
-    fclose(pi->child_stdin_fp);
-    fclose(pi->child_stdout_fp);
     freez(pi);
     return spawn_popen_status_rc(status);
 }

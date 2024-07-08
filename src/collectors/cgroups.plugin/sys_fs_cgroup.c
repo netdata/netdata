@@ -112,7 +112,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
         }
     }
 
-    if(spawn_popen_stop(instance) != 0)
+    if(spawn_popen_wait(instance) != 0)
         return SYSTEMD_CGROUP_ERR;
 
     return retval;
@@ -164,7 +164,7 @@ static enum cgroups_type cgroups_try_detect_version()
             break;
         }
     }
-    if(spawn_popen_stop(instance) != 0)
+    if(spawn_popen_wait(instance) != 0)
         return CGROUPS_AUTODETECT_FAIL;
 
     if(!cgroups2_available)

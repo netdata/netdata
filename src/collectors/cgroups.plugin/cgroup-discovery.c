@@ -189,7 +189,7 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
 
     char buffer[CGROUP_CHARTID_LINE_MAX + 1];
     char *new_name = fgets(buffer, CGROUP_CHARTID_LINE_MAX, instance->child_stdout_fp);
-    int exit_code = spawn_popen_stop(instance);
+    int exit_code = spawn_popen_wait(instance);
 
     switch (exit_code) {
         case 0:
@@ -1141,7 +1141,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
         }
     }
 
-    spawn_popen_stop(instance);
+    spawn_popen_wait(instance);
 }
 
 static inline void discovery_process_cgroup(struct cgroup *cg) {

@@ -26,7 +26,6 @@ int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 bool ieee754_doubles = false;
 time_t netdata_start_time = 0;
 struct netdata_static_thread *static_threads;
-bool i_am_the_spawn_server = false;
 
 struct config netdata_config = {
         .first_section = NULL,
@@ -325,9 +324,6 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
 void web_client_cache_destroy(void);
 
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
-    if (i_am_the_spawn_server)
-        exit(ret);
-
     watcher_shutdown_begin();
 
     nd_log_limits_unlimited();
@@ -1407,7 +1403,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 }
             }
         }
-        spawn_popen_stop(instance);
+        spawn_popen_wait(instance);
     }
     freez(script);
 #else
@@ -1491,13 +1487,6 @@ int netdata_main(int argc, char **argv) {
     netdata_ready = false;
     // set the name for logging
     program_name = "netdata";
-
-    if (argc > 1 && strcmp(argv[1], SPAWN_SERVER_COMMAND_LINE_ARGUMENT) == 0) {
-        // don't run netdata, this is the spawn server
-        i_am_the_spawn_server = true;
-        spawn_server();
-        exit(0);
-    }
 
     // parse options
     {
@@ -2225,10 +2214,6 @@ int netdata_main(int argc, char **argv) {
 
     // fork the spawn server
     delta_startup_time("fork the spawn server");
-
-#ifndef OS_WINDOWS
-    spawn_init();
-#endif
 
     /*
      * Libuv uv_spawn() uses SIGCHLD internally:

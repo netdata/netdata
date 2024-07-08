@@ -1222,13 +1222,6 @@ set(CLAIM_PLUGIN_FILES
         src/claim/claim.h
 )
 
-set(SPAWN_PLUGIN_FILES
-        src/spawn/spawn.c
-        src/spawn/spawn_server.c
-        src/spawn/spawn_client.c
-        src/spawn/spawn.h
-)
-
 set(ACLK_ALWAYS_BUILD
         src/aclk/aclk_rrdhost_state.h
         src/aclk/aclk_proxy.c
@@ -1415,7 +1408,6 @@ set(NETDATA_FILES
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
-        ${SPAWN_PLUGIN_FILES}
         ${ACLK_ALWAYS_BUILD}
         ${PROFILE_PLUGIN_FILES}
 )
