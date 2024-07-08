@@ -2863,7 +2863,6 @@ install(FILES
         src/collectors/python.d.plugin/openldap/openldap.conf
         src/collectors/python.d.plugin/oracledb/oracledb.conf
         src/collectors/python.d.plugin/pandas/pandas.conf
-        src/collectors/python.d.plugin/puppet/puppet.conf
         src/collectors/python.d.plugin/rethinkdbs/rethinkdbs.conf
         src/collectors/python.d.plugin/retroshare/retroshare.conf
         src/collectors/python.d.plugin/riakkv/riakkv.conf
@@ -2902,7 +2901,6 @@ install(FILES
         src/collectors/python.d.plugin/openldap/openldap.chart.py
         src/collectors/python.d.plugin/oracledb/oracledb.chart.py
         src/collectors/python.d.plugin/pandas/pandas.chart.py
-        src/collectors/python.d.plugin/puppet/puppet.chart.py
         src/collectors/python.d.plugin/rethinkdbs/rethinkdbs.chart.py
         src/collectors/python.d.plugin/retroshare/retroshare.chart.py
         src/collectors/python.d.plugin/riakkv/riakkv.chart.py
