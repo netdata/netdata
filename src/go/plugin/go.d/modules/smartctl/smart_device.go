@@ -27,10 +27,6 @@ func (d *smartDevice) deviceType() string {
 	return d.data.Get("device.type").String()
 }
 
-func (d *smartDevice) deviceProtocol() string {
-	return d.data.Get("device.protocol").String()
-}
-
 func (d *smartDevice) serialNumber() string {
 	return d.data.Get("serial_number").String()
 }
