@@ -103,3 +103,59 @@
 
       ### Reference
       https://openid.net/developers/how-connect-works/
+
+- id: 'scim'
+  meta:
+    name: 'SCIM'
+    link: 'https://netdata.cloud'
+    categories:
+      - auth
+    icon_filename: 'scim.svg'
+  keywords:
+    - scim
+    - identity-management
+  overview:
+    authentication_description: "The System for Cross-domain Identity Management (SCIM) specification is designed to simplify the management of user identities in cloud-based applications and services."
+    authentication_limitations: ''
+  setup:
+    description: |
+      ### Prerequisites
+      - A Netdata Cloud account
+      - Admin access to the Space
+      - The Space must be on a paid plan
+      - OIDC/SSO integration must already be enabled in one of your Spaces
+
+      ### Netdata Configuration Steps
+      1. Click on the Space settings cog (located above your profile icon).
+      2. Click on the **User Management** tab.
+      3. In the SCIM card, click on **Configure**.
+      4. Depending on your situation:
+         - If OIDC/SSO integration is already enabled in your Space, click **Save**.
+         - If you have an existing SCIM integration in another Space and want to create a new one in this space linked to it, provide the SCIM token you received when enabling the first SCIM integration, and click **Save**.
+      5. If the setup is successful, you will receive two parameters:
+         - **Token**: Use this token for Bearer Authentication with your SCIM client.
+         - **Base URL**: Use this URL as the base URL for your SCIM client.
+
+      ### Rotating the SCIM Token
+      You can rotate the token provided during SCIM integration setup if needed.
+
+      Steps to rotate the token:
+      1. Click on the Space settings cog (located above your profile icon).
+      2. Click on the **User Management** tab.
+      3. In the already configured SCIM card, click **Edit**.
+      4. Click **Rotate Token**.
+      5. If successful, you will receive a new token for Bearer Authentication with your SCIM client.
+
+      ### Supported Features
+      This integration adheres to SCIM v2 specifications. Supported features include:
+
+      - User Resource Management (urn:ietf:params:scim:schemas:core:2.0:User)
+      - Patch operations: Supported
+      - Bulk operations: Not supported
+      - Filtering: Supported (max results: 200)
+      - Password synchronization: Not supported, as we rely on SSO/OIDC authentication
+      - eTag: Not supported
+      - Authentication schemes: OAuth Bearer Token
+
+      ### Reference
+      [SCIM Specification](https://scim.org)
