@@ -1612,7 +1612,12 @@ static void winerror_annotator(BUFFER *wb, const char *key, struct log_field *lf
             (DWORD)(sizeof(buf) - 1),
             NULL
     );
-    if(!size)
+    if(size > 0) {
+        // remove \r\n at the end
+        while(size > 0 && (buf[size - 1] == '\r' || buf[size - 1] == '\n'))
+            buf[--size] = '\0';
+    }
+    else
         size = snprintf(buf, sizeof(buf) - 1, "unknown error code");
 
     buf[size] = '\0';

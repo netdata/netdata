@@ -126,6 +126,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 };
 
+    errno_clear();
+
     SPAWN_INSTANCE *instance = callocz(1, sizeof(*instance));
     instance->request_id = __atomic_add_fetch(&server->request_id, 1, __ATOMIC_RELAXED);
 
@@ -216,6 +218,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     instance->write_fd = pipe_stdin[1];
     instance->read_fd = pipe_stdout[0];
 
+    errno_clear();
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
            "SPAWN PARENT: created process for request No %zu, pid %d, command: %s",
            instance->request_id, (int)instance->child_pid, command);
