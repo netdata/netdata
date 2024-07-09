@@ -133,12 +133,16 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     char *command = (char *)buffer_tostring(wb);
 
     if (pipe(pipe_stdin) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Cannot create stdin pipe()");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot create stdin pipe() for request No %zu, command: %s",
+               instance->request_id, command);
         goto cleanup;
     }
 
     if (pipe(pipe_stdout) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Cannot create stdout pipe()");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot create stdout pipe() for request No %zu, command: %s",
+               instance->request_id, command);
         goto cleanup;
     }
 
@@ -153,7 +157,9 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     if (stdin_read_handle == INVALID_HANDLE_VALUE || stdout_write_handle == INVALID_HANDLE_VALUE || stderr_handle == INVALID_HANDLE_VALUE) {
         spinlock_unlock(&spinlock);
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Invalid handle value(s)");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Invalid handle value(s) for request No %zu, command: %s",
+               instance->request_id, command);
         goto cleanup;
     }
 
@@ -162,7 +168,9 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         !SetHandleInformation(stdout_write_handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT) ||
         !SetHandleInformation(stderr_handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT)) {
         spinlock_unlock(&spinlock);
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Cannot set handle inheritance");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot set handle(s) inheritance for request No %zu, command: %s",
+               instance->request_id, command);
         goto cleanup;
     }
 
@@ -176,13 +184,16 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     si.hStdOutput = stdout_write_handle;
     si.hStdError = stderr_handle;
 
-    nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN PARENT: command to run: %s", command);
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "SPAWN PARENT: Running request No %zu, command: %s",
+           instance->request_id, command);
 
     // Spawn the process
     if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
         spinlock_unlock(&spinlock);
-        DWORD error_code = GetLastError();
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: cannot CreateProcess(), error code: %u", error_code);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: cannot CreateProcess() for request No %zu, command: %s",
+               instance->request_id, command);
         goto cleanup;
     }
 
@@ -205,7 +216,9 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     instance->write_fd = pipe_stdin[1];
     instance->read_fd = pipe_stdout[0];
 
-    nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN PARENT: created process: %s", command);
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "SPAWN PARENT: created process for request No %zu, pid %d, command: %s",
+           instance->request_id, (int)instance->child_pid, command);
 
     return instance;
 
@@ -229,10 +242,12 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     DWORD exit_code;
     GetExitCodeProcess(instance->process_handle, &exit_code);
     CloseHandle(instance->process_handle);
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "SPAWN PARENT: child of request No %zu, pid %d, killed and exited with code %d",
+           instance->request_id, (int)instance->child_pid, (int)exit_code);
+
     freez(instance);
-
-    nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: child killed and exited with code %d", (int)exit_code);
-
     return (int)exit_code;
 }
 
@@ -247,10 +262,12 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     DWORD exit_code = -1;
     GetExitCodeProcess(instance->process_handle, &exit_code);
     CloseHandle(instance->process_handle);
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "SPAWN PARENT: child of request No %zu, pid %d, waited and exited with code %d",
+           instance->request_id, (int)instance->child_pid, (int)exit_code);
+
     freez(instance);
-
-    nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: child waited and exited with code %d", (int)exit_code);
-
     return (int)exit_code;
 }
 

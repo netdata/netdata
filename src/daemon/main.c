@@ -620,39 +620,6 @@ void web_server_config_options(void)
     }
 }
 
-
-// killpid kills pid with SIGTERM.
-int killpid(pid_t pid) {
-    int ret;
-    netdata_log_debug(D_EXIT, "Request to kill pid %d", pid);
-
-    int signal = SIGTERM;
-//#ifdef NETDATA_INTERNAL_CHECKS
-//    if(service_running(SERVICE_COLLECTORS))
-//        signal = SIGABRT;
-//#endif
-
-    errno = 0;
-    ret = kill(pid, signal);
-    if (ret == -1) {
-        switch(errno) {
-            case ESRCH:
-                // We wanted the process to exit so just let the caller handle.
-                return ret;
-
-            case EPERM:
-                netdata_log_error("Cannot kill pid %d, but I do not have enough permissions.", pid);
-                break;
-
-            default:
-                netdata_log_error("Cannot kill pid %d, but I received an error.", pid);
-                break;
-        }
-    }
-
-    return ret;
-}
-
 static void set_nofile_limit(struct rlimit *rl) {
     // get the num files allowed
     if(getrlimit(RLIMIT_NOFILE, rl) != 0) {
@@ -1332,7 +1299,7 @@ static void post_conf_load(char **user)
 }
 
 static bool load_netdata_conf(char *filename, char overwrite_used, char **user) {
-    errno = 0;
+    errno_clear();
 
     int ret = 0;
 

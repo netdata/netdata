@@ -43,7 +43,7 @@ void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int 
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    errno = 0;
+    errno_clear();
 
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
 

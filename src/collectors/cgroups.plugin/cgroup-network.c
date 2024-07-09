@@ -421,19 +421,19 @@ void detect_veth_interfaces(pid_t pid) {
 
     host = read_proc_net_dev("host", netdata_configured_host_prefix);
     if(!host) {
-        errno = 0;
+        errno_clear();
         collector_error("cannot read host interface list.");
         goto cleanup;
     }
 
     if(!eligible_ifaces(host)) {
-        errno = 0;
+        errno_clear();
         collector_info("there are no double-linked host interfaces available.");
         goto cleanup;
     }
 
     if(switch_namespace(netdata_configured_host_prefix, pid)) {
-        errno = 0;
+        errno_clear();
         collector_error("cannot switch to the namespace of pid %u", (unsigned int) pid);
         goto cleanup;
     }
@@ -444,13 +444,13 @@ void detect_veth_interfaces(pid_t pid) {
 
     cgroup = read_proc_net_dev("cgroup", NULL);
     if(!cgroup) {
-        errno = 0;
+        errno_clear();
         collector_error("cannot read cgroup interface list.");
         goto cleanup;
     }
 
     if(!eligible_ifaces(cgroup)) {
-        errno = 0;
+        errno_clear();
         collector_error("there are not double-linked cgroup interfaces available.");
         goto cleanup;
     }
@@ -701,7 +701,7 @@ int main(int argc, char **argv) {
         pid = atoi(argv[arg+1]);
 
         if(pid <= 0) {
-            errno = 0;
+            errno_clear();
             collector_error("Invalid pid %d given", (int) pid);
             return 2;
         }
@@ -719,7 +719,7 @@ int main(int argc, char **argv) {
         if(helper) call_the_helper(pid, cgroup);
 
         if(pid <= 0 && !detected_devices) {
-            errno = 0;
+            errno_clear();
             collector_error("Cannot find a cgroup PID from cgroup '%s'", cgroup);
         }
     }

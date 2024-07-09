@@ -1248,7 +1248,7 @@ cleanup:
             close(fd);
     }
     if(mem == MAP_FAILED) return NULL;
-    errno = 0;
+    errno_clear();
     return mem;
 }
 
@@ -1364,7 +1364,7 @@ int verify_netdata_host_prefix(bool log_msg) {
     char buffer[FILENAME_MAX + 1];
     char *path = netdata_configured_host_prefix;
     char *reason = "unknown reason";
-    errno = 0;
+    errno_clear();
 
     struct stat sb;
     if (stat(path, &sb) == -1) {
@@ -1723,6 +1723,7 @@ bool run_command_and_copy_output_to_stdout(const char *command, int max_line_len
 
 
 static int fd_is_valid(int fd) {
+    errno_clear();
     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
 }
 

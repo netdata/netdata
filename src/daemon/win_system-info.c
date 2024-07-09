@@ -172,7 +172,7 @@ static DWORD netdata_windows_get_current_build()
             cBuild, 63, HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "CurrentBuild"))
         return 0;
 
-    errno = 0;
+    errno_clear();
 
     DWORD version = strtol(cBuild, NULL, 10);
     if (errno == ERANGE)

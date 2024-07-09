@@ -385,7 +385,7 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
     if (fp_child_output)
         fclose(fp_child_output);
 
-    errno = 0;
+    errno_clear();
 
     ret = netdata_waitid(P_PID, (id_t) pid, &info, WEXITED);
     netdata_popen_tracking_del_pid(pid);

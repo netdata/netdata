@@ -461,7 +461,7 @@ void sql_alert_cleanup(bool cli)
 {
     UNUSED(cli);
 
-    errno = 0;
+    errno_clear();
     if (sql_init_meta_database(DB_CHECK_NONE, 0)) {
         netdata_log_error("Failed to open database");
         return;

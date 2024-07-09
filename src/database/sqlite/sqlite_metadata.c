@@ -711,7 +711,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     }
 
     if (rebuild & DB_CHECK_ANALYZE) {
-        errno = 0;
+        errno_clear();
         netdata_log_info("Running ANALYZE on %s", sqlite_database);
         rc = sqlite3_exec_monitored(db_meta, "ANALYZE", 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
@@ -725,7 +725,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         return 1;
     }
 
-    errno = 0;
+    errno_clear();
     netdata_log_info("SQLite database %s initialization", sqlite_database);
 
     rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);

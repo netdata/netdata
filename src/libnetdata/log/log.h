@@ -46,6 +46,9 @@ typedef enum __attribute__((__packed__)) {
     NDF_LOG_SOURCE,                             // DAEMON, COLLECTORS, HEALTH, ACCESS, ACLK - set at the log call
     NDF_PRIORITY,                               // the syslog priority (severity) - set at the log call
     NDF_ERRNO,                                  // the ERRNO at the time of the log call - added automatically
+#if defined(OS_WINDOWS)
+    NDF_WINERROR,                               // Windows GetLastError()
+#endif
     NDF_INVOCATION_ID,                          // the INVOCATION_ID of Netdata - added automatically
     NDF_LINE,                                   // the source code file line number - added automatically
     NDF_FILE,                                   // the source code filename - added automatically
@@ -141,6 +144,7 @@ typedef enum __attribute__((__packed__)) {
     NDFT_CALLBACK,
 } ND_LOG_STACK_FIELD_TYPE;
 
+void errno_clear(void);
 void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting);
 void nd_log_set_facility(const char *facility);
 void nd_log_set_priority_level(const char *setting);

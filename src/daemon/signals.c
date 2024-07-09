@@ -122,7 +122,7 @@ void signals_reset(void) {
 static void reap_child(pid_t pid) {
     siginfo_t i;
 
-    errno = 0;
+    errno_clear();
     netdata_log_debug(D_CHILDS, "SIGNAL: reap_child(%d)...", pid);
     if (netdata_waitid(P_PID, (id_t)pid, &i, WEXITED|WNOHANG) == -1) {
         if (errno != ECHILD)

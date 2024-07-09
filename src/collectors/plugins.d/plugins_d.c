@@ -263,7 +263,7 @@ void *pluginsd_main(void *ptr) {
             if (unlikely(!service_running(SERVICE_COLLECTORS)))
                 break;
 
-            errno = 0;
+            errno_clear();
             DIR *dir = opendir(directory_name);
             if (unlikely(!dir)) {
                 if (directory_errors[idx] != errno) {

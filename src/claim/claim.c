@@ -110,7 +110,7 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
         netdata_log_error("Agent claiming command '%s' failed to complete its run", command_exec_buffer);
         return CLAIM_AGENT_CLAIM_SCRIPT_FAILED;
     }
-    errno = 0;
+    errno_clear();
     unsigned maximum_known_exit_code = sizeof(claiming_errors) / sizeof(claiming_errors[0]) - 1;
 
     if ((unsigned)exit_code > maximum_known_exit_code) {
@@ -211,7 +211,7 @@ void load_cloud_conf(int silent)
         netdata_cloud_enabled = CONFIG_BOOLEAN_NO;
 
     char *filename;
-    errno = 0;
+    errno_clear();
 
     int ret = 0;
 
