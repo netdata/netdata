@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- go.d fix compiling for windows [\#18091](https://github.com/netdata/netdata/pull/18091) ([ilyam8](https://github.com/ilyam8))
+- go.d megacli: return error if no adapters found \(parsing failed\) [\#18090](https://github.com/netdata/netdata/pull/18090) ([ilyam8](https://github.com/ilyam8))
+- update go.d path in docs and ci [\#18087](https://github.com/netdata/netdata/pull/18087) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18086](https://github.com/netdata/netdata/pull/18086) ([netdatabot](https://github.com/netdatabot))
+- Switch to legacy images for CentOS 7 CI. [\#18085](https://github.com/netdata/netdata/pull/18085) ([Ferroin](https://github.com/Ferroin))
+- Track LTS for Debian EOL status. [\#18084](https://github.com/netdata/netdata/pull/18084) ([Ferroin](https://github.com/Ferroin))
+- Remove Debian 10 from supported platforms. [\#18083](https://github.com/netdata/netdata/pull/18083) ([Ferroin](https://github.com/Ferroin))
+- Remove Ubuntu 23.10 from supported platforms. [\#18082](https://github.com/netdata/netdata/pull/18082) ([Ferroin](https://github.com/Ferroin))
+- go.d fail2ban: add docker support [\#18081](https://github.com/netdata/netdata/pull/18081) ([ilyam8](https://github.com/ilyam8))
 - Bump golang.org/x/net from 0.26.0 to 0.27.0 in /src/go [\#18078](https://github.com/netdata/netdata/pull/18078) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/gofrs/flock from 0.11.0 to 0.12.0 in /src/go [\#18077](https://github.com/netdata/netdata/pull/18077) ([dependabot[bot]](https://github.com/apps/dependabot))
 - proc: collect ksm/swap/cma/zswap only when feature enabled [\#18076](https://github.com/netdata/netdata/pull/18076) ([ilyam8](https://github.com/ilyam8))
@@ -15,6 +24,7 @@
 - Port ipfs from python to Go [\#18070](https://github.com/netdata/netdata/pull/18070) ([Ancairon](https://github.com/Ancairon))
 - update golang version in netdata.spec [\#18069](https://github.com/netdata/netdata/pull/18069) ([ilyam8](https://github.com/ilyam8))
 - go.d set sensitive props to "password" widget [\#18068](https://github.com/netdata/netdata/pull/18068) ([ilyam8](https://github.com/ilyam8))
+- netdata.spec/plugin-go: added weak dependency for lm\_sensors [\#18067](https://github.com/netdata/netdata/pull/18067) ([k0ste](https://github.com/k0ste))
 - Disable health thread on windows [\#18066](https://github.com/netdata/netdata/pull/18066) ([stelfrag](https://github.com/stelfrag))
 - Remove hard-coded url from python.d puppet chart plugin [\#18064](https://github.com/netdata/netdata/pull/18064) ([Hufschmidt](https://github.com/Hufschmidt))
 - go.d postgres github.com/jackc/pgx/v5 [\#18062](https://github.com/netdata/netdata/pull/18062) ([ilyam8](https://github.com/ilyam8))
@@ -33,6 +43,7 @@
 - Bump github.com/docker/docker from 27.0.0+incompatible to 27.0.2+incompatible in /src/go/collectors/go.d.plugin [\#18047](https://github.com/netdata/netdata/pull/18047) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/likexian/whois-parser from 1.24.16 to 1.24.18 in /src/go/collectors/go.d.plugin [\#18046](https://github.com/netdata/netdata/pull/18046) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/gofrs/flock from 0.8.1 to 0.11.0 in /src/go/collectors/go.d.plugin [\#18045](https://github.com/netdata/netdata/pull/18045) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Semaphore \(common context\) [\#18041](https://github.com/netdata/netdata/pull/18041) ([thiagoftsm](https://github.com/thiagoftsm))
 - proc/diskstats: Increase accuracy of average IO operation time [\#18040](https://github.com/netdata/netdata/pull/18040) ([ilyam8](https://github.com/ilyam8))
 - diskspace: update exclude paths/filesystems [\#18039](https://github.com/netdata/netdata/pull/18039) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18038](https://github.com/netdata/netdata/pull/18038) ([netdatabot](https://github.com/netdatabot))
@@ -88,6 +99,7 @@
 - sysinfo \(WinAPI\) [\#17857](https://github.com/netdata/netdata/pull/17857) ([thiagoftsm](https://github.com/thiagoftsm))
 - Run the agent as a Windows service. [\#17766](https://github.com/netdata/netdata/pull/17766) ([vkalintiris](https://github.com/vkalintiris))
 - add Win CPU interrupts [\#17753](https://github.com/netdata/netdata/pull/17753) ([thiagoftsm](https://github.com/thiagoftsm))
+- Relax strict version constraints for DEB package dependencies. [\#17681](https://github.com/netdata/netdata/pull/17681) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.46.1](https://github.com/netdata/netdata/tree/v1.46.1) (2024-06-21)
 
@@ -395,17 +407,6 @@
 - Significantly simplify the protobuf handling in CMake. [\#17533](https://github.com/netdata/netdata/pull/17533) ([Ferroin](https://github.com/Ferroin))
 - Clean up handling of compiler flags in CMake. [\#17532](https://github.com/netdata/netdata/pull/17532) ([Ferroin](https://github.com/Ferroin))
 - add features section requested on Okta review [\#17531](https://github.com/netdata/netdata/pull/17531) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Don’t unnescesarily clean repo during static builds. [\#17530](https://github.com/netdata/netdata/pull/17530) ([Ferroin](https://github.com/Ferroin))
-- Revert changes to ENABLE\_CLOUD option. [\#17528](https://github.com/netdata/netdata/pull/17528) ([Ferroin](https://github.com/Ferroin))
-- fix \_ndpath in detect\_existing\_install\(\) [\#17527](https://github.com/netdata/netdata/pull/17527) ([ilyam8](https://github.com/ilyam8))
-- go.d prometheus fix units for snmp\_exporter [\#17524](https://github.com/netdata/netdata/pull/17524) ([ilyam8](https://github.com/ilyam8))
-- update the file [\#17522](https://github.com/netdata/netdata/pull/17522) ([Ancairon](https://github.com/Ancairon))
-- Events tab documentation updates [\#17521](https://github.com/netdata/netdata/pull/17521) ([Ancairon](https://github.com/Ancairon))
-- Bump github.com/docker/docker from 26.0.2+incompatible to 26.1.0+incompatible in /src/go/collectors/go.d.plugin [\#17520](https://github.com/netdata/netdata/pull/17520) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Anomaly Advisor documentation edits [\#17518](https://github.com/netdata/netdata/pull/17518) ([Ancairon](https://github.com/Ancairon))
-- Make CMake options for platform-dependent plugins depend on being build for a supported platform. [\#17517](https://github.com/netdata/netdata/pull/17517) ([Ferroin](https://github.com/Ferroin))
-- Support to WolfSSL \(Step 1\) [\#17516](https://github.com/netdata/netdata/pull/17516) ([thiagoftsm](https://github.com/thiagoftsm))
-- add smartctl to ndsudo [\#17515](https://github.com/netdata/netdata/pull/17515) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
