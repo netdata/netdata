@@ -326,6 +326,9 @@ size_t judy_aral_structures(void);
 
 #define GUID_LEN 36
 
+#define PIPE_READ 0
+#define PIPE_WRITE 1
+
 #include "linked-lists.h"
 #include "storage-point.h"
 
@@ -486,7 +489,6 @@ extern char *netdata_configured_host_prefix;
 #include "log/log.h"
 #include "spawn_server/spawn_server.h"
 #include "spawn_server/spawn_popen.h"
-#include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"
 #ifdef ENABLE_HTTPS
 # include "socket/security.h"
@@ -518,7 +520,6 @@ extern char *netdata_configured_host_prefix;
 #include "facets/facets.h"
 #include "functions_evloop/functions_evloop.h"
 #include "query_progress/progress.h"
-#include "safe_fork/safe_fork.h"
 
 // BEWARE: this exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"

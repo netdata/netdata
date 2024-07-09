@@ -1679,19 +1679,17 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
     return value;
 }
 
-
 BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_length) {
     BUFFER *wb = buffer_create(0, NULL);
 
-    pid_t pid;
-    FILE *fp = netdata_popen(command, &pid, NULL);
-
-    if(fp) {
+    POPEN_INSTANCE *pi = spawn_popen_run(command);
+    if(pi) {
         char buffer[max_line_length + 1];
-        while (fgets(buffer, max_line_length, fp)) {
+        while (fgets(buffer, max_line_length, pi->child_stdout_fp)) {
             buffer[max_line_length] = '\0';
             buffer_strcat(wb, buffer);
         }
+        spawn_popen_kill(pi);
     }
     else {
         buffer_free(wb);
@@ -1699,28 +1697,26 @@ BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_l
         return NULL;
     }
 
-    netdata_pclose(NULL, fp, pid);
     return wb;
 }
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {
-    pid_t pid;
-    FILE *fp = netdata_popen(command, &pid, NULL);
-
-    if(fp) {
+    POPEN_INSTANCE *pi = spawn_popen_run(command);
+    if(pi) {
         char buffer[max_line_length + 1];
-        while (fgets(buffer, max_line_length, fp))
+
+        while (fgets(buffer, max_line_length, pi->child_stdout_fp))
             fprintf(stdout, "%s", buffer);
+
+        spawn_popen_kill(pi);
     }
     else {
         netdata_log_error("Failed to execute command '%s'.", command);
         return false;
     }
 
-    netdata_pclose(NULL, fp, pid);
     return true;
 }
-
 
 static int fd_is_valid(int fd) {
     errno_clear();

@@ -5,8 +5,13 @@
 SPAWN_SERVER *netdata_main_spawn_server = NULL;
 
 bool netdata_main_spawn_server_init(const char *name, int argc, const char **argv) {
-    if(!netdata_main_spawn_server)
-        netdata_main_spawn_server = spawn_server_create(name, NULL, argc, argv);
+    if(netdata_main_spawn_server == NULL) {
+        static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+        spinlock_lock(&spinlock);
+        if(netdata_main_spawn_server == NULL)
+            netdata_main_spawn_server = spawn_server_create(name, NULL, argc, argv);
+        spinlock_unlock(&spinlock);
+    }
 
     return netdata_main_spawn_server != NULL;
 }
@@ -19,6 +24,8 @@ void netdata_main_spawn_server_cleanup(void) {
 }
 
 POPEN_INSTANCE *spawn_popen_run_argv(const char **argv) {
+    netdata_main_spawn_server_init(NULL, 0, NULL);
+
     SPAWN_INSTANCE *si = spawn_server_exec(netdata_main_spawn_server, nd_log_collectors_fd(),
         0, argv, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
 
@@ -111,6 +118,8 @@ static int spawn_popen_status_rc(int status) {
 }
 
 int spawn_popen_wait(POPEN_INSTANCE *pi) {
+    if(!pi) return -1;
+
     fclose(pi->child_stdin_fp); pi->child_stdin_fp = NULL; spawn_server_instance_write_fd_unset(pi->si);
     fclose(pi->child_stdout_fp); pi->child_stdout_fp = NULL; spawn_server_instance_read_fd_unset(pi->si);
     int status = spawn_server_exec_wait(netdata_main_spawn_server, pi->si);
@@ -119,6 +128,8 @@ int spawn_popen_wait(POPEN_INSTANCE *pi) {
 }
 
 int spawn_popen_kill(POPEN_INSTANCE *pi) {
+    if(!pi) return -1;
+
     fclose(pi->child_stdin_fp); pi->child_stdin_fp = NULL; spawn_server_instance_write_fd_unset(pi->si);
     fclose(pi->child_stdout_fp); pi->child_stdout_fp = NULL; spawn_server_instance_read_fd_unset(pi->si);
     int status = spawn_server_exec_kill(netdata_main_spawn_server, pi->si);

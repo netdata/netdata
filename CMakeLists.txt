@@ -668,8 +668,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/byteorder.h
         src/libnetdata/onewayalloc/onewayalloc.c
         src/libnetdata/onewayalloc/onewayalloc.h
-        src/libnetdata/popen/popen.c
-        src/libnetdata/popen/popen.h
         src/libnetdata/procfile/procfile.c
         src/libnetdata/procfile/procfile.h
         src/libnetdata/query_progress/progress.c
@@ -750,8 +748,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setenv.h
         src/libnetdata/os/strndup.c
         src/libnetdata/os/strndup.h
-        src/libnetdata/safe_fork/safe_fork.c
-        src/libnetdata/safe_fork/safe_fork.h
         src/libnetdata/spawn_server/spawn_server.c
         src/libnetdata/spawn_server/spawn_server.h
         src/libnetdata/spawn_server/spawn_popen.c

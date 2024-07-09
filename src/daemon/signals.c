@@ -124,7 +124,7 @@ static void reap_child(pid_t pid) {
 
     errno_clear();
     netdata_log_debug(D_CHILDS, "SIGNAL: reap_child(%d)...", pid);
-    if (netdata_waitid(P_PID, (id_t)pid, &i, WEXITED|WNOHANG) == -1) {
+    if (os_waitid(P_PID, (id_t)pid, &i, WEXITED|WNOHANG) == -1) {
         if (errno != ECHILD)
             netdata_log_error("SIGNAL: waitid(%d): failed to wait for child", pid);
         else
@@ -168,7 +168,7 @@ static void reap_children() {
 
     while(1) {
         i.si_pid = 0;
-        if (netdata_waitid(P_ALL, (id_t)0, &i, WEXITED|WNOHANG|WNOWAIT) == -1 || i.si_pid == 0)
+        if (os_waitid(P_ALL, (id_t)0, &i, WEXITED|WNOHANG|WNOWAIT) == -1 || i.si_pid == 0)
             // nothing to do
             return;
 

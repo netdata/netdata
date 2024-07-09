@@ -850,7 +850,7 @@ static SPAWN_REQUEST *find_request_by_pid(pid_t pid) {
 }
 
 static void spawn_server_process_sigchld(void) {
-    nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: checking for exited children");
+    // nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: checking for exited children");
 
     int status;
     pid_t pid;
@@ -962,7 +962,7 @@ static void spawn_server_event_loop(SPAWN_SERVER *server) {
 
     // stop all children
     if(spawn_server_requests) {
-        nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: killing all children...");
+        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: killing all children...");
         size_t killed = 0;
         for(SPAWN_REQUEST *rq = spawn_server_requests; rq ; rq = rq->next) {
             kill(rq->pid, SIGTERM);
@@ -972,7 +972,7 @@ static void spawn_server_event_loop(SPAWN_SERVER *server) {
             spawn_server_process_sigchld();
             tinysleep();
         }
-        nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: all %zu children finished", killed);
+        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: all %zu children finished", killed);
     }
 
     exit(1);
