@@ -454,6 +454,9 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *request)
             close(request->socket); request->socket = -1;
             close(custom_fd); custom_fd = -1;
             execvp(request->argv[0], (char **)request->argv);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                "SPAWN SERVER: Failed to execute command of request No %zu (argv[0] = '%s')",
+                request->request_id, request->argv[0]);
             exit(1);
             break;
 
@@ -518,8 +521,12 @@ static const char** decode_argv(const char *buffer, size_t size) {
     size_t count = 0;
     const char *ptr = buffer;
     while (ptr < buffer + size) {
-        count++;
-        ptr += strlen(ptr) + 1;
+        if(ptr && *ptr) {
+            count++;
+            ptr += strlen(ptr) + 1;
+        }
+        else
+            break;
     }
 
     const char **argv = mallocz((count + 1) * sizeof(char *));
