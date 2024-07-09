@@ -136,8 +136,7 @@ typedef enum ebpf_socket_idx {
 // Contexts
 #define NETDATA_CGROUP_TCP_V4_CONN_CONTEXT "cgroup.net_conn_ipv4"
 #define NETDATA_CGROUP_TCP_V6_CONN_CONTEXT "cgroup.net_conn_ipv6"
-#define NETDATA_CGROUP_SOCKET_BYTES_RECV_CONTEXT "cgroup.net_bytes_recv"
-#define NETDATA_CGROUP_SOCKET_BYTES_SEND_CONTEXT "cgroup.net_bytes_send"
+#define NETDATA_CGROUP_SOCKET_TCP_BANDWIDTH_CONTEXT "cgroup.net_total_bandwidth"
 #define NETDATA_CGROUP_SOCKET_TCP_RECV_CONTEXT "cgroup.net_tcp_recv"
 #define NETDATA_CGROUP_SOCKET_TCP_SEND_CONTEXT "cgroup.net_tcp_send"
 #define NETDATA_CGROUP_SOCKET_TCP_RETRANSMIT_CONTEXT "cgroup.net_retransmit"
@@ -146,8 +145,7 @@ typedef enum ebpf_socket_idx {
 
 #define NETDATA_SERVICES_SOCKET_TCP_V4_CONN_CONTEXT "systemd.service.net_conn_ipv4"
 #define NETDATA_SERVICES_SOCKET_TCP_V6_CONN_CONTEXT "systemd.service.net_conn_ipv6"
-#define NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT "systemd.service.net_bytes_recv"
-#define NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT "systemd.service.net_bytes_send"
+#define NETDATA_SERVICES_SOCKET_TCP_BANDWIDTH_CONTEXT "systemd.service.net_total_bandwidth"
 #define NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT "systemd.service.net_tcp_recv"
 #define NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT "systemd.service.net_tcp_send"
 #define NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT "systemd.service.net_retransmit"

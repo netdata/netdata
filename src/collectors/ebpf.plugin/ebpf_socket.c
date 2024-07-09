@@ -540,7 +540,7 @@ static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
                               EBPF_COMMON_UNITS_KILOBITS,
                               NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT,
+                              NETDATA_SERVICES_SOCKET_TCP_BANDWIDTH_CONTEXT,
                               order++,
                               update_every);
 
@@ -2120,7 +2120,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                          EBPF_COMMON_UNITS_KILOBITS,
                          NETDATA_CGROUP_NET_GROUP,
                          NETDATA_EBPF_CHART_TYPE_LINE,
-                         NETDATA_CGROUP_SOCKET_BYTES_RECV_CONTEXT,
+                         NETDATA_CGROUP_SOCKET_TCP_BANDWIDTH_CONTEXT,
                          NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
                          update_every,
                          NETDATA_EBPF_MODULE_NAME_SOCKET);
@@ -2244,7 +2244,7 @@ static void ebpf_obsolete_specific_socket_charts(char *type, int update_every)
                               "",
                               "Bandwidth.",
                               EBPF_COMMON_UNITS_KILOBITS, NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SOCKET_TCP_BANDWIDTH_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_TCP_RECV_CALLS, "",
