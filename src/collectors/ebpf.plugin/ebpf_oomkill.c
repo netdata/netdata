@@ -242,7 +242,7 @@ static void ebpf_create_systemd_oomkill_charts(int update_every)
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20191,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
-        .context = NETDATA_CGROUP_OOMKILLS_CONTEXT,
+        .context = NETDATA_SYSTEMD_OOMKILLS_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_OOMKILL,
         .update_every = 0,
         .suffix = NETDATA_OOMKILL_CHART,
