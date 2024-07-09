@@ -2223,7 +2223,7 @@ static void ebpf_obsolete_specific_socket_charts(char *type, int update_every)
                               EBPF_COMMON_UNITS_CONNECTIONS,
                               NETDATA_APPS_NET_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NETDATA_SERVICES_SOCKET_TCP_V4_CONN_CONTEXT,
+                              NETDATA_CGROUP_TCP_V4_CONN_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
                               update_every);
 
@@ -2235,7 +2235,7 @@ static void ebpf_obsolete_specific_socket_charts(char *type, int update_every)
                                   EBPF_COMMON_UNITS_CONNECTIONS,
                                   NETDATA_APPS_NET_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
-                                  NETDATA_SERVICES_SOCKET_TCP_V6_CONN_CONTEXT,
+                                  NETDATA_CGROUP_TCP_V6_CONN_CONTEXT,
                                   NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
                                   update_every);
     }
@@ -2250,31 +2250,31 @@ static void ebpf_obsolete_specific_socket_charts(char *type, int update_every)
     ebpf_write_chart_obsolete(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_TCP_RECV_CALLS, "",
                               "Calls to tcp_cleanup_rbuf.",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SOCKET_TCP_RECV_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_TCP_SEND_CALLS, "",
                               "Calls to tcp_sendmsg.",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SOCKET_TCP_SEND_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_TCP_RETRANSMIT, "",
                               "Calls to tcp_retransmit.",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SOCKET_TCP_RETRANSMIT_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_UDP_SEND_CALLS, "",
                               "Calls to udp_sendmsg.",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT,
+                              NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SOCKET_UDP_SEND_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH_UDP_RECV_CALLS, "",
                               "Calls to udp_recvmsg.",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_APPS_NET_GROUP, NETDATA_EBPF_CHART_TYPE_LINE,
-                              NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT,
+                              NETDATA_CGROUP_SOCKET_UDP_RECV_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 }
 
@@ -2368,7 +2368,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20082,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
-        .context = NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH,
+        .context = NETDATA_SERVICES_SOCKET_TCP_BANDWIDTH_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
         .update_every = 0,
         .suffix = NETDATA_SOCK_ID_OR_SUFFIX_BANDWIDTH,
