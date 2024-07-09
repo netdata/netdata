@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/stdlib"
 )
 
 // 'SHOW STATS;' response was changed significantly in v1.8.0
@@ -264,7 +264,7 @@ func (p *PgBouncer) openConnection() error {
 	if err != nil {
 		return err
 	}
-	cfg.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	cfg.PreferSimpleProtocol = true
 
 	db, err := sql.Open("pgx", stdlib.RegisterConnConfig(cfg))
 	if err != nil {
