@@ -649,14 +649,6 @@ int main(int argc, char **argv) {
     clocks_init();
     nd_log_initialize_for_external_plugins("cgroup-network");
 
-    nd_log(NDLS_COLLECTORS, NDLP_INFO, "cgroup-network started argc=%d ('%s' '%s' '%s' '%s')",
-        argc,
-        argc >= 1 ? argv[0] : "(none)",
-        argc >= 2 ? argv[1] : "(none)",
-        argc >= 3 ? argv[2] : "(none)",
-        argc >= 4 ? argv[3] : "(none)"
-        );
-
     // since cgroup-network runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
 
