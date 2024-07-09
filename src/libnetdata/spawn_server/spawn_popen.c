@@ -30,12 +30,12 @@ POPEN_INSTANCE *spawn_popen_run_argv(const char **argv) {
     pi->child_stdout_fp = fdopen(spawn_server_instance_read_fd(si), "r");
 
     if(!pi->child_stdin_fp) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open FILE on child's stdin on fd %d.", spawn_server_instance_write_fd(si));
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open FILE on child's stdin on fd %d.", spawn_server_instance_write_fd(si));
         goto cleanup;
     }
 
     if(!pi->child_stdout_fp) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open FILE on child's stdout on fd %d.", spawn_server_instance_read_fd(si));
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open FILE on child's stdout on fd %d.", spawn_server_instance_read_fd(si));
         goto cleanup;
     }
 
