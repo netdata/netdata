@@ -422,6 +422,8 @@ int main(int argc, char *argv[]) {
     }
     else {
         setuid(0);
+        setgid(0);
+        setegid(0);
 
         char *clean_env[] = {NULL};
         execve(filename, params, clean_env);
