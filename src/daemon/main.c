@@ -1919,7 +1919,7 @@ int netdata_main(int argc, char **argv) {
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
         // the caller may have left open files (lxc-attach has this issue)
-        for_each_open_fd(OPEN_FD_ACTION_CLOSE, OPEN_FD_EXCLUDE_STDIN | OPEN_FD_EXCLUDE_STDOUT | OPEN_FD_EXCLUDE_STDERR);
+        os_close_all_non_std_open_fds_except(NULL, 0);
     }
 
     if(!config_loaded) {

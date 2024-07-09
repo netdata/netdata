@@ -1140,12 +1140,7 @@ SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t chi
         }
 
         replace_stdio_with_dev_null();
-
-        // close all file descriptors
-        for(int i = 3; i < 1024 ;i++)
-            if(i != server->server_sock && i != server->pipe[0] && i != server->pipe[1])
-                close(i);
-
+        os_close_all_non_std_open_fds_except((int[]){ server->server_sock, server->pipe[1] }, 2);
         spawn_server_event_loop(server);
     }
     else if (pid > 0) {

@@ -752,6 +752,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/spawn_server/spawn_server.h
         src/libnetdata/spawn_server/spawn_popen.c
         src/libnetdata/spawn_server/spawn_popen.h
+        src/libnetdata/os/close_range.c
+        src/libnetdata/os/close_range.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

@@ -443,17 +443,6 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int max_line_length);
 
-typedef enum {
-    OPEN_FD_ACTION_CLOSE,
-    OPEN_FD_ACTION_FD_CLOEXEC
-} OPEN_FD_ACTION;
-typedef enum {
-    OPEN_FD_EXCLUDE_STDIN   = 0x01,
-    OPEN_FD_EXCLUDE_STDOUT  = 0x02,
-    OPEN_FD_EXCLUDE_STDERR  = 0x04
-} OPEN_FD_EXCLUDE;
-void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds);
-
 #ifdef OS_WINDOWS
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data);
 #else
