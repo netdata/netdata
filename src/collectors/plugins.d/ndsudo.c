@@ -421,6 +421,8 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     else {
+        setuid(0);
+
         char *clean_env[] = {NULL};
         execve(filename, params, clean_env);
         perror("execve"); // execve only returns on error
