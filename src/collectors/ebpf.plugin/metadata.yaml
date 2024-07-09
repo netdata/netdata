@@ -1785,50 +1785,62 @@ modules:
               unit: "connections/s"
               chart_type: line
               dimensions:
-                - name: connected_v4
+                - name: connections
             - name: cgroup.net_conn_ipv6
               description: Calls to tcp_v6_connection
               unit: "connections/s"
               chart_type: line
               dimensions:
-                - name: connected_v6
-            - name: cgroup.net_bandwidth_total
+                - name: connections
+            - name: cgroup.net_total_bandwidth
               description: Bytes received
               unit: "kilobits/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
+            - name: cgroup.net_tcp_recv
+              description: Calls to tcp_cleanup_rbuf.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
             - name: cgroup.net_tcp_send
               description: Calls to tcp_sendmsg.
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: sent
+                - name: calls
             - name: cgroup.net_retransmit
               description: Calls to tcp_retransmit.
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: retransmitted
+                - name: calls
             - name: cgroup.net_udp_send
               description: Calls to udp_sendmsg
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: sent
+                - name: calls
             - name: cgroup.net_udp_recv
               description: Calls to udp_recvmsg
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: received
+                - name: calls
+            - name: services.net_conn_ipv4
+              description: Calls to tcp_v4_connection
+              unit: "connections/s"
+              chart_type: stacked
+              dimensions:
+                - name: connections
             - name: services.net_conn_ipv6
               description: Calls to tcp_v6_connection
               unit: "connections/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per systemd service
+                - name: connections
             - name: services.net_total_bandwidth
               description: Bytes received
               unit: "kilobits/s"
@@ -1841,31 +1853,31 @@ modules:
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per systemd service
+                - name: calls
             - name: services.net_tcp_send
               description: Calls to tcp_sendmsg.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per systemd service
+                - name: calls
             - name: services.net_tcp_retransmit
               description: Calls to tcp_retransmit
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per systemd service
+                - name: calls
             - name: services.net_udp_send
               description: Calls to udp_sendmsg
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per systemd service
+                - name: calls
             - name: services.net_udp_recv
               description: Calls to udp_recvmsg
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per systemd service
+                - name: calls
   - meta:
       plugin_name: ebpf.plugin
       module_name: dcstat
