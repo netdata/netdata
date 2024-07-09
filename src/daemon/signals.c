@@ -167,6 +167,7 @@ void signals_handle(void) {
         // is delivered that either terminates the process or causes the invocation
         // of a signal-catching function.
         if(pause() == -1 && errno == EINTR) {
+            errno_clear();
 
             // loop once, but keep looping while signals are coming in
             // this is needed because a few operations may take some time
