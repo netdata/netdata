@@ -718,8 +718,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/linked-lists.h
         src/libnetdata/storage-point.h
         src/libnetdata/bitmap64.h
-        src/libnetdata/os/waitid.c
-        src/libnetdata/os/waitid.h
         src/libnetdata/os/gettid.c
         src/libnetdata/os/gettid.h
         src/libnetdata/os/adjtimex.c

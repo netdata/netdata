@@ -864,23 +864,55 @@ static void spawn_server_process_sigchld(void) {
 
     // Loop to check for exited child processes
     while ((pid = waitpid((pid_t)(-1), &status, WNOHANG)) != 0) {
-        if(pid == -1) {
-            // nd_log(NDLS_COLLECTORS, NDLP_WARNING, "SPAWN SERVER: waitpid() reports no more pending exited children.");
+        if(pid == -1)
             break;
-        }
 
         SPAWN_REQUEST *rq = find_request_by_pid(pid);
-        if(rq == NULL) {
-            nd_log(NDLS_COLLECTORS, NDLP_WARNING, "SPAWN SERVER: received SIGCHLD for pid %d, but there is no request related to it.", pid);
-            continue;
-        }
-        // else
-        //     nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: child %d, req %zu finished", rq->pid, rq->request_id);
+        size_t request_id = rq ? rq->request_id : 0;
+        bool send_report_remove_request = false;
 
-        spawn_server_send_status_exit(rq->socket, status);
-        close(rq->socket);
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(spawn_server_requests, rq, prev, next);
-        freez(rq);
+        if(WIFEXITED(status)) {
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                "SPAWN SERVER: child with pid %d (request %zu) exited normally with exit code %d",
+                pid, request_id, WEXITSTATUS(status));
+            send_report_remove_request = true;
+        }
+        else if(WIFSIGNALED(status)) {
+            if(WCOREDUMP(status))
+                nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                    "SPAWN SERVER: child with pid %d (request %zu) coredump'd due to signal %d",
+                    pid, request_id, WTERMSIG(status));
+            else
+                nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                    "SPAWN SERVER: child with pid %d (request %zu) killed by signal %d",
+                    pid, request_id, WTERMSIG(status));
+            send_report_remove_request = true;
+        }
+        else if(WIFSTOPPED(status)) {
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                "SPAWN SERVER: child with pid %d (request %zu) stopped due to signal %d",
+                pid, request_id, WSTOPSIG(status));
+            send_report_remove_request = false;
+        }
+        else if(WIFCONTINUED(status)) {
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                "SPAWN SERVER: child with pid %d (request %zu) continued due to signal %d",
+                pid, request_id, SIGCONT);
+            send_report_remove_request = false;
+        }
+        else {
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                "SPAWN SERVER: child with pid %d (request %zu) reports unhandled status",
+                pid, request_id);
+            send_report_remove_request = false;
+        }
+
+        if(send_report_remove_request && rq) {
+            spawn_server_send_status_exit(rq->socket, status);
+            close(rq->socket);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(spawn_server_requests, rq, prev, next);
+            freez(rq);
+        }
     }
 }
 

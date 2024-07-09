@@ -13,7 +13,6 @@
 #include "getgrouplist.h"
 #include "adjtimex.h"
 #include "gettid.h"
-#include "waitid.h"
 #include "get_pid_max.h"
 #include "get_system_cpus.h"
 #include "tinysleep.h"
