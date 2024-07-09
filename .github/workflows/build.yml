@@ -975,6 +975,7 @@ jobs:
           }}
 
   macos-build: # Test building on macOS
+    name: Test building on macOS
     runs-on: ${{ matrix.runner }}
     if: github.event_name != 'workflow_dispatch'
     needs:
@@ -1044,6 +1045,36 @@ jobs:
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
           }}
+
+  windows-build: # Test building on Windows
+    name: Test building on Windows
+    runs-on: windows-latest
+    if: github.event_name != 'workflow_dispatch'
+    needs:
+      - file-check
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: Write-Output "SKIPPED"
+      - name: Checkout
+        uses: actions/checkout@v4
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        with:
+          submodules: recursive
+      - name: Set Up Dependencies
+        id: deps
+        if: needs.file-check.outputs.run == 'true'
+        run: ./packaging/windows/install-dependencies.ps1
+      - name: Build Netdata
+        id: build
+        if: needs.file-check.outputs.run == 'true'
+        run: ./packaging/windows/build.ps1
+      - name: Package Netdata
+        id: package
+        if: needs.file-check.outputs.run == 'true'
+        run: ./packaging/windows/package.ps1
 
   updater-check: # Test the generated dist archive using the updater code.
     name: Test Generated Distfile and Updater Code
