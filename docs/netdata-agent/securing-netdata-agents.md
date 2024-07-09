@@ -69,6 +69,8 @@ that node no longer serves its local dashboard.
 `netdata.conf` and use
 > `edit-config`.
 
+If you use netdata in docker, you should change environment variable NETDATA_HEALTHCHECK_TARGET to "cli".
+
 ## Expose Netdata only in a private LAN
 
 If your organisation has a private administration and management LAN, you can bind Netdata on this network interface on all your servers. 
