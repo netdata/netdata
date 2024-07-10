@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- go.d use pgx v4 for pgbouncer [\#18097](https://github.com/netdata/netdata/pull/18097) ([ilyam8](https://github.com/ilyam8))
+- Update securing-netdata-agents.md [\#18096](https://github.com/netdata/netdata/pull/18096) ([yoursweetginger](https://github.com/yoursweetginger))
+- ndsudo set uid/gid/egid to 0 before executing command [\#18093](https://github.com/netdata/netdata/pull/18093) ([ilyam8](https://github.com/ilyam8))
 - go.d fix compiling for windows [\#18091](https://github.com/netdata/netdata/pull/18091) ([ilyam8](https://github.com/ilyam8))
 - go.d megacli: return error if no adapters found \(parsing failed\) [\#18090](https://github.com/netdata/netdata/pull/18090) ([ilyam8](https://github.com/ilyam8))
 - update go.d path in docs and ci [\#18087](https://github.com/netdata/netdata/pull/18087) ([ilyam8](https://github.com/ilyam8))
@@ -400,13 +403,6 @@
 - refresh the ML documentation and consolidate the two docs [\#17543](https://github.com/netdata/netdata/pull/17543) ([Ancairon](https://github.com/Ancairon))
 - Bump github.com/likexian/whois from 1.15.2 to 1.15.3 in /src/go/collectors/go.d.plugin [\#17542](https://github.com/netdata/netdata/pull/17542) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Additional code cleanup [\#17541](https://github.com/netdata/netdata/pull/17541) ([stelfrag](https://github.com/stelfrag))
-- docs: Add Ubuntu AArch64 that is missing from the list [\#17538](https://github.com/netdata/netdata/pull/17538) ([dgibbs64](https://github.com/dgibbs64))
-- go.d smartctl [\#17536](https://github.com/netdata/netdata/pull/17536) ([ilyam8](https://github.com/ilyam8))
-- Fix handling of OpenSSL linking on macOS [\#17535](https://github.com/netdata/netdata/pull/17535) ([Ferroin](https://github.com/Ferroin))
-- Detect and use ld.mold instead of the system linker. [\#17534](https://github.com/netdata/netdata/pull/17534) ([Ferroin](https://github.com/Ferroin))
-- Significantly simplify the protobuf handling in CMake. [\#17533](https://github.com/netdata/netdata/pull/17533) ([Ferroin](https://github.com/Ferroin))
-- Clean up handling of compiler flags in CMake. [\#17532](https://github.com/netdata/netdata/pull/17532) ([Ferroin](https://github.com/Ferroin))
-- add features section requested on Okta review [\#17531](https://github.com/netdata/netdata/pull/17531) ([hugovalente-pm](https://github.com/hugovalente-pm))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
