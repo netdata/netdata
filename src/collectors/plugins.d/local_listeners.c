@@ -291,7 +291,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    SPAWN_SERVER *spawn_server = spawn_server_create(NULL, local_sockets_spawn_server_callback, argc, (const char **)argv);
+    SPAWN_SERVER *spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, NULL, local_sockets_spawn_server_callback, argc, (const char **)argv);
     if(spawn_server == NULL) {
         fprintf(stderr, "Cannot create spawn server.\n");
         exit(1);

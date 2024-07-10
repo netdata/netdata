@@ -1016,7 +1016,7 @@ static inline void local_sockets_init(LS_STATE *ls) {
 #endif
 
     if(ls->config.namespaces && ls->spawn_server == NULL) {
-        ls->spawn_server = spawn_server_create(NULL, local_sockets_spawn_server_callback, 0, NULL);
+        ls->spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, NULL, local_sockets_spawn_server_callback, 0, NULL);
         ls->spawn_server_is_mine = true;
     }
     else

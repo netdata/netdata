@@ -940,7 +940,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     uc = system_usernames_cache_init();
 
-    spawn_srv = spawn_server_create("setns", local_sockets_spawn_server_callback, argc, (const char **)argv);
+    spawn_srv = spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, "setns", local_sockets_spawn_server_callback, argc, (const char **)argv);
     if(spawn_srv == NULL) {
         fprintf(stderr, "Cannot create spawn server.\n");
         exit(1);
