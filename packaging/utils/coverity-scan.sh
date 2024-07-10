@@ -168,7 +168,7 @@ installit() {
   debugrun curl --remote-name --remote-header-name --show-error --location --data "token=${token}&project=${repo}" https://scan.coverity.com/download/linux64
 
   if [ -z "${COVERITY_BUILD_VERSION}" ]; then
-    COVERITY_ARCHIVE="$(find  "${TMP_DIR}" -maxdepth 0 -name 'cov-analysis-linux64-*.tar.gz' | cut -f 2 -d '/' | head -n 1)"
+    COVERITY_ARCHIVE="$(find  "${TMP_DIR}" -maxdepth 1 -mindepth 1 -name 'cov-analysis-linux64-*.tar.gz' | cut -f 2 -d '/' | head -n 1)"
   else
     COVERITY_ARCHIVE="${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz"
   fi
