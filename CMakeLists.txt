@@ -668,8 +668,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/byteorder.h
         src/libnetdata/onewayalloc/onewayalloc.c
         src/libnetdata/onewayalloc/onewayalloc.h
-        src/libnetdata/popen/popen.c
-        src/libnetdata/popen/popen.h
         src/libnetdata/procfile/procfile.c
         src/libnetdata/procfile/procfile.h
         src/libnetdata/query_progress/progress.c
@@ -720,8 +718,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/linked-lists.h
         src/libnetdata/storage-point.h
         src/libnetdata/bitmap64.h
-        src/libnetdata/os/waitid.c
-        src/libnetdata/os/waitid.h
         src/libnetdata/os/gettid.c
         src/libnetdata/os/gettid.h
         src/libnetdata/os/adjtimex.c
@@ -750,6 +746,14 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setenv.h
         src/libnetdata/os/strndup.c
         src/libnetdata/os/strndup.h
+        src/libnetdata/spawn_server/spawn_server.c
+        src/libnetdata/spawn_server/spawn_server.h
+        src/libnetdata/spawn_server/spawn_popen.c
+        src/libnetdata/spawn_server/spawn_popen.h
+        src/libnetdata/os/close_range.c
+        src/libnetdata/os/close_range.h
+        src/libnetdata/os/setproctitle.c
+        src/libnetdata/os/setproctitle.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1216,13 +1220,6 @@ set(CLAIM_PLUGIN_FILES
         src/claim/claim.h
 )
 
-set(SPAWN_PLUGIN_FILES
-        src/spawn/spawn.c
-        src/spawn/spawn_server.c
-        src/spawn/spawn_client.c
-        src/spawn/spawn.h
-)
-
 set(ACLK_ALWAYS_BUILD
         src/aclk/aclk_rrdhost_state.h
         src/aclk/aclk_proxy.c
@@ -1410,7 +1407,6 @@ set(NETDATA_FILES
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
-        ${SPAWN_PLUGIN_FILES}
         ${ACLK_ALWAYS_BUILD}
         ${PROFILE_PLUGIN_FILES}
 )

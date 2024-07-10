@@ -29,7 +29,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     static ARL_BASE *arl_base = NULL;
     static ARL_ENTRY *arl_hwcorrupted = NULL, *arl_memavailable = NULL, *arl_hugepages_total = NULL,
-        *arl_zswapped = NULL, *arl_high_low = NULL, *arl_cma_total = NULL,
+        *arl_zswapped = NULL, *arl_high_low = NULL,
         *arl_directmap4k = NULL, *arl_directmap2m = NULL, *arl_directmap4m = NULL, *arl_directmap1g = NULL;
 
     static unsigned long long
@@ -189,7 +189,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         arl_expect(arl_base, "FilePmdMapped", &FilePmdMapped);
 
         // CONFIG_CMA
-        arl_cma_total = arl_expect(arl_base, "CmaTotal", &CmaTotal);
+        arl_expect(arl_base, "CmaTotal", &CmaTotal);
         arl_expect(arl_base, "CmaFree", &CmaFree);
 
         // CONFIG_UNACCEPTED_MEMORY

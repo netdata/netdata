@@ -691,7 +691,7 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method)
         }
     }
     if(!found) {
-        errno = 0;
+        errno_clear();
         internal_error(true, "QUERY: grouping method %u not found. Using 'average'", (unsigned int)group_method);
         r->time_grouping.create  = tg_average_create;
         r->time_grouping.reset   = tg_average_reset;

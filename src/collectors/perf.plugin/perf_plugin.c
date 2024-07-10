@@ -1288,7 +1288,7 @@ int main(int argc, char **argv) {
 
     parse_command_line(argc, argv);
 
-    errno = 0;
+    errno_clear();
 
     if(freq >= update_every)
         update_every = freq;

@@ -343,7 +343,7 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
     }
 
     if(unlikely(now < next)) {
-        errno = 0;
+        errno_clear();
         nd_log_limit_static_global_var(erl, 10, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
                      "heartbeat clock: woke up %"PRIu64" microseconds earlier than expected "
@@ -351,7 +351,7 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
                      next - now);
     }
     else if(unlikely(now - next >  tick / 2)) {
-        errno = 0;
+        errno_clear();
         nd_log_limit_static_global_var(erl, 10, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
                      "heartbeat clock: woke up %"PRIu64" microseconds later than expected "

@@ -106,13 +106,13 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
     else if(strncmp(payload, "DELETE /", 8) == 0)
         start = payload + 7;
     else {
-        errno = 0;
+        errno_clear();
         netdata_log_error("Only accepting requests that start with GET, POST, PUT, DELETE from CLOUD.");
         return 1;
     }
 
     if(!(end = strstr(payload, HTTP_1_1 HTTP_ENDL))) {
-        errno = 0;
+        errno_clear();
         netdata_log_error("Doesn't look like HTTP GET request.");
         return 1;
     }
@@ -127,7 +127,7 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
 {
     aclk_query_t query;
 
-    errno = 0;
+    errno_clear();
     if (cloud_to_agent->version < ACLK_V_COMPRESSION) {
         netdata_log_error(
             "This handler cannot reply to request with version older than %d, received %d.",

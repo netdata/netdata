@@ -75,6 +75,7 @@ typedef enum __attribute__((packed)) {
     BIB_LIB_LIBCAP,
     BIB_LIB_LIBCRYPTO,
     BIB_LIB_LIBYAML,
+    BIB_LIB_LIBMNL,
     BIB_PLUGIN_APPS,
     BIB_PLUGIN_LINUX_CGROUPS,
     BIB_PLUGIN_LINUX_CGROUP_NETWORK,
@@ -698,6 +699,14 @@ static struct {
             .json = "libyaml",
             .value = NULL,
         },
+        [BIB_LIB_LIBMNL] = {
+            .category = BIC_LIBS,
+            .type = BIT_BOOLEAN,
+            .analytics = "libmnl",
+            .print = "libmnl (library for working with netfilter)",
+            .json = "libmnl",
+            .value = NULL,
+        },
         [BIB_PLUGIN_APPS] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
@@ -1177,6 +1186,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef HAVE_LIBYAML
     build_info_set_status(BIB_LIB_LIBYAML, true);
 #endif
+#ifdef HAVE_LIBMNL
+    build_info_set_status(BIB_LIB_LIBMNL, true);
+#endif
 
 #ifdef ENABLE_PLUGIN_APPS
     build_info_set_status(BIB_PLUGIN_APPS, true);
@@ -1278,9 +1290,18 @@ static void populate_system_info(void) {
         system_info = localhost->system_info;
     }
     else {
+        bool started_spawn_server = false;
+        if(!netdata_main_spawn_server) {
+            started_spawn_server = true;
+            netdata_main_spawn_server_init(NULL, 0, NULL);
+        }
+
         system_info = callocz(1, sizeof(struct rrdhost_system_info));
         get_system_info(system_info);
         free_system_info = true;
+
+        if(started_spawn_server)
+            netdata_main_spawn_server_cleanup();
     }
 
     build_info_set_value_strdupz(BIB_OS_KERNEL_NAME, system_info->kernel_name);

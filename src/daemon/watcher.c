@@ -151,6 +151,8 @@ void watcher_thread_start() {
         "remove pid file";
     watcher_steps[WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES].msg =
         "free openssl structures";
+    watcher_steps[WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER].msg =
+        "destroy main spawn server";
     watcher_steps[WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE].msg =
         "remove incomplete shutdown file";
 

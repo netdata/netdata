@@ -118,61 +118,45 @@ void signals_reset(void) {
     }
 }
 
-// reap_child reaps the child identified by pid.
-static void reap_child(pid_t pid) {
-    siginfo_t i;
+static void sigchild_handle() {
+    int status;
+    pid_t pid;
 
-    errno = 0;
-    netdata_log_debug(D_CHILDS, "SIGNAL: reap_child(%d)...", pid);
-    if (netdata_waitid(P_PID, (id_t)pid, &i, WEXITED|WNOHANG) == -1) {
-        if (errno != ECHILD)
-            netdata_log_error("SIGNAL: waitid(%d): failed to wait for child", pid);
-        else
-            netdata_log_info("SIGNAL: waitid(%d): failed - it seems the child is already reaped", pid);
-        return;
-    }
-    else if (i.si_pid == 0) {
-        // Process didn't exit, this shouldn't happen.
-        netdata_log_error("SIGNAL: waitid(%d): reports pid 0 - child has not exited", pid);
-        return;
-    }
+    // Loop to check for exited child processes
+    while ((pid = waitpid((pid_t)(-1), &status, WNOHANG)) != 0) {
+        if(pid == -1)
+            break;
 
-    switch (i.si_code) {
-        case CLD_EXITED:
-            netdata_log_info("SIGNAL: reap_child(%d) exited with code: %d", pid, i.si_status);
-            break;
-        case CLD_KILLED:
-            netdata_log_info("SIGNAL: reap_child(%d) killed by signal: %d", pid, i.si_status);
-            break;
-        case CLD_DUMPED:
-            netdata_log_info("SIGNAL: reap_child(%d) dumped core by signal: %d", pid, i.si_status);
-            break;
-        case CLD_STOPPED:
-            netdata_log_info("SIGNAL: reap_child(%d) stopped by signal: %d", pid, i.si_status);
-            break;
-        case CLD_TRAPPED:
-            netdata_log_info("SIGNAL: reap_child(%d) trapped by signal: %d", pid, i.si_status);
-            break;
-        case CLD_CONTINUED:
-            netdata_log_info("SIGNAL: reap_child(%d) continued by signal: %d", pid, i.si_status);
-            break;
-        default:
-            netdata_log_info("SIGNAL: reap_child(%d) gave us a SIGCHLD with code %d and status %d.", pid, i.si_code, i.si_status);
-            break;
-    }
-}
-
-// reap_children reaps all pending children which are not managed by myp.
-static void reap_children() {
-    siginfo_t i;
-
-    while(1) {
-        i.si_pid = 0;
-        if (netdata_waitid(P_ALL, (id_t)0, &i, WEXITED|WNOHANG|WNOWAIT) == -1 || i.si_pid == 0)
-            // nothing to do
-            return;
-
-        reap_child(i.si_pid);
+        if(WIFEXITED(status)) {
+            nd_log(NDLS_DAEMON, NDLP_INFO,
+                "DAEMON: child with pid %d exited normally with exit code %d",
+                pid, WEXITSTATUS(status));
+        }
+        else if(WIFSIGNALED(status)) {
+            if(WCOREDUMP(status))
+                nd_log(NDLS_DAEMON, NDLP_INFO,
+                    "DAEMON: child with pid %d coredump'd due to signal %d",
+                    pid, WTERMSIG(status));
+            else
+                nd_log(NDLS_DAEMON, NDLP_INFO,
+                    "DAEMON: child with pid %d killed by signal %d",
+                    pid, WTERMSIG(status));
+        }
+        else if(WIFSTOPPED(status)) {
+            nd_log(NDLS_DAEMON, NDLP_INFO,
+                "DAEMON: child with pid %d stopped due to signal %d",
+                pid, WSTOPSIG(status));
+        }
+        else if(WIFCONTINUED(status)) {
+            nd_log(NDLS_DAEMON, NDLP_INFO,
+                "DAEMON: child with pid %d continued due to signal %d",
+                pid, SIGCONT);
+        }
+        else {
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                "DAEMON: child with pid %d reports unhandled status",
+                pid);
+        }
     }
 }
 
@@ -183,6 +167,7 @@ void signals_handle(void) {
         // is delivered that either terminates the process or causes the invocation
         // of a signal-catching function.
         if(pause() == -1 && errno == EINTR) {
+            errno_clear();
 
             // loop once, but keep looping while signals are coming in
             // this is needed because a few operations may take some time
@@ -227,7 +212,7 @@ void signals_handle(void) {
                                 break;
 
                             case NETDATA_SIGNAL_CHILD:
-                                reap_children();
+                                sigchild_handle();
                                 break;
 
                             default:

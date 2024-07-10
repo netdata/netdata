@@ -1894,7 +1894,7 @@ void *rrdpush_sender_thread(void *ptr) {
         // protection from overflow
         if(unlikely(s->flags & SENDER_FLAG_OVERFLOW)) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW);
-            errno = 0;
+            errno_clear();
             netdata_log_error("STREAM %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. Restarting connection",
                   rrdhost_hostname(s->host), s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);
             rrdpush_sender_thread_close_socket(s->host);
