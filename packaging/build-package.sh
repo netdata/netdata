@@ -18,7 +18,7 @@ SCRIPT_SOURCE="$(
 )"
 SOURCE_DIR="$(dirname "$(dirname "${SCRIPT_SOURCE}")")"
 
-CMAKE_ARGS="-S ${SOURCE_DIR} -B ${BUILD_DIR} -G Ninja"
+CMAKE_ARGS="-S ${SOURCE_DIR} -B ${BUILD_DIR}"
 
 add_cmake_option() {
     CMAKE_ARGS="${CMAKE_ARGS} -D${1}=${2}"
@@ -89,8 +89,8 @@ else
 fi
 
 # shellcheck disable=SC2086
-cmake ${CMAKE_ARGS}
-cmake --build "${BUILD_DIR}" --parallel "$(nproc)"
+cmake ${CMAKE_ARGS} -G Ninja
+cmake --build "${BUILD_DIR}" --parallel "$(nproc)" -- -k 1
 
 if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then
     sentry-cli debug-files upload -o netdata-inc -p netdata-agent --force-foreground --log-level=debug --wait --include-sources build/netdata
