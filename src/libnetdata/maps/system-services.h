@@ -19,11 +19,11 @@ typedef struct servicenames_cache {
     SIMPLE_HASHTABLE_SERVICENAMES_CACHE ht;
 } SERVICENAMES_CACHE;
 
-static inline uint64_t create_key(uint16_t port, uint16_t ipproto) {
+static inline uint64_t system_servicenames_key(uint16_t port, uint16_t ipproto) {
     return ((uint64_t)ipproto << 16) | (uint64_t)port;
 }
 
-static inline const char *ipproto2str(uint16_t ipproto) {
+static inline const char *system_servicenames_ipproto2str(uint16_t ipproto) {
     return (ipproto == IPPROTO_TCP) ? "tcp" : "udp";
 }
 
@@ -38,7 +38,7 @@ static inline const char *static_portnames(uint16_t port, uint16_t ipproto) {
 }
 
 static inline STRING *system_servicenames_cache_lookup(SERVICENAMES_CACHE *sc, uint16_t port, uint16_t ipproto) {
-    uint64_t key = create_key(port, ipproto);
+    uint64_t key = system_servicenames_key(port, ipproto);
     spinlock_lock(&sc->spinlock);
 
     SIMPLE_HASHTABLE_SLOT_SERVICENAMES_CACHE *sl = simple_hashtable_get_slot_SERVICENAMES_CACHE(&sc->ht, key, &key, true);
@@ -49,11 +49,11 @@ static inline STRING *system_servicenames_cache_lookup(SERVICENAMES_CACHE *sc, u
             s = string_strdupz(st);
         }
         else {
-            struct servent *se = getservbyport(htons(port), ipproto2str(ipproto));
+            struct servent *se = getservbyport(htons(port), system_servicenames_ipproto2str(ipproto));
 
             if (!se || !se->s_name) {
                 char name[50];
-                snprintfz(name, sizeof(name), "%u/%s", port, ipproto2str(ipproto));
+                snprintfz(name, sizeof(name), "%u/%s", port, system_servicenames_ipproto2str(ipproto));
                 s = string_strdupz(name);
             }
             else
