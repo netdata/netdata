@@ -372,7 +372,7 @@ static int ebpf_select_max_index(int is_rhf, uint32_t kver)
     } else { // Kernels from kernel.org
         if (kver >= NETDATA_EBPF_KERNEL_6_8)
             return NETDATA_IDX_V6_8;
-	else if (kver >= NETDATA_EBPF_KERNEL_5_16)
+        else if (kver >= NETDATA_EBPF_KERNEL_5_16)
             return NETDATA_IDX_V5_16;
         else if (kver >= NETDATA_EBPF_KERNEL_5_15)
             return NETDATA_IDX_V5_15;
@@ -617,6 +617,30 @@ void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report,
 
         ebpf_update_kernel_memory(report, map, action);
     }
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Unload legacy code
+ *
+ * @param objects       objects loaded from eBPF programs
+ * @param probe_links   links from loader
+ */
+void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
+{
+    if (!probe_links || !objects)
+        return;
+
+    struct bpf_program *prog;
+    size_t j = 0 ;
+    bpf_object__for_each_program(prog, objects) {
+        bpf_link__destroy(probe_links[j]);
+        j++;
+    }
+
+    freez(probe_links);
+    bpf_object__close(objects);
 }
 
 //----------------------------------------------------------------------------------------------------------------------

@@ -104,6 +104,10 @@ typedef struct local_socket_state {
     uint16_t tmp_protocol;
 #endif
 
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+    bool use_ebpf;
+    ebpf_module_t *ebpf_module;
+#endif    
     ARAL *local_socket_aral;
     ARAL *pid_socket_aral;
 
@@ -223,6 +227,81 @@ static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+enum ebpf_nv_tables_list {
+    NETWORK_VIEWER_EBPF_NV_SOCKET,
+    NETWORK_VIEWER_EBPF_NV_CONTROL
+};
+
+enum ebpf_nv_load_data {
+    NETWORK_VIEWER_EBPF_NV_NOT_RUNNING = 1<<0,
+    NETWORK_VIEWER_EBPF_NV_LOAD_DATA = 1<<1,
+    NETWORK_VIEWER_EBPF_NV_ONLY_READ = 1<<2,
+    NETWORK_VIEWER_EBPF_NV_USE_PID = 1<<3
+};
+
+#define NETWORK_VIEWER_EBPF_ACTION_LIMIT 5
+
+typedef struct ebpf_nv_idx {
+    union ipv46 saddr;
+    union ipv46 daddr;
+    uint16_t sport;
+    uint16_t dport;
+} ebpf_nv_idx_t;
+
+typedef struct ebpf_nv_data {
+    int state;
+
+    uint32_t pid;
+    uint32_t tgid;
+    uint32_t uid;
+    uint64_t ts;
+
+    uint8_t timer;
+    uint8_t retransmits;
+    uint16_t closed;
+    uint32_t expires;
+    uint32_t rqueue;
+    uint32_t wqueue;
+
+    char name[TASK_COMM_LEN];
+
+    SOCKET_DIRECTION direction;
+
+    uint16_t family;
+    uint16_t protocol;
+} ebpf_nv_data_t;
+
+static inline void local_sockets_ebpf_store_sockets(LS_STATE *ls, LOCAL_SOCKET *n) {
+    ebpf_nv_idx_t key =  { };
+    ebpf_nv_data_t data = {};
+
+    key.sport = n->local_port_key.port;
+    key.dport = n->remote.port;
+    if (n->local.family == AF_INET) {
+        key.saddr.ipv4 = n->local.ip.ipv4;
+        key.daddr.ipv4 = n->remote.ip.ipv4;
+    }
+    else {
+        memcpy(&key.saddr.ipv6, &n->local.ip.ipv6, sizeof(n->local.ip.ipv6));
+        memcpy(&key.daddr.ipv6, &n->remote.ip.ipv6, sizeof(n->remote.ip.ipv6));
+    }
+
+    data.protocol = n->local.protocol;
+    data.family = n->local.family;
+    data.uid = n->uid;
+    data.pid = n->pid;
+    data.direction = n->direction;
+    data.ts = n->inode;
+    strncpyz(data.name, n->comm, sizeof(n->comm) - 1);
+
+    int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
+    if (bpf_map_update_elem(fd, &key, &data, BPF_ANY))
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "PLUGIN: cannot insert value inside table.");
+}
+#endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+
+// --------------------------------------------------------------------------------------------------------------------
 
 static void local_sockets_foreach_local_socket_call_cb(LS_STATE *ls) {
     for(SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_first_read_only_LOCAL_SOCKET(&ls->sockets_hashtable);
@@ -239,6 +318,11 @@ static void local_sockets_foreach_local_socket_call_cb(LS_STATE *ls) {
             // we have to call the callback for this socket
             if (ls->config.cb)
                 ls->config.cb(ls, n, ls->config.data);
+
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+            if (ls->ebpf_module->maps)
+                local_sockets_ebpf_store_sockets(ls, n);
+#endif
         }
     }
 }

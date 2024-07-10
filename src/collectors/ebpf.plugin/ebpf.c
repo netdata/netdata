@@ -67,14 +67,14 @@ ebpf_module_t ebpf_modules[] = {
     { .info = {.thread_name = "socket",
               .config_name = "socket",
               .thread_description = NETDATA_EBPF_SOCKET_MODULE_DESC},
-      .functions = {.start_routine = ebpf_socket_thread,
-                   .apps_routine = ebpf_socket_create_apps_charts,
-                   .fnct_routine = ebpf_socket_read_open_connections,
-                   .fcnt_name = EBPF_FUNCTION_SOCKET,
-                   .fcnt_desc = EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION,
-                   .fcnt_thread_chart_name = NULL,
-                   .fcnt_thread_lifetime_name = NULL},
-                   .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
+      .functions = {.start_routine = NULL, //ebpf_socket_thread,
+                    .apps_routine = NULL, //ebpf_socket_create_apps_charts,
+                    .fnct_routine = NULL, //ebpf_socket_read_open_connections,
+                    .fcnt_name = EBPF_FUNCTION_SOCKET,
+                    .fcnt_desc = EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION,
+                    .fcnt_thread_chart_name = NULL,
+                    .fcnt_thread_lifetime_name = NULL},
+                    .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL,
@@ -811,28 +811,6 @@ static void ebpf_exit()
     pthread_mutex_unlock(&mutex_cgroup_shm);
 
     exit(0);
-}
-
-/**
- * Unload loegacy code
- *
- * @param objects       objects loaded from eBPF programs
- * @param probe_links   links from loader
- */
-void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
-{
-    if (!probe_links || !objects)
-        return;
-
-    struct bpf_program *prog;
-    size_t j = 0 ;
-    bpf_object__for_each_program(prog, objects) {
-        bpf_link__destroy(probe_links[j]);
-        j++;
-    }
-    freez(probe_links);
-    if (objects)
-        bpf_object__close(objects);
 }
 
 /**

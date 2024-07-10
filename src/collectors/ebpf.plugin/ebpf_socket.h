@@ -55,18 +55,6 @@ enum ebpf_socket_publish_index {
     NETDATA_MAX_SOCKET_VECTOR
 };
 
-enum socket_functions {
-    NETDATA_FCNT_INET_CSK_ACCEPT,
-    NETDATA_FCNT_TCP_RETRANSMIT,
-    NETDATA_FCNT_CLEANUP_RBUF,
-    NETDATA_FCNT_TCP_CLOSE,
-    NETDATA_FCNT_UDP_RECEVMSG,
-    NETDATA_FCNT_TCP_SENDMSG,
-    NETDATA_FCNT_UDP_SENDMSG,
-    NETDATA_FCNT_TCP_V4_CONNECT,
-    NETDATA_FCNT_TCP_V6_CONNECT
-};
-
 typedef enum ebpf_socket_idx {
     NETDATA_KEY_CALLS_TCP_SENDMSG,
     NETDATA_KEY_ERROR_TCP_SENDMSG,
@@ -210,16 +198,6 @@ typedef struct netdata_passive_connection_idx {
     uint16_t protocol;
     uint16_t port;
 } netdata_passive_connection_idx_t;
-
-/**
- * Union used to store ip addresses
- */
-union netdata_ip_t {
-    uint8_t  addr8[16];
-    uint16_t addr16[8];
-    uint32_t addr32[4];
-    uint64_t addr64[2];
-};
 
 typedef struct ebpf_network_viewer_ip_list {
     char *value;            // IP value
