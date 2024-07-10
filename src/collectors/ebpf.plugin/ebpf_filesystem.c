@@ -502,9 +502,11 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                     pthread_mutex_unlock(&lock);
                     return -1;
                 } else if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj,
-                        efp->functions, NULL)) {
-                        pthread_mutex_unlock(&lock);
-                        return -1;
+                    efp->functions, NULL)) {
+                    em->info.thread_name = saved_name;
+                    em->kernels = kernels;
+                    pthread_mutex_unlock(&lock);
+                    return -1;
                 }
             }
 #endif
