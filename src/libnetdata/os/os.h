@@ -7,6 +7,7 @@
 #include <sys/syscall.h>
 #endif
 
+#include "setproctitle.h"
 #include "close_range.h"
 #include "setresuid.h"
 #include "setresgid.h"

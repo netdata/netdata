@@ -23,6 +23,7 @@ struct spawn_server {
     char *path;
     spawn_request_callback_t cb;
 
+    int argc;
     const char **argv;
     size_t argv0_size;
 #endif
@@ -290,23 +291,6 @@ static SPAWN_REQUEST *spawn_server_requests = NULL;
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static void set_process_name(SPAWN_SERVER *server, const char *comm __maybe_unused) {
-
-#ifdef HAVE_SYS_PRCTL_H
-    // Set the process name (comm)
-    prctl(PR_SET_NAME, comm, 0, 0, 0);
-#endif
-
-    if(server->argv && server->argv[0] && server->argv0_size) {
-        size_t len = strlen(comm);
-        strncpyz((char *)server->argv[0], comm, MIN(server->argv0_size, len));
-        while(len < server->argv0_size)
-            ((char *)server->argv[0])[len++] = ' ';
-    }
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-
 static int connect_to_spawn_server(const char *path, bool log) {
     int sock = -1;
 
@@ -415,7 +399,7 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *request)
     {
         char buf[15];
         snprintfz(buf, sizeof(buf), "chld-%zu-r%zu", server->id, request->request_id);
-        set_process_name(server, buf);
+        os_setproctitle(buf, server->argc, server->argv);
     }
 
     // get the fds from the request
@@ -1101,6 +1085,7 @@ SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t chi
     server->pipe[1] = -1;
     server->server_sock = -1;
     server->cb = child_callback;
+    server->argc = argc;
     server->argv = argv;
     server->argv0_size = (argv && argv[0]) ? strlen(argv[0]) : 0;
 
@@ -1157,18 +1142,10 @@ SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t chi
     pid_t pid = fork();
     if (pid == 0) {
         // the child - the spawn server
-        if(argc && argv) {
-            // replace with spaces all parameters found
-            for(int i = 1; i < argc ;i++) {
-                char *s = (char *)&argv[i][0];
-                while(*s != '\0') *s++ = ' ';
-            }
-        }
-
         {
             char buf[15];
             snprintfz(buf, sizeof(buf), "spawn-%s", server->name);
-            set_process_name(server, buf);
+            os_setproctitle(buf, server->argc, server->argv);
         }
 
         replace_stdio_with_dev_null();
