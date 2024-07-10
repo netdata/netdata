@@ -125,6 +125,6 @@ int read_proc_pid_cmdline(struct pid_stat *p) {
 cleanup:
     // copy the command to the command line
     if(p->cmdline) freez(p->cmdline);
-    p->cmdline = strdupz(p->comm);
+    p->cmdline = strdupz(string2str(p->comm));
     return 0;
 }

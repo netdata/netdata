@@ -526,7 +526,8 @@ static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr) {
         if (unlikely(fdid >= p->fds_size)) {
             // it is small, extend it
 
-            debug_log("extending fd memory slots for %s from %d to %d", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
+            debug_log("extending fd memory slots for %s from %d to %d",
+                string2str(p->comm), p->fds_size, fdid + MAX_SPARE_FDS);
 
             p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(struct pid_fd));
 
@@ -644,7 +645,7 @@ static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __may
             // it is small, extend it
 
             debug_log("extending fd memory slots for %s from %d to %d"
-                      , p->comm
+                      , string2str(p->comm)
                       , p->fds_size
                       , fdid + MAX_SPARE_FDS
             );
