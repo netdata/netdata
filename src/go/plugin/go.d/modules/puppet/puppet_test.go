@@ -180,7 +180,11 @@ func prepareCaseOkDefault(t *testing.T) (*Puppet, func()) {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case "/status/v1/services":
-				_, _ = w.Write(serviceStatusResponse)
+				if r.URL.RawQuery != urlQueryStatusService {
+					w.WriteHeader(http.StatusNotFound)
+				} else {
+					_, _ = w.Write(serviceStatusResponse)
+				}
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
