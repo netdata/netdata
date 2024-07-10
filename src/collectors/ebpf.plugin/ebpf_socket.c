@@ -2864,7 +2864,6 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_socket_load_bpf(em)) {
-        pthread_mutex_unlock(&lock);
         goto endsocket;
     }
 
