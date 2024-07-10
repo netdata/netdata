@@ -2,6 +2,7 @@
 
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
+
 #include "libnetdata/required_dummies.h"
 
 static SPAWN_SERVER *spawn_srv = NULL;
@@ -24,6 +25,7 @@ static SPAWN_SERVER *spawn_srv = NULL;
 
 #include "libnetdata/maps/local-sockets.h"
 #include "libnetdata/maps/system-users.h"
+#include "libnetdata/maps/system-services.h"
 
 #define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
 #define NETWORK_CONNECTIONS_VIEWER_HELP "Network connections explorer"
@@ -35,6 +37,7 @@ static SPAWN_SERVER *spawn_srv = NULL;
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
 static USERNAMES_CACHE *uc;
+static SERVICENAMES_CACHE *sc;
 
 ENUM_STR_MAP_DEFINE(SOCKET_DIRECTION) = {
     { .id = SOCKET_DIRECTION_LISTEN, .name = "listen" },
@@ -153,6 +156,43 @@ static void local_socket_to_json_array(struct sockets_stats *st, LOCAL_SOCKET *n
             string_freez(u);
         }
 
+        struct socket_endpoint *server_endpoint;
+        const char *server_address;
+        const char *client_address_space;
+        const char *server_address_space;
+        switch (n->direction) {
+            case SOCKET_DIRECTION_LISTEN:
+            case SOCKET_DIRECTION_INBOUND:
+            case SOCKET_DIRECTION_LOCAL_INBOUND:
+                server_address = local_address;
+                server_address_space = n->network_viewer.aggregated_key.local_address_space;
+                client_address_space = n->network_viewer.aggregated_key.remote_address_space;
+                server_endpoint = &n->local;
+                break;
+
+            case SOCKET_DIRECTION_OUTBOUND:
+            case SOCKET_DIRECTION_LOCAL_OUTBOUND:
+                server_address = remote_address;
+                server_address_space = n->network_viewer.aggregated_key.remote_address_space;
+                client_address_space = n->network_viewer.aggregated_key.local_address_space;
+                server_endpoint = &n->remote;
+                break;
+
+            case SOCKET_DIRECTION_NONE:
+                server_address = NULL;
+                client_address_space = NULL;
+                server_address_space = NULL;
+                server_endpoint = NULL;
+                break;
+        }
+
+        if(server_endpoint) {
+            STRING *serv = system_servicenames_cache_lookup(sc, server_endpoint->port, server_endpoint->protocol);
+            buffer_json_add_array_item_string(wb, string2str(serv));
+        }
+        else
+            buffer_json_add_array_item_string(wb, "[unknown]");
+
         if(!aggregated) {
             buffer_json_add_array_item_string(wb, local_address);
             buffer_json_add_array_item_uint64(wb, n->local.port);
@@ -164,32 +204,6 @@ static void local_socket_to_json_array(struct sockets_stats *st, LOCAL_SOCKET *n
             buffer_json_add_array_item_uint64(wb, n->remote.port);
         }
         buffer_json_add_array_item_string(wb, n->network_viewer.aggregated_key.remote_address_space);
-
-        const char *server_address;
-        const char *client_address_space;
-        const char *server_address_space;
-        switch (n->direction) {
-            case SOCKET_DIRECTION_LISTEN:
-            case SOCKET_DIRECTION_INBOUND:
-            case SOCKET_DIRECTION_LOCAL_INBOUND:
-                server_address = local_address;
-                server_address_space = n->network_viewer.aggregated_key.local_address_space;
-                client_address_space = n->network_viewer.aggregated_key.remote_address_space;
-                break;
-
-            case SOCKET_DIRECTION_OUTBOUND:
-            case SOCKET_DIRECTION_LOCAL_OUTBOUND:
-                server_address = remote_address;
-                server_address_space = n->network_viewer.aggregated_key.remote_address_space;
-                client_address_space = n->network_viewer.aggregated_key.local_address_space;
-                break;
-
-            case SOCKET_DIRECTION_NONE:
-                server_address = NULL;
-                client_address_space = NULL;
-                server_address_space = NULL;
-                break;
-        }
 
         if(aggregated) {
             buffer_json_add_array_item_string(wb, server_address);
@@ -618,6 +632,14 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                         RRDF_FIELD_OPTS_VISIBLE,
                                         NULL);
 
+            // Portname
+            buffer_rrdf_table_add_field(wb, field_id++, "Portname", "Server Port Name",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_VISIBLE,
+                                        NULL);
+
             if(!aggregated) {
                 // Local Address
                 buffer_rrdf_table_add_field(wb, field_id++, "LocalIP", "Local IP Address",
@@ -938,13 +960,14 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix(true) == -1) exit(1);
 
-    uc = system_usernames_cache_init();
-
     spawn_srv = spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, "setns", local_sockets_spawn_server_callback, argc, (const char **)argv);
     if(spawn_srv == NULL) {
         fprintf(stderr, "Cannot create spawn server.\n");
         exit(1);
     }
+
+    uc = system_usernames_cache_init();
+    sc = system_servicenames_cache_init();
 
     // ----------------------------------------------------------------------------------------------------------------
 
