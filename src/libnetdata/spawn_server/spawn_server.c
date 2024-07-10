@@ -17,6 +17,11 @@ struct spawn_server {
     size_t request_id;
     const char *name;
 #if !defined(OS_WINDOWS)
+    SPAWN_SERVER_OPTIONS options;
+
+    ND_UUID magic;          // for authorizing requests, the client needs to know our random UUID
+                            // it is ignored for PING requests
+
     int pipe[2];
     int server_sock;
     pid_t server_pid;
@@ -25,7 +30,6 @@ struct spawn_server {
 
     int argc;
     const char **argv;
-    size_t argv0_size;
 #endif
 };
 
@@ -51,7 +55,7 @@ void spawn_server_instance_write_fd_unset(SPAWN_INSTANCE *si) { si->write_fd = -
 
 #if defined(OS_WINDOWS)
 
-SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t cb  __maybe_unused, int argc __maybe_unused, const char **argv __maybe_unused) {
+SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, const char *name, spawn_request_callback_t cb  __maybe_unused, int argc __maybe_unused, const char **argv __maybe_unused) {
     SPAWN_SERVER* server = callocz(1, sizeof(SPAWN_SERVER));
     if(name)
         server->name = strdupz(name);
@@ -536,17 +540,18 @@ typedef enum __attribute__((packed)) {
 
 static bool spawn_server_is_running(const char *path) {
     struct msghdr msg = {0};
-    struct iovec iov[6];
+    struct iovec iov[7];
     SPAWN_SERVER_MSG msg_type = SPAWN_SERVER_MSG_PING;
     size_t dummy_size = 0;
     SPAWN_INSTANCE_TYPE dummy_type = 0;
+    ND_UUID magic = UUID_ZERO;
     char cmsgbuf[CMSG_SPACE(sizeof(int))];
 
     iov[0].iov_base = &msg_type;
     iov[0].iov_len = sizeof(msg_type);
 
-    iov[1].iov_base = &dummy_size;
-    iov[1].iov_len = sizeof(dummy_size);
+    iov[1].iov_base = magic.uuid;
+    iov[1].iov_len = sizeof(magic.uuid);
 
     iov[2].iov_base = &dummy_size;
     iov[2].iov_len = sizeof(dummy_size);
@@ -557,11 +562,14 @@ static bool spawn_server_is_running(const char *path) {
     iov[4].iov_base = &dummy_size;
     iov[4].iov_len = sizeof(dummy_size);
 
-    iov[5].iov_base = &dummy_type;
-    iov[5].iov_len = sizeof(dummy_type);
+    iov[5].iov_base = &dummy_size;
+    iov[5].iov_len = sizeof(dummy_size);
+
+    iov[6].iov_base = &dummy_type;
+    iov[6].iov_len = sizeof(dummy_type);
 
     msg.msg_iov = iov;
-    msg.msg_iovlen = 6;
+    msg.msg_iovlen = 7;
     msg.msg_control = cmsgbuf;
     msg.msg_controllen = sizeof(cmsgbuf);
 
@@ -588,7 +596,7 @@ static bool spawn_server_is_running(const char *path) {
     return sr.status == STATUS_REPORT_PING;
 }
 
-static bool spawn_server_send_request(SPAWN_REQUEST *request) {
+static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
     bool ret = false;
 
     size_t env_size = 0;
@@ -605,7 +613,7 @@ static bool spawn_server_send_request(SPAWN_REQUEST *request) {
     struct cmsghdr *cmsg;
     SPAWN_SERVER_MSG msg_type = SPAWN_SERVER_MSG_REQUEST;
     char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)];
-    struct iovec iov[10];
+    struct iovec iov[11];
 
 
     // We send 1 request with 10 iovec in it
@@ -616,35 +624,38 @@ static bool spawn_server_send_request(SPAWN_REQUEST *request) {
     iov[0].iov_base = &msg_type;
     iov[0].iov_len = sizeof(msg_type);
 
-    iov[1].iov_base = &request->request_id;
-    iov[1].iov_len = sizeof(request->request_id);
+    iov[1].iov_base = magic->uuid;
+    iov[1].iov_len = sizeof(magic->uuid);
 
-    iov[2].iov_base = &env_size;
-    iov[2].iov_len = sizeof(env_size);
+    iov[2].iov_base = &request->request_id;
+    iov[2].iov_len = sizeof(request->request_id);
 
-    iov[3].iov_base = &argv_size;
-    iov[3].iov_len = sizeof(argv_size);
+    iov[3].iov_base = &env_size;
+    iov[3].iov_len = sizeof(env_size);
 
-    iov[4].iov_base = &request->data_size;
-    iov[4].iov_len = sizeof(request->data_size);
+    iov[4].iov_base = &argv_size;
+    iov[4].iov_len = sizeof(argv_size);
 
-    iov[5].iov_base = &request->type;  // Added this line
-    iov[5].iov_len = sizeof(request->type);
+    iov[5].iov_base = &request->data_size;
+    iov[5].iov_len = sizeof(request->data_size);
 
-    iov[6].iov_base = encoded_env;
-    iov[6].iov_len = env_size;
+    iov[6].iov_base = &request->type;  // Added this line
+    iov[6].iov_len = sizeof(request->type);
 
-    iov[7].iov_base = encoded_argv;
-    iov[7].iov_len = argv_size;
+    iov[7].iov_base = encoded_env;
+    iov[7].iov_len = env_size;
 
-    iov[8].iov_base = (char *)request->data;
-    iov[8].iov_len = request->data_size;
+    iov[8].iov_base = encoded_argv;
+    iov[8].iov_len = argv_size;
 
-    iov[9].iov_base = NULL;
-    iov[9].iov_len = 0;
+    iov[9].iov_base = (char *)request->data;
+    iov[9].iov_len = request->data_size;
+
+    iov[10].iov_base = NULL;
+    iov[10].iov_len = 0;
 
     msg.msg_iov = iov;
-    msg.msg_iovlen = 10;
+    msg.msg_iovlen = 11;
     msg.msg_control = cmsgbuf;
     msg.msg_controllen = CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS);
 
@@ -675,12 +686,13 @@ cleanup:
 
 static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     struct msghdr msg = {0};
-    struct iovec iov[6];
+    struct iovec iov[7];
     SPAWN_SERVER_MSG msg_type = SPAWN_SERVER_MSG_INVALID;
     size_t request_id;
     size_t env_size;
     size_t argv_size;
     size_t data_size;
+    ND_UUID magic = UUID_ZERO;
     SPAWN_INSTANCE_TYPE type;
     char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)];
     char *envp = NULL, *argv = NULL, *data = NULL;
@@ -689,29 +701,67 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     // First recvmsg() to read sizes and control message
     iov[0].iov_base = &msg_type;
     iov[0].iov_len = sizeof(msg_type);
-    iov[1].iov_base = &request_id;
-    iov[1].iov_len = sizeof(request_id);
-    iov[2].iov_base = &env_size;
-    iov[2].iov_len = sizeof(env_size);
-    iov[3].iov_base = &argv_size;
-    iov[3].iov_len = sizeof(argv_size);
-    iov[4].iov_base = &data_size;
-    iov[4].iov_len = sizeof(data_size);
-    iov[5].iov_base = &type;
-    iov[5].iov_len = sizeof(type);
+
+    iov[1].iov_base = magic.uuid;
+    iov[1].iov_len = sizeof(magic.uuid);
+
+    iov[2].iov_base = &request_id;
+    iov[2].iov_len = sizeof(request_id);
+
+    iov[3].iov_base = &env_size;
+    iov[3].iov_len = sizeof(env_size);
+
+    iov[4].iov_base = &argv_size;
+    iov[4].iov_len = sizeof(argv_size);
+
+    iov[5].iov_base = &data_size;
+    iov[5].iov_len = sizeof(data_size);
+
+    iov[6].iov_base = &type;
+    iov[6].iov_len = sizeof(type);
 
     msg.msg_iov = iov;
-    msg.msg_iovlen = 6;
+    msg.msg_iovlen = 7;
     msg.msg_control = cmsgbuf;
     msg.msg_controllen = sizeof(cmsgbuf);
 
     if (recvmsg(sock, &msg, 0) < 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: failed to recvmsg() the first part of the request.");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: failed to recvmsg() the first part of the request.");
+        close(sock);
         return;
     }
 
     if(msg_type == SPAWN_SERVER_MSG_PING) {
         spawn_server_send_status_ping(sock);
+        close(sock);
+        return;
+    }
+
+    if(!UUIDeq(magic, server->magic)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Invalid authorization key for request %zu. "
+            "Rejecting request.",
+            request_id);
+        close(sock);
+        return;
+    }
+
+    if(type == SPAWN_INSTANCE_TYPE_EXEC && !(server->options & SPAWN_SERVER_OPTION_EXEC)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Request %zu wants to exec, but exec is not allowed for this spawn server. "
+            "Rejecting request.",
+            request_id);
+        close(sock);
+        return;
+    }
+
+    if(type == SPAWN_INSTANCE_TYPE_CALLBACK && !(server->options & SPAWN_SERVER_OPTION_CALLBACK)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Request %zu wants to run a callback, but callbacks are not allowed for this spawn server. "
+            "Rejecting request.",
+            request_id);
+        close(sock);
         return;
     }
 
@@ -721,11 +771,13 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
             "SPAWN SERVER: Received invalid control message (expected %zu bytes, received %zu bytes)",
             CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS), cmsg?cmsg->cmsg_len:0);
+        close(sock);
         return;
     }
 
     if (cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Received unexpected control message type.");
+        close(sock);
         return;
     }
 
@@ -739,6 +791,7 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
             "SPAWN SERVER: invalid file descriptors received, stdin = %d, stdout = %d, stderr = %d",
             stdin_fd, stdout_fd, stderr_fd);
+        close(sock);
         goto cleanup;
     }
 
@@ -758,6 +811,7 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     ssize_t total_bytes_received = recvmsg(sock, &msg, 0);
     if (total_bytes_received < 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: failed to recvmsg() the second part of the request.");
+        close(sock);
         goto cleanup;
     }
 
@@ -786,16 +840,15 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     if (pid == 0) {
         // the child
         spawn_server_run_child(server, request);
-        exit(1);
-
+        exit(63);
     }
     else if (pid > 0) {
         // the parent
-        request->pid = pid;
-        request->environment = NULL;
-        request->argv = NULL;
-        request->data = NULL;
+        request->environment = NULL; // will be free'd at cleanup
+        request->argv = NULL; // will be free'd at cleanup
+        request->data = NULL; // will be free'd at cleanup
         request->data_size = 0;
+        request->pid = pid;
         request->fds[0] = -1;
         request->fds[1] = -1;
         request->fds[2] = -1;
@@ -808,7 +861,9 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     else {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to fork() child.");
         spawn_server_send_status_failure(stdout_fd);
-        freez(request);
+        // the other allocations (envp, argv, data) will be free'd at cleanup
+        freez((void *)request);
+        close(sock);
     }
 
 cleanup:
@@ -856,9 +911,10 @@ static void spawn_server_process_sigchld(void) {
         bool send_report_remove_request = false;
 
         if(WIFEXITED(status)) {
-            nd_log(NDLS_COLLECTORS, NDLP_INFO,
-                "SPAWN SERVER: child with pid %d (request %zu) exited normally with exit code %d",
-                pid, request_id, WEXITSTATUS(status));
+            if(WEXITSTATUS(status))
+                nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                    "SPAWN SERVER: child with pid %d (request %zu) exited normally with exit code %d",
+                    pid, request_id, WEXITSTATUS(status));
             send_report_remove_request = true;
         }
         else if(WIFSIGNALED(status)) {
@@ -1079,7 +1135,7 @@ static void replace_stdio_with_dev_null() {
     close(dev_null_fd);
 }
 
-SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t child_callback, int argc, const char **argv) {
+SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name, spawn_request_callback_t child_callback, int argc, const char **argv) {
     SPAWN_SERVER *server = callocz(1, sizeof(SPAWN_SERVER));
     server->pipe[0] = -1;
     server->pipe[1] = -1;
@@ -1087,9 +1143,9 @@ SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t chi
     server->cb = child_callback;
     server->argc = argc;
     server->argv = argv;
-    server->argv0_size = (argv && argv[0]) ? strlen(argv[0]) : 0;
-
+    server->options = options;
     server->id = __atomic_add_fetch(&spawn_server_id, 1, __ATOMIC_RELAXED);
+    os_uuid_generate_random(server->magic.uuid);
 
     char *runtime_directory = getenv("NETDATA_CACHE_DIR");
     if(runtime_directory && !*runtime_directory) runtime_directory = NULL;
@@ -1268,7 +1324,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         .type = type
     };
 
-    if(!spawn_server_send_request(&request))
+    if(!spawn_server_send_request(&server->magic, &request))
         goto cleanup;
 
     close(pipe_stdin[0]); pipe_stdin[0] = -1;

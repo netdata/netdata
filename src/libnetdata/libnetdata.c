@@ -493,7 +493,7 @@ char *strndupz(const char *s, size_t len) {
 
 // If ptr is NULL, no operation is performed.
 void freez(void *ptr) {
-    free(ptr);
+    if(likely(ptr)) free(ptr);
 }
 
 void *mallocz(size_t size) {

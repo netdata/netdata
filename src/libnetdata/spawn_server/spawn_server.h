@@ -5,12 +5,19 @@
 
 #define SPAWN_SERVER_TRANSFER_FDS 4
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     SPAWN_INSTANCE_TYPE_EXEC = 0,
 #if !defined(OS_WINDOWS)
     SPAWN_INSTANCE_TYPE_CALLBACK = 1
 #endif
 } SPAWN_INSTANCE_TYPE;
+
+typedef enum __attribute__((packed)) {
+    SPAWN_SERVER_OPTION_EXEC = (1 << 0),
+#if !defined(OS_WINDOWS)
+    SPAWN_SERVER_OPTION_CALLBACK = (1 << 1),
+#endif
+} SPAWN_SERVER_OPTIONS;
 
 // this is only used publicly for SPAWN_INSTANCE_TYPE_CALLBACK
 // which is not available in Windows
@@ -32,7 +39,7 @@ typedef void (*spawn_request_callback_t)(SPAWN_REQUEST *request);
 typedef struct spawm_instance SPAWN_INSTANCE;
 typedef struct spawn_server SPAWN_SERVER;
 
-SPAWN_SERVER* spawn_server_create(const char *name, spawn_request_callback_t child_callback, int argc, const char **argv);
+SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name, spawn_request_callback_t child_callback, int argc, const char **argv);
 void spawn_server_destroy(SPAWN_SERVER *server);
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type);

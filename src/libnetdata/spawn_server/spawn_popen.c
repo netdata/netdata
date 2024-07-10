@@ -9,7 +9,7 @@ bool netdata_main_spawn_server_init(const char *name, int argc, const char **arg
         static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
         spinlock_lock(&spinlock);
         if(netdata_main_spawn_server == NULL)
-            netdata_main_spawn_server = spawn_server_create(name, NULL, argc, argv);
+            netdata_main_spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC, name, NULL, argc, argv);
         spinlock_unlock(&spinlock);
     }
 
