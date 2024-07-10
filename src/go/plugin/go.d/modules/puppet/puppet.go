@@ -40,8 +40,8 @@ func New() *Puppet {
 }
 
 type Config struct {
-	UpdateEvery  int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP     `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTP    `yaml:",inline" json:""`
 }
 
 type Puppet struct {
@@ -69,7 +69,6 @@ func (ppt *Puppet) Init() error {
 		return err
 	}
 	ppt.httpClient = client
-
 
 	ppt.Debugf("using URL %s", ppt.URL)
 	ppt.Debugf("using timeout: %s", ppt.Timeout)

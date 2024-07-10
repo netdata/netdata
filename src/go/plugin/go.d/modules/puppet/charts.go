@@ -13,7 +13,9 @@ const (
 	prioFileDescriptors
 )
 
-const(byteToMiB = 1 << 20)
+const (
+	byteToMiB = 1 << 20
+)
 
 var charts = module.Charts{
 	jvmHeapChart.Copy(),
@@ -59,7 +61,6 @@ var (
 		},
 	}
 
-
 	cpuUsageChart = module.Chart{
 		ID:       "cpu",
 		Title:    "CPU usage",
@@ -74,7 +75,6 @@ var (
 			{ID: "gc_time", Name: "GC", Div: 1000},
 		},
 	}
-
 
 	fileDescriptorsChart = module.Chart{
 		ID:       "fd_open",
