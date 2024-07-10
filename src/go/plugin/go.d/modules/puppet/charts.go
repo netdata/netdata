@@ -70,9 +70,8 @@ var (
 		Type:     module.Stacked,
 		Priority: prioCPUUsage,
 		Dims: module.Dims{
-			// Div by CPU scale
-			{ID: "cpu_time", Name: "execution", Div: 1000},
-			{ID: "gc_time", Name: "GC", Div: 1000},
+			{ID: "cpu_usage", Name: "execution", Div: 1000},
+			{ID: "gc_cpu_usage", Name: "GC", Div: 1000},
 		},
 	}
 
@@ -85,7 +84,7 @@ var (
 		Type:     module.Line,
 		Priority: prioFileDescriptors,
 		Dims: module.Dims{
-			{ID: "fd_used", Name: "used", Div: 1000},
+			{ID: "fd_used", Name: "used"},
 		},
 		Vars: module.Vars{
 			{ID: "fd_max"},

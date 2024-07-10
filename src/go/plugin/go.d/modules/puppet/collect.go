@@ -7,138 +7,52 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-type PuppetStatsService struct {
-	StatusService ServiceData `json:"status-service"`
-}
-
-type ServiceData struct {
-	Status Status `json:"status"`
-}
-
-type Status struct {
-	Experimental Experimental `json:"experimental"`
-}
-
-type Experimental struct {
-	JVMMetrics *JVMMetrics `json:"jvm-metrics,omitempty"`
-}
-type JVMMetrics struct {
-	CPUUsage        float64                  `json:"cpu-usage"`
-	UpTimeMS        int64                    `json:"up-time-ms"`
-	MemoryPools     map[string]MemoryPool    `json:"memory-pools"`
-	GCCPUUsage      float64                  `json:"gc-cpu-usage"`
-	Threading       Threading                `json:"threading"`
-	HeapMemory      MemoryUsage              `json:"heap-memory"`
-	GCStats         map[string]GCStats       `json:"gc-stats"`
-	StartTimeMS     int64                    `json:"start-time-ms"`
-	FileDescriptors FileDescriptors          `json:"file-descriptors"`
-	NonHeapMemory   MemoryUsage              `json:"non-heap-memory"`
-	NIOBufferPools  map[string]NIOBufferPool `json:"nio-buffer-pools"`
-}
-
-type MemoryPool struct {
-	Type  string      `json:"type"`
-	Usage MemoryUsage `json:"usage"`
-}
-
-type MemoryUsage struct {
-	Committed int64 `json:"committed"`
-	Init      int64 `json:"init"`
-	Max       int64 `json:"max"`
-	Used      int64 `json:"used"`
-}
-
-type Threading struct {
-	ThreadCount     int `json:"thread-count"`
-	PeakThreadCount int `json:"peak-thread-count"`
-}
-
-type GCStats struct {
-	Count       int         `json:"count"`
-	TotalTimeMS int64       `json:"total-time-ms"`
-	LastGCInfo  *LastGCInfo `json:"last-gc-info,omitempty"`
-}
-
-type LastGCInfo struct {
-	DurationMS int64 `json:"duration-ms"`
-}
-
-type FileDescriptors struct {
-	Used int `json:"used"`
-	Max  int `json:"max"`
-}
-
-type NIOBufferPool struct {
-	Count         int64 `json:"count"`
-	MemoryUsed    int64 `json:"memory-used"`
-	TotalCapacity int64 `json:"total-capacity"`
-}
-
-const (
-	urlPathStatsService = "/status/v1/services?level=debug" //https://puppet.com/docs/puppet/8/server/status-api/v1/services
+var (
+	//https://puppet.com/docs/puppet/8/server/status-api/v1/services
+	urlPathStatusService  = "/status/v1/services"
+	urlQueryStatusService = url.Values{"level": {"debug"}}.Encode()
 )
 
-func (ppt *Puppet) collect() (map[string]int64, error) {
-	mx := make(map[string]int64)
-
-	if err := ppt.collectStatsService(mx); err != nil {
+func (p *Puppet) collect() (map[string]int64, error) {
+	stats, err := p.queryStatsService()
+	if err != nil {
 		return nil, err
 	}
+
+	mx := stm.ToMap(stats)
 
 	return mx, nil
 }
 
-func (ppt *Puppet) collectStatsService(mx map[string]int64) error {
-	stats, err := ppt.queryStatsService()
-	if err != nil {
-		return err
-	}
-
-	mx["jvm_heap_committed"] = stats.StatusService.Status.Experimental.JVMMetrics.HeapMemory.Committed
-	mx["jvm_heap_used"] = stats.StatusService.Status.Experimental.JVMMetrics.HeapMemory.Used
-	mx["jvm_nonheap_committed"] = stats.StatusService.Status.Experimental.JVMMetrics.NonHeapMemory.Committed
-	mx["jvm_nonheap_used"] = stats.StatusService.Status.Experimental.JVMMetrics.NonHeapMemory.Used
-	mx["cpu_time"] = int64(stats.StatusService.Status.Experimental.JVMMetrics.CPUUsage * 1000)
-	mx["gc_time"] = int64(stats.StatusService.Status.Experimental.JVMMetrics.GCCPUUsage * 1000)
-	mx["fd_used"] = int64(stats.StatusService.Status.Experimental.JVMMetrics.FileDescriptors.Used * 1000)
-
-	//vars
-	mx["jvm_heap_max"] = stats.StatusService.Status.Experimental.JVMMetrics.HeapMemory.Max
-	mx["jvm_heap_init"] = stats.StatusService.Status.Experimental.JVMMetrics.HeapMemory.Init
-	mx["jvm_nonheap_max"] = stats.StatusService.Status.Experimental.JVMMetrics.NonHeapMemory.Max
-	mx["jvm_nonheap_init"] = stats.StatusService.Status.Experimental.JVMMetrics.NonHeapMemory.Init
-	mx["fd_max"] = int64(stats.StatusService.Status.Experimental.JVMMetrics.FileDescriptors.Max * 1000)
-
-	return nil
-}
-
-func (ppt *Puppet) queryStatsService() (*PuppetStatsService, error) {
-	req, err := web.NewHTTPRequest(ppt.Request)
+func (p *Puppet) queryStatsService() (*statusServiceResponse, error) {
+	req, err := web.NewHTTPRequest(p.Request)
 	if err != nil {
 		return nil, err
 	}
 
-	req.URL.Path = "/status/v1/services"
-	req.URL.RawQuery = "level=debug"
+	req.URL.Path = urlPathStatusService
+	req.URL.RawQuery = urlQueryStatusService
 
-	var stats PuppetStatsService
-	if err := ppt.doOKDecode(req, &stats); err != nil {
+	var stats statusServiceResponse
+	if err := p.doOKDecode(req, &stats); err != nil {
 		return nil, err
 	}
 
-	if stats.StatusService == (ServiceData{}) {
+	if stats.StatusService == nil {
 		return nil, fmt.Errorf("unexpected response: not puppet service status data")
 	}
 
 	return &stats, nil
 }
 
-func (ppt *Puppet) doOKDecode(req *http.Request, in interface{}) error {
-	resp, err := ppt.httpClient.Do(req)
+func (p *Puppet) doOKDecode(req *http.Request, in interface{}) error {
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}

@@ -17,12 +17,11 @@ modules:
         description: ""
       keywords:
         - puppet
-        - jvm heap
       most_popular: false
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Puppet metrics about JVM Heap, Non-Heap, CPU usage and file descriptors.'
+          This collector monitors Puppet metrics, including JVM heap and non-heap memory, CPU usage, and file descriptors.
         method_description: |
           It uses Puppet's metrics API endpoint [/status/v1/services](https://www.puppet.com/docs/puppetserver/5.3/status-api/v1/services.html) to gather the metrics.
       supported_platforms:
@@ -33,7 +32,11 @@ modules:
         description: ""
       default_behavior:
         auto_detection:
-          description: By default, this collector will use `https://fqdn.example.com:8140` as the URL to look for metrics.
+          description: |
+            By default, it detects Puppet instances running on localhost that are listening on port 8140.
+            On startup, it tries to collect metrics from:
+
+            - https://127.0.0.1:8140
         limits:
           description: ""
         performance_impact:
@@ -52,8 +55,8 @@ modules:
             enabled: true
           list:
             - name: url
-              description: HTTPS URL, exact Fully Qualified Domain Name of the node should be used.
-              default_value: https://fqdn.example.com:8140
+              description: The base URL where the Puppet instance can be accessed.
+              default_value: https://127.0.0.1:8140
               required: true
             - name: timeout
               description: HTTPS request timeout.
@@ -116,23 +119,13 @@ modules:
             enabled: true
             title: "Config"
           list:
-            - name: Basic
-              description: A basic example configuration
-              folding:
-                enabled: false
+            - name: Basic with self-signed certificate
+              description: Puppet with self-signed TLS certificate.
               config: |
                 jobs:
                   - name: local
-                    url: 'https://fqdn.example.com:8140'
-            - name: TLS Certificate
-              description: An example using a TLS certificate
-              config: |
-                jobs:
-                  - name: tlscert
-                  url: 'https://fqdn.example.com:8140'
-                  tls_cert: /path/to/client.crt
-                  tls_key: /path/to/client.key
-                  autodetection_retry: 1
+                    url: https://127.0.0.1:8140
+                    tls_skip_verify: yes
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
@@ -141,12 +134,12 @@ modules:
               config: |
                 jobs:
                   - name: local
-                    url: http://127.0.0.1:8140
+                    url: https://127.0.0.1:8140
+                    tls_skip_verify: yes
 
                   - name: remote
-                    url: http://192.0.2.1:8140
-                    tls_cert: /path/to/client.crt
-                    tls_key: /path/to/client.key
+                    url: https://192.0.2.1:8140
+                    tls_skip_verify: yes
     troubleshooting:
       problems:
         list: []

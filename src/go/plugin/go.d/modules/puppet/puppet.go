@@ -53,33 +53,33 @@ type Puppet struct {
 	httpClient *http.Client
 }
 
-func (ppt *Puppet) Configuration() any {
-	return ppt.Config
+func (p *Puppet) Configuration() any {
+	return p.Config
 }
 
-func (ppt *Puppet) Init() error {
-	if ppt.URL == "" {
-		ppt.Error("URL not set")
+func (p *Puppet) Init() error {
+	if p.URL == "" {
+		p.Error("URL not set")
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(ppt.Client)
+	client, err := web.NewHTTPClient(p.Client)
 	if err != nil {
-		ppt.Error(err)
+		p.Error(err)
 		return err
 	}
-	ppt.httpClient = client
+	p.httpClient = client
 
-	ppt.Debugf("using URL %s", ppt.URL)
-	ppt.Debugf("using timeout: %s", ppt.Timeout)
+	p.Debugf("using URL %s", p.URL)
+	p.Debugf("using timeout: %s", p.Timeout)
 
 	return nil
 }
 
-func (ppt *Puppet) Check() error {
-	mx, err := ppt.collect()
+func (p *Puppet) Check() error {
+	mx, err := p.collect()
 	if err != nil {
-		ppt.Error(err)
+		p.Error(err)
 		return err
 	}
 
@@ -90,14 +90,14 @@ func (ppt *Puppet) Check() error {
 	return nil
 }
 
-func (ppt *Puppet) Charts() *module.Charts {
-	return ppt.charts
+func (p *Puppet) Charts() *module.Charts {
+	return p.charts
 }
 
-func (ppt *Puppet) Collect() map[string]int64 {
-	mx, err := ppt.collect()
+func (p *Puppet) Collect() map[string]int64 {
+	mx, err := p.collect()
 	if err != nil {
-		ppt.Error(err)
+		p.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -107,8 +107,8 @@ func (ppt *Puppet) Collect() map[string]int64 {
 	return mx
 }
 
-func (ppt *Puppet) Cleanup() {
-	if ppt.httpClient != nil {
-		ppt.httpClient.CloseIdleConnections()
+func (p *Puppet) Cleanup() {
+	if p.httpClient != nil {
+		p.httpClient.CloseIdleConnections()
 	}
 }
