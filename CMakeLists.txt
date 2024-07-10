@@ -1182,6 +1182,7 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
         src/libnetdata/maps/system-users.h
         src/libnetdata/maps/system-groups.h
+        src/libnetdata/maps/system-services.h
 )
 
 set(STREAMING_PLUGIN_FILES
