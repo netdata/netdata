@@ -89,7 +89,7 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
               claiming_arguments);
 
     netdata_log_info("Executing agent claiming command: %s", command_exec_buffer);
-    POPEN_INSTANCE *instance = spawn_popen_run(command_exec_buffer);
+    POPEN_INSTANCE *instance = spawn_popen_run(command_line_buffer);
     if(!instance) {
         netdata_log_error("Cannot popen(\"%s\").", command_exec_buffer);
         return CLAIM_AGENT_CANNOT_EXECUTE_CLAIM_SCRIPT;
