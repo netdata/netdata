@@ -22,6 +22,7 @@ typedef enum __attribute__((packed)) {
 // this is only used publicly for SPAWN_INSTANCE_TYPE_CALLBACK
 // which is not available in Windows
 typedef struct spawn_request {
+    const char *cmdline;
     size_t request_id;
     pid_t pid;
     int socket;

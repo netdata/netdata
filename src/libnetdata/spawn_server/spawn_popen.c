@@ -3,14 +3,14 @@
 #include "spawn_popen.h"
 
 SPAWN_SERVER *netdata_main_spawn_server = NULL;
+static SPINLOCK netdata_main_spawn_server_spinlock = NETDATA_SPINLOCK_INITIALIZER;
 
 bool netdata_main_spawn_server_init(const char *name, int argc, const char **argv) {
     if(netdata_main_spawn_server == NULL) {
-        static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
-        spinlock_lock(&spinlock);
+        spinlock_lock(&netdata_main_spawn_server_spinlock);
         if(netdata_main_spawn_server == NULL)
             netdata_main_spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC, name, NULL, argc, argv);
-        spinlock_unlock(&spinlock);
+        spinlock_unlock(&netdata_main_spawn_server_spinlock);
     }
 
     return netdata_main_spawn_server != NULL;
@@ -18,8 +18,12 @@ bool netdata_main_spawn_server_init(const char *name, int argc, const char **arg
 
 void netdata_main_spawn_server_cleanup(void) {
     if(netdata_main_spawn_server) {
-        spawn_server_destroy(netdata_main_spawn_server);
-        netdata_main_spawn_server = NULL;
+        spinlock_lock(&netdata_main_spawn_server_spinlock);
+        if(netdata_main_spawn_server) {
+            spawn_server_destroy(netdata_main_spawn_server);
+            netdata_main_spawn_server = NULL;
+        }
+        spinlock_unlock(&netdata_main_spawn_server_spinlock);
     }
 }
 

@@ -287,9 +287,9 @@ static void ebpf_obsolete_specific_shm_charts(char *type, int update_every);
  */
 static void ebpf_obsolete_shm_services(ebpf_module_t *em, char *id)
 {
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_SHMGET_CHART,
+                              "",
                               "Calls to syscall shmget(2).",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -298,9 +298,9 @@ static void ebpf_obsolete_shm_services(ebpf_module_t *em, char *id)
                               20191,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_SHMAT_CHART,
+                              "",
                               "Calls to syscall shmat(2).",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -309,9 +309,9 @@ static void ebpf_obsolete_shm_services(ebpf_module_t *em, char *id)
                               20192,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_SHMDT_CHART,
+                              "",
                               "Calls to syscall shmdt(2).",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -320,9 +320,9 @@ static void ebpf_obsolete_shm_services(ebpf_module_t *em, char *id)
                               20193,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_SHMCTL_CHART,
+                              "",
                               "Calls to syscall shmctl(2).",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -941,19 +941,19 @@ static void ebpf_send_systemd_shm_charts()
             continue;
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SHMGET_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_SHMGET_CHART, "");
         write_chart_dimension("calls", (long long)ect->publish_shm.get);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SHMAT_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_SHMAT_CHART, "");
         write_chart_dimension("calls", (long long)ect->publish_shm.at);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SHMDT_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_SHMDT_CHART, "");
         write_chart_dimension("calls", (long long)ect->publish_shm.dt);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SHMCTL_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_SHMCTL_CHART, "");
         write_chart_dimension("calls", (long long)ect->publish_shm.ctl);
         ebpf_write_end_chart();
     }
