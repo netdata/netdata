@@ -355,7 +355,7 @@ static void spawn_server_send_status_ping(int fd) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Cannot send ping status report");
 }
 
-static void spawn_server_send_status_success(int fd) {
+static void spawn_server_send_status_success(SPAWN_REQUEST *rq) {
     const struct status_report sr = {
         .status = STATUS_REPORT_STARTED,
         .started = {
@@ -363,11 +363,11 @@ static void spawn_server_send_status_success(int fd) {
         },
     };
 
-    if(write(fd, &sr, sizeof(sr)) != sizeof(sr))
+    if(write(rq->sock, &sr, sizeof(sr)) != sizeof(sr))
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Cannot send success status report");
 }
 
-static void spawn_server_send_status_failure(int fd) {
+static void spawn_server_send_status_failure(SPAWN_REQUEST *rq) {
     struct status_report sr = {
         .status = STATUS_REPORT_FAILED,
         .failed = {
@@ -375,11 +375,11 @@ static void spawn_server_send_status_failure(int fd) {
         },
     };
 
-    if(write(fd, &sr, sizeof(sr)) != sizeof(sr))
+    if(write(rq->sock, &sr, sizeof(sr)) != sizeof(sr))
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Cannot send failure status report");
 }
 
-static void spawn_server_send_status_exit(int fd, int waitpid_status) {
+static void spawn_server_send_status_exit(SPAWN_REQUEST *rq, int waitpid_status) {
     struct status_report sr = {
         .status = STATUS_REPORT_EXITED,
         .exited = {
@@ -387,11 +387,11 @@ static void spawn_server_send_status_exit(int fd, int waitpid_status) {
         },
     };
 
-    if(write(fd, &sr, sizeof(sr)) != sizeof(sr))
+    if(write(rq->sock, &sr, sizeof(sr)) != sizeof(sr))
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Cannot send exit status report");
 }
 
-static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *request) {
+static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
     // fprintf(stderr, "CHILD: running request %zu on pid %d\n", request->request_id, getpid());
 
     // close the server sockets;
@@ -402,67 +402,67 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *request)
     // set the process name
     {
         char buf[15];
-        snprintfz(buf, sizeof(buf), "chld-%zu-r%zu", server->id, request->request_id);
+        snprintfz(buf, sizeof(buf), "chld-%zu-r%zu", server->id, rq->request_id);
         os_setproctitle(buf, server->argc, server->argv);
     }
 
     // get the fds from the request
-    int stdin_fd = request->fds[0];
-    int stdout_fd = request->fds[1];
-    int stderr_fd = request->fds[2];
-    int custom_fd = request->fds[3];
+    int stdin_fd = rq->fds[0];
+    int stdout_fd = rq->fds[1];
+    int stderr_fd = rq->fds[2];
+    int custom_fd = rq->fds[3];
 
     // change stdio fds to the ones in the request
     if (dup2(stdin_fd, STDIN_FILENO) == -1) {
-        spawn_server_send_status_failure(stdout_fd);
+        spawn_server_send_status_failure(rq);
         exit(1);
     }
     if (dup2(stdout_fd, STDOUT_FILENO) == -1) {
-        spawn_server_send_status_failure(stdout_fd);
+        spawn_server_send_status_failure(rq);
         exit(1);
     }
     if (dup2(stderr_fd, STDERR_FILENO) == -1) {
-        spawn_server_send_status_failure(stdout_fd);
+        spawn_server_send_status_failure(rq);
         exit(1);
     }
 
     // close the excess fds
-    close(stdin_fd); stdin_fd = request->fds[0] = STDIN_FILENO;
-    close(stdout_fd); stdout_fd = request->fds[1] = STDOUT_FILENO;
-    close(stderr_fd); stderr_fd = request->fds[2] = STDERR_FILENO;
+    close(stdin_fd); stdin_fd = rq->fds[0] = STDIN_FILENO;
+    close(stdout_fd); stdout_fd = rq->fds[1] = STDOUT_FILENO;
+    close(stderr_fd); stderr_fd = rq->fds[2] = STDERR_FILENO;
 
     // overwrite the process environment
-    environ = (char **)request->environment;
+    environ = (char **)rq->environment;
 
     // Perform different actions based on the type
-    switch (request->type) {
+    switch (rq->type) {
 
         case SPAWN_INSTANCE_TYPE_EXEC:
-            spawn_server_send_status_success(request->socket);
-            close(request->socket); request->socket = -1;
+            spawn_server_send_status_success(rq);
+            close(rq->sock); rq->sock = -1;
             close(custom_fd); custom_fd = -1;
-            execvp(request->argv[0], (char **)request->argv);
+            execvp(rq->argv[0], (char **)rq->argv);
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                 "SPAWN SERVER: Failed to execute command of request No %zu (argv[0] = '%s')",
-                request->request_id, request->argv[0]);
+                rq->request_id, rq->argv[0]);
             exit(1);
             break;
 
         case SPAWN_INSTANCE_TYPE_CALLBACK:
             if(server->cb == NULL) {
                 errno = ENOENT;
-                spawn_server_send_status_failure(request->socket);
-                close(request->socket); request->socket = -1;
+                spawn_server_send_status_failure(rq);
+                close(rq->sock); rq->sock = -1;
                 exit(1);
             }
-            spawn_server_send_status_success(request->socket);
-            close(request->socket); request->socket = -1;
-            server->cb(request);
+            spawn_server_send_status_success(rq);
+            close(rq->sock); rq->sock = -1;
+            server->cb(rq);
             exit(0);
             break;
 
         default:
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: unknown request type %u", request->type);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: unknown request type %u", rq->type);
             exit(1);
     }
 }
@@ -714,10 +714,10 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
 
     memcpy(CMSG_DATA(cmsg), request->fds, sizeof(int) * SPAWN_SERVER_TRANSFER_FDS);
 
-    int rc = sendmsg(request->socket, &msg, 0);
+    int rc = sendmsg(request->sock, &msg, 0);
 
     if (rc < 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Failed to sendmsg() request to spawn server using socket %d.", request->socket);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Failed to sendmsg() request to spawn server using socket %d.", request->sock);
         goto cleanup;
     }
     else {
@@ -737,12 +737,68 @@ static void request_free(SPAWN_REQUEST *rq) {
     if(rq->fds[1] != -1) close(rq->fds[1]);
     if(rq->fds[2] != -1) close(rq->fds[2]);
     if(rq->fds[3] != -1) close(rq->fds[3]);
-    if(rq->socket != -1) close(rq->socket);
+    if(rq->sock != -1) close(rq->sock);
     freez((void *)rq->argv);
     freez((void *)rq->environment);
     freez((void *)rq->data);
     freez((void *)rq->cmdline);
     freez((void *)rq);
+}
+
+static void spawn_server_execute_request(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
+    switch(rq->type) {
+        case SPAWN_INSTANCE_TYPE_EXEC:
+            if(rq->argv) {
+                CLEAN_BUFFER *wb = argv_to_cmdline_buffer(rq->argv);
+                rq->cmdline = strdupz(buffer_tostring(wb));
+            }
+        break;
+
+        case SPAWN_INSTANCE_TYPE_CALLBACK:
+            rq->cmdline = strdupz("callback() function");
+        break;
+
+        default:
+            rq->cmdline = strdupz("[unknown request type]");
+        break;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        // fork failed
+
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to fork() child.");
+        spawn_server_send_status_failure(rq);
+        request_free(rq);
+        return;
+    }
+    else if (pid == 0) {
+        // the child
+
+        spawn_server_run_child(server, rq);
+        exit(63);
+    }
+
+    // the parent
+    rq->pid = pid;
+
+    // do not keep data we don't need at the parent
+    freez((void *)rq->environment); rq->environment = NULL;
+    freez((void *)rq->argv); rq->argv = NULL;
+    freez((void *)rq->data); rq->data = NULL;
+    rq->data_size = 0;
+
+    // do not keep fds we don't need at the parent
+    if(rq->fds[0] != -1) { close(rq->fds[0]); rq->fds[0] = -1; }
+    if(rq->fds[1] != -1) { close(rq->fds[1]); rq->fds[1] = -1; }
+    if(rq->fds[2] != -1) { close(rq->fds[2]); rq->fds[2] = -1; }
+    if(rq->fds[3] != -1) { close(rq->fds[3]); rq->fds[3] = -1; }
+
+    // keep it in the list
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(spawn_server_requests, rq, prev, next);
+
+    // do not fork this socket on other children
+    sock_setcloexec(rq->sock);
 }
 
 static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
@@ -881,7 +937,7 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     *rq = (SPAWN_REQUEST){
         .pid = 0,
         .request_id = request_id,
-        .socket = sock,
+        .sock = sock,
         .fds = {
             [0] = stdin_fd,
             [1] = stdout_fd,
@@ -895,59 +951,11 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
         .type = type
     };
 
-    switch(rq->type) {
-        case SPAWN_INSTANCE_TYPE_EXEC:
-            if(rq->argv) {
-                CLEAN_BUFFER *wb = argv_to_cmdline_buffer(rq->argv);
-                rq->cmdline = strdupz(buffer_tostring(wb));
-            }
-        break;
+    // all allocations given to the request are now handled by this
+    spawn_server_execute_request(server, rq);
 
-        case SPAWN_INSTANCE_TYPE_CALLBACK:
-            rq->cmdline = strdupz("callback() function");
-            break;
-
-        default:
-            rq->cmdline = strdupz("[unknown request type]");
-            break;
-    }
-
-    pid_t pid = fork();
-    if (pid == 0) {
-        // the child
-        spawn_server_run_child(server, rq);
-        exit(63);
-    }
-    else if (pid > 0) {
-        // the parent
-        rq->pid = pid;
-
-        // do not keep data we don't need at the parent
-        freez(envp_encoded); freez((void *)rq->environment); rq->environment = NULL;
-        freez(argv_encoded); freez((void *)rq->argv); rq->argv = NULL;
-        freez((void *)rq->data); rq->data = NULL;
-        rq->data_size = 0;
-
-        // do not keep fds we don't need at the parent
-        if(rq->fds[0] != -1) { close(rq->fds[0]); rq->fds[0] = -1; }
-        if(rq->fds[1] != -1) { close(rq->fds[1]); rq->fds[1] = -1; }
-        if(rq->fds[2] != -1) { close(rq->fds[2]); rq->fds[2] = -1; }
-        if(rq->fds[3] != -1) { close(rq->fds[3]); rq->fds[3] = -1; }
-
-        // keep it in the list
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(spawn_server_requests, rq, prev, next);
-
-        // do not fork this socket on other children
-        sock_setcloexec(rq->socket);
-
-        // done with this
-        return;
-    }
-
-    nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to fork() child.");
-    spawn_server_send_status_failure(stdout_fd);
-    // the other allocations (envp, argv, data) will be free'd at cleanup
-    request_free(rq);
+    // since we make rq->argv and rq->environment NULL when we keep it,
+    // we don't need these anymore.
     freez(envp_encoded);
     freez(argv_encoded);
     return;
@@ -1037,7 +1045,7 @@ static void spawn_server_process_sigchld(void) {
         }
 
         if(send_report_remove_request && rq) {
-            spawn_server_send_status_exit(rq->socket, status);
+            spawn_server_send_status_exit(rq, status);
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(spawn_server_requests, rq, prev, next);
             request_free(rq);
         }
@@ -1398,7 +1406,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     SPAWN_REQUEST request = {
         .request_id = __atomic_add_fetch(&server->request_id, 1, __ATOMIC_RELAXED),
-        .socket = instance->client_sock,
+        .sock = instance->client_sock,
         .fds = {
             [0] = pipe_stdin[0],
             [1] = pipe_stdout[1],
