@@ -83,6 +83,9 @@ Metrics:
 | smartctl.device_power_on_time | power_on_time | seconds |
 | smartctl.device_temperature | temperature | Celsius |
 | smartctl.device_power_cycles_count | power | cycles |
+| smartctl.device_read_errors_rate | corrected, uncorrected | errors/s |
+| smartctl.device_write_errors_rate | corrected, uncorrected | errors/s |
+| smartctl.device_verify_errors_rate | corrected, uncorrected | errors/s |
 | smartctl.device_smart_attr_{attribute_name} | {attribute_name} | {attribute_unit} |
 | smartctl.device_smart_attr_{attribute_name}_normalized | {attribute_name} | value |
 
