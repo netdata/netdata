@@ -153,6 +153,9 @@ static void insert_alert_queue(
     static __thread sqlite3_stmt *res = NULL;
     int rc;
 
+    if (!host->aclk_config)
+        return;
+
     if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &res))
         return;
 
@@ -430,10 +433,12 @@ static void sql_inject_removed_status(
         sql_update_transition_in_health_log(host, alarm_id, &transition_id, last_transition);
 
 #ifdef ENABLE_ACLK
-        int64_t health_log_id = sqlite3_column_int64(res, 0);
-        RRDCALC_STATUS old_status = (RRDCALC_STATUS)sqlite3_column_double(res, 1);
-        insert_alert_queue(
-            host, health_log_id, (int64_t)unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED);
+        if (netdata_cloud_enabled) {
+            int64_t health_log_id = sqlite3_column_int64(res, 0);
+            RRDCALC_STATUS old_status = (RRDCALC_STATUS)sqlite3_column_double(res, 1);
+            insert_alert_queue(
+                host, health_log_id, (int64_t)unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED);
+        }
 #endif
     }
     //else

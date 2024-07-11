@@ -520,14 +520,6 @@ bool process_alert_pending_queue(RRDHOST *host)
 {
     static __thread sqlite3_stmt *res = NULL;
 
-    if (!host->aclk_config)
-        return false;
-
-    if (!aclk_connected) {
-        nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK STA [%s (N/A)]: ACLK LINK IS DOWN", rrdhost_hostname(host));
-        return false;
-    }
-
     if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &res))
         return false;
 
@@ -543,11 +535,13 @@ bool process_alert_pending_queue(RRDHOST *host)
         int64_t health_log_id = sqlite3_column_int64(res, 0);
         uint32_t unique_id = sqlite3_column_int64(res, 1);
         RRDCALC_STATUS new_status = sqlite3_column_int(res, 2);
-        int64_t row = (int64_t) sqlite3_column_int64(res, 3);
+        int64_t row = sqlite3_column_int64(res, 3);
 
-        int ret = insert_alert_to_submit_queue(host, health_log_id, unique_id, new_status);
-        if (ret == 0)
-            added++;
+        if (host->aclk_config) {
+            int ret = insert_alert_to_submit_queue(host, health_log_id, unique_id, new_status);
+            if (ret == 0)
+                added++;
+        }
 
         if (!start_row)
             start_row = row;
