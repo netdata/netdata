@@ -92,8 +92,7 @@ Metrics:
 |:------|:----------|:----|
 | app.ebpf_call_tcp_v4_connection | connections | connections/s |
 | app.ebpf_call_tcp_v6_connection | connections | connections/s |
-| app.ebpf_sock_bytes_sent | bandwidth | kilobits/s |
-| app.ebpf_sock_bytes_received | bandwidth | kilobits/s |
+| app.ebpf_sock_total_bandwidth | received, sent | kilobits/s |
 | app.ebpf_call_tcp_sendmsg | calls | calls/s |
 | app.ebpf_call_tcp_cleanup_rbuf | calls | calls/s |
 | app.ebpf_call_tcp_retransmit | calls | calls/s |
@@ -110,23 +109,22 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| cgroup.net_conn_ipv4 | connected_v4 | connections/s |
-| cgroup.net_conn_ipv6 | connected_v6 | connections/s |
-| cgroup.net_bytes_recv | received | calls/s |
-| cgroup.net_bytes_sent | sent | calls/s |
-| cgroup.net_tcp_recv | received | calls/s |
-| cgroup.net_tcp_send | sent | calls/s |
-| cgroup.net_retransmit | retransmitted | calls/s |
-| cgroup.net_udp_send | sent | calls/s |
-| cgroup.net_udp_recv | received | calls/s |
-| services.net_conn_ipv6 | a dimension per systemd service | connections/s |
-| services.net_bytes_recv | a dimension per systemd service | kilobits/s |
-| services.net_bytes_sent | a dimension per systemd service | kilobits/s |
-| services.net_tcp_recv | a dimension per systemd service | calls/s |
-| services.net_tcp_send | a dimension per systemd service | calls/s |
-| services.net_tcp_retransmit | a dimension per systemd service | calls/s |
-| services.net_udp_send | a dimension per systemd service | calls/s |
-| services.net_udp_recv | a dimension per systemd service | calls/s |
+| cgroup.net_conn_ipv4 | connections | connections/s |
+| cgroup.net_conn_ipv6 | connections | connections/s |
+| cgroup.net_total_bandwidth | received, sent | kilobits/s |
+| cgroup.net_tcp_recv | calls | calls/s |
+| cgroup.net_tcp_send | calls | calls/s |
+| cgroup.net_retransmit | calls | calls/s |
+| cgroup.net_udp_send | calls | calls/s |
+| cgroup.net_udp_recv | calls | calls/s |
+| services.net_conn_ipv4 | connections | connections/s |
+| services.net_conn_ipv6 | connections | connections/s |
+| services.net_total_bandwidth | received, sent | kilobits/s |
+| services.net_tcp_recv | calls | calls/s |
+| services.net_tcp_send | calls | calls/s |
+| services.net_tcp_retransmit | calls | calls/s |
+| services.net_udp_send | calls | calls/s |
+| services.net_udp_recv | calls | calls/s |
 
 
 
