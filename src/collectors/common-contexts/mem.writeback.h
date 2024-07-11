@@ -28,6 +28,8 @@ static inline void common_mem_writeback(uint64_t writeback,
                                                    );
         rrdset_flag_set(st_mem_writeback, RRDSET_FLAG_DETAIL);
 
+        // Users can configure Windows Page Syze to improve performance, but by default on x86_64
+        // the value is 4096 bytes
         rd_writeback     = rrddim_add(st_mem_writeback, "Writeback",     NULL, multiplier, 1024, RRD_ALGORITHM_ABSOLUTE);
     }
 
