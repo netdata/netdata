@@ -274,9 +274,9 @@ static void ebpf_obsolete_specific_swap_charts(char *type, int update_every);
  */
 static void ebpf_obsolete_swap_services(ebpf_module_t *em, char *id)
 {
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_MEM_SWAP_READ_CHART,
+                              "",
                               "Calls to function swap_readpage.",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_SYSTEM_SWAP_SUBMENU,
@@ -285,9 +285,9 @@ static void ebpf_obsolete_swap_services(ebpf_module_t *em, char *id)
                               20191,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_MEM_SWAP_WRITE_CHART,
+                              "",
                               "Calls to function swap_writepage.",
                               EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_SYSTEM_SWAP_SUBMENU,
@@ -722,11 +722,11 @@ static void ebpf_send_systemd_swap_charts()
             continue;
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_MEM_SWAP_READ_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_MEM_SWAP_READ_CHART, "");
         write_chart_dimension("calls", (long long) ect->publish_systemd_swap.read);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_MEM_SWAP_WRITE_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_MEM_SWAP_WRITE_CHART, "");
         write_chart_dimension("calls", (long long) ect->publish_systemd_swap.write);
         ebpf_write_end_chart();
     }

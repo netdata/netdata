@@ -4050,8 +4050,8 @@ int main(int argc, char **argv)
             ebpf_create_statistic_charts(EBPF_DEFAULT_UPDATE_EVERY);
 
             ebpf_send_statistic_data();
-            pthread_mutex_unlock(&lock);
             fflush(stdout);
+            pthread_mutex_unlock(&lock);
         }
 
         if (++update_apps_list == update_apps_every) {

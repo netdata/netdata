@@ -33,10 +33,10 @@
 #define NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT "cgroup.cachestat_hits"
 #define NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT "cgroup.cachestat_misses"
 
-#define NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT "systemd.services.cachestat_ratio"
-#define NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT "systemd.services.cachestat_dirties"
-#define NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT "systemd.services.cachestat_hits"
-#define NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT "systemd.services.cachestat_misses"
+#define NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT "systemd.service.cachestat_ratio"
+#define NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT "systemd.service.cachestat_dirties"
+#define NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT "systemd.service.cachestat_hits"
+#define NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT "systemd.service.cachestat_misses"
 
 // variables
 enum cachestat_counters {
