@@ -114,7 +114,8 @@ see the appropriate collector readme.
 | [powerdns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/powerdns)                     | PowerDNS Authoritative Server |
 | [powerdns_recursor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/powerdns_recursor)   |       PowerDNS Recursor       |
 | [proxysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/proxysql)                     |           ProxySQL            |
-| [pulsar](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/portcheck)                      |         Apache Pulsar         |
+| [pulsar](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/pulsar)                         |         Apache Pulsar         |
+| [puppet](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/puppet)                         |            Puppet             |
 | [rabbitmq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/rabbitmq)                     |           RabbitMQ            |
 | [redis](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/redis)                           |             Redis             |
 | [rspamd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/rspamd)                         |            Rspamd             |
