@@ -1002,7 +1002,7 @@ static void spawn_server_process_sigchld(void) {
         if(WIFEXITED(status)) {
             if(WEXITSTATUS(status))
                 nd_log(NDLS_COLLECTORS, NDLP_INFO,
-                    "SPAWN SERVER: child with pid %d (request %zu) exited normally with exit code %d: %s",
+                    "SPAWN SERVER: child with pid %d (request %zu) exited with exit code %d: %s",
                     pid, request_id, WEXITSTATUS(status), rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = true;
         }
