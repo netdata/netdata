@@ -377,39 +377,13 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     }
 
     if(do_writeback) {
-        static RRDSET *st_mem_writeback = NULL;
-        static RRDDIM *rd_dirty = NULL, *rd_writeback = NULL, *rd_fusewriteback = NULL, *rd_nfs_writeback = NULL, *rd_bounce = NULL;
-
-        if(unlikely(!st_mem_writeback)) {
-            st_mem_writeback = rrdset_create_localhost(
-                    "mem"
-                    , "writeback"
-                    , NULL
-                    , "writeback"
-                    , NULL
-                    , "Writeback Memory"
-                    , "MiB"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_MEMINFO_NAME
-                    , NETDATA_CHART_PRIO_MEM_KERNEL
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-            rrdset_flag_set(st_mem_writeback, RRDSET_FLAG_DETAIL);
-
-            rd_dirty         = rrddim_add(st_mem_writeback, "Dirty",         NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rd_writeback     = rrddim_add(st_mem_writeback, "Writeback",     NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rd_fusewriteback = rrddim_add(st_mem_writeback, "FuseWriteback", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rd_nfs_writeback = rrddim_add(st_mem_writeback, "NfsWriteback",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rd_bounce        = rrddim_add(st_mem_writeback, "Bounce",        NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-        }
-
-        rrddim_set_by_pointer(st_mem_writeback, rd_dirty,         Dirty);
-        rrddim_set_by_pointer(st_mem_writeback, rd_writeback,     Writeback);
-        rrddim_set_by_pointer(st_mem_writeback, rd_fusewriteback, WritebackTmp);
-        rrddim_set_by_pointer(st_mem_writeback, rd_nfs_writeback, NFS_Unstable);
-        rrddim_set_by_pointer(st_mem_writeback, rd_bounce,        Bounce);
-        rrdset_done(st_mem_writeback);
+        common_mem_writeback(Dirty,
+                             Writeback,
+                             WritebackTmp,
+                             NFS_Unstable,
+                             Bounce,
+                             update_every,
+                             _COMMON_PLUGIN_MODULE_NAME);
     }
 
     // --------------------------------------------------------------------

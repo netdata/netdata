@@ -1040,6 +1040,7 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/mem.swap.h
         src/collectors/common-contexts/mem.pgfaults.h
         src/collectors/common-contexts/mem.available.h
+        src/collectors/common-contexts/mem.writeback.h
 )
 
 set(PLUGINSD_PLUGIN_FILES
