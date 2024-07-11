@@ -2,6 +2,12 @@
 
 #include "common.h"
 
+/*
+ * IMPORTANT: Libuv uv_spawn() uses SIGCHLD internally:
+ * https://github.com/libuv/libuv/blob/cc51217a317e96510fbb284721d5e6bc2af31e33/src/unix/process.c#L485
+ * Extreme care is needed when mixing and matching POSIX and libuv.
+ */
+
 typedef enum signal_action {
     NETDATA_SIGNAL_END_OF_LIST,
     NETDATA_SIGNAL_IGNORE,
@@ -9,7 +15,6 @@ typedef enum signal_action {
     NETDATA_SIGNAL_REOPEN_LOGS,
     NETDATA_SIGNAL_RELOAD_HEALTH,
     NETDATA_SIGNAL_FATAL,
-    NETDATA_SIGNAL_CHILD,
 } SIGNAL_ACTION;
 
 static struct {
@@ -25,7 +30,6 @@ static struct {
         { SIGHUP,  "SIGHUP",  0, NETDATA_SIGNAL_REOPEN_LOGS   },
         { SIGUSR2, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH },
         { SIGBUS,  "SIGBUS",  0, NETDATA_SIGNAL_FATAL         },
-        { SIGCHLD, "SIGCHLD", 0, NETDATA_SIGNAL_CHILD         },
 
         // terminator
         { 0,       "NONE",    0, NETDATA_SIGNAL_END_OF_LIST   }
@@ -93,18 +97,6 @@ void signals_init(void) {
     }
 }
 
-void signals_restore_SIGCHLD(void)
-{
-    struct sigaction sa;
-
-    sa.sa_flags = 0;
-    sigfillset(&sa.sa_mask);
-    sa.sa_handler = signal_handler;
-
-    if(sigaction(SIGCHLD, &sa, NULL) == -1)
-        netdata_log_error("SIGNAL: Failed to change signal handler for: SIGCHLD");
-}
-
 void signals_reset(void) {
     struct sigaction sa;
     sigemptyset(&sa.sa_mask);
@@ -115,48 +107,6 @@ void signals_reset(void) {
     for (i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST; i++) {
         if(sigaction(signals_waiting[i].signo, &sa, NULL) == -1)
             netdata_log_error("SIGNAL: Failed to reset signal handler for: %s", signals_waiting[i].name);
-    }
-}
-
-static void sigchild_handle() {
-    int status;
-    pid_t pid;
-
-    // Loop to check for exited child processes
-    while ((pid = waitpid((pid_t)(-1), &status, WNOHANG)) != 0) {
-        if(pid == -1)
-            break;
-
-        if(WIFEXITED(status)) {
-            nd_log(NDLS_DAEMON, NDLP_INFO,
-                "DAEMON: child with pid %d exited normally with exit code %d",
-                pid, WEXITSTATUS(status));
-        }
-        else if(WIFSIGNALED(status)) {
-            if(WCOREDUMP(status))
-                nd_log(NDLS_DAEMON, NDLP_INFO,
-                    "DAEMON: child with pid %d coredump'd due to signal %d",
-                    pid, WTERMSIG(status));
-            else
-                nd_log(NDLS_DAEMON, NDLP_INFO,
-                    "DAEMON: child with pid %d killed by signal %d",
-                    pid, WTERMSIG(status));
-        }
-        else if(WIFSTOPPED(status)) {
-            nd_log(NDLS_DAEMON, NDLP_INFO,
-                "DAEMON: child with pid %d stopped due to signal %d",
-                pid, WSTOPSIG(status));
-        }
-        else if(WIFCONTINUED(status)) {
-            nd_log(NDLS_DAEMON, NDLP_INFO,
-                "DAEMON: child with pid %d continued due to signal %d",
-                pid, SIGCONT);
-        }
-        else {
-            nd_log(NDLS_COLLECTORS, NDLP_INFO,
-                "DAEMON: child with pid %d reports unhandled status",
-                pid);
-        }
     }
 }
 
@@ -209,10 +159,6 @@ void signals_handle(void) {
 
                             case NETDATA_SIGNAL_FATAL:
                                 fatal("SIGNAL: Received %s. netdata now exits.", name);
-                                break;
-
-                            case NETDATA_SIGNAL_CHILD:
-                                sigchild_handle();
                                 break;
 
                             default:

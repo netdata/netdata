@@ -324,6 +324,8 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
 void web_client_cache_destroy(void);
 
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
+    netdata_exit = 1;
+
     watcher_shutdown_begin();
 
     nd_log_limits_unlimited();
@@ -343,6 +345,9 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
     watcher_step_complete(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
+
+    netdata_main_spawn_server_cleanup();
+    watcher_step_complete(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER);
 
 #ifdef ENABLE_DBENGINE
     if(dbengine_enabled) {
@@ -485,9 +490,6 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     netdata_ssl_cleanup();
 #endif
     watcher_step_complete(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
-
-    netdata_main_spawn_server_cleanup();
-    watcher_step_complete(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER);
 
     (void) unlink(agent_incomplete_shutdown_file);
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE);
@@ -666,8 +668,6 @@ void cancel_main_threads() {
             found++;
         }
     }
-
-    netdata_exit = 1;
 
     while(found && max > 0) {
         max -= step;
@@ -2178,18 +2178,6 @@ int netdata_main(int argc, char **argv) {
     // initialize internal registry
     delta_startup_time("initialize registry");
     registry_init();
-
-    // fork the spawn server
-    delta_startup_time("fork the spawn server");
-
-    /*
-     * Libuv uv_spawn() uses SIGCHLD internally:
-     * https://github.com/libuv/libuv/blob/cc51217a317e96510fbb284721d5e6bc2af31e33/src/unix/process.c#L485
-     * and inadvertently replaces the netdata signal handler which was setup during initialization.
-     * Thusly, we must explicitly restore the signal handler for SIGCHLD.
-     * Warning: extreme care is needed when mixing and matching POSIX and libuv.
-     */
-    signals_restore_SIGCHLD();
 
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.

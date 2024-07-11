@@ -471,7 +471,7 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *request)
 // Encoding and decoding of spawn server request argv type of data
 
 // Function to encode argv or envp
-static void* encode_argv(const char **argv, size_t *out_size) {
+static void* argv_encode(const char **argv, size_t *out_size) {
     size_t buffer_size = 1024; // Initial buffer size
     size_t buffer_used = 0;
     char *buffer = mallocz(buffer_size);
@@ -505,7 +505,7 @@ static void* encode_argv(const char **argv, size_t *out_size) {
 }
 
 // Function to decode argv or envp
-static const char** decode_argv(const char *buffer, size_t size) {
+static const char** argv_decode(const char *buffer, size_t size) {
     size_t count = 0;
     const char *ptr = buffer;
     while (ptr < buffer + size) {
@@ -527,6 +527,54 @@ static const char** decode_argv(const char *buffer, size_t size) {
     argv[count] = NULL; // Null-terminate the array
 
     return argv;
+}
+
+static BUFFER *argv_to_cmdline_buffer(const char **argv) {
+    BUFFER *wb = buffer_create(0, NULL);
+
+    for(size_t i = 0; argv[i] ;i++) {
+        const char *s = argv[i];
+        size_t len = strlen(s);
+        buffer_need_bytes(wb, len * 2 + 1);
+
+        bool needs_quotes = false;
+        for(const char *c = s; !needs_quotes && *c ; c++) {
+            switch(*c) {
+                case ' ':
+                case '\v':
+                case '\t':
+                case '\n':
+                case '"':
+                    needs_quotes = true;
+                break;
+
+                default:
+                    break;
+            }
+        }
+
+        if(needs_quotes && buffer_strlen(wb))
+            buffer_strcat(wb, " \"");
+        else
+            buffer_putc(wb, ' ');
+
+        for(const char *c = s; *c ; c++) {
+            switch(*c) {
+                case '"':
+                    buffer_putc(wb, '\\');
+                // fall through
+
+                default:
+                    buffer_putc(wb, *c);
+                break;
+            }
+        }
+
+        if(needs_quotes)
+            buffer_strcat(wb, "\"");
+    }
+
+    return wb;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -600,12 +648,12 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
     bool ret = false;
 
     size_t env_size = 0;
-    void *encoded_env = encode_argv(request->environment, &env_size);
+    void *encoded_env = argv_encode(request->environment, &env_size);
     if (!encoded_env)
         goto cleanup;
 
     size_t argv_size = 0;
-    void *encoded_argv = encode_argv(request->argv, &argv_size);
+    void *encoded_argv = argv_encode(request->argv, &argv_size);
     if (!encoded_argv)
         goto cleanup;
 
@@ -684,6 +732,19 @@ cleanup:
     return ret;
 }
 
+static void request_free(SPAWN_REQUEST *rq) {
+    if(rq->fds[0] != -1) close(rq->fds[0]);
+    if(rq->fds[1] != -1) close(rq->fds[1]);
+    if(rq->fds[2] != -1) close(rq->fds[2]);
+    if(rq->fds[3] != -1) close(rq->fds[3]);
+    if(rq->socket != -1) close(rq->socket);
+    freez((void *)rq->argv);
+    freez((void *)rq->environment);
+    freez((void *)rq->data);
+    freez((void *)rq->cmdline);
+    freez((void *)rq);
+}
+
 static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     struct msghdr msg = {0};
     struct iovec iov[7];
@@ -695,7 +756,7 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     ND_UUID magic = UUID_ZERO;
     SPAWN_INSTANCE_TYPE type;
     char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)];
-    char *envp = NULL, *argv = NULL, *data = NULL;
+    char *envp_encoded = NULL, *argv_encoded = NULL, *data = NULL;
     int stdin_fd = -1, stdout_fd = -1, stderr_fd = -1, custom_fd = -1;
 
     // First recvmsg() to read sizes and control message
@@ -791,14 +852,13 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
             "SPAWN SERVER: invalid file descriptors received, stdin = %d, stdout = %d, stderr = %d",
             stdin_fd, stdout_fd, stderr_fd);
-        close(sock);
         goto cleanup;
     }
 
     // Second recvmsg() to read buffer contents
-    iov[0].iov_base = envp = mallocz(env_size);
+    iov[0].iov_base = envp_encoded = mallocz(env_size);
     iov[0].iov_len = env_size;
-    iov[1].iov_base = argv = mallocz(argv_size);
+    iov[1].iov_base = argv_encoded = mallocz(argv_size);
     iov[1].iov_len = argv_size;
     iov[2].iov_base = data = mallocz(data_size);
     iov[2].iov_len = data_size;
@@ -811,15 +871,14 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     ssize_t total_bytes_received = recvmsg(sock, &msg, 0);
     if (total_bytes_received < 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: failed to recvmsg() the second part of the request.");
-        close(sock);
         goto cleanup;
     }
 
     // fprintf(stderr, "SPAWN SERVER: received request %zu (fds: %d, %d, %d, %d)\n", request_id,
     //     stdin_fd, stdout_fd, stderr_fd, custom_fd);
 
-    SPAWN_REQUEST *request = mallocz(sizeof(*request));
-    *request = (SPAWN_REQUEST){
+    SPAWN_REQUEST *rq = mallocz(sizeof(*rq));
+    *rq = (SPAWN_REQUEST){
         .pid = 0,
         .request_id = request_id,
         .socket = sock,
@@ -829,50 +888,78 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
             [2] = stderr_fd,
             [3] = custom_fd,
         },
-        .environment = decode_argv(envp, env_size),
-        .argv = decode_argv(argv, argv_size),
+        .environment = argv_decode(envp_encoded, env_size),
+        .argv = argv_decode(argv_encoded, argv_size),
         .data = data,
         .data_size = data_size,
         .type = type
     };
 
+    switch(rq->type) {
+        case SPAWN_INSTANCE_TYPE_EXEC:
+            if(rq->argv) {
+                CLEAN_BUFFER *wb = argv_to_cmdline_buffer(rq->argv);
+                rq->cmdline = strdupz(buffer_tostring(wb));
+            }
+        break;
+
+        case SPAWN_INSTANCE_TYPE_CALLBACK:
+            rq->cmdline = strdupz("callback() function");
+            break;
+
+        default:
+            rq->cmdline = strdupz("[unknown request type]");
+            break;
+    }
+
     pid_t pid = fork();
     if (pid == 0) {
         // the child
-        spawn_server_run_child(server, request);
+        spawn_server_run_child(server, rq);
         exit(63);
     }
     else if (pid > 0) {
         // the parent
-        request->environment = NULL; // will be free'd at cleanup
-        request->argv = NULL; // will be free'd at cleanup
-        request->data = NULL; // will be free'd at cleanup
-        request->data_size = 0;
-        request->pid = pid;
-        request->fds[0] = -1;
-        request->fds[1] = -1;
-        request->fds[2] = -1;
-        request->fds[3] = -1;
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(spawn_server_requests, request, prev, next);
+        rq->pid = pid;
+
+        // do not keep data we don't need at the parent
+        freez(envp_encoded); freez((void *)rq->environment); rq->environment = NULL;
+        freez(argv_encoded); freez((void *)rq->argv); rq->argv = NULL;
+        freez((void *)rq->data); rq->data = NULL;
+        rq->data_size = 0;
+
+        // do not keep fds we don't need at the parent
+        if(rq->fds[0] != -1) { close(rq->fds[0]); rq->fds[0] = -1; }
+        if(rq->fds[1] != -1) { close(rq->fds[1]); rq->fds[1] = -1; }
+        if(rq->fds[2] != -1) { close(rq->fds[2]); rq->fds[2] = -1; }
+        if(rq->fds[3] != -1) { close(rq->fds[3]); rq->fds[3] = -1; }
+
+        // keep it in the list
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(spawn_server_requests, rq, prev, next);
 
         // do not fork this socket on other children
-        sock_setcloexec(request->socket);
-    }
-    else {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to fork() child.");
-        spawn_server_send_status_failure(stdout_fd);
-        // the other allocations (envp, argv, data) will be free'd at cleanup
-        freez((void *)request);
-        close(sock);
+        sock_setcloexec(rq->socket);
+
+        // done with this
+        return;
     }
 
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to fork() child.");
+    spawn_server_send_status_failure(stdout_fd);
+    // the other allocations (envp, argv, data) will be free'd at cleanup
+    request_free(rq);
+    freez(envp_encoded);
+    freez(argv_encoded);
+    return;
+
 cleanup:
+    close(sock);
     if(stdin_fd != -1) close(stdin_fd);
     if(stdout_fd != -1) close(stdout_fd);
     if(stderr_fd != -1) close(stderr_fd);
     if(custom_fd != -1) close(custom_fd);
-    freez(envp);
-    freez(argv);
+    freez(envp_encoded);
+    freez(argv_encoded);
     freez(data);
 }
 
@@ -906,6 +993,8 @@ static void spawn_server_process_sigchld(void) {
         if(pid == -1)
             break;
 
+        errno_clear();
+
         SPAWN_REQUEST *rq = find_request_by_pid(pid);
         size_t request_id = rq ? rq->request_id : 0;
         bool send_report_remove_request = false;
@@ -913,45 +1002,44 @@ static void spawn_server_process_sigchld(void) {
         if(WIFEXITED(status)) {
             if(WEXITSTATUS(status))
                 nd_log(NDLS_COLLECTORS, NDLP_INFO,
-                    "SPAWN SERVER: child with pid %d (request %zu) exited normally with exit code %d",
-                    pid, request_id, WEXITSTATUS(status));
+                    "SPAWN SERVER: child with pid %d (request %zu) exited with exit code %d: %s",
+                    pid, request_id, WEXITSTATUS(status), rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = true;
         }
         else if(WIFSIGNALED(status)) {
             if(WCOREDUMP(status))
                 nd_log(NDLS_COLLECTORS, NDLP_INFO,
-                    "SPAWN SERVER: child with pid %d (request %zu) coredump'd due to signal %d",
-                    pid, request_id, WTERMSIG(status));
+                    "SPAWN SERVER: child with pid %d (request %zu) coredump'd due to signal %d: %s",
+                    pid, request_id, WTERMSIG(status), rq ? rq->cmdline : "[request not found]");
             else
                 nd_log(NDLS_COLLECTORS, NDLP_INFO,
-                    "SPAWN SERVER: child with pid %d (request %zu) killed by signal %d",
-                    pid, request_id, WTERMSIG(status));
+                    "SPAWN SERVER: child with pid %d (request %zu) killed by signal %d: %s",
+                    pid, request_id, WTERMSIG(status), rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = true;
         }
         else if(WIFSTOPPED(status)) {
             nd_log(NDLS_COLLECTORS, NDLP_INFO,
-                "SPAWN SERVER: child with pid %d (request %zu) stopped due to signal %d",
-                pid, request_id, WSTOPSIG(status));
+                "SPAWN SERVER: child with pid %d (request %zu) stopped due to signal %d: %s",
+                pid, request_id, WSTOPSIG(status), rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = false;
         }
         else if(WIFCONTINUED(status)) {
             nd_log(NDLS_COLLECTORS, NDLP_INFO,
-                "SPAWN SERVER: child with pid %d (request %zu) continued due to signal %d",
-                pid, request_id, SIGCONT);
+                "SPAWN SERVER: child with pid %d (request %zu) continued due to signal %d: %s",
+                pid, request_id, SIGCONT, rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = false;
         }
         else {
             nd_log(NDLS_COLLECTORS, NDLP_INFO,
-                "SPAWN SERVER: child with pid %d (request %zu) reports unhandled status",
-                pid, request_id);
+                "SPAWN SERVER: child with pid %d (request %zu) reports unhandled status: %s",
+                pid, request_id, rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = false;
         }
 
         if(send_report_remove_request && rq) {
             spawn_server_send_status_exit(rq->socket, status);
-            close(rq->socket);
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(spawn_server_requests, rq, prev, next);
-            freez(rq);
+            request_free(rq);
         }
     }
 }
@@ -961,7 +1049,7 @@ static void signals_unblock(void) {
     sigfillset(&sigset);
 
     if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) == -1) {
-        netdata_log_error("SIGNAL: Could not unblock signals for threads");
+        netdata_log_error("SPAWN SERVER: Could not unblock signals for threads");
     }
 }
 
