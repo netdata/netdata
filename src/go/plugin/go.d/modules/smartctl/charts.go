@@ -130,7 +130,7 @@ var (
 		},
 	}
 	deviceScsiVerifyErrorsChartTmpl = module.Chart{
-		ID:       "device_%s_type_%s_log_verify_errors_rate",
+		ID:       "device_%s_type_%s_verify_errors_rate",
 		Title:    "Device verify errors",
 		Units:    "errors/s",
 		Fam:      "scsi errors",
