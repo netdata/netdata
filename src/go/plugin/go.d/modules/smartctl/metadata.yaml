@@ -186,6 +186,27 @@ modules:
               chart_type: line
               dimensions:
                 - name: power
+            - name: smartctl.device_read_errors_rate
+              description: Device read errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: corrected
+                - name: uncorrected
+            - name: smartctl.device_write_errors_rate
+              description: Device write errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: corrected
+                - name: uncorrected
+            - name: smartctl.device_verify_errors_rate
+              description: Device verify errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: corrected
+                - name: uncorrected
             - name: smartctl.device_smart_attr_{attribute_name}
               description: Device smart attribute {attribute_name}
               unit: '{attribute_unit}'
