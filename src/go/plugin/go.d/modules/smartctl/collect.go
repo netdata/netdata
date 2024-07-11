@@ -136,6 +136,30 @@ func (s *Smartctl) collectSmartDevice(mx map[string]int64, dev *smartDevice) {
 			}
 		}
 	}
+
+	if dev.deviceType() == "scsi" {
+		sel := dev.data.Get("scsi_error_counter_log")
+		if !sel.Exists() {
+			return
+		}
+
+		for _, v := range []string{"read", "write", "verify"} {
+			for _, n := range []string{
+				//"errors_corrected_by_eccdelayed",
+				//"errors_corrected_by_eccfast",
+				//"errors_corrected_by_rereads_rewrites",
+				"total_errors_corrected",
+				"total_uncorrected_errors",
+			} {
+				key := fmt.Sprintf("%sscsi_error_log_%s_%s", px, v, n)
+				metric := fmt.Sprintf("%s.%s", v, n)
+
+				if m := sel.Get(metric); m.Exists() {
+					mx[key] = m.Int()
+				}
+			}
+		}
+	}
 }
 
 func (s *Smartctl) isTimeToScan(now time.Time) bool {
