@@ -382,8 +382,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                              WritebackTmp,
                              NFS_Unstable,
                              Bounce,
-                             update_every,
-                             _COMMON_PLUGIN_MODULE_NAME);
+                             update_every);
     }
 
     // --------------------------------------------------------------------

@@ -5,13 +5,44 @@
 
 #include "common-contexts.h"
 
+#if defined(OS_WINDOWS)
+static inline void common_mem_writeback(uint64_t writeback,
+                                        int multiplier,
+                                        int update_every) {
+    static RRDSET *st_mem_writeback = NULL;
+    static RRDDIM *rd_writeback = NULL;
+
+    if(unlikely(!st_mem_writeback)) {
+        st_mem_writeback = rrdset_create_localhost("mem"
+                                                   , "writeback"
+                                                   , NULL
+                                                   , "writeback"
+                                                   , NULL
+                                                   , "Writeback Memory"
+                                                   , "MiB"
+                                                   , _COMMON_PLUGIN_NAME
+                                                   , _COMMON_PLUGIN_MODULE_NAME
+                                                   , NETDATA_CHART_PRIO_MEM_KERNEL
+                                                   , update_every
+                                                   , RRDSET_TYPE_LINE
+                                                   );
+        rrdset_flag_set(st_mem_writeback, RRDSET_FLAG_DETAIL);
+
+        rd_writeback     = rrddim_add(st_mem_writeback, "Writeback",     NULL, multiplier, 1024, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(st_mem_writeback, rd_writeback,     (collected_number)writeback);
+    rrdset_done(st_mem_writeback);
+}
+#endif
+
+#if defined(OS_LINUX)
 static inline void common_mem_writeback(uint64_t dirty,
                                         uint64_t writeback,
                                         uint64_t fuseWriteback,
                                         uint64_t NFSWriteback,
                                         uint64_t Bounce,
-                                        int update_every,
-                                        char *module) {
+                                        int update_every) {
     static RRDSET *st_mem_writeback = NULL;
     static RRDDIM *rd_dirty = NULL, *rd_writeback = NULL, *rd_fusewriteback = NULL,
                   *rd_nfs_writeback = NULL, *rd_bounce = NULL;
@@ -25,7 +56,7 @@ static inline void common_mem_writeback(uint64_t dirty,
                                                    , "Writeback Memory"
                                                    , "MiB"
                                                    , _COMMON_PLUGIN_NAME
-                                                   , module
+                                                   , _COMMON_PLUGIN_MODULE_NAME
                                                    , NETDATA_CHART_PRIO_MEM_KERNEL
                                                    , update_every
                                                    , RRDSET_TYPE_LINE
@@ -46,6 +77,7 @@ static inline void common_mem_writeback(uint64_t dirty,
     rrddim_set_by_pointer(st_mem_writeback, rd_bounce,        (collected_number)Bounce);
     rrdset_done(st_mem_writeback);
 }
+#endif
 
 #endif //NETDATA_MEM_WRITEBACK_H
 

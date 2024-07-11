@@ -41,6 +41,22 @@ static bool do_memory(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     common_mem_available(available_bytes, update_every);
 
+    static DWORD page_size = 0;
+    ULONGLONG writeBackSize = 0;
+
+    if (!page_size) {
+        SYSTEM_INFO sysInfo;
+        GetSystemInfo(&sysInfo);
+        page_size = sysInfo.dwPageSize;
+    }
+    static COUNTER_DATA writeBack = { .key = "Page Writes/sec" };
+   /* static COUNTER_DATA dirty = { .key = "Pool Paged Allocs" }; // These are calls, not page or bytes */
+
+   if(perflibGetObjectCounter(pDataBlock, pObjectType, &writeBack))
+       writeBackSize = writeBack.current.Data;
+
+    common_mem_writeback(writeBackSize, page_size, update_every);
+
     return true;
 }
 
