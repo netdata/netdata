@@ -2178,6 +2178,7 @@ int netdata_main(int argc, char **argv) {
     // initialize internal registry
     delta_startup_time("initialize registry");
     registry_init();
+    netdata_random_session_id_generate();
 
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
