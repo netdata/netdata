@@ -2,10 +2,17 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.46.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.46.2...HEAD)
 
 **Merged pull requests:**
 
+- move "api key" option in stream.conf [\#18108](https://github.com/netdata/netdata/pull/18108) ([ilyam8](https://github.com/ilyam8))
+- add port service names to network viewer [\#18107](https://github.com/netdata/netdata/pull/18107) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#18106](https://github.com/netdata/netdata/pull/18106) ([netdatabot](https://github.com/netdatabot))
+- docs: deploy docker add host root mount \(stable\) [\#18105](https://github.com/netdata/netdata/pull/18105) ([ilyam8](https://github.com/ilyam8))
+- Fix detection of Coverity archive in scan script. [\#18104](https://github.com/netdata/netdata/pull/18104) ([Ferroin](https://github.com/Ferroin))
+- add authorization to spawn requests [\#18103](https://github.com/netdata/netdata/pull/18103) ([ktsaou](https://github.com/ktsaou))
+- Fix network sent dimensions [\#18099](https://github.com/netdata/netdata/pull/18099) ([stelfrag](https://github.com/stelfrag))
 - go.d use pgx v4 for pgbouncer [\#18097](https://github.com/netdata/netdata/pull/18097) ([ilyam8](https://github.com/ilyam8))
 - Update securing-netdata-agents.md [\#18096](https://github.com/netdata/netdata/pull/18096) ([yoursweetginger](https://github.com/yoursweetginger))
 - ndsudo set uid/gid/egid to 0 before executing command [\#18093](https://github.com/netdata/netdata/pull/18093) ([ilyam8](https://github.com/ilyam8))
@@ -99,10 +106,15 @@
 - Sign DEB packages in the GHA runners that build them. [\#17949](https://github.com/netdata/netdata/pull/17949) ([Ferroin](https://github.com/Ferroin))
 - Detect on startup if the netdata-meta.db file is not a valid database file [\#17924](https://github.com/netdata/netdata/pull/17924) ([stelfrag](https://github.com/stelfrag))
 - Fix small typo [\#17875](https://github.com/netdata/netdata/pull/17875) ([stelfrag](https://github.com/stelfrag))
+- spawn server \(Windows support for external plugins\) [\#17866](https://github.com/netdata/netdata/pull/17866) ([ktsaou](https://github.com/ktsaou))
 - sysinfo \(WinAPI\) [\#17857](https://github.com/netdata/netdata/pull/17857) ([thiagoftsm](https://github.com/thiagoftsm))
 - Run the agent as a Windows service. [\#17766](https://github.com/netdata/netdata/pull/17766) ([vkalintiris](https://github.com/vkalintiris))
 - add Win CPU interrupts [\#17753](https://github.com/netdata/netdata/pull/17753) ([thiagoftsm](https://github.com/thiagoftsm))
 - Relax strict version constraints for DEB package dependencies. [\#17681](https://github.com/netdata/netdata/pull/17681) ([Ferroin](https://github.com/Ferroin))
+
+## [v1.46.2](https://github.com/netdata/netdata/tree/v1.46.2) (2024-07-10)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.46.1...v1.46.2)
 
 ## [v1.46.1](https://github.com/netdata/netdata/tree/v1.46.1) (2024-06-21)
 
@@ -397,12 +409,6 @@
 - try hardcode docs links [\#17553](https://github.com/netdata/netdata/pull/17553) ([Ancairon](https://github.com/Ancairon))
 - Notification section updates [\#17551](https://github.com/netdata/netdata/pull/17551) ([Ancairon](https://github.com/Ancairon))
 - Adjust eBPF code. [\#17550](https://github.com/netdata/netdata/pull/17550) ([thiagoftsm](https://github.com/thiagoftsm))
-- Remove Fedora 38 from CI. [\#17548](https://github.com/netdata/netdata/pull/17548) ([Ferroin](https://github.com/Ferroin))
-- Remove Alpine 3.16 from CI. [\#17547](https://github.com/netdata/netdata/pull/17547) ([Ferroin](https://github.com/Ferroin))
-- Fix platform EOL check issue assignment. [\#17544](https://github.com/netdata/netdata/pull/17544) ([Ferroin](https://github.com/Ferroin))
-- refresh the ML documentation and consolidate the two docs [\#17543](https://github.com/netdata/netdata/pull/17543) ([Ancairon](https://github.com/Ancairon))
-- Bump github.com/likexian/whois from 1.15.2 to 1.15.3 in /src/go/collectors/go.d.plugin [\#17542](https://github.com/netdata/netdata/pull/17542) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Additional code cleanup [\#17541](https://github.com/netdata/netdata/pull/17541) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 

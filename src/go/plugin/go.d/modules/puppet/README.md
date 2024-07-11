@@ -1,0 +1,1 @@
+integrations/puppet.md

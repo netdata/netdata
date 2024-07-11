@@ -1,0 +1,497 @@
+{
+  "puppet-profiler": {
+    "service_version": "8.4.0",
+    "service_status_version": 1,
+    "detail_level": "debug",
+    "state": "running",
+    "status": {
+      "experimental": {
+        "function-metrics": [],
+        "resource-metrics": [],
+        "catalog-metrics": [],
+        "puppetdb-metrics": [],
+        "inline-metrics": []
+      }
+    },
+    "active_alerts": []
+  },
+  "jruby-metrics": {
+    "service_version": "8.4.0",
+    "service_status_version": 1,
+    "detail_level": "debug",
+    "state": "running",
+    "status": {
+      "experimental": {
+        "jruby-pool-lock-status": {
+          "current-state": ":not-in-use",
+          "last-change-time": "2024-07-05T06:23:20.120Z"
+        },
+        "metrics": {
+          "average-lock-wait-time": 0,
+          "num-free-jrubies": 4,
+          "borrow-count": 0,
+          "average-requested-jrubies": 0.0,
+          "borrow-timeout-count": 0,
+          "return-count": 0,
+          "borrow-timers": {
+            "total": {
+              "count": 0,
+              "mean": 0,
+              "max": 0,
+              "rate": 0.0
+            }
+          },
+          "borrow-retry-count": 0,
+          "borrowed-instances": [],
+          "average-borrow-time": 0,
+          "num-jrubies": 4,
+          "requested-count": 0,
+          "queue-limit-hit-rate": 0.0,
+          "average-lock-held-time": 0,
+          "requested-instances": [],
+          "queue-limit-hit-count": 0,
+          "average-free-jrubies": 3.3019592583652217,
+          "num-pool-locks": 0,
+          "average-wait-time": 0
+        }
+      }
+    },
+    "active_alerts": []
+  },
+  "ca": {
+    "service_version": "8.4.0",
+    "service_status_version": 1,
+    "detail_level": "debug",
+    "state": "running",
+    "status": {},
+    "active_alerts": []
+  },
+  "master": {
+    "service_version": "8.4.0",
+    "service_status_version": 1,
+    "detail_level": "debug",
+    "state": "running",
+    "status": {
+      "experimental": {
+        "http-metrics": [
+          {
+            "route-id": "puppet-v3-static_file_content-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-file_content-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-environments",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-tasks-:module-name-:task-name",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-file_metadata-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-facts-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "other",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-tasks",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-compile",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-report-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-node-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-catalog-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-plans-:module-name-:plan-name",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-file_metadatas-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-file_bucket_file-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v4-catalog",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "total",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-environment_modules-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-environment_classes-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-plans",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-environment_transports-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          }
+        ],
+        "http-client-metrics": []
+      }
+    },
+    "active_alerts": []
+  },
+  "server": {
+    "service_version": "8.4.0",
+    "service_status_version": 1,
+    "detail_level": "debug",
+    "state": "running",
+    "status": {
+      "experimental": {
+        "http-metrics": [
+          {
+            "route-id": "puppet-v3-static_file_content-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-file_content-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-environments",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-tasks-:module-name-:task-name",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-file_metadata-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-facts-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "other",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-tasks",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-compile",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-report-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-node-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-catalog-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-plans-:module-name-:plan-name",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-file_metadatas-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-file_bucket_file-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v4-catalog",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "total",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-environment_modules-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-environment_classes-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-plans",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          },
+          {
+            "route-id": "puppet-v3-environment_transports-/*/",
+            "count": 0,
+            "mean": 0,
+            "aggregate": 0
+          }
+        ],
+        "http-client-metrics": []
+      }
+    },
+    "active_alerts": []
+  },
+  "status-service": {
+    "service_version": "1.1.1",
+    "service_status_version": 1,
+    "detail_level": "debug",
+    "state": "running",
+    "status": {
+      "experimental": {
+        "jvm-metrics": {
+          "cpu-usage": 0.04997002,
+          "up-time-ms": 51328,
+          "memory-pools": {
+            "Metaspace": {
+              "type": "NON_HEAP",
+              "usage": {
+                "committed": 214106112,
+                "init": 0,
+                "max": -1,
+                "used": 183450600
+              }
+            },
+            "CodeHeap 'non-nmethods'": {
+              "type": "NON_HEAP",
+              "usage": {
+                "committed": 2555904,
+                "init": 2555904,
+                "max": 5840896,
+                "used": 1923072
+              }
+            },
+            "CodeHeap 'profiled nmethods'": {
+              "type": "NON_HEAP",
+              "usage": {
+                "committed": 52559872,
+                "init": 2555904,
+                "max": 122908672,
+                "used": 52545664
+              }
+            },
+            "Compressed Class Space": {
+              "type": "NON_HEAP",
+              "usage": {
+                "committed": 49020928,
+                "init": 0,
+                "max": 1073741824,
+                "used": 37887856
+              }
+            },
+            "G1 Eden Space": {
+              "type": "HEAP",
+              "usage": {
+                "committed": 542113792,
+                "init": 53477376,
+                "max": -1,
+                "used": 146800640
+              }
+            },
+            "G1 Old Gen": {
+              "type": "HEAP",
+              "usage": {
+                "committed": 462422016,
+                "init": 1020264448,
+                "max": 1073741824,
+                "used": 335020032
+              }
+            },
+            "G1 Survivor Space": {
+              "type": "HEAP",
+              "usage": {
+                "committed": 69206016,
+                "init": 0,
+                "max": -1,
+                "used": 68681728
+              }
+            },
+            "CodeHeap 'non-profiled nmethods'": {
+              "type": "NON_HEAP",
+              "usage": {
+                "committed": 15597568,
+                "init": 2555904,
+                "max": 122908672,
+                "used": 15588736
+              }
+            }
+          },
+          "gc-cpu-usage": 0.0,
+          "threading": {
+            "thread-count": 59,
+            "peak-thread-count": 59
+          },
+          "heap-memory": {
+            "committed": 1073741824,
+            "init": 1073741824,
+            "max": 1073741824,
+            "used": 550502400
+          },
+          "gc-stats": {
+            "G1 Young Generation": {
+              "count": 18,
+              "total-time-ms": 550,
+              "last-gc-info": {
+                "duration-ms": 75
+              }
+            },
+            "G1 Old Generation": {
+              "count": 0,
+              "total-time-ms": 0
+            },
+            "G1 Concurrent GC": {
+              "count": 10,
+              "total-time-ms": 49,
+              "last-gc-info": {
+                "duration-ms": 0
+              }
+            }
+          },
+          "start-time-ms": 1720160584298,
+          "file-descriptors": {
+            "used": 234,
+            "max": 524288
+          },
+          "non-heap-memory": {
+            "committed": 334102528,
+            "init": 7667712,
+            "max": -1,
+            "used": 291591160
+          },
+          "nio-buffer-pools": {
+            "mapped": {
+              "count": 0,
+              "memory-used": 0,
+              "total-capacity": 0
+            },
+            "direct": {
+              "count": 11,
+              "memory-used": 197631,
+              "total-capacity": 197631
+            },
+            "mapped - 'non-volatile memory'": {
+              "count": 0,
+              "memory-used": 0,
+              "total-capacity": 0
+            }
+          }
+        }
+      }
+    },
+    "active_alerts": []
+  }
+}

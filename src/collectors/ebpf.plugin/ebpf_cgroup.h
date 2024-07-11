@@ -9,8 +9,6 @@
 #include "ebpf.h"
 #include "ebpf_apps.h"
 
-#define NETDATA_SERVICE_FAMILY "systemd"
-
 struct pid_on_target2 {
     int32_t pid;
     int updated;

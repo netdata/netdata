@@ -72,6 +72,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/prometheus"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/proxysql"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/pulsar"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/puppet"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/rabbitmq"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/redis"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/rspamd"
