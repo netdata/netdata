@@ -4,32 +4,23 @@
 #include <sched.h>
 
 char *pidfile = NULL;
-char netdata_exe_path[FILENAME_MAX + 1];
-char netdata_exe_file[FILENAME_MAX + 1];
+char *netdata_exe_path = NULL;
 
 void get_netdata_execution_path(void) {
-    int ret;
-    size_t exepath_size = 0;
-    struct passwd *passwd = NULL;
-    char *user = NULL;
+    struct passwd *passwd = getpwuid(getuid());
+    char *user = (passwd && passwd->pw_name) ? passwd->pw_name : "";
 
-    passwd = getpwuid(getuid());
-    user = (passwd && passwd->pw_name) ? passwd->pw_name : "";
-
-    exepath_size = sizeof(netdata_exe_file) - 1;
-    ret = uv_exepath(netdata_exe_file, &exepath_size);
-    if (0 != ret) {
-        netdata_log_error("uv_exepath(\"%s\", %u) (user: %s) failed (%s).", netdata_exe_file, (unsigned)exepath_size, user,
-                          uv_strerror(ret));
-        fatal("Cannot start netdata without getting execution path.");
+    char b[FILENAME_MAX + 1];
+    size_t b_size = sizeof(b) - 1;
+    int ret = uv_exepath(b, &b_size);
+    if (ret != 0) {
+        fatal("Cannot start netdata without getting execution path. "
+            "(uv_exepath(\"%s\", %zu), user: '%s', failed: %s).",
+            b, b_size, user, uv_strerror(ret));
     }
+    b[b_size] = '\0';
 
-    netdata_exe_file[exepath_size] = '\0';
-
-    // macOS's dirname(3) does not modify passed string
-    char *tmpdir = strdupz(netdata_exe_file);
-    strcpy(netdata_exe_path, dirname(tmpdir));
-    freez(tmpdir);
+    netdata_exe_path = strdupz(b);
 }
 
 static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t gid, bool recursive)

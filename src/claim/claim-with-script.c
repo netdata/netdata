@@ -58,8 +58,8 @@ static CLAIM_AGENT_RESPONSE claim_call_script(const char *claiming_arguments, bo
 
     snprintfz(command_exec_buffer, CLAIMING_COMMAND_LENGTH,
               "exec \"%s%snetdata-claim.sh\"",
-              netdata_exe_path[0] ? netdata_exe_path : "",
-              netdata_exe_path[0] ? "/" : ""
+              netdata_exe_path ? netdata_exe_path : "",
+              netdata_exe_path ? "/" : ""
               );
 
     snprintfz(command_line_buffer,
