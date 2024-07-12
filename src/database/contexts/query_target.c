@@ -716,10 +716,18 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(QUERY_INSTANCE *qi,
         if (ret == SP_NOT_MATCHED && match_names)
             ret = simple_pattern_matches_string_extract(instances_sp, query_instance_name_fqdn(qi, version), NULL, 0);
 
-        if (ret == SP_NOT_MATCHED && match_ids && host_node_id_str[0]) {
-            char buffer[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_id(qi->ria), host_node_id_str);
-            ret = simple_pattern_matches_extract(instances_sp, buffer, NULL, 0);
+        if(ret == SP_NOT_MATCHED) {
+            char buffer[RRD_ID_LENGTH_MAX + 1 + UUID_STR_LEN + 1];
+
+            if (ret == SP_NOT_MATCHED && match_ids && host_node_id_str[0]) {
+                snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_id(qi->ria), host_node_id_str);
+                ret = simple_pattern_matches_extract(instances_sp, buffer, NULL, 0);
+            }
+
+            if (ret == SP_NOT_MATCHED && match_names && host_node_id_str[0]) {
+                snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_name(qi->ria), host_node_id_str);
+                ret = simple_pattern_matches_extract(instances_sp, buffer, NULL, 0);
+            }
         }
     }
 
