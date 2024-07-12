@@ -11,6 +11,7 @@ char *netdata_configured_web_dir             = WEB_DIR;
 char *netdata_configured_cache_dir           = CACHE_DIR;
 char *netdata_configured_varlib_dir          = VARLIB_DIR;
 char *netdata_configured_lock_dir            = VARLIB_DIR "/lock";
+char *netdata_configured_cloud_dir           = VARLIB_DIR "/cloud.d";
 char *netdata_configured_home_dir            = VARLIB_DIR;
 char *netdata_configured_host_prefix         = NULL;
 char *netdata_configured_timezone            = NULL;

@@ -627,35 +627,11 @@ cleanup:
     return NULL;
 }
 
-static const char *verify_required_directory(const char *dir)
-{
-    if (chdir(dir) == -1)
-        fatal("Cannot change directory to '%s'", dir);
-
-    DIR *d = opendir(dir);
-    if (!d)
-        fatal("Cannot examine the contents of directory '%s'", dir);
-    closedir(d);
-
-    return dir;
-}
-
-static const char *verify_or_create_required_directory(const char *dir) {
-    int result;
-
-    result = mkdir(dir, 0755);
-
-    if (result != 0 && errno != EEXIST)
-        fatal("Cannot create required directory '%s'", dir);
-
-    return verify_required_directory(dir);
-}
-
 /*
  * This is called after the rrdinit
  * These values will be sent on the START event
  */
-void set_late_global_environment(struct rrdhost_system_info *system_info)
+void set_late_analytics_variables(struct rrdhost_system_info *system_info)
 {
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, default_rrdpush_enabled ? "true" : "false");
     analytics_set_data_str(&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
@@ -831,119 +807,6 @@ void get_system_timezone(void)
     }
 }
 
-void set_global_environment() {
-    {
-        char b[16];
-        snprintfz(b, sizeof(b) - 1, "%d", default_rrd_update_every);
-        setenv("NETDATA_UPDATE_EVERY", b, 1);
-    }
-
-    setenv("NETDATA_VERSION", NETDATA_VERSION, 1);
-    setenv("NETDATA_HOSTNAME", netdata_configured_hostname, 1);
-    setenv("NETDATA_CONFIG_DIR", verify_required_directory(netdata_configured_user_config_dir), 1);
-    setenv("NETDATA_USER_CONFIG_DIR", verify_required_directory(netdata_configured_user_config_dir), 1);
-    setenv("NETDATA_STOCK_CONFIG_DIR", verify_required_directory(netdata_configured_stock_config_dir), 1);
-    setenv("NETDATA_PLUGINS_DIR", verify_required_directory(netdata_configured_primary_plugins_dir), 1);
-    setenv("NETDATA_WEB_DIR", verify_required_directory(netdata_configured_web_dir), 1);
-    setenv("NETDATA_CACHE_DIR", verify_or_create_required_directory(netdata_configured_cache_dir), 1);
-    setenv("NETDATA_LIB_DIR", verify_or_create_required_directory(netdata_configured_varlib_dir), 1);
-    setenv("NETDATA_LOCK_DIR", verify_or_create_required_directory(netdata_configured_lock_dir), 1);
-    setenv("NETDATA_LOG_DIR", verify_or_create_required_directory(netdata_configured_log_dir), 1);
-    setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
-
-    {
-        BUFFER *user_plugins_dirs = buffer_create(FILENAME_MAX, NULL);
-
-        for (size_t i = 1; i < PLUGINSD_MAX_DIRECTORIES && plugin_directories[i]; i++) {
-            if (i > 1)
-                buffer_strcat(user_plugins_dirs, " ");
-            buffer_strcat(user_plugins_dirs, plugin_directories[i]);
-        }
-
-        setenv("NETDATA_USER_PLUGINS_DIRS", buffer_tostring(user_plugins_dirs), 1);
-
-        buffer_free(user_plugins_dirs);
-    }
-
-    analytics_data.data_length = 0;
-    analytics_set_data(&analytics_data.netdata_config_stream_enabled, "null");
-    analytics_set_data(&analytics_data.netdata_config_memory_mode, "null");
-    analytics_set_data(&analytics_data.netdata_config_exporting_enabled, "null");
-    analytics_set_data(&analytics_data.netdata_exporting_connectors, "null");
-    analytics_set_data(&analytics_data.netdata_allmetrics_prometheus_used, "null");
-    analytics_set_data(&analytics_data.netdata_allmetrics_shell_used, "null");
-    analytics_set_data(&analytics_data.netdata_allmetrics_json_used, "null");
-    analytics_set_data(&analytics_data.netdata_dashboard_used, "null");
-    analytics_set_data(&analytics_data.netdata_collectors, "null");
-    analytics_set_data(&analytics_data.netdata_collectors_count, "null");
-    analytics_set_data(&analytics_data.netdata_buildinfo, "null");
-    analytics_set_data(&analytics_data.netdata_config_page_cache_size, "null");
-    analytics_set_data(&analytics_data.netdata_config_multidb_disk_quota, "null");
-    analytics_set_data(&analytics_data.netdata_config_https_enabled, "null");
-    analytics_set_data(&analytics_data.netdata_config_web_enabled, "null");
-    analytics_set_data(&analytics_data.netdata_config_release_channel, "null");
-    analytics_set_data(&analytics_data.netdata_mirrored_host_count, "null");
-    analytics_set_data(&analytics_data.netdata_mirrored_hosts_reachable, "null");
-    analytics_set_data(&analytics_data.netdata_mirrored_hosts_unreachable, "null");
-    analytics_set_data(&analytics_data.netdata_notification_methods, "null");
-    analytics_set_data(&analytics_data.netdata_alarms_normal, "null");
-    analytics_set_data(&analytics_data.netdata_alarms_warning, "null");
-    analytics_set_data(&analytics_data.netdata_alarms_critical, "null");
-    analytics_set_data(&analytics_data.netdata_charts_count, "null");
-    analytics_set_data(&analytics_data.netdata_metrics_count, "null");
-    analytics_set_data(&analytics_data.netdata_config_is_parent, "null");
-    analytics_set_data(&analytics_data.netdata_config_hosts_available, "null");
-    analytics_set_data(&analytics_data.netdata_host_cloud_available, "null");
-    analytics_set_data(&analytics_data.netdata_host_aclk_implementation, "null");
-    analytics_set_data(&analytics_data.netdata_host_aclk_available, "null");
-    analytics_set_data(&analytics_data.netdata_host_aclk_protocol, "null");
-    analytics_set_data(&analytics_data.netdata_host_agent_claimed, "null");
-    analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "null");
-    analytics_set_data(&analytics_data.netdata_config_https_available, "null");
-    analytics_set_data(&analytics_data.netdata_install_type, "null");
-    analytics_set_data(&analytics_data.netdata_config_is_private_registry, "null");
-    analytics_set_data(&analytics_data.netdata_config_use_private_registry, "null");
-    analytics_set_data(&analytics_data.netdata_config_oom_score, "null");
-    analytics_set_data(&analytics_data.netdata_prebuilt_distro, "null");
-    analytics_set_data(&analytics_data.netdata_fail_reason, "null");
-
-    analytics_data.prometheus_hits = 0;
-    analytics_data.shell_hits = 0;
-    analytics_data.json_hits = 0;
-    analytics_data.dashboard_hits = 0;
-    analytics_data.charts_count = 0;
-    analytics_data.metrics_count = 0;
-    analytics_data.exporting_enabled = false;
-
-    char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
-    int clean = 0;
-    if (!default_port) {
-        default_port = strdupz("19999");
-        clean = 1;
-    }
-
-    setenv("NETDATA_LISTEN_PORT", default_port, 1);
-    if (clean)
-        freez(default_port);
-
-    // set the path we need
-    char path[4096], *p = getenv("PATH");
-    if (!p) p = "/bin:/usr/bin";
-    snprintfz(path, sizeof(path), "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
-    setenv("PATH", config_get(CONFIG_SECTION_ENV_VARS, "PATH", path), 1);
-
-    // python options
-    p = getenv("PYTHONPATH");
-    if (!p) p = "";
-    setenv("PYTHONPATH", config_get(CONFIG_SECTION_ENV_VARS, "PYTHONPATH", p), 1);
-
-    // disable buffering for python plugins
-    setenv("PYTHONUNBUFFERED", "1", 1);
-
-    // switch to standard locale for plugins
-    setenv("LC_ALL", "C", 1);
-}
-
 void analytics_statistic_send(const analytics_statistic_t *statistic) {
     if (!statistic)
         return;
@@ -1073,6 +936,58 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
                as_script);
 
     freez(command_to_run);
+}
+
+void analytics_reset(void) {
+        analytics_data.data_length = 0;
+    analytics_set_data(&analytics_data.netdata_config_stream_enabled, "null");
+    analytics_set_data(&analytics_data.netdata_config_memory_mode, "null");
+    analytics_set_data(&analytics_data.netdata_config_exporting_enabled, "null");
+    analytics_set_data(&analytics_data.netdata_exporting_connectors, "null");
+    analytics_set_data(&analytics_data.netdata_allmetrics_prometheus_used, "null");
+    analytics_set_data(&analytics_data.netdata_allmetrics_shell_used, "null");
+    analytics_set_data(&analytics_data.netdata_allmetrics_json_used, "null");
+    analytics_set_data(&analytics_data.netdata_dashboard_used, "null");
+    analytics_set_data(&analytics_data.netdata_collectors, "null");
+    analytics_set_data(&analytics_data.netdata_collectors_count, "null");
+    analytics_set_data(&analytics_data.netdata_buildinfo, "null");
+    analytics_set_data(&analytics_data.netdata_config_page_cache_size, "null");
+    analytics_set_data(&analytics_data.netdata_config_multidb_disk_quota, "null");
+    analytics_set_data(&analytics_data.netdata_config_https_enabled, "null");
+    analytics_set_data(&analytics_data.netdata_config_web_enabled, "null");
+    analytics_set_data(&analytics_data.netdata_config_release_channel, "null");
+    analytics_set_data(&analytics_data.netdata_mirrored_host_count, "null");
+    analytics_set_data(&analytics_data.netdata_mirrored_hosts_reachable, "null");
+    analytics_set_data(&analytics_data.netdata_mirrored_hosts_unreachable, "null");
+    analytics_set_data(&analytics_data.netdata_notification_methods, "null");
+    analytics_set_data(&analytics_data.netdata_alarms_normal, "null");
+    analytics_set_data(&analytics_data.netdata_alarms_warning, "null");
+    analytics_set_data(&analytics_data.netdata_alarms_critical, "null");
+    analytics_set_data(&analytics_data.netdata_charts_count, "null");
+    analytics_set_data(&analytics_data.netdata_metrics_count, "null");
+    analytics_set_data(&analytics_data.netdata_config_is_parent, "null");
+    analytics_set_data(&analytics_data.netdata_config_hosts_available, "null");
+    analytics_set_data(&analytics_data.netdata_host_cloud_available, "null");
+    analytics_set_data(&analytics_data.netdata_host_aclk_implementation, "null");
+    analytics_set_data(&analytics_data.netdata_host_aclk_available, "null");
+    analytics_set_data(&analytics_data.netdata_host_aclk_protocol, "null");
+    analytics_set_data(&analytics_data.netdata_host_agent_claimed, "null");
+    analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "null");
+    analytics_set_data(&analytics_data.netdata_config_https_available, "null");
+    analytics_set_data(&analytics_data.netdata_install_type, "null");
+    analytics_set_data(&analytics_data.netdata_config_is_private_registry, "null");
+    analytics_set_data(&analytics_data.netdata_config_use_private_registry, "null");
+    analytics_set_data(&analytics_data.netdata_config_oom_score, "null");
+    analytics_set_data(&analytics_data.netdata_prebuilt_distro, "null");
+    analytics_set_data(&analytics_data.netdata_fail_reason, "null");
+
+    analytics_data.prometheus_hits = 0;
+    analytics_data.shell_hits = 0;
+    analytics_data.json_hits = 0;
+    analytics_data.dashboard_hits = 0;
+    analytics_data.charts_count = 0;
+    analytics_data.metrics_count = 0;
+    analytics_data.exporting_enabled = false;
 }
 
 void analytics_init(void)

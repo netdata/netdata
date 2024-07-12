@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <daemon/main.h>
-#include "event_loop.h"
+#include "libuv_workers.h"
 
 // Register workers
 void register_libuv_worker_jobs() {

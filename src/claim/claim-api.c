@@ -1,0 +1,224 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "claim.h"
+
+static char *netdata_random_session_id_filename = NULL;
+static nd_uuid_t netdata_random_session_id = { 0 };
+
+const char *netdata_random_session_id_get_filename(void) {
+    if(!netdata_random_session_id_filename)
+        netdata_random_session_id_generate();
+
+    return netdata_random_session_id_filename;
+}
+
+bool netdata_random_session_id_matches(const char *guid) {
+    if(uuid_is_null(netdata_random_session_id))
+        return false;
+
+    nd_uuid_t uuid;
+
+    if(uuid_parse(guid, uuid))
+        return false;
+
+    if(uuid_compare(netdata_random_session_id, uuid) == 0)
+        return true;
+
+    return false;
+}
+
+bool netdata_random_session_id_generate(void) {
+    static char guid[UUID_STR_LEN] = "";
+
+    uuid_generate_random(netdata_random_session_id);
+    uuid_unparse_lower(netdata_random_session_id, guid);
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/netdata_random_session_id", netdata_configured_varlib_dir);
+
+    bool ret = true;
+
+    (void)unlink(filename);
+
+    // save it
+    int fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 640);
+    if(fd == -1) {
+        netdata_log_error("Cannot create random session id file '%s'.", filename);
+        ret = false;
+    }
+    else {
+        if (write(fd, guid, UUID_STR_LEN - 1) != UUID_STR_LEN - 1) {
+            netdata_log_error("Cannot write the random session id file '%s'.", filename);
+            ret = false;
+        } else {
+            ssize_t bytes = write(fd, "\n", 1);
+            UNUSED(bytes);
+        }
+        close(fd);
+    }
+
+    if(ret && (!netdata_random_session_id_filename || strcmp(netdata_random_session_id_filename, filename) != 0)) {
+        freez(netdata_random_session_id_filename);
+        netdata_random_session_id_filename = strdupz(filename);
+    }
+
+    return ret;
+}
+
+static bool check_claim_param(const char *s) {
+    if(!s || !*s) return true;
+
+    do {
+        if(isalnum((uint8_t)*s) || *s == '.' || *s == ',' || *s == '-' || *s == ':' || *s == '/' || *s == '_')
+            ;
+        else
+            return false;
+
+    } while(*++s);
+
+    return true;
+}
+
+int api_v2_claim(struct web_client *w, char *url) {
+    char *key = NULL;
+    char *token = NULL;
+    char *rooms = NULL;
+    char *base_url = NULL;
+
+    while (url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if (!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if (!name || !*name) continue;
+        if (!value || !*value) continue;
+
+        if(!strcmp(name, "key"))
+            key = value;
+        else if(!strcmp(name, "token"))
+            token = value;
+        else if(!strcmp(name, "rooms"))
+            rooms = value;
+        else if(!strcmp(name, "url"))
+            base_url = value;
+    }
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    time_t now_s = now_realtime_sec();
+    CLOUD_STATUS status = buffer_json_cloud_status(wb, now_s);
+
+    bool can_be_claimed = false;
+    switch(status) {
+        case CLOUD_STATUS_AVAILABLE:
+        case CLOUD_STATUS_DISABLED:
+        case CLOUD_STATUS_OFFLINE:
+            can_be_claimed = true;
+            break;
+
+        case CLOUD_STATUS_UNAVAILABLE:
+        case CLOUD_STATUS_BANNED:
+        case CLOUD_STATUS_ONLINE:
+            can_be_claimed = false;
+            break;
+    }
+
+    buffer_json_member_add_boolean(wb, "can_be_claimed", can_be_claimed);
+
+    if(can_be_claimed && key) {
+        if(!netdata_random_session_id_matches(key)) {
+            buffer_reset(wb);
+            buffer_strcat(wb, "invalid key");
+            netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
+            return HTTP_RESP_FORBIDDEN;
+        }
+
+        if(!token || !base_url || !check_claim_param(token) || !check_claim_param(base_url) || (rooms && !check_claim_param(rooms))) {
+            buffer_reset(wb);
+            buffer_strcat(wb, "invalid parameters");
+            netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
+            return HTTP_RESP_BAD_REQUEST;
+        }
+
+        netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
+
+        netdata_cloud_enabled = CONFIG_BOOLEAN_AUTO;
+        appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", CONFIG_BOOLEAN_AUTO);
+        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", base_url);
+
+        nd_uuid_t claimed_id;
+        uuid_generate_random(claimed_id);
+        char claimed_id_str[UUID_STR_LEN];
+        uuid_unparse_lower(claimed_id, claimed_id_str);
+
+        bool success = false;
+        const char *msg = NULL;
+        CLAIM_AGENT_RESPONSE rc = claim_agent(claimed_id_str, token, rooms, true, &msg);
+        switch(rc) {
+            case CLAIM_AGENT_OK:
+                msg = "ok";
+                success = true;
+                can_be_claimed = false;
+                claim_reload_all();
+                {
+                    int ms = 0;
+                    do {
+                        status = cloud_status();
+                        if (status == CLOUD_STATUS_ONLINE && __atomic_load_n(&localhost->node_id, __ATOMIC_RELAXED))
+                            break;
+
+                        sleep_usec(50 * USEC_PER_MS);
+                        ms += 50;
+                    } while (ms < 10000);
+                }
+                break;
+
+            case CLAIM_AGENT_NO_CLOUD_URL:
+                msg = "No Netdata Cloud URL.";
+                break;
+
+            case CLAIM_AGENT_CLAIM_SCRIPT_FAILED:
+                msg = "Claiming script failed.";
+                break;
+
+            case CLAIM_AGENT_CLOUD_DISABLED:
+                msg = "Netdata Cloud is disabled on this agent.";
+                break;
+
+            case CLAIM_AGENT_CANNOT_EXECUTE_CLAIM_SCRIPT:
+                msg = "Failed to execute claiming script.";
+                break;
+
+            case CLAIM_AGENT_CLAIM_SCRIPT_RETURNED_INVALID_CODE:
+                msg = "Claiming script returned invalid code.";
+                break;
+
+            default:
+            case CLAIM_AGENT_FAILED_WITH_MESSAGE:
+                if(!msg)
+                    msg = "Unknown error";
+                break;
+        }
+
+        // our status may have changed
+        // refresh the status in our output
+        buffer_flush(wb);
+        buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+        now_s = now_realtime_sec();
+        buffer_json_cloud_status(wb, now_s);
+
+        // and this is the status of the claiming command we run
+        buffer_json_member_add_boolean(wb, "success", success);
+        buffer_json_member_add_string(wb, "message", msg);
+    }
+
+    if(can_be_claimed)
+        buffer_json_member_add_string(wb, "key_filename", netdata_random_session_id_get_filename());
+
+    buffer_json_agents_v2(wb, NULL, now_s, false, false);
+    buffer_json_finalize(wb);
+
+    return HTTP_RESP_OK;
+}

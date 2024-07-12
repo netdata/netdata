@@ -18,7 +18,8 @@ typedef enum __attribute__((packed)) {
     CLAIM_AGENT_FAILED_WITH_MESSAGE,
 } CLAIM_AGENT_RESPONSE;
 
-CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, const char **msg);
+CLAIM_AGENT_RESPONSE claim_agent(const char *id, const char *token, const char *rooms, bool force, const char **error);
+
 char *get_agent_claimid(void);
 void load_claiming_state(void);
 void load_cloud_conf(int silent);

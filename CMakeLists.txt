@@ -852,8 +852,8 @@ set(DAEMON_FILES
         src/daemon/common.h
         src/daemon/daemon.c
         src/daemon/daemon.h
-        src/daemon/event_loop.c
-        src/daemon/event_loop.h
+        src/daemon/libuv_workers.c
+        src/daemon/libuv_workers.h
         src/daemon/global_statistics.c
         src/daemon/global_statistics.h
         src/daemon/analytics.c
@@ -1410,6 +1410,11 @@ set(NETDATA_FILES
         ${CLAIM_PLUGIN_FILES}
         ${ACLK_ALWAYS_BUILD}
         ${PROFILE_PLUGIN_FILES}
+        src/claim/claim-api.c
+        src/claim/cloud-conf.c
+        src/claim/claim-with-script.c
+        src/claim/claim-with-api.c
+        src/daemon/environment.c
 )
 
 if(OS_LINUX)

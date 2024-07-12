@@ -890,12 +890,10 @@ static void log_init(void) {
 #endif
 }
 
-char *initialize_lock_directory_path(char *prefix)
-{
+static char *get_varlib_subdir_from_config(const char *prefix, const char *dir) {
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/lock", prefix);
-
-    return config_get(CONFIG_SECTION_DIRECTORIES, "lock", filename);
+    snprintfz(filename, FILENAME_MAX, "%s/%s", prefix, dir);
+    return config_get(CONFIG_SECTION_DIRECTORIES, dir, filename);
 }
 
 static void backwards_compatible_config() {
@@ -1175,7 +1173,8 @@ static void get_netdata_configured_variables()
     netdata_configured_cache_dir        = config_get(CONFIG_SECTION_DIRECTORIES, "cache",        netdata_configured_cache_dir);
     netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_DIRECTORIES, "lib",          netdata_configured_varlib_dir);
 
-    netdata_configured_lock_dir = initialize_lock_directory_path(netdata_configured_varlib_dir);
+    netdata_configured_lock_dir = get_varlib_subdir_from_config(netdata_configured_varlib_dir, "lock");
+    netdata_configured_cloud_dir = get_varlib_subdir_from_config(netdata_configured_varlib_dir, "cloud.d");
 
     {
         pluginsd_initialize_plugin_directories();
@@ -1522,7 +1521,6 @@ int netdata_main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
-                        char* claim_string = "claim";
 #ifdef ENABLE_DBENGINE
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
@@ -1884,10 +1882,6 @@ int netdata_main(int argc, char **argv) {
                             printf("%s\n", value);
                             return 0;
                         }
-                        else if(strncmp(optarg, claim_string, strlen(claim_string)) == 0) {
-                            /* will trigger a claiming attempt when the agent is initialized */
-                            claiming_pending_arguments = optarg + strlen(claim_string);
-                        }
                         else if(strcmp(optarg, "buildinfo") == 0) {
                             print_build_info();
                             return 0;
@@ -1970,7 +1964,8 @@ int netdata_main(int argc, char **argv) {
 
         // prepare configuration environment variables for the plugins
         get_netdata_configured_variables();
-        set_global_environment();
+        set_environment_for_plugins_and_scripts();
+        analytics_reset();
 
         // work while we are cd into config_dir
         // to allow the plugins refer to their config
@@ -2203,7 +2198,7 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("initialize RRD structures");
 
     if(rrd_init(netdata_configured_hostname, system_info, false)) {
-        set_late_global_environment(system_info);
+        set_late_analytics_variables(system_info);
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
     }
 
@@ -2224,10 +2219,6 @@ int netdata_main(int argc, char **argv) {
     // Claim netdata agent to a cloud endpoint
 
     delta_startup_time("collect claiming info");
-
-    if (claiming_pending_arguments)
-         claim_agent(claiming_pending_arguments, false, NULL);
-
     load_claiming_state();
 
     // ------------------------------------------------------------------------
@@ -2246,7 +2237,7 @@ int netdata_main(int argc, char **argv) {
 
     web_server_config_options();
 
-    set_late_global_environment(system_info);
+    set_late_analytics_variables(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 

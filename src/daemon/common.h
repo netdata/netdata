@@ -4,7 +4,7 @@
 #define NETDATA_COMMON_H 1
 
 #include "libnetdata/libnetdata.h"
-#include "event_loop.h"
+#include "libuv_workers.h"
 
 // ----------------------------------------------------------------------------
 // shortcuts for the default netdata configuration
@@ -103,6 +103,7 @@ extern char *netdata_configured_web_dir;
 extern char *netdata_configured_cache_dir;
 extern char *netdata_configured_varlib_dir;
 extern char *netdata_configured_lock_dir;
+extern char *netdata_configured_cloud_dir;
 extern char *netdata_configured_home_dir;
 extern char *netdata_configured_host_prefix;
 extern char *netdata_configured_timezone;
@@ -134,5 +135,7 @@ size_t cloud_connection_id(void);
 const char *cloud_offline_reason(void);
 const char *cloud_base_url(void);
 CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s);
+
+void set_environment_for_plugins_and_scripts(void);
 
 #endif /* NETDATA_COMMON_H */

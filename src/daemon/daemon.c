@@ -4,7 +4,6 @@
 #include <sched.h>
 
 char pidfile[FILENAME_MAX + 1] = "";
-char claiming_directory[FILENAME_MAX + 1];
 char netdata_exe_path[FILENAME_MAX + 1];
 char netdata_exe_file[FILENAME_MAX + 1];
 
@@ -89,7 +88,7 @@ static void prepare_required_directories(uid_t uid, gid_t gid) {
     change_dir_ownership(netdata_configured_varlib_dir, uid, gid, false);
     change_dir_ownership(netdata_configured_lock_dir, uid, gid, false);
     change_dir_ownership(netdata_configured_log_dir, uid, gid, false);
-    change_dir_ownership(claiming_directory, uid, gid, false);
+    change_dir_ownership(netdata_configured_cloud_dir, uid, gid, false);
 
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
@@ -489,9 +488,6 @@ int become_daemon(int dont_fork, const char *user)
 
     // never become a problem
     sched_setscheduler_set();
-
-    // Set claiming directory based on user config directory with correct ownership
-    snprintfz(claiming_directory, FILENAME_MAX, "%s/cloud.d", netdata_configured_varlib_dir);
 
     if(user && *user) {
         if(become_user(user, pidfd) != 0) {
