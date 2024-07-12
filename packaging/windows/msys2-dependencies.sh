@@ -4,7 +4,7 @@
 
 . /etc/profile
 
-set -e
+set -euo pipefail
 
 echo "Updating MSYS2"
 
