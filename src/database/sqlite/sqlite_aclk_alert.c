@@ -452,9 +452,11 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
 
     param = 0;
     RRDCALC_STATUS status;
+    struct aclk_sync_cfg_t *wc = host->aclk_config;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         health_alarm_log_populate(&alarm_log, res, host, &status);
         aclk_send_alarm_log_entry(&alarm_log);
+        wc->alert_count++;
 
         last_id = alarm_log.sequence_id;
         if (first_id == 0)
@@ -510,6 +512,48 @@ static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row1, int64_t
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_RESET(res);
+}
+
+#define SQL_REBUILD_HOST_ALERT_VERSION_TABLE                                                                           \
+    "INSERT INTO alert_version (health_log_id, unique_id, status, version, date_submitted) "                           \
+    " SELECT hl.health_log_id, hld.unique_id, hld.new_status, hld.when_key, UNIXEPOCH() "                              \
+    " FROM health_log hl, health_log_detail hld WHERE "                                                                \
+    "  hl.host_id = @host_id AND hld.health_log_id = hl.health_log_id AND hld.transition_id = hl.last_transition_id"
+
+#define SQL_DELETE_HOST_ALERT_VERSION_TABLE                                                                            \
+    "DELETE FROM alert_version WHERE health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = @host_id)"
+
+void rebuild_host_alert_version_table(RRDHOST *host)
+{
+    sqlite3_stmt *res = NULL;
+
+    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_HOST_ALERT_VERSION_TABLE, &res))
+        return;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+
+    param = 0;
+    int rc = execute_insert(res);
+    if (rc != SQLITE_DONE) {
+        netdata_log_error("Failed to delete the host alert version table");
+        goto done;
+    }
+
+    SQLITE_FINALIZE(res);
+    if (!PREPARE_STATEMENT(db_meta, SQL_REBUILD_HOST_ALERT_VERSION_TABLE, &res))
+        return;
+
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+
+    param = 0;
+    rc = execute_insert(res);
+    if (rc != SQLITE_DONE)
+        netdata_log_error("Failed to rebuild the host alert version table");
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
 }
 
 #define SQL_PROCESS_ALERT_PENDING_QUEUE                                                                                \
@@ -583,11 +627,15 @@ void aclk_push_alert_events_for_all_hosts(void)
         }
 
         if (wc->send_snapshot) {
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+            if (wc->send_snapshot == 1)
+                continue;
             (void)process_alert_pending_queue(host);
             commit_alert_events(host);
+            rebuild_host_alert_version_table(host);
             send_alert_snapshot_to_cloud(host);
-            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-            wc->send_snapshot = false;
+            wc->snapshot_count++;
+            wc->send_snapshot = 0;
         }
         else
             aclk_push_alert_event(host);
@@ -764,7 +812,7 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *wc, uint64
             cloud_version,
             local_version);
 
-        wc->send_snapshot = true;
+        wc->send_snapshot = 1;
         rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
     }
     else
@@ -776,6 +824,7 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *wc, uint64
             wc->node_id,
             cloud_version,
             local_version);
+    wc->checkpoint_count++;
 }
 
 void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unused, char *snapshot_uuid)
@@ -804,9 +853,8 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unus
 
     wc->alerts_snapshot_uuid = strdupz(snapshot_uuid);
 
-    wc->send_snapshot = true;
+    wc->send_snapshot = 1;
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-    //aclk_push_node_alert_snapshot(node_id);
 }
 
 #define SQL_COUNT_SNAPSHOT_ENTRIES                                                                                     \
@@ -951,45 +999,6 @@ done:
 
     freez(claim_id);
 }
-
-/*
-#define SQL_GET_MIN_MAX_ALERT_SEQ "SELECT MIN(sequence_id), MAX(sequence_id), " \
-                                  "(SELECT MAX(sequence_id) FROM aclk_alert_%s WHERE date_submitted IS NOT NULL) " \
-                                  "FROM aclk_alert_%s WHERE date_submitted IS NULL"
-*/
-
-//int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert_status)
-//{
-//
-//    struct aclk_sync_cfg_t *wc = host->aclk_config;
-//    if (!wc)
-//        return 1;
-//
-//    return 1;
-//
-//    proto_alert_status->alert_updates = wc->alert_updates;
-//
-//    char sql[ACLK_SYNC_QUERY_SIZE];
-//    snprintfz(sql, sizeof(sql) - 1, SQL_GET_MIN_MAX_ALERT_SEQ, wc->uuid_str, wc->uuid_str);
-//
-//    sqlite3_stmt *res = NULL;
-//    if (!PREPARE_STATEMENT(db_meta, sql, &res))
-//        return 1;
-//
-//    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-//        proto_alert_status->pending_min_sequence_id =
-//            sqlite3_column_bytes(res, 0) > 0 ? (uint64_t)sqlite3_column_int64(res, 0) : 0;
-//        proto_alert_status->pending_max_sequence_id =
-//            sqlite3_column_bytes(res, 1) > 0 ? (uint64_t)sqlite3_column_int64(res, 1) : 0;
-//        proto_alert_status->last_submitted_sequence_id =
-//            sqlite3_column_bytes(res, 2) > 0 ? (uint64_t)sqlite3_column_int64(res, 2) : 0;
-//    }
-//
-//    SQLITE_FINALIZE(res);
-//
-//    return 0;
-//}
-
 
 // Start streaming alerts
 void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version)

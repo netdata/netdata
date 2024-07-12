@@ -36,14 +36,16 @@ enum aclk_database_opcode {
 struct aclk_database_cmd {
     enum aclk_database_opcode opcode;
     void *param[2];
-    struct completion *completion;
     struct aclk_database_cmd *prev, *next;
 };
 
 typedef struct aclk_sync_cfg_t {
     RRDHOST *host;
-    bool send_snapshot;
+    int8_t send_snapshot;
     bool stream_alerts;
+    int alert_count;
+    int snapshot_count;
+    int checkpoint_count;
     time_t node_info_send_time;
     time_t node_collectors_send;
     char node_id[UUID_STR_LEN];

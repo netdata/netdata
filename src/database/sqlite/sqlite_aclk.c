@@ -34,7 +34,6 @@ static struct aclk_database_cmd aclk_database_deq_cmd(void)
     }
     else {
         ret.opcode = ACLK_DATABASE_NOOP;
-        ret.completion = NULL;
     }
     spinlock_unlock(&aclk_sync_config.cmd_queue_lock);
 
@@ -262,10 +261,7 @@ static void timer_cb(uv_timer_t *handle)
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
-    struct aclk_sync_config_s *config = handle->data;
-    struct aclk_database_cmd cmd;
-    memset(&cmd, 0, sizeof(cmd));
-
+    struct aclk_database_cmd cmd = { 0 };
     if (aclk_connected) {
         cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
         aclk_database_enq_cmd(&cmd);
@@ -343,8 +339,6 @@ static void aclk_synchronization(void *arg)
                     aclk_push_alert_events_for_all_hosts();
                     break;
             }
-            if (cmd.completion)
-                completion_mark_complete(cmd.completion);
         } while (opcode != ACLK_DATABASE_NOOP);
     }
 
@@ -441,15 +435,12 @@ void sql_aclk_sync_init(void)
 #endif
 }
 
-// Public
-
 static inline void queue_aclk_sync_cmd(enum aclk_database_opcode opcode, const void *param0, const void *param1)
 {
     struct aclk_database_cmd cmd;
     cmd.opcode = opcode;
     cmd.param[0] = (void *) param0;
     cmd.param[1] = (void *) param1;
-    cmd.completion = NULL;
     aclk_database_enq_cmd(&cmd);
 }
 
@@ -467,13 +458,7 @@ void schedule_node_info_update(RRDHOST *host __maybe_unused)
 #ifdef ENABLE_ACLK
     if (unlikely(!host))
         return;
-
-    struct aclk_database_cmd cmd;
-    memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = ACLK_DATABASE_NODE_STATE;
-    cmd.param[0] = host;
-    cmd.completion = NULL;
-    aclk_database_enq_cmd(&cmd);
+    queue_aclk_sync_cmd(ACLK_DATABASE_NODE_STATE, host, NULL);
 #endif
 }
 
@@ -482,12 +467,6 @@ void unregister_node(const char *machine_guid)
 {
     if (unlikely(!machine_guid))
         return;
-
-    struct aclk_database_cmd cmd;
-    memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = ACLK_DATABASE_NODE_UNREGISTER;
-    cmd.param[0] = strdupz(machine_guid);
-    cmd.completion = NULL;
-    aclk_database_enq_cmd(&cmd);
+    queue_aclk_sync_cmd(ACLK_DATABASE_NODE_UNREGISTER, strdupz(machine_guid), NULL);
 }
 #endif

@@ -298,7 +298,7 @@ static void health_event_loop(void) {
 #ifdef ENABLE_ACLK
             if (netdata_cloud_enabled) {
                 struct aclk_sync_cfg_t *wc = host->aclk_config;
-                if (wc && wc->send_snapshot) {
+                if (wc && wc->send_snapshot == 2) {
                     netdata_log_info("DEBUG: %s SKIPPING HEALTH BECAUSE WE WILL SEND SNAPSHOT", rrdhost_hostname(host));
                     continue;
                 }
@@ -651,8 +651,14 @@ static void health_event_loop(void) {
             }
         }
 #ifdef ENABLE_ACLK
-        if (process_alert_pending_queue(host))
+        struct aclk_sync_cfg_t *wc = host->aclk_config;
+        if (wc && wc->send_snapshot == 1) {
+            wc->send_snapshot = 2;
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+        }
+        else
+            if (process_alert_pending_queue(host))
+                rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 #endif
 
         dfe_done(host);
