@@ -1,0 +1,25 @@
+name: Update websitr
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "integrations/integrations.json"
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger another workflow
+        env:
+          TARGET_REPO: "netdata/website"
+          WORKFLOW_FILE: "update-integrations.yml"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            https://api.github.com/repos/$TARGET_REPO/actions/workflows/$WORKFLOW_FILE/dispatches \
+            -d '{"ref":"master"}'
