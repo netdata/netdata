@@ -1,0 +1,12 @@
+phy#0
+	Interface wlp1s0
+		ifindex 2
+		wdev 0x1
+		addr 28:cd:c4:b8:63:cb
+		ssid Fotis' Pixel 8 Pro
+		type managed
+		channel 36 (5180 MHz), width: 80 MHz, center1: 5210 MHz
+		txpower 0.00 dBm
+		multicast TXQ:
+			qsz-byt	qsz-pkt	flows	drops	marksoverlmt	hashcol	tx-bytes	tx-packets
+			0	0	0	0	0	00	0		0
