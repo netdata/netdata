@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Trigger another workflow
+      - name: Trigger netdata/website update-integrations workflow
         env:
           TARGET_REPO: "netdata/website"
           WORKFLOW_FILE: "update-integrations.yml"
