@@ -323,13 +323,17 @@ static int connect_to_spawn_server(const char *path, bool log) {
 // the child created by the spawn server
 
 typedef enum __attribute__((packed)) {
+    STATUS_REPORT_NONE = 0,
     STATUS_REPORT_STARTED,
     STATUS_REPORT_FAILED,
     STATUS_REPORT_EXITED,
     STATUS_REPORT_PING,
 } STATUS_REPORT;
 
+#define STATUS_REPORT_MAGIC 0xBADA55EE
+
 struct status_report {
+    uint32_t magic;
     STATUS_REPORT status;
     union {
         struct {
@@ -346,17 +350,20 @@ struct status_report {
     };
 };
 
-static void spawn_server_send_status_ping(int fd) {
+static void spawn_server_send_status_ping(int sock) {
     struct status_report sr = {
+        .magic = STATUS_REPORT_MAGIC,
         .status = STATUS_REPORT_PING,
     };
 
-    if(write(fd, &sr, sizeof(sr)) != sizeof(sr))
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Cannot send ping status report");
+    if(write(sock, &sr, sizeof(sr)) != sizeof(sr))
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Cannot send ping reply.");
 }
 
 static void spawn_server_send_status_success(SPAWN_REQUEST *rq) {
     const struct status_report sr = {
+        .magic = STATUS_REPORT_MAGIC,
         .status = STATUS_REPORT_STARTED,
         .started = {
             .pid = getpid(),
@@ -364,11 +371,14 @@ static void spawn_server_send_status_success(SPAWN_REQUEST *rq) {
     };
 
     if(write(rq->sock, &sr, sizeof(sr)) != sizeof(sr))
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Cannot send success status report");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Cannot send success status report for request %zu: %s",
+            rq->request_id, rq->cmdline);
 }
 
 static void spawn_server_send_status_failure(SPAWN_REQUEST *rq) {
     struct status_report sr = {
+        .magic = STATUS_REPORT_MAGIC,
         .status = STATUS_REPORT_FAILED,
         .failed = {
             .err_no = errno,
@@ -376,11 +386,14 @@ static void spawn_server_send_status_failure(SPAWN_REQUEST *rq) {
     };
 
     if(write(rq->sock, &sr, sizeof(sr)) != sizeof(sr))
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Cannot send failure status report");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Cannot send failure status report for request %zu: %s",
+            rq->request_id, rq->cmdline);
 }
 
 static void spawn_server_send_status_exit(SPAWN_REQUEST *rq, int waitpid_status) {
     struct status_report sr = {
+        .magic = STATUS_REPORT_MAGIC,
         .status = STATUS_REPORT_EXITED,
         .exited = {
             .waitpid_status = waitpid_status,
@@ -388,7 +401,9 @@ static void spawn_server_send_status_exit(SPAWN_REQUEST *rq, int waitpid_status)
     };
 
     if(write(rq->sock, &sr, sizeof(sr)) != sizeof(sr))
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Cannot send exit status report");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Cannot send exit status (%d) report for request %zu: %s",
+            waitpid_status, rq->request_id, rq->cmdline);
 }
 
 static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
@@ -1357,8 +1372,15 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     // get the result
     struct status_report sr = { 0 };
     if(read(instance->client_sock, &sr, sizeof(sr)) != sizeof(sr))
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: failed to receive final status report for child %d, request %zu", instance->child_pid, instance->request_id);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN PARENT: failed to read final status report for child %d, request %zu",
+            instance->child_pid, instance->request_id);
 
+    else if(sr.magic != STATUS_REPORT_MAGIC) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN PARENT: invalid final status report for child %d, request %zu (invalid magic %#x in response)",
+            instance->child_pid, instance->request_id, sr.magic);
+    }
     else switch(sr.status) {
         case STATUS_REPORT_EXITED:
             rc = sr.exited.waitpid_status;
@@ -1368,7 +1390,9 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
         case STATUS_REPORT_FAILED:
         default:
             errno = 0;
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: invalid status report to exec spawn request %zu for pid %d (status = %u)", instance->request_id, instance->child_pid, sr.status);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                "SPAWN PARENT: invalid status report to exec spawn request %zu for pid %d (status = %u)",
+                instance->request_id, instance->child_pid, sr.status);
             break;
     }
 
@@ -1431,7 +1455,16 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     struct status_report sr = { 0 };
     if(read(instance->client_sock, &sr, sizeof(sr)) != sizeof(sr)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Failed to exec spawn request %zu (cannot get initial status report)", request.request_id);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN PARENT: Failed to exec spawn request %zu (cannot get initial status report)",
+            request.request_id);
+        goto cleanup;
+    }
+
+    if(sr.magic != STATUS_REPORT_MAGIC) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN PARENT: Failed to exec spawn request %zu (invalid magic %#x in response)",
+            request.request_id, sr.magic);
         goto cleanup;
     }
 
@@ -1442,13 +1475,17 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
         case STATUS_REPORT_FAILED:
             errno = sr.failed.err_no;
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Failed to exec spawn request %zu (check errno #1)", request.request_id);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                "SPAWN PARENT: Failed to exec spawn request %zu (server reports failure, errno is updated)",
+                request.request_id);
             errno = 0;
             break;
 
         case STATUS_REPORT_EXITED:
             errno = ENOEXEC;
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Failed to exec spawn request %zu (check errno #2)", request.request_id);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                "SPAWN PARENT: Failed to exec spawn request %zu (server reports exit, errno is updated)",
+                request.request_id);
             errno = 0;
             break;
 
