@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # On MSYS2, install these dependencies to build netdata:
 install_dependencies() {
@@ -27,16 +27,12 @@ then
 fi
 
 BUILD_FOR_PACKAGING="Off"
-if [ "${1}" = "package" ]
-then
+if [ "${1}" = "package" ]; then
 	BUILD_FOR_PACKAGING="On"
 fi
 
-export PATH="/usr/local/bin:${PATH}"
-
 WT_ROOT="$(pwd)"
 BUILD_TYPE="Debug"
-NULL=""
 
 if [ -z "${MSYSTEM}" ]; then
    build="${WT_ROOT}/build-${OSTYPE}"
@@ -50,8 +46,7 @@ fi
 
 set -exu -o pipefail
 
-if [ -d "${build}" ]
-then
+if [ -d "${build}" ]; then
 	rm -rf "${build}"
 fi
 
@@ -69,8 +64,7 @@ fi
     -DENABLE_CLOUD=On \
     -DENABLE_ML=On \
     -DENABLE_BUNDLED_JSONC=On \
-    -DENABLE_BUNDLED_PROTOBUF=Off \
-    ${NULL}
+    -DENABLE_BUNDLED_PROTOBUF=Off
 
 ninja -v -C "${build}" || ninja -v -C "${build}" -j 1
 

@@ -1,7 +1,5 @@
 #!/bin/bash
 
-export PATH="/usr/local/bin:${PATH}"
-
 WT_ROOT="$(pwd)"
 
 if [ -z "${MSYSTEM}" ]; then
