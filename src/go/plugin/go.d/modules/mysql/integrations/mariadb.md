@@ -45,12 +45,8 @@ This collector supports collecting metrics from multiple instances of this integ
 
 #### Auto-Detection
 
-By default, it detects instances running on localhost by trying to connect as root and netdata using known MySQL TCP and UNIX sockets:
+By default, it detects instances running on localhost by trying to connect as root and netdata using known MySQL TCP sockets:
 
-- /var/run/mysqld/mysqld.sock
-- /var/run/mysqld/mysql.sock
-- /var/lib/mysql/mysql.sock
-- /tmp/mysql.sock
 - 127.0.0.1:3306
 - "[::1]:3306"
 
