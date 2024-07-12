@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- go.d smartctl: add scsi read/write/verify error rate [\#18119](https://github.com/netdata/netdata/pull/18119) ([ilyam8](https://github.com/ilyam8))
+- log in the same line [\#18118](https://github.com/netdata/netdata/pull/18118) ([ktsaou](https://github.com/ktsaou))
+- spawn server fixes 3 [\#18117](https://github.com/netdata/netdata/pull/18117) ([ktsaou](https://github.com/ktsaou))
+- make claiming work again [\#18116](https://github.com/netdata/netdata/pull/18116) ([ktsaou](https://github.com/ktsaou))
+- spawn server improvements [\#18115](https://github.com/netdata/netdata/pull/18115) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#18114](https://github.com/netdata/netdata/pull/18114) ([netdatabot](https://github.com/netdatabot))
+- Regenerate integrations.js [\#18110](https://github.com/netdata/netdata/pull/18110) ([netdatabot](https://github.com/netdatabot))
 - move "api key" option in stream.conf [\#18108](https://github.com/netdata/netdata/pull/18108) ([ilyam8](https://github.com/ilyam8))
 - add port service names to network viewer [\#18107](https://github.com/netdata/netdata/pull/18107) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18106](https://github.com/netdata/netdata/pull/18106) ([netdatabot](https://github.com/netdatabot))
@@ -18,6 +25,7 @@
 - ndsudo set uid/gid/egid to 0 before executing command [\#18093](https://github.com/netdata/netdata/pull/18093) ([ilyam8](https://github.com/ilyam8))
 - go.d fix compiling for windows [\#18091](https://github.com/netdata/netdata/pull/18091) ([ilyam8](https://github.com/ilyam8))
 - go.d megacli: return error if no adapters found \(parsing failed\) [\#18090](https://github.com/netdata/netdata/pull/18090) ([ilyam8](https://github.com/ilyam8))
+- Port puppet collector from Python to Go [\#18088](https://github.com/netdata/netdata/pull/18088) ([Ancairon](https://github.com/Ancairon))
 - update go.d path in docs and ci [\#18087](https://github.com/netdata/netdata/pull/18087) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18086](https://github.com/netdata/netdata/pull/18086) ([netdatabot](https://github.com/netdatabot))
 - Switch to legacy images for CentOS 7 CI. [\#18085](https://github.com/netdata/netdata/pull/18085) ([Ferroin](https://github.com/Ferroin))
@@ -105,6 +113,7 @@
 - Tidy-up build related CI jobs. [\#17962](https://github.com/netdata/netdata/pull/17962) ([Ferroin](https://github.com/Ferroin))
 - Sign DEB packages in the GHA runners that build them. [\#17949](https://github.com/netdata/netdata/pull/17949) ([Ferroin](https://github.com/Ferroin))
 - Detect on startup if the netdata-meta.db file is not a valid database file [\#17924](https://github.com/netdata/netdata/pull/17924) ([stelfrag](https://github.com/stelfrag))
+- eBPF cgroup and mutex [\#17915](https://github.com/netdata/netdata/pull/17915) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix small typo [\#17875](https://github.com/netdata/netdata/pull/17875) ([stelfrag](https://github.com/stelfrag))
 - spawn server \(Windows support for external plugins\) [\#17866](https://github.com/netdata/netdata/pull/17866) ([ktsaou](https://github.com/ktsaou))
 - sysinfo \(WinAPI\) [\#17857](https://github.com/netdata/netdata/pull/17857) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -404,11 +413,6 @@
 - go.d smartctl improve units [\#17564](https://github.com/netdata/netdata/pull/17564) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17561](https://github.com/netdata/netdata/pull/17561) ([netdatabot](https://github.com/netdatabot))
 - Regenerate integrations.js [\#17560](https://github.com/netdata/netdata/pull/17560) ([netdatabot](https://github.com/netdatabot))
-- Add OIDC docs [\#17557](https://github.com/netdata/netdata/pull/17557) ([car12o](https://github.com/car12o))
-- Fix handling of vendored eBPF code in CMake. [\#17556](https://github.com/netdata/netdata/pull/17556) ([Ferroin](https://github.com/Ferroin))
-- try hardcode docs links [\#17553](https://github.com/netdata/netdata/pull/17553) ([Ancairon](https://github.com/Ancairon))
-- Notification section updates [\#17551](https://github.com/netdata/netdata/pull/17551) ([Ancairon](https://github.com/Ancairon))
-- Adjust eBPF code. [\#17550](https://github.com/netdata/netdata/pull/17550) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
