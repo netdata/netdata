@@ -22,12 +22,9 @@ pacman -S --noconfirm \
     libyaml-devel \
     libzstd-devel \
     mingw64/mingw-w64-x86_64-brotli \
-    mingw64/mingw-w64-x86_64-ccache \
-    mingw64/mingw-w64-x86_64-gdb \
     mingw64/mingw-w64-x86_64-go \
     mingw64/mingw-w64-x86_64-libuv \
     mingw64/mingw-w64-x86_64-lz4 \
-    mingw64/mingw-w64-x86_64-mold \
     mingw64/mingw-w64-x86_64-nsis \
     mingw64/mingw-w64-x86_64-openssl \
     mingw64/mingw-w64-x86_64-pcre2 \
@@ -37,8 +34,6 @@ pacman -S --noconfirm \
     mingw-w64-x86_64-toolchain \
     msys2-devel \
     msys/brotli-devel \
-    msys/ccache \
-    msys/gdb \
     msys/libuv-devel \
     msys/pcre2-devel \
     msys/zlib-devel \
@@ -46,12 +41,9 @@ pacman -S --noconfirm \
     openssl-devel \
     protobuf-devel \
     ucrt64/mingw-w64-ucrt-x86_64-brotli \
-    ucrt64/mingw-w64-ucrt-x86_64-ccache \
-    ucrt64/mingw-w64-ucrt-x86_64-gdb \
     ucrt64/mingw-w64-ucrt-x86_64-go \
     ucrt64/mingw-w64-ucrt-x86_64-libuv \
     ucrt64/mingw-w64-ucrt-x86_64-lz4 \
-    ucrt64/mingw-w64-ucrt-x86_64-mold \
     ucrt64/mingw-w64-ucrt-x86_64-openssl \
     ucrt64/mingw-w64-ucrt-x86_64-pcre2 \
     ucrt64/mingw-w64-ucrt-x86_64-protobuf \
