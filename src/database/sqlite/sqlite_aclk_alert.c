@@ -570,15 +570,17 @@ void aclk_push_alert_events_for_all_hosts(void)
         return;
 
     dfe_start_reentrant(rrdhost_root_index, host) {
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) ||
-            !rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS))
+        if (!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS))
             continue;
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 
         struct aclk_sync_cfg_t *wc = host->aclk_config;
-        if (!wc || false == wc->stream_alerts)
+        if (!wc || false == wc->stream_alerts || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
+            (void)process_alert_pending_queue(host);
+            commit_alert_events(host);
             continue;
+        }
 
         if (wc->send_snapshot) {
             (void)process_alert_pending_queue(host);

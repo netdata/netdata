@@ -549,7 +549,10 @@ static RRDHOST *rrdhost_create(
 //        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
         ml_host_new(host);
     } else
-        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
+        rrdhost_flag_set(
+            host,
+            RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_ACLK_STREAM_ALERTS | RRDHOST_FLAG_ARCHIVED |
+                RRDHOST_FLAG_ORPHAN);
 
     return host;
 }
