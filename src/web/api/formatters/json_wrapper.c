@@ -271,6 +271,7 @@ static size_t query_target_summary_contexts_v2(BUFFER *wb, QUERY_TARGET *qt, con
         QUERY_INSTANCES_COUNTS instances;
         QUERY_METRICS_COUNTS metrics;
         QUERY_ALERTS_COUNTS alerts;
+        const char *units;
     } *z;
 
     for (long c = 0; c < (long) qt->contexts.used; c++) {
@@ -293,16 +294,22 @@ static size_t query_target_summary_contexts_v2(BUFFER *wb, QUERY_TARGET *qt, con
         z->alerts.critical += qc->alerts.critical;
 
         storage_point_merge_to(z->query_points, qc->query_points);
+
+        if(!z->units)
+            z->units = rrdcontext_acquired_units(qc->rca);
     }
 
     size_t unique_contexts = dictionary_entries(dict);
     dfe_start_read(dict, z) {
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_string(wb, "id", z_dfe.name);
-        query_target_instance_counts(wb, &z->instances);
-        query_target_metric_counts(wb, &z->metrics);
-        query_target_alerts_counts(wb, &z->alerts, NULL, false);
-                query_target_points_statistics(wb, qt, &z->query_points);
+        {
+            buffer_json_member_add_string(wb, "id", z_dfe.name);
+            buffer_json_member_add_string(wb, "units", z->units);
+            query_target_instance_counts(wb, &z->instances);
+            query_target_metric_counts(wb, &z->metrics);
+            query_target_alerts_counts(wb, &z->alerts, NULL, false);
+            query_target_points_statistics(wb, qt, &z->query_points);
+        }
         buffer_json_object_close(wb);
 
         aggregate_into_summary_totals(totals, &z->metrics);
