@@ -996,23 +996,34 @@ void nd_log_reopen_log_files(bool log) {
     if(log)
         netdata_log_info("Reopening all log files.");
 
-    if(nd_log.syslog.initialized) {
-        closelog();
-        nd_log.syslog.initialized = true;
-    }
-
-    if(nd_log.journal_direct.initialized) {
-        close(nd_log.journal_direct.fd);
-        nd_log.journal_direct.fd = -1;
-        nd_log.journal_direct.initialized = false;
-    }
-
     nd_log.std_output.initialized = false;
     nd_log.std_error.initialized = false;
     nd_log_initialize();
 
     if(log)
         netdata_log_info("Log files re-opened.");
+}
+
+void nd_log_reopen_log_files_for_spawn_server(void) {
+    if(nd_log.syslog.initialized) {
+        closelog();
+        nd_log.syslog.initialized = false;
+        nd_log_syslog_init();
+    }
+
+    if(nd_log.journal_direct.initialized) {
+        close(nd_log.journal_direct.fd);
+        nd_log.journal_direct.fd = -1;
+        nd_log.journal_direct.initialized = false;
+        nd_log_journal_direct_init(NULL);
+    }
+
+    nd_log.sources[NDLS_UNSET].method = NDLM_DISABLED;
+    nd_log.sources[NDLS_ACCESS].method = NDLM_DISABLED;
+    nd_log.sources[NDLS_ACLK].method = NDLM_DISABLED;
+    nd_log.sources[NDLS_DEBUG].method = NDLM_DISABLED;
+    nd_log.sources[NDLS_HEALTH].method = NDLM_DISABLED;
+    nd_log_reopen_log_files(false);
 }
 
 void chown_open_file(int fd, uid_t uid, gid_t gid) {

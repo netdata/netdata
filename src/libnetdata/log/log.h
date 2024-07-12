@@ -154,6 +154,7 @@ void chown_open_file(int fd, uid_t uid, gid_t gid);
 void nd_log_chown_log_files(uid_t uid, gid_t gid);
 void nd_log_set_flood_protection(size_t logs, time_t period);
 void nd_log_initialize_for_external_plugins(const char *name);
+void nd_log_reopen_log_files_for_spawn_server(void);
 bool nd_log_journal_socket_available(void);
 ND_LOG_FIELD_ID nd_log_field_id_by_name(const char *field, size_t len);
 int nd_log_priority2id(const char *priority);

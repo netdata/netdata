@@ -59,12 +59,14 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, c
     SPAWN_SERVER* server = callocz(1, sizeof(SPAWN_SERVER));
     if(name)
         server->name = strdupz(name);
+    else
+        server->name = strdupz("unnamed");
     return server;
 }
 
 void spawn_server_destroy(SPAWN_SERVER *server) {
     if (server) {
-        if(server->name) freez((void *)server->name);
+        freez((void *)server->name);
         freez(server);
     }
 }
@@ -329,11 +331,7 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
     if(server->pipe[1] != -1) { close(server->pipe[1]); server->pipe[1] = -1; }
 
     // set the process name
-    {
-        char buf[15];
-        snprintfz(buf, sizeof(buf), "chld-%zu-r%zu", server->id, rq->request_id);
-        os_setproctitle(buf, server->argc, server->argv);
-    }
+    os_setproctitle("spawn-child", server->argc, server->argv);
 
     // get the fds from the request
     int stdin_fd = rq->fds[0];
@@ -1137,6 +1135,7 @@ static void spawn_server_event_loop(SPAWN_SERVER *server) {
         if (spawn_server_sigchld) {
             spawn_server_sigchld = false;
             spawn_server_process_sigchld();
+            errno_clear();
 
             if(ret == -1)
                 continue;
@@ -1312,8 +1311,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         snprintf(path, sizeof(path), "%s/.netdata-spawn-%s.sock", runtime_directory, name);
     }
     else {
-        snprintfz(path, sizeof(path), "%d-%zu", getpid(), server->id);
-        server->name = strdupz(path);
+        server->name = strdupz("unnamed");
         snprintf(path, sizeof(path), "%s/.netdata-spawn-%d-%zu.sock", runtime_directory, getpid(), server->id);
     }
 
@@ -1339,7 +1337,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
 
         replace_stdio_with_dev_null();
         os_close_all_non_std_open_fds_except((int[]){ server->sock, server->pipe[1] }, 2);
-        nd_log_reopen_log_files(false);
+        nd_log_reopen_log_files_for_spawn_server();
         spawn_server_event_loop(server);
     }
     else if (pid > 0) {
