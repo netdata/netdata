@@ -31,17 +31,17 @@ if [ "${1}" = "package" ]; then
 	BUILD_FOR_PACKAGING="On"
 fi
 
-WT_ROOT="$(pwd)"
+repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
 BUILD_TYPE="Debug"
 
 if [ -z "${MSYSTEM}" ]; then
-   build="${WT_ROOT}/build-${OSTYPE}"
+   build="${repo_root}/build-${OSTYPE}"
 else
-   build="${WT_ROOT}/build-${OSTYPE}-${MSYSTEM}"
+   build="${repo_root}/build-${OSTYPE}-${MSYSTEM}"
 fi
 
 if [ "$USER" = "vk" ]; then
-    build="${WT_ROOT}/build"
+    build="${repo_root}/build"
 fi
 
 set -exu -o pipefail
@@ -50,7 +50,7 @@ if [ -d "${build}" ]; then
 	rm -rf "${build}"
 fi
 
-/usr/bin/cmake -S "${WT_ROOT}" -B "${build}" \
+/usr/bin/cmake -S "${repo_root}" -B "${build}" \
     -G Ninja \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \

@@ -1,15 +1,15 @@
 #!/bin/bash
 
-WT_ROOT="$(pwd)"
+repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
 
 if [ -z "${MSYSTEM}" ]; then
-   build="${WT_ROOT}/build-${OSTYPE}"
+   build="${repo_root}/build-${OSTYPE}"
 else
-   build="${WT_ROOT}/build-${OSTYPE}-${MSYSTEM}"
+   build="${repo_root}/build-${OSTYPE}-${MSYSTEM}"
 fi
 
 if [ "$USER" = "vk" ]; then
-    build="${WT_ROOT}/build"
+    build="${repo_root}/build"
 fi
 
 set -exu -o pipefail
@@ -25,5 +25,4 @@ NDVERSION=$"$(grep 'CMAKE_PROJECT_VERSION:STATIC' "${build}/CMakeCache.txt"| cut
 NDMAJORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MAJOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 NDMINORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MINOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 
-makensis -DCURRVERSION="${NDVERSION}" -DMAJORVERSION="${NDMAJORVERSION}" -DMINORVERSION="${NDMINORVERSION}" "${WT_ROOT}/packaging/utils/installer.nsi"
-
+makensis -DCURRVERSION="${NDVERSION}" -DMAJORVERSION="${NDMAJORVERSION}" -DMINORVERSION="${NDMINORVERSION}" "${repo_root}/packaging/utils/installer.nsi"
