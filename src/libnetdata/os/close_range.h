@@ -7,6 +7,6 @@
 
 int os_get_fd_open_max(void);
 void os_close_range(int first, int last);
-void os_close_all_non_std_open_fds_except(int fds[], size_t fds_num);
+void os_close_all_non_std_open_fds_except(const int fds[], size_t fds_num);
 
 #endif //CLOSE_RANGE_H
