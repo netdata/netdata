@@ -3,7 +3,7 @@
 #include "common.h"
 #include <sched.h>
 
-char pidfile[FILENAME_MAX + 1] = "";
+char *pidfile = NULL;
 char netdata_exe_path[FILENAME_MAX + 1];
 char netdata_exe_file[FILENAME_MAX + 1];
 
@@ -111,7 +111,7 @@ static int become_user(const char *username, int pid_fd) {
 
     prepare_required_directories(uid, gid);
 
-    if(pidfile[0]) {
+    if(pidfile && *pidfile) {
         if(chown(pidfile, uid, gid) == -1)
             netdata_log_error("Cannot chown '%s' to %u:%u", pidfile, (unsigned int)uid, (unsigned int)gid);
     }
@@ -464,7 +464,7 @@ int become_daemon(int dont_fork, const char *user)
 
     // generate our pid file
     int pidfd = -1;
-    if(pidfile[0]) {
+    if(pidfile && *pidfile) {
         pidfd = open(pidfile, O_WRONLY | O_CREAT | O_CLOEXEC, 0644);
         if(pidfd >= 0) {
             if(ftruncate(pidfd, 0) != 0)

@@ -480,7 +480,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
 
     // unlink the pid
-    if(pidfile[0]) {
+    if(pidfile && *pidfile) {
         if(unlink(pidfile) != 0)
             netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
     }
@@ -1498,8 +1498,7 @@ int netdata_main(int argc, char **argv) {
                     config_set(CONFIG_SECTION_WEB, "bind to", optarg);
                     break;
                 case 'P':
-                    strncpy(pidfile, optarg, FILENAME_MAX);
-                    pidfile[FILENAME_MAX] = '\0';
+                    pidfile = strdupz(optarg);
                     break;
                 case 'p':
                     config_set(CONFIG_SECTION_GLOBAL, "default port", optarg);
