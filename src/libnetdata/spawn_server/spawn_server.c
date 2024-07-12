@@ -335,14 +335,11 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
         os_setproctitle(buf, server->argc, server->argv);
     }
 
-    // just a precausion in case we have any left-over fds
-    os_close_all_non_std_open_fds_except(rq->fds, SPAWN_SERVER_TRANSFER_FDS);
-
     // get the fds from the request
     int stdin_fd = rq->fds[0];
     int stdout_fd = rq->fds[1];
     int stderr_fd = rq->fds[2];
-    int custom_fd = rq->fds[3];
+    int custom_fd = rq->fds[3]; (void)custom_fd;
 
     // change stdio fds to the ones in the request
     if (dup2(stdin_fd, STDIN_FILENO) == -1) {
@@ -376,11 +373,16 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
     switch (rq->type) {
 
         case SPAWN_INSTANCE_TYPE_EXEC:
-            if(custom_fd != -1) { close(custom_fd); custom_fd = -1; }
+            // close all fds except the ones we need
+            os_close_all_non_std_open_fds_except(NULL, 0);
+
+            // run the command
             execvp(rq->argv[0], (char **)rq->argv);
+
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                 "SPAWN SERVER: Failed to execute command of request No %zu: %s",
                 rq->request_id, rq->cmdline);
+
             exit(1);
             break;
 
