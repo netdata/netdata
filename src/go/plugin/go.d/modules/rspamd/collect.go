@@ -50,12 +50,10 @@ func (r *Rspamd) collect() (map[string]int64, error) {
 }
 
 func (r *Rspamd) queryRspamdStats() (*rspamdStats, error) {
-	req, err := web.NewHTTPRequest(r.Request)
+	req, err := web.NewHTTPRequestWithPath(r.Request, "/stat")
 	if err != nil {
 		return nil, err
 	}
-
-	req.URL.Path = "/stat"
 
 	var stats rspamdStats
 	if err := r.doOKDecode(req, &stats); err != nil {

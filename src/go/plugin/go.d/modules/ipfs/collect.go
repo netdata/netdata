@@ -125,12 +125,10 @@ func (ip *IPFS) collectPinLs(mx map[string]int64) error {
 }
 
 func (ip *IPFS) queryStatsBandwidth() (*ipfsStatsBw, error) {
-	req, err := web.NewHTTPRequest(ip.Request)
+	req, err := web.NewHTTPRequestWithPath(ip.Request, urlPathStatsBandwidth)
 	if err != nil {
 		return nil, err
 	}
-
-	req.URL.Path = urlPathStatsBandwidth
 
 	var stats ipfsStatsBw
 	if err := ip.doOKDecode(req, &stats); err != nil {
@@ -145,12 +143,10 @@ func (ip *IPFS) queryStatsBandwidth() (*ipfsStatsBw, error) {
 }
 
 func (ip *IPFS) querySwarmPeers() (*ipfsSwarmPeers, error) {
-	req, err := web.NewHTTPRequest(ip.Request)
+	req, err := web.NewHTTPRequestWithPath(ip.Request, urlPathSwarmPeers)
 	if err != nil {
 		return nil, err
 	}
-
-	req.URL.Path = urlPathSwarmPeers
 
 	var stats ipfsSwarmPeers
 	if err := ip.doOKDecode(req, &stats); err != nil {
@@ -161,12 +157,10 @@ func (ip *IPFS) querySwarmPeers() (*ipfsSwarmPeers, error) {
 }
 
 func (ip *IPFS) queryStatsRepo() (*ipfsStatsRepo, error) {
-	req, err := web.NewHTTPRequest(ip.Request)
+	req, err := web.NewHTTPRequestWithPath(ip.Request, urlPathStatsRepo)
 	if err != nil {
 		return nil, err
 	}
-
-	req.URL.Path = urlPathStatsRepo
 
 	var stats ipfsStatsRepo
 	if err := ip.doOKDecode(req, &stats); err != nil {
@@ -177,12 +171,10 @@ func (ip *IPFS) queryStatsRepo() (*ipfsStatsRepo, error) {
 }
 
 func (ip *IPFS) queryPinLs() (*ipfsPinsLs, error) {
-	req, err := web.NewHTTPRequest(ip.Request)
+	req, err := web.NewHTTPRequestWithPath(ip.Request, urlPathPinLs)
 	if err != nil {
 		return nil, err
 	}
-
-	req.URL.Path = urlPathPinLs
 
 	var stats ipfsPinsLs
 	if err := ip.doOKDecode(req, &stats); err != nil {

@@ -69,12 +69,11 @@ func (c *Consul) isServer() bool {
 }
 
 func (c *Consul) doOKDecode(urlPath string, in interface{}, statusCodes ...int) error {
-	req, err := web.NewHTTPRequest(c.Request.Copy())
+	req, err := web.NewHTTPRequestWithPath(c.Request, urlPath)
 	if err != nil {
 		return fmt.Errorf("error on creating request: %v", err)
 	}
 
-	req.URL.Path = urlPath
 	if c.ACLToken != "" {
 		req.Header.Set("X-Consul-Token", c.ACLToken)
 	}
