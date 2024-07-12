@@ -59,12 +59,14 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, c
     SPAWN_SERVER* server = callocz(1, sizeof(SPAWN_SERVER));
     if(name)
         server->name = strdupz(name);
+    else
+        server->name = strdupz("unnamed");
     return server;
 }
 
 void spawn_server_destroy(SPAWN_SERVER *server) {
     if (server) {
-        if(server->name) freez((void *)server->name);
+        freez((void *)server->name);
         freez(server);
     }
 }
@@ -329,20 +331,13 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
     if(server->pipe[1] != -1) { close(server->pipe[1]); server->pipe[1] = -1; }
 
     // set the process name
-    {
-        char buf[15];
-        snprintfz(buf, sizeof(buf), "chld-%zu-r%zu", server->id, rq->request_id);
-        os_setproctitle(buf, server->argc, server->argv);
-    }
-
-    // just a precausion in case we have any left-over fds
-    os_close_all_non_std_open_fds_except(rq->fds, SPAWN_SERVER_TRANSFER_FDS);
+    os_setproctitle("spawn-child", server->argc, server->argv);
 
     // get the fds from the request
     int stdin_fd = rq->fds[0];
     int stdout_fd = rq->fds[1];
     int stderr_fd = rq->fds[2];
-    int custom_fd = rq->fds[3];
+    int custom_fd = rq->fds[3]; (void)custom_fd;
 
     // change stdio fds to the ones in the request
     if (dup2(stdin_fd, STDIN_FILENO) == -1) {
@@ -376,11 +371,16 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
     switch (rq->type) {
 
         case SPAWN_INSTANCE_TYPE_EXEC:
-            if(custom_fd != -1) { close(custom_fd); custom_fd = -1; }
+            // close all fds except the ones we need
+            os_close_all_non_std_open_fds_except(NULL, 0);
+
+            // run the command
             execvp(rq->argv[0], (char **)rq->argv);
+
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                 "SPAWN SERVER: Failed to execute command of request No %zu: %s",
                 rq->request_id, rq->cmdline);
+
             exit(1);
             break;
 
@@ -1135,6 +1135,7 @@ static void spawn_server_event_loop(SPAWN_SERVER *server) {
         if (spawn_server_sigchld) {
             spawn_server_sigchld = false;
             spawn_server_process_sigchld();
+            errno_clear();
 
             if(ret == -1)
                 continue;
@@ -1310,8 +1311,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         snprintf(path, sizeof(path), "%s/.netdata-spawn-%s.sock", runtime_directory, name);
     }
     else {
-        snprintfz(path, sizeof(path), "%d-%zu", getpid(), server->id);
-        server->name = strdupz(path);
+        server->name = strdupz("unnamed");
         snprintf(path, sizeof(path), "%s/.netdata-spawn-%d-%zu.sock", runtime_directory, getpid(), server->id);
     }
 
@@ -1337,6 +1337,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
 
         replace_stdio_with_dev_null();
         os_close_all_non_std_open_fds_except((int[]){ server->sock, server->pipe[1] }, 2);
+        nd_log_reopen_log_files_for_spawn_server();
         spawn_server_event_loop(server);
     }
     else if (pid > 0) {
