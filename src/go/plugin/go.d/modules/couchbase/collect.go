@@ -112,11 +112,13 @@ func (cb *Couchbase) addDimToChart(chartID string, dim *module.Dim) {
 }
 
 func (cb *Couchbase) scrapeCouchbase() (*cbMetrics, error) {
-	ms := &cbMetrics{}
-	req, _ := web.NewHTTPRequest(cb.Request)
-	req.URL.Path = urlPathBucketsStats
+	req, err := web.NewHTTPRequestWithPath(cb.Request, urlPathBucketsStats)
+	if err != nil {
+		return nil, err
+	}
 	req.URL.RawQuery = url.Values{"skipMap": []string{"true"}}.Encode()
 
+	ms := &cbMetrics{}
 	if err := cb.doOKDecode(req, &ms.BucketsBasicStats); err != nil {
 		return nil, err
 	}
