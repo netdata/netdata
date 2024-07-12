@@ -149,7 +149,7 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting);
 void nd_log_set_facility(const char *facility);
 void nd_log_set_priority_level(const char *setting);
 void nd_log_initialize(void);
-void nd_log_reopen_log_files(void);
+void nd_log_reopen_log_files(bool log);
 void chown_open_file(int fd, uid_t uid, gid_t gid);
 void nd_log_chown_log_files(uid_t uid, gid_t gid);
 void nd_log_set_flood_protection(size_t logs, time_t period);

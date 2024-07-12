@@ -992,14 +992,27 @@ void nd_log_initialize(void) {
         nd_log_open(&nd_log.sources[i], i);
 }
 
-void nd_log_reopen_log_files(void) {
-    netdata_log_info("Reopening all log files.");
+void nd_log_reopen_log_files(bool log) {
+    if(log)
+        netdata_log_info("Reopening all log files.");
+
+    if(nd_log.syslog.initialized) {
+        closelog();
+        nd_log.syslog.initialized = true;
+    }
+
+    if(nd_log.journal_direct.initialized) {
+        close(nd_log.journal_direct.fd);
+        nd_log.journal_direct.fd = -1;
+        nd_log.journal_direct.initialized = false;
+    }
 
     nd_log.std_output.initialized = false;
     nd_log.std_error.initialized = false;
     nd_log_initialize();
 
-    netdata_log_info("Log files re-opened.");
+    if(log)
+        netdata_log_info("Log files re-opened.");
 }
 
 void chown_open_file(int fd, uid_t uid, gid_t gid) {

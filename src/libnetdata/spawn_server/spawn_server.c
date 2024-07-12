@@ -1337,6 +1337,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
 
         replace_stdio_with_dev_null();
         os_close_all_non_std_open_fds_except((int[]){ server->sock, server->pipe[1] }, 2);
+        nd_log_reopen_log_files(false);
         spawn_server_event_loop(server);
     }
     else if (pid > 0) {
