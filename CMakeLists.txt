@@ -147,7 +147,7 @@ option(DEFAULT_FEATURE_STATE "Specify the default state for most optional featur
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
 # openssl/crypto
-option(ENABLE_WOLFSSL "Compile netdata using WolfSSL." False)
+option(ENABLE_WOLFSSL "Compile netdata using WolfSSL." True)
 cmake_dependent_option(ENABLE_OPENSSL "Compile netdata using OpenSSL." True "NOT ENABLE_WOLFSSL" False)
 
 # High-level features
@@ -206,13 +206,9 @@ mark_as_advanced(FORCE_LEGACY_LIBBPF)
 include(CheckFunctionExists)
 
 if(ENABLE_WOLFSSL)
-        pkg_check_modules(TLS IMPORTED_TARGET wolfssl)
+        include(NetdataWolfSSL)
 
-        list(APPEND CMAKE_REQUIRED_LIBRARIES wolfssl)
-        check_function_exists(wolfSSL_set_alpn_protos HAVE_WOLFSSL_SET_ALPN_PROTOS)
-        if(NOT HAVE_WOLFSSL_SET_ALPN_PROTOS)
-                message(FATAL_ERROR "Your WolfSSL library has not been compiled with the OPENSSL_EXTRA flag, which is necessary to create symbols for the OpenSSL API that Netdata uses.")
-        endif()
+        netdata_is_there_wolfssl()
 else()
         pkg_check_modules(TLS IMPORTED_TARGET openssl)
 endif()
