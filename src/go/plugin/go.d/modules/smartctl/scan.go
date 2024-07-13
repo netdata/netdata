@@ -12,6 +12,7 @@ type scanDevice struct {
 	name     string
 	infoName string
 	typ      string
+	extra    bool // added via config "extra_devices"
 }
 
 func (s *scanDevice) key() string {
@@ -65,11 +66,21 @@ func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
 		devices[dev.key()] = dev
 	}
 
+	s.Debugf("smartctl scan found %d devices", len(devices))
+
+	for _, v := range s.ExtraDevices {
+		if v.Name == "" || v.Type == "" {
+			continue
+		}
+		dev := &scanDevice{name: v.Name, typ: v.Type, extra: true}
+		if _, ok := devices[dev.key()]; !ok {
+			devices[dev.key()] = dev
+		}
+	}
+
 	if len(devices) == 0 {
 		return nil, errors.New("no devices found during scan")
 	}
-
-	s.Debugf("smartctl scan found %d devices", len(devices))
 
 	return devices, nil
 }
