@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- Spawn server fixes 6 [\#18136](https://github.com/netdata/netdata/pull/18136) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#18135](https://github.com/netdata/netdata/pull/18135) ([netdatabot](https://github.com/netdatabot))
+- docs: go.d mysql: remove unix sockets from auto\_detection [\#18134](https://github.com/netdata/netdata/pull/18134) ([ilyam8](https://github.com/ilyam8))
+- go.d fix url path overwrite [\#18132](https://github.com/netdata/netdata/pull/18132) ([ilyam8](https://github.com/ilyam8))
+- Spawn server improvements 5 [\#18131](https://github.com/netdata/netdata/pull/18131) ([ktsaou](https://github.com/ktsaou))
+- Spawn server fixes No 4 [\#18127](https://github.com/netdata/netdata/pull/18127) ([ktsaou](https://github.com/ktsaou))
+- go.d filecheck fix dir existence chart label [\#18126](https://github.com/netdata/netdata/pull/18126) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18124](https://github.com/netdata/netdata/pull/18124) ([netdatabot](https://github.com/netdatabot))
+- go.d whoisquery fix "days until" in config\_schema.json [\#18121](https://github.com/netdata/netdata/pull/18121) ([ilyam8](https://github.com/ilyam8))
 - go.d smartctl: add scsi read/write/verify error rate [\#18119](https://github.com/netdata/netdata/pull/18119) ([ilyam8](https://github.com/ilyam8))
 - log in the same line [\#18118](https://github.com/netdata/netdata/pull/18118) ([ktsaou](https://github.com/ktsaou))
 - spawn server fixes 3 [\#18117](https://github.com/netdata/netdata/pull/18117) ([ktsaou](https://github.com/ktsaou))
@@ -403,16 +412,6 @@
 - Cpack fixes [\#17576](https://github.com/netdata/netdata/pull/17576) ([vkalintiris](https://github.com/vkalintiris))
 - Fix compilation without `dbengine` [\#17575](https://github.com/netdata/netdata/pull/17575) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix handling of netdata.conf on install in build system. [\#17572](https://github.com/netdata/netdata/pull/17572) ([Ferroin](https://github.com/Ferroin))
-- Update Netdata subscription plans documentation [\#17571](https://github.com/netdata/netdata/pull/17571) ([Ancairon](https://github.com/Ancairon))
-- go.d prometheus remove apostrophe in label values [\#17570](https://github.com/netdata/netdata/pull/17570) ([ilyam8](https://github.com/ilyam8))
-- remove go.d symbol/debug info with RelWithDebInfo [\#17569](https://github.com/netdata/netdata/pull/17569) ([ilyam8](https://github.com/ilyam8))
-- go.d smartctl add meta setup prerequisites [\#17568](https://github.com/netdata/netdata/pull/17568) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17567](https://github.com/netdata/netdata/pull/17567) ([netdatabot](https://github.com/netdatabot))
-- Increase the message size to the spawn server [\#17566](https://github.com/netdata/netdata/pull/17566) ([stelfrag](https://github.com/stelfrag))
-- go.d smartctl small improvements [\#17565](https://github.com/netdata/netdata/pull/17565) ([ilyam8](https://github.com/ilyam8))
-- go.d smartctl improve units [\#17564](https://github.com/netdata/netdata/pull/17564) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17561](https://github.com/netdata/netdata/pull/17561) ([netdatabot](https://github.com/netdatabot))
-- Regenerate integrations.js [\#17560](https://github.com/netdata/netdata/pull/17560) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
