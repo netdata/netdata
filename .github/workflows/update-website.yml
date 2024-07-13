@@ -14,13 +14,9 @@ jobs:
     if: github.repository == 'netdata/netdata'
     steps:
       - name: Trigger netdata/website update-integrations workflow
-        env:
-          TARGET_REPO: "netdata/website"
-          WORKFLOW_FILE: "update-integrations.yml"
-          GITHUB_TOKEN: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
-        run: |
-          curl -X POST \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            https://api.github.com/repos/$TARGET_REPO/actions/workflows/$WORKFLOW_FILE/dispatches \
-            -d '{"ref":"master"}'
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          repo: netdata/website
+          workflow: Update integrations
+          ref: refs/heads/master
