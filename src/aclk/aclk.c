@@ -1065,8 +1065,8 @@ static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
         "\n\t\tAlert count: %d"
         "\n\t\tAlert snapshot count: %d",
         wc->stream_alerts,
-        wc->alert_count,
         wc->checkpoint_count,
+        wc->alert_count,
         wc->snapshot_count
     );
 }
