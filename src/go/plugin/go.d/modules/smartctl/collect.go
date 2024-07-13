@@ -42,7 +42,8 @@ func (s *Smartctl) collect() (map[string]int64, error) {
 		// TODO: make it concurrent
 		for _, d := range s.scannedDevices {
 			if err := s.collectScannedDevice(mx, d); err != nil {
-				return nil, err
+				s.Warning(err)
+				continue
 			}
 		}
 
@@ -57,7 +58,7 @@ func (s *Smartctl) collect() (map[string]int64, error) {
 func (s *Smartctl) collectScannedDevice(mx map[string]int64, scanDev *scanDevice) error {
 	resp, err := s.exec.deviceInfo(scanDev.name, scanDev.typ, s.NoCheckPowerMode)
 	if err != nil {
-		if resp != nil && isDeviceOpenFailedNoSuchDevice(resp) {
+		if resp != nil && isDeviceOpenFailedNoSuchDevice(resp) && !scanDev.extra {
 			s.Infof("smartctl reported that device '%s' type '%s' no longer exists", scanDev.name, scanDev.typ)
 			s.forceScan = true
 			return nil
