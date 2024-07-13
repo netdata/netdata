@@ -162,6 +162,7 @@ The following options can be defined globally: update_every.
 | scan_every | interval for discovering new devices using `smartctl --scan`, measured in seconds. | 900 | no |
 | poll_devices_every | interval for gathering data for every device, measured in seconds. Data is cached for this interval. | 300 | no |
 | device_selector | Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
+| extra_devices | Allows manual specification of devices not automatically detected by `smartctl --scan`. Each device entry must include both a name and a type. See "Configuration Examples" for details. | [] | no |
 | no_check_power_mode | Skip data collection when the device is in a low-power mode. Prevents unnecessary disk spin-up. | standby | no |
 
 ##### no_check_power_mode
@@ -190,6 +191,23 @@ Allows you to override the default devices poll interval (data collection).
 jobs:
   - name: smartctl
     devices_poll_interval: 60  # Collect S.M.A.R.T statistics every 60 seconds
+
+```
+</details>
+
+##### Extra devices
+
+This example demonstrates using `extra_devices` to manually add a storage device (`/dev/sdc`) not automatically detected by `smartctl --scan`.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: smartctl
+    extra_devices:
+      - name: /dev/sdc
+        type: jmb39x-q,3
 
 ```
 </details>
