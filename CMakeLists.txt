@@ -147,7 +147,7 @@ option(DEFAULT_FEATURE_STATE "Specify the default state for most optional featur
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
 # openssl/crypto
-option(ENABLE_WOLFSSL "Compile netdata using WolfSSL." True)
+option(ENABLE_WOLFSSL "Compile netdata using WolfSSL." False)
 cmake_dependent_option(ENABLE_OPENSSL "Compile netdata using OpenSSL." True "NOT ENABLE_WOLFSSL" False)
 
 # High-level features
