@@ -38,6 +38,7 @@ func New() *Smartctl {
 			DeviceSelector:   "*",
 		},
 		charts:      &module.Charts{},
+		forceScan:   true,
 		deviceSr:    matcher.TRUE(),
 		seenDevices: make(map[string]bool),
 	}
