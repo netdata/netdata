@@ -83,6 +83,7 @@ type (
 	}
 	smartctlCli interface {
 		scan() (*gjson.Result, error)
+		scanOpen() (*gjson.Result, error)
 		deviceInfo(deviceName, deviceType, powerMode string) (*gjson.Result, error)
 	}
 )

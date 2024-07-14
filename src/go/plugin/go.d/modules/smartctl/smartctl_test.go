@@ -477,6 +477,10 @@ func (m *mockSmartctlCliExec) scan() (*gjson.Result, error) {
 	return &res, nil
 }
 
+func (m *mockSmartctlCliExec) scanOpen() (*gjson.Result, error) {
+	return m.scan()
+}
+
 func (m *mockSmartctlCliExec) deviceInfo(deviceName, deviceType, powerMode string) (*gjson.Result, error) {
 	if m.deviceDataFunc == nil {
 		return nil, nil
