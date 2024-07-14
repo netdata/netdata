@@ -53,11 +53,15 @@ func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
 			// Accurate device type information is crucial because we use the `--device` option to gather data.
 			// Using the wrong type can lead to issues.
 			// For example, using 'scsi' for 'sat' devices prevents `smartctl` from issuing the necessary ATA commands.
-			resp, _ := s.exec.deviceInfo(dev.name, dev.typ, s.NoCheckPowerMode)
-			if resp != nil && isExitStatusHasBit(resp, 2) {
-				correctType := "sat"
-				s.Debugf("changing device '%s' type '%s' -> '%s'", dev.name, dev.typ, correctType)
-				dev.typ = correctType
+			d := scanDevice{name: dev.name, typ: "sat"}
+			if _, ok := s.scannedDevices[d.key()]; ok {
+				dev.typ = "sat"
+			} else {
+				resp, _ := s.exec.deviceInfo(dev.name, dev.typ, s.NoCheckPowerMode)
+				if resp != nil && isExitStatusHasBit(resp, 2) {
+					s.Debugf("changing device '%s' type 'scsi' -> 'sat'", dev.name)
+					dev.typ = "sat"
+				}
 			}
 		}
 
