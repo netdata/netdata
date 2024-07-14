@@ -159,7 +159,7 @@ The following options can be defined globally: update_every.
 |:----|:-----------|:-------|:--------:|
 | update_every | interval for updating Netdata charts, measured in seconds. Collector might use cached data if less than **Devices poll interval**. | 10 | no |
 | timeout | smartctl binary execution timeout. | 5 | no |
-| scan_every | interval for discovering new devices using `smartctl --scan`, measured in seconds. | 900 | no |
+| scan_every | interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup. | 900 | no |
 | poll_devices_every | interval for gathering data for every device, measured in seconds. Data is cached for this interval. | 300 | no |
 | device_selector | Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
 | extra_devices | Allows manual specification of devices not automatically detected by `smartctl --scan`. Each device entry must include both a name and a type. See "Configuration Examples" for details. | [] | no |
