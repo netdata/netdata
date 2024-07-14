@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18141](https://github.com/netdata/netdata/pull/18141) ([netdatabot](https://github.com/netdatabot))
+- go.d smartctl add "extra\_devices" option [\#18140](https://github.com/netdata/netdata/pull/18140) ([ilyam8](https://github.com/ilyam8))
 - Spawn server fixes 6 [\#18136](https://github.com/netdata/netdata/pull/18136) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18135](https://github.com/netdata/netdata/pull/18135) ([netdatabot](https://github.com/netdatabot))
 - docs: go.d mysql: remove unix sockets from auto\_detection [\#18134](https://github.com/netdata/netdata/pull/18134) ([ilyam8](https://github.com/ilyam8))
@@ -410,8 +412,6 @@
 - Fix invalid item in postinst script for Netdata package. [\#17580](https://github.com/netdata/netdata/pull/17580) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17578](https://github.com/netdata/netdata/pull/17578) ([netdatabot](https://github.com/netdatabot))
 - Cpack fixes [\#17576](https://github.com/netdata/netdata/pull/17576) ([vkalintiris](https://github.com/vkalintiris))
-- Fix compilation without `dbengine` [\#17575](https://github.com/netdata/netdata/pull/17575) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix handling of netdata.conf on install in build system. [\#17572](https://github.com/netdata/netdata/pull/17572) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
