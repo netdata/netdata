@@ -164,7 +164,7 @@ func (s *Smartctl) collectSmartDevice(mx map[string]int64, dev *smartDevice) {
 }
 
 func (s *Smartctl) isTimeToScan(now time.Time) bool {
-	return now.After(s.lastScanTime.Add(s.ScanEvery.Duration()))
+	return s.ScanEvery.Duration().Seconds() != 0 && now.After(s.lastScanTime.Add(s.ScanEvery.Duration()))
 }
 
 func (s *Smartctl) isTimeToPollDevices(now time.Time) bool {

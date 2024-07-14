@@ -20,7 +20,7 @@
       },
       "scan_every": {
         "title": "Scan interval",
-        "description": "Interval for discovering new devices using `smartctl --scan`, measured in seconds.",
+        "description": "Interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup.",
         "type": "number",
         "minimum": 1,
         "default": 900

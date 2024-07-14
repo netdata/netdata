@@ -97,7 +97,7 @@ modules:
               default_value: 5
               required: false
             - name: scan_every
-              description: interval for discovering new devices using `smartctl --scan`, measured in seconds.
+              description: interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup.
               default_value: 900
               required: false
             - name: poll_devices_every
