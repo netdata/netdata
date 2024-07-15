@@ -614,7 +614,8 @@ void aclk_push_alert_events_for_all_hosts(void)
         return;
 
     dfe_start_reentrant(rrdhost_root_index, host) {
-        if (!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS))
+        if (!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS) ||
+            rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
             continue;
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
