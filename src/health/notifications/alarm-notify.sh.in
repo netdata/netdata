@@ -1515,13 +1515,20 @@ send_telegram() {
       notify_telegram=1
       notify_retries=${TELEGRAM_RETRIES_ON_LIMIT:-0}
 
+      IFS=":" read -r chatID threadID <<< "${chatid}"
+
+      # https://core.telegram.org/bots/api#sendmessage
+      api_url="https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatID}"
+      if [ -n "${threadID}" ]; then
+        api_url+="&message_thread_id=${threadID}"
+      fi
+
       while [ ${notify_telegram} -eq 1 ]; do
-        # https://core.telegram.org/bots/api#sendmessage
         httpcode=$(docurl ${disableNotification} \
           --data-urlencode "parse_mode=HTML" \
           --data-urlencode "disable_web_page_preview=true" \
           --data-urlencode "text=${emoji} ${message}" \
-          "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
+          "${api_url}")
 
         notify_telegram=0
 
