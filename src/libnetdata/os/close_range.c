@@ -67,20 +67,31 @@ static int compare_ints(const void *a, const void *b) {
     return (int_a > int_b) - (int_a < int_b);
 }
 
-void os_close_all_non_std_open_fds_except(int fds[], size_t fds_num) {
+void os_close_all_non_std_open_fds_except(const int fds[], size_t fds_num) {
     if (fds_num == 0 || fds == NULL) {
         os_close_range(STDERR_FILENO + 1, CLOSE_RANGE_FD_MAX);
         return;
     }
 
-    qsort(fds, fds_num, sizeof(int), compare_ints);
+    // copy the fds array to ensure we will not alter them
+    int fds_copy[fds_num];
+    memcpy(fds_copy, fds, sizeof(fds_copy));
+
+    qsort(fds_copy, fds_num, sizeof(int), compare_ints);
 
     int start = STDERR_FILENO + 1;
-    for (size_t i = 0; i < fds_num; i++) {
-        if (fds[i] > start)
-            os_close_range(start, fds[i] - 1);
+    size_t i = 0;
 
-        start = fds[i] + 1;
+    // filter out all fds with a number smaller than our start
+    for (; i < fds_num; i++)
+        if(fds_copy[i] >= start) break;
+
+    // call os_close_range() as many times as needed
+    for (; i < fds_num; i++) {
+        if (fds_copy[i] > start)
+            os_close_range(start, fds_copy[i] - 1);
+
+        start = fds_copy[i] + 1;
     }
 
     os_close_range(start, CLOSE_RANGE_FD_MAX);

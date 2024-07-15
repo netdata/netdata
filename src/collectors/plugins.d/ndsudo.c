@@ -46,6 +46,14 @@ struct command {
         },
     },
     {
+        .name = "smartctl-json-scan-open",
+        .params = "--json --scan-open",
+        .search = {
+            [0] = "smartctl",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "smartctl-json-device-info",
         .params = "--json --all {{deviceName}} --device {{deviceType}} --nocheck {{powerMode}}",
         .search = {

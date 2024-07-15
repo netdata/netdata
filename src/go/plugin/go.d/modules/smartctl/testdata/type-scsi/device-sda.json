@@ -1,0 +1,128 @@
+{
+  "json_format_version": [
+    1,
+    0
+  ],
+  "smartctl": {
+    "version": [
+      7,
+      3
+    ],
+    "svn_revision": "5338",
+    "platform_info": "REDACTED",
+    "build_info": "(local build)",
+    "argv": [
+      "smartctl",
+      "--json",
+      "--all",
+      "/dev/sda",
+      "--device",
+      "scsi"
+    ],
+    "exit_status": 0
+  },
+  "local_time": {
+    "time_t": 1720689199,
+    "asctime": "Thu Jul 11 09:13:19 2024 UTC"
+  },
+  "device": {
+    "name": "/dev/sda",
+    "info_name": "/dev/sda",
+    "type": "scsi",
+    "protocol": "SCSI"
+  },
+  "scsi_vendor": "HGST",
+  "scsi_product": "REDACTED",
+  "scsi_model_name": "REDACTED",
+  "scsi_revision": "REDACTED",
+  "scsi_version": "REDACTED",
+  "user_capacity": {
+    "blocks": 7814037168,
+    "bytes": 4000787030016
+  },
+  "logical_block_size": 512,
+  "scsi_lb_provisioning": {
+    "name": "fully provisioned",
+    "value": 0,
+    "management_enabled": {
+      "name": "LBPME",
+      "value": 0
+    },
+    "read_zeros": {
+      "name": "LBPRZ",
+      "value": 0
+    }
+  },
+  "rotation_rate": 7200,
+  "form_factor": {
+    "scsi_value": 2,
+    "name": "3.5 inches"
+  },
+  "logical_unit_id": "REDACTED",
+  "serial_number": "REDACTED",
+  "device_type": {
+    "scsi_terminology": "Peripheral Device Type [PDT]",
+    "scsi_value": 0,
+    "name": "disk"
+  },
+  "scsi_transport_protocol": {
+    "name": "SAS (SPL-4)",
+    "value": 6
+  },
+  "smart_support": {
+    "available": true,
+    "enabled": true
+  },
+  "temperature_warning": {
+    "enabled": true
+  },
+  "smart_status": {
+    "passed": true
+  },
+  "temperature": {
+    "current": 34,
+    "drive_trip": 85
+  },
+  "power_on_time": {
+    "hours": 1641,
+    "minutes": 22
+  },
+  "scsi_start_stop_cycle_counter": {
+    "year_of_manufacture": "2013",
+    "week_of_manufacture": "51",
+    "specified_cycle_count_over_device_lifetime": 50000,
+    "accumulated_start_stop_cycles": 4,
+    "specified_load_unload_count_over_device_lifetime": 600000,
+    "accumulated_load_unload_cycles": 119
+  },
+  "scsi_grown_defect_list": 0,
+  "scsi_error_counter_log": {
+    "read": {
+      "errors_corrected_by_eccfast": 647707,
+      "errors_corrected_by_eccdelayed": 29,
+      "errors_corrected_by_rereads_rewrites": 0,
+      "total_errors_corrected": 647736,
+      "correction_algorithm_invocations": 586730,
+      "gigabytes_processed": "36537.378",
+      "total_uncorrected_errors": 0
+    },
+    "write": {
+      "errors_corrected_by_eccfast": 0,
+      "errors_corrected_by_eccdelayed": 0,
+      "errors_corrected_by_rereads_rewrites": 0,
+      "total_errors_corrected": 0,
+      "correction_algorithm_invocations": 13549,
+      "gigabytes_processed": "2811.293",
+      "total_uncorrected_errors": 0
+    },
+    "verify": {
+      "errors_corrected_by_eccfast": 0,
+      "errors_corrected_by_eccdelayed": 0,
+      "errors_corrected_by_rereads_rewrites": 0,
+      "total_errors_corrected": 0,
+      "correction_algorithm_invocations": 2146,
+      "gigabytes_processed": "0.000",
+      "total_uncorrected_errors": 0
+    }
+  }
+}

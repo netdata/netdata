@@ -89,7 +89,7 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
               claiming_arguments);
 
     netdata_log_info("Executing agent claiming command: %s", command_exec_buffer);
-    POPEN_INSTANCE *instance = spawn_popen_run(command_exec_buffer);
+    POPEN_INSTANCE *instance = spawn_popen_run(command_line_buffer);
     if(!instance) {
         netdata_log_error("Cannot popen(\"%s\").", command_exec_buffer);
         return CLAIM_AGENT_CANNOT_EXECUTE_CLAIM_SCRIPT;
@@ -118,10 +118,8 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
         return CLAIM_AGENT_CLAIM_SCRIPT_RETURNED_INVALID_CODE;
     }
 
-    netdata_log_error("Agent failed to be claimed using the command '%s' with the following error message:",
-                      command_exec_buffer);
-
-    netdata_log_error("\"%s\"", claiming_errors[exit_code]);
+    netdata_log_error("Agent failed to be claimed using the command '%s' with the following error message: %s",
+                      command_exec_buffer, claiming_errors[exit_code]);
 
     if(msg) *msg = claiming_errors[exit_code];
 

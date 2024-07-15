@@ -1,0 +1,113 @@
+{
+  "json_format_version": [
+    1,
+    0
+  ],
+  "smartctl": {
+    "version": [
+      7,
+      3
+    ],
+    "svn_revision": "5338",
+    "platform_info": "REDACTED",
+    "build_info": "(local build)",
+    "argv": [
+      "smartctl",
+      "--json",
+      "--all",
+      "/dev/nvme1",
+      "--device",
+      "nvme"
+    ],
+    "exit_status": 0
+  },
+  "local_time": {
+    "time_t": 1720897758,
+    "asctime": "Sat Jul 13 22:09:18 2024 EEST"
+  },
+  "device": {
+    "name": "/dev/nvme1",
+    "info_name": "/dev/nvme1",
+    "type": "nvme",
+    "protocol": "NVMe"
+  },
+  "model_name": "Seagate FireCuda 530 ZP4000GM30023",
+  "serial_number": "REDACTED",
+  "firmware_version": "REDACTED",
+  "nvme_pci_vendor": {
+    "id": 7089,
+    "subsystem_id": 7089
+  },
+  "nvme_ieee_oui_identifier": 6584743,
+  "nvme_total_capacity": 4000787030016,
+  "nvme_unallocated_capacity": 0,
+  "nvme_controller_id": 1,
+  "nvme_version": {
+    "string": "1.4",
+    "value": 66560
+  },
+  "nvme_number_of_namespaces": 1,
+  "nvme_namespaces": [
+    {
+      "id": 1,
+      "size": {
+        "blocks": 7814037168,
+        "bytes": 4000787030016
+      },
+      "capacity": {
+        "blocks": 7814037168,
+        "bytes": 4000787030016
+      },
+      "utilization": {
+        "blocks": 7814037168,
+        "bytes": 4000787030016
+      },
+      "formatted_lba_size": 512,
+      "eui64": {
+        "oui": 6584743,
+        "ext_id": 553497146765
+      }
+    }
+  ],
+  "user_capacity": {
+    "blocks": 7814037168,
+    "bytes": 4000787030016
+  },
+  "logical_block_size": 512,
+  "smart_support": {
+    "available": true,
+    "enabled": true
+  },
+  "smart_status": {
+    "passed": true,
+    "nvme": {
+      "value": 0
+    }
+  },
+  "nvme_smart_health_information_log": {
+    "critical_warning": 0,
+    "temperature": 36,
+    "available_spare": 100,
+    "available_spare_threshold": 5,
+    "percentage_used": 0,
+    "data_units_read": 202,
+    "data_units_written": 0,
+    "host_reads": 2509,
+    "host_writes": 0,
+    "controller_busy_time": 0,
+    "power_cycles": 5,
+    "power_on_hours": 4733,
+    "unsafe_shutdowns": 2,
+    "media_errors": 0,
+    "num_err_log_entries": 20,
+    "warning_temp_time": 0,
+    "critical_comp_time": 0
+  },
+  "temperature": {
+    "current": 36
+  },
+  "power_cycle_count": 5,
+  "power_on_time": {
+    "hours": 4733
+  }
+}

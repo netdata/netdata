@@ -158,12 +158,14 @@ func (es *Elasticsearch) scrapeElasticsearch() *esMetrics {
 }
 
 func (es *Elasticsearch) scrapeNodesStats(ms *esMetrics) {
-	req, _ := web.NewHTTPRequest(es.Request)
+	var p string
 	if es.ClusterMode {
-		req.URL.Path = urlPathNodesStats
+		p = urlPathNodesStats
 	} else {
-		req.URL.Path = urlPathLocalNodeStats
+		p = urlPathLocalNodeStats
 	}
+
+	req, _ := web.NewHTTPRequestWithPath(es.Request, p)
 
 	var stats esNodesStats
 	if err := es.doOKDecode(req, &stats); err != nil {
@@ -175,8 +177,7 @@ func (es *Elasticsearch) scrapeNodesStats(ms *esMetrics) {
 }
 
 func (es *Elasticsearch) scrapeClusterHealth(ms *esMetrics) {
-	req, _ := web.NewHTTPRequest(es.Request)
-	req.URL.Path = urlPathClusterHealth
+	req, _ := web.NewHTTPRequestWithPath(es.Request, urlPathClusterHealth)
 
 	var health esClusterHealth
 	if err := es.doOKDecode(req, &health); err != nil {
@@ -188,8 +189,7 @@ func (es *Elasticsearch) scrapeClusterHealth(ms *esMetrics) {
 }
 
 func (es *Elasticsearch) scrapeClusterStats(ms *esMetrics) {
-	req, _ := web.NewHTTPRequest(es.Request)
-	req.URL.Path = urlPathClusterStats
+	req, _ := web.NewHTTPRequestWithPath(es.Request, urlPathClusterStats)
 
 	var stats esClusterStats
 	if err := es.doOKDecode(req, &stats); err != nil {
@@ -201,8 +201,7 @@ func (es *Elasticsearch) scrapeClusterStats(ms *esMetrics) {
 }
 
 func (es *Elasticsearch) scrapeLocalIndicesStats(ms *esMetrics) {
-	req, _ := web.NewHTTPRequest(es.Request)
-	req.URL.Path = urlPathIndicesStats
+	req, _ := web.NewHTTPRequestWithPath(es.Request, urlPathIndicesStats)
 	req.URL.RawQuery = "local=true&format=json"
 
 	var stats []esIndexStats
