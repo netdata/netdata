@@ -19,20 +19,20 @@ const (
 )
 
 var apChartsTmpl = module.Charts{
-	apClientsChart.Copy(),
-	apBandwidthChart.Copy(),
-	apPacketsChart.Copy(),
-	apIssuesChart.Copy(),
-	apSignalChart.Copy(),
-	apBitrateChart.Copy(),
+	apClientsChartTmpl.Copy(),
+	apBandwidthChartTmpl.Copy(),
+	apPacketsChartTmpl.Copy(),
+	apIssuesChartTmpl.Copy(),
+	apSignalChartTmpl.Copy(),
+	apBitrateChartTmpl.Copy(),
 }
 
 var (
-	apClientsChart = module.Chart{
-		ID:       "ap_clients.%s",
-		Title:    "Connected clients to %s on %s",
+	apClientsChartTmpl = module.Chart{
+		ID:       "ap_%s_clients",
+		Title:    "Connected clients",
+		Fam:      "clients",
 		Units:    "clients",
-		Fam:      "%s",
 		Ctx:      "ap.clients",
 		Type:     module.Line,
 		Priority: prioClients,
@@ -41,39 +41,39 @@ var (
 		},
 	}
 
-	apBandwidthChart = module.Chart{
-		ID:       "ap_bandwidth.%s",
-		Title:    "Bandwidth for %s on %s",
+	apBandwidthChartTmpl = module.Chart{
+		ID:       "ap_%s_bandwidth",
+		Title:    "Bandwidth",
 		Units:    "kilobits/s",
-		Fam:      "%s",
+		Fam:      "traffic",
 		Ctx:      "ap.net",
 		Type:     module.Area,
 		Priority: prioBandwidth,
 		Dims: module.Dims{
-			{ID: "ap_%s_bw_received", Name: "received", Algo: module.Incremental, Mul: 8, Div: 1024},
-			{ID: "ap_%s_bw_sent", Name: "sent", Algo: module.Incremental, Mul: -8, Div: 1024},
+			{ID: "ap_%s_bw_received", Name: "received", Algo: module.Incremental, Mul: 8, Div: 1000},
+			{ID: "ap_%s_bw_sent", Name: "sent", Algo: module.Incremental, Mul: -8, Div: 1000},
 		},
 	}
 
-	apPacketsChart = module.Chart{
-		ID:       "ap_packets.%s",
-		Title:    "Packets for %s on %s",
+	apPacketsChartTmpl = module.Chart{
+		ID:       "ap_%s_packets",
+		Title:    "Packets",
+		Fam:      "packets",
 		Units:    "packets/s",
-		Fam:      "%s",
 		Ctx:      "ap.packets",
 		Type:     module.Line,
 		Priority: prioPackets,
 		Dims: module.Dims{
-			{ID: "ap_%s_packets_received", Name: "tx received", Algo: module.Incremental},
-			{ID: "ap_%s_packets_sent", Name: "tx failures", Algo: module.Incremental, Mul: -1},
+			{ID: "ap_%s_packets_received", Name: "received", Algo: module.Incremental},
+			{ID: "ap_%s_packets_sent", Name: "sent", Algo: module.Incremental, Mul: -1},
 		},
 	}
 
-	apIssuesChart = module.Chart{
-		ID:       "ap_issues.%s",
-		Title:    "Transmit issues for %s on %s",
+	apIssuesChartTmpl = module.Chart{
+		ID:       "ap_%s_issues",
+		Title:    "Transmit issues",
+		Fam:      "issues",
 		Units:    "issues/s",
-		Fam:      "%s",
 		Ctx:      "ap.issues",
 		Type:     module.Line,
 		Priority: prioIssues,
@@ -83,52 +83,46 @@ var (
 		},
 	}
 
-	apSignalChart = module.Chart{
-		ID:       "ap_signal.%s",
-		Title:    "Average Signal for %s on %s",
+	apSignalChartTmpl = module.Chart{
+		ID:       "ap_%s_signal",
+		Title:    "Average Signal",
 		Units:    "dBm",
-		Fam:      "%s",
+		Fam:      "signal",
 		Ctx:      "ap.signal",
 		Type:     module.Line,
 		Priority: prioSignal,
 		Dims: module.Dims{
-			{ID: "ap_%s_average_signal", Name: "average signal", Div: 1000},
+			{ID: "ap_%s_average_signal", Name: "average signal", Div: precision},
 		},
 	}
 
-	apBitrateChart = module.Chart{
-		ID:       "ap_bitrate.%s",
-		Title:    "Bitrate for %s on %s",
+	apBitrateChartTmpl = module.Chart{
+		ID:       "ap_%s_bitrate",
+		Title:    "Bitrate",
 		Units:    "Mbps",
-		Fam:      "%s",
+		Fam:      "bitrate",
 		Ctx:      "ap.bitrate",
 		Type:     module.Line,
 		Priority: prioBitrate,
 		Dims: module.Dims{
-			{ID: "ap_%s_bitrate_receive", Name: "receive", Div: 1000},
-			{ID: "ap_%s_bitrate_transmit", Name: "transmit", Mul: -1, Div: 1000},
-			// deprecated dim, not present in command output
-			// {ID: "ap_%s_bitrate_expected", Name: "expected throughput", Div: 1000},
+			{ID: "ap_%s_bitrate_receive", Name: "receive", Div: precision},
+			{ID: "ap_%s_bitrate_transmit", Name: "transmit", Mul: -1, Div: precision},
 		},
 	}
 )
 
-func (a *AP) addInterfaceCharts(dev string, ssid string) {
+func (a *AP) addInterfaceCharts(dev string) {
 
 	charts := apChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, dev)
-		chart.Title = fmt.Sprintf(chart.Title, ssid, dev)
-		chart.Fam = fmt.Sprintf(chart.Fam, dev)
 		chart.Labels = []module.Label{
-			{Key: "ssid", Value: ssid},
 			{Key: "device", Value: dev},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, dev)
 		}
-
 	}
 
 	if err := a.Charts().Add(*charts...); err != nil {
@@ -138,8 +132,9 @@ func (a *AP) addInterfaceCharts(dev string, ssid string) {
 }
 
 func (a *AP) removeInterfaceCharts(dev string) {
+	px := fmt.Sprintf("ap_%s_", dev)
 	for _, chart := range *a.Charts() {
-		if strings.HasSuffix(chart.ID, dev) {
+		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
 		}

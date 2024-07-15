@@ -32,7 +32,7 @@ func New() *AP {
 			Timeout:    web.Duration(time.Second * 2),
 		},
 		charts:     &module.Charts{},
-		interfaces: make(map[string]bool),
+		seenIfaces: make(map[string]bool),
 	}
 }
 
@@ -49,16 +49,13 @@ type (
 
 		charts *module.Charts
 
-		execIWDev         iwDevBinary
-		execIWStationDump iwStationDumpBinary
+		exec iwBinary
 
-		interfaces map[string]bool
+		seenIfaces map[string]bool
 	}
-	iwDevBinary interface {
-		list() ([]byte, error)
-	}
-	iwStationDumpBinary interface {
-		list(ifaceName string) ([]byte, error)
+	iwBinary interface {
+		devices() ([]byte, error)
+		stationStatistics(ifaceName string) ([]byte, error)
 	}
 )
 
@@ -72,19 +69,12 @@ func (a *AP) Init() error {
 		return err
 	}
 
-	iwDev, err := a.initIWDevExec()
+	iw, err := a.initIwExec()
 	if err != nil {
 		a.Errorf("iw dev exec initialization: %v", err)
 		return err
 	}
-	a.execIWDev = iwDev
-
-	stDump, err := a.initIWStationDumpExec()
-	if err != nil {
-		a.Errorf("iw station dump exec initialization %v", err)
-		return err
-	}
-	a.execIWStationDump = stDump
+	a.exec = iw
 
 	return nil
 }

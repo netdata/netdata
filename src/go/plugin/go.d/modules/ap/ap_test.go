@@ -17,17 +17,19 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataIWDevAP, _       = os.ReadFile("testdata/iw_dev_ap.txt")
-	dataIWDevManaged, _  = os.ReadFile("testdata/iw_dev_managed.txt")
-	dataIWStationDump, _ = os.ReadFile("testdata/station_dump.txt")
+	dataIwDevManaged, _ = os.ReadFile("testdata/iw_dev_managed.txt")
+
+	dataIwDevAP, _       = os.ReadFile("testdata/iw_dev_ap.txt")
+	dataIwStationDump, _ = os.ReadFile("testdata/station_dump.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
 		"dataConfigJSON":    dataConfigJSON,
 		"dataConfigYAML":    dataConfigYAML,
-		"dataIWDev":         dataIWDevAP,
-		"dataIWStationDump": dataIWStationDump,
+		"dataIwDevManaged":  dataIwDevManaged,
+		"dataIwDevAP":       dataIwDevAP,
+		"dataIwStationDump": dataIwStationDump,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -51,7 +53,7 @@ func TestAP_Init(t *testing.T) {
 		"fails if failed to find binary": {
 			wantFail: true,
 			config: Config{
-				BinaryPath: "IW!!!",
+				BinaryPath: "iw!!!",
 			},
 		},
 	}
@@ -81,20 +83,18 @@ func TestAP_Cleanup(t *testing.T) {
 		},
 		"after check": {
 			prepare: func() *AP {
-				a := New()
-				a.execIWDev = prepareMockOKIWDev()
-				a.execIWStationDump = prepareMockOKIWStationDump()
-				_ = a.Check()
-				return a
+				ap := New()
+				ap.exec = prepareMockOk()
+				_ = ap.Check()
+				return ap
 			},
 		},
 		"after collect": {
 			prepare: func() *AP {
-				a := New()
-				a.execIWDev = prepareMockOKIWDev()
-				a.execIWStationDump = prepareMockOKIWStationDump()
-				_ = a.Collect()
-				return a
+				ap := New()
+				ap.exec = prepareMockOk()
+				_ = ap.Collect()
+				return ap
 			},
 		},
 	}
@@ -114,44 +114,40 @@ func TestAP_Charts(t *testing.T) {
 
 func TestAP_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepareMockIWDev         func() *mockExecIWDev
-		prepareMockIWStationDump func() *mockExecIWStationDump
-		wantFail                 bool
+		prepareMock func() *mockIwExec
+		wantFail    bool
 	}{
 		"success case": {
-			wantFail:                 false,
-			prepareMockIWDev:         prepareMockOKIWDev,
-			prepareMockIWStationDump: prepareMockOKIWStationDump,
+			wantFail:    false,
+			prepareMock: prepareMockOk,
 		},
 		"no ap devices": {
-			prepareMockIWDev:         prepareMockNoAPDevicesIWDev,
-			prepareMockIWStationDump: prepareMockNoAPDevicesIWStationDump,
-			wantFail:                 true,
+			wantFail:    true,
+			prepareMock: prepareMockNoAPDevices,
 		},
-		"error on list call": {
-			prepareMockIWDev:         prepareMockErrOnListIWDev,
-			prepareMockIWStationDump: prepareMockErrOnListIWStationDump,
-			wantFail:                 true,
+		"error on devices call": {
+			wantFail:    true,
+			prepareMock: prepareMockErrOnDevices,
+		},
+		"error on station stats call": {
+			wantFail:    true,
+			prepareMock: prepareMockErrOnStationStats,
 		},
 		"unexpected response": {
-			prepareMockIWDev:         prepareMockUnexpectedResponseIWDev,
-			prepareMockIWStationDump: prepareMockUnexpectedResponseIWStationDump,
-			wantFail:                 true,
+			wantFail:    true,
+			prepareMock: prepareMockUnexpectedResponse,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pf := New()
-			mock := test.prepareMockIWDev()
-			pf.execIWDev = mock
-			mockb := test.prepareMockIWStationDump()
-			pf.execIWStationDump = mockb
+			ap := New()
+			ap.exec = test.prepareMock()
 
 			if test.wantFail {
-				assert.Error(t, pf.Check())
+				assert.Error(t, ap.Check())
 			} else {
-				assert.NoError(t, pf.Check())
+				assert.NoError(t, ap.Check())
 			}
 		})
 	}
@@ -159,13 +155,13 @@ func TestAP_Check(t *testing.T) {
 
 func TestAP_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepareMockIWDev         func() *mockExecIWDev
-		prepareMockIWStationDump func() *mockExecIWStationDump
-		wantMetrics              map[string]int64
+		prepareMock func() *mockIwExec
+		wantMetrics map[string]int64
+		wantCharts  int
 	}{
 		"success case": {
-			prepareMockIWDev:         prepareMockOKIWDev,
-			prepareMockIWStationDump: prepareMockOKIWStationDump,
+			prepareMock: prepareMockOk,
+			wantCharts:  len(apChartsTmpl),
 			wantMetrics: map[string]int64{
 				"ap_wlp1s0_average_signal":   -34000,
 				"ap_wlp1s0_bitrate_receive":  65500,
@@ -173,83 +169,89 @@ func TestAP_Collect(t *testing.T) {
 				"ap_wlp1s0_bw_received":      95117,
 				"ap_wlp1s0_bw_sent":          8270,
 				"ap_wlp1s0_clients":          2,
-				"ap_wlp1s0_issues_failures":  0,
-				"ap_wlp1s0_issues_retries":   0,
+				"ap_wlp1s0_issues_failures":  1,
+				"ap_wlp1s0_issues_retries":   1,
 				"ap_wlp1s0_packets_received": 2531,
 				"ap_wlp1s0_packets_sent":     38,
 			},
 		},
 		"no ap devices": {
-			prepareMockIWDev:         prepareMockNoAPDevicesIWDev,
-			prepareMockIWStationDump: prepareMockNoAPDevicesIWStationDump,
-			wantMetrics:              nil,
+			prepareMock: prepareMockNoAPDevices,
+			wantMetrics: nil,
 		},
-		"error on list call": {
-			prepareMockIWDev:         prepareMockErrOnListIWDev,
-			prepareMockIWStationDump: prepareMockErrOnListIWStationDump,
-			wantMetrics:              nil,
+		"error on devices call": {
+			prepareMock: prepareMockErrOnDevices,
+			wantMetrics: nil,
+		},
+		"error on statis stats call": {
+			prepareMock: prepareMockErrOnStationStats,
+			wantMetrics: nil,
 		},
 		"unexpected response": {
-			prepareMockIWDev:         prepareMockUnexpectedResponseIWDev,
-			prepareMockIWStationDump: prepareMockUnexpectedResponseIWStationDump,
-			wantMetrics:              nil,
+			prepareMock: prepareMockUnexpectedResponse,
+			wantMetrics: nil,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			a := New()
-			mock := test.prepareMockIWDev()
-			a.execIWDev = mock
-			mockb := test.prepareMockIWStationDump()
-			a.execIWStationDump = mockb
+			ap := New()
+			ap.exec = test.prepareMock()
 
-			mx := a.Collect()
+			mx := ap.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
+			assert.Equal(t, test.wantCharts, len(*ap.Charts()), "Charts")
+			testMetricsHasAllChartsDims(t, ap, mx)
 		})
 	}
 }
 
-func prepareMockOKIWDev() *mockExecIWDev {
-	return &mockExecIWDev{
-		listData: dataIWDevAP,
+func testMetricsHasAllChartsDims(t *testing.T, ap *AP, mx map[string]int64) {
+	for _, chart := range *ap.Charts() {
+		if chart.Obsolete {
+			continue
+		}
+		for _, dim := range chart.Dims {
+			_, ok := mx[dim.ID]
+			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
+		}
+		for _, v := range chart.Vars {
+			_, ok := mx[v.ID]
+			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
+		}
 	}
 }
 
-func prepareMockOKIWStationDump() *mockExecIWStationDump {
-	return &mockExecIWStationDump{
-		listData: dataIWStationDump,
+func prepareMockOk() *mockIwExec {
+	return &mockIwExec{
+		devicesData:      dataIwDevAP,
+		stationStatsData: dataIwStationDump,
 	}
 }
 
-func prepareMockNoAPDevicesIWDev() *mockExecIWDev {
-	return &mockExecIWDev{
-		listData: dataIWDevManaged,
+func prepareMockNoAPDevices() *mockIwExec {
+	return &mockIwExec{
+		devicesData: dataIwDevManaged,
 	}
 }
 
-func prepareMockNoAPDevicesIWStationDump() *mockExecIWStationDump {
-	return &mockExecIWStationDump{
-		listData: []byte(""),
+func prepareMockErrOnDevices() *mockIwExec {
+	return &mockIwExec{
+		errOnDevices: true,
 	}
 }
 
-func prepareMockErrOnListIWDev() *mockExecIWDev {
-	return &mockExecIWDev{
-		errOnList: true,
+func prepareMockErrOnStationStats() *mockIwExec {
+	return &mockIwExec{
+		devicesData:       dataIwDevAP,
+		errOnStationStats: true,
 	}
 }
 
-func prepareMockErrOnListIWStationDump() *mockExecIWStationDump {
-	return &mockExecIWStationDump{
-		errOnList: true,
-	}
-}
-
-func prepareMockUnexpectedResponseIWDev() *mockExecIWDev {
-	return &mockExecIWDev{
-		listData: []byte(`
+func prepareMockUnexpectedResponse() *mockIwExec {
+	return &mockIwExec{
+		devicesData: []byte(`
 Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 Nulla malesuada erat id magna mattis, eu viverra tellus rhoncus.
 Fusce et felis pulvinar, posuere sem non, porttitor eros.
@@ -257,33 +259,24 @@ Fusce et felis pulvinar, posuere sem non, porttitor eros.
 	}
 }
 
-func prepareMockUnexpectedResponseIWStationDump() *mockExecIWStationDump {
-	return &mockExecIWStationDump{
-		listData: []byte(``),
-	}
+type mockIwExec struct {
+	errOnDevices      bool
+	errOnStationStats bool
+	devicesData       []byte
+	stationStatsData  []byte
 }
 
-type mockExecIWDev struct {
-	errOnList bool
-	listData  []byte
-}
-
-type mockExecIWStationDump struct {
-	errOnList bool
-	listData  []byte
-}
-
-func (m *mockExecIWDev) list() ([]byte, error) {
-	if m.errOnList {
-		return nil, errors.New("mock.list() error")
+func (m *mockIwExec) devices() ([]byte, error) {
+	if m.errOnDevices {
+		return nil, errors.New("mock.devices() error")
 	}
 
-	return m.listData, nil
+	return m.devicesData, nil
 }
 
-func (m *mockExecIWStationDump) list(ifaceName string) ([]byte, error) {
-	if m.errOnList {
-		return nil, errors.New("mock.list() error")
+func (m *mockIwExec) stationStatistics(ifaceName string) ([]byte, error) {
+	if m.errOnStationStats {
+		return nil, errors.New("mock.stationStatistics() error")
 	}
-	return m.listData, nil
+	return m.stationStatsData, nil
 }

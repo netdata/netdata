@@ -5,203 +5,195 @@ package ap
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 )
 
-type interfaceStats struct {
-	name             string
-	clients          int64
-	ssid             string
-	bw_received      int64
-	bw_sent          int64
-	packets_received int64
-	packets_sent     int64
-	issues_retries   int64
-	issues_failures  int64
-	average_signal   int64
-	bitrate_receive  int64
-	bitrate_transmit int64
+const precision = 1000
+
+type stationStats struct {
+	clients   int64
+	rxBytes   int64
+	rxPackets int64
+	txBytes   int64
+	txPackets int64
+	txRetries int64
+	txFailed  int64
+	signalAvg int64
+	txBitrate float64
+	rxBitrate float64
 }
 
 func (a *AP) collect() (map[string]int64, error) {
-	bs, err := a.execIWDev.list()
+	bs, err := a.exec.devices()
 	if err != nil {
 		return nil, err
 	}
 
-	apInterfaces := processIWDevResponse(bs)
+	// TODO: call this periodically, not on every data collection
+	apInterfaces, err := parseIwDevices(bs)
+	if err != nil {
+		return nil, fmt.Errorf("parsing AP interfaces: %v", err)
+	}
 
 	if len(apInterfaces) == 0 {
-		return nil, fmt.Errorf("no interfaces found in AP mode'")
+		return nil, errors.New("no type AP interfaces found")
 	}
 
 	mx := make(map[string]int64)
+	seen := make(map[string]bool)
 
-	a.handleCharts(apInterfaces)
-
-	for iface := range apInterfaces {
-		bs, err = a.execIWStationDump.list(iface)
+	for _, iface := range apInterfaces {
+		bs, err = a.exec.stationStatistics(iface)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("getting station statistics for %s: %v", iface, err)
 		}
 
-		ifaceStats := processIWStationDump(bs)
-		mx[fmt.Sprintf("ap_%s_clients", iface)] = ifaceStats.clients
-		mx[fmt.Sprintf("ap_%s_bw_received", iface)] = ifaceStats.bw_received
-		mx[fmt.Sprintf("ap_%s_bw_sent", iface)] = ifaceStats.bw_sent
-		mx[fmt.Sprintf("ap_%s_packets_received", iface)] = ifaceStats.packets_received
-		mx[fmt.Sprintf("ap_%s_packets_sent", iface)] = ifaceStats.packets_sent
-		mx[fmt.Sprintf("ap_%s_issues_retries", iface)] = ifaceStats.issues_retries
-		mx[fmt.Sprintf("ap_%s_issues_failures", iface)] = ifaceStats.issues_failures
-		mx[fmt.Sprintf("ap_%s_average_signal", iface)] = int64(ifaceStats.average_signal / ifaceStats.clients)
-		mx[fmt.Sprintf("ap_%s_bitrate_receive", iface)] = int64(ifaceStats.bitrate_receive / ifaceStats.clients)
-		mx[fmt.Sprintf("ap_%s_bitrate_transmit", iface)] = int64(ifaceStats.bitrate_transmit / ifaceStats.clients)
+		stats, err := parseIwStationStatistics(bs)
+		if err != nil {
+			return nil, fmt.Errorf("parsing station statistics for %s: %v", iface, err)
+		}
+
+		if !a.seenIfaces[iface] {
+			a.seenIfaces[iface] = true
+			a.addInterfaceCharts(iface)
+		}
+
+		px := fmt.Sprintf("ap_%s_", iface)
+
+		mx[px+"clients"] = stats.clients
+		mx[px+"bw_received"] = stats.rxBytes
+		mx[px+"bw_sent"] = stats.txBytes
+		mx[px+"packets_received"] = stats.rxPackets
+		mx[px+"packets_sent"] = stats.txPackets
+		mx[px+"issues_retries"] = stats.txRetries
+		mx[px+"issues_failures"] = stats.txFailed
+		mx[px+"average_signal"], mx[px+"bitrate_receive"], mx[px+"bitrate_transmit"] = 0, 0, 0
+		if clients := float64(stats.clients); clients > 0 {
+			mx[px+"average_signal"] = int64(float64(stats.signalAvg) / clients * precision)
+			mx[px+"bitrate_receive"] = int64(stats.rxBitrate / clients * precision)
+			mx[px+"bitrate_transmit"] = int64(stats.txBitrate / clients * precision)
+		}
+	}
+
+	for iface := range a.seenIfaces {
+		if !seen[iface] {
+			delete(a.seenIfaces, iface)
+			a.removeInterfaceCharts(iface)
+		}
 	}
 
 	return mx, nil
 }
 
-func processIWDevResponse(response []byte) map[string]interfaceStats {
-	scanner := bufio.NewScanner(bytes.NewReader(response))
+func parseIwDevices(resp []byte) ([]string, error) {
 
-	devices := make(map[string]interfaceStats)
-	var iface, ssid string
-	ap := false
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if strings.HasPrefix(line, "	Interface ") {
-			if ap && iface != "" {
-				if _, exists := devices[iface]; !exists {
-					devices[iface] = interfaceStats{}
-				}
-				device := devices[iface]
-				device.name = iface
-				device.ssid = ssid
-				devices[iface] = device
-			}
-			fields := strings.Fields(line)
-			if len(fields) > 1 {
-				iface = fields[1]
-			}
-			ssid = ""
-			ap = false
-		} else if strings.HasSuffix(line, "type AP") {
-			ap = true
-		}
-	}
-
-	if ap && iface != "" {
-		if _, exists := devices[iface]; !exists {
-			devices[iface] = interfaceStats{}
-		}
-		device := devices[iface]
-		device.name = iface
-		device.ssid = ssid
-		devices[iface] = device
-	}
-
-	return devices
-}
-
-func processIWStationDump(response []byte) interfaceStats {
-	scanner := bufio.NewScanner(bytes.NewReader(response))
-
-	var stats interfaceStats
-
-	clients := int64(0)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "Station ") {
-			clients++
-			stats.clients = clients
-		} else if strings.HasPrefix(line, "	rx bytes:") {
-			fields := strings.Fields(line)
-			if v, ok := parseInt(fields[2]); ok {
-				stats.bw_received += v
-			}
-		} else if strings.HasPrefix(line, "	rx packets:") {
-			fields := strings.Fields(line)
-			if v, ok := parseInt(fields[2]); ok {
-				stats.packets_received += v
-			}
-		} else if strings.HasPrefix(line, "	tx bytes:") {
-			fields := strings.Fields(line)
-			if v, ok := parseInt(fields[2]); ok {
-				stats.bw_sent += v
-			}
-		} else if strings.HasPrefix(line, "	tx packets:") {
-			fields := strings.Fields(line)
-			if v, ok := parseInt(fields[2]); ok {
-				stats.packets_sent += v
-			}
-		} else if strings.HasPrefix(line, "	tx retries:") {
-			fields := strings.Fields(line)
-			if v, ok := parseInt(fields[2]); ok {
-				stats.issues_retries += v
-			}
-		} else if strings.HasPrefix(line, "	tx failed:") {
-			fields := strings.Fields(line)
-			if v, ok := parseInt(fields[2]); ok {
-				stats.issues_failures += v
-			}
-		} else if strings.HasPrefix(line, "	signal avg:") {
-			fields := strings.Fields(line)
-			if v, ok := parseInt(fields[2]); ok {
-				stats.average_signal += v * 1000
-			}
-		} else if strings.HasPrefix(line, "	rx bitrate:") {
-			fields := strings.Fields(line)
-			if v, ok := parseFloat(fields[2]); ok {
-				stats.bitrate_receive += int64(v * 1000)
-			}
-		} else if strings.HasPrefix(line, "	tx bitrate:") {
-			fields := strings.Fields(line)
-			if v, ok := parseFloat(fields[2]); ok {
-				stats.bitrate_transmit += int64(v * 1000)
-			}
-		}
-	}
-
-	return stats
-}
-
-func (a *AP) handleCharts(apInterfaces map[string]interfaceStats) {
 	seen := make(map[string]bool)
-	for iface := range apInterfaces {
-		seen[iface] = true
+	var ifaceName string
+	var apInterfaces []string
 
-		if !a.interfaces[iface] {
-			a.addInterfaceCharts(iface, apInterfaces[iface].ssid)
-			a.interfaces[iface] = true
+	sc := bufio.NewScanner(bytes.NewReader(resp))
+
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+
+		switch {
+		case strings.HasPrefix(line, "Interface"):
+			parts := strings.Fields(line)
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("invalid interface line: '%s'", line)
+			}
+			ifaceName = parts[1]
+		case strings.HasPrefix(line, "type"):
+			parts := strings.Fields(line)
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("invalid type line: '%s'", line)
+			}
+			ifaceType := parts[1]
+			if ifaceType == "AP" && ifaceName != "" && !seen[ifaceType] {
+				seen[ifaceType] = true
+				apInterfaces = append(apInterfaces, ifaceName)
+			}
 		}
-
 	}
 
-	for iface := range apInterfaces {
-		if !seen[iface] {
-			a.removeInterfaceCharts(iface)
-			delete(a.interfaces, iface)
-		}
-	}
+	return apInterfaces, nil
 }
 
-func parseInt(s string) (int64, bool) {
-	if s == "-" {
-		return 0, false
+func parseIwStationStatistics(resp []byte) (*stationStats, error) {
+	var stats stationStats
+
+	sc := bufio.NewScanner(bytes.NewReader(resp))
+
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+
+		var v float64
+		var err error
+
+		switch {
+		case strings.HasPrefix(line, "Station"):
+			stats.clients++
+		case strings.HasPrefix(line, "rx bytes:"):
+			if v, err = get3rdValue(line); err == nil {
+				stats.rxBytes += int64(v)
+			}
+		case strings.HasPrefix(line, "rx packets:"):
+			if v, err = get3rdValue(line); err == nil {
+				stats.rxPackets += int64(v)
+			}
+		case strings.HasPrefix(line, "tx bytes:"):
+			if v, err = get3rdValue(line); err == nil {
+				stats.txBytes += int64(v)
+			}
+		case strings.HasPrefix(line, "tx packets:"):
+			if v, err = get3rdValue(line); err == nil {
+				stats.txPackets += int64(v)
+			}
+		case strings.HasPrefix(line, "tx retries:"):
+			if v, err = get3rdValue(line); err == nil {
+				stats.txRetries += int64(v)
+			}
+		case strings.HasPrefix(line, "tx failed:"):
+			if v, err = get3rdValue(line); err == nil {
+				stats.txFailed += int64(v)
+			}
+		case strings.HasPrefix(line, "signal avg:"):
+			if v, err = get3rdValue(line); err == nil {
+				stats.signalAvg += int64(v)
+			}
+		case strings.HasPrefix(line, "tx bitrate:"):
+			if v, err = get3rdValue(line); err == nil {
+				stats.txBitrate += v
+			}
+		case strings.HasPrefix(line, "rx bitrate:"):
+			if v, err = get3rdValue(line); err == nil {
+				stats.rxBitrate += v
+			}
+		default:
+			continue
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("parsing line '%s': %v", line, err)
+		}
 	}
-	v, err := strconv.ParseInt(s, 10, 64)
-	return v, err == nil
+
+	return &stats, nil
 }
 
-func parseFloat(s string) (float64, bool) {
-	if s == "-" {
-		return 0, false
+func get3rdValue(line string) (float64, error) {
+	parts := strings.Fields(line)
+	if len(parts) < 3 {
+		return 0.0, errors.New("invalid format")
 	}
-	v, err := strconv.ParseFloat(s, 64)
-	return v, err == nil
+
+	v := parts[2]
+
+	if v == "-" {
+		return 0.0, nil
+	}
+	return strconv.ParseFloat(v, 64)
 }

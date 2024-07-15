@@ -4,8 +4,8 @@ Station 7e:0d:a5:a6:91:2b (on wlp1s0)
 	rx packets:	2446
 	tx bytes:	6918
 	tx packets:	30
-	tx retries:	0
-	tx failed:	0
+	tx retries:	1
+	tx failed:	1
 	rx drop misc:	0
 	signal:  	-44 [-51, -44] dBm
 	signal avg:	-38 [-39, -39] dBm
@@ -56,4 +56,3 @@ Station fa:50:db:c1:1c:18 (on wlp1s0)
 	associated at [boottime]:	13440.167s
 	associated at:	1720706069520 ms
 	current time:	1720706075344 ms
-

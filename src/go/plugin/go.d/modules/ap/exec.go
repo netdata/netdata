@@ -11,40 +11,26 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
-func newIWDevExec(binPath string, timeout time.Duration) *iwDevExec {
-	return &iwDevExec{
+func newIwExec(binPath string, timeout time.Duration) *iwCliExec {
+	return &iwCliExec{
 		binPath: binPath,
 		timeout: timeout,
 	}
 }
 
-func newIWStationDumpExec(binPath string, timeout time.Duration) *iwStationDumpExec {
-	return &iwStationDumpExec{
-		binPath: binPath,
-		timeout: timeout,
-	}
-}
-
-type iwDevExec struct {
+type iwCliExec struct {
 	*logger.Logger
 
 	binPath string
 	timeout time.Duration
 }
 
-type iwStationDumpExec struct {
-	*logger.Logger
-
-	binPath string
-	timeout time.Duration
-}
-
-func (a *iwDevExec) list() ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
+func (e *iwCliExec) devices() ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, a.binPath, "dev")
-	a.Debugf("executing '%s'", cmd)
+	cmd := exec.CommandContext(ctx, e.binPath, "dev")
+	e.Debugf("executing '%s'", cmd)
 
 	bs, err := cmd.Output()
 	if err != nil {
@@ -54,12 +40,12 @@ func (a *iwDevExec) list() ([]byte, error) {
 	return bs, nil
 }
 
-func (a *iwStationDumpExec) list(ifaceName string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
+func (e *iwCliExec) stationStatistics(ifaceName string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, a.binPath, ifaceName, "station", "dump")
-	a.Debugf("executing '%s'", cmd)
+	cmd := exec.CommandContext(ctx, e.binPath, ifaceName, "station", "dump")
+	e.Debugf("executing '%s'", cmd)
 
 	bs, err := cmd.Output()
 	if err != nil {

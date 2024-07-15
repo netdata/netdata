@@ -92,40 +92,40 @@ modules:
           labels: []
           metrics:
             - name: ap.clients
-              description: Connected clients to ${ssid} on ${dev}
+              description: Connected clients
               unit: "clients"
               chart_type: line
               dimensions:
                 - name: clients
             - name: ap.net
-              description: Bandwidth for ${ssid} on ${dev}
+              description: Bandwidth
               unit: "kilobits/s"
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: ap.packets
-              description: Packets for ${ssid} on ${dev}
+              description: Packets
               unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ap.issues
-              description: Transmit Issues for ${ssid} on ${dev}
+              description: Transmit Issues
               unit: "issues/s"
               chart_type: line
               dimensions:
                 - name: retries
                 - name: failures
             - name: ap.signal
-              description: Average Signal for ${ssid} on ${dev}
+              description: Average Signal
               unit: "dBm"
               chart_type: line
               dimensions:
                 - name: average signal
             - name: ap.bitrate
-              description: Bitrate for ${ssid} on ${dev}
+              description: Bitrate
               unit: "Mbps"
               chart_type: line
               dimensions:
