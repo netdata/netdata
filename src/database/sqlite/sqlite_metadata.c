@@ -1454,11 +1454,10 @@ static void cleanup_health_log(struct metadata_wc *wc)
 
     RRDHOST *host;
 
-    bool is_claimed = claimed();
     dfe_start_reentrant(rrdhost_root_index, host){
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
-        sql_health_alarm_log_cleanup(host, is_claimed);
+        sql_health_alarm_log_cleanup(host);
         if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
             break;
     }

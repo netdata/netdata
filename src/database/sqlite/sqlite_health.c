@@ -306,7 +306,7 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
     " AND updated_by_id <> 0 AND transition_id NOT IN "                                                                \
     " (SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id)"
 
-void sql_health_alarm_log_cleanup(RRDHOST *host, bool claimed __maybe_unused)
+void sql_health_alarm_log_cleanup(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
     int rc;
