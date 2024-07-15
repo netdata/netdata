@@ -31,12 +31,11 @@ func (p *Puppet) collect() (map[string]int64, error) {
 }
 
 func (p *Puppet) queryStatsService() (*statusServiceResponse, error) {
-	req, err := web.NewHTTPRequest(p.Request)
+	req, err := web.NewHTTPRequestWithPath(p.Request, urlPathStatusService)
 	if err != nil {
 		return nil, err
 	}
 
-	req.URL.Path = urlPathStatusService
 	req.URL.RawQuery = urlQueryStatusService
 
 	var stats statusServiceResponse

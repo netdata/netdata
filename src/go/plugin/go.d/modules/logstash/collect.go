@@ -45,8 +45,10 @@ func (l *Logstash) updateCharts(pipelines map[string]pipelineStats) {
 }
 
 func (l *Logstash) queryNodeStats() (*nodeStats, error) {
-	req, _ := web.NewHTTPRequest(l.Request.Copy())
-	req.URL.Path = urlPathNodeStatsAPI
+	req, err := web.NewHTTPRequestWithPath(l.Request, urlPathNodeStatsAPI)
+	if err != nil {
+		return nil, err
+	}
 
 	var stats nodeStats
 

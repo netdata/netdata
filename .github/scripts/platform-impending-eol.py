@@ -48,13 +48,14 @@ except urllib.error.HTTPError as e:
             )
             sys.exit(EXIT_FAILURE)
 
-eol = datetime.date.fromisoformat(data['eol'])
 
 if LTS == '1' and 'extendedSupport' in data:
-    datetime.date.fromisoformat(data['extendedSupport'])
+    ref = 'extendedSupport'
 else:
+    ref = 'eol'
     LTS = False
 
+eol = datetime.date.fromisoformat(data[ref])
 offset = abs(eol - NOW)
 
 if offset <= LEAD_DAYS:

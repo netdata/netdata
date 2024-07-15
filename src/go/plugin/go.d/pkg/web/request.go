@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
@@ -89,4 +90,16 @@ func NewHTTPRequest(cfg Request) (*http.Request, error) {
 	}
 
 	return req, nil
+}
+
+func NewHTTPRequestWithPath(cfg Request, urlPath string) (*http.Request, error) {
+	cfg = cfg.Copy()
+
+	v, err := url.JoinPath(cfg.URL, urlPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to join URL path: %v", err)
+	}
+	cfg.URL = v
+
+	return NewHTTPRequest(cfg)
 }
