@@ -50,7 +50,7 @@ type (
 		charts *module.Charts
 
 		execIWDev       iwDevBinary
-		execStationDump iwStationDumpBinary
+		execIWStationDump iwStationDumpBinary
 
 		interfaces map[string]bool
 	}
@@ -84,7 +84,7 @@ func (a *AP) Init() error {
 		a.Errorf("iw station dump exec initialization %v", err)
 		return err
 	}
-	a.execStationDump = stDump
+	a.execIWStationDump = stDump
 
 	return nil
 }
