@@ -40,6 +40,7 @@ pacman -S --noconfirm \
     ninja \
     openssl-devel \
     protobuf-devel \
+    python \
     ucrt64/mingw-w64-ucrt-x86_64-brotli \
     ucrt64/mingw-w64-ucrt-x86_64-go \
     ucrt64/mingw-w64-ucrt-x86_64-libuv \
