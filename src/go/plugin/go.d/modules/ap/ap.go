@@ -31,7 +31,7 @@ func New() *AP {
 			BinaryPath: "/usr/sbin/iw",
 			Timeout:    web.Duration(time.Second * 2),
 		},
-		charts: &module.Charts{},
+		charts:     &module.Charts{},
 		interfaces: make(map[string]bool),
 	}
 }
@@ -49,7 +49,7 @@ type (
 
 		charts *module.Charts
 
-		execIWDev       iwDevBinary
+		execIWDev         iwDevBinary
 		execIWStationDump iwStationDumpBinary
 
 		interfaces map[string]bool
