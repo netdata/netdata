@@ -51,6 +51,7 @@ see the appropriate collector readme.
 |:-------------------------------------------------------------------------------------------------------------------|:-----------------------------:|
 | [adaptec_raid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/adaptecraid)              |     Adaptec Hardware RAID     |
 | [activemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/activemq)                     |           ActiveMQ            |
+| [activemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ap)                     |           Access Points            |
 | [apache](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/apache)                         |            Apache             |
 | [bind](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/bind)                             |           ISC Bind            |
 | [cassandra](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/cassandra)                   |           Cassandra           |
