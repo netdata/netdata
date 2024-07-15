@@ -2783,7 +2783,6 @@ install(FILES
         DESTINATION usr/lib/netdata/conf.d)
 
 install(PROGRAMS
-        src/collectors/charts.d.plugin/ap/ap.chart.sh
         src/collectors/charts.d.plugin/apcupsd/apcupsd.chart.sh
         src/collectors/charts.d.plugin/example/example.chart.sh
         src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
@@ -2793,7 +2792,6 @@ install(PROGRAMS
         DESTINATION usr/libexec/netdata/charts.d)
 
 install(FILES
-        src/collectors/charts.d.plugin/ap/ap.conf
         src/collectors/charts.d.plugin/apcupsd/apcupsd.conf
         src/collectors/charts.d.plugin/example/example.conf
         src/collectors/charts.d.plugin/libreswan/libreswan.conf
