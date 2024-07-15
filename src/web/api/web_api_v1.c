@@ -1422,10 +1422,13 @@ static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-
+#ifdef ENABLE_ACLK
     char *str = aclk_state_json();
     buffer_strcat(wb, str);
     freez(str);
+#else
+    buffer_strcat(wb, "{\"aclk-available\":false}");
+#endif
 
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
