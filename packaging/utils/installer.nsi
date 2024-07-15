@@ -5,6 +5,8 @@ Outfile "netdata-installer.exe"
 InstallDir "$PROGRAMFILES\netdata"
 RequestExecutionLevel admin
 
+!define MUI_ICON "NetdataWhite.ico"
+
 !define MUI_ABORTWARNING
 !define MUI_UNABORTWARNING
 
