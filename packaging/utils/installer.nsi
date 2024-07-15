@@ -41,6 +41,11 @@ Section "Install Netdata"
 	DetailPrint "Warning: Failed to start Netdata service."
 
 	WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+        WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata" \
+                         "DisplayName" "Netdata -- Real-time system monitoring."
+        WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata" \
+                         "UninstallString" "$INSTDIR\Uninstall.exe"
 SectionEnd
 
 Section "Uninstall"
@@ -55,4 +60,6 @@ Section "Uninstall"
 	DetailPrint "Warning: Failed to delete Netdata service."
 
 	RMDir /r "$INSTDIR"
+
+        DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata"
 SectionEnd
