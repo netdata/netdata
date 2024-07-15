@@ -511,7 +511,7 @@ fi
 
 CMAKE_OPTS="${ninja:+-G Ninja}"
 BUILD_OPTS="VERBOSE=1"
-[ -n "${ninja}" ] && BUILD_OPTS="-v"
+[ -n "${ninja}" ] && BUILD_OPTS="-k 1"
 
 if [ ${DONOTWAIT} -eq 0 ]; then
   if [ -n "${NETDATA_PREFIX}" ]; then
