@@ -23,7 +23,6 @@ type interfaceStats struct {
 	average_signal   int64
 	bitrate_receive  int64
 	bitrate_transmit int64
-	// bitrate_expected int64
 }
 
 func (a *AP) collect() (map[string]int64, error) {
@@ -43,15 +42,12 @@ func (a *AP) collect() (map[string]int64, error) {
 	a.handleCharts(apInterfaces)
 
 	for iface := range apInterfaces {
-		bs, err = a.execStationDump.list(iface)
+		bs, err = a.execIWStationDump.list(iface)
 		if err != nil {
 			return nil, err
 		}
 
-		mx["a"] = 1
-
 		ifaceStats := processIWStationDump(bs)
-		// fmt.Print(ifaceStats)
 		mx[fmt.Sprintf("ap_%s_clients", iface)] = ifaceStats.clients
 		mx[fmt.Sprintf("ap_%s_bw_received", iface)] = ifaceStats.bw_received
 		mx[fmt.Sprintf("ap_%s_bw_sent", iface)] = ifaceStats.bw_sent
