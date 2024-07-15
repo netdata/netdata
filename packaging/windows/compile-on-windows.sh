@@ -28,6 +28,7 @@ if [ -d "${build}" ]; then
 	rm -rf "${build}"
 fi
 
+${GITHUB_ACTIONS+echo "::group::Configuring"}
 /usr/bin/cmake -S "${repo_root}" -B "${build}" \
     -G Ninja \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
@@ -42,9 +43,14 @@ fi
     -DENABLE_ML=On \
     -DENABLE_BUNDLED_JSONC=On \
     -DENABLE_BUNDLED_PROTOBUF=Off
+${GITHUB_ACTIONS+echo "::endgroup::"}
 
+${GITHUB_ACTIONS+echo "::group::Building"}
 ninja -C "${build}" -k 1
+${GITHUB_ACTIONS+echo "::endgroup::"}
 
-echo
-echo "Compile with:"
-echo "ninja -v -C \"${build}\" || ninja -v -C \"${build}\" -j 1"
+if [ -t 1 ]; then
+    echo
+    echo "Compile with:"
+    echo "ninja -v -C \"${build}\" || ninja -v -C \"${build}\" -j 1"
+fi

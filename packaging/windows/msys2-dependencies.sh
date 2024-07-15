@@ -6,12 +6,11 @@
 
 set -euo pipefail
 
-echo "Updating MSYS2"
-
+${GITHUB_ACTIONS+echo "::group::Updating MSYS2"}
 pacman -Syuu --noconfirm
+${GITHUB_ACTIONS+echo "::endgroup::"}
 
-echo "Installing required dependencies"
-
+${GITHUB_ACTIONS+echo "::group::Installing dependencies"}
 pacman -S --noconfirm \
     base-devel \
     cmake \
@@ -49,3 +48,4 @@ pacman -S --noconfirm \
     ucrt64/mingw-w64-ucrt-x86_64-pcre2 \
     ucrt64/mingw-w64-ucrt-x86_64-protobuf \
     ucrt64/mingw-w64-ucrt-x86_64-zlib
+${GITHUB_ACTIONS+echo "::endgroup::"}
