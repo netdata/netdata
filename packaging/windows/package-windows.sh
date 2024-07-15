@@ -2,13 +2,17 @@
 
 repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
 
-if [ -z "${MSYSTEM}" ]; then
-   build="${repo_root}/build-${OSTYPE}"
+if [ -n "${BUILD_DIR}" ]; then
+    build="${BUILD_DIR}"
+elif [ -n "${OSTYPE}" ]; then
+    if [ -n "${MSYSTEM}" ]; then
+        build="${repo_root}/build-${OSTYPE}-${MSYSTEM}"
+    else
+        build="${repo_root}/build-${OSTYPE}"
+    fi
+elif [ "$USER" = "vk" ]; then
+    build="${repo_root}/build"
 else
-   build="${repo_root}/build-${OSTYPE}-${MSYSTEM}"
-fi
-
-if [ "$USER" = "vk" ]; then
     build="${repo_root}/build"
 fi
 
