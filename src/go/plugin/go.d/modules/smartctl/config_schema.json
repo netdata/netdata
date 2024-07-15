@@ -20,7 +20,7 @@
       },
       "scan_every": {
         "title": "Scan interval",
-        "description": "Interval for discovering new devices using `smartctl --scan`, measured in seconds.",
+        "description": "Interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup.",
         "type": "number",
         "minimum": 1,
         "default": 900
@@ -50,6 +50,36 @@
         "type": "string",
         "minimum": 1,
         "default": "*"
+      },
+      "extra_devices": {
+        "title": "Extra devices",
+        "description": "Allows manual specification of devices not automatically detected by `smartctl --scan`. Each device entry must include both a name and a type.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "Device",
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "name",
+            "type"
+          ],
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "type": {
+              "title": "Type",
+              "type": "string"
+            }
+          }
+        }
       }
     },
     "additionalProperties": false,
@@ -75,9 +105,10 @@
           ]
         },
         {
-          "title": "Filtering",
+          "title": "Devices",
           "fields": [
-            "device_selector"
+            "device_selector",
+            "extra_devices"
           ]
         }
       ]
@@ -94,6 +125,16 @@
     },
     "device_selector": {
       "ui:help": "Leave blank or use `*` to collect data for all devices."
+    },
+    "extra_devices": {
+      "items": {
+        "name": {
+          "ui:placeholder": "/dev/sda"
+        },
+        "type": {
+          "ui:placeholder": "jmb39x-q,3"
+        }
+      }
     }
   }
 }

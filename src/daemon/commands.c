@@ -164,7 +164,7 @@ static cmd_status_t cmd_reopen_logs_execute(char *args, char **message)
     (void)message;
 
     nd_log_limits_unlimited();
-    nd_log_reopen_log_files();
+    nd_log_reopen_log_files(true);
     nd_log_limits_reset();
 
     return CMD_STATUS_SUCCESS;
