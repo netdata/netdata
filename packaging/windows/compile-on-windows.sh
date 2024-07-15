@@ -43,7 +43,7 @@ fi
     -DENABLE_BUNDLED_JSONC=On \
     -DENABLE_BUNDLED_PROTOBUF=Off
 
-ninja -v -C "${build}" || ninja -v -C "${build}" -j 1
+ninja -C "${build}" -k 1
 
 echo
 echo "Compile with:"

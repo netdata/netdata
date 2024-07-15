@@ -18,7 +18,7 @@ fi
 
 set -exu -o pipefail
 
-ninja -v -C "${build}" install
+ninja -C "${build}" -k 1 install
 
 if [ ! -f "/msys2-installer.exe" ]; then
     "${repo_root}/packaging/windows/fetch-msys2-installer.py" /msys2-installer.exe
