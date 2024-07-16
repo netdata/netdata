@@ -69,7 +69,7 @@ modules:
           folding:
             enabled: true
             title: ""
-          list: 
+          list:
             - name: Custom binary path
               description: The executable is not in the directories specified in the PATH environment variable.
               config: |
