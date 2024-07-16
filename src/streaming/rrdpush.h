@@ -238,9 +238,7 @@ struct sender_state {
     FILE *stream_log_fp;
 #endif
 
-#ifdef ENABLE_HTTPS
     NETDATA_SSL ssl;                     // structure used to encrypt the connection
-#endif
 
     struct {
         bool shutdown;
@@ -382,9 +380,7 @@ struct receiver_state {
         STREAM_CAPABILITIES compression_priorities[COMPRESSION_ALGORITHM_MAX];
     } config;
 
-#ifdef ENABLE_HTTPS
     NETDATA_SSL ssl;
-#endif
 
     time_t replication_first_time_t;
 

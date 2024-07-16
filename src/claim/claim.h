@@ -30,7 +30,7 @@ const char *netdata_random_session_id_get_filename(void);
 bool netdata_random_session_id_matches(const char *guid);
 int api_v2_claim(struct web_client *w, char *url);
 
-#if defined(HAVE_LIBCURL) && defined(ENABLE_OPENSSL)
+#if defined(HAVE_LIBCURL)
 #define CLAIM_WITH_API
 #else
 #define CLAIM_WITH_SCRIPT

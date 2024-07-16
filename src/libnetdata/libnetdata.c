@@ -1831,7 +1831,6 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step) {
     }
 }
 
-#ifdef ENABLE_HTTPS
 int hash256_string(const unsigned char *string, size_t size, char *hash) {
     EVP_MD_CTX *ctx;
     ctx = EVP_MD_CTX_create();
@@ -1856,7 +1855,6 @@ int hash256_string(const unsigned char *string, size_t size, char *hash) {
     EVP_MD_CTX_destroy(ctx);
     return 1;
 }
-#endif
 
 
 bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now) {

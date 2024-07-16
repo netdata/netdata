@@ -1125,9 +1125,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef ENABLE_WEBRTC
     build_info_set_status(BIB_CONNECTIVITY_WEBRTC, true);
 #endif
-#ifdef ENABLE_HTTPS
     build_info_set_status(BIB_CONNECTIVITY_NATIVE_HTTPS, true);
-#endif
 #if defined(HAVE_X509_VERIFY_PARAM_set1_host) && HAVE_X509_VERIFY_PARAM_set1_host == 1
     build_info_set_status(BIB_CONNECTIVITY_TLS_HOST_VERIFY, true);
 #endif
@@ -1161,9 +1159,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef HAVE_LIBDATACHANNEL
     build_info_set_status(BIB_LIB_LIBDATACHANNEL, true);
 #endif
-#ifdef ENABLE_OPENSSL
     build_info_set_status(BIB_LIB_OPENSSL, true);
-#endif
 #ifdef ENABLE_JSONC
     build_info_set_status(BIB_LIB_JSONC, true);
 #endif

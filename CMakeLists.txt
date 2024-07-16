@@ -529,7 +529,6 @@ if(OS_FREEBSD OR OS_MACOS)
 endif()
 
 # openssl/crypto
-set(ENABLE_OPENSSL True)
 pkg_check_modules(TLS IMPORTED_TARGET openssl)
 
 if(NOT TARGET PkgConfig::TLS)

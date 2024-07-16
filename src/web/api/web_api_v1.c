@@ -1342,11 +1342,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_boolean(wb, "stream-compression",
                                    host->sender && host->sender->compressor.initialized);
 
-#ifdef ENABLE_HTTPS
     buffer_json_member_add_boolean(wb, "https-enabled", true);
-#else
-    buffer_json_member_add_boolean(wb, "https-enabled", false);
-#endif
 
     buffer_json_member_add_quoted_string(wb, "buildinfo", analytics_data.netdata_buildinfo);
     buffer_json_member_add_quoted_string(wb, "release-channel", analytics_data.netdata_config_release_channel);

@@ -468,8 +468,6 @@ struct engine *read_exporting_config()
 
         tmp_instance->config.hostname = strdupz(exporter_get(instance_name, "hostname", engine->config.hostname));
 
-#ifdef ENABLE_HTTPS
-
 #define STR_GRAPHITE_HTTPS "graphite:https"
 #define STR_JSON_HTTPS "json:https"
 #define STR_OPENTSDB_HTTPS "opentsdb:https"
@@ -487,7 +485,6 @@ struct engine *read_exporting_config()
                  strlen(STR_PROMETHEUS_REMOTE_WRITE_HTTPS)))) {
             tmp_instance->config.options |= EXPORTING_OPTION_USE_TLS;
         }
-#endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
         netdata_log_info(

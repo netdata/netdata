@@ -101,9 +101,8 @@ typedef struct parser {
     FILE *fp_input;                 // Input source e.g. stream
     FILE *fp_output;                // Stream to send commands to plugin
 
-#ifdef ENABLE_HTTPS
     NETDATA_SSL *ssl_output;
-#endif
+
 #ifdef ENABLE_H2O
     void *h2o_ctx;                  // if set we use h2o_stream functions to send data
 #endif

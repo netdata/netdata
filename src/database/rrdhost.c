@@ -244,9 +244,7 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
 
         rrdhost_streaming_sender_structures_init(host);
 
-#ifdef ENABLE_HTTPS
         host->sender->ssl = NETDATA_SSL_UNSET_CONNECTION;
-#endif
 
         host->rrdpush_send_destination = strdupz(rrdpush_destination);
         rrdpush_destinations_init(host);
@@ -1749,9 +1747,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
         s->ingest.capabilities = host->receiver->capabilities;
         s->ingest.peers = socket_peers(host->receiver->fd);
-#ifdef ENABLE_HTTPS
         s->ingest.ssl = SSL_connection(&host->receiver->ssl);
-#endif
     }
     netdata_mutex_unlock(&host->receiver_lock);
 
@@ -1810,9 +1806,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
         s->stream.since = host->sender->last_state_since_t;
         s->stream.peers = socket_peers(host->sender->rrdpush_sender_socket);
-#ifdef ENABLE_HTTPS
         s->stream.ssl = SSL_connection(&host->sender->ssl);
-#endif
 
         memcpy(s->stream.sent_bytes_on_this_connection_per_type,
                host->sender->sent_bytes_on_this_connection_per_type,

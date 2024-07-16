@@ -48,10 +48,8 @@ char *default_rrdpush_send_charts_matching = NULL;
 bool default_rrdpush_enable_replication = true;
 time_t default_rrdpush_seconds_to_replicate = 86400;
 time_t default_rrdpush_replication_step = 600;
-#ifdef ENABLE_HTTPS
 char *netdata_ssl_ca_path = NULL;
 char *netdata_ssl_ca_file = NULL;
-#endif
 
 static void load_stream_conf() {
     errno_clear();
@@ -132,7 +130,6 @@ int rrdpush_init() {
         default_rrdpush_enabled = 0;
     }
 
-#ifdef ENABLE_HTTPS
     netdata_ssl_validate_certificate_sender = !appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
 
     if(!netdata_ssl_validate_certificate_sender)
@@ -140,7 +137,6 @@ int rrdpush_init() {
 
     netdata_ssl_ca_path = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", NULL);
     netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", NULL);
-#endif
 
     return default_rrdpush_enabled;
 }
@@ -777,12 +773,10 @@ int rrdpush_receiver_too_busy_now(struct web_client *w) {
 static void rrdpush_receiver_takeover_web_connection(struct web_client *w, struct receiver_state *rpt) {
     rpt->fd                = w->ifd;
 
-#ifdef ENABLE_HTTPS
     rpt->ssl.conn          = w->ssl.conn;
     rpt->ssl.state         = w->ssl.state;
 
     w->ssl = NETDATA_SSL_UNSET_CONNECTION;
-#endif
 
     WEB_CLIENT_IS_DEAD(w);
 
@@ -825,9 +819,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
 
-#ifdef ENABLE_HTTPS
     rpt->ssl = NETDATA_SSL_UNSET_CONNECTION;
-#endif
 
     rpt->config.update_every = default_rrd_update_every;
 
@@ -1083,9 +1075,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
 
         if(send_timeout(
-#ifdef ENABLE_HTTPS
                 &rpt->ssl,
-#endif
                 rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 
             nd_log_daemon(NDLP_ERR, "STREAM '%s' [receive from [%s]:%s]: "

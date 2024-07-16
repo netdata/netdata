@@ -375,7 +375,6 @@ static void analytics_get_install_type(struct rrdhost_system_info *system_info)
 void analytics_https(void)
 {
     BUFFER *b = buffer_create(30, NULL);
-#ifdef ENABLE_HTTPS
     analytics_exporting_connectors_ssl(b);
 
     buffer_strcat(b, netdata_ssl_streaming_sender_ctx &&
@@ -383,9 +382,6 @@ void analytics_https(void)
                      SSL_connection(&localhost->sender->ssl) ? "streaming|" : "|");
 
     buffer_strcat(b, netdata_ssl_web_server_ctx ? "web" : "");
-#else
-    buffer_strcat(b, "||");
-#endif
 
     analytics_set_data_str(&analytics_data.netdata_config_https_available, (char *)buffer_tostring(b));
     buffer_free(b);
@@ -648,11 +644,7 @@ void set_late_analytics_variables(struct rrdhost_system_info *system_info)
     }
 #endif
 
-#ifdef ENABLE_HTTPS
     analytics_set_data(&analytics_data.netdata_config_https_enabled, "true");
-#else
-    analytics_set_data(&analytics_data.netdata_config_https_enabled, "false");
-#endif
 
     if (web_server_mode == WEB_SERVER_MODE_NONE)
         analytics_set_data(&analytics_data.netdata_config_web_enabled, "false");

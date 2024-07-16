@@ -55,9 +55,7 @@ static inline buffered_reader_ret_t buffered_reader_read(struct buffered_reader 
 static inline buffered_reader_ret_t buffered_reader_read_timeout(struct buffered_reader *reader, int fd, int timeout_ms, bool log_error) {
     short int revents = 0;
     switch(wait_on_socket_or_cancel_with_timeout(
-#ifdef ENABLE_HTTPS
         NULL,
-#endif
         fd, timeout_ms, POLLIN, &revents)) {
 
         case 0: // data are waiting

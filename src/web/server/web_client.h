@@ -21,9 +21,7 @@ typedef enum __attribute__((packed)) {
     HTTP_VALIDATION_EXCESS_REQUEST_DATA,
     HTTP_VALIDATION_MALFORMED_URL,
     HTTP_VALIDATION_INCOMPLETE,
-#ifdef ENABLE_HTTPS
     HTTP_VALIDATION_REDIRECT
-#endif
 } HTTP_VALIDATION;
 
 typedef enum __attribute__((packed)) {
@@ -202,9 +200,7 @@ struct web_client {
     size_t pollinfo_slot;               // POLLINFO slot of the web client
     size_t pollinfo_filecopy_slot;      // POLLINFO slot of the file read
 
-#ifdef ENABLE_HTTPS
     NETDATA_SSL ssl;
-#endif
 
     struct {
         nd_uuid_t bearer_token;

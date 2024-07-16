@@ -17,7 +17,6 @@ ssize_t send_to_plugin(const char *txt, void *data) {
     spinlock_lock(&parser->writer.spinlock);
     ssize_t bytes = -1;
 
-#ifdef ENABLE_HTTPS
     NETDATA_SSL *ssl = parser->ssl_output;
     if(ssl) {
 
@@ -30,7 +29,6 @@ ssize_t send_to_plugin(const char *txt, void *data) {
         spinlock_unlock(&parser->writer.spinlock);
         return bytes;
     }
-#endif
 
     if(parser->fp_output) {
 
@@ -110,9 +108,7 @@ PARSER *parser_init(struct parser_user_object *user, FILE *fp_input, FILE *fp_ou
     parser->fd = fd;
     parser->fp_input = fp_input;
     parser->fp_output = fp_output;
-#ifdef ENABLE_HTTPS
     parser->ssl_output = ssl;
-#endif
     parser->flags = flags;
 
     spinlock_init(&parser->writer.spinlock);

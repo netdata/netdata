@@ -12,8 +12,6 @@ typedef enum __attribute__((packed)) {
 #define NETDATA_SSL_STREAMING_SENDER_CTX 1
 #define NETDATA_SSL_EXPORTING_CTX 2
 
-# ifdef ENABLE_HTTPS
-
 #define OPENSSL_VERSION_095 0x00905100L
 #define OPENSSL_VERSION_097 0x0907000L
 #define OPENSSL_VERSION_110 0x10100000L
@@ -73,5 +71,4 @@ ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num);
 ssize_t netdata_ssl_pending(NETDATA_SSL *ssl);
 bool netdata_ssl_has_pending(NETDATA_SSL *ssl);
 
-# endif //ENABLE_HTTPS
 #endif //NETDATA_SECURITY_H

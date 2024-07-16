@@ -19,9 +19,7 @@ void receiver_state_free(struct receiver_state *rpt) {
     freez(rpt->program_name);
     freez(rpt->program_version);
 
-#ifdef ENABLE_HTTPS
     netdata_ssl_close(&rpt->ssl);
-#endif
 
     if(rpt->fd != -1) {
         internal_error(true, "closing socket...");
@@ -73,9 +71,7 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
         errno_clear();
 
         switch(wait_on_socket_or_cancel_with_timeout(
-#ifdef ENABLE_HTTPS
         &r->ssl,
-#endif
         r->fd, 0, POLLIN, NULL))
         {
             case 0: // data are waiting
@@ -95,14 +91,10 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
                 return -2;
         }
 
-#ifdef ENABLE_HTTPS
         if (SSL_connection(&r->ssl))
             bytes_read = netdata_ssl_read(&r->ssl, buffer, size);
         else
             bytes_read = read(r->fd, buffer, size);
-#else
-        bytes_read = read(r->fd, buffer, size);
-#endif
 
     } while(bytes_read < 0 && errno == EINTR && tries--);
 
@@ -540,9 +532,7 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
 
 static void rrdpush_send_error_on_taken_over_connection(struct receiver_state *rpt, const char *msg) {
     (void) send_timeout(
-#ifdef ENABLE_HTTPS
             &rpt->ssl,
-#endif
             rpt->fd,
             (char *)msg,
             strlen(msg),
@@ -732,11 +722,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
          , rpt->host->rrd_history_entries
          , rrd_memory_mode_name(rpt->host->rrd_memory_mode)
          , (rpt->config.health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((rpt->config.health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
-#ifdef ENABLE_HTTPS
          , (rpt->ssl.conn != NULL) ? " SSL," : ""
-#else
-         , ""
-#endif
     );
 #endif // NETDATA_INTERNAL_CHECKS
 
@@ -786,9 +772,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
         } else {
 #endif
             ssize_t bytes_sent = send_timeout(
-#ifdef ENABLE_HTTPS
                     &rpt->ssl,
-#endif
                     rpt->fd, initial_response, strlen(initial_response), 0, 60);
 
             if(bytes_sent != (ssize_t)strlen(initial_response)) {
@@ -844,11 +828,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rrdpush_reset_destinations_postpone_time(rpt->host);
 
     size_t count = streaming_parser(rpt, &cd, rpt->fd,
-#ifdef ENABLE_HTTPS
                                     (rpt->ssl.conn) ? &rpt->ssl : NULL
-#else
-                                    NULL
-#endif
                                     );
 
     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
@@ -899,11 +879,7 @@ static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
     if(!rpt)
         return false;
 
-#ifdef ENABLE_HTTPS
     buffer_strcat(wb, SSL_connection(&rpt->ssl) ? "https" : "http");
-#else
-    buffer_strcat(wb, "http");
-#endif
     return true;
 }
 

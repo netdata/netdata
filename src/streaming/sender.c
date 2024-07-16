@@ -334,9 +334,7 @@ static void rrdpush_sender_after_connect(RRDHOST *host) {
 }
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
-#ifdef ENABLE_HTTPS
     netdata_ssl_close(&host->sender->ssl);
-#endif
 
     if(host->sender->rrdpush_sender_socket != -1) {
         close(host->sender->rrdpush_sender_socket);
@@ -572,7 +570,6 @@ unsigned char alpn_proto_list[] = {
 #define CONN_UPGRADE_VAL "upgrade"
 
 static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
-#ifdef ENABLE_HTTPS
     RRDHOST *host = s->host;
     bool ssl_required = host->destination && host->destination->ssl;
 
@@ -627,11 +624,6 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
 
     netdata_log_error("SSL: failed to establish connection.");
     return false;
-
-#else
-    // SSL is not enabled
-    return true;
-#endif
 }
 
 static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
@@ -644,9 +636,7 @@ static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
             HTTP_HDR_END);
 
     ssize_t bytes = send_timeout(
-#ifdef ENABLE_HTTPS
         &host->sender->ssl,
-#endif
         s->rrdpush_sender_socket,
         http,
         strlen(http),
@@ -654,9 +644,7 @@ static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
         1000);
 
     bytes = recv_timeout(
-#ifdef ENABLE_HTTPS
         &host->sender->ssl,
-#endif
         s->rrdpush_sender_socket,
         http,
         HTTP_HEADER_SIZE,
@@ -885,9 +873,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     
     ssize_t len = (ssize_t)strlen(http);
     ssize_t bytes = send_timeout(
-#ifdef ENABLE_HTTPS
         &host->sender->ssl,
-#endif
         s->rrdpush_sender_socket,
         http,
         len,
@@ -914,9 +900,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     }
 
     bytes = recv_timeout(
-#ifdef ENABLE_HTTPS
         &host->sender->ssl,
-#endif
         s->rrdpush_sender_socket,
         http,
         HTTP_HEADER_SIZE,
@@ -1037,14 +1021,10 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     size_t outstanding = cbuffer_next_unsafe(s->buffer, &chunk);
     netdata_log_debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
 
-#ifdef ENABLE_HTTPS
     if(SSL_connection(&s->ssl))
         ret = netdata_ssl_write(&s->ssl, chunk, outstanding);
     else
         ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
-#else
-    ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
-#endif
 
     if (likely(ret > 0)) {
         cbuffer_remove_unsafe(s->buffer, ret);
@@ -1072,14 +1052,10 @@ static ssize_t attempt_to_send(struct sender_state *s) {
 static ssize_t attempt_read(struct sender_state *s) {
     ssize_t ret;
 
-#ifdef ENABLE_HTTPS
     if (SSL_connection(&s->ssl))
         ret = netdata_ssl_read(&s->ssl, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1);
     else
         ret = recv(s->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,MSG_DONTWAIT);
-#else
-    ret = recv(s->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,MSG_DONTWAIT);
-#endif
 
     if (ret > 0) {
         s->read_len += ret;
@@ -1089,13 +1065,9 @@ static ssize_t attempt_read(struct sender_state *s) {
     if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
         return ret;
 
-#ifdef ENABLE_HTTPS
     if (SSL_connection(&s->ssl))
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
-    else
-#endif
-
-    if (ret == 0 || errno == ECONNRESET) {
+    else if (ret == 0 || errno == ECONNRESET) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED);
         netdata_log_error("STREAM %s [send to %s]: connection closed by far end.", rrdhost_hostname(s->host), s->connected_to);
     }
@@ -1516,7 +1488,6 @@ static void rrdpush_sender_thread_cleanup_callback(void *pptr) {
 }
 
 void rrdpush_initialize_ssl_ctx(RRDHOST *host __maybe_unused) {
-#ifdef ENABLE_HTTPS
     static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
     spinlock_lock(&sp);
 
@@ -1538,7 +1509,6 @@ void rrdpush_initialize_ssl_ctx(RRDHOST *host __maybe_unused) {
     }
 
     spinlock_unlock(&sp);
-#endif
 }
 
 static bool stream_sender_log_capabilities(BUFFER *wb, void *ptr) {
@@ -1555,11 +1525,7 @@ static bool stream_sender_log_transport(BUFFER *wb, void *ptr) {
     if(!state)
         return false;
 
-#ifdef ENABLE_HTTPS
     buffer_strcat(wb, SSL_connection(&state->ssl) ? "https" : "http");
-#else
-    buffer_strcat(wb, "http");
-#endif
     return true;
 }
 

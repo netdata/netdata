@@ -486,9 +486,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     }
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);
 
-#ifdef ENABLE_HTTPS
     netdata_ssl_cleanup();
-#endif
     watcher_step_complete(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
 
     (void) unlink(agent_incomplete_shutdown_file);
@@ -825,7 +823,6 @@ int help(int exitcode) {
     return exitcode;
 }
 
-#ifdef ENABLE_HTTPS
 static void security_init(){
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
@@ -839,7 +836,6 @@ static void security_init(){
 
     netdata_ssl_initialize_openssl();
 }
-#endif
 
 static void log_init(void) {
     nd_log_set_facility(config_get(CONFIG_SECTION_LOGS, "facility", "daemon"));
@@ -2022,9 +2018,7 @@ int netdata_main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // get the certificate and start security
 
-#ifdef ENABLE_HTTPS
         security_init();
-#endif
 
         // --------------------------------------------------------------------
         // This is the safest place to start the SILENCERS structure
