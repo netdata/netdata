@@ -320,7 +320,7 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message)
     (void)args;
 
     BUFFER *wb = buffer_create(1024, NULL);
-    config_generate(wb, 0);
+    netdata_conf_generate(wb, 0);
     *message = strdupz(buffer_tostring(wb));
     buffer_free(wb);
     return CMD_STATUS_SUCCESS;
