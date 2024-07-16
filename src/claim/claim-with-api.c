@@ -156,7 +156,8 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     // Read the public key
     fp = fopen(public_key_file, "r");
     if (!fp || fread(public_key, 1, sizeof(public_key), fp) <= 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Failed to read public key: %s", public_key_file);
+        *error = "failed to read public key";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: %s: %s", *error, public_key_file);
         if (fp) fclose(fp);
         return false;
     }
@@ -185,7 +186,8 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 
     curl = curl_easy_init();
     if(!curl) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Failed to initialize curl");
+        *error = "failed to initialize libcurl";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: %s", *error);
         return false;
     }
 
@@ -208,12 +210,14 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: curl_easy_perform() failed: %s", curl_easy_strerror(res));
+        *error = "failed to make libcurl request";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: %s: %s", *error, curl_easy_strerror(res));
         curl_easy_cleanup(curl);
         return false;
     }
 
     curl_easy_cleanup(curl);
+    *error = "OK";
     return true;
 }
 
