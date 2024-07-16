@@ -74,5 +74,11 @@ $env:CHERE_INVOKING = 'yes'
 & $msysbash -l "$PSScriptRoot\msys2-dependencies.sh"
 
 if ($LastExitcode -ne 0) {
-    exit 1
+    Write-Host "First update attempt failed. This is expected if the msys-runtime package needed updated, trying again."
+
+    & $msysbash -l "$PSScriptRoot\msys2-dependencies.sh"
+
+    if ($LastExitcode -ne 0) {
+        exit 1
+    }
 }
