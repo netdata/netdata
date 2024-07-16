@@ -24,4 +24,7 @@ if [ ! -f "/msys2-installer.exe" ]; then
       "https://github.com/msys2/msys2-installer/releases/download/2024-05-07/msys2-x86_64-20240507.exe"
 fi
 
-makensis "${WT_ROOT}/packaging/utils/installer.nsi"
+NDVERSION=$"$(grep 'CMAKE_PROJECT_VERSION:STATIC' ${build}/CMakeCache.txt| cut -d= -f2)"
+
+makensis -DCURRVERSION="${NDVERSION}" "${WT_ROOT}/packaging/utils/installer.nsi"
+

@@ -1,4 +1,5 @@
 !include "MUI2.nsh"
+!include "FileFunc.nsh"
 
 Name "Netdata"
 Outfile "netdata-installer.exe"
@@ -6,6 +7,9 @@ InstallDir "$PROGRAMFILES\netdata"
 RequestExecutionLevel admin
 
 !define MUI_ICON "NetdataWhite.ico"
+!define MUI_UNICON "NetdataWhite.ico"
+
+!define ND_UININSTALL_REG "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata"
 
 !define MUI_ABORTWARNING
 !define MUI_UNABORTWARNING
@@ -44,10 +48,28 @@ Section "Install Netdata"
 
 	WriteUninstaller "$INSTDIR\Uninstall.exe"
 
-        WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata" \
-                         "DisplayName" "Netdata -- Real-time system monitoring."
-        WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata" \
+        WriteRegStr HKLM "${ND_UININSTALL_REG}" \
+                         "DisplayName" "Netdata - Real-time system monitoring."
+        WriteRegStr HKLM "${ND_UININSTALL_REG}" \
+                         "DisplayIcon" "$INSTDIR\Uninstall.exe,0"
+        WriteRegStr HKLM "${ND_UININSTALL_REG}" \
                          "UninstallString" "$INSTDIR\Uninstall.exe"
+        WriteRegStr HKLM "${ND_UININSTALL_REG}" \
+                         "RegOwner" "Netdata Inc."
+        WriteRegStr HKLM "${ND_UININSTALL_REG}" \
+                         "RegCompany" "Netdata Inc."
+        WriteRegStr HKLM "${ND_UININSTALL_REG}" \
+                         "Publisher" "Netdata Inc."
+        WriteRegStr HKLM "${ND_UININSTALL_REG}" \
+                         "HelpLink" "https://learn.netdata.cloud/"
+        WriteRegStr HKLM "${ND_UININSTALL_REG}" \
+                         "URLInfoAbout" "https://www.netdata.cloud/"
+        WriteRegStr HKLM "${ND_UININSTALL_REG}" \
+                         "DisplayVersion" "${NDVERSION}"
+
+        ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
+        IntFmt $0 "0x%08X" $0
+        WriteRegDWORD HKLM "${ND_UININSTALL_REG}" "EstimatedSize" "$0"
 SectionEnd
 
 Section "Uninstall"
