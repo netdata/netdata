@@ -21,9 +21,11 @@ Module: ap
 
 ## Overview
 
-The ap collector visualizes data related to wireless access points.
+This collector monitors various wireless access point metrics like connected clients, bandwidth, packets, transmit issues, signal strength, and bitrate for each device and its associated SSID.
 
-It uses the `iw` command line utility to detect access points. Initially, the `iw dev` command is run. For each interface that is found to be of `type AP`, `iw INTERFACE station dump` is executed to collect metrics.
+
+This tool uses the `iw` command-line utility to discover nearby access points. It starts by running `iw dev`, which provides information about all wireless interfaces.  Then, for each interface identified as an access point (type AP), the `iw INTERFACE station dump` command is executed to gather relevant metrics.
+
 
 This collector is only supported on the following platforms:
 
