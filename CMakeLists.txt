@@ -2259,7 +2259,7 @@ target_compile_options(netdata PRIVATE
 )
 
 target_include_directories(netdata PRIVATE
-        "${CMAKE_SOURCE_DIR}"
+        "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
         "$<$<BOOL:${CURL_FOUND}>:${CURL_INCLUDE_DIRS}>"

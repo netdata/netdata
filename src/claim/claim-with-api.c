@@ -162,7 +162,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     return true;
 }
 
-CLAIM_AGENT_RESPONSE claim_agent(const char *token, const char *rooms, const char *url, const char *proxy, int insecure, const char **msg) {
+CLAIM_AGENT_RESPONSE claim_agent2(const char *token, const char *rooms, const char *url, const char *proxy, int insecure, const char **msg) {
     if (!create_claiming_directory()) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Error in creating claiming directory");
         return false;
@@ -179,6 +179,10 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *token, const char *rooms, const cha
     }
 
     return true;
+}
+
+CLAIM_AGENT_RESPONSE claim_agent(const char *id, const char *token, const char *rooms, const char **error) {
+    return claim_agent2(token, rooms, NULL, NULL, false, error);
 }
 
 #endif
