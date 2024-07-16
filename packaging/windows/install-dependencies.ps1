@@ -35,8 +35,8 @@ function Install-MSYS2 {
     }
     $installer_path = "$env:TEMP\msys2-base.exe"
 
-    if ($PROCESSOR_ARCHITECTURE -ne "AMD64") {
-        Write-Host "We can only install MSYS2 for 64-bit x86 systems, but you appear to have a different processor architecture ($PROCESSOR_ARCHITECTURE)."
+    if ($env:PROCESSOR_ARCHITECTURE -ne "AMD64") {
+        Write-Host "We can only install MSYS2 for 64-bit x86 systems, but you appear to have a different processor architecture ($env:PROCESSOR_ARCHITECTURE)."
         Write-Host "You will need to install MSYS2 yourself instead."
         exit 1
     }
