@@ -41,19 +41,22 @@ function Install-MSYS2 {
         exit 1
     }
 
-    Write-Host "Installing MSYS2 using the official installer"
-
-    $release = Invoke-RESTMethod -Uri $uri -Headers $headers -ConnectionTimeoutSeconds 15
+    Write-Host "Determining latest release"
+    $release = Invoke-RESTMethod -Uri $uri -Headers $headers -TimeoutSec 30
 
     $release_name = $release.name
     $version = $release.tag_name.Replace('-', '')
     $installer_url = "https://github.com/$repo/releases/download/$release_name/msys2-x86_64-$version.exe"
 
+    Write-Host "Fetching $installer_url"
     Invoke-WebRequest $installer_url -OutFile $installer_path
+    Write-Host "Fetching $installer_url.sha256"
     Invoke-WebRequest "$installer_url.sha256" -OutFile "$installer_path.sha256"
 
+    Write-Host "Checking file hash"
     Check-FileHash $installer_path
 
+    Write-Host "Installing"
     & $installer_path in --confirm-command --accept-messages --root C:/msys64
 
     return "C:\msys64"
