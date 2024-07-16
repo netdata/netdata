@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18176](https://github.com/netdata/netdata/pull/18176) ([netdatabot](https://github.com/netdatabot))
+- docs: add "install smartmontools" for Docker netdata [\#18175](https://github.com/netdata/netdata/pull/18175) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18174](https://github.com/netdata/netdata/pull/18174) ([netdatabot](https://github.com/netdatabot))
+- add support for sending Telegram notifications to topics [\#18173](https://github.com/netdata/netdata/pull/18173) ([ilyam8](https://github.com/ilyam8))
+- Fix logic bug in platform EOL check code. [\#18172](https://github.com/netdata/netdata/pull/18172) ([Ferroin](https://github.com/Ferroin))
+- Fix issue in platform EOL check workflow. [\#18171](https://github.com/netdata/netdata/pull/18171) ([Ferroin](https://github.com/Ferroin))
+- Bump github.com/likexian/whois from 1.15.3 to 1.15.4 in /src/go [\#18169](https://github.com/netdata/netdata/pull/18169) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/lmittmann/tint from 1.0.4 to 1.0.5 in /src/go [\#18167](https://github.com/netdata/netdata/pull/18167) ([dependabot[bot]](https://github.com/apps/dependabot))
 - go.d smartctl: use scan-open when "no\_check\_power\_mode" is "never" [\#18146](https://github.com/netdata/netdata/pull/18146) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18145](https://github.com/netdata/netdata/pull/18145) ([netdatabot](https://github.com/netdatabot))
 - go.d smartctl: do scan only once on startup if interval is 0 [\#18144](https://github.com/netdata/netdata/pull/18144) ([ilyam8](https://github.com/ilyam8))
@@ -27,6 +35,7 @@
 - make claiming work again [\#18116](https://github.com/netdata/netdata/pull/18116) ([ktsaou](https://github.com/ktsaou))
 - spawn server improvements [\#18115](https://github.com/netdata/netdata/pull/18115) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18114](https://github.com/netdata/netdata/pull/18114) ([netdatabot](https://github.com/netdatabot))
+- Fix detection of Coverity archive path in scan script. [\#18112](https://github.com/netdata/netdata/pull/18112) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#18110](https://github.com/netdata/netdata/pull/18110) ([netdatabot](https://github.com/netdatabot))
 - move "api key" option in stream.conf [\#18108](https://github.com/netdata/netdata/pull/18108) ([ilyam8](https://github.com/ilyam8))
 - add port service names to network viewer [\#18107](https://github.com/netdata/netdata/pull/18107) ([ktsaou](https://github.com/ktsaou))
@@ -34,6 +43,8 @@
 - docs: deploy docker add host root mount \(stable\) [\#18105](https://github.com/netdata/netdata/pull/18105) ([ilyam8](https://github.com/ilyam8))
 - Fix detection of Coverity archive in scan script. [\#18104](https://github.com/netdata/netdata/pull/18104) ([Ferroin](https://github.com/Ferroin))
 - add authorization to spawn requests [\#18103](https://github.com/netdata/netdata/pull/18103) ([ktsaou](https://github.com/ktsaou))
+- Bump CMake supported versions. [\#18102](https://github.com/netdata/netdata/pull/18102) ([Ferroin](https://github.com/Ferroin))
+- Stop a bit more quickly on a failure when using Ninja. [\#18101](https://github.com/netdata/netdata/pull/18101) ([Ferroin](https://github.com/Ferroin))
 - Fix network sent dimensions [\#18099](https://github.com/netdata/netdata/pull/18099) ([stelfrag](https://github.com/stelfrag))
 - go.d use pgx v4 for pgbouncer [\#18097](https://github.com/netdata/netdata/pull/18097) ([ilyam8](https://github.com/ilyam8))
 - Update securing-netdata-agents.md [\#18096](https://github.com/netdata/netdata/pull/18096) ([yoursweetginger](https://github.com/yoursweetginger))
@@ -406,13 +417,6 @@
 - Remove CentOS Stream 8 from CI. [\#17599](https://github.com/netdata/netdata/pull/17599) ([Ferroin](https://github.com/Ferroin))
 - go.d postgres: reset table/index bloat stats before querying [\#17598](https://github.com/netdata/netdata/pull/17598) ([ilyam8](https://github.com/ilyam8))
 - Bump golang.org/x/text from 0.14.0 to 0.15.0 in /src/go/collectors/go.d.plugin [\#17596](https://github.com/netdata/netdata/pull/17596) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/docker/docker from 26.1.0+incompatible to 26.1.1+incompatible in /src/go/collectors/go.d.plugin [\#17592](https://github.com/netdata/netdata/pull/17592) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Update eBPF code to v1.4.1. [\#17591](https://github.com/netdata/netdata/pull/17591) ([Ferroin](https://github.com/Ferroin))
-- Fix handling of service startup in DEB packages. [\#17589](https://github.com/netdata/netdata/pull/17589) ([Ferroin](https://github.com/Ferroin))
-- go.d/python.d respect all netdata log levels [\#17587](https://github.com/netdata/netdata/pull/17587) ([ilyam8](https://github.com/ilyam8))
-- Fix DEB package conflict entries. [\#17584](https://github.com/netdata/netdata/pull/17584) ([Ferroin](https://github.com/Ferroin))
-- fix ndsudo setuid bit for static builds [\#17583](https://github.com/netdata/netdata/pull/17583) ([ilyam8](https://github.com/ilyam8))
-- fix table [\#17581](https://github.com/netdata/netdata/pull/17581) ([hugovalente-pm](https://github.com/hugovalente-pm))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
