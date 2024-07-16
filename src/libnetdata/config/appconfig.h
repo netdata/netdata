@@ -186,7 +186,7 @@ int appconfig_set_boolean(struct config *root, const char *section, const char *
 int appconfig_exists(struct config *root, const char *section, const char *name);
 int appconfig_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new);
 
-void appconfig_generate(struct config *root, BUFFER *wb, int only_changed);
+void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool netdata_conf);
 
 int appconfig_section_compare(void *a, void *b);
 

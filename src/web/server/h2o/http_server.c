@@ -314,7 +314,7 @@ static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
         return -1;
 
     BUFFER *buf = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
-    config_generate(buf, 0);
+    netdata_conf_generate(buf, 0);
 
     void *managed = h2o_mem_alloc_shared(&req->pool, buf->len, NULL);
     memcpy(managed, buf->buffer, buf->len);

@@ -23,8 +23,6 @@ char *get_agent_claimid()
  */
 void load_claiming_state(void)
 {
-    // --------------------------------------------------------------------
-    // Check if the cloud is enabled
     nd_uuid_t uuid;
 
     // Propagate into aclk and registry. Be kind of atomic...
@@ -37,18 +35,26 @@ void load_claiming_state(void)
         freez(localhost->aclk_state.claimed_id);
         localhost->aclk_state.claimed_id = NULL;
     }
-    if (aclk_connected)
-    {
+
+    if (aclk_connected) {
         netdata_log_info("Agent was already connected to Cloud - forcing reconnection under new credentials");
         aclk_kill_link = 1;
     }
     aclk_disable_runtime = 0;
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/cloud.d/claimed_id", netdata_configured_varlib_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/claimed_id", netdata_configured_cloud_dir);
 
     long bytes_read;
     char *claimed_id = read_by_filename(filename, &bytes_read);
+    if(!claimed_id) {
+        const char *error;
+        if(claim_agent_from_files(&error))
+            claimed_id = read_by_filename(filename, &bytes_read);
+        else
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to automatically claim: %s", error);
+    }
+
     if(claimed_id && uuid_parse(claimed_id, uuid)) {
         netdata_log_error("claimed_id \"%s\" doesn't look like valid UUID", claimed_id);
         freez(claimed_id);

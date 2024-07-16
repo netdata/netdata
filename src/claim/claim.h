@@ -8,17 +8,8 @@
 extern char *claiming_pending_arguments;
 extern struct config cloud_config;
 
-typedef enum __attribute__((packed)) {
-    CLAIM_AGENT_OK,
-    CLAIM_AGENT_CLOUD_DISABLED,
-    CLAIM_AGENT_NO_CLOUD_URL,
-    CLAIM_AGENT_CANNOT_EXECUTE_CLAIM_SCRIPT,
-    CLAIM_AGENT_CLAIM_SCRIPT_FAILED,
-    CLAIM_AGENT_CLAIM_SCRIPT_RETURNED_INVALID_CODE,
-    CLAIM_AGENT_FAILED_WITH_MESSAGE,
-} CLAIM_AGENT_RESPONSE;
-
-CLAIM_AGENT_RESPONSE claim_agent(const char *token, const char *rooms, const char **error);
+bool claim_agent(const char *token, const char *rooms, const char **error);
+bool claim_agent_from_files(const char **error);
 
 char *get_agent_claimid(void);
 void load_claiming_state(void);
@@ -33,11 +24,5 @@ int api_v2_claim(struct web_client *w, char *url);
 const char *cloud_url(void);
 const char *cloud_proxy(void);
 bool cloud_insecure(void);
-
-#if defined(HAVE_LIBCURL)
-#define CLAIM_WITH_API
-#else
-#define CLAIM_WITH_SCRIPT
-#endif
 
 #endif //NETDATA_CLAIM_H

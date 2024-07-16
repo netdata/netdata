@@ -1197,7 +1197,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: generating netdata.conf ...", w->id);
             w->response.data->content_type = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
-            config_generate(w->response.data, 0);
+            netdata_conf_generate(w->response.data, 0);
             return HTTP_RESP_OK;
         }
 #ifdef NETDATA_INTERNAL_CHECKS

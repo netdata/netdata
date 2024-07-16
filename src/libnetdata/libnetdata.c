@@ -1618,34 +1618,37 @@ char *read_by_filename(const char *filename, long *file_size)
     FILE *f = fopen(filename, "r");
     if (!f)
         return NULL;
+
     if (fseek(f, 0, SEEK_END) < 0) {
         fclose(f);
         return NULL;
     }
+
     long size = ftell(f);
     if (size <= 0 || fseek(f, 0, SEEK_END) < 0) {
         fclose(f);
         return NULL;
     }
+
     char *contents = callocz(size + 1, 1);
-    if (!contents) {
-        fclose(f);
-        return NULL;
-    }
     if (fseek(f, 0, SEEK_SET) < 0) {
         fclose(f);
         freez(contents);
         return NULL;
     }
+
     size_t res = fread(contents, 1, size, f);
     if ( res != (size_t)size) {
         freez(contents);
         fclose(f);
         return NULL;
     }
+
     fclose(f);
+
     if (file_size)
         *file_size = size;
+
     return contents;
 }
 

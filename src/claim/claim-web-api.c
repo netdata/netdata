@@ -147,51 +147,26 @@ int api_v2_claim(struct web_client *w, char *url) {
 
         bool success = false;
         const char *msg = NULL;
-        CLAIM_AGENT_RESPONSE rc = claim_agent(token, rooms, &msg);
-        switch(rc) {
-            case CLAIM_AGENT_OK:
-                msg = "ok";
-                success = true;
-                can_be_claimed = false;
-                claim_reload_all();
-                {
-                    int ms = 0;
-                    do {
-                        status = cloud_status();
-                        if (status == CLOUD_STATUS_ONLINE && __atomic_load_n(&localhost->node_id, __ATOMIC_RELAXED))
-                            break;
+        if(claim_agent(token, rooms, &msg)) {
+            msg = "ok";
+            success = true;
+            can_be_claimed = false;
+            claim_reload_all();
+            {
+                int ms = 0;
+                do {
+                    status = cloud_status();
+                    if (status == CLOUD_STATUS_ONLINE && __atomic_load_n(&localhost->node_id, __ATOMIC_RELAXED))
+                        break;
 
-                        sleep_usec(50 * USEC_PER_MS);
-                        ms += 50;
-                    } while (ms < 10000);
-                }
-                break;
-
-            case CLAIM_AGENT_NO_CLOUD_URL:
-                msg = "No Netdata Cloud URL.";
-                break;
-
-            case CLAIM_AGENT_CLAIM_SCRIPT_FAILED:
-                msg = "Claiming script failed.";
-                break;
-
-            case CLAIM_AGENT_CLOUD_DISABLED:
-                msg = "Netdata Cloud is disabled on this agent.";
-                break;
-
-            case CLAIM_AGENT_CANNOT_EXECUTE_CLAIM_SCRIPT:
-                msg = "Failed to execute claiming script.";
-                break;
-
-            case CLAIM_AGENT_CLAIM_SCRIPT_RETURNED_INVALID_CODE:
-                msg = "Claiming script returned invalid code.";
-                break;
-
-            default:
-            case CLAIM_AGENT_FAILED_WITH_MESSAGE:
-                if(!msg)
-                    msg = "Unknown error";
-                break;
+                    sleep_usec(50 * USEC_PER_MS);
+                    ms += 50;
+                } while (ms < 10000);
+            }
+        }
+        else {
+            if (!msg)
+                msg = "Unknown error";
         }
 
         // our status may have changed
