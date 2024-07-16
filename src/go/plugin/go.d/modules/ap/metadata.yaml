@@ -89,7 +89,11 @@ modules:
       scopes:
         - name: wireless device
           description: "These metrics refer to the entire monitored application."
-          labels: []
+          labels:
+            - name: device
+              description: Wireless interface name
+            - name: ssid
+              description: SSID
           metrics:
             - name: ap.clients
               description: Connected clients
