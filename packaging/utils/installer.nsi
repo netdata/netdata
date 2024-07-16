@@ -66,6 +66,10 @@ Section "Install Netdata"
                          "URLInfoAbout" "https://www.netdata.cloud/"
         WriteRegStr HKLM "${ND_UININSTALL_REG}" \
                          "DisplayVersion" "${NDVERSION}"
+        WriteRegStr HKLM "${ND_UININSTALL_REG}" \
+                         "VersionMajor" "${NDMAJORVERSION}"
+        WriteRegStr HKLM "${ND_UININSTALL_REG}" \
+                         "VersionMinor" "${NDMINORVERSION}"
 
         ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
         IntFmt $0 "0x%08X" $0

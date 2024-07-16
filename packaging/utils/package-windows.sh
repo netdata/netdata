@@ -24,6 +24,8 @@ if [ ! -f "/msys2-installer.exe" ]; then
 fi
 
 NDVERSION=$"$(grep 'CMAKE_PROJECT_VERSION:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
+NDMAJORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MAJOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
+NDMINORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MINOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 
-makensis -DCURRVERSION="${NDVERSION}" "${WT_ROOT}/packaging/utils/installer.nsi"
+makensis -DCURRVERSION="${NDVERSION}" -DMAJORVERSION="${NDMAJORVERSION}" -DMINORVERSION="${NDMINORVERSION}" "${WT_ROOT}/packaging/utils/installer.nsi"
 
