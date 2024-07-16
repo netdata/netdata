@@ -26,24 +26,7 @@ function Check-FileHash {
     }
 }
 
-function Install-MSYS2Chocolatey {
-    Write-Host "Using Chocolatey to install MSYS2."
-    choco install -y msys2
-
-    if ($LastExitcode -ne 0) {
-        Write-Host "Failed to install MSYS2 using Chocolatey"
-        exit 1
-    }
-
-    if (Test-Path -Path "$env:ChocolateyToolsLocation\msys64\usr\bin\bash.exe") {
-        return "$env:ChocolateyToolsLocation\msys2"
-    } else {
-        Write-Host "Can not find the copy of MSYS2 installed by Chocolatey"
-        exit 1
-    }
-}
-
-function Install-MSYS2Native {
+function Install-MSYS2 {
     $repo = 'msys2/msys2-installer'
     $uri = "https://api.github.com/repos/$repo/releases/latest"
     $headers = @{
@@ -77,13 +60,8 @@ function Install-MSYS2Native {
 }
 
 if (-Not ($msysprefix)) {
-    Write-Host "Could not find MSYS2, attempting to install it."
-
-    if (Get-Command choco) {
-        $msysprefix = Install-MSYS2Chocolatey
-    } else {
-        $msysprefix = Install-MSYS2Native
-    }
+    Write-Host "Could not find MSYS2, attempting to install it"
+    $msysprefix = Install-MSYS2
 }
 
 $msysbash = Get-MSYS2Bash "$msysprefix"

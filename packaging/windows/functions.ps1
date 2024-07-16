@@ -8,6 +8,8 @@ function Get-MSYS2Prefix {
             return "C:\msys64"
         } elseif ($env:ChocolateyToolsLocation) {
             if (Test-Path -Path "$env:ChocolateyToolsLocation\msys64\usr\bin\bash.exe") {
+                Write-Host "Found MSYS2 installed via Chocolatey"
+                Write-Host "This will work for building Netdata, but not for packaging it"
                 return "$env:ChocolateyToolsLocation\msys64"
             }
         }
