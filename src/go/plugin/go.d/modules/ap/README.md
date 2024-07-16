@@ -1,0 +1,1 @@
+integrations/access_points.md
