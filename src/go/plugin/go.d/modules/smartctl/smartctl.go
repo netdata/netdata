@@ -82,8 +82,7 @@ type (
 		mx          map[string]int64
 	}
 	smartctlCli interface {
-		scan() (*gjson.Result, error)
-		scanOpen() (*gjson.Result, error)
+		scan(open bool) (*gjson.Result, error)
 		deviceInfo(deviceName, deviceType, powerMode string) (*gjson.Result, error)
 	}
 )
