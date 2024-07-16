@@ -42,10 +42,9 @@ function Install-MSYS2 {
     }
 
     Write-Host "Determining latest release"
-    $release_list = Invoke-RESTMethod -Uri $uri -Headers $headers -TimeoutSec 30
-    $release_list = Where-Object -InputObject "$release_list" -Property name -NE -Value "Nightly Installer Build"
-    $release = $release_list[0]
+    $release_list = Invoke-RestMethod -Uri $uri -Headers $headers -TimeoutSec 30
 
+    $release = $release_list[0]
     $release_name = $release.name
     $version = $release.tag_name.Replace('-', '')
     $installer_url = "https://github.com/$repo/releases/download/$release_name/msys2-x86_64-$version.exe"
