@@ -25,9 +25,6 @@ void load_claiming_state(void)
 {
     // --------------------------------------------------------------------
     // Check if the cloud is enabled
-#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-    netdata_cloud_enabled = false;
-#else
     nd_uuid_t uuid;
 
     // Propagate into aclk and registry. Be kind of atomic...
@@ -76,7 +73,6 @@ void load_claiming_state(void)
 
     netdata_log_info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
     netdata_cloud_enabled = appconfig_get_boolean_ondemand(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", netdata_cloud_enabled);
-#endif
 }
 
 void claim_reload_all(void) {

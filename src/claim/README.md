@@ -247,61 +247,6 @@ If you choose to continue using the outdated version of OpenSSL, your node will 
 with hostname verification disabled. Without verification, your Netdata Cloud connection could be vulnerable to
 man-in-the-middle attacks.
 
-### cloud-enabled is false
-
-If `cloud-enabled` is `false`, you probably ran the installer with `--disable-cloud` option.
-
-Additionally, check that the `enabled` setting in `var/lib/netdata/cloud.d/cloud.conf` is set to `true`:
-
-```conf
-[global]
-    enabled = true
-```
-
-To fix this issue, reinstall Netdata using
-your [preferred method](/packaging/installer/README.md) and do not add
-the `--disable-cloud` option.
-
-### cloud-available is false / ACLK Available: No
-
-If `cloud-available` is `false` after you verified Cloud is enabled in the previous step, the most likely issue is that
-Cloud features failed to build during installation.
-
-If Cloud features fail to build, the installer continues and finishes the process without Cloud functionality as opposed
-to failing the installation altogether.
-
-We do this to ensure the Agent will always finish installing.
-
-If you can't see an explicit error in the installer's output, you can run the installer with the `--require-cloud`
-option. This option causes the installation to fail if Cloud functionality can't be built and enabled, and the
-installer's output should give you more error details.
-
-You may see one of the following error messages during installation:
-
-- `Failed to build libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud.`
-- `Unable to fetch sources for libmosquitto. The install process will continue, but you will not be able to connect this node to Netdata Cloud.`
-- `Failed to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud.`
-- `Unable to fetch sources for libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud.`
-- `Could not find cmake, which is required to build libwebsockets. The install process will continue, but you may not be able to connect this node to Netdata Cloud.`
-- `Could not find cmake, which is required to build JSON-C. The install process will continue, but Netdata Cloud support will be disabled.`
-- `Failed to build JSON-C. Netdata Cloud support will be disabled.`
-- `Unable to fetch sources for JSON-C. Netdata Cloud support will be disabled.`
-
-One common cause of the installer failing to build Cloud features is not having one of the following dependencies on
-your system: `cmake`, `json-c` and `OpenSSL`, including corresponding `devel` packages.
-
-You can also look for error messages in `/var/log/netdata/error.log`. Try one of the following two commands to search
-for ACLK-related errors.
-
-```bash
-less /var/log/netdata/error.log
-grep -i ACLK /var/log/netdata/error.log
-```
-
-If the installer's output does not help you enable Cloud features, contact us
-by [creating an issue on GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=The+installer+failed+to+prepare+the+required+dependencies+for+Netdata+Cloud+functionality)
-with details about your system and relevant output from `error.log`.
-
 ### agent-claimed is false / Claimed: No
 
 You must [connect your node](#connect).

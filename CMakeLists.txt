@@ -2430,10 +2430,6 @@ set(registrydir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata/registry")
 set(varlibdir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(netdata_user_POST "${NETDATA_USER}")
 
-# netdata-claim.sh
-set(enable_cloud_POST "yes")
-set(enable_aclk_POST "yes")
-
 configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh

@@ -812,13 +812,6 @@ void *aclk_main(void *ptr)
 
     unsigned int proto_hdl_cnt = aclk_init_rx_msg_handlers();
 
-#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-    nd_log(NDLS_DAEMON, NDLP_INFO,
-           "Killing ACLK thread -> cloud functionality has been disabled");
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-    return NULL;
-#endif
     query_threads.count = read_query_thread_count();
 
     if (wait_till_cloud_enabled())

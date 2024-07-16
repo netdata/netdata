@@ -202,8 +202,6 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly updates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-ebpf             Disable eBPF Kernel plugin. Default: enabled.
-  --disable-cloud            Disable all Netdata Cloud functionality.
-  --require-cloud            Fail the install if it can't build Netdata Cloud support.
   --force-legacy-cxx         Force usage of an older C++ standard to allow building on older systems. This will usually be autodetected.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi  Explicitly disable the FreeIPMI plugin.
@@ -260,6 +258,7 @@ ENABLE_DBENGINE=1
 ENABLE_GO=1
 ENABLE_H2O=1
 ENABLE_CLOUD=1
+NETDATA_REQUIRE_CLOUD=1
 ENABLE_LOGS_MANAGEMENT=1
 ENABLE_LOGS_MANAGEMENT_TESTS=0
 FORCE_LEGACY_CXX=0
@@ -335,20 +334,10 @@ while [ -n "${1}" ]; do
       # XXX: No longer supported
       ;;
     "--disable-cloud")
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-        warning "Cloud explicitly enabled, ignoring --disable-cloud."
-      else
-        ENABLE_CLOUD=0
-        NETDATA_DISABLE_CLOUD=1
-      fi
+      warning "Cloud cannot be disabled."
       ;;
     "--require-cloud")
-      if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
-        warning "Cloud explicitly disabled, ignoring --require-cloud."
-      else
-        ENABLE_CLOUD=1
-        NETDATA_REQUIRE_CLOUD=1
-      fi
+      warning "Cloud is always required."
       ;;
     "--build-json-c")
       NETDATA_BUILD_JSON_C=1

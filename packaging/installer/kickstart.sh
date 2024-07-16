@@ -53,7 +53,6 @@ INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="default"
 NETDATA_CLAIM_URL="https://app.netdata.cloud"
 NETDATA_COMMAND="default"
-NETDATA_DISABLE_CLOUD=0
 NETDATA_INSTALLER_OPTIONS=""
 NETDATA_FORCE_METHOD=""
 NETDATA_OFFLINE_INSTALL_SOURCE=""
@@ -149,8 +148,6 @@ main() {
 
   if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
     claim
-  elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ]; then
-    soft_disable_cloud
   fi
 
   set_auto_updates
@@ -185,8 +182,6 @@ USAGE: kickstart.sh [options]
   --native-only                    Only install if native binary packages are available.
   --static-only                    Only install if a static build is available.
   --build-only                     Only install using a local build.
-  --disable-cloud                  Disable support for Netdata Cloud (default: detect)
-  --require-cloud                  Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
   --install-prefix <path>          Specify an installation prefix for local builds (default: autodetect based on system type).
   --old-install-prefix <path>      Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
   --install-version <version>      Specify the version of Netdata to install.
@@ -1237,8 +1232,6 @@ check_claim_opts() {
     fatal "Invalid claiming options, claim rooms may only be specified when a token is specified." F0204
   elif [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_EXTRA}" ]; then
     fatal "Invalid claiming options, a claiming token must be specified." F0204
-  elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ] && [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
-    fatal "Cloud explicitly disabled, but automatic claiming requested. Either enable Netdata Cloud, or remove the --claim-* options." F0204
   fi
 }
 
@@ -1926,12 +1919,6 @@ build_and_install() {
     opts="${opts} --stable-channel"
   fi
 
-  if [ "${NETDATA_REQUIRE_CLOUD}" -eq 1 ]; then
-    opts="${opts} --require-cloud"
-  elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ]; then
-    opts="${opts} --disable-cloud"
-  fi
-
   # shellcheck disable=SC2086
   run_script ./netdata-installer.sh ${opts}
 
@@ -2369,12 +2356,10 @@ parse_args() {
         esac
         ;;
       "--disable-cloud")
-        NETDATA_DISABLE_CLOUD=1
-        NETDATA_REQUIRE_CLOUD=0
+        warning "Cloud cannot be disabled"
         ;;
       "--require-cloud")
-        NETDATA_DISABLE_CLOUD=0
-        NETDATA_REQUIRE_CLOUD=1
+        warning "Cloud is always required"
         ;;
       "--dont-start-it")
         NETDATA_NO_START=1

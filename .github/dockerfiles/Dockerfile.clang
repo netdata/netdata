@@ -16,4 +16,4 @@ WORKDIR /netdata
 COPY . .
 
 # Build Netdata
-RUN ./netdata-installer.sh --dont-wait --dont-start-it --disable-go --require-cloud
+RUN ./netdata-installer.sh --dont-wait --dont-start-it --disable-go

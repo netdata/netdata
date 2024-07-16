@@ -245,10 +245,6 @@ By default, the kickstart script will provide a Netdata agent installation that 
   Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [connecting through a proxy](/src/claim/README.md#connect-through-a-proxy) for details.
 - `--claim-only`
   If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
-- `--require-cloud`
-  Only install if Netdata Cloud can be enabled.
-- `--disable-cloud`
-  For local builds, don’t build any of the Netdata Cloud code at all. For native packages and static builds, use runtime configuration to disable Netdata Cloud support.
 
 ### anonymous telemetry
 
