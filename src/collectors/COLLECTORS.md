@@ -679,7 +679,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 #### Network
 
-- [Access Points](https://github.com/netdata/netdata/blob/master/src/collectors/charts.d.plugin/ap/integrations/access_points.md)
+- [Access Points](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/ap/integrations/access_points.md)
 
 - [IP Virtual Server](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/ip_virtual_server.md)
 
