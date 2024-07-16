@@ -493,7 +493,7 @@ char *strndupz(const char *s, size_t len) {
 
 // If ptr is NULL, no operation is performed.
 void freez(void *ptr) {
-    free(ptr);
+    if(likely(ptr)) free(ptr);
 }
 
 void *mallocz(size_t size) {
@@ -1248,7 +1248,7 @@ cleanup:
             close(fd);
     }
     if(mem == MAP_FAILED) return NULL;
-    errno = 0;
+    errno_clear();
     return mem;
 }
 
@@ -1364,7 +1364,7 @@ int verify_netdata_host_prefix(bool log_msg) {
     char buffer[FILENAME_MAX + 1];
     char *path = netdata_configured_host_prefix;
     char *reason = "unknown reason";
-    errno = 0;
+    errno_clear();
 
     struct stat sb;
     if (stat(path, &sb) == -1) {
@@ -1679,19 +1679,17 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
     return value;
 }
 
-
 BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_length) {
     BUFFER *wb = buffer_create(0, NULL);
 
-    pid_t pid;
-    FILE *fp = netdata_popen(command, &pid, NULL);
-
-    if(fp) {
+    POPEN_INSTANCE *pi = spawn_popen_run(command);
+    if(pi) {
         char buffer[max_line_length + 1];
-        while (fgets(buffer, max_line_length, fp)) {
+        while (fgets(buffer, max_line_length, pi->child_stdout_fp)) {
             buffer[max_line_length] = '\0';
             buffer_strcat(wb, buffer);
         }
+        spawn_popen_kill(pi);
     }
     else {
         buffer_free(wb);
@@ -1699,101 +1697,25 @@ BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_l
         return NULL;
     }
 
-    netdata_pclose(NULL, fp, pid);
     return wb;
 }
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {
-    pid_t pid;
-    FILE *fp = netdata_popen(command, &pid, NULL);
-
-    if(fp) {
+    POPEN_INSTANCE *pi = spawn_popen_run(command);
+    if(pi) {
         char buffer[max_line_length + 1];
-        while (fgets(buffer, max_line_length, fp))
+
+        while (fgets(buffer, max_line_length, pi->child_stdout_fp))
             fprintf(stdout, "%s", buffer);
+
+        spawn_popen_kill(pi);
     }
     else {
         netdata_log_error("Failed to execute command '%s'.", command);
         return false;
     }
 
-    netdata_pclose(NULL, fp, pid);
     return true;
-}
-
-
-static int fd_is_valid(int fd) {
-    return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
-}
-
-void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds){
-    int fd;
-
-    switch(action){
-        case OPEN_FD_ACTION_CLOSE:
-            if(!(excluded_fds & OPEN_FD_EXCLUDE_STDIN))  (void)close(STDIN_FILENO);
-            if(!(excluded_fds & OPEN_FD_EXCLUDE_STDOUT)) (void)close(STDOUT_FILENO);
-            if(!(excluded_fds & OPEN_FD_EXCLUDE_STDERR)) (void)close(STDERR_FILENO);
-#if defined(HAVE_CLOSE_RANGE)
-            if(close_range(STDERR_FILENO + 1, ~0U, 0) == 0) return;
-            nd_log(NDLS_DAEMON, NDLP_DEBUG, "close_range() failed, will try to close fds one by one");
-#endif
-            break;
-        case OPEN_FD_ACTION_FD_CLOEXEC:
-            if(!(excluded_fds & OPEN_FD_EXCLUDE_STDIN))  (void)fcntl(STDIN_FILENO, F_SETFD, FD_CLOEXEC);
-            if(!(excluded_fds & OPEN_FD_EXCLUDE_STDOUT)) (void)fcntl(STDOUT_FILENO, F_SETFD, FD_CLOEXEC);
-            if(!(excluded_fds & OPEN_FD_EXCLUDE_STDERR)) (void)fcntl(STDERR_FILENO, F_SETFD, FD_CLOEXEC);
-#if defined(HAVE_CLOSE_RANGE) && defined(CLOSE_RANGE_CLOEXEC) // Linux >= 5.11, FreeBSD >= 13.1
-            if(close_range(STDERR_FILENO + 1, ~0U, CLOSE_RANGE_CLOEXEC) == 0) return;
-            nd_log(NDLS_DAEMON, NDLP_DEBUG, "close_range() failed, will try to mark fds for closing one by one");
-#endif
-            break;
-        default:
-            break; // do nothing
-    }
-
-    DIR *dir = opendir("/proc/self/fd");
-    if (dir == NULL) {
-        struct rlimit rl;
-        int open_max = -1;
-
-        if(getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_max != RLIM_INFINITY) open_max = rl.rlim_max;
-#ifdef _SC_OPEN_MAX
-        else open_max = sysconf(_SC_OPEN_MAX);
-#endif
-
-        if (open_max == -1) open_max = 65535; // 65535 arbitrary default if everything else fails
-
-        for (fd = STDERR_FILENO + 1; fd < open_max; fd++) {
-            switch(action){
-                case OPEN_FD_ACTION_CLOSE:
-                    if(fd_is_valid(fd)) (void)close(fd);
-                    break;
-                case OPEN_FD_ACTION_FD_CLOEXEC:
-                    (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
-                    break;
-                default:
-                    break; // do nothing
-            }
-        }
-    } else {
-        struct dirent *entry;
-        while ((entry = readdir(dir)) != NULL) {
-            fd = str2i(entry->d_name);
-            if(unlikely((fd == STDIN_FILENO ) || (fd == STDOUT_FILENO) || (fd == STDERR_FILENO) )) continue;
-            switch(action){
-                case OPEN_FD_ACTION_CLOSE:
-                    if(fd_is_valid(fd)) (void)close(fd);
-                    break;
-                case OPEN_FD_ACTION_FD_CLOEXEC:
-                    (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
-                    break;
-                default:
-                    break; // do nothing
-            }
-        }
-        closedir(dir);
-    }
 }
 
 struct timing_steps {

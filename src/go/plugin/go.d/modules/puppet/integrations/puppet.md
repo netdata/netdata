@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/python.d.plugin/puppet/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/collectors/python.d.plugin/puppet/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/puppet/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/puppet/metadata.yaml"
 sidebar_label: "Puppet"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/CICD Platforms"
@@ -14,17 +14,17 @@ endmeta-->
 <img src="https://netdata.cloud/img/puppet.svg" width="150"/>
 
 
-Plugin: python.d.plugin
+Plugin: go.d.plugin
 Module: puppet
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Overview
 
-This collector monitors Puppet metrics about JVM Heap, Non-Heap, CPU usage and file descriptors.'
+This collector monitors Puppet metrics, including JVM heap and non-heap memory, CPU usage, and file descriptors.
 
 
-It uses Puppet's metrics API endpoint to gather the metrics.
+It uses Puppet's metrics API endpoint [/status/v1/services](https://www.puppet.com/docs/puppetserver/5.3/status-api/v1/services.html) to gather the metrics.
 
 
 This collector is supported on all platforms.
@@ -36,7 +36,11 @@ This collector supports collecting metrics from multiple instances of this integ
 
 #### Auto-Detection
 
-By default, this collector will use `https://fqdn.example.com:8140` as the URL to look for metrics.
+By default, it detects Puppet instances running on localhost that are listening on port 8140.
+On startup, it tries to collect metrics from:
+
+- https://127.0.0.1:8140
+
 
 #### Limits
 
@@ -87,7 +91,7 @@ No action required.
 
 #### File
 
-The configuration file name for this integration is `python.d/puppet.conf`.
+The configuration file name for this integration is `go.d/puppet.conf`.
 
 
 You can edit the configuration file using the `edit-config` script from the
@@ -95,70 +99,48 @@ Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netda
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config python.d/puppet.conf
+sudo ./edit-config go.d/puppet.conf
 ```
 #### Options
 
-This particular collector does not need further configuration to work if permissions are satisfied, but you can always customize it's data collection behavior.
-
-There are 2 sections:
-
-* Global variables
-* One or more JOBS that can define multiple different instances to monitor.
-
-The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
-
-Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
-
-Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
-
-> Notes:
-> - Exact Fully Qualified Domain Name of the node should be used.
-> - Usually Puppet Server/DB startup time is VERY long. So, there should be quite reasonable retry count.
-> - A secured PuppetDB config may require a client certificate. This does not apply to the default PuppetDB configuration though.
+The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details open><summary>Config options</summary>
+<details open><summary></summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| url | HTTP or HTTPS URL, exact Fully Qualified Domain Name of the node should be used. | https://fqdn.example.com:8081 | yes |
-| tls_verify | Control HTTPS server certificate verification. | False | no |
-| tls_ca_file | Optional CA (bundle) file to use |  | no |
-| tls_cert_file | Optional client certificate file |  | no |
-| tls_key_file | Optional client key file |  | no |
-| update_every | Sets the default data collection frequency. | 30 | no |
-| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
-| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
-| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | no |
+| url | The base URL where the Puppet instance can be accessed. | https://127.0.0.1:8140 | yes |
+| timeout | HTTPS request timeout. | 1 | no |
+| username | Username for basic HTTPS authentication. |  | no |
+| password | Password for basic HTTPS authentication. |  | no |
+| proxy_url | Proxy URL. |  | no |
+| proxy_username | Username for proxy basic HTTPS authentication. |  | no |
+| proxy_password | Password for proxy basic HTTPS authentication. |  | no |
+| method | HTTPS request method. | POST | no |
+| body | HTTPS request body. |  | no |
+| headers | HTTPS request headers. |  | no |
+| not_follow_redirects | Redirect handling policy. Controls whether the client follows redirects. | no | no |
+| tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | no | no |
+| tls_ca | Certification authority that the client uses when verifying the server's certificates. |  | no |
+| tls_cert | Client TLS certificate. |  | no |
+| tls_key | Client TLS key. |  | no |
 
 </details>
 
 #### Examples
 
-##### Basic
+##### Basic with self-signed certificate
 
-A basic example configuration
-
-```yaml
-puppetserver:
-  url: 'https://fqdn.example.com:8140'
-  autodetection_retry: 1
-
-```
-##### TLS Certificate
-
-An example using a TLS certificate
+Puppet with self-signed TLS certificate.
 
 <details open><summary>Config</summary>
 
 ```yaml
-puppetdb:
-  url: 'https://fqdn.example.com:8081'
-  tls_cert_file: /path/to/client.crt
-  tls_key_file: /path/to/client.key
-  autodetection_retry: 1
+jobs:
+  - name: local
+    url: https://127.0.0.1:8140
+    tls_skip_verify: yes
 
 ```
 </details>
@@ -173,13 +155,14 @@ Collecting metrics from local and remote instances.
 <details open><summary>Config</summary>
 
 ```yaml
-puppetserver1:
-  url: 'https://fqdn.example.com:8140'
-  autodetection_retry: 1
+jobs:
+  - name: local
+    url: https://127.0.0.1:8140
+    tls_skip_verify: yes
 
-puppetserver2:
-  url: 'https://fqdn.example2.com:8140'
-  autodetection_retry: 1
+  - name: remote
+    url: https://192.0.2.1:8140
+    tls_skip_verify: yes
 
 ```
 </details>
@@ -190,7 +173,7 @@ puppetserver2:
 
 ### Debug Mode
 
-To troubleshoot issues with the `puppet` collector, run the `python.d.plugin` with the debug option enabled. The output
+To troubleshoot issues with the `puppet` collector, run the `go.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.
 
 - Navigate to the `plugins.d` directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on
@@ -206,10 +189,10 @@ should give you clues as to why the collector isn't working.
   sudo -u netdata -s
   ```
 
-- Run the `python.d.plugin` to debug the collector:
+- Run the `go.d.plugin` to debug the collector:
 
   ```bash
-  ./python.d.plugin puppet debug trace
+  ./go.d.plugin -d -m puppet
   ```
 
 ### Getting Logs

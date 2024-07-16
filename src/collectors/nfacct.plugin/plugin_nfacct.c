@@ -809,7 +809,7 @@ int main(int argc, char **argv) {
 
     nfacct_signals();
 
-    errno = 0;
+    errno_clear();
 
     if(freq >= netdata_update_every)
         netdata_update_every = freq;

@@ -326,18 +326,15 @@ void analytics_alarms_notifications(void)
 
     strcat(script, " dump_methods");
 
-    pid_t command_pid;
-
     netdata_log_debug(D_ANALYTICS, "Executing %s", script);
 
     BUFFER *b = buffer_create(1000, NULL);
     int cnt = 0;
-    FILE *fp_child_input;
-    FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
-    if (fp_child_output) {
+    POPEN_INSTANCE *instance = spawn_popen_run(script);
+    if (instance) {
         char line[200 + 1];
 
-        while (fgets(line, 200, fp_child_output) != NULL) {
+        while (fgets(line, 200, instance->child_stdout_fp) != NULL) {
             char *end = line;
             while (*end && *end != '\n')
                 end++;
@@ -350,7 +347,7 @@ void analytics_alarms_notifications(void)
 
             cnt++;
         }
-        netdata_pclose(fp_child_input, fp_child_output, command_pid);
+        spawn_popen_wait(instance);
     }
     freez(script);
 
@@ -1001,8 +998,6 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
     char *command_to_run = mallocz(
         sizeof(char) * (strlen(statistic->action) + strlen(action_result) + strlen(action_data) + strlen(as_script) +
                         analytics_data.data_length + (ANALYTICS_NO_OF_ITEMS * 3) + 15));
-    pid_t command_pid;
-
     sprintf(
         command_to_run,
         "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
@@ -1055,12 +1050,11 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
            "%s '%s' '%s' '%s'",
            as_script, statistic->action, action_result, action_data);
 
-    FILE *fp_child_input;
-    FILE *fp_child_output = netdata_popen(command_to_run, &command_pid, &fp_child_input);
-    if (fp_child_output) {
+    POPEN_INSTANCE *instance = spawn_popen_run(command_to_run);
+    if (instance) {
         char buffer[4 + 1];
-        char *s = fgets(buffer, 4, fp_child_output);
-        int exit_code = netdata_pclose(fp_child_input, fp_child_output, command_pid);
+        char *s = fgets(buffer, 4, instance->child_stdout_fp);
+        int exit_code = spawn_popen_wait(instance);
         if (exit_code)
 
             nd_log(NDLS_DAEMON, NDLP_NOTICE,

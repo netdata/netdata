@@ -18,11 +18,15 @@
 macro(FetchContent_MakeAvailable_NoInstall name)
     include(FetchContent)
 
-    FetchContent_GetProperties(${name})
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+        FetchContent_MakeAvailable(${name})
+    else()
+        FetchContent_GetProperties(${name})
 
-    if(NOT ${name}_POPULATED)
-        FetchContent_Populate(${name})
-        add_subdirectory(${${name}_SOURCE_DIR} ${${name}_BINARY_DIR} EXCLUDE_FROM_ALL)
+        if(NOT ${name}_POPULATED)
+            FetchContent_Populate(${name})
+            add_subdirectory(${${name}_SOURCE_DIR} ${${name}_BINARY_DIR} EXCLUDE_FROM_ALL)
+        endif()
     endif()
 endmacro()
 

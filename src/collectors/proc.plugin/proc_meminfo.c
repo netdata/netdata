@@ -29,7 +29,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     static ARL_BASE *arl_base = NULL;
     static ARL_ENTRY *arl_hwcorrupted = NULL, *arl_memavailable = NULL, *arl_hugepages_total = NULL,
-        *arl_zswapped = NULL, *arl_high_low = NULL, *arl_cma_total = NULL,
+        *arl_zswapped = NULL, *arl_high_low = NULL,
         *arl_directmap4k = NULL, *arl_directmap2m = NULL, *arl_directmap4m = NULL, *arl_directmap1g = NULL;
 
     static unsigned long long
@@ -101,18 +101,18 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             ;
 
     if(unlikely(!arl_base)) {
-        do_ram          = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system ram", 1);
+        do_ram          = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system ram", CONFIG_BOOLEAN_YES);
         do_swap         = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system swap", CONFIG_BOOLEAN_AUTO);
         do_hwcorrupt    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "hardware corrupted ECC", CONFIG_BOOLEAN_AUTO);
-        do_committed    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "committed memory", 1);
-        do_writeback    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "writeback memory", 1);
-        do_kernel       = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "kernel memory", 1);
-        do_slab         = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "slab memory", 1);
+        do_committed    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "committed memory", CONFIG_BOOLEAN_YES);
+        do_writeback    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "writeback memory", CONFIG_BOOLEAN_YES);
+        do_kernel       = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "kernel memory", CONFIG_BOOLEAN_YES);
+        do_slab         = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "slab memory", CONFIG_BOOLEAN_YES);
         do_hugepages    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "hugepages", CONFIG_BOOLEAN_AUTO);
         do_transparent_hugepages = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "transparent hugepages", CONFIG_BOOLEAN_AUTO);
         do_reclaiming   = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "memory reclaiming", CONFIG_BOOLEAN_AUTO);
         do_high_low     = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "high low memory", CONFIG_BOOLEAN_AUTO);
-        do_cma          = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "cma memory", CONFIG_BOOLEAN_AUTO);
+        do_cma          = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "cma memory", CONFIG_BOOLEAN_AUTO);
         do_directmap    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "direct maps", CONFIG_BOOLEAN_AUTO);
 
         // https://github.com/torvalds/linux/blob/master/fs/proc/meminfo.c
@@ -189,7 +189,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         arl_expect(arl_base, "FilePmdMapped", &FilePmdMapped);
 
         // CONFIG_CMA
-        arl_cma_total = arl_expect(arl_base, "CmaTotal", &CmaTotal);
+        arl_expect(arl_base, "CmaTotal", &CmaTotal);
         arl_expect(arl_base, "CmaFree", &CmaFree);
 
         // CONFIG_UNACCEPTED_MEMORY
@@ -285,7 +285,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             rrdset_done(st_mem_swap_cached);
         }
 
-        if(arl_zswapped->flags & ARL_ENTRY_FLAG_FOUND) {
+        if (is_mem_zswap_enabled && (arl_zswapped->flags & ARL_ENTRY_FLAG_FOUND)) {
             static RRDSET *st_mem_zswap = NULL;
             static RRDDIM *rd_zswap = NULL, *rd_zswapped = NULL;
 
@@ -673,7 +673,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         rrdset_done(st_mem_high_low);
     }
 
-    if(do_cma == CONFIG_BOOLEAN_YES || (do_cma == CONFIG_BOOLEAN_AUTO && (arl_cma_total->flags & ARL_ENTRY_FLAG_FOUND) && CmaTotal)) {
+    if (CmaTotal && do_cma != CONFIG_BOOLEAN_NO) {
         do_cma = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_mem_cma = NULL;

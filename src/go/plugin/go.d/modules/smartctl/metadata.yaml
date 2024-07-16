@@ -54,30 +54,36 @@ modules:
               Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
           - title: For Netdata running in a Docker container
             description: |
-              Netdata requires the `SYS_RAWIO` capability and access to the storage devices to run the `smartctl` collector inside a Docker container. Here's how you can achieve this:
+              1. **Install smartmontools**.
 
-              - `docker run`
+                  Ensure `smartctl` is available in the container by setting the environment variable `NETDATA_EXTRA_DEB_PACKAGES=smartmontools` when starting the container.
 
-                ```bash
-                docker run --cap-add SYS_RAWIO --device /dev/sda:/dev/sda ...
-                ```
+              2. **Provide access to storage devices**.
 
-              - `docker-compose.yml`
+                  Netdata requires the `SYS_RAWIO` capability and access to the storage devices to run the `smartctl` collector inside a Docker container. Here's how you can achieve this:
 
-                ```yaml
-                services:
-                  netdata:
-                    cap_add:
-                      - SYS_PTRACE
-                      - SYS_ADMIN
-                      - SYS_RAWIO # smartctl
-                    devices:
-                      - "/dev/sda:/dev/sda"
-                ```
+                  - `docker run`
 
-              > **Multiple Devices**: These examples only show mapping of one device (/dev/sda). You'll need to add additional `--device` options (in docker run) or entries in the `devices` list (in docker-compose.yml) for each storage device you want Netdata's smartctl collector to monitor.
+                    ```bash
+                    docker run --cap-add SYS_RAWIO --device /dev/sda:/dev/sda ...
+                    ```
 
-              > **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nvme#readme) to monitor NVMe devices.
+                  - `docker-compose.yml`
+
+                    ```yaml
+                    services:
+                      netdata:
+                        cap_add:
+                          - SYS_PTRACE
+                          - SYS_ADMIN
+                          - SYS_RAWIO # smartctl
+                        devices:
+                          - "/dev/sda:/dev/sda"
+                    ```
+
+                  > **Multiple Devices**: These examples only show mapping of one device (/dev/sda). You'll need to add additional `--device` options (in docker run) or entries in the `devices` list (in docker-compose.yml) for each storage device you want Netdata's smartctl collector to monitor.
+
+                  > **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nvme#readme) to monitor NVMe devices.
       configuration:
         file:
           name: go.d/smartctl.conf
@@ -97,7 +103,7 @@ modules:
               default_value: 5
               required: false
             - name: scan_every
-              description: interval for discovering new devices using `smartctl --scan`, measured in seconds.
+              description: interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup.
               default_value: 900
               required: false
             - name: poll_devices_every
@@ -107,6 +113,10 @@ modules:
             - name: device_selector
               description: "Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`."
               default_value: "*"
+              required: false
+            - name: extra_devices
+              description: "Allows manual specification of devices not automatically detected by `smartctl --scan`. Each device entry must include both a name and a type. See \"Configuration Examples\" for details."
+              default_value: "[]"
               required: false
             - name: no_check_power_mode
               description: "Skip data collection when the device is in a low-power mode. Prevents unnecessary disk spin-up."
@@ -132,6 +142,15 @@ modules:
                 jobs:
                   - name: smartctl
                     devices_poll_interval: 60  # Collect S.M.A.R.T statistics every 60 seconds
+            - name: Extra devices
+              description: |
+                This example demonstrates using `extra_devices` to manually add a storage device (`/dev/sdc`) not automatically detected by `smartctl --scan`.
+              config: |
+                jobs:
+                  - name: smartctl
+                    extra_devices:
+                      - name: /dev/sdc
+                        type: jmb39x-q,3
     troubleshooting:
       problems:
         list: []
@@ -186,6 +205,27 @@ modules:
               chart_type: line
               dimensions:
                 - name: power
+            - name: smartctl.device_read_errors_rate
+              description: Device read errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: corrected
+                - name: uncorrected
+            - name: smartctl.device_write_errors_rate
+              description: Device write errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: corrected
+                - name: uncorrected
+            - name: smartctl.device_verify_errors_rate
+              description: Device verify errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: corrected
+                - name: uncorrected
             - name: smartctl.device_smart_attr_{attribute_name}
               description: Device smart attribute {attribute_name}
               unit: '{attribute_unit}'

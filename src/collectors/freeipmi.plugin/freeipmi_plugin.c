@@ -1120,7 +1120,7 @@ static void netdata_update_ipmi_sel_events_count(struct netdata_ipmi_state *stt,
 }
 
 int netdata_ipmi_collect_data(struct ipmi_monitoring_ipmi_config *ipmi_config, IPMI_COLLECTION_TYPE type, struct netdata_ipmi_state *stt) {
-    errno = 0;
+    errno_clear();
 
     if(type & IPMI_COLLECT_TYPE_SENSORS) {
         stt->sensors.collected = 0;
@@ -1930,7 +1930,7 @@ int main (int argc, char **argv) {
         collector_error("%s(): ignoring parameter '%s'", __FUNCTION__, argv[i]);
     }
 
-    errno = 0;
+    errno_clear();
 
     if(freq_s && freq_s < update_every)
         collector_info("%s(): update frequency %d seconds is too small for IPMI. Using %d.",

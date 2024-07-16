@@ -834,7 +834,7 @@ static inline void tc_split_words(char *str, char **words, int max_words) {
     while(i < max_words) words[i++] = NULL;
 }
 
-static pid_t tc_child_pid = 0;
+static POPEN_INSTANCE *tc_child_instance = NULL;
 
 static void tc_main_cleanup(void *pptr) {
     struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
@@ -847,16 +847,10 @@ static void tc_main_cleanup(void *pptr) {
 
     collector_info("cleaning up...");
 
-    if(tc_child_pid) {
-        collector_info("TC: killing with SIGTERM tc-qos-helper process %d", tc_child_pid);
-        if(killpid(tc_child_pid) != -1) {
-            siginfo_t info;
-
-            collector_info("TC: waiting for tc plugin child process pid %d to exit...", tc_child_pid);
-            netdata_waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
-        }
-
-        tc_child_pid = 0;
+    if(tc_child_instance) {
+        collector_info("TC: stopping the running tc-qos-helper script");
+        int code = spawn_popen_wait(tc_child_instance); (void)code;
+        tc_child_instance = NULL;
     }
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -921,21 +915,20 @@ void *tc_main(void *ptr) {
     char *tc_script = config_get("plugin:tc", "script to run to get tc values", command);
 
     while(service_running(SERVICE_COLLECTORS)) {
-        FILE *fp_child_input, *fp_child_output;
         struct tc_device *device = NULL;
         struct tc_class *class = NULL;
 
         snprintfz(command, TC_LINE_MAX, "exec %s %d", tc_script, localhost->rrd_update_every);
         netdata_log_debug(D_TC_LOOP, "executing '%s'", command);
 
-        fp_child_output = netdata_popen(command, (pid_t *)&tc_child_pid, &fp_child_input);
-        if(unlikely(!fp_child_output)) {
+        tc_child_instance = spawn_popen_run(command);
+        if(!tc_child_instance) {
             collector_error("TC: Cannot popen(\"%s\", \"r\").", command);
             goto cleanup;
         }
 
         char buffer[TC_LINE_MAX+1] = "";
-        while(fgets(buffer, TC_LINE_MAX, fp_child_output) != NULL) {
+        while(fgets(buffer, TC_LINE_MAX, tc_child_instance->child_stdout_fp) != NULL) {
             if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
             buffer[TC_LINE_MAX] = '\0';
@@ -1142,8 +1135,8 @@ void *tc_main(void *ptr) {
         }
 
         // fgets() failed or loop broke
-        int code = netdata_pclose(fp_child_input, fp_child_output, (pid_t)tc_child_pid);
-        tc_child_pid = 0;
+        int code = spawn_popen_kill(tc_child_instance);
+        tc_child_instance = NULL;
 
         if(unlikely(device)) {
             // tc_device_free(device);

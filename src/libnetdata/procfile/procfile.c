@@ -336,7 +336,7 @@ __attribute__((constructor)) void procfile_initialize_default_separators(void) {
         if(unlikely(i == '\n' || i == '\r'))
             procfile_default_separators[i] = PF_CHAR_IS_NEWLINE;
 
-        else if(unlikely(isspace(i) || !isprint(i)))
+        else if(unlikely(isspace(i) || (!isprint(i) && !IS_UTF8_BYTE(i))))
             procfile_default_separators[i] = PF_CHAR_IS_SEPARATOR;
 
         else

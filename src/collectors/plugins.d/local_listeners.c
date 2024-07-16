@@ -15,6 +15,14 @@ static const char *protocol_name(LOCAL_SOCKET *n) {
         else
             return "UNKNOWN_IPV4";
     }
+    else if(is_local_socket_ipv46(n)) {
+        if (n->local.protocol == IPPROTO_TCP)
+            return "TCP46";
+        else if(n->local.protocol == IPPROTO_UDP)
+            return "UDP46";
+        else
+            return "UNKNOWN_IPV46";
+    }
     else if(n->local.family == AF_INET6) {
         if (n->local.protocol == IPPROTO_TCP)
             return "TCP6";
@@ -34,6 +42,10 @@ static void print_local_listeners(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, 
     if(n->local.family == AF_INET) {
         ipv4_address_to_txt(n->local.ip.ipv4, local_address);
         ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
+    }
+    else if(is_local_socket_ipv46(n)) {
+        strncpyz(local_address, "*", sizeof(local_address) - 1);
+        remote_address[0] = '\0';
     }
     else if(n->local.family == AF_INET6) {
         ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
@@ -93,8 +105,10 @@ int main(int argc, char **argv) {
             .cmdline = true,
             .comm = false,
             .namespaces = true,
+            .tcp_info = false,
 
             .max_errors = 10,
+            .max_concurrent_namespaces = 10,
 
             .cb = print_local_listeners,
             .data = NULL,
@@ -212,6 +226,7 @@ int main(int argc, char **argv) {
             ls.config.comm = true;
             ls.config.cmdline = true;
             ls.config.namespaces = true;
+            ls.config.tcp_info = true;
             ls.config.uid = true;
             ls.config.max_errors = SIZE_MAX;
             ls.config.cb = print_local_listeners_debug;
@@ -276,7 +291,16 @@ int main(int argc, char **argv) {
         }
     }
 
+    SPAWN_SERVER *spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, NULL, local_sockets_spawn_server_callback, argc, (const char **)argv);
+    if(spawn_server == NULL) {
+        fprintf(stderr, "Cannot create spawn server.\n");
+        exit(1);
+    }
+    ls.spawn_server = spawn_server;
+
     local_sockets_process(&ls);
+
+    spawn_server_destroy(spawn_server);
 
     getrusage(RUSAGE_SELF, &ended);
 
@@ -285,7 +309,7 @@ int main(int argc, char **argv) {
         unsigned long long system = ended.ru_stime.tv_sec * 1000000ULL + ended.ru_stime.tv_usec - started.ru_stime.tv_sec * 1000000ULL + started.ru_stime.tv_usec;
         unsigned long long total  = user + system;
 
-        fprintf(stderr, "CPU Usage %llu user, %llu system, %llu total\n", user, system, total);
+        fprintf(stderr, "CPU Usage %llu user, %llu system, %llu total, %zu namespaces, %zu nl requests (without namespaces)\n", user, system, total, ls.stats.namespaces_found, ls.stats.mnl_sends);
     }
 
     return 0;

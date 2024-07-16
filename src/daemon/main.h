@@ -8,7 +8,6 @@
 extern struct config netdata_config;
 
 void cancel_main_threads(void);
-int killpid(pid_t pid);
 
 typedef enum {
     ABILITY_DATA_QUERIES          = (1 << 0),

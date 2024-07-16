@@ -499,11 +499,14 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                 if (!efp->fs_obj) {
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
+                    pthread_mutex_unlock(&lock);
                     return -1;
-                } else {
-                    if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj,
-                        efp->functions, NULL))
-                        return -1;
+                } else if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj,
+                    efp->functions, NULL)) {
+                    em->info.thread_name = saved_name;
+                    em->kernels = kernels;
+                    pthread_mutex_unlock(&lock);
+                    return -1;
                 }
             }
 #endif
@@ -756,8 +759,8 @@ static void ebpf_filesystem_exit(void *pptr)
         pthread_mutex_lock(&lock);
         ebpf_obsolete_filesystem_global(em);
 
-        pthread_mutex_unlock(&lock);
         fflush(stdout);
+        pthread_mutex_unlock(&lock);
     }
 
     ebpf_filesystem_cleanup_ebpf_data();

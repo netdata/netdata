@@ -65,6 +65,7 @@ void *watcher_main(void *arg)
     usec_t shutdown_start_time = now_monotonic_usec();
 
     watcher_wait_for_step(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
+    watcher_wait_for_step(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER);
     watcher_wait_for_step(WATCHER_STEP_ID_DBENGINE_EXIT_MODE);
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
     watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK);
@@ -105,6 +106,8 @@ void watcher_thread_start() {
 
     watcher_steps[WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE].msg =
         "create shutdown file";
+    watcher_steps[WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER].msg =
+        "destroy main spawn server";
     watcher_steps[WATCHER_STEP_ID_DBENGINE_EXIT_MODE].msg =
         "dbengine exit mode";
     watcher_steps[WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS].msg =

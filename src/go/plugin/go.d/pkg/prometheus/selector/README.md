@@ -1,6 +1,6 @@
 <!--
 title: "Time series selector"
-custom_edit_url: "/src/go/collectors/go.d.plugin/pkg/prometheus/selector/README.md"
+custom_edit_url: "/src/go/plugin/go.d/pkg/prometheus/selector/README.md"
 sidebar_label: "Time series selector"
 learn_status: "Published"
 learn_rel_path: "Developers/External plugins/go.d.plugin/Helper Packages"

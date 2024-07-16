@@ -43,7 +43,7 @@ int sql_init_context_database(int memory)
         return 1;
     }
 
-    errno = 0;
+    errno_clear();
     netdata_log_info("SQLite database %s initialization", sqlite_database);
 
     char buf[1024 + 1] = "";

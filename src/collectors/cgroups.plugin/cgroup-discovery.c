@@ -178,11 +178,9 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
 
     netdata_log_debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s'", cg->id, cg->chart_id);
     netdata_log_debug(D_CGROUP, "executing command %s \"%s\" for cgroup '%s'", cgroups_rename_script, cg->intermediate_id, cg->chart_id);
-    pid_t cgroup_pid;
 
-    FILE *fp_child_input, *fp_child_output;
-    (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp_child_input, &fp_child_output, cgroups_rename_script, cg->id, cg->intermediate_id);
-    if (!fp_child_output) {
+    POPEN_INSTANCE *instance = spawn_popen_run_variadic(cgroups_rename_script, cg->id, cg->intermediate_id, NULL);
+    if (!instance) {
         collector_error("CGROUP: cannot popen(%s \"%s\", \"r\").", cgroups_rename_script, cg->intermediate_id);
         cg->pending_renames = 0;
         cg->processed = 1;
@@ -190,8 +188,8 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     }
 
     char buffer[CGROUP_CHARTID_LINE_MAX + 1];
-    char *new_name = fgets(buffer, CGROUP_CHARTID_LINE_MAX, fp_child_output);
-    int exit_code = netdata_pclose(fp_child_input, fp_child_output, cgroup_pid);
+    char *new_name = fgets(buffer, CGROUP_CHARTID_LINE_MAX, instance->child_stdout_fp);
+    int exit_code = spawn_popen_wait(instance);
 
     switch (exit_code) {
         case 0:
@@ -1085,7 +1083,6 @@ static void cgroup_cleanup_ebpf_integration()
 static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     netdata_log_debug(D_CGROUP, "looking for the network interfaces of cgroup '%s' with chart id '%s'", cg->id, cg->chart_id);
 
-    pid_t cgroup_pid;
     char cgroup_identifier[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
 
     if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
@@ -1096,16 +1093,15 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     }
 
     netdata_log_debug(D_CGROUP, "executing cgroup_identifier %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, cgroup_identifier, cg->id);
-    FILE *fp_child_input, *fp_child_output;
-    (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp_child_input, &fp_child_output, cgroups_network_interface_script, "--cgroup", cgroup_identifier);
-    if(!fp_child_output) {
+    POPEN_INSTANCE *instance = spawn_popen_run_variadic(cgroups_network_interface_script, "--cgroup", cgroup_identifier, NULL);
+    if(!instance) {
         collector_error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, cgroup_identifier);
         return;
     }
 
     char *s;
     char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
-    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp_child_output))) {
+    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, instance->child_stdout_fp))) {
         trim(s);
 
         if(*s && *s != '\n') {
@@ -1145,7 +1141,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
         }
     }
 
-    netdata_pclose(fp_child_input, fp_child_output, cgroup_pid);
+    spawn_popen_wait(instance);
 }
 
 static inline void discovery_process_cgroup(struct cgroup *cg) {

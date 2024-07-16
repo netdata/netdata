@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -15,27 +16,46 @@ import (
 
 var errJailNotExist = errors.New("jail not exist")
 
+const socketPathInDocker = "/host/var/run/fail2ban/fail2ban.sock"
+
 func newFail2BanClientCliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *fail2banClientCliExec {
+	_, err := os.Stat("/host/var/run")
+
 	return &fail2banClientCliExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:         log,
+		ndsudoPath:     ndsudoPath,
+		timeout:        timeout,
+		isInsideDocker: err == nil,
 	}
 }
 
 type fail2banClientCliExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	ndsudoPath     string
+	timeout        time.Duration
+	isInsideDocker bool
 }
 
 func (e *fail2banClientCliExec) status() ([]byte, error) {
+	if e.isInsideDocker {
+		return e.execute("fail2ban-client-status-socket",
+			"--socket_path", socketPathInDocker,
+		)
+	}
 	return e.execute("fail2ban-client-status")
 }
 
 func (e *fail2banClientCliExec) jailStatus(jail string) ([]byte, error) {
-	return e.execute("fail2ban-client-status-jail", "--jail", jail)
+	if e.isInsideDocker {
+		return e.execute("fail2ban-client-status-jail-socket",
+			"--jail", jail,
+			"--socket_path", socketPathInDocker,
+		)
+	}
+	return e.execute("fail2ban-client-status-jail",
+		"--jail", jail,
+	)
 }
 
 func (e *fail2banClientCliExec) execute(args ...string) ([]byte, error) {

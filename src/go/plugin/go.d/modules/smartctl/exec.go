@@ -33,6 +33,10 @@ func (e *smartctlCliExec) scan() (*gjson.Result, error) {
 	return e.execute("smartctl-json-scan")
 }
 
+func (e *smartctlCliExec) scanOpen() (*gjson.Result, error) {
+	return e.execute("smartctl-json-scan-open")
+}
+
 func (e *smartctlCliExec) deviceInfo(deviceName, deviceType, powerMode string) (*gjson.Result, error) {
 	return e.execute("smartctl-json-device-info",
 		"--deviceName", deviceName,

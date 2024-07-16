@@ -95,7 +95,7 @@ static inline str2xx_errno str2int(int *out, char *s, int base) {
         // m_assert(0, "str2int error: STR2XX_INCONVERTIBLE");
         return STR2XX_INCONVERTIBLE;
     }
-    errno = 0;
+    errno_clear();
     long l = strtol(s, &end, base);
     /* Both checks are needed because INT_MAX == LONG_MAX is possible. */
     if (unlikely(l > INT_MAX || (errno == ERANGE && l == LONG_MAX))){
@@ -124,7 +124,7 @@ static inline str2xx_errno str2float(float *out, char *s) {
         // m_assert(0, "str2float error: STR2XX_INCONVERTIBLE");
         return STR2XX_INCONVERTIBLE;
     }
-    errno = 0;
+    errno_clear();
     float f = strtof(s, &end);
     /* Both checks are needed because INT_MAX == LONG_MAX is possible. */
     if (unlikely((errno == ERANGE && f == HUGE_VALF))){

@@ -58,7 +58,7 @@ var (
 		Units:    "percent",
 		Fam:      "size",
 		Ctx:      "ipfs.datastore_space_utilization",
-		Type:     module.Line,
+		Type:     module.Area,
 		Priority: prioDatastoreSpaceUtilization,
 		Dims: module.Dims{
 			{ID: "used_percent", Name: "used"},

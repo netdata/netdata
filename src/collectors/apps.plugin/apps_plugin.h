@@ -17,9 +17,7 @@
 #include <sys/proc_info.h>
 #include <sys/sysctl.h>
 #include <mach/mach_time.h> // For mach_timebase_info_data_t and mach_timebase_info
-#endif
 
-#if defined(__APPLE__)
 extern mach_timebase_info_data_t mach_info;
 #endif
 
@@ -47,7 +45,6 @@ struct pid_info {
     struct proc_taskinfo taskinfo;
     struct proc_bsdinfo bsdinfo;
     struct rusage_info_v4 rusageinfo;
-
 };
 #endif
 
@@ -467,9 +464,7 @@ extern struct target
     *users_root_target,
     *groups_root_target;
 
-extern struct pid_stat
-    *root_of_pids,
-    **all_pids;
+extern struct pid_stat *root_of_pids;
 
 extern int update_every;
 extern unsigned int time_factor;
@@ -558,5 +553,8 @@ void send_proc_states_count(usec_t dt);
 void send_charts_updates_to_netdata(struct target *root, const char *type, const char *lbl_name, const char *title);
 void send_collected_data_to_netdata(struct target *root, const char *type, usec_t dt);
 void send_resource_usage_to_netdata(usec_t dt);
+
+void pids_init(void);
+struct pid_stat *find_pid_entry(pid_t pid);
 
 #endif //NETDATA_APPS_PLUGIN_H

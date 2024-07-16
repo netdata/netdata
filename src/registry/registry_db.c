@@ -162,7 +162,7 @@ int registry_db_save(void) {
 
     fclose(fp);
 
-    errno = 0;
+    errno_clear();
 
     // remove the .old db
     netdata_log_debug(D_REGISTRY, "REGISTRY: Removing old db '%s'", old_filename);

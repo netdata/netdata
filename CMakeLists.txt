@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-cmake_minimum_required(VERSION 3.13.0...3.28)
+cmake_minimum_required(VERSION 3.16.0...3.30)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/Modules")
 
@@ -668,8 +668,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/byteorder.h
         src/libnetdata/onewayalloc/onewayalloc.c
         src/libnetdata/onewayalloc/onewayalloc.h
-        src/libnetdata/popen/popen.c
-        src/libnetdata/popen/popen.h
         src/libnetdata/procfile/procfile.c
         src/libnetdata/procfile/procfile.h
         src/libnetdata/query_progress/progress.c
@@ -720,8 +718,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/linked-lists.h
         src/libnetdata/storage-point.h
         src/libnetdata/bitmap64.h
-        src/libnetdata/os/waitid.c
-        src/libnetdata/os/waitid.h
         src/libnetdata/os/gettid.c
         src/libnetdata/os/gettid.h
         src/libnetdata/os/adjtimex.c
@@ -750,6 +746,14 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setenv.h
         src/libnetdata/os/strndup.c
         src/libnetdata/os/strndup.h
+        src/libnetdata/spawn_server/spawn_server.c
+        src/libnetdata/spawn_server/spawn_server.h
+        src/libnetdata/spawn_server/spawn_popen.c
+        src/libnetdata/spawn_server/spawn_popen.h
+        src/libnetdata/os/close_range.c
+        src/libnetdata/os/close_range.h
+        src/libnetdata/os/setproctitle.c
+        src/libnetdata/os/setproctitle.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1178,6 +1182,7 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
         src/libnetdata/maps/system-users.h
         src/libnetdata/maps/system-groups.h
+        src/libnetdata/maps/system-services.h
 )
 
 set(STREAMING_PLUGIN_FILES
@@ -1214,13 +1219,6 @@ set(WEB_PLUGIN_FILES
 set(CLAIM_PLUGIN_FILES
         src/claim/claim.c
         src/claim/claim.h
-)
-
-set(SPAWN_PLUGIN_FILES
-        src/spawn/spawn.c
-        src/spawn/spawn_server.c
-        src/spawn/spawn_client.c
-        src/spawn/spawn.h
 )
 
 set(ACLK_ALWAYS_BUILD
@@ -1299,6 +1297,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-dump.c
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
+        src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
@@ -1409,7 +1408,6 @@ set(NETDATA_FILES
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
-        ${SPAWN_PLUGIN_FILES}
         ${ACLK_ALWAYS_BUILD}
         ${PROFILE_PLUGIN_FILES}
 )
@@ -2863,7 +2861,6 @@ install(FILES
         src/collectors/python.d.plugin/openldap/openldap.conf
         src/collectors/python.d.plugin/oracledb/oracledb.conf
         src/collectors/python.d.plugin/pandas/pandas.conf
-        src/collectors/python.d.plugin/puppet/puppet.conf
         src/collectors/python.d.plugin/rethinkdbs/rethinkdbs.conf
         src/collectors/python.d.plugin/retroshare/retroshare.conf
         src/collectors/python.d.plugin/riakkv/riakkv.conf
@@ -2902,7 +2899,6 @@ install(FILES
         src/collectors/python.d.plugin/openldap/openldap.chart.py
         src/collectors/python.d.plugin/oracledb/oracledb.chart.py
         src/collectors/python.d.plugin/pandas/pandas.chart.py
-        src/collectors/python.d.plugin/puppet/puppet.chart.py
         src/collectors/python.d.plugin/rethinkdbs/rethinkdbs.chart.py
         src/collectors/python.d.plugin/retroshare/retroshare.chart.py
         src/collectors/python.d.plugin/riakkv/riakkv.chart.py

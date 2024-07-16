@@ -80,9 +80,10 @@ Metrics:
 |:------|:----------|:----|
 | ipfs.bandwidth | in, out | bytes/s |
 | ipfs.peers | peers | peers |
-| ipfs.repo_size | size | GiB |
+| ipfs.datastore_space_utilization | used | percent |
+| ipfs.repo_size | size | bytes |
 | ipfs.repo_objects | objects | objects |
-| ipfs.repo_pinned_objects | recursive_pins | objects |
+| ipfs.repo_pinned_objects | pinned, recursive_pins | objects |
 
 
 

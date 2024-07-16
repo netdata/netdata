@@ -109,7 +109,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Jenkins](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/jenkins.md)
 
-- [Puppet](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/puppet/integrations/puppet.md)
+- [Puppet](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/puppet/integrations/puppet.md)
 
 ### Cloud Provider Managed
 

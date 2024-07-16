@@ -26,7 +26,6 @@ int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 bool ieee754_doubles = false;
 time_t netdata_start_time = 0;
 struct netdata_static_thread *static_threads;
-bool i_am_the_spawn_server = false;
 
 struct config netdata_config = {
         .first_section = NULL,
@@ -325,8 +324,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
 void web_client_cache_destroy(void);
 
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
-    if (i_am_the_spawn_server)
-        exit(ret);
+    netdata_exit = 1;
 
     watcher_shutdown_begin();
 
@@ -347,6 +345,9 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
     watcher_step_complete(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
+
+    netdata_main_spawn_server_cleanup();
+    watcher_step_complete(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER);
 
 #ifdef ENABLE_DBENGINE
     if(dbengine_enabled) {
@@ -492,7 +493,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
     (void) unlink(agent_incomplete_shutdown_file);
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE);
-    
+
     watcher_shutdown_end();
     watcher_thread_stop();
 
@@ -621,39 +622,6 @@ void web_server_config_options(void)
     }
 }
 
-
-// killpid kills pid with SIGTERM.
-int killpid(pid_t pid) {
-    int ret;
-    netdata_log_debug(D_EXIT, "Request to kill pid %d", pid);
-
-    int signal = SIGTERM;
-//#ifdef NETDATA_INTERNAL_CHECKS
-//    if(service_running(SERVICE_COLLECTORS))
-//        signal = SIGABRT;
-//#endif
-
-    errno = 0;
-    ret = kill(pid, signal);
-    if (ret == -1) {
-        switch(errno) {
-            case ESRCH:
-                // We wanted the process to exit so just let the caller handle.
-                return ret;
-
-            case EPERM:
-                netdata_log_error("Cannot kill pid %d, but I do not have enough permissions.", pid);
-                break;
-
-            default:
-                netdata_log_error("Cannot kill pid %d, but I received an error.", pid);
-                break;
-        }
-    }
-
-    return ret;
-}
-
 static void set_nofile_limit(struct rlimit *rl) {
     // get the num files allowed
     if(getrlimit(RLIMIT_NOFILE, rl) != 0) {
@@ -700,8 +668,6 @@ void cancel_main_threads() {
             found++;
         }
     }
-
-    netdata_exit = 1;
 
     while(found && max > 0) {
         max -= step;
@@ -1333,7 +1299,7 @@ static void post_conf_load(char **user)
 }
 
 static bool load_netdata_conf(char *filename, char overwrite_used, char **user) {
-    errno = 0;
+    errno_clear();
 
     int ret = 0;
 
@@ -1380,15 +1346,12 @@ int get_system_info(struct rrdhost_system_info *system_info) {
         return 1;
     }
 
-    pid_t command_pid;
-
-    FILE *fp_child_input;
-    FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
-    if(fp_child_output) {
+    POPEN_INSTANCE *instance = spawn_popen_run(script);
+    if(instance) {
         char line[200 + 1];
         // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
         // One time init code, but I'm curious about the warning...
-        while (fgets(line, 200, fp_child_output) != NULL) {
+        while (fgets(line, 200, instance->child_stdout_fp) != NULL) {
             char *value=line;
             while (*value && *value != '=') value++;
             if (*value=='=') {
@@ -1407,7 +1370,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 }
             }
         }
-        netdata_pclose(fp_child_input, fp_child_output, command_pid);
+        spawn_popen_wait(instance);
     }
     freez(script);
 #else
@@ -1464,15 +1427,12 @@ int unittest_prepare_rrd(char **user) {
     return 0;
 }
 
-int netdata_main(int argc, char **argv)
-{
-    analytics_init();
-    string_init();
-
-    // initialize the system clocks
+int netdata_main(int argc, char **argv) {
     clocks_init();
-    netdata_start_time = now_realtime_sec();
+    string_init();
+    analytics_init();
 
+    netdata_start_time = now_realtime_sec();
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;
@@ -1494,13 +1454,6 @@ int netdata_main(int argc, char **argv)
     netdata_ready = false;
     // set the name for logging
     program_name = "netdata";
-
-    if (argc > 1 && strcmp(argv[1], SPAWN_SERVER_COMMAND_LINE_ARGUMENT) == 0) {
-        // don't run netdata, this is the spawn server
-        i_am_the_spawn_server = true;
-        spawn_server();
-        exit(0);
-    }
 
     // parse options
     {
@@ -1966,7 +1919,7 @@ int netdata_main(int argc, char **argv)
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
         // the caller may have left open files (lxc-attach has this issue)
-        for_each_open_fd(OPEN_FD_ACTION_CLOSE, OPEN_FD_EXCLUDE_STDIN | OPEN_FD_EXCLUDE_STDOUT | OPEN_FD_EXCLUDE_STDERR);
+        os_close_all_non_std_open_fds_except(NULL, 0);
     }
 
     if(!config_loaded) {
@@ -2196,6 +2149,7 @@ int netdata_main(int argc, char **argv)
     (void)dont_fork;
 #endif
 
+    netdata_main_spawn_server_init("plugins", argc, (const char **)argv);
     watcher_thread_start();
 
     // init sentry
@@ -2224,22 +2178,7 @@ int netdata_main(int argc, char **argv)
     // initialize internal registry
     delta_startup_time("initialize registry");
     registry_init();
-
-    // fork the spawn server
-    delta_startup_time("fork the spawn server");
-
-#ifndef OS_WINDOWS
-    spawn_init();
-#endif
-
-    /*
-     * Libuv uv_spawn() uses SIGCHLD internally:
-     * https://github.com/libuv/libuv/blob/cc51217a317e96510fbb284721d5e6bc2af31e33/src/unix/process.c#L485
-     * and inadvertently replaces the netdata signal handler which was setup during initialization.
-     * Thusly, we must explicitly restore the signal handler for SIGCHLD.
-     * Warning: extreme care is needed when mixing and matching POSIX and libuv.
-     */
-    signals_restore_SIGCHLD();
+    netdata_random_session_id_generate();
 
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
@@ -2288,6 +2227,7 @@ int netdata_main(int argc, char **argv)
 
     if (claiming_pending_arguments)
          claim_agent(claiming_pending_arguments, false, NULL);
+
     load_claiming_state();
 
     // ------------------------------------------------------------------------

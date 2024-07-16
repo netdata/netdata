@@ -84,9 +84,6 @@
 
 // global GUID map functions
 
-// netdata agent spawn server
-#include "spawn/spawn.h"
-
 // the netdata daemon
 #include "daemon.h"
 #include "main.h"

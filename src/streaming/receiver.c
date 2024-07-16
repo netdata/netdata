@@ -70,7 +70,7 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
     ssize_t bytes_read;
 
     do {
-        errno = 0;
+        errno_clear();
 
         switch(wait_on_socket_or_cancel_with_timeout(
 #ifdef ENABLE_HTTPS

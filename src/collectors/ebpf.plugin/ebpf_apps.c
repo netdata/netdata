@@ -441,7 +441,7 @@ static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
                 }
             }
         }
-        errno = 0;
+        errno_clear();
     } else if (unlikely(p->log_thrown & log)) {
         // netdata_log_error("unsetting log %u on pid %d", log, p->pid);
         p->log_thrown &= ~log;
