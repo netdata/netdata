@@ -26,7 +26,7 @@
 #define config_exists(section, name) appconfig_exists(&netdata_config, section, name)
 #define config_move(section_old, name_old, section_new, name_new) appconfig_move(&netdata_config, section_old, name_old, section_new, name_new)
 
-#define config_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed)
+#define netdata_conf_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed, true)
 
 #define config_section_destroy(section) appconfig_section_destroy_non_loaded(&netdata_config, section)
 #define config_section_option_destroy(section, name) appconfig_section_option_destroy_non_loaded(&netdata_config, section, name)
