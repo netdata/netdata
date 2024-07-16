@@ -100,6 +100,47 @@ static size_t write_callback(void *ptr, size_t size, size_t nmemb, void *stream)
     return size * nmemb;
 }
 
+static const char *curl_add_json_room(BUFFER *wb, const char *start, const char *end) {
+    size_t len = end - start;
+
+    // copy the item to an new buffer and terminate it
+    char buf[len + 1];
+    memcpy(buf, start, len);
+    buf[len] = '\0';
+
+    // add it to the json array
+    const char *trimmed = trim(buf); // remove leading and trailing spaces
+    if(trimmed)
+        buffer_json_add_array_item_string(wb, trimmed);
+
+    // prepare for the next item
+    start = end + 1;
+
+    // skip multiple separators or spaces
+    while(*start == ',' || *start == ' ') start++;
+
+    return start;
+}
+
+void curl_add_rooms_json_array(BUFFER *wb, const char *rooms) {
+    buffer_json_member_add_array(wb, "rooms");
+    {
+        const char *start = rooms, *end = NULL;
+
+        // Skip initial separators or spaces
+        while (*start == ',' || *start == ' ') start++;
+
+        // Process each item in the comma-separated list
+        while ((end = strchr(start, ',')) != NULL)
+            start = curl_add_json_room(wb, start, end);
+
+        // Process the last item if any
+        if (*start)
+            curl_add_json_room(wb, start, &start[strlen(start)]);
+    }
+    buffer_json_array_close(wb);
+}
+
 static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure) {
     CURL *curl;
     CURLcode res;
@@ -121,10 +162,26 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     }
     fclose(fp);
 
-    char json_payload[4096];
-    snprintf(json_payload, sizeof(json_payload),
-             "{\"node\": {\"id\": \"%s\", \"hostname\": \"%s\"}, \"token\": \"%s\", \"rooms\": [ \"%s\" ], \"publicKey\": \"%s\", \"mGUID\": \"%s\"}",
-             machine_guid, hostname, token, rooms, public_key, machine_guid);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+
+    buffer_json_member_add_object(wb, "node");
+    {
+        nd_uuid_t claimed_id;
+        uuid_generate_random(claimed_id);
+        char claimed_id_str[UUID_STR_LEN];
+        uuid_unparse_lower(claimed_id, claimed_id_str);
+
+        buffer_json_member_add_string(wb, "id", claimed_id_str);
+        buffer_json_member_add_string(wb, "hostname", hostname);
+    }
+    buffer_json_object_close(wb); // node
+
+    buffer_json_member_add_string(wb, "token", token);
+    curl_add_rooms_json_array(wb, rooms);
+    buffer_json_member_add_string(wb, "publicKey", public_key);
+    buffer_json_member_add_string(wb, "mGUID", machine_guid);
+    buffer_json_finalize(wb);
 
     curl_global_init(CURL_GLOBAL_ALL);
     curl = curl_easy_init();
@@ -135,7 +192,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 
     headers = curl_slist_append(headers, "Content-Type: application/json");
     curl_easy_setopt(curl, CURLOPT_URL, target_url);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_payload);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, buffer_tostring(wb));
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, stdout);
@@ -162,7 +219,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     return true;
 }
 
-CLAIM_AGENT_RESPONSE claim_agent2(const char *token, const char *rooms, const char *url, const char *proxy, int insecure, const char **msg) {
+CLAIM_AGENT_RESPONSE claim_agent2(const char *token, const char *rooms, const char *url, const char *proxy, int insecure, const char **error) {
     if (!create_claiming_directory()) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Error in creating claiming directory");
         return false;
@@ -181,8 +238,8 @@ CLAIM_AGENT_RESPONSE claim_agent2(const char *token, const char *rooms, const ch
     return true;
 }
 
-CLAIM_AGENT_RESPONSE claim_agent(const char *id, const char *token, const char *rooms, const char **error) {
-    return claim_agent2(token, rooms, NULL, NULL, false, error);
+CLAIM_AGENT_RESPONSE claim_agent(const char *token, const char *rooms, const char **error) {
+    return claim_agent2(token, rooms, cloud_url(), cloud_proxy(), cloud_insecure(), error);
 }
 
 #endif

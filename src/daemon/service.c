@@ -249,7 +249,7 @@ restart_after_removal:
         worker_is_busy(WORKER_JOB_FREE_HOST);
         // in case we have cloud connection we inform cloud
         // a child disconnected
-        if (netdata_cloud_enabled && force) {
+        if (force) {
             aclk_host_state_update(host, 0, 0);
             unregister_node(host->machine_guid);
         }

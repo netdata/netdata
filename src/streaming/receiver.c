@@ -816,8 +816,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
     // in case we have cloud connection we inform cloud
     // new child connected
-    if (netdata_cloud_enabled)
-        aclk_host_state_update(rpt->host, 1, 1);
+    aclk_host_state_update(rpt->host, 1, 1);
 
     rrdhost_set_is_parent_label();
 
@@ -843,8 +842,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
     // in case we have cloud connection we inform cloud
     // a child disconnected
-    if (netdata_cloud_enabled)
-        aclk_host_state_update(rpt->host, 0, 1);
+    aclk_host_state_update(rpt->host, 0, 1);
 
 cleanup:
     ;

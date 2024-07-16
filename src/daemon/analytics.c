@@ -624,10 +624,7 @@ void set_late_analytics_variables(struct rrdhost_system_info *system_info)
 {
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, default_rrdpush_enabled ? "true" : "false");
     analytics_set_data_str(&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
-
-    analytics_set_data(
-        &analytics_data.netdata_host_cloud_enabled,
-        appconfig_get_boolean_ondemand(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", netdata_cloud_enabled) ? "true" : "false");
+    analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "true");
 
 #ifdef ENABLE_DBENGINE
     {

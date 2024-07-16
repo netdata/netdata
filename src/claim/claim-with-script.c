@@ -43,7 +43,7 @@ static CLAIM_AGENT_RESPONSE claim_call_script(const char *claiming_arguments, bo
     char command_line_buffer[CLAIMING_COMMAND_LENGTH + 1];
 
     // This is guaranteed to be set early in main via post_conf_load()
-    char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+    char *cloud_base_url = cloud_url();
     if (cloud_base_url == NULL) {
         internal_fatal(true, "Do not move the cloud base url out of post_conf_load!!");
         return CLAIM_AGENT_NO_CLOUD_URL;
@@ -117,12 +117,17 @@ static CLAIM_AGENT_RESPONSE claim_call_script(const char *claiming_arguments, bo
     return CLAIM_AGENT_FAILED_WITH_MESSAGE;
 }
 
-CLAIM_AGENT_RESPONSE claim_agent(const char *id, const char *token, const char *rooms, const char **error) {
+CLAIM_AGENT_RESPONSE claim_agent(const char *token, const char *rooms, const char **error) {
+    nd_uuid_t claimed_id;
+    uuid_generate_random(claimed_id);
+    char claimed_id_str[UUID_STR_LEN];
+    uuid_unparse_lower(claimed_id, claimed_id_str);
+
     CLEAN_BUFFER *t = buffer_create(1024, NULL);
     if(rooms)
-        buffer_sprintf(t, "-id=%s -token=%s -rooms=%s", id, token, rooms);
+        buffer_sprintf(t, "-id=%s -token=%s -rooms=%s", claimed_id_str, token, rooms);
     else
-        buffer_sprintf(t, "-id=%s -token=%s", id, token);
+        buffer_sprintf(t, "-id=%s -token=%s", claimed_id_str, token);
 
     return claim_call_script(buffer_tostring(t), true, error);
 }

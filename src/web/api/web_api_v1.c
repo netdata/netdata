@@ -1321,8 +1321,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     host_functions2json(host, wb);
     host_collectors(host, wb);
 
-    buffer_json_member_add_boolean(wb, "cloud-enabled", netdata_cloud_enabled);
-
+    buffer_json_member_add_boolean(wb, "cloud-enabled", true);
     buffer_json_member_add_boolean(wb, "cloud-available", true);
 
     char *agent_id = get_agent_claimid();

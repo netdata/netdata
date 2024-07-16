@@ -18,7 +18,7 @@ typedef enum __attribute__((packed)) {
     CLAIM_AGENT_FAILED_WITH_MESSAGE,
 } CLAIM_AGENT_RESPONSE;
 
-CLAIM_AGENT_RESPONSE claim_agent(const char *id, const char *token, const char *rooms, const char **error);
+CLAIM_AGENT_RESPONSE claim_agent(const char *token, const char *rooms, const char **error);
 
 char *get_agent_claimid(void);
 void load_claiming_state(void);
@@ -29,6 +29,10 @@ bool netdata_random_session_id_generate(void);
 const char *netdata_random_session_id_get_filename(void);
 bool netdata_random_session_id_matches(const char *guid);
 int api_v2_claim(struct web_client *w, char *url);
+
+const char *cloud_url(void);
+const char *cloud_proxy(void);
+bool cloud_insecure(void);
 
 #if defined(HAVE_LIBCURL)
 #define CLAIM_WITH_API

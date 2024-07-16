@@ -28,7 +28,7 @@ void load_claiming_state(void)
     nd_uuid_t uuid;
 
     // Propagate into aclk and registry. Be kind of atomic...
-    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
+    cloud_url();
 
     rrdhost_aclk_state_lock(localhost);
     if (localhost->aclk_state.claimed_id) {
@@ -72,7 +72,6 @@ void load_claiming_state(void)
     freez(claimed_id);
 
     netdata_log_info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
-    netdata_cloud_enabled = appconfig_get_boolean_ondemand(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", netdata_cloud_enabled);
 }
 
 void claim_reload_all(void) {

@@ -1451,9 +1451,7 @@ void rrdhost_set_is_parent_label(void) {
         rrdlabels_add(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
         //queue a node info
-        if (netdata_cloud_enabled) {
-            aclk_queue_node_info(localhost, false);
-        }
+        aclk_queue_node_info(localhost, false);
     }
 }
 

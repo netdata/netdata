@@ -147,19 +147,6 @@ biofailed:
     return 1;
 }
 
-static int wait_till_cloud_enabled()
-{
-    nd_log(NDLS_DAEMON, NDLP_INFO,
-           "Waiting for Cloud to be enabled");
-
-    while (!netdata_cloud_enabled) {
-        sleep_usec(USEC_PER_SEC * 1);
-        if (!service_running(SERVICE_ACLK))
-            return 1;
-    }
-    return 0;
-}
-
 /**
  * Will block until agent is claimed. Returns only if agent claimed
  * or if agent needs to shutdown.
@@ -199,7 +186,7 @@ static int wait_till_agent_claim_ready()
 
         // The NULL return means the value was never initialised, but this value has been initialized in post_conf_load.
         // We trap the impossible NULL here to keep the linter happy without using a fatal() in the code.
-        char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+        const char *cloud_base_url = cloud_url();
         if (cloud_base_url == NULL) {
             netdata_log_error("Do not move the cloud base url out of post_conf_load!!");
             return 1;
@@ -596,7 +583,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 #endif
 
     while (service_running(SERVICE_ACLK)) {
-        aclk_cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+        aclk_cloud_base_url = cloud_url();
         if (aclk_cloud_base_url == NULL) {
             error_report("Do not move the cloud base url out of post_conf_load!!");
             aclk_status = ACLK_STATUS_NO_CLOUD_URL;
@@ -813,9 +800,6 @@ void *aclk_main(void *ptr)
     unsigned int proto_hdl_cnt = aclk_init_rx_msg_handlers();
 
     query_threads.count = read_query_thread_count();
-
-    if (wait_till_cloud_enabled())
-        goto exit;
 
     if (wait_till_agent_claim_ready())
         goto exit;
@@ -1081,7 +1065,7 @@ char *aclk_state(void)
     if (agent_id == NULL)
         buffer_strcat(wb, "No\n");
     else {
-        char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+        const char *cloud_base_url = cloud_url();
         buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\n", agent_id, cloud_base_url ? cloud_base_url : "null");
         freez(agent_id);
     }
@@ -1206,7 +1190,7 @@ char *aclk_state_json(void)
         tmp = NULL;
     json_object_object_add(msg, "claimed-id", tmp);
 
-    char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+    const char *cloud_base_url = cloud_url();
     tmp = cloud_base_url ? json_object_new_string(cloud_base_url) : NULL;
     json_object_object_add(msg, "cloud-url", tmp);
 

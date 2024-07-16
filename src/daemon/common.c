@@ -19,7 +19,6 @@ char *netdata_configured_abbrev_timezone     = NULL;
 int32_t netdata_configured_utc_offset        = 0;
 
 bool netdata_ready = false;
-int netdata_cloud_enabled = CONFIG_BOOLEAN_AUTO;
 
 long get_netdata_cpus(void) {
     static long processors = 0;
@@ -69,9 +68,6 @@ const char *cloud_status_to_string(CLOUD_STATUS status) {
         case CLOUD_STATUS_AVAILABLE:
             return "available";
 
-        case CLOUD_STATUS_DISABLED:
-            return "disabled";
-
         case CLOUD_STATUS_BANNED:
             return "banned";
 
@@ -90,7 +86,7 @@ CLOUD_STATUS cloud_status(void) {
     if(aclk_connected)
         return CLOUD_STATUS_ONLINE;
 
-    if(netdata_cloud_enabled == CONFIG_BOOLEAN_YES) {
+    {
         char *agent_id = get_agent_claimid();
         bool claimed = agent_id != NULL;
         freez(agent_id);
@@ -99,10 +95,7 @@ CLOUD_STATUS cloud_status(void) {
             return CLOUD_STATUS_OFFLINE;
     }
 
-    if(netdata_cloud_enabled != CONFIG_BOOLEAN_NO)
-        return CLOUD_STATUS_AVAILABLE;
-
-    return CLOUD_STATUS_DISABLED;
+    return CLOUD_STATUS_AVAILABLE;
 }
 
 time_t cloud_last_change(void) {
@@ -120,9 +113,6 @@ size_t cloud_connection_id(void) {
 }
 
 const char *cloud_offline_reason() {
-    if(!netdata_cloud_enabled)
-        return "disabled";
-
     if(aclk_disable_runtime)
         return "banned";
 

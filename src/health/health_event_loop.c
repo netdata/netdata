@@ -102,15 +102,13 @@ static void health_sleep(time_t next_run, unsigned int loop __maybe_unused) {
 }
 
 static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
-    if (netdata_cloud_enabled) {
-        struct aclk_sync_cfg_t *wc = host->aclk_config;
-        if (unlikely(!wc)) {
-            return;
-        }
+    struct aclk_sync_cfg_t *wc = host->aclk_config;
+    if (unlikely(!wc)) {
+        return;
+    }
 
-        if (wc->alert_queue_removed >= 1) {
-            wc->alert_queue_removed+=6;
-        }
+    if (wc->alert_queue_removed >= 1) {
+        wc->alert_queue_removed+=6;
     }
 }
 
@@ -313,8 +311,7 @@ static void health_event_loop(void) {
                             rc->last_updated = now_tmp;
                             rc->value = NAN;
 
-                            if (netdata_cloud_enabled)
-                                sql_queue_alarm_to_aclk(host, ae, true);
+                            sql_queue_alarm_to_aclk(host, ae, true);
                         }
                     }
                 }
@@ -702,7 +699,8 @@ static void health_event_loop(void) {
                 wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up();
                 break;
             }
-            if (netdata_cloud_enabled) {
+
+            {
                 struct aclk_sync_cfg_t *wc = host->aclk_config;
                 if (unlikely(!wc))
                     continue;

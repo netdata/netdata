@@ -113,7 +113,6 @@ int api_v2_claim(struct web_client *w, char *url) {
     bool can_be_claimed = false;
     switch(status) {
         case CLOUD_STATUS_AVAILABLE:
-        case CLOUD_STATUS_DISABLED:
         case CLOUD_STATUS_OFFLINE:
             can_be_claimed = true;
             break;
@@ -144,18 +143,11 @@ int api_v2_claim(struct web_client *w, char *url) {
 
         netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
 
-        netdata_cloud_enabled = CONFIG_BOOLEAN_AUTO;
-        appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", CONFIG_BOOLEAN_AUTO);
-        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", base_url);
-
-        nd_uuid_t claimed_id;
-        uuid_generate_random(claimed_id);
-        char claimed_id_str[UUID_STR_LEN];
-        uuid_unparse_lower(claimed_id, claimed_id_str);
+        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", base_url);
 
         bool success = false;
         const char *msg = NULL;
-        CLAIM_AGENT_RESPONSE rc = claim_agent(claimed_id_str, token, rooms, &msg);
+        CLAIM_AGENT_RESPONSE rc = claim_agent(token, rooms, &msg);
         switch(rc) {
             case CLAIM_AGENT_OK:
                 msg = "ok";

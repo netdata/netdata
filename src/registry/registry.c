@@ -154,7 +154,7 @@ static inline int registry_person_url_callback_verify_machine_exists(REGISTRY_PE
 // that could make this safe, so try to be as atomic as possible.
 
 void registry_update_cloud_base_url() {
-    registry.cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
+    registry.cloud_base_url = cloud_url();
     setenv("NETDATA_REGISTRY_CLOUD_BASE_URL", registry.cloud_base_url, 1);
 }
 

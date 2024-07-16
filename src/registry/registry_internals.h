@@ -33,7 +33,7 @@ struct registry {
     char *registry_domain;
     char *hostname;
     char *registry_to_announce;
-    char *cloud_base_url;
+    const char *cloud_base_url;
     time_t persons_expiration; // seconds to expire idle persons
     int verify_cookies_redirects;
     int enable_cookies_samesite_secure;
