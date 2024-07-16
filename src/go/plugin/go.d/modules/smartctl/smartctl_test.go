@@ -469,16 +469,12 @@ type mockSmartctlCliExec struct {
 	deviceDataFunc func(deviceName, deviceType, powerMode string) ([]byte, error)
 }
 
-func (m *mockSmartctlCliExec) scan() (*gjson.Result, error) {
+func (m *mockSmartctlCliExec) scan(_ bool) (*gjson.Result, error) {
 	if m.errOnScan {
 		return nil, fmt.Errorf("mock.scan() error")
 	}
 	res := gjson.ParseBytes(m.scanData)
 	return &res, nil
-}
-
-func (m *mockSmartctlCliExec) scanOpen() (*gjson.Result, error) {
-	return m.scan()
 }
 
 func (m *mockSmartctlCliExec) deviceInfo(deviceName, deviceType, powerMode string) (*gjson.Result, error) {
