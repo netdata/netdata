@@ -1413,7 +1413,6 @@ set(NETDATA_FILES
         ${PROFILE_PLUGIN_FILES}
         src/claim/claim-web-api.c
         src/claim/cloud-conf.c
-        src/claim/claim-with-script.c
         src/claim/claim-with-api.c
         src/daemon/environment.c
 )
