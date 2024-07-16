@@ -5,6 +5,7 @@ package modules
 import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/activemq"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/adaptecraid"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/ap"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/apache"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/bind"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/cassandra"
