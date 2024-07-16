@@ -28,7 +28,7 @@ function Check-FileHash {
 
 function Install-MSYS2 {
     $repo = 'msys2/msys2-installer'
-    $uri = "https://api.github.com/repos/$repo/releases/latest"
+    $uri = "https://api.github.com/repos/$repo/releases"
     $headers = @{
         'Accept' = 'application/vnd.github+json'
         'X-GitHub-API-Version' = '2022-11-28'
@@ -42,7 +42,9 @@ function Install-MSYS2 {
     }
 
     Write-Host "Determining latest release"
-    $release = Invoke-RESTMethod -Uri $uri -Headers $headers -TimeoutSec 30
+    $release_list = Invoke-RESTMethod -Uri $uri -Headers $headers -TimeoutSec 30
+    $release_list = Where-Object -InputObject "$release_list" -Property name -NE -Value "Nightly Installer Build"
+    $release = $release_list[0]
 
     $release_name = $release.name
     $version = $release.tag_name.Replace('-', '')
