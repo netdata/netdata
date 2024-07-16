@@ -65,18 +65,18 @@ done:
 
 int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status)
 {
-    int delay = 0;
+    int delay = ALERT_TRANSITION_DELAY_NONE;
     switch(old_status) {
         case RRDCALC_STATUS_REMOVED:
             switch (new_status) {
                 case RRDCALC_STATUS_UNINITIALIZED:
-                    delay = 600;
+                    delay = ALERT_TRANSITION_DELAY_LONG;
                     break;
                 case RRDCALC_STATUS_CLEAR:
-                    delay = 10;
+                    delay = ALERT_TRANSITION_DELAY_SHORT;
                     break;
                 default:
-                    delay = 0;
+                    delay = ALERT_TRANSITION_DELAY_NONE;
                     break;
             }
             break;
@@ -86,13 +86,13 @@ int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status)
                 case RRDCALC_STATUS_REMOVED:
                 case RRDCALC_STATUS_UNINITIALIZED:
                 case RRDCALC_STATUS_UNDEFINED:
-                    delay = 600;
+                    delay = ALERT_TRANSITION_DELAY_LONG;
                     break;
                 case RRDCALC_STATUS_CLEAR:
-                    delay = 10;
+                    delay = ALERT_TRANSITION_DELAY_SHORT;
                     break;
                 default:
-                    delay = 0;
+                    delay = ALERT_TRANSITION_DELAY_NONE;
                     break;
             }
             break;
@@ -101,12 +101,12 @@ int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status)
                 case RRDCALC_STATUS_REMOVED:
                 case RRDCALC_STATUS_UNINITIALIZED:
                 case RRDCALC_STATUS_UNDEFINED:
-                    delay = 600;
+                    delay = ALERT_TRANSITION_DELAY_LONG;
                     break;
                 case RRDCALC_STATUS_WARNING:
                 case RRDCALC_STATUS_CRITICAL:
                 default:
-                    delay = 0;
+                    delay = ALERT_TRANSITION_DELAY_NONE;
                     break;
 
             }
@@ -117,18 +117,18 @@ int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status)
                 case RRDCALC_STATUS_REMOVED:
                 case RRDCALC_STATUS_UNINITIALIZED:
                 case RRDCALC_STATUS_UNDEFINED:
-                    delay = 600;
+                    delay = ALERT_TRANSITION_DELAY_LONG;
                     break;
                 case RRDCALC_STATUS_CLEAR:
-                    delay = 10;
+                    delay = ALERT_TRANSITION_DELAY_SHORT;
                     break;
                 default:
-                    delay = 0;
+                    delay = ALERT_TRANSITION_DELAY_NONE;
                     break;
             }
             break;
         default:
-            delay = 0;
+            delay = ALERT_TRANSITION_DELAY_NONE;
             break;
     }
     return delay;

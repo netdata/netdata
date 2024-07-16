@@ -215,7 +215,7 @@ static inline char *sqlite3_text_strdupz_empty(sqlite3_stmt *res, int iCol) {
 
 #define SQL_UPDATE_ALERT_VERSION                                                                                       \
     "INSERT INTO alert_version (health_log_id, unique_id, status, version, date_submitted)"                            \
-    " VALUES (@health_log_id, @unique_id, @status, @version, @date_submitted)"                                         \
+    " VALUES (@health_log_id, @unique_id, @status, @version, UNIXEPOCH())"                                         \
     " ON CONFLICT(health_log_id) DO UPDATE SET status = excluded.status, version = excluded.version, "                 \
     " unique_id=excluded.unique_id, date_submitted=excluded.date_submitted"
 
@@ -235,7 +235,6 @@ static void sql_update_alert_version(int64_t health_log_id, int64_t unique_id, R
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, unique_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, status));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, version));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, now_realtime_sec()));
 
     param = 0;
     int rc = sqlite3_step_monitored(res);
@@ -248,11 +247,11 @@ done:
 }
 
 #define SQL_SELECT_ALERT_TO_DUMMY                                                                                      \
-    "SELECT aa.sequence_id, hld.unique_id, hld.when_key, hld.new_status, hld.health_log_id"                            \
-    " FROM health_log hl, aclk_queue aa, alert_hash ha, health_log_detail hld"                                         \
-    " WHERE hld.unique_id = aa.unique_id AND hl.config_hash_id = ha.hash_id"                                           \
-    " AND hl.host_id = @host_id AND aa.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
-    " ORDER BY aa.sequence_id ASC"
+    "SELECT aq.sequence_id, hld.unique_id, hld.when_key, hld.new_status, hld.health_log_id"                            \
+    " FROM health_log hl, aclk_queue aq, alert_hash ah, health_log_detail hld"                                         \
+    " WHERE hld.unique_id = aq.unique_id AND hl.config_hash_id = ah.hash_id"                                           \
+    " AND hl.host_id = @host_id AND aq.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
+    " ORDER BY aq.sequence_id ASC"
 
 //
 // Check all queued alerts for a host and commit them as if they have been send to the cloud
@@ -413,15 +412,15 @@ void health_alarm_log_populate(
 }
 
 #define SQL_SELECT_ALERT_TO_PUSH                                                                                       \
-    "SELECT aa.sequence_id, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key,"          \
+    "SELECT aq.sequence_id, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key,"          \
     " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,"    \
-    " hl.chart, hl.exec, hl.recipient, ha.source, hl.units, hld.info, hld.exec_code, hld.new_status,"                  \
+    " hl.chart, hl.exec, hl.recipient, ah.source, hl.units, hld.info, hld.exec_code, hld.new_status,"                  \
     " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id,"  \
     " hld.alarm_event_id, hl.chart_name, hld.summary, hld.health_log_id, hld.when_key"                                 \
-    " FROM health_log hl, aclk_queue aa, alert_hash ha, health_log_detail hld"                                         \
-    " WHERE hld.unique_id = aa.unique_id AND hl.config_hash_id = ha.hash_id"                                           \
-    " AND hl.host_id = @host_id AND aa.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
-    " ORDER BY aa.sequence_id ASC LIMIT "ACLK_MAX_ALERT_UPDATES
+    " FROM health_log hl, aclk_queue aq, alert_hash ah, health_log_detail hld"                                         \
+    " WHERE hld.unique_id = aq.unique_id AND hl.config_hash_id = ah.hash_id"                                           \
+    " AND hl.host_id = @host_id AND aq.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
+    " ORDER BY aq.sequence_id ASC LIMIT "ACLK_MAX_ALERT_UPDATES
 
 static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
 {
@@ -891,11 +890,11 @@ done:
 #define SQL_GET_SNAPSHOT_ENTRIES                                                                                       \
     " SELECT 0, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key, "                     \
     " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,  "  \
-    " hl.chart, hl.exec, hl.recipient, ha.source, hl.units, hld.info, hld.exec_code, hld.new_status,  "                \
+    " hl.chart, hl.exec, hl.recipient, ah.source, hl.units, hld.info, hld.exec_code, hld.new_status,  "                \
     " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id, " \
     " hld.alarm_event_id, hl.chart_name, hld.summary, hld.health_log_id, av.version "                                  \
-    " FROM health_log hl, alert_hash ha, health_log_detail hld, alert_version av "                                     \
-    " WHERE hl.config_hash_id = ha.hash_id"                                                                            \
+    " FROM health_log hl, alert_hash ah, health_log_detail hld, alert_version av "                                     \
+    " WHERE hl.config_hash_id = ah.hash_id"                                                                            \
     " AND hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id "                                             \
     " AND hld.health_log_id = av.health_log_id AND av.unique_id = hld.unique_id"
 
