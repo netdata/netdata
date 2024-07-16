@@ -141,7 +141,7 @@ void curl_add_rooms_json_array(BUFFER *wb, const char *rooms) {
     buffer_json_array_close(wb);
 }
 
-static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure) {
+static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure, const char **error) {
     CURL *curl;
     CURLcode res;
     char target_url[256];
@@ -218,18 +218,22 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 }
 
 CLAIM_AGENT_RESPONSE claim_agent2(const char *token, const char *rooms, const char *url, const char *proxy, int insecure, const char **error) {
+    *error = "OK";
+
     if (!create_claiming_directory()) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Error in creating claiming directory");
+        *error = "failed to create claim directory";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: %s", *error);
         return false;
     }
 
     if (!check_and_generate_certificates()) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Error in generating or loading certificates");
+        *error = "failed to generate certificates";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: %s", *error);
         return false;
     }
 
-    if (!send_curl_request(registry_get_this_machine_guid(), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Error in sending curl request");
+    if (!send_curl_request(registry_get_this_machine_guid(), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure, error)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: %s", *error);
         return false;
     }
 
