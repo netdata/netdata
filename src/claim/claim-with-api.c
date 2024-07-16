@@ -183,7 +183,6 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     buffer_json_member_add_string(wb, "mGUID", machine_guid);
     buffer_json_finalize(wb);
 
-    curl_global_init(CURL_GLOBAL_ALL);
     curl = curl_easy_init();
     if(!curl) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Failed to initialize curl");
@@ -215,7 +214,6 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     }
 
     curl_easy_cleanup(curl);
-    curl_global_cleanup();
     return true;
 }
 

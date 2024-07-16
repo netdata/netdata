@@ -6,6 +6,7 @@
 #include "static_threads.h"
 
 #include "database/engine/page_test.h"
+#include <curl/curl.h>
 
 #ifdef OS_WINDOWS
 #include "win_system-info.h"
@@ -494,6 +495,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
     watcher_shutdown_end();
     watcher_thread_stop();
+    curl_global_cleanup();
 
 #ifdef OS_WINDOWS
     return;
@@ -1447,6 +1449,8 @@ int netdata_main(int argc, char **argv) {
     netdata_ready = false;
     // set the name for logging
     program_name = "netdata";
+
+    curl_global_init(CURL_GLOBAL_ALL);
 
     // parse options
     {
