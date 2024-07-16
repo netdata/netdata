@@ -32,7 +32,7 @@ func New() *AP {
 			Timeout:    web.Duration(time.Second * 2),
 		},
 		charts:     &module.Charts{},
-		seenIfaces: make(map[string]bool),
+		seenIfaces: make(map[string]*iwInterface),
 	}
 }
 
@@ -51,7 +51,7 @@ type (
 
 		exec iwBinary
 
-		seenIfaces map[string]bool
+		seenIfaces map[string]*iwInterface
 	}
 	iwBinary interface {
 		devices() ([]byte, error)

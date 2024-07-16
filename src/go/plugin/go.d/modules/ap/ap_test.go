@@ -161,18 +161,28 @@ func TestAP_Collect(t *testing.T) {
 	}{
 		"success case": {
 			prepareMock: prepareMockOk,
-			wantCharts:  len(apChartsTmpl),
+			wantCharts:  len(apChartsTmpl) * 2,
 			wantMetrics: map[string]int64{
-				"ap_wlp1s0_average_signal":   -34000,
-				"ap_wlp1s0_bitrate_receive":  65500,
-				"ap_wlp1s0_bitrate_transmit": 65000,
-				"ap_wlp1s0_bw_received":      95117,
-				"ap_wlp1s0_bw_sent":          8270,
-				"ap_wlp1s0_clients":          2,
-				"ap_wlp1s0_issues_failures":  1,
-				"ap_wlp1s0_issues_retries":   1,
-				"ap_wlp1s0_packets_received": 2531,
-				"ap_wlp1s0_packets_sent":     38,
+				"ap_wlp1s0_testing_average_signal":   -34000,
+				"ap_wlp1s0_testing_bitrate_receive":  65500,
+				"ap_wlp1s0_testing_bitrate_transmit": 65000,
+				"ap_wlp1s0_testing_bw_received":      95117,
+				"ap_wlp1s0_testing_bw_sent":          8270,
+				"ap_wlp1s0_testing_clients":          2,
+				"ap_wlp1s0_testing_issues_failures":  1,
+				"ap_wlp1s0_testing_issues_retries":   1,
+				"ap_wlp1s0_testing_packets_received": 2531,
+				"ap_wlp1s0_testing_packets_sent":     38,
+				"ap_wlp1s1_testing_average_signal":   -34000,
+				"ap_wlp1s1_testing_bitrate_receive":  65500,
+				"ap_wlp1s1_testing_bitrate_transmit": 65000,
+				"ap_wlp1s1_testing_bw_received":      95117,
+				"ap_wlp1s1_testing_bw_sent":          8270,
+				"ap_wlp1s1_testing_clients":          2,
+				"ap_wlp1s1_testing_issues_failures":  1,
+				"ap_wlp1s1_testing_issues_retries":   1,
+				"ap_wlp1s1_testing_packets_received": 2531,
+				"ap_wlp1s1_testing_packets_sent":     38,
 			},
 		},
 		"no ap devices": {
@@ -274,7 +284,7 @@ func (m *mockIwExec) devices() ([]byte, error) {
 	return m.devicesData, nil
 }
 
-func (m *mockIwExec) stationStatistics(ifaceName string) ([]byte, error) {
+func (m *mockIwExec) stationStatistics(_ string) ([]byte, error) {
 	if m.errOnStationStats {
 		return nil, errors.New("mock.stationStatistics() error")
 	}

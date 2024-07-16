@@ -13,6 +13,12 @@ import (
 
 const precision = 1000
 
+type iwInterface struct {
+	name string
+	ssid string
+	typ  string
+}
+
 type stationStats struct {
 	clients   int64
 	rxBytes   int64
@@ -46,7 +52,7 @@ func (a *AP) collect() (map[string]int64, error) {
 	seen := make(map[string]bool)
 
 	for _, iface := range apInterfaces {
-		bs, err = a.exec.stationStatistics(iface)
+		bs, err = a.exec.stationStatistics(iface.name)
 		if err != nil {
 			return nil, fmt.Errorf("getting station statistics for %s: %v", iface, err)
 		}
@@ -56,12 +62,16 @@ func (a *AP) collect() (map[string]int64, error) {
 			return nil, fmt.Errorf("parsing station statistics for %s: %v", iface, err)
 		}
 
-		if !a.seenIfaces[iface] {
-			a.seenIfaces[iface] = true
+		key := fmt.Sprintf("%s-%s", iface.name, iface.ssid)
+
+		seen[key] = true
+
+		if _, ok := a.seenIfaces[key]; !ok {
+			a.seenIfaces[key] = iface
 			a.addInterfaceCharts(iface)
 		}
 
-		px := fmt.Sprintf("ap_%s_", iface)
+		px := fmt.Sprintf("ap_%s_%s_", iface.name, iface.ssid)
 
 		mx[px+"clients"] = stats.clients
 		mx[px+"bw_received"] = stats.rxBytes
@@ -78,9 +88,9 @@ func (a *AP) collect() (map[string]int64, error) {
 		}
 	}
 
-	for iface := range a.seenIfaces {
-		if !seen[iface] {
-			delete(a.seenIfaces, iface)
+	for key, iface := range a.seenIfaces {
+		if !seen[key] {
+			delete(a.seenIfaces, key)
 			a.removeInterfaceCharts(iface)
 		}
 	}
@@ -88,11 +98,9 @@ func (a *AP) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func parseIwDevices(resp []byte) ([]string, error) {
-
-	seen := make(map[string]bool)
-	var ifaceName string
-	var apInterfaces []string
+func parseIwDevices(resp []byte) ([]*iwInterface, error) {
+	ifaces := make(map[string]*iwInterface)
+	var iface *iwInterface
 
 	sc := bufio.NewScanner(bytes.NewReader(resp))
 
@@ -105,21 +113,35 @@ func parseIwDevices(resp []byte) ([]string, error) {
 			if len(parts) != 2 {
 				return nil, fmt.Errorf("invalid interface line: '%s'", line)
 			}
-			ifaceName = parts[1]
-		case strings.HasPrefix(line, "type"):
+			name := parts[1]
+			if _, ok := ifaces[name]; !ok {
+				iface = &iwInterface{name: name}
+				ifaces[name] = iface
+			}
+		case strings.HasPrefix(line, "ssid") && iface != nil:
+			parts := strings.Fields(line)
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("invalid ssid line: '%s'", line)
+			}
+			iface.ssid = parts[1]
+		case strings.HasPrefix(line, "type") && iface != nil:
 			parts := strings.Fields(line)
 			if len(parts) != 2 {
 				return nil, fmt.Errorf("invalid type line: '%s'", line)
 			}
-			ifaceType := parts[1]
-			if ifaceType == "AP" && ifaceName != "" && !seen[ifaceType] {
-				seen[ifaceType] = true
-				apInterfaces = append(apInterfaces, ifaceName)
-			}
+			iface.typ = parts[1]
 		}
 	}
 
-	return apInterfaces, nil
+	var apIfaces []*iwInterface
+
+	for _, iface := range ifaces {
+		if strings.ToLower(iface.typ) == "ap" {
+			apIfaces = append(apIfaces, iface)
+		}
+	}
+
+	return apIfaces, nil
 }
 
 func parseIwStationStatistics(resp []byte) (*stationStats, error) {
