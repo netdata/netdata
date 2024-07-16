@@ -2,7 +2,6 @@
 
 #include "aclk.h"
 
-#ifdef ENABLE_ACLK
 #include "aclk_stats.h"
 #include "mqtt_websockets/mqtt_wss_client.h"
 #include "aclk_otp.h"
@@ -14,7 +13,6 @@
 #include "https_client.h"
 #include "schema-wrappers/schema_wrappers.h"
 #include "aclk_capas.h"
-
 #include "aclk_proxy.h"
 
 #ifdef ACLK_LOG_CONVERSATION_DIR
@@ -24,8 +22,6 @@
 #endif
 
 #define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
-
-#endif /* ENABLE_ACLK */
 
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 int aclk_rcvd_cloud_msgs = 0;
@@ -49,7 +45,6 @@ float last_backoff_value = 0;
 
 time_t aclk_block_until = 0;
 
-#ifdef ENABLE_ACLK
 mqtt_wss_client mqttwss_client;
 
 netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -1075,13 +1070,9 @@ static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
         status.last_submitted_sequence_id
     );
 }
-#endif /* ENABLE_ACLK */
 
 char *aclk_state(void)
 {
-#ifndef ENABLE_ACLK
-    return strdupz("ACLK Available: No");
-#else
     BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_aclk);
     struct tm *tmptr, tmbuf;
     char *ret;
@@ -1163,10 +1154,8 @@ char *aclk_state(void)
     ret = strdupz(buffer_tostring(wb));
     buffer_free(wb);
     return ret;
-#endif /* ENABLE_ACLK */
 }
 
-#ifdef ENABLE_ACLK
 static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 {
     struct proto_alert_status status;
@@ -1197,13 +1186,9 @@ static json_object *timestamp_to_json(const time_t *t)
     }
     return NULL;
 }
-#endif /* ENABLE_ACLK */
 
 char *aclk_state_json(void)
 {
-#ifndef ENABLE_ACLK
-    return strdupz("{\"aclk-available\":false}");
-#else
     json_object *tmp, *grp, *msg = json_object_new_object();
 
     tmp = json_object_new_boolean(1);
@@ -1313,13 +1298,11 @@ char *aclk_state_json(void)
     char *str = strdupz(json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN));
     json_object_put(msg);
     return str;
-#endif /* ENABLE_ACLK */
 }
 
 void add_aclk_host_labels(void) {
     RRDLABELS *labels = localhost->rrdlabels;
 
-#ifdef ENABLE_ACLK
     rrdlabels_add(labels, "_aclk_available", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
     ACLK_PROXY_TYPE aclk_proxy;
     char *proxy_str;
@@ -1340,9 +1323,6 @@ void add_aclk_host_labels(void) {
     rrdlabels_add(labels, "_mqtt_version", "5", RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_aclk_proxy", proxy_str, RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_aclk_ng_new_cloud_protocol", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
-#else
-    rrdlabels_add(labels, "_aclk_available", "false", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
-#endif
 }
 
 void aclk_queue_node_info(RRDHOST *host, bool immediate)

@@ -164,11 +164,9 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
         sql_health_alarm_log_update(host, ae);
     else {
         sql_health_alarm_log_insert(host, ae);
-#ifdef ENABLE_ACLK
         if (netdata_cloud_enabled) {
             sql_queue_alarm_to_aclk(host, ae, false);
         }
-#endif
     }
 }
 

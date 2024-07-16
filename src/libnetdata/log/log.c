@@ -27,12 +27,8 @@
 #endif
 
 const char *program_name = "";
-
 uint64_t debug_flags = 0;
-
-#ifdef ENABLE_ACLK
 int aclklog_enabled = 0;
-#endif
 
 // ----------------------------------------------------------------------------
 

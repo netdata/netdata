@@ -47,9 +47,7 @@ static cmd_status_t cmd_ping_execute(char *args, char **message);
 static cmd_status_t cmd_aclk_state(char *args, char **message);
 static cmd_status_t cmd_version(char *args, char **message);
 static cmd_status_t cmd_dumpconfig(char *args, char **message);
-#ifdef ENABLE_ACLK
 static cmd_status_t cmd_remove_node(char *args, char **message);
-#endif
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -65,9 +63,7 @@ static command_info_t command_info_array[] = {
         {"aclk-state", cmd_aclk_state, CMD_TYPE_ORTHOGONAL},
         {"version", cmd_version, CMD_TYPE_ORTHOGONAL},
         {"dumpconfig", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL},
-#ifdef ENABLE_ACLK
         {"remove-stale-node", cmd_remove_node, CMD_TYPE_ORTHOGONAL}
-#endif
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -135,10 +131,8 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "    Returns current state of ACLK and Cloud connection. (optionally in json).\n"
              "dumpconfig\n"
              "    Returns the current netdata.conf on stdout.\n"
-#ifdef ENABLE_ACLK
              "remove-stale-node node_id|machine_guid\n"
              "    Unregisters and removes a node from the cloud.\n"
-#endif
              "version\n"
              "    Returns the netdata version.\n",
              MAX_COMMAND_LENGTH - 1);
@@ -197,11 +191,6 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message
 {
     (void)args;
     (void)message;
-#if defined(DISABLE_CLOUD) || !defined(ENABLE_ACLK)
-    netdata_log_info("The claiming feature has been explicitly disabled");
-    *message = strdupz("This agent cannot be claimed, it was built without support for Cloud");
-    return CMD_STATUS_FAILURE;
-#endif
     netdata_log_info("COMMAND: Reloading Agent Claiming configuration.");
     claim_reload_all();
     return CMD_STATUS_SUCCESS;
@@ -337,7 +326,6 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message)
     return CMD_STATUS_SUCCESS;
 }
 
-#ifdef ENABLE_ACLK
 static cmd_status_t cmd_remove_node(char *args, char **message)
 {
     (void)args;
@@ -385,7 +373,6 @@ done:
     buffer_free(wb);
     return CMD_STATUS_SUCCESS;
 }
-#endif
 
 static void cmd_lock_exclusive(unsigned index)
 {

@@ -468,13 +468,8 @@ void analytics_alarms(void)
  */
 void analytics_misc(void)
 {
-#ifdef ENABLE_ACLK
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "true");
     analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");
-#else
-    analytics_set_data(&analytics_data.netdata_host_cloud_available, "false");
-    analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "");
-#endif
 
     analytics_data.exporting_enabled = appconfig_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO);
     analytics_set_data(&analytics_data.netdata_config_exporting_enabled,  analytics_data.exporting_enabled ? "true" : "false");
@@ -495,13 +490,11 @@ void analytics_misc(void)
 
 void analytics_aclk(void)
 {
-#ifdef ENABLE_ACLK
     if (aclk_connected) {
         analytics_set_data(&analytics_data.netdata_host_aclk_available, "true");
         analytics_set_data_str(&analytics_data.netdata_host_aclk_protocol, "New");
     }
     else
-#endif
         analytics_set_data(&analytics_data.netdata_host_aclk_available, "false");
 }
 

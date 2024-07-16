@@ -6,8 +6,6 @@
 #include "../../aclk/aclk_contexts_api.h"
 #include "../../aclk/aclk_capas.h"
 
-#ifdef ENABLE_ACLK
-
 DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
     RRDSET *st;
     char name[500];
@@ -196,5 +194,3 @@ void aclk_check_node_info_and_collectors(void)
             context_pp);
     }
 }
-
-#endif

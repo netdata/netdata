@@ -133,7 +133,6 @@ const struct netdata_static_thread static_threads_common[] = {
     },
 #endif
 
-#ifdef ENABLE_ACLK
     {
         .name = "ACLK_MAIN",
         .config_section = NULL,
@@ -143,7 +142,6 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = aclk_main
     },
-#endif
 
     {
         .name = "RRDCONTEXT",

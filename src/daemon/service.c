@@ -247,14 +247,12 @@ restart_after_removal:
         }
 
         worker_is_busy(WORKER_JOB_FREE_HOST);
-#ifdef ENABLE_ACLK
         // in case we have cloud connection we inform cloud
         // a child disconnected
         if (netdata_cloud_enabled && force) {
             aclk_host_state_update(host, 0, 0);
             unregister_node(host->machine_guid);
         }
-#endif
         rrdhost_free___while_having_rrd_wrlock(host, force);
         goto restart_after_removal;
     }

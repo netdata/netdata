@@ -19,12 +19,7 @@ char *netdata_configured_abbrev_timezone     = NULL;
 int32_t netdata_configured_utc_offset        = 0;
 
 bool netdata_ready = false;
-
-#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-int netdata_cloud_enabled = CONFIG_BOOLEAN_NO;
-#else
 int netdata_cloud_enabled = CONFIG_BOOLEAN_AUTO;
-#endif
 
 long get_netdata_cpus(void) {
     static long processors = 0;
@@ -89,7 +84,6 @@ const char *cloud_status_to_string(CLOUD_STATUS status) {
 }
 
 CLOUD_STATUS cloud_status(void) {
-#ifdef ENABLE_ACLK
     if(aclk_disable_runtime)
         return CLOUD_STATUS_BANNED;
 
@@ -109,39 +103,23 @@ CLOUD_STATUS cloud_status(void) {
         return CLOUD_STATUS_AVAILABLE;
 
     return CLOUD_STATUS_DISABLED;
-#else
-    return CLOUD_STATUS_UNAVAILABLE;
-#endif
 }
 
 time_t cloud_last_change(void) {
-#ifdef ENABLE_ACLK
     time_t ret = MAX(last_conn_time_mqtt, last_disconnect_time);
     if(!ret) ret = netdata_start_time;
     return ret;
-#else
-    return netdata_start_time;
-#endif
 }
 
 time_t cloud_next_connection_attempt(void) {
-#ifdef ENABLE_ACLK
     return next_connection_attempt;
-#else
-    return 0;
-#endif
 }
 
 size_t cloud_connection_id(void) {
-#ifdef ENABLE_ACLK
     return aclk_connection_counter;
-#else
-    return 0;
-#endif
 }
 
 const char *cloud_offline_reason() {
-#ifdef ENABLE_ACLK
     if(!netdata_cloud_enabled)
         return "disabled";
 
@@ -149,17 +127,10 @@ const char *cloud_offline_reason() {
         return "banned";
 
     return aclk_status_to_string();
-#else
-    return "disabled";
-#endif
 }
 
 const char *cloud_base_url() {
-#ifdef ENABLE_ACLK
     return aclk_cloud_base_url;
-#else
-    return NULL;
-#endif
 }
 
 CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s) {

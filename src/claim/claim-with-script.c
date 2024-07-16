@@ -3,6 +3,8 @@
 #include "claim.h"
 #include "aclk/aclk_proxy.h"
 
+#ifdef CLAIM_WITH_SCRIPT
+
 #define CLAIMING_COMMAND_LENGTH 16384
 #define CLAIMING_PROXY_LENGTH (CLAIMING_COMMAND_LENGTH/4)
 
@@ -115,12 +117,14 @@ static CLAIM_AGENT_RESPONSE claim_call_script(const char *claiming_arguments, bo
     return CLAIM_AGENT_FAILED_WITH_MESSAGE;
 }
 
-CLAIM_AGENT_RESPONSE claim_agent(const char *id, const char *token, const char *rooms, bool force, const char **error) {
+CLAIM_AGENT_RESPONSE claim_agent(const char *id, const char *token, const char *rooms, const char **error) {
     CLEAN_BUFFER *t = buffer_create(1024, NULL);
     if(rooms)
         buffer_sprintf(t, "-id=%s -token=%s -rooms=%s", id, token, rooms);
     else
         buffer_sprintf(t, "-id=%s -token=%s", id, token);
 
-    return claim_call_script(buffer_tostring(t), force, error);
+    return claim_call_script(buffer_tostring(t), true, error);
 }
+
+#endif

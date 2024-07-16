@@ -21,7 +21,6 @@ void sanity_check(void) {
     BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < ACLK_MAX_ENUMERATIONS_DEFINED);
 }
 
-#ifdef ENABLE_ACLK
 static struct aclk_database_cmd aclk_database_deq_cmd(void)
 {
     struct aclk_database_cmd ret;
@@ -41,7 +40,6 @@ static struct aclk_database_cmd aclk_database_deq_cmd(void)
 
     return ret;
 }
-#endif
 
 static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
 {
@@ -173,8 +171,6 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 #endif
     return 0;
 }
-
-#ifdef ENABLE_ACLK
 
 #define SQL_SELECT_HOST_BY_UUID  "SELECT host_id FROM host WHERE host_id = @host_id"
 static int is_host_available(nd_uuid_t *host_id)
@@ -485,13 +481,11 @@ static void aclk_synchronization_init(void)
     memset(&aclk_sync_config, 0, sizeof(aclk_sync_config));
     fatal_assert(0 == uv_thread_create(&aclk_sync_config.thread, aclk_synchronization, &aclk_sync_config));
 }
-#endif
 
 // -------------------------------------------------------------
 
 void sql_create_aclk_table(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __maybe_unused, nd_uuid_t *node_id __maybe_unused)
 {
-#ifdef ENABLE_ACLK
     char uuid_str[UUID_STR_LEN];
     char host_guid[UUID_STR_LEN];
     int rc;
@@ -539,7 +533,6 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __
     wc->alert_updates = 0;
     time_t now = now_realtime_sec();
     wc->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
-#endif
 }
 
 #define SQL_FETCH_ALL_HOSTS                                                                                            \
@@ -575,7 +568,6 @@ void sql_aclk_sync_init(void)
     // Trigger host context load for hosts that have been created
     metadata_queue_load_host_context(NULL);
 
-#ifdef ENABLE_ACLK
     if (!number_of_children)
         aclk_queue_node_info(localhost, true);
 
@@ -588,7 +580,6 @@ void sql_aclk_sync_init(void)
     aclk_synchronization_init();
 
     netdata_log_info("ACLK sync initialization completed");
-#endif
 }
 
 // Public
@@ -631,7 +622,6 @@ void aclk_push_node_removed_alerts(const char *node_id)
 
 void schedule_node_info_update(RRDHOST *host __maybe_unused)
 {
-#ifdef ENABLE_ACLK
     if (unlikely(!host))
         return;
 
@@ -641,10 +631,8 @@ void schedule_node_info_update(RRDHOST *host __maybe_unused)
     cmd.param[0] = host;
     cmd.completion = NULL;
     aclk_database_enq_cmd(&cmd);
-#endif
 }
 
-#ifdef ENABLE_ACLK
 void unregister_node(const char *machine_guid)
 {
     if (unlikely(!machine_guid))
@@ -657,4 +645,3 @@ void unregister_node(const char *machine_guid)
     cmd.completion = NULL;
     aclk_database_enq_cmd(&cmd);
 }
-#endif

@@ -1606,9 +1606,7 @@ static void restore_host_context(void *arg)
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
 
-#ifdef ENABLE_ACLK
     aclk_queue_node_info(host, false);
-#endif
 
     nd_log(
         NDLS_DAEMON,

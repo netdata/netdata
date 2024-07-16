@@ -1323,21 +1323,13 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_json_member_add_boolean(wb, "cloud-enabled", netdata_cloud_enabled);
 
-#ifdef ENABLE_ACLK
     buffer_json_member_add_boolean(wb, "cloud-available", true);
-#else
-    buffer_json_member_add_boolean(wb, "cloud-available", false);
-#endif
 
     char *agent_id = get_agent_claimid();
     buffer_json_member_add_boolean(wb, "agent-claimed", agent_id != NULL);
     freez(agent_id);
 
-#ifdef ENABLE_ACLK
     buffer_json_member_add_boolean(wb, "aclk-available", aclk_connected);
-#else
-    buffer_json_member_add_boolean(wb, "aclk-available", false);
-#endif
 
     buffer_json_member_add_string(wb, "memory-mode", rrd_memory_mode_name(host->rrd_memory_mode));
 #ifdef ENABLE_DBENGINE

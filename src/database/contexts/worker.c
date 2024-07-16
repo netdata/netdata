@@ -822,7 +822,6 @@ void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused
     rc->hub.last_time_s = rrd_flag_is_collected(rc) ? 0 : rc->last_time_s;
     rc->hub.deleted = rrd_flag_is_deleted(rc) ? true : false;
 
-#ifdef ENABLE_ACLK
     struct context_updated message = {
             .id = rc->hub.id,
             .version = rc->hub.version,
@@ -844,7 +843,6 @@ void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused
         else
             contexts_updated_add_ctx_update(bundle, &message);
     }
-#endif
 
     // store it to SQL
 
@@ -992,7 +990,6 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
                     if(check_if_cloud_version_changed_unsafe(rc, true)) {
                         worker_is_busy(WORKER_JOB_SEND);
 
-#ifdef ENABLE_ACLK
                         if(!bundle) {
                             // prepare the bundle to send the messages
                             char uuid[UUID_STR_LEN];
@@ -1000,7 +997,6 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
 
                             bundle = contexts_updated_new(claim_id, uuid, 0, now_ut);
                         }
-#endif
                         // update the hub data of the context, give a new version, pack the message
                         // and save an update to SQL
                         rrdcontext_message_send_unsafe(rc, false, bundle);
@@ -1041,7 +1037,6 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
             }
     dfe_done(rc);
 
-#ifdef ENABLE_ACLK
     if(service_running(SERVICE_CONTEXT) && bundle) {
         // we have a bundle to send messages
 
@@ -1053,7 +1048,6 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
     }
     else if(bundle)
         contexts_updated_delete(bundle);
-#endif
 
 }
 

@@ -881,13 +881,11 @@ static void log_init(void) {
         snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
     nd_log_set_user_settings(NDLS_HEALTH, config_get(CONFIG_SECTION_LOGS, "health", filename));
 
-#ifdef ENABLE_ACLK
     aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
         nd_log_set_user_settings(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
     }
-#endif
 }
 
 static char *get_varlib_subdir_from_config(const char *prefix, const char *dir) {
@@ -2285,26 +2283,7 @@ int netdata_main(int argc, char **argv) {
         }
     }
 
-    // ------------------------------------------------------------------------
-    // Report ACLK build failure
-#ifndef ENABLE_ACLK
-    netdata_log_error("This agent doesn't have ACLK.");
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/.aclk_report_sent", netdata_configured_varlib_dir);
-    if (netdata_anonymous_statistics_enabled > 0 && access(filename, F_OK)) { // -1 -> not initialized
-        analytics_statistic_t statistic = { "ACLK_DISABLED", "-", "-" };
-        analytics_statistic_send(&statistic);
-
-        int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 444);
-        if (fd == -1)
-            netdata_log_error("Cannot create file '%s'. Please fix this.", filename);
-        else
-            close(fd);
-    }
-#endif
-
     webrtc_initialize();
-
     signals_unblock();
 
     return 10;

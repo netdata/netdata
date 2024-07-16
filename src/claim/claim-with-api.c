@@ -2,6 +2,10 @@
 
 #include "claim.h"
 
+#ifdef CLAIM_WITH_API
+
+#include "registry/registry.h"
+
 #include <curl/curl.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
@@ -158,18 +162,23 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     return true;
 }
 
-bool claim_agent2(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure) {
+CLAIM_AGENT_RESPONSE claim_agent(const char *token, const char *rooms, const char *url, const char *proxy, int insecure, const char **msg) {
     if (!create_claiming_directory()) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Error in creating claiming directory");
         return false;
     }
+
     if (!check_and_generate_certificates()) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Error in generating or loading certificates");
         return false;
     }
-    if (!send_curl_request(machine_guid, hostname, token, rooms, url, proxy, insecure)) {
+
+    if (!send_curl_request(registry_get_this_machine_guid(), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Error in sending curl request");
         return false;
     }
+
     return true;
 }
+
+#endif

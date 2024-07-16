@@ -102,7 +102,6 @@ static void health_sleep(time_t next_run, unsigned int loop __maybe_unused) {
 }
 
 static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
-#ifdef ENABLE_ACLK
     if (netdata_cloud_enabled) {
         struct aclk_sync_cfg_t *wc = host->aclk_config;
         if (unlikely(!wc)) {
@@ -113,7 +112,6 @@ static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
             wc->alert_queue_removed+=6;
         }
     }
-#endif
 }
 
 static void health_execute_delayed_initializations(RRDHOST *host) {
@@ -315,10 +313,8 @@ static void health_event_loop(void) {
                             rc->last_updated = now_tmp;
                             rc->value = NAN;
 
-#ifdef ENABLE_ACLK
                             if (netdata_cloud_enabled)
                                 sql_queue_alarm_to_aclk(host, ae, true);
-#endif
                         }
                     }
                 }
@@ -706,7 +702,6 @@ static void health_event_loop(void) {
                 wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up();
                 break;
             }
-#ifdef ENABLE_ACLK
             if (netdata_cloud_enabled) {
                 struct aclk_sync_cfg_t *wc = host->aclk_config;
                 if (unlikely(!wc))
@@ -724,7 +719,6 @@ static void health_event_loop(void) {
                     wc->alert_checkpoint_req--;
                 }
             }
-#endif
         }
         dfe_done(host);
 

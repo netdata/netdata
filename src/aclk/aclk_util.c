@@ -2,8 +2,6 @@
 
 #include "aclk_util.h"
 
-#ifdef ENABLE_ACLK
-
 #include "aclk_proxy.h"
 
 #include "daemon/common.h"
@@ -440,7 +438,6 @@ void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd, enum mqtt
 
     freez(proxy);
 }
-#endif /* ENABLE_ACLK */
 
 #if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
 static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)

@@ -2,10 +2,7 @@
 
 #include "sqlite_functions.h"
 #include "sqlite_aclk_alert.h"
-
-#ifdef ENABLE_ACLK
 #include "../../aclk/aclk_alarm_api.h"
-#endif
 
 #define SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param)                                                                     \
     ({                                                                                                                 \
@@ -171,7 +168,6 @@ done:
 
 int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
 {
-#ifdef ENABLE_ACLK
     switch(status) {
         case RRDCALC_STATUS_REMOVED:
             return ALARM_STATUS_REMOVED;
@@ -191,10 +187,6 @@ int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
         default:
             return ALARM_STATUS_UNKNOWN;
     }
-#else
-    UNUSED(status);
-    return 1;
-#endif
 }
 
 static inline char *sqlite3_uuid_unparse_strdupz(sqlite3_stmt *res, int iCol) {
@@ -222,7 +214,6 @@ static inline char *sqlite3_text_strdupz_empty(sqlite3_stmt *res, int iCol) {
 
 static void aclk_push_alert_event(struct aclk_sync_cfg_t *wc __maybe_unused)
 {
-#ifdef ENABLE_ACLK
     int rc;
 
     if (unlikely(!wc->alert_updates)) {
@@ -389,7 +380,6 @@ done:
 
     freez(claim_id);
     buffer_free(sql);
-#endif
 }
 
 void aclk_push_alert_events_for_all_hosts(void)
@@ -484,7 +474,6 @@ void aclk_send_alarm_configuration(char *config_hash)
 
 void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash __maybe_unused)
 {
-#ifdef ENABLE_ACLK
     sqlite3_stmt *res = NULL;
     struct aclk_sync_cfg_t *wc;
 
@@ -586,7 +575,6 @@ done:
     SQLITE_FINALIZE(res);
     freez(config_hash);
     freez(node_id);
-#endif
 }
 
 
@@ -702,7 +690,6 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unus
     aclk_push_node_alert_snapshot(node_id);
 }
 
-#ifdef ENABLE_ACLK
 void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_ENTRY *ae, RRDHOST *host)
 {
     char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
@@ -756,9 +743,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 
     freez(edit_command);
 }
-#endif
 
-#ifdef ENABLE_ACLK
 static bool have_recent_alarm_unsafe(RRDHOST *host, int64_t alarm_id, int64_t mark)
 {
     ALARM_ENTRY *ae = host->health_log.alarms;
@@ -772,12 +757,10 @@ static bool have_recent_alarm_unsafe(RRDHOST *host, int64_t alarm_id, int64_t ma
 
     return false;
 }
-#endif
 
 #define ALARM_EVENTS_PER_CHUNK 1000
 void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 {
-#ifdef ENABLE_ACLK
     RRDHOST *host = find_host_by_node_id(node_id);
 
     if (unlikely(!host)) {
@@ -885,7 +868,6 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     wc->alerts_snapshot_uuid = NULL;
 
     freez(claim_id);
-#endif
 }
 
 #define SQL_DELETE_ALERT_ENTRIES "DELETE FROM aclk_alert_%s WHERE date_created < UNIXEPOCH() - @period"
@@ -986,7 +968,6 @@ static inline int compare_active_alerts(const void *a, const void *b)
 #define BATCH_ALLOCATED 10
 void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
 {
-#ifdef ENABLE_ACLK
     struct aclk_sync_cfg_t *wc = host->aclk_config;
     if (unlikely(!wc)) {
         nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", rrdhost_hostname(host));
@@ -1065,5 +1046,4 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
 
     wc->alert_checkpoint_req = 0;
     buffer_free(alarms_to_hash);
-#endif
 }

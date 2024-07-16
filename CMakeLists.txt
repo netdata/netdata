@@ -151,8 +151,6 @@ option(DEFAULT_FEATURE_STATE "Specify the default state for most optional featur
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
 # High-level features
-option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
@@ -207,10 +205,14 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
-if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
-        set(NEED_PROTOBUF True)
+set(NEED_PROTOBUF True)
+
+find_package(CURL)
+if(CURL_FOUND)
+        set(HAVE_LIBCURL TRUE)
+        include_directories(${CURL_INCLUDE_DIRS})
 else()
-        set(NEED_PROTOBUF False)
+        message(STATUS "libcurl not found")
 endif()
 
 if(ENABLE_PLUGIN_GO)
@@ -1410,7 +1412,7 @@ set(NETDATA_FILES
         ${CLAIM_PLUGIN_FILES}
         ${ACLK_ALWAYS_BUILD}
         ${PROFILE_PLUGIN_FILES}
-        src/claim/claim-api.c
+        src/claim/claim-web-api.c
         src/claim/cloud-conf.c
         src/claim/claim-with-script.c
         src/claim/claim-with-api.c
@@ -1723,10 +1725,7 @@ endif()
 #
 # mqtt library
 #
-if (ENABLE_H2O OR ENABLE_ACLK)
-        set(ENABLE_MQTTWEBSOCKETS True)
-endif()
-
+set(ENABLE_MQTTWEBSOCKETS True)
 if(ENABLE_MQTTWEBSOCKETS)
         add_library(mqttwebsockets STATIC ${MQTT_WEBSOCKETS_FILES})
 
@@ -1741,20 +1740,17 @@ if(ENABLE_MQTTWEBSOCKETS)
 
 endif()
 
-if(ENABLE_ACLK)
-        #
-        # proto definitions
-        #
-        netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
-                                    "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
-                                    ACLK_PROTO_BUILT_SRCS
-                                    ACLK_PROTO_BUILT_HDRS
-                                    ${ACLK_PROTO_DEFS})
+#
+# proto definitions
+#
+netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+                            "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+                            ACLK_PROTO_BUILT_SRCS
+                            ACLK_PROTO_BUILT_HDRS
+                            ${ACLK_PROTO_DEFS})
 
-        list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
-                               ${ACLK_PROTO_BUILT_HDRS})
-
-endif()
+list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
+                       ${ACLK_PROTO_BUILT_HDRS})
 
 #
 # build plugins
@@ -2247,7 +2243,7 @@ endif()
 
 add_executable(netdata
         ${NETDATA_FILES}
-        "$<$<BOOL:${ENABLE_ACLK}>:${ACLK_FILES}>"
+        "${ACLK_FILES}"
         "$<$<BOOL:${ENABLE_H2O}>:${H2O_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGODB_EXPORTING_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES}>"
@@ -2263,9 +2259,10 @@ target_compile_options(netdata PRIVATE
 )
 
 target_include_directories(netdata PRIVATE
-        "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas>"
+        "${CMAKE_SOURCE_DIR}"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
+        "$<$<BOOL:${CURL_FOUND}>:${CURL_INCLUDE_DIRS}>"
 )
 
 target_link_libraries(netdata PRIVATE
@@ -2279,6 +2276,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
+        "$<$<BOOL:${CURL_FOUND}>:${CURL_LIBRARIES}>"
 )
 
 if(NEED_PROTOBUF)
@@ -2434,17 +2432,8 @@ set(varlibdir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(netdata_user_POST "${NETDATA_USER}")
 
 # netdata-claim.sh
-if(ENABLE_CLOUD)
-        set(enable_cloud_POST "yes")
-else()
-        set(enable_cloud_POST "no")
-endif()
-
-if(ENABLE_ACLK)
-        set(enable_aclk_POST "yes")
-else()
-        set(enable_aclk_POST "no")
-endif()
+set(enable_cloud_POST "yes")
+set(enable_aclk_POST "yes")
 
 configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
 install(PROGRAMS

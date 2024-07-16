@@ -245,7 +245,6 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
                "Sending snapshot of all contexts.",
                cmd->version_hash, rrdhost_hostname(host), our_version_hash);
 
-#ifdef ENABLE_ACLK
         // prepare the snapshot
         char uuid[UUID_STR_LEN];
         uuid_unparse_lower(*host->node_id, uuid);
@@ -262,7 +261,6 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 
         // send it
         aclk_send_contexts_snapshot(bundle);
-#endif
     }
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,

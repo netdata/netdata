@@ -155,7 +155,7 @@ int api_v2_claim(struct web_client *w, char *url) {
 
         bool success = false;
         const char *msg = NULL;
-        CLAIM_AGENT_RESPONSE rc = claim_agent(claimed_id_str, token, rooms, true, &msg);
+        CLAIM_AGENT_RESPONSE rc = claim_agent(claimed_id_str, token, rooms, &msg);
         switch(rc) {
             case CLAIM_AGENT_OK:
                 msg = "ok";

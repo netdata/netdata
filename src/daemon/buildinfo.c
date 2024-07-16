@@ -1078,18 +1078,8 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #endif
 
-#ifdef ENABLE_ACLK
     build_info_set_status(BIB_FEATURE_CLOUD, true);
     build_info_set_status(BIB_CONNECTIVITY_ACLK, true);
-#else
-    build_info_set_status(BIB_FEATURE_CLOUD, false);
-#ifdef DISABLE_CLOUD
-    build_info_set_value(BIB_FEATURE_CLOUD, "disabled");
-#else
-    build_info_set_value(BIB_FEATURE_CLOUD, "unavailable");
-#endif
-#endif
-
     build_info_set_status(BIB_FEATURE_HEALTH, true);
     build_info_set_status(BIB_FEATURE_STREAMING, true);
     build_info_set_status(BIB_FEATURE_BACKFILLING, true);

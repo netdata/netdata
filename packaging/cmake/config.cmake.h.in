@@ -67,6 +67,7 @@
 #cmakedefine HAVE_GETPRIORITY
 #cmakedefine HAVE_SETENV
 #cmakedefine HAVE_DLSYM
+#cmakedefine HAVE_LIBCURL
 
 #cmakedefine HAVE_BACKTRACE
 #cmakedefine HAVE_CLOSE_RANGE
@@ -104,8 +105,6 @@
 // enabled features
 
 #cmakedefine ENABLE_OPENSSL
-#cmakedefine ENABLE_CLOUD
-#cmakedefine ENABLE_ACLK
 #cmakedefine ENABLE_ML
 #cmakedefine ENABLE_EXPORTING_MONGODB
 #cmakedefine ENABLE_H2O
