@@ -70,6 +70,7 @@ jobs:
             packaging/cmake/
             packaging/makeself/
             packaging/installer/
+            packaging/windows/
             packaging/*.sh
             packaging/*.version
             packaging/*.checksums
@@ -1063,8 +1064,14 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         with:
           submodules: recursive
-      - name: Set Up Dependencies
-        id: deps
+      # We need to handle dependencies in two passes because MSYS2 kills
+      # itself to force a restart if certain parts get updated.
+      - name: Set Up Dependencies (First Pass)
+        id: deps-1
+        if: needs.file-check.outputs.run == 'true'
+        run: ./packaging/windows/install-dependencies.ps1
+      - name: Set Up Dependencies (Second Pass)
+        id: deps-2
         if: needs.file-check.outputs.run == 'true'
         run: ./packaging/windows/install-dependencies.ps1
       - name: Build Netdata
@@ -1075,6 +1082,14 @@ jobs:
         id: package
         if: needs.file-check.outputs.run == 'true'
         run: ./packaging/windows/package.ps1
+      - name: Upload Installer
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64-installer
+          path: packaging\windows\netdata-installer.exe
+          retention-days: 30
+
 
   updater-check: # Test the generated dist archive using the updater code.
     name: Test Generated Distfile and Updater Code
