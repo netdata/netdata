@@ -67,7 +67,7 @@ gunzip netdata*.tar.gz && tar xf netdata*.tar && rm -rf netdata*.tar
 Install Netdata in `/opt/netdata`. If you want to enable automatic updates, add `--auto-update` or `-u` to install `netdata-updater` in `cron` (**need root permission**):
 
 ```sh
-cd netdata-v* && ./netdata-installer.sh --install-prefix /opt && cp /opt/netdata/usr/sbin/netdata-claim.sh /usr/sbin/
+cd netdata-v* && ./netdata-installer.sh --install-prefix /opt
 ```
 
 You also need to enable the `netdata` service in `/etc/rc.conf`:
