@@ -205,7 +205,6 @@ USAGE: ${PROGRAM} [options]
   --force-legacy-cxx         Force usage of an older C++ standard to allow building on older systems. This will usually be autodetected.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi  Explicitly disable the FreeIPMI plugin.
-  --disable-https            Explicitly disable TLS support.
   --disable-dbengine         Explicitly disable DB engine support.
   --enable-plugin-go         Enable the Go plugin. Default: Enabled when possible.
   --disable-plugin-go        Disable the Go plugin.

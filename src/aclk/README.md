@@ -28,17 +28,10 @@ However, to be able to offer the stunning visualizations and advanced functional
 
 ## Enable and configure the ACLK
 
-The ACLK is enabled by default, with its settings automatically configured and stored in the Agent's memory. No file is
-created at `/var/lib/netdata/cloud.d/cloud.conf` until you either connect a node or create it yourself. The default
-configuration uses two settings:
-
-```conf
-[global]
-  cloud base url = https://app.netdata.cloud
-```
+The ACLK is enabled by default, with its settings automatically configured and stored in the Agent's memory.
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
-connecting to cloud](/src/claim/README.md#connect-through-a-proxy).
+connecting to cloud](/src/claim/README.md).
 
 You can configure following keys in the `netdata.conf` section `[cloud]`:
 ```

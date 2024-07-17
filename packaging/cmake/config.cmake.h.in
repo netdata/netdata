@@ -179,7 +179,6 @@
 // #cmakedefine ENABLE_PROMETHEUS_REMOTE_WRITE
 
 // /* NSA spy stuff */
-// #define ENABLE_HTTPS 1
 // #cmakedefine01 HAVE_X509_VERIFY_PARAM_set1_host
 
 #define HAVE_CRYPTO

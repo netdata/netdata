@@ -56,7 +56,6 @@ NETDATA_COMMAND="default"
 NETDATA_INSTALLER_OPTIONS=""
 NETDATA_FORCE_METHOD=""
 NETDATA_OFFLINE_INSTALL_SOURCE=""
-NETDATA_REQUIRE_CLOUD=1
 NETDATA_WARNINGS=""
 RELEASE_CHANNEL="default"
 
@@ -1165,41 +1164,6 @@ handle_existing_install() {
       fi
       ;;
   esac
-}
-
-soft_disable_cloud() {
-  set_tmpdir
-
-  cloud_prefix="${INSTALL_PREFIX}/var/lib/netdata/cloud.d"
-
-  run_as_root mkdir -p "${cloud_prefix}"
-
-  cat > "${tmpdir}/cloud.conf" << EOF
-[global]
-  enabled = no
-EOF
-
-  run_as_root cp "${tmpdir}/cloud.conf" "${cloud_prefix}/cloud.conf"
-
-  if [ -z "${NETDATA_NO_START}" ]; then
-    case "${SYSTYPE}" in
-      Darwin) run_as_root launchctl kickstart -k com.github.netdata ;;
-      FreeBSD) run_as_root service netdata restart ;;
-      Linux)
-        initpath="$(run_as_root readlink /proc/1/exe)"
-
-        if command -v service > /dev/null 2>&1; then
-          run_as_root service netdata restart
-        elif command -v rc-service > /dev/null 2>&1; then
-          run_as_root rc-service netdata restart
-        elif [ "$(basename "${initpath}" 2> /dev/null)" = "systemd" ]; then
-          run_as_root systemctl restart netdata
-        elif [ -f /etc/init.d/netdata ]; then
-          run_as_root /etc/init.d/netdata restart
-        fi
-        ;;
-    esac
-  fi
 }
 
 confirm_install_prefix() {
