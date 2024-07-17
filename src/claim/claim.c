@@ -144,11 +144,13 @@ bool load_claiming_state(void) {
     invalidate_node_instances(&localhost->host_uuid, have_claimed_id ? &uuid.uuid : NULL);
     metaqueue_store_claim_id(&localhost->host_uuid, have_claimed_id ? &uuid.uuid : NULL);
 
+    errno_clear();
+
     if (!have_claimed_id)
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "CLAIM: Unable to find our claimed_id, setting state to AGENT_UNCLAIMED");
     else
-        nd_log(NDLS_DAEMON, NDLP_ERR,
+        nd_log(NDLS_DAEMON, NDLP_INFO,
                "CLAIM: Found a valid claimed_id, setting state to AGENT_CLAIMED");
 
     return have_claimed_id;
