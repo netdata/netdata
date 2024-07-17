@@ -17,7 +17,9 @@ static bool create_claiming_directory() {
     struct stat st = {0};
     if (stat(netdata_configured_cloud_dir, &st) == -1) {
         if (mkdir(netdata_configured_cloud_dir, 0770) != 0) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Failed to create claiming directory: %s", netdata_configured_cloud_dir);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "CLAIM: Failed to create claiming directory: %s",
+                   netdata_configured_cloud_dir);
             return false;
         }
     }
@@ -71,7 +73,8 @@ static bool check_and_generate_certificates() {
     // Save private key
     fp = fopen(private_key_file, "wb");
     if (!fp || !PEM_write_PrivateKey(fp, pkey, NULL, NULL, 0, NULL, NULL)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Failed to write private key: %s", private_key_file);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "CLAIM: Failed to write private key: %s", private_key_file);
         if (fp) fclose(fp);
         EVP_PKEY_free(pkey);
         return false;
@@ -141,39 +144,6 @@ void curl_add_rooms_json_array(BUFFER *wb, const char *rooms) {
             curl_add_json_room(wb, start, &start[strlen(start)]);
     }
     buffer_json_array_close(wb);
-}
-
-static void agent_is_now_claimed(const char *claimed_id_str, const char *machine_guid __maybe_unused, const char *hostname __maybe_unused, const char *token __maybe_unused, const char *rooms __maybe_unused, const char *url, const char *proxy, int insecure) {
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, sizeof(filename), "%s/claimed_id", netdata_configured_cloud_dir);
-    FILE *fp = fopen(filename, "w");
-    if(!fp)
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open file '%s' for writing.", filename);
-    else {
-        fprintf(fp, "%s", claimed_id_str);
-        fclose(fp);
-    }
-
-    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", url);
-    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", proxy);
-    appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", insecure);
-
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    appconfig_generate(&cloud_config, wb, false, false);
-    snprintfz(filename, sizeof(filename), "%s/cloud.conf", netdata_configured_cloud_dir);
-    fp = fopen(filename, "w");
-    if(!fp)
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open file '%s' for writing.", filename);
-    else {
-        fprintf(fp, "%s", buffer_tostring(wb));
-        fclose(fp);
-    }
-
-    snprintfz(filename, sizeof(filename), "%s/token", netdata_configured_cloud_dir);
-    unlink(filename);
-
-    snprintfz(filename, sizeof(filename), "%s/rooms", netdata_configured_cloud_dir);
-    unlink(filename);
 }
 
 static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure, const char **error) {
@@ -250,8 +220,9 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        *error = "Failed to make libcurl request";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: %s: %s", *error, curl_easy_strerror(res));
+        *error = "Failed to make HTTPS request";
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "CLAIM: %s: %s", *error, curl_easy_strerror(res));
         curl_easy_cleanup(curl);
         return false;
     }
@@ -264,7 +235,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     if(http_status_code == 204) {
         *error = "Agent claimed successfully";
         ret = true;
-        agent_is_now_claimed(claimed_id_str, machine_guid, hostname, token, rooms, url, proxy, insecure);
+        cloud_conf_regenerate(claimed_id_str, machine_guid, hostname, token, rooms, url, proxy, insecure);
     }
     else if (http_status_code == 422) {
         if(buffer_strlen(response)) {
@@ -338,28 +309,143 @@ bool claim_agent_with_checks(const char *token, const char *rooms, const char *u
     return true;
 }
 
-bool claim_agent(const char *token, const char *rooms, const char **error) {
-    return claim_agent_with_checks(token, rooms, cloud_url(), cloud_proxy(), cloud_insecure(), error);
+bool claim_agent(const char *url, const char *token, const char *rooms, const char *proxy, bool insecure) {
+    const char *msg = NULL;
+    bool rc = claim_agent_with_checks(token, rooms, url, proxy, insecure, &msg);
+
+    if(rc)
+        claim_agent_failure_reason_set(NULL);
+    else
+        claim_agent_failure_reason_set(msg && *msg ? msg : "Unknown error");
+
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", url);
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "token", token ? token : "");
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "rooms", rooms ? rooms : "");
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", proxy ? proxy : "");
+    appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", insecure);
+
+    return rc;
 }
 
-bool claim_agent_from_files(const char **error) {
+bool claim_agent_from_environment(void) {
+    const char *url = getenv("NETDATA_CLAIM_URL");
+    if(!url || !*url) {
+        url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
+        if(!url || !*url) return false;
+    }
+
+    const char *token = getenv("NETDATA_CLAIM_TOKEN");
+    if(!token || !*token)
+        return false;
+
+    const char *rooms = getenv("NETDATA_CLAIM_ROOMS");
+    if(!rooms)
+        rooms = "";
+
+    const char *proxy = getenv("NETDATA_CLAIM_PROXY");
+    if(!proxy || !*proxy)
+        proxy = "";
+
+    bool insecure = CONFIG_BOOLEAN_NO;
+    const char *from_env = getenv("NETDATA_EXTRA_CLAIM_OPTS");
+    if(from_env && *from_env && strstr(from_env, "-insecure") == 0)
+        insecure = CONFIG_BOOLEAN_YES;
+
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", url);
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "token", token);
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "rooms", rooms);
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", proxy);
+    appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", insecure);
+
+    return claim_agent(url, token, rooms, proxy, insecure);
+}
+
+bool claim_agent_from_claim_conf(void) {
+    static struct config claim_config = {
+        .first_section = NULL,
+        .last_section = NULL,
+        .mutex = NETDATA_MUTEX_INITIALIZER,
+        .index = {
+            .avl_tree = {
+                .root = NULL,
+                .compar = appconfig_section_compare
+            },
+            .rwlock = AVL_LOCK_INITIALIZER
+        }
+    };
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    bool ret = false;
+
+    spinlock_lock(&spinlock);
+
+    errno_clear();
+    char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "claim.conf");
+    bool loaded = appconfig_load(&claim_config, filename, 1, NULL);
+    freez(filename);
+
+    if(loaded) {
+        const char *url = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
+        const char *token = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "token", "");
+        const char *rooms = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "rooms", "");
+        const char *proxy = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "proxy", "");
+        bool insecure = appconfig_get_boolean(&claim_config, CONFIG_SECTION_GLOBAL, "insecure", CONFIG_BOOLEAN_NO);
+
+        if(token && *token && url && *url)
+            ret = claim_agent(url, token, rooms, proxy, insecure);
+    }
+
+    spinlock_unlock(&spinlock);
+
+    return ret;
+}
+
+bool claim_agent_from_split_files(void) {
     char filename[FILENAME_MAX + 1];
 
     snprintfz(filename, sizeof(filename), "%s/token", netdata_configured_cloud_dir);
     long token_len = 0;
     char *token = read_by_filename(filename, &token_len);
-    if(!token) {
-        token = getenv("NETDATA_CLAIM_TOKEN");
-        if(error)
-            *error = "No token file";
+    if(!token || !*token)
         return false;
-    }
 
     snprintfz(filename, sizeof(filename), "%s/rooms", netdata_configured_cloud_dir);
     long rooms_len = 0;
     char *rooms = read_by_filename(filename, &rooms_len);
-    if(!rooms)
-        rooms = getenv("NETDATA_CLAIM_ROOMS");
+    if(!rooms || !*rooms)
+        rooms = NULL;
 
-    return claim_agent(token, rooms, error);
+    bool ret = claim_agent(cloud_url(), token, rooms, cloud_proxy(), cloud_insecure());
+
+    if(ret) {
+        snprintfz(filename, sizeof(filename), "%s/token", netdata_configured_cloud_dir);
+        unlink(filename);
+
+        snprintfz(filename, sizeof(filename), "%s/rooms", netdata_configured_cloud_dir);
+        unlink(filename);
+    }
+
+    return ret;
+}
+
+bool claim_agent_automatically(void) {
+    // Use /etc/netdata/claim.conf
+
+    if(claim_agent_from_claim_conf())
+        return true;
+
+    // Users may set NETDATA_CLAIM_TOKEN and NETDATA_CLAIM_ROOMS
+    // A good choice for docker container users.
+
+    if(claim_agent_from_environment())
+        return true;
+
+    // Users may store token and rooms in /var/lib/netdata/cloud.d
+    // This was a bad choice, since users may have to create this directory
+    // which may end up with the wrong permissions, preventing netdata from storing
+    // the required information there.
+
+    if(claim_agent_from_split_files())
+        return true;
+
+    return false;
 }

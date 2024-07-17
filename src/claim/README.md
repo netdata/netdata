@@ -28,12 +28,13 @@ Once you've chosen your installation method, follow the provided instructions to
 
 ### Connect an Existing Agent
 
-There are two methods to connect an already installed Netdata Agent to your Netdata Cloud Space:
+There are three methods to connect an already installed Netdata Agent to your Netdata Cloud Space:
 
-- using the Netdata Cloud user interface (UI).
-- using the claiming script.
+- Manually via the UI
+- Automatically via a provisioning system (or the command line)
+- Automatically via environment variables (e.g. kubernetes, docker, etc)
 
-#### Using the UI (recommended)
+#### Manually, via the UI
 
 The UI method is the easiest and recommended way to connect your Agent. Here's how:
 
@@ -42,36 +43,49 @@ The UI method is the easiest and recommended way to connect your Agent. Here's h
 3. Click the "Connect" button.
 4. Follow the on-screen instructions to connect your Agent.
 
-#### Using claiming script
+#### Automatically, via a provisioning system or the command line
 
-You can connect an Agent by running
-the [netdata-claim.sh](https://github.com/netdata/netdata/blob/master/src/claim/netdata-claim.sh.in) script directly.
-You can either run it with root privileges using `sudo` or as the user running the Agent (typically `netdata`).
-
-The claiming script accepts options that control the connection process. You can specify these options using the
-following format:
+Netdata Agents can be connected to Netdata Cloud by creating the file `/etc/netdata/claim.conf`
+(or `/opt/netdata/etc/netdata/claim.conf` depending on your installation), like this:
 
 ```bash
-netdata-claim.sh -OPTION=VALUE ...
+[global]
+   token = The claiming token for your Netdata Cloud Space (required)
+   rooms = A comma-separated list of Rooms to add the Agent to (optional)
+   proxy = The URL of a proxy server to use for the connection (optional)
+   insecure = Either yes or no (optional)
 ```
 
-Claiming script options:
-
-| Option | Description                                                        | Required | Default value                                         |
-|--------|--------------------------------------------------------------------|:--------:|:------------------------------------------------------|
-| token  | The claiming token for your Netdata Cloud Space.                   |   yes    |                                                       |
-| rooms  | A comma-separated list of Rooms to add the Agent to.               |    no    | The Agent will be added to the "All nodes" Room only. |
-| id     | The unique identifier of the Agent.                                |    no    | The Agent's MACHINE_GUID.                             |
-| proxy  | The URL of a proxy server to use for the connection, if necessary. |    no    |                                                       |
-
-Example:
+example:
 
 ```bash
-netdata-claim.sh -token=MYTOKEN1234567 -rooms=room1,room2
+[global]
+   token = NETDATA_CLOUD_SPACE_TOKEN
+   rooms = ROOM_KEY1,ROOM_KEY2,ROOM_KEY3
+   proxy = http://username:password@myproxy:8080
+   insecure = no
 ```
 
-This command connects the Agent and adds it to the "room1" and "room2" Rooms using your claiming token
-MYTOKEN1234567.
+If the agent is already running, you can either run `netdatacli reload-claiming-state` or restart the agent.
+Otherwise, the agent will be claimed when it starts.
+
+If claiming fails for whatever reason, daemon.log will log the reason (search for `CLAIM`),
+and also `http://ip:19999/api/v2/info` would also state the reason at the `cloud` section of the response.
+
+#### Automatically, via environment variables
+
+Netdata will use the following environment variables:
+
+- `NETDATA_CLAIM_URL`
+- `NETDATA_CLAIM_TOKEN`
+- `NETDATA_CLAIM_ROOMS`
+- `NETDATA_CLAIM_PROXY`
+- `NETDATA_EXTRA_CLAIM_OPTS`, may contain a space separated list of options. The option `-insecure` is the only currently used.
+
+The `NETDATA_CLAIM_TOKEN` alone is enough for triggering the claiming process.
+
+If claiming fails for whatever reason, daemon.log will log the reason (search for `CLAIM`),
+and also `http://ip:19999/api/v2/info` would also state the reason at the `cloud` section of the response.
 
 ## Reconnect
 
@@ -83,6 +97,9 @@ To remove a node from your Space in Netdata Cloud, delete the `cloud.d/` directo
 cd /var/lib/netdata   # Replace with your Netdata library directory, if not /var/lib/netdata/
 sudo rm -rf cloud.d/
 ```
+
+> IMPORTANT:<br/>
+> Keep in mind that the Agent will be **re-claimed automatically** if the environment variables or `claim.conf` exist when the agent is restarted. 
 
 This node no longer has access to the credentials it was used when connecting to Netdata Cloud via the ACLK. You will
 still be able to see this node in your Rooms in an **unreachable** state.

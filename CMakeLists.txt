@@ -1528,6 +1528,7 @@ set(ACLK_FILES
         src/aclk/schema-wrappers/agent_cmds.h
         src/aclk/helpers/mqtt_wss_pal.h
         src/aclk/helpers/ringbuffer_pal.h
+        src/claim/cloud-status.c
 )
 
 

@@ -1324,7 +1324,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_boolean(wb, "cloud-enabled", true);
     buffer_json_member_add_boolean(wb, "cloud-available", true);
 
-    char *agent_id = get_agent_claimid();
+    char *agent_id = aclk_get_claimed_id();
     buffer_json_member_add_boolean(wb, "agent-claimed", agent_id != NULL);
     freez(agent_id);
 

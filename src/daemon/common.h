@@ -116,23 +116,6 @@ extern time_t netdata_start_time;
 
 long get_netdata_cpus(void);
 
-typedef enum __attribute__((packed)) {
-    CLOUD_STATUS_UNAVAILABLE = 0,   // cloud and aclk functionality is not available on this agent
-    CLOUD_STATUS_AVAILABLE,         // cloud and aclk functionality is available, but the agent is not claimed
-    CLOUD_STATUS_BANNED,            // the agent has been banned from cloud
-    CLOUD_STATUS_OFFLINE,           // the agent tries to connect to cloud, but cannot do it
-    CLOUD_STATUS_ONLINE,            // the agent is connected to cloud
-} CLOUD_STATUS;
-
-const char *cloud_status_to_string(CLOUD_STATUS status);
-CLOUD_STATUS cloud_status(void);
-time_t cloud_last_change(void);
-time_t cloud_next_connection_attempt(void);
-size_t cloud_connection_id(void);
-const char *cloud_offline_reason(void);
-const char *cloud_base_url(void);
-CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s);
-
 void set_environment_for_plugins_and_scripts(void);
 
 #endif /* NETDATA_COMMON_H */

@@ -66,23 +66,76 @@ bool cloud_insecure(void) {
     return insecure;
 }
 
-void load_cloud_conf(int silent) {
+static void cloud_conf_load_defaults(void) {
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", "");
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "token", "");
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "rooms", "");
+    appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", CONFIG_BOOLEAN_NO);
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "machine_guid", "");
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "claimed_id", "");
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "hostname", "");
+}
+
+void cloud_conf_load(int silent) {
     errno_clear();
-    char *filename = strdupz_path_subpath(netdata_configured_varlib_dir, "cloud.d/cloud.conf");
+    char *filename = strdupz_path_subpath(netdata_configured_cloud_dir, "cloud.conf");
     int ret = appconfig_load(&cloud_config, filename, 1, NULL);
 
     if(!ret && !silent)
-        netdata_log_info("CONFIG: cannot load cloud config '%s'. Running with internal defaults.", filename);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "CLAIM: cannot load cloud config '%s'. Running with internal defaults.", filename);
 
     freez(filename);
-
-    // --------------------------------------------------------------------
-    // Check if the cloud is enabled
 
     appconfig_move(&cloud_config,
                    CONFIG_SECTION_GLOBAL, "cloud base url",
                    CONFIG_SECTION_GLOBAL, "url");
 
-    // This must be set before any point in the code that accesses it. Do not move it from this function.
-    cloud_url();
+    cloud_conf_load_defaults();
+}
+
+void cloud_conf_init_after_registry(void) {
+    const char *machine_guid = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "machine_guid", "");
+    const char *hostname = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "hostname", "");
+
+    // for machine guid and hostname we have to use appconfig_set() for that they will be saved uncommented
+    if(!machine_guid || !*machine_guid)
+        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "machine_guid", registry_get_this_machine_guid());
+
+    if(!hostname || !*hostname)
+        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "hostname", registry_get_this_machine_hostname());
+}
+
+bool cloud_conf_save(void) {
+    char filename[FILENAME_MAX + 1];
+
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    appconfig_generate(&cloud_config, wb, false, false);
+    snprintfz(filename, sizeof(filename), "%s/cloud.conf", netdata_configured_cloud_dir);
+    FILE *fp = fopen(filename, "w");
+    if(!fp) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open file '%s' for writing.", filename);
+        return false;
+    }
+
+    fprintf(fp, "%s", buffer_tostring(wb));
+    fclose(fp);
+    return true;
+}
+
+void cloud_conf_regenerate(const char *claimed_id_str, const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure) {
+    // for backwards compatibility (older agents), save the claimed_id to its file
+    claimed_id_save_to_file(claimed_id_str);
+
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", url);
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", proxy ? proxy : "");
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "token", token ? token : "");
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "rooms", rooms ? rooms : "");
+    appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", insecure);
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "machine_guid", machine_guid ? machine_guid : "");
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "claimed_id", claimed_id_str ? claimed_id_str : "");
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "hostname", hostname ? hostname : "");
+
+    cloud_conf_save();
 }

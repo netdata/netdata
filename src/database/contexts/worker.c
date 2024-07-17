@@ -980,7 +980,7 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
 
                 worker_is_busy(WORKER_JOB_QUEUED);
                 usec_t dispatch_ut = rrdcontext_calculate_queued_dispatch_time_ut(rc, now_ut);
-                char *claim_id = get_agent_claimid();
+                char *claim_id = aclk_get_claimed_id();
 
                 if(unlikely(now_ut >= dispatch_ut) && claim_id) {
                     worker_is_busy(WORKER_JOB_CHECK);

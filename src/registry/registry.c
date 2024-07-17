@@ -174,7 +174,7 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w, bool do_not
         if(localhost->node_id)
             buffer_json_member_add_uuid(w->response.data, "node_id", localhost->node_id);
 
-        char *claim_id = get_agent_claimid();
+        char *claim_id = aclk_get_claimed_id();
         if (claim_id) {
             buffer_json_member_add_string(w->response.data, "claim_id", claim_id);
             freez(claim_id);

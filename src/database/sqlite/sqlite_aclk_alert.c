@@ -224,7 +224,7 @@ static void aclk_push_alert_event(struct aclk_sync_cfg_t *wc __maybe_unused)
         return;
     }
 
-    char *claim_id = get_agent_claimid();
+    char *claim_id = aclk_get_claimed_id();
     if (unlikely(!claim_id))
         return;
 
@@ -784,7 +784,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     if (unlikely(!wc->alerts_snapshot_uuid))
         return;
 
-    char *claim_id = get_agent_claimid();
+    char *claim_id = aclk_get_claimed_id();
     if (unlikely(!claim_id))
         return;
 
@@ -1033,7 +1033,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
         hash[SHA256_DIGEST_LENGTH] = 0;
 
         struct alarm_checkpoint alarm_checkpoint;
-        char *claim_id = get_agent_claimid();
+        char *claim_id = aclk_get_claimed_id();
         alarm_checkpoint.claim_id = claim_id;
         alarm_checkpoint.node_id = wc->node_id;
         alarm_checkpoint.checksum = (char *)hash;

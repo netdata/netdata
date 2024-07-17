@@ -117,7 +117,6 @@ int api_v2_claim(struct web_client *w, char *url) {
             can_be_claimed = true;
             break;
 
-        case CLOUD_STATUS_UNAVAILABLE:
         case CLOUD_STATUS_BANNED:
         case CLOUD_STATUS_ONLINE:
             can_be_claimed = false;
@@ -143,31 +142,16 @@ int api_v2_claim(struct web_client *w, char *url) {
 
         netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
 
-        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", base_url);
-
         bool success = false;
-        const char *msg = NULL;
-        if(claim_agent(token, rooms, &msg)) {
+        const char *msg;
+        if(claim_agent(base_url, token, rooms, cloud_proxy(), cloud_insecure())) {
             msg = "ok";
             success = true;
             can_be_claimed = false;
-            claim_reload_all();
-            {
-                int ms = 0;
-                do {
-                    status = cloud_status();
-                    if (status == CLOUD_STATUS_ONLINE && __atomic_load_n(&localhost->node_id, __ATOMIC_RELAXED))
-                        break;
-
-                    sleep_usec(50 * USEC_PER_MS);
-                    ms += 50;
-                } while (ms < 10000);
-            }
+            status = claim_reload_and_wait_online();
         }
-        else {
-            if (!msg)
-                msg = "Unknown error";
-        }
+        else
+            msg = claim_agent_failure_reason_get();
 
         // our status may have changed
         // refresh the status in our output
@@ -178,7 +162,7 @@ int api_v2_claim(struct web_client *w, char *url) {
 
         // and this is the status of the claiming command we run
         buffer_json_member_add_boolean(wb, "success", success);
-        buffer_json_member_add_string(wb, "message", msg);
+        buffer_json_member_add_string_or_empty(wb, "message", msg);
     }
 
     if(can_be_claimed)

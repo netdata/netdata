@@ -2,10 +2,97 @@
 
 #include "claim.h"
 
+// --------------------------------------------------------------------------------------------------------------------
+// keep track of the last claiming failure reason
+
+static const char *cloud_claim_failure_reason = NULL;
+
+void claim_agent_failure_reason_set(const char *reason) {
+    freez((void *)cloud_claim_failure_reason);
+    cloud_claim_failure_reason = reason ? strdupz(reason) : NULL;
+}
+
+const char *claim_agent_failure_reason_get(void) {
+    if(!cloud_claim_failure_reason)
+        return "Agent is not claimed yet";
+    else
+        return cloud_claim_failure_reason;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// claimed_id load/save
+
+bool claimed_id_save_to_file(const char *claimed_id_str) {
+    bool ret;
+    const char *filename = strdupz_path_subpath(netdata_configured_cloud_dir, "claimed_id");
+    FILE *fp = fopen(filename, "w");
+    if(fp) {
+        fprintf(fp, "%s", claimed_id_str);
+        fclose(fp);
+        ret = true;
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "CLAIM: cannot open file '%s' for writing.", filename);
+        ret = false;
+    }
+
+    freez((void *)filename);
+    return ret;
+}
+
+static ND_UUID claimed_id_parse(const char *claimed_id, const char *source) {
+    ND_UUID uuid;
+
+    if(uuid_parse(claimed_id, uuid.uuid) != 0) {
+        uuid = UUID_ZERO;
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "CLAIM: claimed_id '%s' (loaded from '%s'), is not a valid UUID.",
+               claimed_id, source);
+    }
+
+    return uuid;
+}
+
+static ND_UUID claimed_id_load_from_file(void) {
+    ND_UUID uuid;
+
+    long bytes_read;
+    const char *filename = strdupz_path_subpath(netdata_configured_cloud_dir, "claimed_id");
+    char *claimed_id = read_by_filename(filename, &bytes_read);
+
+    if(!claimed_id)
+        uuid = UUID_ZERO;
+    else
+        uuid = claimed_id_parse(claimed_id, filename);
+
+    freez(claimed_id);
+    freez((void *)filename);
+    return uuid;
+}
+
+static ND_UUID claimed_id_get_from_cloud_conf(void) {
+    if(appconfig_exists(&cloud_config, CONFIG_SECTION_GLOBAL, "claimed_id")) {
+        const char *claimed_id = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "claimed_id", "");
+        return claimed_id_parse(claimed_id, "cloud.conf");
+    }
+    return UUID_ZERO;
+}
+
+static ND_UUID claimed_id_load(void) {
+    ND_UUID uuid = claimed_id_get_from_cloud_conf();
+    if(UUIDeq(uuid, UUID_ZERO))
+        uuid = claimed_id_load_from_file();
+
+    return uuid;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 /* Retrieve the claim id for the agent.
  * Caller owns the string.
 */
-char *get_agent_claimid()
+char *aclk_get_claimed_id()
 {
     char *result;
     rrdhost_aclk_state_lock(localhost);
@@ -21,13 +108,7 @@ char *get_agent_claimid()
  *   - after spawning the claim because of a command-line argument
  * If this happens with the ACLK active under an old claim then we MUST KILL THE LINK
  */
-void load_claiming_state(void)
-{
-    nd_uuid_t uuid;
-
-    // Propagate into aclk and registry. Be kind of atomic...
-    cloud_url();
-
+bool load_claiming_state(void) {
     rrdhost_aclk_state_lock(localhost);
     if (localhost->aclk_state.claimed_id) {
         if (aclk_connected)
@@ -37,53 +118,64 @@ void load_claiming_state(void)
     }
 
     if (aclk_connected) {
-        netdata_log_info("Agent was already connected to Cloud - forcing reconnection under new credentials");
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "CLAIM: agent was already connected to NC - forcing reconnection under new credentials");
         aclk_kill_link = 1;
     }
     aclk_disable_runtime = 0;
 
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/claimed_id", netdata_configured_cloud_dir);
-
-    long bytes_read;
-    char *claimed_id = read_by_filename(filename, &bytes_read);
-    if(!claimed_id) {
-        const char *error;
-        if(claim_agent_from_files(&error))
-            claimed_id = read_by_filename(filename, &bytes_read);
-        else
-            nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to automatically claim: %s", error);
+    ND_UUID uuid = claimed_id_load();
+    if(UUIDeq(uuid, UUID_ZERO)) {
+        // not found
+        if(claim_agent_automatically())
+            uuid = claimed_id_load();
     }
 
-    if(claimed_id && uuid_parse(claimed_id, uuid)) {
-        netdata_log_error("claimed_id \"%s\" doesn't look like valid UUID", claimed_id);
-        freez(claimed_id);
-        claimed_id = NULL;
-    }
-
-    if(claimed_id) {
+    bool have_claimed_id = false;
+    if(!UUIDeq(uuid, UUID_ZERO)) {
+        // we go it somehow
         localhost->aclk_state.claimed_id = mallocz(UUID_STR_LEN);
-        uuid_unparse_lower(uuid, localhost->aclk_state.claimed_id);
+        uuid_unparse_lower(uuid.uuid, localhost->aclk_state.claimed_id);
+        have_claimed_id = true;
     }
 
     rrdhost_aclk_state_unlock(localhost);
-    invalidate_node_instances(&localhost->host_uuid, claimed_id ? &uuid : NULL);
-    metaqueue_store_claim_id(&localhost->host_uuid, claimed_id ? &uuid : NULL);
+    invalidate_node_instances(&localhost->host_uuid, have_claimed_id ? &uuid.uuid : NULL);
+    metaqueue_store_claim_id(&localhost->host_uuid, have_claimed_id ? &uuid.uuid : NULL);
 
-    if (!claimed_id) {
-        netdata_log_info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
-        return;
-    }
+    if (!have_claimed_id)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "CLAIM: Unable to find our claimed_id, setting state to AGENT_UNCLAIMED");
+    else
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "CLAIM: Found a valid claimed_id, setting state to AGENT_CLAIMED");
 
-    freez(claimed_id);
-
-    netdata_log_info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
+    return have_claimed_id;
 }
 
-void claim_reload_all(void) {
+CLOUD_STATUS claim_reload_and_wait_online(void) {
+    nd_log(NDLS_DAEMON, NDLP_INFO,
+           "CLAIM: Reloading Agent Claiming configuration.");
+
     nd_log_limits_unlimited();
-    load_claiming_state();
+    cloud_conf_load(0);
+    bool claimed = load_claiming_state();
     registry_update_cloud_base_url();
     rrdpush_send_claimed_id(localhost);
     nd_log_limits_reset();
+
+    CLOUD_STATUS status = cloud_status();
+    if(claimed) {
+        int ms = 0;
+        do {
+            status = cloud_status();
+            if (status == CLOUD_STATUS_ONLINE && __atomic_load_n(&localhost->node_id, __ATOMIC_RELAXED))
+                break;
+
+            sleep_usec(50 * USEC_PER_MS);
+            ms += 50;
+        } while (ms < 10000);
+    }
+
+    return status;
 }

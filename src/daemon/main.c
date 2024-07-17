@@ -1480,7 +1480,7 @@ int netdata_main(int argc, char **argv) {
                     }
                     else {
                         netdata_log_debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
-                        load_cloud_conf(1);
+                        cloud_conf_load(1);
                         config_loaded = 1;
                     }
                     break;
@@ -1865,7 +1865,7 @@ int netdata_main(int argc, char **argv) {
                             if(!config_loaded) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
                                 load_netdata_conf(NULL, 0, &user);
-                                load_cloud_conf(1);
+                                cloud_conf_load(1);
                             }
 
                             get_netdata_configured_variables();
@@ -1915,7 +1915,7 @@ int netdata_main(int argc, char **argv) {
 
     if(!config_loaded) {
         load_netdata_conf(NULL, 0, &user);
-        load_cloud_conf(0);
+        cloud_conf_load(0);
     }
 
     // ------------------------------------------------------------------------
@@ -2168,6 +2168,7 @@ int netdata_main(int argc, char **argv) {
     // initialize internal registry
     delta_startup_time("initialize registry");
     registry_init();
+    cloud_conf_init_after_registry();
     netdata_random_session_id_generate();
 
     // ------------------------------------------------------------------------

@@ -488,7 +488,7 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     unsigned char *challenge = NULL;
     int challenge_bytes;
 
-    char *agent_id = get_agent_claimid();
+    char *agent_id = aclk_get_claimed_id();
     if (agent_id == NULL) {
         netdata_log_error("Agent was not claimed - cannot perform challenge/response");
         return 1;
@@ -831,7 +831,7 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
 
     req.request_type = HTTP_REQ_GET;
 
-    char *agent_id = get_agent_claimid();
+    char *agent_id = aclk_get_claimed_id();
     if (agent_id == NULL)
     {
         netdata_log_error("Agent was not claimed - cannot perform challenge/response");

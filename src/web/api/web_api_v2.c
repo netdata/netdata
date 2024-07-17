@@ -10,7 +10,7 @@ static bool verify_agent_uuids(const char *machine_guid, const char *node_id, co
     if(strcmp(machine_guid, localhost->machine_guid) != 0)
         return false;
 
-    char *agent_claim_id = get_agent_claimid();
+    char *agent_claim_id = aclk_get_claimed_id();
 
     bool not_verified = (!agent_claim_id || strcmp(claim_id, agent_claim_id) != 0);
     freez(agent_claim_id);

@@ -157,12 +157,12 @@ biofailed:
 static int wait_till_agent_claimed(void)
 {
     //TODO prevent malloc and freez
-    char *agent_id = get_agent_claimid();
+    char *agent_id = aclk_get_claimed_id();
     while (likely(!agent_id)) {
         sleep_usec(USEC_PER_SEC * 1);
         if (!service_running(SERVICE_ACLK))
             return 1;
-        agent_id = get_agent_claimid();
+        agent_id = aclk_get_claimed_id();
     }
     freez(agent_id);
     return 0;
@@ -1061,7 +1061,7 @@ char *aclk_state(void)
     );
     buffer_sprintf(wb, "Protocol Used: Protobuf\nMQTT Version: %d\nClaimed: ", 5);
 
-    char *agent_id = get_agent_claimid();
+    char *agent_id = aclk_get_claimed_id();
     if (agent_id == NULL)
         buffer_strcat(wb, "No\n");
     else {
@@ -1179,7 +1179,7 @@ char *aclk_state_json(void)
     json_object_array_add(grp, tmp);
     json_object_object_add(msg, "protocols-supported", grp);
 
-    char *agent_id = get_agent_claimid();
+    char *agent_id = aclk_get_claimed_id();
     tmp = json_object_new_boolean(agent_id != NULL);
     json_object_object_add(msg, "agent-claimed", tmp);
 

@@ -31,7 +31,7 @@ static void build_node_collectors(RRDHOST *host)
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
     upd_node_collectors.node_id = wc->node_id;
-    upd_node_collectors.claim_id = get_agent_claimid();
+    upd_node_collectors.claim_id = aclk_get_claimed_id();
 
     upd_node_collectors.node_collectors = collectors_from_charts(host, dict);
     aclk_update_node_collectors(&upd_node_collectors);
@@ -50,7 +50,7 @@ static void build_node_info(RRDHOST *host)
 
     rrd_rdlock();
     node_info.node_id = wc->node_id;
-    node_info.claim_id = get_agent_claimid();
+    node_info.claim_id = aclk_get_claimed_id();
     node_info.machine_guid = host->machine_guid;
     node_info.child = (host != localhost);
     node_info.ml_info.ml_capable = ml_capable();

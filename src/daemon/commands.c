@@ -187,12 +187,38 @@ static cmd_status_t cmd_fatal_execute(char *args, char **message)
     return CMD_STATUS_SUCCESS;
 }
 
-static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message)
-{
-    (void)args;
-    (void)message;
-    netdata_log_info("COMMAND: Reloading Agent Claiming configuration.");
-    claim_reload_all();
+static cmd_status_t cmd_reload_claiming_state_execute(char *args __maybe_unused, char **message) {
+    char msg[1024];
+
+    CLOUD_STATUS status = claim_reload_and_wait_online();
+    switch(status) {
+        case CLOUD_STATUS_ONLINE:
+            snprintfz(msg, sizeof(msg),
+                      "Netdata Agent is claimed to Netdata Cloud and is currently online.");
+            break;
+
+        case CLOUD_STATUS_BANNED:
+            snprintfz(msg, sizeof(msg),
+                      "Netdata Agent is claimed to Netdata Cloud, but it is banned.");
+            break;
+
+        default:
+        case CLOUD_STATUS_AVAILABLE:
+            snprintfz(msg, sizeof(msg),
+                      "Netdata Agent is not claimed to Netdata Cloud. "
+                      "Reason: %s (check the logs for more information).",
+                      claim_agent_failure_reason_get());
+            break;
+
+        case CLOUD_STATUS_OFFLINE:
+            snprintfz(msg, sizeof(msg),
+                      "Netdata Agent is claimed to Netdata Cloud, but it is currently offline. "
+                      "Reason: %s (check the logs for more information).",
+                      cloud_status_aclk_offline_reason());
+    }
+
+    *message = strdupz(msg);
+
     return CMD_STATUS_SUCCESS;
 }
 
