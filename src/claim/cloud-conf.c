@@ -16,13 +16,7 @@ struct config cloud_config = {
 };
 
 const char *cloud_url(void) {
-    const char *url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
-
-    const char *from_env = getenv("NETDATA_CLAIM_URL");
-    if(from_env && *from_env)
-        url = appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", from_env);
-
-    return url;
+    return appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
 }
 
 const char *cloud_proxy(void) {
@@ -43,27 +37,12 @@ const char *cloud_proxy(void) {
         config_set(CONFIG_SECTION_CLOUD, "proxy", proxy);
     }
 
-    const char *from_env = getenv("NETDATA_CLAIM_PROXY");
-    if(from_env && *from_env) {
-        // set it in netdata.conf
-        config_set(CONFIG_SECTION_CLOUD, "proxy", proxy);
-
-        // set it in cloud.conf
-        proxy = appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", from_env);
-    }
-
     return proxy;
 }
 
 bool cloud_insecure(void) {
     // load it from cloud.conf or use internal default
-    bool insecure = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", CONFIG_BOOLEAN_NO);
-
-    const char *from_env = getenv("NETDATA_EXTRA_CLAIM_OPTS");
-    if(from_env && *from_env && strstr(from_env, "-insecure") == 0)
-        insecure = appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", CONFIG_BOOLEAN_YES);
-
-    return insecure;
+    return appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", CONFIG_BOOLEAN_NO);
 }
 
 static void cloud_conf_load_defaults(void) {

@@ -351,12 +351,6 @@ bool claim_agent_from_environment(void) {
     if(from_env && *from_env && strstr(from_env, "-insecure") == 0)
         insecure = CONFIG_BOOLEAN_YES;
 
-    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", url);
-    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "token", token);
-    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "rooms", rooms);
-    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", proxy);
-    appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", insecure);
-
     return claim_agent(url, token, rooms, proxy, insecure);
 }
 
