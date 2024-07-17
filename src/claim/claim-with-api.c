@@ -211,8 +211,17 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
         curl_easy_setopt(curl, CURLOPT_CAINFO, trusted_key_file);
 
     // Proxy configuration
-    if (proxy && *proxy && strcmp(proxy, "none") != 0 && strcmp(proxy, "env") != 0)
-        curl_easy_setopt(curl, CURLOPT_PROXY, proxy);
+    if (proxy) {
+        if (!*proxy || strcmp(proxy, "none") == 0)
+            // disable proxy configuration in libcurl
+            curl_easy_setopt(curl, CURLOPT_PROXY, "");
+
+        else if (strcmp(proxy, "env") != 0)
+            // set the custom proxy for libcurl
+            curl_easy_setopt(curl, CURLOPT_PROXY, proxy);
+
+        // otherwise, libcurl will use its own proxy environment variables
+    }
 
     // Insecure option
     if (insecure) {

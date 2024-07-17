@@ -52,9 +52,12 @@ Netdata Agents can be connected to Netdata Cloud by creating the file `/etc/netd
    url = The Netdata Cloud base URL (optional, defaults to `https://app.netdata.cloud`)
    token = The claiming token for your Netdata Cloud Space (required)
    rooms = A comma-separated list of Rooms to add the Agent to (optional)
-   proxy = The URL of a proxy server to use for the connection (optional)
+   proxy = The URL of a proxy server to use for the connection, or none, or env (optional, defaults to env)
    insecure = Either yes or no (optional)
 ```
+
+- `proxy` can get anything libcurl accepts as proxy, or the keywords `none` and `env`. `none` or just empty disables proxy configuration, while `env` instructs libcurl to use the environment for determining proxy configuration (usually the environment variable `https_proxy`).
+- `insecure` is a boolean (either `yes`, or `no`) and when set to `yes` it instructs libcurl to disable host verification.
 
 example:
 
