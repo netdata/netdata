@@ -399,7 +399,6 @@ happened, on your systems and applications.
 	-DENABLE_PLUGIN_PERF=On \
 	-DENABLE_PLUGIN_SLABINFO=On \
 	-DENABLE_PLUGIN_SYSTEMD_JOURNAL=On \
-	-DENABLE_PLUGIN_LOGS_MANAGEMENT=On \
 	-DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=On \
 	-DENABLE_BUNDLED_JSONC=Off \
 	-DENABLE_BUNDLED_YAML=Off
@@ -624,11 +623,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 # xenstat belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/xenstat.plugin
-
-# logs management belongs to a different sub-package
-%exclude %{_libexecdir}/%{name}/plugins.d/logs-management.plugin
-%exclude %{_libdir}/%{name}/conf.d/logsmanagement.d.conf
-%exclude %{_libdir}/%{name}/conf.d/logsmanagement.d
 
 # Network viewer belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
@@ -973,29 +967,6 @@ fi
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/xenstat.plugin
 %endif
 
-%package plugin-logs-management
-Summary: The logs-management plugin for the Netdata Agent
-Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
-
-%description plugin-logs-management
- This plugin allows the Netdata Agent to collect logs from the system
- and parse them to extract metrics.
-
-%pre plugin-logs-management
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
-
-%files plugin-logs-management
-%defattr(0644,root,netdata,0755)
-%{_libdir}/%{name}/conf.d/logsmanagement.d.conf
-%{_libdir}/%{name}/conf.d/logsmanagement.d
-%defattr(0750,root,netdata,0750)
-# CAP_DAC_READ_SEARCH and CAP_SYSLOG needed for data collection.
-%caps(cap_dac_read_search,cap_syslog=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/logs-management.plugin
-
 %package plugin-network-viewer
 Summary: The network viewer plugin for the Netdata Agent
 Group: Applications/System
@@ -1024,6 +995,8 @@ fi
 %caps(cap_sys_admin,cap_sys_ptrace,cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
 
 %changelog
+* Tue Jul 16 2024 Austin Hemmelgarn <austin@netdata.cloud>
+- Removed logs-management plugin
 * Wed Jul 03 2024 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-26
 - Added lm_sensors as weak dependency for plugin-go package
 * Tue Feb 06 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-25
