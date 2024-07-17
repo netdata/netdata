@@ -128,7 +128,9 @@ function(nd_perms_generate_cmake_install_hook path component perms)
   message(STATUS "Adding post-install hook for supplementary permissions for ${path}")
 
   if(USE_FILE_CAPABILITIES AND NOT "${perms}" STREQUAL "suid")
-    install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-linux-caps-hook.sh ${path} ${NETDATA_GROUP} ${perms})" COMPONENT "${component}")
+    list(JOIN perms " " caps)
+
+    install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-linux-caps-hook.sh ${path} ${NETDATA_GROUP} ${caps})" COMPONENT "${component}")
   else()
     install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-suid-hook.sh ${path} ${NETDATA_GROUP})" COMPONENT "${component}")
   endif()
