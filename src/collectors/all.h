@@ -403,7 +403,6 @@
 // Logs Management
 
 #define NETDATA_CHART_PRIO_LOGS_BASE                 95000 // many charts
-#define NETDATA_CHART_PRIO_LOGS_STATS_BASE           160000 // logsmanagement stats in "Netdata Monitoring"
 
 // PCI
 

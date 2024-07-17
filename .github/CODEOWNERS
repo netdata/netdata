@@ -32,7 +32,6 @@ system/ @netdata/agent-sre
 tests/ @netdata/agent-sre @vkalintiris
 src/web/ @thiagoftsm @vkalintiris
 src/web/gui/ @novykh
-src/logsmanagement/ @thiagoftsm
 
 # Ownership by filetype (overwrites ownership by directory)
 *.md @Ancairon

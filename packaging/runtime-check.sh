@@ -60,7 +60,6 @@ plugins.d/freeipmi.plugin
 plugins.d/go.d.plugin
 plugins.d/ioping.plugin
 plugins.d/local-listeners
-plugins.d/logs-management.plugin
 plugins.d/ndsudo
 plugins.d/network-viewer.plugin
 plugins.d/nfacct.plugin
