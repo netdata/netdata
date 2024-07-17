@@ -303,6 +303,14 @@ prepare_cmake_options() {
     enable_feature PLUGIN_GO 0
   fi
 
+  if [ -n "${NETDATA_ENABLE_LTO}" ]; then
+    if [ "${NETDATA_ENABLE_LTO}" -eq 1 ]; then
+      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DDISABLE_LTO=Off"
+    else
+      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DDISABLE_LTO=On"
+    fi
+  fi
+
   if [ "${USE_SYSTEM_PROTOBUF:-0}" -eq 1 ]; then
     enable_feature BUNDLED_PROTOBUF 0
   else
