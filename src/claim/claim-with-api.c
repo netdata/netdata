@@ -321,7 +321,7 @@ bool claim_agent(const char *url, const char *token, const char *rooms, const ch
     appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", url);
     appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "token", token ? token : "");
     appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "rooms", rooms ? rooms : "");
-    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", proxy ? proxy : "");
+    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", proxy && *proxy ? proxy : "env");
     appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", insecure);
 
     return rc;

@@ -47,7 +47,7 @@ bool cloud_insecure(void) {
 
 static void cloud_conf_load_defaults(void) {
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
-    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", "");
+    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", "env");
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "token", "");
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "rooms", "");
     appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", CONFIG_BOOLEAN_NO);
