@@ -3,7 +3,6 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk_alert.h"
 
-#ifdef ENABLE_ACLK
 #include "../../aclk/aclk_alarm_api.h"
 
 #define SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param)                                                                     \
@@ -425,7 +424,7 @@ void health_alarm_log_populate(
 static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
 {
 
-    char *claim_id = get_agent_claimid();
+    char *claim_id = aclk_get_claimed_id();
     if (!claim_id || !host->node_id)
         return;
 
@@ -908,7 +907,7 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
         return;
     }
 
-    char *claim_id = get_agent_claimid();
+    char *claim_id = aclk_get_claimed_id();
     if (unlikely(!claim_id))
         return;
 
@@ -1034,7 +1033,7 @@ void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_vers
     if (unlikely(!node_id || !claim_id || !claimed() || uuid_parse(node_id, node_uuid)))
         return;
 
-    char *agent_claim_id = get_agent_claimid();
+    char *agent_claim_id = aclk_get_claimed_id();
     if (claim_id && agent_claim_id && strcmp(agent_claim_id, claim_id) != 0) {
         nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT VALIDATION REQUEST RECEIVED WITH INVALID CLAIM ID", node_id);
         goto done;
@@ -1051,5 +1050,3 @@ void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_vers
 done:
     freez(agent_claim_id);
 }
-
-#endif

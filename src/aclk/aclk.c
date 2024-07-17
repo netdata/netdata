@@ -1273,7 +1273,6 @@ char *aclk_state_json(void)
     json_object_put(msg);
     return str;
 }
-#endif /* ENABLE_ACLK */
 
 void add_aclk_host_labels(void) {
     RRDLABELS *labels = localhost->rrdlabels;

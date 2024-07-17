@@ -20,7 +20,6 @@ void sanity_check(void) {
     BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < ACLK_MAX_ENUMERATIONS_DEFINED);
 }
 
-#ifdef ENABLE_ACLK
 static struct aclk_database_cmd aclk_database_deq_cmd(void)
 {
     struct aclk_database_cmd ret = { 0 };
@@ -39,7 +38,6 @@ static struct aclk_database_cmd aclk_database_deq_cmd(void)
 
     return ret;
 }
-#endif
 
 static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
 {
@@ -172,7 +170,6 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     return 0;
 }
 
-#ifdef ENABLE_ACLK
 
 #define SQL_SELECT_ACLK_ALERT_TABLES                                                                                   \
     "SELECT 'DROP '||type||' IF EXISTS '||name||';' FROM sqlite_schema WHERE name LIKE 'aclk_alert_%' AND type IN ('table', 'trigger', 'index')"
@@ -358,13 +355,11 @@ static void aclk_synchronization_init(void)
     memset(&aclk_sync_config, 0, sizeof(aclk_sync_config));
     fatal_assert(0 == uv_thread_create(&aclk_sync_config.thread, aclk_synchronization, &aclk_sync_config));
 }
-#endif
 
 // -------------------------------------------------------------
 
 void create_aclk_config(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __maybe_unused, nd_uuid_t *node_id __maybe_unused)
 {
-#ifdef ENABLE_ACLK
 
     if (!host || host->aclk_config)
         return;
@@ -383,7 +378,6 @@ void create_aclk_config(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __may
     wc->stream_alerts = false;
     time_t now = now_realtime_sec();
     wc->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
-#endif
 }
 
 #define SQL_FETCH_ALL_HOSTS                                                                                            \
@@ -419,7 +413,6 @@ void sql_aclk_sync_init(void)
     // Trigger host context load for hosts that have been created
     metadata_queue_load_host_context(NULL);
 
-#ifdef ENABLE_ACLK
     if (!number_of_children)
         aclk_queue_node_info(localhost, true);
 
@@ -432,7 +425,6 @@ void sql_aclk_sync_init(void)
     aclk_synchronization_init();
 
     netdata_log_info("ACLK sync initialization completed");
-#endif
 }
 
 static inline void queue_aclk_sync_cmd(enum aclk_database_opcode opcode, const void *param0, const void *param1)
@@ -455,18 +447,14 @@ void aclk_push_alert_config(const char *node_id, const char *config_hash)
 
 void schedule_node_info_update(RRDHOST *host __maybe_unused)
 {
-#ifdef ENABLE_ACLK
     if (unlikely(!host))
         return;
     queue_aclk_sync_cmd(ACLK_DATABASE_NODE_STATE, host, NULL);
-#endif
 }
 
-#ifdef ENABLE_ACLK
 void unregister_node(const char *machine_guid)
 {
     if (unlikely(!machine_guid))
         return;
     queue_aclk_sync_cmd(ACLK_DATABASE_NODE_UNREGISTER, strdupz(machine_guid), NULL);
 }
-#endif

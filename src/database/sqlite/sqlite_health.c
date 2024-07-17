@@ -134,7 +134,6 @@ int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status)
     return delay;
 }
 
-#ifdef ENABLE_ACLK
 #define SQL_INSERT_ALERT_PENDING_QUEUE                                                                                 \
     "INSERT INTO alert_queue (host_id, health_log_id, unique_id, alarm_id, status, date_scheduled)"                    \
     "  VALUES (@host_id, @health_log_id, @unique_id, @alarm_id, @new_status, UNIXEPOCH() + @delay)"                    \
@@ -179,7 +178,6 @@ done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_RESET(res);
 }
-#endif
 
 #define SQL_INSERT_HEALTH_LOG_DETAIL                                                                                         \
     "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, "                                    \
@@ -272,11 +270,8 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
     if (rc == SQLITE_ROW) {
         health_log_id = (size_t)sqlite3_column_int64(res, 0);
         sql_health_alarm_log_insert_detail(host, health_log_id, ae);
-#ifdef ENABLE_ACLK
-        if (netdata_cloud_enabled)
-            insert_alert_queue(
-                host, health_log_id, (int64_t)ae->unique_id, (int64_t)ae->alarm_id, ae->old_status, ae->new_status);
-#endif
+        insert_alert_queue(
+            host, health_log_id, (int64_t)ae->unique_id, (int64_t)ae->alarm_id, ae->old_status, ae->new_status);
     } else
         error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG, rc = %d", rrdhost_hostname(host), rc);
 
@@ -432,14 +427,10 @@ static void sql_inject_removed_status(
         //update the old entry in health_log
         sql_update_transition_in_health_log(host, alarm_id, &transition_id, last_transition);
 
-#ifdef ENABLE_ACLK
-        if (netdata_cloud_enabled) {
-            int64_t health_log_id = sqlite3_column_int64(res, 0);
-            RRDCALC_STATUS old_status = (RRDCALC_STATUS)sqlite3_column_double(res, 1);
-            insert_alert_queue(
-                host, health_log_id, (int64_t)unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED);
-        }
-#endif
+        int64_t health_log_id = sqlite3_column_int64(res, 0);
+        RRDCALC_STATUS old_status = (RRDCALC_STATUS)sqlite3_column_double(res, 1);
+        insert_alert_queue(
+            host, health_log_id, (int64_t)unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED);
     }
     //else
     //   error_report("HEALTH [N/A]: Failed to execute SQL_INJECT_REMOVED, rc = %d", rc);

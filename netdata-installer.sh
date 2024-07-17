@@ -255,7 +255,6 @@ NETDATA_ENABLE_ML=""
 ENABLE_DBENGINE=1
 ENABLE_GO=1
 ENABLE_H2O=1
-ENABLE_CLOUD=1
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 
@@ -277,9 +276,7 @@ while [ -n "${1}" ]; do
     "--enable-plugin-freeipmi") ENABLE_FREEIPMI=1 ;;
     "--disable-plugin-freeipmi") ENABLE_FREEIPMI=0 ;;
     "--disable-https")
-      ENABLE_DBENGINE=0
-      ENABLE_H2O=0
-      ENABLE_CLOUD=0
+      warning "HTTPS cannot be disabled."
       ;;
     "--disable-dbengine") ENABLE_DBENGINE=0 ;;
     "--enable-plugin-go") ENABLE_GO=1 ;;

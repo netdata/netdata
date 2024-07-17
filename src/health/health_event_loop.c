@@ -295,15 +295,13 @@ static void health_event_loop(void) {
             }
 
             worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
-#ifdef ENABLE_ACLK
-            if (netdata_cloud_enabled) {
+            {
                 struct aclk_sync_cfg_t *wc = host->aclk_config;
                 if (wc && wc->send_snapshot == 2) {
                     netdata_log_info("DEBUG: %s SKIPPING HEALTH BECAUSE WE WILL SEND SNAPSHOT", rrdhost_hostname(host));
                     continue;
                 }
             }
-#endif
 
             // the first loop is to lookup values from the db
             foreach_rrdcalc_in_rrdhost_read(host, rc) {
@@ -650,7 +648,6 @@ static void health_event_loop(void) {
                 break;
             }
         }
-#ifdef ENABLE_ACLK
         struct aclk_sync_cfg_t *wc = host->aclk_config;
         if (wc && wc->send_snapshot == 1) {
             wc->send_snapshot = 2;
@@ -659,7 +656,6 @@ static void health_event_loop(void) {
         else
             if (process_alert_pending_queue(host))
                 rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-#endif
 
         dfe_done(host);
 
