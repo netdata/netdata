@@ -35,9 +35,9 @@ func New() *Icecast {
 				},
 			},
 		},
-		charts: chartsTmpl.Copy(),
+		charts: &module.Charts{},
 
-		seenSources: make(map[string]*Source),
+		seenSources: make(map[string]bool),
 	}
 }
 
@@ -52,7 +52,7 @@ type Icecast struct {
 
 	charts *module.Charts
 
-	seenSources map[string]*Source
+	seenSources map[string]bool
 
 	httpClient *http.Client
 }

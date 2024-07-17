@@ -159,10 +159,10 @@ modules:
           description: "These metrics refer to an icecast source."
           labels:
             - name: source
-              description: Source name
+              description: Source name.
           metrics:
             - name: icecast.listeners
-              description: Number of Icecast Listeners on active sources
+              description: Icecast Listeners
               unit: "listeners"
               chart_type: line
               dimensions:

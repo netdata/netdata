@@ -11,23 +11,18 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-type Source struct {
-	ServerName  string `json:"server_name"`
-	StreamStart string `json:"stream_start"`
-	Listeners   int64  `json:"listeners"`
-}
-
-type Icestats struct {
-	Source []Source `json:"source"`
-}
-
-type Data struct {
-	Icestats Icestats `json:"icestats"`
-}
-
-type sourceWrapper struct {
-	Source json.RawMessage `json:"source"`
-}
+type (
+	serverStats struct {
+		IceStats *struct {
+			Source []sourceStats `json:"source"`
+		} `json:"icestats"`
+	}
+	sourceStats struct {
+		ServerName  string `json:"server_name"`
+		StreamStart string `json:"stream_start"`
+		Listeners   int64  `json:"listeners"`
+	}
+)
 
 const (
 	urlPathServerStats = "/status-json.xsl" // https://icecast.org/docs/icecast-trunk/server_stats/
@@ -48,87 +43,56 @@ func (ic *Icecast) collectServerStats(mx map[string]int64) error {
 	if err != nil {
 		return err
 	}
+	if stats.IceStats == nil {
+		return fmt.Errorf("unexpected response: no icestats found")
+	}
+	if len(stats.IceStats.Source) == 0 {
+		return fmt.Errorf("no icecast sources found")
+	}
 
 	seen := make(map[string]bool)
 
-	// if len(stats.Icestats.Source) == 0 {
-	// 	return fmt.Errorf("no active icecast sources found")
-	// }
-
-	for _, source := range stats.Icestats.Source {
-
-		if source.ServerName != "" && source.StreamStart != "" {
-			key := source.ServerName
-
-			seen[key] = true
-
-			if _, ok := ic.seenSources[key]; !ok {
-				ic.seenSources[key] = &source
-				ic.addSourceChart(&source)
-			}
-
-			mx[source.ServerName+"_listeners"] = source.Listeners
+	for _, src := range stats.IceStats.Source {
+		name := src.ServerName
+		if name == "" {
+			continue
 		}
 
+		seen[name] = true
+
+		if !ic.seenSources[name] {
+			ic.seenSources[name] = true
+			ic.addSourceCharts(name)
+		}
+
+		px := fmt.Sprintf("source_%s_", name)
+
+		mx[px+"listeners"] = src.Listeners
 	}
 
-	for _, source := range stats.Icestats.Source {
-
-		if !seen[source.ServerName] {
-			delete(ic.seenSources, source.ServerName)
-			ic.removeSourceChart(&source)
+	for name := range ic.seenSources {
+		if !seen[name] {
+			delete(ic.seenSources, name)
+			ic.removeSourceCharts(name)
 		}
-
 	}
 
 	return nil
 }
 
-func (ic *Icecast) queryServerStats() (*Data, error) {
+func (ic *Icecast) queryServerStats() (*serverStats, error) {
 	req, err := web.NewHTTPRequestWithPath(ic.Request, urlPathServerStats)
 	if err != nil {
 		return nil, err
 	}
 
-	var statsWrapper struct {
-		Icestats *sourceWrapper `json:"icestats"`
-	}
+	var stats serverStats
 
-	if err := ic.doOKDecode(req, &statsWrapper); err != nil {
+	if err := ic.doOKDecode(req, &stats); err != nil {
 		return nil, err
 	}
 
-	if statsWrapper.Icestats == nil {
-		return nil, fmt.Errorf("unexpected response: icestats field is nil")
-	}
-
-	if len(statsWrapper.Icestats.Source) == 0 {
-		return nil, fmt.Errorf("unexpected response: no sources found")
-	}
-
-	var icestats Icestats
-
-	if statsWrapper.Icestats.Source[0] == '{' {
-		// Single object case
-		var singleSource Source
-		if err := json.Unmarshal(statsWrapper.Icestats.Source, &singleSource); err != nil {
-			return nil, err
-		}
-		icestats.Source = []Source{singleSource}
-	} else {
-		// Array case
-		if err := json.Unmarshal(statsWrapper.Icestats.Source, &icestats.Source); err != nil {
-			return nil, err
-		}
-	}
-
-	for _, source := range icestats.Source {
-		if source.ServerName == "" || source.StreamStart == "" {
-			return nil, fmt.Errorf("invalid JSON response: missing required fields in source")
-		}
-	}
-
-	return &Data{Icestats: icestats}, nil
+	return &stats, nil
 }
 
 func (ic *Icecast) doOKDecode(req *http.Request, in interface{}) error {

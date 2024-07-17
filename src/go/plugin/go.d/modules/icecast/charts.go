@@ -10,51 +10,56 @@ import (
 )
 
 const (
-	prioListeners = module.Priority + iota
+	prioSourceListeners = module.Priority + iota
 )
 
-var chartsTmpl = module.Charts{
-	ListenersChart.Copy(),
+var sourceChartsTmpl = module.Charts{
+	sourceListenersChartTmpl.Copy(),
 }
 
 var (
-	ListenersChart = module.Chart{
+	sourceListenersChartTmpl = module.Chart{
 		ID:       "icecast_%s_listeners",
-		Title:    "Number of Icecast Listeners on active sources",
+		Title:    "Icecast Listeners",
 		Units:    "listeners",
 		Fam:      "listeners",
 		Ctx:      "icecast.listeners",
 		Type:     module.Line,
-		Priority: prioListeners,
+		Priority: prioSourceListeners,
 		Dims: module.Dims{
-			{ID: "%s_listeners", Name: "listeners"},
+			{ID: "source_%s_listeners", Name: "listeners"},
 		},
 	}
 )
 
-func (a *Icecast) addSourceChart(stats *Source) {
-	chart := ListenersChart.Copy()
+func (ic *Icecast) addSourceCharts(name string) {
+	chart := sourceListenersChartTmpl.Copy()
 
-	chart.ID = fmt.Sprintf(chart.ID, stats.ServerName)
+	chart.ID = fmt.Sprintf(chart.ID, cleanSource(name))
 	chart.Labels = []module.Label{
-		{Key: "source", Value: stats.ServerName},
+		{Key: "source", Value: name},
 	}
 	for _, dim := range chart.Dims {
-		dim.ID = fmt.Sprintf(dim.ID, stats.ServerName)
+		dim.ID = fmt.Sprintf(dim.ID, name)
 	}
 
-	if err := a.Charts().Add(chart); err != nil {
-		a.Warning(err)
+	if err := ic.Charts().Add(chart); err != nil {
+		ic.Warning(err)
 	}
 
 }
 
-func (a *Icecast) removeSourceChart(source *Source) {
-	px := fmt.Sprintf("icecast_%s_listeners", source.ServerName)
-	for _, chart := range *a.Charts() {
+func (ic *Icecast) removeSourceCharts(name string) {
+	px := fmt.Sprintf("icecast_%s_", cleanSource(name))
+	for _, chart := range *ic.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
 		}
 	}
+}
+
+func cleanSource(name string) string {
+	r := strings.NewReplacer(" ", "_", ".", "_", ",", "_")
+	return r.Replace(name)
 }
