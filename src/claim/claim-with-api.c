@@ -9,61 +9,42 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-// Configuration
-#define PRIVATE_KEY_FILE_FMT "%s/private.pem"
-#define PUBLIC_KEY_FILE_FMT "%s/public.pem"
-
-static bool create_claiming_directory() {
-    struct stat st = {0};
-    if (stat(netdata_configured_cloud_dir, &st) == -1) {
-        if (mkdir(netdata_configured_cloud_dir, 0770) != 0) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "CLAIM: Failed to create claiming directory: %s",
-                   netdata_configured_cloud_dir);
-            return false;
-        }
-    }
-    return true;
-}
-
 static bool check_and_generate_certificates() {
     FILE *fp;
     EVP_PKEY *pkey = NULL;
     EVP_PKEY_CTX *pctx = NULL;
-    char private_key_file[256];
-    char public_key_file[256];
 
-    snprintf(private_key_file, sizeof(private_key_file), PRIVATE_KEY_FILE_FMT, netdata_configured_cloud_dir);
-    snprintf(public_key_file, sizeof(public_key_file), PUBLIC_KEY_FILE_FMT, netdata_configured_cloud_dir);
+    CLEAN_CHAR_P *private_key_file = strdupz_path_subpath(netdata_configured_cloud_dir, "private.pem");
+    CLEAN_CHAR_P *public_key_file = strdupz_path_subpath(netdata_configured_cloud_dir, "public.pem");
 
     // Check if private key exists
-    fp = fopen(private_key_file, "r");
+    fp = fopen(public_key_file, "r");
     if (fp) {
         fclose(fp);
-        return true; // Keys already exist
+        return true;
     }
 
     // Generate the RSA key
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
     if (!pctx) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: EVP_PKEY_CTX_new_id error");
+        claim_agent_failure_reason_set("Cannot generate RSA key, EVP_PKEY_CTX_new_id() failed");
         return false;
     }
 
     if (EVP_PKEY_keygen_init(pctx) <= 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: EVP_PKEY_keygen_init error");
+        claim_agent_failure_reason_set("Cannot generate RSA key, EVP_PKEY_keygen_init() failed");
         EVP_PKEY_CTX_free(pctx);
         return false;
     }
 
     if (EVP_PKEY_CTX_set_rsa_keygen_bits(pctx, 2048) <= 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: EVP_PKEY_CTX_set_rsa_keygen_bits error");
+        claim_agent_failure_reason_set("Cannot generate RSA key, EVP_PKEY_CTX_set_rsa_keygen_bits() failed");
         EVP_PKEY_CTX_free(pctx);
         return false;
     }
 
     if (EVP_PKEY_keygen(pctx, &pkey) <= 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: EVP_PKEY_keygen error");
+        claim_agent_failure_reason_set("Cannot generate RSA key, EVP_PKEY_keygen() failed");
         EVP_PKEY_CTX_free(pctx);
         return false;
     }
@@ -73,8 +54,7 @@ static bool check_and_generate_certificates() {
     // Save private key
     fp = fopen(private_key_file, "wb");
     if (!fp || !PEM_write_PrivateKey(fp, pkey, NULL, NULL, 0, NULL, NULL)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "CLAIM: Failed to write private key: %s", private_key_file);
+        claim_agent_failure_reason_set("Cannot write private key file: %s", private_key_file);
         if (fp) fclose(fp);
         EVP_PKEY_free(pkey);
         return false;
@@ -84,7 +64,7 @@ static bool check_and_generate_certificates() {
     // Save public key
     fp = fopen(public_key_file, "wb");
     if (!fp || !PEM_write_PUBKEY(fp, pkey)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: Failed to write public key: %s", public_key_file);
+        claim_agent_failure_reason_set("Cannot write public key file: %s", public_key_file);
         if (fp) fclose(fp);
         EVP_PKEY_free(pkey);
         return false;
@@ -146,11 +126,10 @@ void curl_add_rooms_json_array(BUFFER *wb, const char *rooms) {
     buffer_json_array_close(wb);
 }
 
-static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure, const char **error) {
+static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure) {
     CURL *curl;
     CURLcode res;
-    char target_url[1024];
-    char public_key_file[256];
+    char target_url[2048];
     char public_key[2048] = "";  // Adjust size as needed
     FILE *fp;
     struct curl_slist *headers = NULL;
@@ -165,16 +144,34 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     snprintf(target_url, sizeof(target_url), "%s/api/v1/spaces/nodes/%s", url, claimed_id_str);
 
     // Read the public key
-    snprintf(public_key_file, sizeof(public_key_file), PUBLIC_KEY_FILE_FMT, netdata_configured_cloud_dir);
+    CLEAN_CHAR_P *public_key_file = strdupz_path_subpath(netdata_configured_cloud_dir, "public.pem");
     fp = fopen(public_key_file, "r");
     if (!fp || fread(public_key, 1, sizeof(public_key), fp) <= 0) {
-        *error = "Failed to read public key";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: %s: %s", *error, public_key_file);
+        claim_agent_failure_reason_set("cannot read public key file '%s'", public_key_file);
         if (fp) fclose(fp);
         return false;
     }
     fclose(fp);
 
+    // check if we have trusted.pem
+    // or cloud_fullchain.pem, for backwards compatibility
+    CLEAN_CHAR_P *trusted_key_file = strdupz_path_subpath(netdata_configured_cloud_dir, "trusted.pem");
+    fp = fopen(trusted_key_file, "r");
+    if(fp)
+        fclose(fp);
+    else {
+        freez(trusted_key_file);
+        trusted_key_file = strdupz_path_subpath(netdata_configured_cloud_dir, "cloud_fullchain.pem");
+        fp = fopen(trusted_key_file, "r");
+        if(fp)
+            fclose(fp);
+        else {
+            freez(trusted_key_file);
+            trusted_key_file = NULL;
+        }
+    }
+
+    // generate the JSON request message
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
@@ -191,15 +188,17 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     buffer_json_member_add_string(wb, "mGUID", machine_guid);
     buffer_json_finalize(wb);
 
+    // initialize libcurl
     curl = curl_easy_init();
     if(!curl) {
-        *error = "Failed to initialize libcurl";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: %s", *error);
+        claim_agent_failure_reason_set("Cannot initialize request (curl_easy_init() failed)");
         return false;
     }
 
+    // we will receive the response in this
     CLEAN_BUFFER *response = buffer_create(0, NULL);
 
+    // configure the request
     headers = curl_slist_append(headers, "Content-Type: application/json");
     curl_easy_setopt(curl, CURLOPT_URL, target_url);
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
@@ -207,6 +206,9 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, response_write_callback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, response);
+
+    if(trusted_key_file)
+        curl_easy_setopt(curl, CURLOPT_CAINFO, trusted_key_file);
 
     // Proxy configuration
     if (proxy && *proxy && strcmp(proxy, "none") != 0 && strcmp(proxy, "env") != 0)
@@ -218,11 +220,10 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
     }
 
+    // execute the request
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        *error = "Failed to make HTTPS request";
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "CLAIM: %s: %s", *error, curl_easy_strerror(res));
+        claim_agent_failure_reason_set("Request failed with error: %s", curl_easy_strerror(res));
         curl_easy_cleanup(curl);
         return false;
     }
@@ -233,9 +234,12 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 
     bool ret = false;
     if(http_status_code == 204) {
-        *error = "Agent claimed successfully";
-        ret = true;
-        cloud_conf_regenerate(claimed_id_str, machine_guid, hostname, token, rooms, url, proxy, insecure);
+        if(!cloud_conf_regenerate(claimed_id_str, machine_guid, hostname, token, rooms, url, proxy, insecure))
+            claim_agent_failure_reason_set("Failed to save claiming info to disk");
+        else {
+            claim_agent_failure_reason_set(NULL);
+            ret = true;
+        }
     }
     else if (http_status_code == 422) {
         if(buffer_strlen(response)) {
@@ -249,82 +253,59 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
                     error_key = json_object_get_string(error_key_obj);
 
                 if (strcmp(error_key, "ErrInvalidNodeID") == 0)
-                    *error = "Invalid node id";
+                    claim_agent_failure_reason_set("Failed: the node id is invalid");
                 else if (strcmp(error_key, "ErrInvalidNodeName") == 0)
-                    *error = "Invalid node name";
+                    claim_agent_failure_reason_set("Failed: the node name is invalid");
                 else if (strcmp(error_key, "ErrInvalidRoomID") == 0)
-                    *error = "Invalid room id";
+                    claim_agent_failure_reason_set("Failed: one or more room ids are invalid");
                 else if (strcmp(error_key, "ErrInvalidPublicKey") == 0)
-                    *error = "Invalid public key";
+                    claim_agent_failure_reason_set("Failed: the public key is invalid");
                 else
-                    *error = "Failed with unknown error reason in response";
+                    claim_agent_failure_reason_set("Failed with description '%s'", error_key);
 
                 json_object_put(parsed_json);
             }
             else
-                *error = "Failed to parse JSON response";
+                claim_agent_failure_reason_set("Failed with a response code %ld", http_status_code);
         }
         else
-            *error = "Failed with empty JSON response";
+            claim_agent_failure_reason_set("Failed with an empty response, code %ld", http_status_code);
     }
     else if(http_status_code == 102)
-        *error = "Processing claiming";
+        claim_agent_failure_reason_set("Claiming is in progress");
     else if(http_status_code == 403)
-        *error = "Token expired/token not found/invalid token";
+        claim_agent_failure_reason_set("Failed: token is expired, not found, or invalid");
     else if(http_status_code == 409)
-        *error = "Already claimed";
+        claim_agent_failure_reason_set("Failed: agent is already claimed");
     else if(http_status_code == 500)
-        *error = "Internal server error";
+        claim_agent_failure_reason_set("Failed: received Internal Server Error");
     else if(http_status_code == 503)
-        *error = "Service unavailable";
+        claim_agent_failure_reason_set("Failed: Netdata Cloud is unavailable");
     else if(http_status_code == 504)
-        *error = "Gateway timeout";
+        claim_agent_failure_reason_set("Failed: Gateway Timeout");
     else
-        *error = "Unknown HTTP response code";
+        claim_agent_failure_reason_set("Failed with response code %ld", http_status_code);
 
     curl_easy_cleanup(curl);
     return ret;
 }
 
-bool claim_agent_with_checks(const char *token, const char *rooms, const char *url, const char *proxy, int insecure, const char **error) {
-    *error = "OK";
-
-    if (!create_claiming_directory()) {
-        *error = "Failed to create claim directory";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: %s", *error);
-        return false;
-    }
+bool claim_agent(const char *url, const char *token, const char *rooms, const char *proxy, bool insecure) {
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    spinlock_lock(&spinlock);
 
     if (!check_and_generate_certificates()) {
-        *error = "Failed to generate certificates";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: %s", *error);
+        spinlock_unlock(&spinlock);
         return false;
     }
 
-    if (!send_curl_request(registry_get_this_machine_guid(), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure, error)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "CLAIM: %s", *error);
+    if (!send_curl_request(registry_get_this_machine_guid(), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure)) {
+        spinlock_unlock(&spinlock);
         return false;
     }
 
+    spinlock_unlock(&spinlock);
     return true;
-}
-
-bool claim_agent(const char *url, const char *token, const char *rooms, const char *proxy, bool insecure) {
-    const char *msg = NULL;
-    bool rc = claim_agent_with_checks(token, rooms, url, proxy, insecure, &msg);
-
-    if(rc)
-        claim_agent_failure_reason_set(NULL);
-    else
-        claim_agent_failure_reason_set(msg && *msg ? msg : "Unknown error");
-
-    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", url);
-    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "token", token ? token : "");
-    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "rooms", rooms ? rooms : "");
-    appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", proxy && *proxy ? proxy : "env");
-    appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", insecure);
-
-    return rc;
 }
 
 bool claim_agent_from_environment(void) {

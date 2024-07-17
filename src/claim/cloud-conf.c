@@ -103,7 +103,7 @@ bool cloud_conf_save(void) {
     return true;
 }
 
-void cloud_conf_regenerate(const char *claimed_id_str, const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure) {
+bool cloud_conf_regenerate(const char *claimed_id_str, const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure) {
     // for backwards compatibility (older agents), save the claimed_id to its file
     claimed_id_save_to_file(claimed_id_str);
 
@@ -116,5 +116,5 @@ void cloud_conf_regenerate(const char *claimed_id_str, const char *machine_guid,
     appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "claimed_id", claimed_id_str ? claimed_id_str : "");
     appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "hostname", hostname ? hostname : "");
 
-    cloud_conf_save();
+    return cloud_conf_save();
 }

@@ -26,7 +26,7 @@ static const char *verify_or_create_required_directory(const char *dir) {
 
 static const char *verify_or_create_required_private_directory(const char *dir) {
     errno_clear();
-    
+
     if (mkdir(dir, 0770) != 0 && errno != EEXIST)
         fatal("Cannot create required directory '%s'", dir);
 

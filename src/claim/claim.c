@@ -5,15 +5,25 @@
 // --------------------------------------------------------------------------------------------------------------------
 // keep track of the last claiming failure reason
 
-static const char *cloud_claim_failure_reason = NULL;
+static char cloud_claim_failure_reason[4096] = "";
 
-void claim_agent_failure_reason_set(const char *reason) {
-    freez((void *)cloud_claim_failure_reason);
-    cloud_claim_failure_reason = reason ? strdupz(reason) : NULL;
+void claim_agent_failure_reason_set(const char *format, ...) {
+    if(!format || !*format) {
+        cloud_claim_failure_reason[0] = '\0';
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+    vsnprintf(cloud_claim_failure_reason, sizeof(cloud_claim_failure_reason), format, args);
+    va_end(args);
+
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "CLAIM: %s", cloud_claim_failure_reason);
 }
 
 const char *claim_agent_failure_reason_get(void) {
-    if(!cloud_claim_failure_reason)
+    if(!cloud_claim_failure_reason[0])
         return "Agent is not claimed yet";
     else
         return cloud_claim_failure_reason;

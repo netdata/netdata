@@ -205,15 +205,13 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args __maybe_unused,
         default:
         case CLOUD_STATUS_AVAILABLE:
             snprintfz(msg, sizeof(msg),
-                      "Netdata Agent is not claimed to Netdata Cloud. "
-                      "Reason: %s (check the logs for more information).",
+                      "Netdata Agent is not claimed to Netdata Cloud: %s",
                       claim_agent_failure_reason_get());
             break;
 
         case CLOUD_STATUS_OFFLINE:
             snprintfz(msg, sizeof(msg),
-                      "Netdata Agent is claimed to Netdata Cloud, but it is currently offline. "
-                      "Reason: %s (check the logs for more information).",
+                      "Netdata Agent is claimed to Netdata Cloud, but it is currently offline: %s",
                       cloud_status_aclk_offline_reason());
     }
 

@@ -22,7 +22,7 @@ const char *cloud_status_aclk_base_url(void);
 CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s);
 
 const char *claim_agent_failure_reason_get(void);
-void claim_agent_failure_reason_set(const char *reason);
+void claim_agent_failure_reason_set(const char *format, ...) PRINTFLIKE(1, 2);
 
 extern struct config cloud_config;
 
@@ -36,7 +36,7 @@ bool load_claiming_state(void);
 void cloud_conf_load(int silent);
 void cloud_conf_init_after_registry(void);
 bool cloud_conf_save(void);
-void cloud_conf_regenerate(const char *claimed_id_str, const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure);
+bool cloud_conf_regenerate(const char *claimed_id_str, const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure);
 CLOUD_STATUS claim_reload_and_wait_online(void);
 
 bool netdata_random_session_id_generate(void);
