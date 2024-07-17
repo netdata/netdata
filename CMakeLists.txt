@@ -90,7 +90,6 @@ set(OS_FREEBSD     False)
 set(OS_LINUX       False)
 set(OS_MACOS       False)
 set(OS_WINDOWS     False)
-set(ALLOW_PLATFORM_SENSITIVE_OPTIONS True)
 
 set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
 set(BINDIR usr/sbin)
@@ -107,11 +106,6 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
         set(OS_LINUX True)
         add_definitions(-D_GNU_SOURCE)
         message(INFO " Compiling for Linux... ")
-        include(NetdataUtil)
-        netdata_identify_libc(LIBC_IMPLEMENTATION)
-        if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND LIBC_IMPLEMENTATION STREQUAL "musl")
-            set(ALLOW_PLATFORM_SENSITIVE_OPTIONS False)
-        endif()
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
         set(OS_WINDOWS True)
 
@@ -170,7 +164,6 @@ cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" 
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
-cmake_dependent_option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" False "OS_LINUX AND ALLOW_PLATFORM_SENSITIVE_OPTIONS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
@@ -186,10 +179,6 @@ option(ENABLE_EXPORTER_MONGODB "Enable exporting to MongoDB" ${DEFAULT_FEATURE_S
 option(ENABLE_BUNDLED_JSONC "Force use of a vendored copy of JSON-C" False)
 option(ENABLE_BUNDLED_YAML "Force use of a vendored copy of libyaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
-
-# Optional test code
-cmake_dependent_option(ENABLE_LOGS_MANAGEMENT_TESTS "Enable test code for logs-management plugin." True "ENABLE_PLUGIN_LOGS_MANAGEMENT" False)
-mark_as_advanced(ENABLE_LOGS_MANAGEMENT_TESTS)
 
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
@@ -1355,44 +1344,6 @@ set(TC_PLUGIN_FILES
         src/collectors/tc.plugin/plugin_tc.c
 )
 
-set(LOGS_MANAGEMENT_PLUGIN_FILES
-        src/logsmanagement/circular_buffer.c
-        src/logsmanagement/circular_buffer.h
-        src/logsmanagement/db_api.c
-        src/logsmanagement/db_api.h
-        src/logsmanagement/defaults.h
-        src/logsmanagement/file_info.h
-        src/logsmanagement/flb_plugin.c
-        src/logsmanagement/flb_plugin.h
-        src/logsmanagement/functions.c
-        src/logsmanagement/functions.h
-        src/logsmanagement/helper.h
-        src/logsmanagement/logsmanag_config.c
-        src/logsmanagement/logsmanag_config.h
-        src/logsmanagement/logsmanagement.c
-        src/logsmanagement/parser.c
-        src/logsmanagement/parser.h
-        src/logsmanagement/query.c
-        src/logsmanagement/query.h
-        src/logsmanagement/rrd_api/rrd_api_docker_ev.c
-        src/logsmanagement/rrd_api/rrd_api_docker_ev.h
-        src/logsmanagement/rrd_api/rrd_api_generic.c
-        src/logsmanagement/rrd_api/rrd_api_generic.h
-        src/logsmanagement/rrd_api/rrd_api_kernel.c
-        src/logsmanagement/rrd_api/rrd_api_kernel.h
-        src/logsmanagement/rrd_api/rrd_api_mqtt.c
-        src/logsmanagement/rrd_api/rrd_api_mqtt.h
-        src/logsmanagement/rrd_api/rrd_api_stats.c
-        src/logsmanagement/rrd_api/rrd_api_stats.h
-        src/logsmanagement/rrd_api/rrd_api_systemd.c
-        src/logsmanagement/rrd_api/rrd_api_systemd.h
-        src/logsmanagement/rrd_api/rrd_api_web_log.c
-        src/logsmanagement/rrd_api/rrd_api_web_log.h
-        src/logsmanagement/rrd_api/rrd_api.h
-        src/database/sqlite/sqlite3.c
-        src/database/sqlite/sqlite3.h
-)
-
 set(NETDATA_FILES
         src/collectors/all.h
         ${DAEMON_FILES}
@@ -1934,45 +1885,6 @@ if(ENABLE_PLUGIN_SLABINFO)
     endif()
 endif()
 
-if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
-    set(ENABLE_LOGSMANAGEMENT True)
-
-    if(ENABLE_LOGS_MANAGEMENT_TESTS)
-        list(APPEND LOGS_MANAGEMENT_PLUGIN_FILES src/logsmanagement/unit_test/unit_test.c
-                                                 src/logsmanagement/unit_test/unit_test.h)
-        set(ENABLE_LOGSMANAGEMENT_TESTS True)
-    endif()
-
-    add_executable(logs-management.plugin ${LOGS_MANAGEMENT_PLUGIN_FILES})
-    target_link_libraries(logs-management.plugin libnetdata)
-
-    install(TARGETS logs-management.plugin
-            COMPONENT plugin-logs-management
-            DESTINATION usr/libexec/netdata/plugins.d)
-
-    install(DIRECTORY src/logsmanagement/stock_conf/logsmanagement.d
-            COMPONENT plugin-logs-management
-            DESTINATION usr/lib/netdata/conf.d)
-
-    install(DIRECTORY
-            COMPONENT plugin-logs-management
-            DESTINATION etc/netdata/logsmanagement.d)
-
-    configure_file(src/logsmanagement/stock_conf/logsmanagement.d.conf.in
-                   src/logsmanagement/stock_conf/logsmanagement.d.conf
-                   @ONLY)
-
-    install(FILES ${CMAKE_BINARY_DIR}/src/logsmanagement/stock_conf/logsmanagement.d.conf
-            COMPONENT plugin-logs-management
-            DESTINATION usr/lib/netdata/conf.d)
-
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-logs-management
-                DESTINATION usr/share/doc/netdata-plugin-logs-management)
-    endif()
-endif()
 
 if(ENABLE_PLUGIN_CUPS)
     pkg_check_modules(CUPS libcups)
