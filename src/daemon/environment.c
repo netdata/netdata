@@ -24,6 +24,15 @@ static const char *verify_or_create_required_directory(const char *dir) {
     return verify_required_directory(dir);
 }
 
+static const char *verify_or_create_required_private_directory(const char *dir) {
+    errno_clear();
+    
+    if (mkdir(dir, 0770) != 0 && errno != EEXIST)
+        fatal("Cannot create required directory '%s'", dir);
+
+    return verify_required_directory(dir);
+}
+
 void set_environment_for_plugins_and_scripts(void) {
     {
         char b[16];
@@ -44,7 +53,7 @@ void set_environment_for_plugins_and_scripts(void) {
     setenv("NETDATA_LOG_DIR", verify_or_create_required_directory(netdata_configured_log_dir), 1);
     setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
-    setenv("CLAIMING_DIR", verify_required_directory(netdata_configured_cloud_dir), 1);
+    setenv("CLAIMING_DIR", verify_or_create_required_private_directory(netdata_configured_cloud_dir), 1);
 
     {
         BUFFER *user_plugins_dirs = buffer_create(FILENAME_MAX, NULL);
