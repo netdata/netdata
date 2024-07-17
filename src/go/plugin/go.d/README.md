@@ -51,7 +51,7 @@ see the appropriate collector readme.
 |:-------------------------------------------------------------------------------------------------------------------|:-----------------------------:|
 | [adaptec_raid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/adaptecraid)              |     Adaptec Hardware RAID     |
 | [activemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/activemq)                     |           ActiveMQ            |
-| [activemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ap)                     |           Access Points            |
+| [ap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ap)                                 |          Wireless AP          |
 | [apache](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/apache)                         |            Apache             |
 | [bind](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/bind)                             |           ISC Bind            |
 | [cassandra](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/cassandra)                   |           Cassandra           |
@@ -82,6 +82,7 @@ see the appropriate collector readme.
 | [hdfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hdfs)                             |             HDFS              |
 | [hpssa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hpssa)                           |        HPE Smart Array        |
 | [httpcheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/httpcheck)                   |       Any HTTP Endpoint       |
+| [icecast](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/icecast)                       |            Icecast            |
 | [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/intelgpu)                     |     Intel integrated GPU      |
 | [ipfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ipfs)                             |             IPFS              |
 | [isc_dhcpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/isc_dhcpd)                   |           ISC DHCP            |
@@ -112,6 +113,7 @@ see the appropriate collector readme.
 | [prometheus](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/prometheus)                 |    Any Prometheus Endpoint    |
 | [portcheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/portcheck)                   |       Any TCP Endpoint        |
 | [postgres](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/postgres)                     |          PostgreSQL           |
+| [postfix](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/postfix)                       |            Postfix            |
 | [powerdns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/powerdns)                     | PowerDNS Authoritative Server |
 | [powerdns_recursor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/powerdns_recursor)   |       PowerDNS Recursor       |
 | [proxysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/proxysql)                     |           ProxySQL            |

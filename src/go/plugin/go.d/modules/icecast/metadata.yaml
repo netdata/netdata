@@ -1,36 +1,28 @@
 plugin_name: go.d.plugin
 modules:
   - meta:
-      id: collector-go.d.plugin-ipfs
       plugin_name: go.d.plugin
-      module_name: ipfs
+      module_name: icecast
       monitored_instance:
-        name: IPFS
-        link: "https://ipfs.tech/"
+        name: Icecast
+        link: "https://icecast.org/"
         categories:
-          - data-collection.storage-mount-points-and-filesystems
-        icon_filename: "ipfs.svg"
+          - data-collection.media-streaming-servers
+        icon_filename: "icecast.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
       keywords:
-        - ipfs
-        - filesystem
+        - icecast
+        - streaming
+        - media
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "This collector monitors IPFS daemon health and network activity."
-        method_description: |
-          It uses [RPC API](https://docs.ipfs.tech/reference/kubo/rpc/) to collect metrics.
-
-          Used endpoints:
-
-          - [/api/v0/stats/bw](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-stats-bw)
-          - [/api/v0/swarm/peers](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-swarm-peers)
-          - [/api/v0/stats/repo](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-stats-repo)
-          - [/api/v0/pin/ls](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-pin-ls)
+        metrics_description: "This collector monitors Icecast listener counts."
+        method_description: "It uses the Icecast server statistics `status-json.xsl` endpoint to retrieve the metrics."
       supported_platforms:
         include: []
         exclude: []
@@ -39,24 +31,19 @@ modules:
         description: ""
       default_behavior:
         auto_detection:
-          description: |
-            By default, it detects IPFS instances running on localhost that are listening on port 5001.
+          description: By default, it detects Icecast instances running on localhost that are listening on port 8000.
         limits:
           description: ""
         performance_impact:
-          description: |
-            Calls to the following endpoints are disabled by default due to IPFS bugs:
-
-            - /api/v0/stats/repo ([#7528](https://github.com/ipfs/go-ipfs/issues/7528)).
-            - /api/v0/pin/ls ([#3874](https://github.com/ipfs/go-ipfs/issues/3874)).
-
-            **Disabled by default** due to potential high CPU usage. Consider enabling only if necessary.
+          description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: "Icecast minimum version"
+            description: "Needs at least Icecast version >= 2.4.0"
       configuration:
         file:
-          name: go.d/ipfs.conf
+          name: go.d/icecast.conf
         options:
           description: |
             The following options can be defined globally: update_every, autodetection_retry.
@@ -72,17 +59,9 @@ modules:
               description: Recheck interval in seconds. Zero means no recheck will be scheduled.
               default_value: 0
               required: false
-            - name: repoapi
-              description: Enables querying the [/api/v0/stats/repo](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-repo-stat) endpoint for repository statistics.
-              default_value: false
-              required: false
-            - name: pinapi
-              description: Enables querying the [/api/v0/pin/ls](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-pin-ls) endpoint to retrieve a list of all pinned objects.
-              default_value: false
-              required: false
             - name: url
               description: Server URL.
-              default_value: http://127.0.0.1:5001
+              default_value: http://127.0.0.1:8000
               required: true
             - name: timeout
               description: HTTP request timeout.
@@ -143,7 +122,7 @@ modules:
         examples:
           folding:
             enabled: true
-            title: "Config"
+            title: Config
           list:
             - name: Basic
               description: A basic example configuration.
@@ -152,7 +131,7 @@ modules:
               config: |
                 jobs:
                   - name: local
-                    url: http://127.0.0.1:5001
+                    url: http://127.0.0.1:8000
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
@@ -161,18 +140,14 @@ modules:
               config: |
                 jobs:
                   - name: local
-                    url: http://127.0.0.1:5001
+                    url: http://127.0.0.1:8000
 
                   - name: remote
-                    url: http://192.0.2.1:5001
+                    url: http://192.0.2.1:8000
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: ipfs_datastore_usage
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipfs.conf
-        metric: ipfs.datastore_space_utilization
-        info: IPFS datastore utilization
+    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -180,45 +155,15 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: "These metrics refer to the entire monitored application."
-          labels: []
+        - name: Icecast source
+          description: "These metrics refer to an icecast source."
+          labels:
+            - name: source
+              description: Source name.
           metrics:
-            - name: ipfs.bandwidth
-              description: IPFS Bandwidth
-              unit: "bytes/s"
-              chart_type: area
-              dimensions:
-                - name: in
-                - name: out
-            - name: ipfs.peers
-              description: IPFS Peers
-              unit: "peers"
+            - name: icecast.listeners
+              description: Icecast Listeners
+              unit: "listeners"
               chart_type: line
               dimensions:
-                - name: peers
-            - name: ipfs.datastore_space_utilization
-              description: IPFS Datastore Space Utilization
-              unit: "percent"
-              chart_type: area
-              dimensions:
-                - name: used
-            - name: ipfs.repo_size
-              description: IPFS Repo Size
-              unit: "bytes"
-              chart_type: line
-              dimensions:
-                - name: size
-            - name: ipfs.repo_objects
-              description: IPFS Repo Objects
-              unit: "objects"
-              chart_type: line
-              dimensions:
-                - name: objects
-            - name: ipfs.repo_pinned_objects
-              description: IPFS Repo Pinned Objects
-              unit: "objects"
-              chart_type: line
-              dimensions:
-                - name: pinned
-                - name: recursive_pins
+                - name: listeners

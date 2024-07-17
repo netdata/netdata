@@ -37,6 +37,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/hdfs"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/hpssa"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/httpcheck"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/icecast"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/intelgpu"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/ipfs"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/isc_dhcpd"
