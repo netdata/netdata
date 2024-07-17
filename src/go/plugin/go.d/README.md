@@ -82,6 +82,7 @@ see the appropriate collector readme.
 | [hdfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hdfs)                             |             HDFS              |
 | [hpssa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hpssa)                           |        HPE Smart Array        |
 | [httpcheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/httpcheck)                   |       Any HTTP Endpoint       |
+| [icecast](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/icecast)                     |     Intel integrated GPU      |
 | [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/intelgpu)                     |     Intel integrated GPU      |
 | [ipfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ipfs)                             |             IPFS              |
 | [isc_dhcpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/isc_dhcpd)                   |           ISC DHCP            |
