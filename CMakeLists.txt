@@ -202,7 +202,7 @@ if(BUILD_FOR_PACKAGING)
     set(PACKAGE_TYPE "none" CACHE STRING "Specify the type of package to build for.")
     mark_as_advanced(PACKAGE_TYPE)
     set(SUPPORTED_PACKAGE_TYPES "docker;static;deb")
-    set(CHANGELOG_INCLUDE_TYPES "deb")
+    set(NATIVE_PACKAGE_TYPES "deb")
     string(TOLOWER "${PACKAGE_TYPE}" PACKAGE_TYPE)
 
     if(PACKAGE_TYPE STREQUAL "none")
@@ -1855,7 +1855,7 @@ if(ENABLE_PLUGIN_DEBUGFS)
                             COMPONENT plugin-debugfs
                             PERMISSIONS dac_read_search)
 
-    if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-debugfs
@@ -1903,7 +1903,7 @@ if(ENABLE_PLUGIN_APPS)
             COMPONENT plugin-apps
             DESTINATION usr/lib/netdata/conf.d)
 
-    if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-apps
@@ -1932,7 +1932,7 @@ if(ENABLE_PLUGIN_FREEIPMI)
                             COMPONENT plugin-freeipmi
                             PERMISSIONS suid)
 
-    if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-freeipmi
@@ -1961,7 +1961,7 @@ if(ENABLE_PLUGIN_NFACCT)
                             COMPONENT plugin-nfacct
                             PERMISSIONS suid)
 
-    if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-nfacct
@@ -1987,7 +1987,7 @@ if(ENABLE_PLUGIN_XENSTAT)
                             COMPONENT plugin-xenstat
                             PERMISSIONS suid)
 
-    if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-xenstat
@@ -2008,7 +2008,7 @@ if(ENABLE_PLUGIN_PERF)
                             COMPONENT plugin-perf
                             PERMISSIONS perfmon)
 
-    if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
          install(FILES
                  ${PKG_FILES_PATH}/copyright
                  COMPONENT plugin-perf
@@ -2029,7 +2029,7 @@ if(ENABLE_PLUGIN_SLABINFO)
                             COMPONENT plugin-slabinfo
                             PERMISSIONS dac_read_search)
 
-    if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-slabinfo
@@ -2068,7 +2068,7 @@ if(ENABLE_PLUGIN_CUPS)
                 COMPONENT plugin-cups
                 DESTINATION usr/libexec/netdata/plugins.d)
 
-        if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+        if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
                 install(FILES
                         ${PKG_FILES_PATH}/copyright
                         COMPONENT plugin-cups
@@ -2119,7 +2119,7 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                                 COMPONENT plugin-systemd-journal
                                 PERMISSIONS dac_read_search)
 
-        if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+        if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
                 install(FILES
                         ${PKG_FILES_PATH}/copyright
                         COMPONENT plugin-systemd-journal
@@ -2211,7 +2211,7 @@ if(ENABLE_PLUGIN_EBPF)
             COMPONENT plugin-ebpf
             DESTINATION usr/lib/netdata/conf.d/ebpf.d)
 
-    if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-ebpf
@@ -2269,7 +2269,7 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                                 COMPONENT plugin-network-viewer
                                 PERMISSIONS dac_read_search sys_admin sys_ptrace)
 
-        if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+        if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
                 install(FILES
                         ${PKG_FILES_PATH}/copyright
                         COMPONENT plugin-network-viewer
@@ -2687,13 +2687,7 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
 if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
-=======
-if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
->>>>>>> 503ff7bcf (Fix a couple of typos in CMakeLists.txt)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
                 COMPONENT netdata
@@ -2708,7 +2702,6 @@ if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
                 RENAME netdata.conf)
 endif()
 
->>>>>>> 08701d7fc (Update package build handling to differentiate package type.)
 configure_file(system/systemd/netdata.service.v235.in system/systemd/netdata.service.v235 @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235
@@ -2751,7 +2744,7 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION etc/netdata)
 
-if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         set(NETDATA_CONF_DEST "etc/netdata")
 else()
         set(NETDATA_CONF_DEST "usr/lib/netdata/conf.d")
@@ -2929,7 +2922,7 @@ install(FILES
         COMPONENT plugin-chartsd
         DESTINATION usr/lib/netdata/conf.d/charts.d)
 
-if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-chartsd
@@ -2998,7 +2991,7 @@ install(FILES
         COMPONENT plugin-pythond
         DESTINATION usr/libexec/netdata/python.d)
 
-if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-pythond
@@ -3041,7 +3034,7 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/sd)
 
-    if(PACKAGE_TYPE IN_LIST CHANGELOG_INCLUDE_TYPES)
+    if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
         install(FILES
                 ${PKG_FILES_PATH}/copyright
                 COMPONENT plugin-go
