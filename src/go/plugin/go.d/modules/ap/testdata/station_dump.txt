@@ -1,0 +1,58 @@
+Station 7e:0d:a5:a6:91:2b (on wlp1s0)
+	inactive time:	58264 ms
+	rx bytes:	89675
+	rx packets:	2446
+	tx bytes:	6918
+	tx packets:	30
+	tx retries:	1
+	tx failed:	1
+	rx drop misc:	0
+	signal:  	-44 [-51, -44] dBm
+	signal avg:	-38 [-39, -39] dBm
+	tx bitrate:	65.0 MBit/s MCS 7
+	tx duration:	0 us
+	rx bitrate:	130.0 MBit/s MCS 15
+	rx duration:	0 us
+	authorized:	yes
+	authenticated:	yes
+	associated:	yes
+	preamble:	short
+	WMM/WME:	yes
+	MFP:		no
+	TDLS peer:	no
+	DTIM period:	2
+	beacon interval:100
+	short slot time:yes
+	connected time:	796 seconds
+	associated at [boottime]:	12650.576s
+	associated at:	1720705279930 ms
+	current time:	1720706075344 ms
+Station fa:50:db:c1:1c:18 (on wlp1s0)
+	inactive time:	93 ms
+	rx bytes:	5442
+	rx packets:	85
+	tx bytes:	1352
+	tx packets:	8
+	tx retries:	0
+	tx failed:	0
+	rx drop misc:	0
+	signal:  	-31 [-31, -39] dBm
+	signal avg:	-30 [-30, -38] dBm
+	tx bitrate:	65.0 MBit/s MCS 7
+	tx duration:	0 us
+	rx bitrate:	1.0 MBit/s
+	rx duration:	0 us
+	authorized:	yes
+	authenticated:	yes
+	associated:	yes
+	preamble:	short
+	WMM/WME:	yes
+	MFP:		no
+	TDLS peer:	no
+	DTIM period:	2
+	beacon interval:100
+	short slot time:yes
+	connected time:	6 seconds
+	associated at [boottime]:	13440.167s
+	associated at:	1720706069520 ms
+	current time:	1720706075344 ms

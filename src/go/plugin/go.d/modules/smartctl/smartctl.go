@@ -38,19 +38,27 @@ func New() *Smartctl {
 			DeviceSelector:   "*",
 		},
 		charts:      &module.Charts{},
+		forceScan:   true,
 		deviceSr:    matcher.TRUE(),
 		seenDevices: make(map[string]bool),
 	}
 }
 
-type Config struct {
-	UpdateEvery      int          `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout          web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	ScanEvery        web.Duration `yaml:"scan_every,omitempty" json:"scan_every"`
-	PollDevicesEvery web.Duration `yaml:"poll_devices_every,omitempty" json:"poll_devices_every"`
-	NoCheckPowerMode string       `yaml:"no_check_power_mode,omitempty" json:"no_check_power_mode"`
-	DeviceSelector   string       `yaml:"device_selector,omitempty" json:"device_selector"`
-}
+type (
+	Config struct {
+		UpdateEvery      int                 `yaml:"update_every,omitempty" json:"update_every"`
+		Timeout          web.Duration        `yaml:"timeout,omitempty" json:"timeout"`
+		ScanEvery        web.Duration        `yaml:"scan_every,omitempty" json:"scan_every"`
+		PollDevicesEvery web.Duration        `yaml:"poll_devices_every,omitempty" json:"poll_devices_every"`
+		NoCheckPowerMode string              `yaml:"no_check_power_mode,omitempty" json:"no_check_power_mode"`
+		DeviceSelector   string              `yaml:"device_selector,omitempty" json:"device_selector"`
+		ExtraDevices     []ConfigExtraDevice `yaml:"extra_devices,omitempty" json:"extra_devices"`
+	}
+	ConfigExtraDevice struct {
+		Name string `yaml:"name" json:"name"`
+		Type string `yaml:"type" json:"type"`
+	}
+)
 
 type (
 	Smartctl struct {
@@ -74,7 +82,7 @@ type (
 		mx          map[string]int64
 	}
 	smartctlCli interface {
-		scan() (*gjson.Result, error)
+		scan(open bool) (*gjson.Result, error)
 		deviceInfo(deviceName, deviceType, powerMode string) (*gjson.Result, error)
 	}
 )

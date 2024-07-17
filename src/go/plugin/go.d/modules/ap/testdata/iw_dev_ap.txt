@@ -1,0 +1,25 @@
+phy#0
+	Interface wlp1s0
+		ifindex 2
+		wdev 0x1
+		addr 28:cd:c4:b8:63:cb
+		ssid testing
+		type AP
+		channel 1 (2412 MHz), width: 20 MHz, center1: 2412 MHz
+		txpower 20.00 dBm
+		multicast TXQ:
+			qsz-byt	qsz-pkt	flows	drops	marks	overlmt	hashcol	tx-bytes	tx-packets
+			0	0	2	0	0	0	0	16447		226
+
+phy#1
+	Interface wlp1s1
+		ifindex 3
+		wdev 0x1
+		addr 28:cd:c4:b8:63:cc
+		ssid testing
+		type AP
+		channel 1 (2412 MHz), width: 20 MHz, center1: 2412 MHz
+		txpower 20.00 dBm
+		multicast TXQ:
+			qsz-byt	qsz-pkt	flows	drops	marks	overlmt	hashcol	tx-bytes	tx-packets
+			0	0	2	0	0	0	0	16447		226

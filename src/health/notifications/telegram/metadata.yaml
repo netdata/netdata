@@ -40,7 +40,7 @@
             required: true
           - name: 'DEFAULT_RECIPIENT_TELEGRAM'
             default_value: ''
-            description: "Set `DEFAULT_RECIPIENT_TELEGRAM` to the chat ID you want the alert notifications to be sent to. You can define multiple chat IDs like this: -49999333322 -1009999222255."
+            description: "Set the `DEFAULT_RECIPIENT_TELEGRAM` variable in your config file to your Telegram chat ID (find it with @myidbot). Separate multiple chat IDs with spaces. To send alerts to a specific topic within a chat, use `chatID:topicID`."
             required: true
             detailed_description: |
               All roles will default to this variable if left unconfigured.
