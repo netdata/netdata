@@ -6,14 +6,22 @@
 
 **Merged pull requests:**
 
+- Create release branches for major releases as well. [\#18184](https://github.com/netdata/netdata/pull/18184) ([Ferroin](https://github.com/Ferroin))
+- Regenerate integrations.js [\#18183](https://github.com/netdata/netdata/pull/18183) ([netdatabot](https://github.com/netdatabot))
+- docs: go.d/ap update data\_collection description [\#18182](https://github.com/netdata/netdata/pull/18182) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18181](https://github.com/netdata/netdata/pull/18181) ([netdatabot](https://github.com/netdatabot))
+- go.d smarctl simplify scan open [\#18180](https://github.com/netdata/netdata/pull/18180) ([ilyam8](https://github.com/ilyam8))
+- Addition to postfix meta [\#18177](https://github.com/netdata/netdata/pull/18177) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#18176](https://github.com/netdata/netdata/pull/18176) ([netdatabot](https://github.com/netdatabot))
 - docs: add "install smartmontools" for Docker netdata [\#18175](https://github.com/netdata/netdata/pull/18175) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18174](https://github.com/netdata/netdata/pull/18174) ([netdatabot](https://github.com/netdatabot))
 - add support for sending Telegram notifications to topics [\#18173](https://github.com/netdata/netdata/pull/18173) ([ilyam8](https://github.com/ilyam8))
 - Fix logic bug in platform EOL check code. [\#18172](https://github.com/netdata/netdata/pull/18172) ([Ferroin](https://github.com/Ferroin))
 - Fix issue in platform EOL check workflow. [\#18171](https://github.com/netdata/netdata/pull/18171) ([Ferroin](https://github.com/Ferroin))
+- Port AP collector to Go [\#18170](https://github.com/netdata/netdata/pull/18170) ([Ancairon](https://github.com/Ancairon))
 - Bump github.com/likexian/whois from 1.15.3 to 1.15.4 in /src/go [\#18169](https://github.com/netdata/netdata/pull/18169) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/lmittmann/tint from 1.0.4 to 1.0.5 in /src/go [\#18167](https://github.com/netdata/netdata/pull/18167) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Personalize installer and uninstaller Windows \(Control Panel\) [\#18147](https://github.com/netdata/netdata/pull/18147) ([thiagoftsm](https://github.com/thiagoftsm))
 - go.d smartctl: use scan-open when "no\_check\_power\_mode" is "never" [\#18146](https://github.com/netdata/netdata/pull/18146) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18145](https://github.com/netdata/netdata/pull/18145) ([netdatabot](https://github.com/netdatabot))
 - go.d smartctl: do scan only once on startup if interval is 0 [\#18144](https://github.com/netdata/netdata/pull/18144) ([ilyam8](https://github.com/ilyam8))
@@ -408,15 +416,6 @@
 - Regenerate integrations.js [\#17610](https://github.com/netdata/netdata/pull/17610) ([netdatabot](https://github.com/netdatabot))
 - Bump golang.org/x/net from 0.24.0 to 0.25.0 in /src/go/collectors/go.d.plugin [\#17609](https://github.com/netdata/netdata/pull/17609) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump jinja2 from 3.1.3 to 3.1.4 in /packaging/dag [\#17607](https://github.com/netdata/netdata/pull/17607) ([dependabot[bot]](https://github.com/apps/dependabot))
-- go.d systemdunits add unit files state [\#17606](https://github.com/netdata/netdata/pull/17606) ([ilyam8](https://github.com/ilyam8))
-- Add improved handling for TLS certificates for static builds. [\#17605](https://github.com/netdata/netdata/pull/17605) ([Ferroin](https://github.com/Ferroin))
-- Add option to limit architectures for offline installs. [\#17604](https://github.com/netdata/netdata/pull/17604) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#17603](https://github.com/netdata/netdata/pull/17603) ([netdatabot](https://github.com/netdatabot))
-- Make offline installs properly offline again. [\#17602](https://github.com/netdata/netdata/pull/17602) ([Ferroin](https://github.com/Ferroin))
-- remove python.d/smartd\_log [\#17600](https://github.com/netdata/netdata/pull/17600) ([ilyam8](https://github.com/ilyam8))
-- Remove CentOS Stream 8 from CI. [\#17599](https://github.com/netdata/netdata/pull/17599) ([Ferroin](https://github.com/Ferroin))
-- go.d postgres: reset table/index bloat stats before querying [\#17598](https://github.com/netdata/netdata/pull/17598) ([ilyam8](https://github.com/ilyam8))
-- Bump golang.org/x/text from 0.14.0 to 0.15.0 in /src/go/collectors/go.d.plugin [\#17596](https://github.com/netdata/netdata/pull/17596) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
