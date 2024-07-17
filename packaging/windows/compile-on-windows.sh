@@ -1,10 +1,5 @@
 #!/bin/bash
 
-BUILD_FOR_PACKAGING="Off"
-if [ "${1}" = "package" ]; then
-    BUILD_FOR_PACKAGING="On"
-fi
-
 repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
 BUILD_TYPE="Debug"
 
@@ -29,12 +24,13 @@ if [ -d "${build}" ]; then
 fi
 
 ${GITHUB_ACTIONS+echo "::group::Configuring"}
+# shellcheck disable=SC2086
 /usr/bin/cmake -S "${repo_root}" -B "${build}" \
     -G Ninja \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
     -DCMAKE_C_FLAGS="-fstack-protector-all -O0 -ggdb -Wall -Wextra -Wno-char-subscripts -Wa,-mbig-obj -pipe -DNETDATA_INTERNAL_CHECKS=1 -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1" \
-    -DBUILD_FOR_PACKAGING="${BUILD_FOR_PACKAGING}" \
+    -DBUILD_FOR_PACKAGING=On \
     -DNETDATA_USER="${USER}" \
     -DDEFAULT_FEATURE_STATE=Off \
     -DENABLE_H2O=Off \
@@ -42,7 +38,8 @@ ${GITHUB_ACTIONS+echo "::group::Configuring"}
     -DENABLE_CLOUD=On \
     -DENABLE_ML=On \
     -DENABLE_BUNDLED_JSONC=On \
-    -DENABLE_BUNDLED_PROTOBUF=Off
+    -DENABLE_BUNDLED_PROTOBUF=Off \
+    ${EXTRA_CMAKE_OPTIONS}
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Building"}
