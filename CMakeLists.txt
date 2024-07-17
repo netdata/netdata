@@ -850,6 +850,7 @@ set(DAEMON_FILES
         src/daemon/analytics.h
         src/daemon/main.c
         src/daemon/main.h
+        src/daemon/environment.c
         src/daemon/win_system-info.c
         src/daemon/win_system-info.h
         src/daemon/signals.c
@@ -1209,6 +1210,10 @@ set(WEB_PLUGIN_FILES
 set(CLAIM_PLUGIN_FILES
         src/claim/claim.c
         src/claim/claim.h
+        src/claim/claim-web-api.c
+        src/claim/cloud-conf.c
+        src/claim/claim-with-api.c
+        src/claim/cloud-status.c
 )
 
 set(ACLK_ALWAYS_BUILD
@@ -1362,10 +1367,6 @@ set(NETDATA_FILES
         ${CLAIM_PLUGIN_FILES}
         ${ACLK_ALWAYS_BUILD}
         ${PROFILE_PLUGIN_FILES}
-        src/claim/claim-web-api.c
-        src/claim/cloud-conf.c
-        src/claim/claim-with-api.c
-        src/daemon/environment.c
 )
 
 if(OS_LINUX)
@@ -1479,7 +1480,6 @@ set(ACLK_FILES
         src/aclk/schema-wrappers/agent_cmds.h
         src/aclk/helpers/mqtt_wss_pal.h
         src/aclk/helpers/ringbuffer_pal.h
-        src/claim/cloud-status.c
 )
 
 
