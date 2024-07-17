@@ -146,6 +146,10 @@ endif()
 option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" True)
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
+# User information
+set(NETDATA_USER netdata CACHE STRING "User name for the user Netdata should run as")
+set(NETDATA_GROUP "${NETDATA_USER}" CACHE STRING "Group name for the group Netdata should run as")
+
 # High-level features
 option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE})
@@ -2368,9 +2372,6 @@ set(WEB_DIR "${NETDATA_RUNTIME_PREFIX}/${WEB_DEST}")
 
 
 set(CONFIGURE_COMMAND "dummy-configure-command")
-if (NOT NETDATA_USER)
-        set(NETDATA_USER "netdata")
-endif()
 
 configure_file(packaging/cmake/config.cmake.h.in config.h)
 
