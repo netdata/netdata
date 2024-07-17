@@ -19,7 +19,8 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataServerStats, _ = os.ReadFile("testdata/server_stats.json")
+	dataServerStats, _       = os.ReadFile("testdata/server_stats.json")
+	dataServerStats_empty, _ = os.ReadFile("testdata/server_stats_empty.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -122,7 +123,8 @@ func TestIcecast_Collect(t *testing.T) {
 		"success default config": {
 			prepare: prepareCaseOkDefault,
 			wantMetrics: map[string]int64{
-				"test": -7,
+				"abc_listeners": 1,
+				"efg_listeners": 10,
 			},
 		},
 		"fails on unexpected json response": {
@@ -203,22 +205,14 @@ func prepareCaseUnexpectedJsonResponse(t *testing.T) (*Icecast, func()) {
 
 func prepareCaseNoSources(t *testing.T) (*Icecast, func()) {
 	t.Helper()
-	resp := `
-{
-  "icestats": {
-    "admin": "icemaster@localhost",
-    "host": "localhost",
-    "location": "Earth",
-    "server_id": "Icecast 2.4.4",
-    "server_start": "Wed, 17 Jul 2024 11:27:40 +0300",
-    "server_start_iso8601": "2024-07-17T11:27:40+0300",
-    "dummy": null
-  }
-}
-`
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write([]byte(resp))
+			switch r.URL.Path {
+			case urlPathServerStats:
+				_, _ = w.Write(dataServerStats_empty)
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
 		}))
 
 	icecast := New()
