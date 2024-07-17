@@ -147,8 +147,12 @@ option(DEFAULT_FEATURE_STATE "Specify the default state for most optional featur
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
 # openssl/crypto
-set(ENABLE_OPENSSL True)
-set(ENABLE_WOLFSSL False)
+option(ENABLE_WOLFSSL "Use WolfSSL in place of OpenSSL for TLS and crypto support" False)
+if(ENABLE_WOLFSSL)
+    set(ENABLE_OPENSSL False)
+else()
+    set(ENABLE_OPENSSL True)
+endif()
 
 # High-level features
 cmake_dependent_option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE} "NOT ENABLE_WOLFSSL" False)
