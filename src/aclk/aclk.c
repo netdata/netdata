@@ -1059,6 +1059,9 @@ void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, con
 static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
 {
     struct aclk_sync_cfg_t *wc = host->aclk_config;
+    if (!wc)
+        return;
+
     buffer_sprintf(wb,
         "\n\t\tUpdates: %d"
         "\n\t\tCheckpoints: %d"
@@ -1156,10 +1159,11 @@ char *aclk_state(void)
     return ret;
 }
 
-// TODO: FIX This to provide some status
 static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 {
     struct aclk_sync_cfg_t *wc = host->aclk_config;
+    if (!wc)
+        return;
 
     json_object *tmp = json_object_new_int(wc->stream_alerts);
     json_object_object_add(obj, "updates", tmp);
