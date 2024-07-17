@@ -347,7 +347,7 @@ int start_alarm_streaming(const char *msg, size_t msg_len)
         netdata_log_error("Error parsing StartAlarmStreaming");
         return 1;
     }
-    aclk_start_alert_streaming(res.node_id, res.resets);
+    aclk_start_alert_streaming(res.node_id, res.version);
     freez(res.node_id);
     return 0;
 }
@@ -361,7 +361,7 @@ int send_alarm_checkpoint(const char *msg, size_t msg_len)
         freez(sac.claim_id);
         return 1;
     }
-    aclk_send_alarm_checkpoint(sac.node_id, sac.claim_id);
+    aclk_alert_version_check(sac.node_id, sac.claim_id, sac.version);
     freez(sac.node_id);
     freez(sac.claim_id);
     return 0;
@@ -375,7 +375,7 @@ int send_alarm_configuration(const char *msg, size_t msg_len)
         freez(config_hash);
         return 1;
     }
-    aclk_send_alarm_configuration(config_hash);
+    aclk_send_alert_configuration(config_hash);
     freez(config_hash);
     return 0;
 }

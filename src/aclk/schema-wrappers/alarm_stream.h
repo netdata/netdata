@@ -13,6 +13,7 @@ extern "C" {
 
 struct start_alarm_streaming {
     char *node_id;
+    uint64_t version;
     bool resets;
 };
 
@@ -36,8 +37,6 @@ struct alarm_log_entry {
     char *name;
     char *family;
 
-    uint64_t batch_id;
-    uint64_t sequence_id;
     uint64_t when;
 
     char *config_hash;
@@ -76,13 +75,22 @@ struct alarm_log_entry {
     char *chart_name;
 
     uint64_t event_id;
+    uint64_t version;
     char *transition_id;
     char *summary;
+
+    // local book keeping
+    int64_t health_log_id;
+    int64_t alarm_id;
+    int64_t unique_id;
+    int64_t sequence_id;
 };
 
 struct send_alarm_checkpoint {
     char *node_id;
     char *claim_id;
+    uint64_t version;
+    uint64_t when_end;
 };
 
 struct alarm_checkpoint {

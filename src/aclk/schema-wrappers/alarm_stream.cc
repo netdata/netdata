@@ -22,6 +22,7 @@ struct start_alarm_streaming parse_start_alarm_streaming(const char *data, size_
 
     ret.node_id = strdupz(msg.node_id().c_str());
     ret.resets = msg.resets();
+    ret.version = msg.version();
 
     return ret;
 }
@@ -37,6 +38,7 @@ struct send_alarm_checkpoint parse_send_alarm_checkpoint(const char *data, size_
 
     ret.node_id = strdupz(msg.node_id().c_str());
     ret.claim_id = strdupz(msg.claim_id().c_str());
+    ret.version = msg.version();
 
     return ret;
 }
@@ -118,6 +120,7 @@ static void fill_alarm_log_entry(struct alarm_log_entry *data, AlarmLogEntry *pr
     proto->set_transition_id(data->transition_id);
     proto->set_chart_name(data->chart_name);
     proto->set_summary(data->summary);
+    proto->set_alert_version(data->version);
 }
 
 char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data)
