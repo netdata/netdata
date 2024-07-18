@@ -53,7 +53,7 @@ ws_client *ws_client_new(size_t buf_size, char **host, mqtt_wss_log_ctx_t log)
     if(!host)
         return NULL;
 
-    client = mw_calloc(1, sizeof(ws_client));
+    client = callocz(1, sizeof(ws_client));
     if (!client)
         return NULL;
 
@@ -87,7 +87,7 @@ cleanup_2:
 cleanup_1:
     rbuf_free(client->buf_read);
 cleanup:
-    mw_free(client);
+    freez(client);
     return NULL;
 }
 
@@ -99,7 +99,7 @@ void ws_client_free_headers(ws_client *client)
     while (ptr) {
         tmp = ptr;
         ptr = ptr->next;
-        mw_free(tmp);
+        freez(tmp);
     }
 
     client->hs.headers = NULL;
@@ -110,25 +110,28 @@ void ws_client_free_headers(ws_client *client)
 void ws_client_destroy(ws_client *client)
 {
     ws_client_free_headers(client);
-    mw_free(client->hs.nonce_reply);
-    mw_free(client->hs.http_reply_msg);
+    freez(client->hs.nonce_reply);
+    freez(client->hs.http_reply_msg);
     close(client->entropy_fd);
     rbuf_free(client->buf_read);
     rbuf_free(client->buf_write);
     rbuf_free(client->buf_to_mqtt);
-    mw_free(client);
+    freez(client);
 }
 
 void ws_client_reset(ws_client *client)
 {
     ws_client_free_headers(client);
-    mw_free(client->hs.nonce_reply);
+    freez(client->hs.nonce_reply);
     client->hs.nonce_reply = NULL;
-    mw_free(client->hs.http_reply_msg);
+
+    freez(client->hs.http_reply_msg);
     client->hs.http_reply_msg = NULL;
+
     rbuf_flush(client->buf_read);
     rbuf_flush(client->buf_write);
     rbuf_flush(client->buf_to_mqtt);
+
     client->state = WS_RAW;
     client->hs.hdr_state = WS_HDR_HTTP;
     client->rx.parse_state = WS_FIRST_2BYTES;
@@ -158,31 +161,11 @@ int ws_client_want_write(ws_client *client)
     return rbuf_bytes_available(client->buf_write);
 }
 
-#define RAND_SRC "/dev/urandom"
-static int ws_client_get_nonce(ws_client *client, char *dest, unsigned int size)
-{
-    // we do not need crypto secure random here
-    // it's just used for protocol negotiation
-    int rd;
-    int f = open(RAND_SRC, O_RDONLY | O_CLOEXEC);
-    if (f < 0) {
-        ERROR("Error opening \"%s\". Err: \"%s\"", RAND_SRC, strerror(errno));
-        return -2;
-    }
-
-    if ((rd = read(f, dest, size)) > 0) {
-        close(f);
-        return rd;
-    }
-    close(f);
-    return -1;
-}
-
 #define WEBSOCKET_NONCE_SIZE 16
 #define TEMP_BUF_SIZE 4096
 int ws_client_start_handshake(ws_client *client)
 {
-    char nonce[WEBSOCKET_NONCE_SIZE];
+    nd_uuid_t nonce;
     char nonce_b64[256];
     char second[TEMP_BUF_SIZE];
     unsigned int md_len;
@@ -190,16 +173,15 @@ int ws_client_start_handshake(ws_client *client)
     EVP_MD_CTX *md_ctx;
     const EVP_MD *md;
 
-    if(!*client->host) {
+    if(!client->host || !*client->host) {
         ERROR("Hostname has not been set. We should not be able to come here!");
         return 1;
     }
 
-    ws_client_get_nonce(client, nonce, WEBSOCKET_NONCE_SIZE);
+    uuid_generate_random(nonce);
     EVP_EncodeBlock((unsigned char *)nonce_b64, (const unsigned char *)nonce, WEBSOCKET_NONCE_SIZE);
-    snprintf(second, TEMP_BUF_SIZE, websocket_upgrage_hdr,
-        *client->host,
-        nonce_b64);
+    snprintf(second, TEMP_BUF_SIZE, websocket_upgrage_hdr, *client->host, nonce_b64);
+
     if(rbuf_bytes_free(client->buf_write) < strlen(second)) {
         ERROR("Write buffer capacity too low.");
         return 1;
@@ -236,10 +218,10 @@ int ws_client_start_handshake(ws_client *client)
     EVP_DigestUpdate(md_ctx, second, strlen(second));
     EVP_DigestFinal_ex(md_ctx, digest, &md_len);
 
-    EVP_EncodeBlock((unsigned char *)nonce_b64, digest, md_len);
+    EVP_EncodeBlock((unsigned char *)nonce_b64, digest, (int) md_len);
 
-    mw_free(client->hs.nonce_reply);
-    client->hs.nonce_reply = mw_strdup(nonce_b64);
+    freez(client->hs.nonce_reply);
+    client->hs.nonce_reply = strdupz(nonce_b64);
 
     OPENSSL_free(digest);
 
@@ -263,7 +245,7 @@ int ws_client_start_handshake(ws_client *client)
     if (rbuf_bytes_available(client->buf_read) < x)                                                                    \
         return WS_CLIENT_NEED_MORE_BYTES;
 
-#define MAX_HTTP_LINE_LENGTH 1024*4
+#define MAX_HTTP_LINE_LENGTH (1024 * 4)
 #define HTTP_SC_LENGTH 4 // "XXX " http status code as C string
 #define WS_CLIENT_HTTP_HDR "HTTP/1.1 "
 #define WS_CONN_ACCEPT "sec-websocket-accept"
@@ -278,11 +260,11 @@ int ws_client_start_handshake(ws_client *client)
 #error "Buffer too small"
 #endif
 
-#define HTTP_HDR_LINE_CHECK_LIMIT(x) if ((x) >= MAX_HTTP_LINE_LENGTH) \
-{ \
-    ERROR("HTTP line received is too long. Maximum is %d", MAX_HTTP_LINE_LENGTH); \
-    return WS_CLIENT_PROTOCOL_ERROR; \
-}
+#define HTTP_HDR_LINE_CHECK_LIMIT(x)                                                                                   \
+    if ((x) >= MAX_HTTP_LINE_LENGTH) {                                                                                 \
+        ERROR("HTTP line received is too long. Maximum is %d", MAX_HTTP_LINE_LENGTH);                                  \
+        return WS_CLIENT_PROTOCOL_ERROR;                                                                               \
+    }
 
 int ws_client_parse_handshake_resp(ws_client *client)
 {
@@ -290,6 +272,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
     int idx_crlf, idx_sep;
     char *ptr;
     size_t bytes;
+
     switch (client->hs.hdr_state) {
         case WS_HDR_HTTP:
             BUF_READ_CHECK_AT_LEAST(strlen(WS_CLIENT_HTTP_HDR))
@@ -297,6 +280,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
             rbuf_bump_tail(client->buf_read, strlen(WS_CLIENT_HTTP_HDR));
             client->hs.hdr_state = WS_HDR_RC;
             break;
+
         case WS_HDR_RC:
             BUF_READ_CHECK_AT_LEAST(HTTP_SC_LENGTH); // "XXX " http return code
             rbuf_pop(client->buf_read, buf, HTTP_SC_LENGTH);
@@ -312,6 +296,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
             }
             client->hs.hdr_state = WS_HDR_ENDLINE;
             break;
+
         case WS_HDR_ENDLINE:
             ptr = rbuf_find_bytes(client->buf_read, WS_HTTP_NEWLINE, strlen(WS_HTTP_NEWLINE), &idx_crlf);
             if (!ptr) {
@@ -321,12 +306,13 @@ int ws_client_parse_handshake_resp(ws_client *client)
             }
             HTTP_HDR_LINE_CHECK_LIMIT(idx_crlf);
 
-            client->hs.http_reply_msg = mw_malloc(idx_crlf+1);
+            client->hs.http_reply_msg = mallocz(idx_crlf+1);
             rbuf_pop(client->buf_read, client->hs.http_reply_msg, idx_crlf);
             client->hs.http_reply_msg[idx_crlf] = 0;
             rbuf_bump_tail(client->buf_read, strlen(WS_HTTP_NEWLINE));
             client->hs.hdr_state = WS_HDR_PARSE_HEADERS;
             break;
+
         case WS_HDR_PARSE_HEADERS:
             ptr = rbuf_find_bytes(client->buf_read, WS_HTTP_NEWLINE, strlen(WS_HTTP_NEWLINE), &idx_crlf);
             if (!ptr) {
@@ -357,7 +343,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
-            struct http_header *hdr = mw_calloc(1, sizeof(struct http_header) + idx_crlf); //idx_crlf includes ": " that will be used as 2 \0 bytes
+            struct http_header *hdr = callocz(1, sizeof(struct http_header) + idx_crlf); //idx_crlf includes ": " that will be used as 2 \0 bytes
             hdr->key = ((char*)hdr) + sizeof(struct http_header);
             hdr->value = hdr->key + idx_sep + 1;
 
@@ -384,6 +370,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
             }
 
             break;
+
         case WS_HDR_PARSE_DONE:
             if (!client->hs.nonce_matched) {
                 ERROR("Missing " WS_CONN_ACCEPT " header");
@@ -398,6 +385,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
             client->hs.hdr_state = WS_HDR_ALL_DONE;
             INFO("Websocket Connection Accepted By Server");
             return WS_CLIENT_PARSING_DONE;
+
         case WS_HDR_ALL_DONE:
             FATAL("This is error we should never come here!");
             return WS_CLIENT_PROTOCOL_ERROR;
@@ -642,7 +630,7 @@ int ws_client_process_rx_ws(ws_client *client)
             break;
         case WS_PAYLOAD_CONNECTION_CLOSE_MSG:
             if (!client->rx.specific_data.op_close.reason)
-                client->rx.specific_data.op_close.reason = mw_malloc(client->rx.payload_length + 1);
+                client->rx.specific_data.op_close.reason = mallocz(client->rx.payload_length + 1);
 
             while (client->rx.payload_processed < client->rx.payload_length) {
                 if (!rbuf_bytes_available(client->buf_read))
@@ -655,7 +643,7 @@ int ws_client_process_rx_ws(ws_client *client)
             INFO("WebSocket server closed the connection with EC=%d and reason \"%s\"",
                 client->rx.specific_data.op_close.ec,
                 client->rx.specific_data.op_close.reason);
-            mw_free(client->rx.specific_data.op_close.reason);
+            freez(client->rx.specific_data.op_close.reason);
             client->rx.specific_data.op_close.reason = NULL;
             client->rx.parse_state = WS_PACKET_DONE;
             break;
@@ -672,7 +660,7 @@ int ws_client_process_rx_ws(ws_client *client)
                 return WS_CLIENT_INTERNAL_ERROR;
             }
             BUF_READ_CHECK_AT_LEAST(client->rx.payload_length);
-            client->rx.specific_data.ping_msg = mw_malloc(client->rx.payload_length);
+            client->rx.specific_data.ping_msg = mallocz(client->rx.payload_length);
             rbuf_pop(client->buf_read, client->rx.specific_data.ping_msg, client->rx.payload_length);
             // TODO schedule this instead of sending right away
             // then attempt to send as soon as buffer space clears up

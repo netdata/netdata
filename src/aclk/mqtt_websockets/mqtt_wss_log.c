@@ -25,13 +25,13 @@ struct mqtt_wss_log_ctx {
 #endif
 mqtt_wss_log_ctx_t mqtt_wss_log_ctx_create(const char *ctx_prefix, mqtt_wss_log_callback_t log_callback)
 {
-    mqtt_wss_log_ctx_t ctx = mw_calloc(1, sizeof(struct mqtt_wss_log_ctx));
+    mqtt_wss_log_ctx_t ctx = callocz(1, sizeof(struct mqtt_wss_log_ctx));
     if(!ctx)
         return NULL;
 
     if(log_callback) {
         ctx->extern_log_fnc = log_callback;
-        ctx->buffer = mw_calloc(1, LOG_BUFFER_SIZE);
+        ctx->buffer = callocz(1, LOG_BUFFER_SIZE);
         if(!ctx->buffer)
             goto cleanup;
 
@@ -60,15 +60,15 @@ mqtt_wss_log_ctx_t mqtt_wss_log_ctx_create(const char *ctx_prefix, mqtt_wss_log_
     return ctx;
 
 cleanup:
-    mw_free(ctx);
+    freez(ctx);
     return NULL;
 }
 
 void mqtt_wss_log_ctx_destroy(mqtt_wss_log_ctx_t ctx)
 {
-    mw_free(ctx->ctx_prefix);
-    mw_free(ctx->buffer);
-    mw_free(ctx);
+    freez(ctx->ctx_prefix);
+    freez(ctx->buffer);
+    freez(ctx);
 }
 
 static inline char severity_to_c(int severity)
