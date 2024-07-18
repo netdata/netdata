@@ -210,6 +210,12 @@ if(ENABLE_PLUGIN_GO)
     find_package(Go "${MIN_GO_VERSION}" REQUIRED)
 endif()
 
+if(ENABLE_PLUGIN_GO)
+    set(NEED_NDSUDO TRUE)
+else()
+    set(NEED_NDSUDO FALSE)
+endif()
+
 if(ENABLE_WEBRTC)
         include(FetchContent)
         include(NetdataFetchContentExtra)
@@ -1926,13 +1932,15 @@ if(ENABLE_PLUGIN_CUPS)
     endif()
 endif()
 
-set(NDSUDO_FILES src/collectors/plugins.d/ndsudo.c)
+if(NEED_NDSUDO)
+    set(NDSUDO_FILES src/collectors/plugins.d/ndsudo.c)
 
-add_executable(ndsudo ${NDSUDO_FILES})
+    add_executable(ndsudo ${NDSUDO_FILES})
 
-install(TARGETS ndsudo
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata/plugins.d)
+    install(TARGETS ndsudo
+            COMPONENT netdata
+            DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 
 if(ENABLE_PLUGIN_CGROUP_NETWORK)
     set(CGROUP_NETWORK_FILES src/collectors/cgroups.plugin/cgroup-network.c)
