@@ -196,14 +196,6 @@ mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
 set(NEED_PROTOBUF True)
 
-find_package(CURL)
-if(CURL_FOUND)
-        set(HAVE_LIBCURL TRUE)
-        include_directories(${CURL_INCLUDE_DIRS})
-else()
-        message(STATUS "libcurl not found")
-endif()
-
 if(ENABLE_PLUGIN_GO)
     include(NetdataGoTools)
 
@@ -254,6 +246,9 @@ if(ENABLE_PLUGIN_EBPF)
         netdata_bundle_libbpf()
         netdata_fetch_ebpf_co_re()
 endif()
+
+pkg_check_modules(CURL libcurl>=7.21 REQUIRED IMPORTED_TARGET)
+set(HAVE_LIBCURL TRUE)
 
 #
 # Libm
@@ -2173,7 +2168,6 @@ target_include_directories(netdata PRIVATE
         "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
-        "$<$<BOOL:${CURL_FOUND}>:${CURL_INCLUDE_DIRS}>"
 )
 
 target_link_libraries(netdata PRIVATE
@@ -2187,7 +2181,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
-        "$<$<BOOL:${CURL_FOUND}>:${CURL_LIBRARIES}>"
+        "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
 )
 
 if(NEED_PROTOBUF)
