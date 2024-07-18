@@ -39,7 +39,7 @@ ${GITHUB_ACTIONS+echo "::group::Configuring"}
     -DENABLE_ML=On \
     -DENABLE_BUNDLED_JSONC=On \
     -DENABLE_BUNDLED_PROTOBUF=Off \
-    ${EXTRA_CMAKE_OPTIONS}
+    ${EXTRA_CMAKE_OPTIONS:-''}
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Building"}
