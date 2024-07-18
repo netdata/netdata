@@ -887,6 +887,17 @@ declare -A pkg_libuuid_dev=(
   ['default']=""
 )
 
+declare -A pkg_libcurl_dev=(
+  ['alpine']="curl-dev"
+  ['arch']="curl"
+  ['clearlinux']="devpkg-curl"
+  ['debian']="libcurl4-openssl-devel"
+  ['gentoo']="net-misc/curl"
+  ['ubuntu']="libcurl4-openssl-devel"
+  ['macos']="curl"
+  ['default']="libcurl-devel"
+)
+
 declare -A pkg_libmnl_dev=(
   ['alpine']="libmnl-dev"
   ['arch']="libmnl"
@@ -1316,6 +1327,7 @@ packages() {
     suitable_package libyaml-dev
     suitable_package libsystemd-dev
     suitable_package pcre2
+    suitable_package libcurl-dev
   fi
 
   # -------------------------------------------------------------------------
