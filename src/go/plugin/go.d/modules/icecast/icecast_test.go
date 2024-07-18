@@ -19,16 +19,18 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataServerStats, _          = os.ReadFile("testdata/server_stats.json")
-	dataServerStatsNoSources, _ = os.ReadFile("testdata/server_stats_no_sources.json")
+	dataServerStatsMultiSource, _  = os.ReadFile("testdata/stats_multi_source.json")
+	dataServerStatsSingleSource, _ = os.ReadFile("testdata/stats_single_source.json")
+	dataServerStatsNoSources, _    = os.ReadFile("testdata/stats_no_sources.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON":           dataConfigJSON,
-		"dataConfigYAML":           dataConfigYAML,
-		"dataServerStats":          dataServerStats,
-		"dataServerStatsNoSources": dataServerStatsNoSources,
+		"dataConfigJSON":              dataConfigJSON,
+		"dataConfigYAML":              dataConfigYAML,
+		"dataServerStats":             dataServerStatsMultiSource,
+		"dataServerStatsSingleSource": dataServerStatsSingleSource,
+		"dataServerStatsNoSources":    dataServerStatsNoSources,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -80,9 +82,13 @@ func TestIcecast_Check(t *testing.T) {
 		wantFail bool
 		prepare  func(t *testing.T) (*Icecast, func())
 	}{
-		"success default config": {
+		"success multiple sources": {
 			wantFail: false,
-			prepare:  prepareCaseOk,
+			prepare:  prepareCaseMultipleSources,
+		},
+		"success single source": {
+			wantFail: false,
+			prepare:  prepareCaseMultipleSources,
 		},
 		"fails on no sources": {
 			wantFail: true,
@@ -122,12 +128,19 @@ func TestIcecast_Collect(t *testing.T) {
 		wantMetrics map[string]int64
 		wantCharts  int
 	}{
-		"success default config": {
-			prepare:    prepareCaseOk,
+		"success multiple sources": {
+			prepare:    prepareCaseMultipleSources,
 			wantCharts: len(sourceChartsTmpl) * 2,
 			wantMetrics: map[string]int64{
 				"source_abc_listeners": 1,
 				"source_efg_listeners": 10,
+			},
+		},
+		"success single source": {
+			prepare:    prepareCaseSingleSource,
+			wantCharts: len(sourceChartsTmpl) * 1,
+			wantMetrics: map[string]int64{
+				"source_abc_listeners": 1,
 			},
 		},
 		"fails on no sources": {
@@ -160,13 +173,32 @@ func TestIcecast_Collect(t *testing.T) {
 	}
 }
 
-func prepareCaseOk(t *testing.T) (*Icecast, func()) {
+func prepareCaseMultipleSources(t *testing.T) (*Icecast, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case urlPathServerStats:
-				_, _ = w.Write(dataServerStats)
+				_, _ = w.Write(dataServerStatsMultiSource)
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
+		}))
+
+	icecast := New()
+	icecast.URL = srv.URL
+	require.NoError(t, icecast.Init())
+
+	return icecast, srv.Close
+}
+
+func prepareCaseSingleSource(t *testing.T) (*Icecast, func()) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case urlPathServerStats:
+				_, _ = w.Write(dataServerStatsSingleSource)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
