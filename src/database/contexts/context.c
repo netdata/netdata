@@ -255,6 +255,10 @@ static void rrdcontext_post_processing_queue_insert_callback(const DICTIONARY_IT
 
 static void rrdcontext_post_processing_queue_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *nothing __maybe_unused) {
     RRDCONTEXT *rc = context;
+
+    // IMPORTANT:
+    // Do not rely on this flag being absent, because the dictionaries have delayed deletions (garbage collect)
+    // so, this flag may not be deleted immediately from the context.
     rrd_flag_clear(rc, RRD_FLAG_QUEUED_FOR_PP);
     rc->pp.dequeued_ut = now_realtime_usec();
 }
