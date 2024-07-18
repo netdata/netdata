@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18193](https://github.com/netdata/netdata/pull/18193) ([netdatabot](https://github.com/netdatabot))
+- Port Icecast collector to Go [\#18190](https://github.com/netdata/netdata/pull/18190) ([Ancairon](https://github.com/Ancairon))
+- ndsudo setuid before looking for command [\#18189](https://github.com/netdata/netdata/pull/18189) ([ilyam8](https://github.com/ilyam8))
+- Remove logs-management plugin. [\#18186](https://github.com/netdata/netdata/pull/18186) ([Ferroin](https://github.com/Ferroin))
 - Create release branches for major releases as well. [\#18184](https://github.com/netdata/netdata/pull/18184) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#18183](https://github.com/netdata/netdata/pull/18183) ([netdatabot](https://github.com/netdatabot))
 - docs: go.d/ap update data\_collection description [\#18182](https://github.com/netdata/netdata/pull/18182) ([ilyam8](https://github.com/ilyam8))
@@ -67,6 +71,7 @@
 - Remove Debian 10 from supported platforms. [\#18083](https://github.com/netdata/netdata/pull/18083) ([Ferroin](https://github.com/Ferroin))
 - Remove Ubuntu 23.10 from supported platforms. [\#18082](https://github.com/netdata/netdata/pull/18082) ([Ferroin](https://github.com/Ferroin))
 - go.d fail2ban: add docker support [\#18081](https://github.com/netdata/netdata/pull/18081) ([ilyam8](https://github.com/ilyam8))
+- Improve alerts [\#18080](https://github.com/netdata/netdata/pull/18080) ([stelfrag](https://github.com/stelfrag))
 - Bump golang.org/x/net from 0.26.0 to 0.27.0 in /src/go [\#18078](https://github.com/netdata/netdata/pull/18078) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/gofrs/flock from 0.11.0 to 0.12.0 in /src/go [\#18077](https://github.com/netdata/netdata/pull/18077) ([dependabot[bot]](https://github.com/apps/dependabot))
 - proc: collect ksm/swap/cma/zswap only when feature enabled [\#18076](https://github.com/netdata/netdata/pull/18076) ([ilyam8](https://github.com/ilyam8))
@@ -409,13 +414,6 @@
 - go.d systemdunits fix unit files selector [\#17622](https://github.com/netdata/netdata/pull/17622) ([ilyam8](https://github.com/ilyam8))
 - Improve handling of an alert that transitions to the REMOVED state [\#17621](https://github.com/netdata/netdata/pull/17621) ([stelfrag](https://github.com/stelfrag))
 - log to journal all transitions [\#17618](https://github.com/netdata/netdata/pull/17618) ([ktsaou](https://github.com/ktsaou))
-- Remove contrib now that we use cpack for DEB packages [\#17614](https://github.com/netdata/netdata/pull/17614) ([vkalintiris](https://github.com/vkalintiris))
-- add update every to json schema [\#17613](https://github.com/netdata/netdata/pull/17613) ([ktsaou](https://github.com/ktsaou))
-- reset health when children disconnect [\#17612](https://github.com/netdata/netdata/pull/17612) ([ktsaou](https://github.com/ktsaou))
-- go.d dyncfg return 200 on Enable for running jobs [\#17611](https://github.com/netdata/netdata/pull/17611) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17610](https://github.com/netdata/netdata/pull/17610) ([netdatabot](https://github.com/netdatabot))
-- Bump golang.org/x/net from 0.24.0 to 0.25.0 in /src/go/collectors/go.d.plugin [\#17609](https://github.com/netdata/netdata/pull/17609) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump jinja2 from 3.1.3 to 3.1.4 in /packaging/dag [\#17607](https://github.com/netdata/netdata/pull/17607) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
