@@ -891,9 +891,9 @@ declare -A pkg_libcurl_dev=(
   ['alpine']="curl-dev"
   ['arch']="curl"
   ['clearlinux']="devpkg-curl"
-  ['debian']="libcurl4-openssl-devel"
+  ['debian']="libcurl4-openssl-dev"
   ['gentoo']="net-misc/curl"
-  ['ubuntu']="libcurl4-openssl-devel"
+  ['ubuntu']="libcurl4-openssl-dev"
   ['macos']="curl"
   ['default']="libcurl-devel"
 )
