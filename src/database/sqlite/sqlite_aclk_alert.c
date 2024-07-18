@@ -859,7 +859,7 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unus
 
 #define SQL_COUNT_SNAPSHOT_ENTRIES                                                                                     \
     "SELECT COUNT(1) FROM alert_version av, health_log hl "                                                            \
-    "WHERE hl.host_id = @host_id AND hl.health_log_id = av.health_log_id"
+    "WHERE hl.host_id = @host_id AND hl.health_log_id = av.health_log_id AND av.status <> -2"
 
 static int calculate_alert_snapshot_entries(nd_uuid_t *host_uuid)
 {
@@ -896,7 +896,7 @@ done:
     " FROM health_log hl, alert_hash ah, health_log_detail hld, alert_version av "                                     \
     " WHERE hl.config_hash_id = ah.hash_id"                                                                            \
     " AND hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id "                                             \
-    " AND hld.health_log_id = av.health_log_id AND av.unique_id = hld.unique_id"
+    " AND hld.health_log_id = av.health_log_id AND av.unique_id = hld.unique_id AND av.status <> -2"
 
 #define ALARM_EVENTS_PER_CHUNK 1000
 void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
@@ -952,19 +952,18 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     alarm_log.node_id = wc->node_id;
     alarm_log.claim_id = claim_id;
 
-
     cnt = 0;
     param = 0;
     uint64_t version = 0;
+    int total_count = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         cnt++;
+        total_count++;
 
         if (!snapshot_proto)
             snapshot_proto = generate_alarm_snapshot_proto(&alarm_snap);
 
         health_alarm_log_populate(&alarm_log, res, host, NULL);
-
-        //log_alarm_log(&alarm_log);
 
         add_alarm_log_entry2snapshot(snapshot_proto, &alarm_log);
         version += alarm_log.version;
