@@ -11,19 +11,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-type (
-	serverStats struct {
-		IceStats *struct {
-			Source []sourceStats `json:"source"`
-		} `json:"icestats"`
-	}
-	sourceStats struct {
-		ServerName  string `json:"server_name"`
-		StreamStart string `json:"stream_start"`
-		Listeners   int64  `json:"listeners"`
-	}
-)
-
 const (
 	urlPathServerStats = "/status-json.xsl" // https://icecast.org/docs/icecast-trunk/server_stats/
 )
