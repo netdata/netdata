@@ -6,9 +6,15 @@
 
 **Merged pull requests:**
 
+- do not rely on the queued flag to queue a context [\#18198](https://github.com/netdata/netdata/pull/18198) ([ktsaou](https://github.com/ktsaou))
+- Do not include REMOVED status in the alert snapshot [\#18197](https://github.com/netdata/netdata/pull/18197) ([stelfrag](https://github.com/stelfrag))
+- remove fluent-bit submodule [\#18196](https://github.com/netdata/netdata/pull/18196) ([ilyam8](https://github.com/ilyam8))
+- go.d icecast single source response [\#18195](https://github.com/netdata/netdata/pull/18195) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18193](https://github.com/netdata/netdata/pull/18193) ([netdatabot](https://github.com/netdatabot))
+- Skip building ndsudo when it’s not actually needed. [\#18191](https://github.com/netdata/netdata/pull/18191) ([Ferroin](https://github.com/Ferroin))
 - Port Icecast collector to Go [\#18190](https://github.com/netdata/netdata/pull/18190) ([Ancairon](https://github.com/Ancairon))
 - ndsudo setuid before looking for command [\#18189](https://github.com/netdata/netdata/pull/18189) ([ilyam8](https://github.com/ilyam8))
+- Add Widnows CI jobs. [\#18187](https://github.com/netdata/netdata/pull/18187) ([Ferroin](https://github.com/Ferroin))
 - Remove logs-management plugin. [\#18186](https://github.com/netdata/netdata/pull/18186) ([Ferroin](https://github.com/Ferroin))
 - Create release branches for major releases as well. [\#18184](https://github.com/netdata/netdata/pull/18184) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#18183](https://github.com/netdata/netdata/pull/18183) ([netdatabot](https://github.com/netdatabot))
@@ -412,8 +418,6 @@
 - Regenerate integrations.js [\#17626](https://github.com/netdata/netdata/pull/17626) ([netdatabot](https://github.com/netdatabot))
 - go.d filecheck update to create a chart per instance [\#17624](https://github.com/netdata/netdata/pull/17624) ([ilyam8](https://github.com/ilyam8))
 - go.d systemdunits fix unit files selector [\#17622](https://github.com/netdata/netdata/pull/17622) ([ilyam8](https://github.com/ilyam8))
-- Improve handling of an alert that transitions to the REMOVED state [\#17621](https://github.com/netdata/netdata/pull/17621) ([stelfrag](https://github.com/stelfrag))
-- log to journal all transitions [\#17618](https://github.com/netdata/netdata/pull/17618) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
