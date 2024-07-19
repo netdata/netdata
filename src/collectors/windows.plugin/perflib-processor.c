@@ -28,6 +28,8 @@ struct processor {
     COUNTER_DATA percentIdleTime;
 
     COUNTER_DATA interruptsPerSec;
+
+    COUNTER_DATA cpuFrequency;
 };
 
 struct processor total = { 0 };
@@ -40,6 +42,7 @@ void initialize_processor_keys(struct processor *p) {
     p->percentInterruptTime.key = "% Interrupt Time";
     p->percentIdleTime.key = "% Idle Time";
     p->interruptsPerSec.key = "Interrupts/sec";
+    p->cpuFrequency.key = "Processor Frequency";
 }
 
 void dict_processor_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -105,6 +108,8 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->percentIdleTime);
 
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->interruptsPerSec);
+
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->cpuFrequency);
 
         if(!p->st) {
             p->st = rrdset_create_localhost(
