@@ -1029,6 +1029,7 @@ endif()
 
 set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/common-contexts.h
+        src/collectors/common-contexts/cpu.cpufreq.h
         src/collectors/common-contexts/disk.io.h
         src/collectors/common-contexts/system.io.h
         src/collectors/common-contexts/system.interrupts.h
