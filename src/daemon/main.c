@@ -807,8 +807,6 @@ int help(int exitcode) {
             "                           are enabled or not, in JSON format.\n\n"
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
-            "  -W \"claim -token=TOKEN -rooms=ROOM1,ROOM2\"\n"
-            "                           Claim the agent to the workspace rooms pointed to by TOKEN and ROOM*.\n\n"
 #ifdef OS_WINDOWS
             "  -W perflibdump [key]\n"
             "                           Dump the Windows Performance Counters Registry in JSON.\n\n"
