@@ -14,11 +14,13 @@ struct processor_info {
     COUNTER_DATA cpuFrequency;
 };
 
+static struct processor_info total = { 0 };
+
 static void initialize_processor_info_keys(struct processor_info *p) {
     p->cpuFrequency.key = "Processor Frequency";
 }
 
-void dict_processor_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+void dict_processor_info_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct processor_info *p = value;
     initialize_processor_info_keys(p);
 }
@@ -26,10 +28,12 @@ void dict_processor_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *
 static DICTIONARY *processors_info = NULL;
 
 static void initialize(void) {
+    initialize_processor_info_keys(&total);
+
     processors_info = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE |
                                                 DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct processor_info));
 
-    dictionary_register_insert_callback(processors_info, dict_processor_insert_cb, NULL);
+    dictionary_register_insert_callback(processors_info, dict_processor_info_insert_cb, NULL);
 }
 
 static inline int cpu_dict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
@@ -67,15 +71,15 @@ static bool do_processors_info(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         struct processor_info *p;
         int cpu = -1;
         if(strcasecmp(windows_shared_buffer, "_Total") == 0) {
-            continue;
+            p = &total;
         } else {
             p = dictionary_set(processors_info, windows_shared_buffer, NULL, sizeof(*p));
             cpu = str2i(windows_shared_buffer);
             snprintfz(p->cpu_freq_id, sizeof(p->cpu_freq_id), "cpu%d", cpu);
+            count_cpus++;
         }
 
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->cpuFrequency);
-        count_cpus++;
     }
 
     if (count_cpus)
