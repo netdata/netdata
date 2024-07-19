@@ -227,6 +227,7 @@ Requires: %{name}-plugin-systemd-journal = %{version}
 Requires: %{name}-plugin-network-viewer = %{version}
 %endif
 
+Obsoletes: %{name}-plugin-logs-management
 
 # #####################################################################
 # Functionality-dependent package dependencies
@@ -995,6 +996,8 @@ fi
 %caps(cap_sys_admin,cap_sys_ptrace,cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
 
 %changelog
+* Fri Jul 19 2024 Austin Hemmelgarn <austin@netdata.cloud>
+- Fix dependency issues with old logs-management plugin
 * Tue Jul 16 2024 Austin Hemmelgarn <austin@netdata.cloud>
 - Removed logs-management plugin
 * Wed Jul 03 2024 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-26
