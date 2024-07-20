@@ -73,8 +73,16 @@ static bool do_processors_info(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if(strcasecmp(windows_shared_buffer, "_Total") == 0) {
             p = &total;
         } else {
-            p = dictionary_set(processors_info, windows_shared_buffer, NULL, sizeof(*p));
-            cpu = str2i(windows_shared_buffer);
+            // Labels are named X,Y
+            char *comma = strchr(windows_shared_buffer, ',');
+            if (!comma)
+                continue;
+
+            if (!isdigit(*(++comma)))
+                continue;
+
+            p = dictionary_set(processors_info, comma, NULL, sizeof(*p));
+            cpu = str2i(comma);
             snprintfz(p->cpu_freq_id, sizeof(p->cpu_freq_id), "cpu%d", cpu);
             count_cpus++;
         }
