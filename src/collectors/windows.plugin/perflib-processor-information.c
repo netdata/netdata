@@ -12,12 +12,16 @@ struct processor_info {
     char cpu_freq_id[16];
 
     COUNTER_DATA cpuFrequency;
+    COUNTER_DATA percMaxFrequency;
+    COUNTER_DATA percProcessorFrequency;
 };
 
 static struct processor_info total = { 0 };
 
 static void initialize_processor_info_keys(struct processor_info *p) {
     p->cpuFrequency.key = "Processor Frequency";
+    p->percMaxFrequency.key = "% of Maximum Frequency";
+    p->percProcessorFrequency.key = "% Processor Performance";
 }
 
 void dict_processor_info_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -43,7 +47,9 @@ static inline int cpu_dict_callback(const DICTIONARY_ITEM *item __maybe_unused, 
     if (!p->rd_cpu_frequency)
         p->rd_cpu_frequency = rrddim_add(cpufreq, p->cpu_freq_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-    rrddim_set_by_pointer(cpufreq, p->rd_cpu_frequency, (collected_number)p->cpuFrequency.current.Data);
+    NETDATA_DOUBLE calc = p->cpuFrequency.current.Data;
+    calc *= ((NETDATA_DOUBLE)p->percMaxFrequency.current.Data)/100.0;
+    rrddim_set_by_pointer(cpufreq, p->rd_cpu_frequency, (collected_number)calc);
 
     return 1;
 }
@@ -88,6 +94,8 @@ static bool do_processors_info(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         }
 
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->cpuFrequency);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->percMaxFrequency);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->percProcessorFrequency);
     }
 
     if (count_cpus)
