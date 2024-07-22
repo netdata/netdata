@@ -35,7 +35,8 @@ func (c *memcachedClient) queryStats() ([]byte, error) {
 	err := c.conn.Command("stats\r\n", func(bytes []byte) bool {
 		s := strings.TrimSpace(string(bytes))
 		b.WriteString(s)
-		return strings.HasPrefix(s, "END") || strings.HasPrefix(s, "ERROR")
+		b.WriteByte('\n')
+		return !(strings.HasPrefix(s, "END") || strings.HasPrefix(s, "ERROR"))
 	})
 	if err != nil {
 		return nil, err
