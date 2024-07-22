@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- docs: simplify "Disk Requirements and Retention" [\#18205](https://github.com/netdata/netdata/pull/18205) ([ilyam8](https://github.com/ilyam8))
 - do not rely on the queued flag to queue a context [\#18198](https://github.com/netdata/netdata/pull/18198) ([ktsaou](https://github.com/ktsaou))
 - Do not include REMOVED status in the alert snapshot [\#18197](https://github.com/netdata/netdata/pull/18197) ([stelfrag](https://github.com/stelfrag))
 - remove fluent-bit submodule [\#18196](https://github.com/netdata/netdata/pull/18196) ([ilyam8](https://github.com/ilyam8))
@@ -416,8 +417,6 @@
 - python.d remove bind\_rndc [\#17628](https://github.com/netdata/netdata/pull/17628) ([ilyam8](https://github.com/ilyam8))
 - Add Sentry support to new CPack packages. [\#17627](https://github.com/netdata/netdata/pull/17627) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17626](https://github.com/netdata/netdata/pull/17626) ([netdatabot](https://github.com/netdatabot))
-- go.d filecheck update to create a chart per instance [\#17624](https://github.com/netdata/netdata/pull/17624) ([ilyam8](https://github.com/ilyam8))
-- go.d systemdunits fix unit files selector [\#17622](https://github.com/netdata/netdata/pull/17622) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
