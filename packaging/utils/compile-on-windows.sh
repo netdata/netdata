@@ -71,8 +71,8 @@ fi
     -DENABLE_BUNDLED_PROTOBUF=Off \
     ${NULL}
 
-ninja -v -C "${build}" || ninja -v -C "${build}" -j 1
+ninja -v -C "${build}" install || ninja -v -C "${build}" -j 1
 
 echo
 echo "Compile with:"
-echo "ninja -v -C \"${build}\" || ninja -v -C \"${build}\" -j 1"
+echo "ninja -v -C \"${build}\" install || ninja -v -C \"${build}\" -j 1"
