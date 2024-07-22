@@ -1,0 +1,27 @@
+{
+  "icestats": {
+    "admin": "icemaster@localhost",
+    "host": "localhost",
+    "location": "Earth",
+    "server_id": "Icecast 2.4.4",
+    "server_start": "Wed, 17 Jul 2024 11:27:40 +0300",
+    "server_start_iso8601": "2024-07-17T11:27:40+0300",
+    "source": {
+      "audio_info": "ice-bitrate=128;ice-channels=2;ice-samplerate=44100",
+      "genre": "(null)",
+      "ice-bitrate": 128,
+      "ice-channels": 2,
+      "ice-samplerate": 44100,
+      "listener_peak": 2,
+      "listeners": 1,
+      "listenurl": "http://localhost:8000/line.nsv",
+      "server_description": "(null)",
+      "server_name": "abc",
+      "server_type": "audio/mpeg",
+      "server_url": "(null)",
+      "stream_start": "Wed, 17 Jul 2024 12:10:20 +0300",
+      "stream_start_iso8601": "2024-07-17T12:10:20+0300",
+      "dummy": null
+    }
+  }
+}

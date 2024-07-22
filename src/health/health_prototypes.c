@@ -687,15 +687,6 @@ void health_apply_prototypes_to_host(RRDHOST *host) {
         health_prototype_reset_alerts_for_rrdset(st);
     }
     rrdset_foreach_done(st);
-
-#ifdef ENABLE_ACLK
-    if (netdata_cloud_enabled) {
-        struct aclk_sync_cfg_t *wc = host->aclk_config;
-        if (likely(wc)) {
-            wc->alert_queue_removed = SEND_REMOVED_AFTER_HEALTH_LOOPS;
-        }
-    }
-#endif
 }
 
 void health_apply_prototypes_to_all_hosts(void) {

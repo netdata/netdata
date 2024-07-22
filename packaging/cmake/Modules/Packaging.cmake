@@ -59,7 +59,6 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
 		"netdata-plugin-cups, netdata-plugin-freeipmi")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
 		"netdata-plugin-systemd-journal, \
-netdata-plugin-logs-management, \
 netdata-plugin-network-viewer")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
@@ -280,26 +279,6 @@ set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 
 #
-# logs-management.plugin
-#
-
-set(CPACK_COMPONENT_PLUGIN-LOGS-MANAGEMENT_DEPENDS "netdata")
-set(CPACK_COMPONENT_PLUGIN-LOGS-MANAGEMENT_DESCRIPTION
-		"The logs-management plugin for the Netdata Agent
- This plugin allows the Netdata Agent to collect logs from the system
- and parse them to extract metrics.")
-
-set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_PACKAGE_NAME "netdata-plugin-logs-management")
-set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_PACKAGE_SECTION "net")
-set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
-
-set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES_PATH}/deb/plugin-logs-management/preinst;"
-	  "${PKG_FILES_PATH}/deb/plugin-logs-management/postinst")
-
-set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_DEBUGINFO_PACKAGE On)
-
-#
 # network-viewer.plugin
 #
 
@@ -476,9 +455,6 @@ if(ENABLE_PLUGIN_FREEIPMI)
 endif()
 if(ENABLE_PLUGIN_GO)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-go")
-endif()
-if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-logs-management")
 endif()
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-network-viewer")

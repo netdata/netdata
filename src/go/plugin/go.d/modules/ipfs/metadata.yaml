@@ -61,7 +61,7 @@ modules:
           description: |
             The following options can be defined globally: update_every, autodetection_retry.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
           list:
             - name: update_every
