@@ -67,8 +67,8 @@ var (
 		Type:     module.Area,
 		Priority: prioNet,
 		Dims: module.Dims{
-			{ID: "bytes_read", Name: "in", Mul: 8, Div: 1000},
-			{ID: "bytes_written", Name: "out", Mul: -8, Div: 1000},
+			{ID: "bytes_read", Name: "in", Mul: 8, Div: 1000, Algo: module.Incremental},
+			{ID: "bytes_written", Name: "out", Mul: -8, Div: 1000, Algo: module.Incremental},
 		},
 	}
 	connectionsChart = module.Chart{
