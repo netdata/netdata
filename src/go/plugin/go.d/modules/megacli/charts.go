@@ -16,6 +16,7 @@ const (
 
 	prioBBURelativeCharge
 	prioBBURechargeCycles
+	prioBBUCapDegradationPerc
 	prioBBUTemperature
 )
 
@@ -76,6 +77,7 @@ var (
 var bbuChartsTmpl = module.Charts{
 	bbuRelativeChargeChartsTmpl.Copy(),
 	bbuRechargeCyclesChartsTmpl.Copy(),
+	bbuCapacityDegradationChartsTmpl.Copy(),
 	bbuTemperatureChartsTmpl.Copy(),
 }
 
@@ -102,6 +104,18 @@ var (
 		Priority: prioBBURechargeCycles,
 		Dims: module.Dims{
 			{ID: "bbu_adapter_%s_cycle_count", Name: "recharge"},
+		},
+	}
+	bbuCapacityDegradationChartsTmpl = module.Chart{
+		ID:       "bbu_adapter_%s_capacity_degradation",
+		Title:    "BBU capacity degradation",
+		Units:    "percent",
+		Fam:      "bbu charge",
+		Ctx:      "megacli.bbu_capacity_degradation",
+		Type:     module.Line,
+		Priority: prioBBUCapDegradationPerc,
+		Dims: module.Dims{
+			{ID: "bbu_adapter_%s_capacity_degradation_perc", Name: "cap_degradation"},
 		},
 	}
 	bbuTemperatureChartsTmpl = module.Chart{
@@ -160,6 +174,10 @@ func (m *MegaCli) addPhysDriveCharts(pd *megaPhysDrive) {
 
 func (m *MegaCli) addBBUCharts(bbu *megaBBU) {
 	charts := bbuChartsTmpl.Copy()
+
+	if _, ok := calcCapDegradationPerc(bbu); !ok {
+		_ = charts.Remove(bbuCapacityDegradationChartsTmpl.ID)
+	}
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, bbu.adapterNumber)
