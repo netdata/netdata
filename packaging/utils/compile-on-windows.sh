@@ -17,7 +17,8 @@ install_dependencies() {
         msys/brotli-devel mingw64/mingw-w64-x86_64-brotli ucrt64/mingw-w64-ucrt-x86_64-brotli \
         msys/ccache ucrt64/mingw-w64-ucrt-x86_64-ccache mingw64/mingw-w64-x86_64-ccache \
         mingw64/mingw-w64-x86_64-go ucrt64/mingw-w64-ucrt-x86_64-go \
-        mingw64/mingw-w64-x86_64-nsis
+        mingw64/mingw-w64-x86_64-nsis \
+        msys/libcurl msys/libcurl-devel
 }
 
 if [ "${1}" = "install" ]
