@@ -527,22 +527,14 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libexecdir}/%{name}/install-service.sh
 %{_libexecdir}/%{name}/%{name}-updater.sh
 %{_libexecdir}/%{name}/%{name}-uninstaller.sh
-%{_libexecdir}/%{name}/plugins.d/acl.sh
-%{_libexecdir}/%{name}/plugins.d/alarm.sh
-%{_libexecdir}/%{name}/plugins.d/alarm-email.sh
 %{_libexecdir}/%{name}/plugins.d/alarm-notify.sh
-%{_libexecdir}/%{name}/plugins.d/alarm-test.sh
 %{_libexecdir}/%{name}/plugins.d/anonymous-statistics.sh
 %{_libexecdir}/%{name}/plugins.d/cgroup-name.sh
 %{_libexecdir}/%{name}/plugins.d/get-kubernetes-labels.sh
-%{_libexecdir}/%{name}/plugins.d/health-cmdapi-test.sh
 %{_libexecdir}/%{name}/plugins.d/ioping.plugin
 %{_libexecdir}/%{name}/plugins.d/loopsleepms.sh.inc
-%{_libexecdir}/%{name}/plugins.d/request.sh
 %{_libexecdir}/%{name}/plugins.d/system-info.sh
 %{_libexecdir}/%{name}/plugins.d/tc-qos-helper.sh
-%{_libexecdir}/%{name}/plugins.d/template_dim.sh
-%{_libexecdir}/%{name}/plugins.d/ebpf_thread_function.sh
 
 # cgroup-network detects the network interfaces of CGROUPs
 # it must be able to use setns() and run cgroup-network-helper.sh as root
