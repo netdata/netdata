@@ -157,6 +157,12 @@ modules:
             - name: battery_type
               description: Battery type (e.g. BBU)
           metrics:
+            - name: megacli.bbu_absolute_charge
+              description: BBU absolute charge
+              unit: percentage
+              chart_type: area
+              dimensions:
+                - name: charge
             - name: megacli.bbu_relative_charge
               description: BBU relative charge
               unit: percentage

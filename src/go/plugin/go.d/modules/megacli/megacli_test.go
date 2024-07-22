@@ -235,6 +235,9 @@ func TestMegaCli_Collect(t *testing.T) {
 
 			assert.Equal(t, test.wantMetrics, mx)
 			assert.Len(t, *mega.Charts(), test.wantCharts)
+			if len(test.wantMetrics) > 0 {
+				module.TestMetricsHasAllChartsDims(t, mega.Charts(), mx)
+			}
 		})
 	}
 }
