@@ -3,108 +3,119 @@
 package memcached
 
 import (
-	"fmt"
+	"bufio"
+	"bytes"
+	"errors"
 	"strconv"
 	"strings"
 )
 
-type (
-	responseMap map[string]int64
-)
+// https://github.com/memcached/memcached/blob/b1aefcdf8a265f8a5126e8aa107a50988fa1ec35/doc/protocol.txt#L1267
+var statsMetrics = map[string]bool{
+	"limit_maxbytes":       true,
+	"bytes":                true,
+	"bytes_read":           true,
+	"bytes_written":        true,
+	"cas_badval":           true,
+	"cas_hits":             true,
+	"cas_misses":           true,
+	"cmd_get":              true,
+	"cmd_set":              true,
+	"cmd_touch":            true,
+	"curr_connections":     true,
+	"curr_items":           true,
+	"decr_hits":            true,
+	"decr_misses":          true,
+	"delete_hits":          true,
+	"delete_misses":        true,
+	"evictions":            true,
+	"get_hits":             true,
+	"get_misses":           true,
+	"incr_hits":            true,
+	"incr_misses":          true,
+	"reclaimed":            true,
+	"rejected_connections": true,
+	"total_connections":    true,
+	"total_items":          true,
+	"touch_hits":           true,
+	"touch_misses":         true,
+}
 
 func (m *Memcached) collect() (map[string]int64, error) {
-	mx := make(map[string]int64)
+	if m.conn == nil {
+		conn, err := m.establishConn()
+		if err != nil {
+			return nil, err
+		}
+		m.conn = conn
+	}
 
-	stats, err := m.collectStats()
+	stats, err := m.conn.queryStats()
 	if err != nil {
+		m.conn.disconnect()
+		m.conn = nil
 		return nil, err
 	}
 
-	mx["avail"] = stats["limit_maxbytes"] - stats["bytes"]
-	mx["used"] = stats["bytes"]
-	mx["bytes_read"] = stats["bytes_read"]
-	mx["bytes_written"] = stats["bytes_written"]
-	mx["curr_connections"] = stats["curr_connections"]
-	mx["rejected_connections"] = stats["rejected_connections"]
-	mx["total_connections"] = stats["total_connections"]
-	mx["curr_items"] = stats["curr_items"]
-	mx["total_items"] = stats["total_items"]
-	mx["reclaimed"] = stats["reclaimed"]
-	mx["evictions"] = stats["evictions"]
-	mx["get_hits"] = stats["get_hits"]
-	mx["get_misses"] = stats["get_misses"]
-	mx["cmd_get"] = stats["cmd_get"]
-	mx["cmd_set"] = stats["cmd_set"]
-	mx["delete_hits"] = stats["delete_hits"]
-	mx["delete_misses"] = stats["delete_misses"]
-	mx["cas_hits"] = stats["cas_hits"]
-	mx["cas_misses"] = stats["cas_misses"]
-	mx["cas_badval"] = stats["cas_badval"]
-	mx["incr_hits"] = stats["incr_hits"]
-	mx["incr_misses"] = stats["incr_misses"]
-	mx["decr_hits"] = stats["decr_hits"]
-	mx["decr_misses"] = stats["decr_misses"]
-	mx["touch_hits"] = stats["touch_hits"]
-	mx["touch_misses"] = stats["touch_misses"]
-	mx["cmd_touch"] = stats["cmd_touch"]
+	mx := make(map[string]int64)
+
+	if err := m.collectStats(mx, stats); err != nil {
+		return nil, err
+	}
 
 	return mx, nil
 }
 
-func (m *Memcached) collectStats() (responseMap, error) {
+func (m *Memcached) collectStats(mx map[string]int64, stats []byte) error {
+	if len(stats) == 0 {
+		return errors.New("empty stats response")
+	}
+
+	var n int
+	sc := bufio.NewScanner(bytes.NewReader(stats))
+
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+
+		switch {
+		case strings.HasPrefix(line, "STAT"):
+			key, value := getStatKeyValue(line)
+			if !statsMetrics[key] {
+				continue
+			}
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				mx[key] = v
+				n++
+			}
+		case strings.HasPrefix(line, "ERROR"):
+			return errors.New("received ERROR response")
+		}
+	}
+
+	if n == 0 {
+		return errors.New("unexpected memcached response")
+	}
+
+	mx["avail"] = mx["limit_maxbytes"] - mx["bytes"]
+
+	return nil
+}
+
+func (m *Memcached) establishConn() (memcachedConn, error) {
 	conn := m.newMemcachedConn(m.Config)
 
 	if err := conn.connect(); err != nil {
 		return nil, err
 	}
-	defer conn.disconnect()
 
-	msg, err := conn.queryStats()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(msg) < 1 {
-		return nil, fmt.Errorf("empty memcached response")
-	}
-
-	if !(strings.HasPrefix(msg, "STAT") && strings.HasSuffix(msg, "END")){
-		return nil, fmt.Errorf("unexpected memcached response")
-	}
-
-	m.Debugf("memcached stats command response: %s", msg)
-
-	parsed, err := parseResponse(msg)
-	if err != nil {
-		return nil, err
-	}
-
-	return *parsed, nil
+	return conn, nil
 }
 
-func parseResponse(msg string) (*responseMap, error) {
-	stats := make(responseMap)
-	lines := strings.Split(msg, "STAT ")
-	for _, line := range lines {
-		if line == "" || strings.HasPrefix(line, "END") {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) == 2 {
-			key := fields[0]
-			valueStr := fields[1]
-			if intValue := parseInt(valueStr); intValue != nil {
-				stats[key] = *intValue
-			}
-		}
+func getStatKeyValue(line string) (string, string) {
+	line = strings.TrimPrefix(line, "STAT ")
+	i := strings.IndexByte(line, ' ')
+	if i < 0 {
+		return "", ""
 	}
-	return &stats, nil
-}
-
-func parseInt(value string) *int64 {
-	v, err := strconv.ParseInt(value, 10, 64)
-	if err != nil {
-		return nil
-	}
-	return &v
+	return line[:i], line[i+1:]
 }

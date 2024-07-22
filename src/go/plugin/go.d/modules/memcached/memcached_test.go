@@ -17,7 +17,7 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	memcachedData, _ = os.ReadFile("testdata/stats.txt")
+	dataMemcachedStats, _ = os.ReadFile("testdata/stats.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -25,7 +25,7 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataConfigJSON": dataConfigJSON,
 		"dataConfigYAML": dataConfigYAML,
 
-		"memcachedData": memcachedData,
+		"dataMemcachedStats": dataMemcachedStats,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -148,16 +148,18 @@ func TestMemcached_Check(t *testing.T) {
 
 func TestMemcached_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepareMock    func() *mockMemcachedConn
-		wantMetrics    map[string]int64
-		wantDisconnect bool
-		wantCharts     int
+		prepareMock             func() *mockMemcachedConn
+		wantMetrics             map[string]int64
+		disconnectBeforeCleanup bool
+		disconnectAfterCleanup  bool
 	}{
 		"success case": {
-			prepareMock:    prepareMockOk,
-			wantDisconnect: true,
+			prepareMock:             prepareMockOk,
+			disconnectBeforeCleanup: false,
+			disconnectAfterCleanup:  true,
 			wantMetrics: map[string]int64{
-				"avail":                67108864,
+				"avail":                67108831,
+				"bytes":                33,
 				"bytes_read":           108662,
 				"bytes_written":        9761348,
 				"cas_badval":           0,
@@ -177,26 +179,39 @@ func TestMemcached_Collect(t *testing.T) {
 				"get_misses":           1,
 				"incr_hits":            0,
 				"incr_misses":          0,
+				"limit_maxbytes":       67108864,
 				"reclaimed":            1,
 				"rejected_connections": 0,
 				"total_connections":    39,
 				"total_items":          1,
 				"touch_hits":           0,
 				"touch_misses":         0,
-				"used":                 0,
 			},
 		},
-		"err on connect": {
-			prepareMock:    prepareMockErrOnConnect,
-			wantDisconnect: false,
+		"error response": {
+			prepareMock:             prepareMockErrorResponse,
+			disconnectBeforeCleanup: false,
+			disconnectAfterCleanup:  true,
 		},
 		"unexpected response": {
-			prepareMock:    prepareMockUnexpectedResponse,
-			wantDisconnect: true,
+			prepareMock:             prepareMockUnexpectedResponse,
+			disconnectBeforeCleanup: false,
+			disconnectAfterCleanup:  true,
 		},
 		"empty response": {
-			prepareMock:    prepareMockEmptyResponse,
-			wantDisconnect: true,
+			prepareMock:             prepareMockEmptyResponse,
+			disconnectBeforeCleanup: false,
+			disconnectAfterCleanup:  true,
+		},
+		"err on connect": {
+			prepareMock:             prepareMockErrOnConnect,
+			disconnectBeforeCleanup: false,
+			disconnectAfterCleanup:  false,
+		},
+		"err on query stats": {
+			prepareMock:             prepareMockErrOnQueryStats,
+			disconnectBeforeCleanup: true,
+			disconnectAfterCleanup:  true,
 		},
 	}
 
@@ -208,33 +223,28 @@ func TestMemcached_Collect(t *testing.T) {
 
 			mx := mem.Collect()
 
-			assert.Equal(t, test.wantMetrics, mx)
-			if len(test.wantMetrics) > 0 {
-				testMetricsHasAllChartsDims(t, mem, mx)
-			}
-		})
-	}
-}
+			require.Equal(t, test.wantMetrics, mx)
 
-func testMetricsHasAllChartsDims(t *testing.T, mem *Memcached, mx map[string]int64) {
-	for _, chart := range *mem.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := mx[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
+			if len(test.wantMetrics) > 0 {
+				module.TestMetricsHasAllChartsDims(t, mem.Charts(), mx)
+			}
+
+			assert.Equal(t, test.disconnectBeforeCleanup, mock.disconnectCalled, "disconnect before cleanup")
+			mem.Cleanup()
+			assert.Equal(t, test.disconnectAfterCleanup, mock.disconnectCalled, "disconnect after cleanup")
+		})
 	}
 }
 
 func prepareMockOk() *mockMemcachedConn {
 	return &mockMemcachedConn{
-		response: string(memcachedData),
+		statsResponse: dataMemcachedStats,
+	}
+}
+
+func prepareMockErrorResponse() *mockMemcachedConn {
+	return &mockMemcachedConn{
+		statsResponse: []byte("ERROR"),
 	}
 }
 
@@ -244,23 +254,27 @@ func prepareMockErrOnConnect() *mockMemcachedConn {
 	}
 }
 
+func prepareMockErrOnQueryStats() *mockMemcachedConn {
+	return &mockMemcachedConn{
+		errOnQueryStats: true,
+	}
+}
+
 func prepareMockUnexpectedResponse() *mockMemcachedConn {
 	return &mockMemcachedConn{
-		response: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+		statsResponse: []byte("Lorem ipsum dolor sit amet, consectetur adipiscing elit."),
 	}
 }
 
 func prepareMockEmptyResponse() *mockMemcachedConn {
-	return &mockMemcachedConn{
-		response: "",
-	}
+	return &mockMemcachedConn{}
 }
 
 type mockMemcachedConn struct {
-	errOnConnect        bool
-	errOnQueryMemcached bool
-	response            string
-	disconnectCalled    bool
+	errOnConnect     bool
+	errOnQueryStats  bool
+	statsResponse    []byte
+	disconnectCalled bool
 }
 
 func (m *mockMemcachedConn) connect() error {
@@ -274,9 +288,9 @@ func (m *mockMemcachedConn) disconnect() {
 	m.disconnectCalled = true
 }
 
-func (m *mockMemcachedConn) queryStats() (string, error) {
-	if m.errOnQueryMemcached {
-		return "", errors.New("mock.queryMemcached() error")
+func (m *mockMemcachedConn) queryStats() ([]byte, error) {
+	if m.errOnQueryStats {
+		return nil, errors.New("mock.queryStats() error")
 	}
-	return m.response, nil
+	return m.statsResponse, nil
 }

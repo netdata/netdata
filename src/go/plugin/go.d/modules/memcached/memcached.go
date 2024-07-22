@@ -47,11 +47,12 @@ type (
 		charts *module.Charts
 
 		newMemcachedConn func(Config) memcachedConn
+		conn             memcachedConn
 	}
 	memcachedConn interface {
 		connect() error
 		disconnect()
-		queryStats() (string, error)
+		queryStats() ([]byte, error)
 	}
 )
 
@@ -99,4 +100,9 @@ func (m *Memcached) Collect() map[string]int64 {
 	return mx
 }
 
-func (m *Memcached) Cleanup() {}
+func (m *Memcached) Cleanup() {
+	if m.conn != nil {
+		m.conn.disconnect()
+		m.conn = nil
+	}
+}

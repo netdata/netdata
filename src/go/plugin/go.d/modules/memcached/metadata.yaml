@@ -24,7 +24,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Monitor Memcached metrics for proficient in-memory key-value store operations. Track cache hits, misses, and memory usage for efficient data caching."
-        method_description: "It reads the server's response to the `stats` command ([stats interface](https://github.com/memcached/memcached/wiki/Commands#stats))."
+        method_description: "It reads the server's response to the `stats` command."
       supported_platforms:
         include: []
         exclude: []

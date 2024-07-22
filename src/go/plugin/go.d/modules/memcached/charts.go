@@ -55,7 +55,7 @@ var (
 		Priority: prioCache,
 		Dims: module.Dims{
 			{ID: "avail", Div: byteToMiB},
-			{ID: "used", Div: byteToMiB},
+			{ID: "bytes", Name: "used", Div: byteToMiB},
 		},
 	}
 	netChart = module.Chart{

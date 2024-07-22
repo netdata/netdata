@@ -73,7 +73,7 @@ STAT log_watcher_sent 0
 STAT log_watchers 0
 STAT unexpected_napi_ids 0
 STAT round_robin_fallback 0
-STAT bytes 0
+STAT bytes 33
 STAT curr_items 0
 STAT total_items 1
 STAT slab_global_page_pool 0

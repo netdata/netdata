@@ -3,6 +3,7 @@
 package memcached
 
 import (
+	"bytes"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
@@ -29,15 +30,15 @@ func (c *memcachedClient) disconnect() {
 	_ = c.conn.Disconnect()
 }
 
-func (c *memcachedClient) queryStats() (string, error) {
-    var s string
-    err := c.conn.Command("stats\r\n", func(bytes []byte) bool {
-        s += string(bytes)
-        // Stop processing after we receive the full response
-        return !strings.Contains(s, "END")
-    })
-    if err != nil {
-        return "", err
-    }
-    return s, nil
+func (c *memcachedClient) queryStats() ([]byte, error) {
+	var b bytes.Buffer
+	err := c.conn.Command("stats\r\n", func(bytes []byte) bool {
+		s := strings.TrimSpace(string(bytes))
+		b.WriteString(s)
+		return strings.HasPrefix(s, "END") || strings.HasPrefix(s, "ERROR")
+	})
+	if err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
 }
