@@ -1,7 +1,8 @@
-plugin_name: python.d.plugin
+plugin_name: go.d.plugin
 modules:
   - meta:
-      plugin_name: python.d.plugin
+      id: collector-go.d.plugin-memcached
+      plugin_name: go.d.plugin
       module_name: memcached
       monitored_instance:
         name: Memcached
@@ -23,7 +24,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Monitor Memcached metrics for proficient in-memory key-value store operations. Track cache hits, misses, and memory usage for efficient data caching."
-        method_description: "It reads server response to stats command ([stats interface](https://github.com/memcached/memcached/wiki/Commands#stats))."
+        method_description: "It reads the server's response to the `stats` command."
       supported_platforms:
         include: []
         exclude: []
@@ -43,84 +44,53 @@ modules:
         list: []
       configuration:
         file:
-          name: python.d/memcached.conf
-          description: ""
+          name: go.d/memcached.conf
         options:
           description: |
-            There are 2 sections:
-            
-            * Global variables
-            * One or more JOBS that can define multiple different instances to monitor.
-            
-            The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
-            
-            Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
-            
-            Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
+            The following options can be defined globally: update_every, autodetection_retry.
           folding:
             title: Config options
             enabled: true
           list:
-            - name: host
-              description: the host to connect to.
-              default_value: "127.0.0.1"
-              required: false
-            - name: port
-              description: the port to connect to.
-              default_value: "11211"
-              required: false
             - name: update_every
-              description: Sets the default data collection frequency.
-              default_value: 10
-              required: false
-            - name: priority
-              description: Controls the order of charts at the netdata dashboard.
-              default_value: 60000
+              description: Data collection frequency.
+              default_value: 1
               required: false
             - name: autodetection_retry
-              description: Sets the job re-check interval in seconds.
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
               default_value: 0
               required: false
-            - name: penalty
-              description: Indicates whether to apply penalty to update_every in case of failures.
-              default_value: yes
-              required: false
-            - name: name
-              description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-              default_value: ""
+            - name: address
+              description: The IP address and port where the memcached service listens for connections.
+              default_value: 127.0.0.1:11211
+              required: true
+            - name: timeout
+              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              default_value: 1
               required: false
         examples:
           folding:
+            title: Config
             enabled: true
-            title: "Config"
           list:
-            - name: localhost
-              description: An example configuration for localhost.
-              folding:
-                enabled: false
+            - name: Basic
+              description: A basic example configuration.
               config: |
-                localhost:
-                  name: 'local'
-                  host: 'localhost'
-                  port: 11211
-            - name: localipv4
-              description: An example configuration for localipv4.
-              folding:
-                enabled: true
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:11211
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
               config: |
-                localhost:
-                  name: 'local'
-                  host: '127.0.0.1'
-                  port: 11211
-            - name: localipv6
-              description: An example configuration for localipv6.
-              folding:
-                enabled: true
-              config: |
-                localhost:
-                  name: 'local'
-                  host: '::1'
-                  port: 11211
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:11211
+
+                  - name: remote
+                    address: 203.0.113.0:11211
     troubleshooting:
       problems:
         list: []
