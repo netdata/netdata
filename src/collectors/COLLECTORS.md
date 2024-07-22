@@ -679,7 +679,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 #### Network
 
-- [Access Points](https://github.com/netdata/netdata/blob/master/src/collectors/charts.d.plugin/ap/integrations/access_points.md)
+- [Access Points](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/ap/integrations/access_points.md)
 
 - [IP Virtual Server](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/ip_virtual_server.md)
 
@@ -759,7 +759,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Discourse](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/discourse.md)
 
-- [Icecast](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/icecast/integrations/icecast.md)
+- [Icecast](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/icecast/integrations/icecast.md)
 
 - [OBS Studio](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/obs_studio.md)
 

@@ -166,6 +166,11 @@ elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     patch_is_zero || exit 1
     check_newer_major_version || exit 1
     check_for_existing_tag || exit 1
+    branch_name="$(echo "${EVENT_VERSION}" | cut -f 1-2 -d '.')"
+    if [ -n "$(git branch --list "${branch_name}")" ]; then
+        echo "::error::A branch named ${branch_name} already exists in the repository."
+        exit 1
+    fi
     echo "${EVENT_VERSION}" > packaging/version || exit 1
     # shellcheck disable=SC2129
     echo "run=true" >> "${GITHUB_OUTPUT}"

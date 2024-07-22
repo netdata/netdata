@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/tidwall/gjson"
 )
 
 type scanDevice struct {
@@ -26,22 +24,15 @@ func (s *scanDevice) shortName() string {
 }
 
 func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
-	powerModeNever := s.NoCheckPowerMode == "never"
-
-	var resp *gjson.Result
-	var err error
-
 	// Issue on Discord: https://discord.com/channels/847502280503590932/1261747175361347644/1261747175361347644
 	// "sat" devices being identified as "scsi" with --scan, and then later
 	// code attempts to validate the type by calling `smartctl` with the "scsi" type.
 	// This validation can trigger unintended "Enabling discard_zeroes_data" messages in system logs (dmesg).
 	// To address this specific issue we use `smartctl --scan-open` as a workaround.
 	// This method reliably identifies device types.
-	if powerModeNever {
-		resp, err = s.exec.scanOpen()
-	} else {
-		resp, err = s.exec.scan()
-	}
+	scanOpen := s.NoCheckPowerMode == "never"
+
+	resp, err := s.exec.scan(scanOpen)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan devices: %v", err)
 	}
@@ -52,7 +43,7 @@ func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
 		dev := &scanDevice{
 			name:     d.Get("name").String(),
 			infoName: d.Get("info_name").String(),
-			typ:      d.Get("type").String(), // guessed type when using '--scan' instead of '--scan-open'
+			typ:      d.Get("type").String(),
 		}
 
 		if dev.name == "" || dev.typ == "" {
@@ -65,21 +56,19 @@ func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
 			continue
 		}
 
-		if !powerModeNever {
-			if dev.typ == "scsi" {
-				// `smartctl --scan` attempts to guess the device type based on the path, but this can be unreliable.
-				// Accurate device type information is crucial because we use the `--device` option to gather data.
-				// Using the wrong type can lead to issues.
-				// For example, using 'scsi' for 'sat' devices prevents `smartctl` from issuing the necessary ATA commands.
-				d := scanDevice{name: dev.name, typ: "sat"}
-				if _, ok := s.scannedDevices[d.key()]; ok {
+		if !scanOpen && dev.typ == "scsi" {
+			// `smartctl --scan` attempts to guess the device type based on the path, but this can be unreliable.
+			// Accurate device type information is crucial because we use the `--device` option to gather data.
+			// Using the wrong type can lead to issues.
+			// For example, using 'scsi' for 'sat' devices prevents `smartctl` from issuing the necessary ATA commands.
+			d := scanDevice{name: dev.name, typ: "sat"}
+			if _, ok := s.scannedDevices[d.key()]; ok {
+				dev.typ = "sat"
+			} else {
+				resp, _ := s.exec.deviceInfo(dev.name, dev.typ, s.NoCheckPowerMode)
+				if resp != nil && isExitStatusHasBit(resp, 2) {
+					s.Debugf("changing device '%s' type 'scsi' -> 'sat'", dev.name)
 					dev.typ = "sat"
-				} else {
-					resp, _ := s.exec.deviceInfo(dev.name, dev.typ, s.NoCheckPowerMode)
-					if resp != nil && isExitStatusHasBit(resp, 2) {
-						s.Debugf("changing device '%s' type 'scsi' -> 'sat'", dev.name)
-						dev.typ = "sat"
-					}
 				}
 			}
 		}

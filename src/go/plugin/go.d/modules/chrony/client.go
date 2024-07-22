@@ -5,6 +5,7 @@ package chrony
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/facebook/time/ntp/chrony"
 )
@@ -16,11 +17,37 @@ func newChronyClient(c Config) (chronyClient, error) {
 	}
 
 	client := &simpleClient{
-		conn:   conn,
-		client: &chrony.Client{Connection: conn},
+		conn: conn,
+		client: &chrony.Client{Connection: &connWithTimeout{
+			Conn:    conn,
+			timeout: c.Timeout.Duration(),
+		}},
 	}
 
 	return client, nil
+}
+
+type connWithTimeout struct {
+	net.Conn
+	timeout time.Duration
+}
+
+func (c *connWithTimeout) Read(p []byte) (n int, err error) {
+	if err := c.Conn.SetReadDeadline(c.deadline()); err != nil {
+		return 0, err
+	}
+	return c.Conn.Read(p)
+}
+
+func (c *connWithTimeout) Write(p []byte) (n int, err error) {
+	if err := c.Conn.SetWriteDeadline(c.deadline()); err != nil {
+		return 0, err
+	}
+	return c.Conn.Write(p)
+}
+
+func (c *connWithTimeout) deadline() time.Time {
+	return time.Now().Add(c.timeout)
 }
 
 type simpleClient struct {

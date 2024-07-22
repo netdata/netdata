@@ -90,7 +90,6 @@ set(OS_FREEBSD     False)
 set(OS_LINUX       False)
 set(OS_MACOS       False)
 set(OS_WINDOWS     False)
-set(ALLOW_PLATFORM_SENSITIVE_OPTIONS True)
 
 set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
 set(BINDIR usr/sbin)
@@ -107,11 +106,6 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
         set(OS_LINUX True)
         add_definitions(-D_GNU_SOURCE)
         message(INFO " Compiling for Linux... ")
-        include(NetdataUtil)
-        netdata_identify_libc(LIBC_IMPLEMENTATION)
-        if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND LIBC_IMPLEMENTATION STREQUAL "musl")
-            set(ALLOW_PLATFORM_SENSITIVE_OPTIONS False)
-        endif()
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
         set(OS_WINDOWS True)
 
@@ -170,7 +164,6 @@ cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" 
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
-cmake_dependent_option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" False "OS_LINUX AND ALLOW_PLATFORM_SENSITIVE_OPTIONS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
@@ -186,10 +179,6 @@ option(ENABLE_EXPORTER_MONGODB "Enable exporting to MongoDB" ${DEFAULT_FEATURE_S
 option(ENABLE_BUNDLED_JSONC "Force use of a vendored copy of JSON-C" False)
 option(ENABLE_BUNDLED_YAML "Force use of a vendored copy of libyaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
-
-# Optional test code
-cmake_dependent_option(ENABLE_LOGS_MANAGEMENT_TESTS "Enable test code for logs-management plugin." True "ENABLE_PLUGIN_LOGS_MANAGEMENT" False)
-mark_as_advanced(ENABLE_LOGS_MANAGEMENT_TESTS)
 
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
@@ -219,6 +208,12 @@ if(ENABLE_PLUGIN_GO)
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
 
     find_package(Go "${MIN_GO_VERSION}" REQUIRED)
+endif()
+
+if(ENABLE_PLUGIN_GO)
+    set(NEED_NDSUDO TRUE)
+else()
+    set(NEED_NDSUDO FALSE)
 endif()
 
 if(ENABLE_WEBRTC)
@@ -1355,44 +1350,6 @@ set(TC_PLUGIN_FILES
         src/collectors/tc.plugin/plugin_tc.c
 )
 
-set(LOGS_MANAGEMENT_PLUGIN_FILES
-        src/logsmanagement/circular_buffer.c
-        src/logsmanagement/circular_buffer.h
-        src/logsmanagement/db_api.c
-        src/logsmanagement/db_api.h
-        src/logsmanagement/defaults.h
-        src/logsmanagement/file_info.h
-        src/logsmanagement/flb_plugin.c
-        src/logsmanagement/flb_plugin.h
-        src/logsmanagement/functions.c
-        src/logsmanagement/functions.h
-        src/logsmanagement/helper.h
-        src/logsmanagement/logsmanag_config.c
-        src/logsmanagement/logsmanag_config.h
-        src/logsmanagement/logsmanagement.c
-        src/logsmanagement/parser.c
-        src/logsmanagement/parser.h
-        src/logsmanagement/query.c
-        src/logsmanagement/query.h
-        src/logsmanagement/rrd_api/rrd_api_docker_ev.c
-        src/logsmanagement/rrd_api/rrd_api_docker_ev.h
-        src/logsmanagement/rrd_api/rrd_api_generic.c
-        src/logsmanagement/rrd_api/rrd_api_generic.h
-        src/logsmanagement/rrd_api/rrd_api_kernel.c
-        src/logsmanagement/rrd_api/rrd_api_kernel.h
-        src/logsmanagement/rrd_api/rrd_api_mqtt.c
-        src/logsmanagement/rrd_api/rrd_api_mqtt.h
-        src/logsmanagement/rrd_api/rrd_api_stats.c
-        src/logsmanagement/rrd_api/rrd_api_stats.h
-        src/logsmanagement/rrd_api/rrd_api_systemd.c
-        src/logsmanagement/rrd_api/rrd_api_systemd.h
-        src/logsmanagement/rrd_api/rrd_api_web_log.c
-        src/logsmanagement/rrd_api/rrd_api_web_log.h
-        src/logsmanagement/rrd_api/rrd_api.h
-        src/database/sqlite/sqlite3.c
-        src/database/sqlite/sqlite3.h
-)
-
 set(NETDATA_FILES
         src/collectors/all.h
         ${DAEMON_FILES}
@@ -1934,45 +1891,6 @@ if(ENABLE_PLUGIN_SLABINFO)
     endif()
 endif()
 
-if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
-    set(ENABLE_LOGSMANAGEMENT True)
-
-    if(ENABLE_LOGS_MANAGEMENT_TESTS)
-        list(APPEND LOGS_MANAGEMENT_PLUGIN_FILES src/logsmanagement/unit_test/unit_test.c
-                                                 src/logsmanagement/unit_test/unit_test.h)
-        set(ENABLE_LOGSMANAGEMENT_TESTS True)
-    endif()
-
-    add_executable(logs-management.plugin ${LOGS_MANAGEMENT_PLUGIN_FILES})
-    target_link_libraries(logs-management.plugin libnetdata)
-
-    install(TARGETS logs-management.plugin
-            COMPONENT plugin-logs-management
-            DESTINATION usr/libexec/netdata/plugins.d)
-
-    install(DIRECTORY src/logsmanagement/stock_conf/logsmanagement.d
-            COMPONENT plugin-logs-management
-            DESTINATION usr/lib/netdata/conf.d)
-
-    install(DIRECTORY
-            COMPONENT plugin-logs-management
-            DESTINATION etc/netdata/logsmanagement.d)
-
-    configure_file(src/logsmanagement/stock_conf/logsmanagement.d.conf.in
-                   src/logsmanagement/stock_conf/logsmanagement.d.conf
-                   @ONLY)
-
-    install(FILES ${CMAKE_BINARY_DIR}/src/logsmanagement/stock_conf/logsmanagement.d.conf
-            COMPONENT plugin-logs-management
-            DESTINATION usr/lib/netdata/conf.d)
-
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-logs-management
-                DESTINATION usr/share/doc/netdata-plugin-logs-management)
-    endif()
-endif()
 
 if(ENABLE_PLUGIN_CUPS)
     pkg_check_modules(CUPS libcups)
@@ -2014,13 +1932,15 @@ if(ENABLE_PLUGIN_CUPS)
     endif()
 endif()
 
-set(NDSUDO_FILES src/collectors/plugins.d/ndsudo.c)
+if(NEED_NDSUDO)
+    set(NDSUDO_FILES src/collectors/plugins.d/ndsudo.c)
 
-add_executable(ndsudo ${NDSUDO_FILES})
+    add_executable(ndsudo ${NDSUDO_FILES})
 
-install(TARGETS ndsudo
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata/plugins.d)
+    install(TARGETS ndsudo
+            COMPONENT netdata
+            DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 
 if(ENABLE_PLUGIN_CGROUP_NETWORK)
     set(CGROUP_NETWORK_FILES src/collectors/cgroups.plugin/cgroup-network.c)
@@ -2721,11 +2641,13 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
-install(PROGRAMS
-        src/health/notifications/alarm-email.sh
-        src/health/notifications/alarm-test.sh
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata/plugins.d)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        install(PROGRAMS
+                src/health/notifications/alarm-email.sh
+                src/health/notifications/alarm-test.sh
+                COMPONENT netdata
+                DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 
 install(FILES
         src/health/notifications/health_alarm_notify.conf
@@ -2736,22 +2658,23 @@ install(FILES
 # test/ files
 #
 
-configure_file(tests/health_mgmtapi/health-cmdapi-test.sh.in tests/health_mgmtapi/health-cmdapi-test.sh @ONLY)
-configure_file(tests/acls/acl.sh.in tests/acls/acl.sh @ONLY)
-configure_file(tests/urls/request.sh.in tests/urls/request.sh @ONLY)
-configure_file(tests/alarm_repetition/alarm.sh.in tests/alarm_repetition/alarm.sh @ONLY)
-configure_file(tests/template_dimension/template_dim.sh.in tests/template_dimension/template_dim.sh @ONLY)
-configure_file(tests/ebpf/ebpf_thread_function.sh.in tests/ebpf/ebpf_thread_function.sh @ONLY)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        configure_file(tests/health_mgmtapi/health-cmdapi-test.sh.in tests/health_mgmtapi/health-cmdapi-test.sh @ONLY)
+        configure_file(tests/acls/acl.sh.in tests/acls/acl.sh @ONLY)
+        configure_file(tests/urls/request.sh.in tests/urls/request.sh @ONLY)
+        configure_file(tests/alarm_repetition/alarm.sh.in tests/alarm_repetition/alarm.sh @ONLY)
+        configure_file(tests/template_dimension/template_dim.sh.in tests/template_dimension/template_dim.sh @ONLY)
+        configure_file(tests/ebpf/ebpf_thread_function.sh.in tests/ebpf/ebpf_thread_function.sh @ONLY)
 
-install(FILES
-        ${CMAKE_BINARY_DIR}/tests/health_mgmtapi/health-cmdapi-test.sh
-        ${CMAKE_BINARY_DIR}/tests/acls/acl.sh
-        ${CMAKE_BINARY_DIR}/tests/urls/request.sh
-        ${CMAKE_BINARY_DIR}/tests/alarm_repetition/alarm.sh
-        ${CMAKE_BINARY_DIR}/tests/template_dimension/template_dim.sh
-        ${CMAKE_BINARY_DIR}/tests/ebpf/ebpf_thread_function.sh
-        DESTINATION usr/libexec/netdata/plugins.d)
-
+        install(FILES
+                ${CMAKE_BINARY_DIR}/tests/health_mgmtapi/health-cmdapi-test.sh
+                ${CMAKE_BINARY_DIR}/tests/acls/acl.sh
+                ${CMAKE_BINARY_DIR}/tests/urls/request.sh
+                ${CMAKE_BINARY_DIR}/tests/alarm_repetition/alarm.sh
+                ${CMAKE_BINARY_DIR}/tests/template_dimension/template_dim.sh
+                ${CMAKE_BINARY_DIR}/tests/ebpf/ebpf_thread_function.sh
+                DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 #
 # charts.d plugin
 #
@@ -2781,7 +2704,6 @@ install(FILES
         DESTINATION usr/lib/netdata/conf.d)
 
 install(PROGRAMS
-        src/collectors/charts.d.plugin/ap/ap.chart.sh
         src/collectors/charts.d.plugin/apcupsd/apcupsd.chart.sh
         src/collectors/charts.d.plugin/example/example.chart.sh
         src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
@@ -2791,7 +2713,6 @@ install(PROGRAMS
         DESTINATION usr/libexec/netdata/charts.d)
 
 install(FILES
-        src/collectors/charts.d.plugin/ap/ap.conf
         src/collectors/charts.d.plugin/apcupsd/apcupsd.conf
         src/collectors/charts.d.plugin/example/example.conf
         src/collectors/charts.d.plugin/libreswan/libreswan.conf
@@ -2855,8 +2776,6 @@ install(FILES
         src/collectors/python.d.plugin/gearman/gearman.conf
         src/collectors/python.d.plugin/go_expvar/go_expvar.conf
         src/collectors/python.d.plugin/haproxy/haproxy.conf
-        src/collectors/python.d.plugin/icecast/icecast.conf
-        src/collectors/python.d.plugin/memcached/memcached.conf
         src/collectors/python.d.plugin/monit/monit.conf
         src/collectors/python.d.plugin/nsd/nsd.conf
         src/collectors/python.d.plugin/nvidia_smi/nvidia_smi.conf
@@ -2893,8 +2812,6 @@ install(FILES
         src/collectors/python.d.plugin/gearman/gearman.chart.py
         src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
         src/collectors/python.d.plugin/haproxy/haproxy.chart.py
-        src/collectors/python.d.plugin/icecast/icecast.chart.py
-        src/collectors/python.d.plugin/memcached/memcached.chart.py
         src/collectors/python.d.plugin/monit/monit.chart.py
         src/collectors/python.d.plugin/nsd/nsd.chart.py
         src/collectors/python.d.plugin/nvidia_smi/nvidia_smi.chart.py

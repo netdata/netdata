@@ -392,6 +392,10 @@ int main(int argc, char *argv[]) {
     char new_path[] = "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
     putenv(new_path);
 
+    setuid(0);
+    setgid(0);
+    setegid(0);
+
     bool found = false;
     char filename[FILENAME_MAX];
 
@@ -429,10 +433,6 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     else {
-        setuid(0);
-        setgid(0);
-        setegid(0);
-
         char *clean_env[] = {NULL};
         execve(filename, params, clean_env);
         perror("execve"); // execve only returns on error
