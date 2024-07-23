@@ -240,6 +240,34 @@ cleanup:
     return NULL;
 }
 
+static char* GetErrorString(DWORD errorCode) {
+    DWORD lastError = GetLastError();
+
+    LPVOID lpMsgBuf;
+    DWORD bufLen = FormatMessage(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER |
+            FORMAT_MESSAGE_FROM_SYSTEM |
+            FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL,
+            errorCode,
+            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPTSTR) &lpMsgBuf,
+            0, NULL );
+
+    SetLastError(lastError);
+
+    if (bufLen) {
+        char* errorString = (char*)LocalAlloc(LMEM_FIXED, bufLen + 1);
+        if (errorString) {
+            strcpy(errorString, (char*)lpMsgBuf);
+        }
+        LocalFree(lpMsgBuf);
+        return errorString;
+    }
+
+    return NULL;
+}
+
 int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
 //    nd_log(NDLS_COLLECTORS, NDLP_ERR,
 //           "SPAWN PARENT: child of request No %zu, pid %d, is about to be killed",
@@ -256,7 +284,7 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     CloseHandle(instance->write_handle); instance->write_handle = NULL;
 
     errno_clear();
-    if(TerminateProcess(instance->process_handle, 0xDEADBEEF) == 0)
+    if(TerminateProcess(instance->process_handle, STATUS_INTERRUPTED) == 0)
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: child of request No %zu, pid %d, failed to be terminated",
                instance->request_id, (int)instance->child_pid);
@@ -269,9 +297,14 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     GetExitCodeProcess(instance->process_handle, &exit_code);
     CloseHandle(instance->process_handle);
 
+    char *err = GetErrorString(exit_code);
+
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
-           "SPAWN PARENT: child of request No %zu, pid %d, killed and exited with code %d",
-           instance->request_id, (int)instance->child_pid, (int)exit_code);
+           "SPAWN PARENT: child of request No %zu, pid %d, stopped/killed and returned code %u (0x%x): %s",
+           instance->request_id, (int)instance->child_pid, (unsigned)exit_code, (unsigned)exit_code, err ? err : "(no reason text)");
+
+    if(err)
+        LocalFree(err);
 
     freez(instance);
     return (int)exit_code;
@@ -294,9 +327,14 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     GetExitCodeProcess(instance->process_handle, &exit_code);
     CloseHandle(instance->process_handle);
 
+    char *err = GetErrorString(exit_code);
+
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
-           "SPAWN PARENT: child of request No %zu, pid %d, waited and exited with code %d",
-           instance->request_id, (int)instance->child_pid, (int)exit_code);
+           "SPAWN PARENT: child of request No %zu, pid %d, exited with code %u (0x%x): %s",
+           instance->request_id, (int)instance->child_pid, (unsigned)exit_code, (unsigned)exit_code, err ? err : "(no reason text)");
+
+    if(err)
+        LocalFree(err);
 
     freez(instance);
     return (int)exit_code;

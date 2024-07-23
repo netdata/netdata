@@ -2,6 +2,10 @@
 
 #include "spawn_popen.h"
 
+#if defined(OS_WINDOWS)
+#include <windows.h>
+#endif
+
 SPAWN_SERVER *netdata_main_spawn_server = NULL;
 static SPINLOCK netdata_main_spawn_server_spinlock = NETDATA_SPINLOCK_INITIALIZER;
 
@@ -129,10 +133,20 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
 
 static int spawn_popen_status_rc(int status) {
 #if defined(OS_WINDOWS)
-    if(status == (int)0xDEADBEEF)
-        return 0;
+    DWORD exitCode = (DWORD)status;
+    switch (exitCode) {
+        case STATUS_ACCESS_VIOLATION:
+        case STATUS_ILLEGAL_INSTRUCTION:
+        case STATUS_STACK_OVERFLOW:
+        case STATUS_HEAP_CORRUPTION:
+        case STATUS_NO_MEMORY:
+            return -1;
 
-    return status;
+        default:
+        case STATUS_CONTROL_C_EXIT:
+        case STATUS_INTERRUPTED:
+            return 0;
+    }
 #else
     if(WIFEXITED(status))
         return WEXITSTATUS(status);
