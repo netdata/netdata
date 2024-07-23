@@ -2618,11 +2618,13 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
-install(PROGRAMS
-        src/health/notifications/alarm-email.sh
-        src/health/notifications/alarm-test.sh
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata/plugins.d)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        install(PROGRAMS
+                src/health/notifications/alarm-email.sh
+                src/health/notifications/alarm-test.sh
+                COMPONENT netdata
+                DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 
 install(FILES
         src/health/notifications/health_alarm_notify.conf
@@ -2633,22 +2635,23 @@ install(FILES
 # test/ files
 #
 
-configure_file(tests/health_mgmtapi/health-cmdapi-test.sh.in tests/health_mgmtapi/health-cmdapi-test.sh @ONLY)
-configure_file(tests/acls/acl.sh.in tests/acls/acl.sh @ONLY)
-configure_file(tests/urls/request.sh.in tests/urls/request.sh @ONLY)
-configure_file(tests/alarm_repetition/alarm.sh.in tests/alarm_repetition/alarm.sh @ONLY)
-configure_file(tests/template_dimension/template_dim.sh.in tests/template_dimension/template_dim.sh @ONLY)
-configure_file(tests/ebpf/ebpf_thread_function.sh.in tests/ebpf/ebpf_thread_function.sh @ONLY)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        configure_file(tests/health_mgmtapi/health-cmdapi-test.sh.in tests/health_mgmtapi/health-cmdapi-test.sh @ONLY)
+        configure_file(tests/acls/acl.sh.in tests/acls/acl.sh @ONLY)
+        configure_file(tests/urls/request.sh.in tests/urls/request.sh @ONLY)
+        configure_file(tests/alarm_repetition/alarm.sh.in tests/alarm_repetition/alarm.sh @ONLY)
+        configure_file(tests/template_dimension/template_dim.sh.in tests/template_dimension/template_dim.sh @ONLY)
+        configure_file(tests/ebpf/ebpf_thread_function.sh.in tests/ebpf/ebpf_thread_function.sh @ONLY)
 
-install(FILES
-        ${CMAKE_BINARY_DIR}/tests/health_mgmtapi/health-cmdapi-test.sh
-        ${CMAKE_BINARY_DIR}/tests/acls/acl.sh
-        ${CMAKE_BINARY_DIR}/tests/urls/request.sh
-        ${CMAKE_BINARY_DIR}/tests/alarm_repetition/alarm.sh
-        ${CMAKE_BINARY_DIR}/tests/template_dimension/template_dim.sh
-        ${CMAKE_BINARY_DIR}/tests/ebpf/ebpf_thread_function.sh
-        DESTINATION usr/libexec/netdata/plugins.d)
-
+        install(FILES
+                ${CMAKE_BINARY_DIR}/tests/health_mgmtapi/health-cmdapi-test.sh
+                ${CMAKE_BINARY_DIR}/tests/acls/acl.sh
+                ${CMAKE_BINARY_DIR}/tests/urls/request.sh
+                ${CMAKE_BINARY_DIR}/tests/alarm_repetition/alarm.sh
+                ${CMAKE_BINARY_DIR}/tests/template_dimension/template_dim.sh
+                ${CMAKE_BINARY_DIR}/tests/ebpf/ebpf_thread_function.sh
+                DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 #
 # charts.d plugin
 #
@@ -2750,7 +2753,6 @@ install(FILES
         src/collectors/python.d.plugin/gearman/gearman.conf
         src/collectors/python.d.plugin/go_expvar/go_expvar.conf
         src/collectors/python.d.plugin/haproxy/haproxy.conf
-        src/collectors/python.d.plugin/memcached/memcached.conf
         src/collectors/python.d.plugin/monit/monit.conf
         src/collectors/python.d.plugin/nsd/nsd.conf
         src/collectors/python.d.plugin/nvidia_smi/nvidia_smi.conf
@@ -2787,7 +2789,6 @@ install(FILES
         src/collectors/python.d.plugin/gearman/gearman.chart.py
         src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
         src/collectors/python.d.plugin/haproxy/haproxy.chart.py
-        src/collectors/python.d.plugin/memcached/memcached.chart.py
         src/collectors/python.d.plugin/monit/monit.chart.py
         src/collectors/python.d.plugin/nsd/nsd.chart.py
         src/collectors/python.d.plugin/nvidia_smi/nvidia_smi.chart.py

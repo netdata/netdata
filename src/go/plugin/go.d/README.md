@@ -95,6 +95,7 @@ see the appropriate collector readme.
 | [logstash](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/logstash)                     |           Logstash            |
 | [lvm](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/lvm)                               |      LVM logical volumes      |
 | [megacli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/megacli)                       |     MegaCli Hardware Raid     |
+| [memcached](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/memcached)                   |           Memcached           |
 | [mongoDB](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/mongodb)                       |            MongoDB            |
 | [mysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/mysql)                           |             MySQL             |
 | [nginx](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginx)                           |             NGINX             |

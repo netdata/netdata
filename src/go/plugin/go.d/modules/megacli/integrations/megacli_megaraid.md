@@ -113,8 +113,9 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| megacli.bbu_relative_charge | charge | percentage |
+| megacli.bbu_charge | charge | percentage |
 | megacli.bbu_recharge_cycles | recharge | cycles |
+| megacli.bbu_capacity_degradation | cap_degradation | percent |
 | megacli.bbu_temperature | temperature | Celsius |
 
 
