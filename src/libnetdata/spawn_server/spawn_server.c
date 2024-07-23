@@ -125,6 +125,22 @@ static BUFFER *argv_to_windows(const char **argv) {
     return wb;
 }
 
+int set_fd_blocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: fcntl(F_GETFL) failed");
+        return -1;
+    }
+
+    flags &= ~O_NONBLOCK;
+    if (fcntl(fd, F_SETFL, flags) == -1) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: fcntl(F_SETFL) failed");
+        return -1;
+    }
+
+    return 0;
+}
+
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
 
@@ -155,13 +171,21 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         goto cleanup;
     }
 
+    // Ensure pipes are in blocking mode
+    if (set_fd_blocking(pipe_stdin[PIPE_READ]) == -1 || set_fd_blocking(pipe_stdin[PIPE_WRITE]) == -1 ||
+        set_fd_blocking(pipe_stdout[PIPE_READ]) == -1 || set_fd_blocking(pipe_stdout[PIPE_WRITE]) == -1) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Failed to set blocking I/O on pipes for request No %zu, command: %s",
+               instance->request_id, command);
+    }
+
     // do not run multiple times this section
     // to prevent handles leaking
     spinlock_lock(&spinlock);
 
     // Convert POSIX file descriptors to Windows handles
-    HANDLE stdin_read_handle = (HANDLE)_get_osfhandle(pipe_stdin[0]);
-    HANDLE stdout_write_handle = (HANDLE)_get_osfhandle(pipe_stdout[1]);
+    HANDLE stdin_read_handle = (HANDLE)_get_osfhandle(pipe_stdin[PIPE_READ]);
+    HANDLE stdout_write_handle = (HANDLE)_get_osfhandle(pipe_stdout[PIPE_WRITE]);
     HANDLE stderr_handle = (HANDLE)_get_osfhandle(stderr_fd);
 
     if (stdin_read_handle == INVALID_HANDLE_VALUE || stdout_write_handle == INVALID_HANDLE_VALUE || stderr_handle == INVALID_HANDLE_VALUE) {
@@ -213,16 +237,16 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     spinlock_unlock(&spinlock);
 
     // Close unused pipe ends
-    close(pipe_stdin[0]); pipe_stdin[0] = -1;
-    close(pipe_stdout[1]); pipe_stdout[1] = -1;
+    close(pipe_stdin[PIPE_READ]); pipe_stdin[PIPE_READ] = -1;
+    close(pipe_stdout[PIPE_WRITE]); pipe_stdout[PIPE_WRITE] = -1;
 
     // Store process information in instance
     instance->child_pid = cygwin_winpid_to_pid((pid_t)pi.dwProcessId);
     instance->process_handle = pi.hProcess;
 
     // Convert handles to POSIX file descriptors
-    instance->write_fd = pipe_stdin[1];
-    instance->read_fd = pipe_stdout[0];
+    instance->write_fd = pipe_stdin[PIPE_WRITE];
+    instance->read_fd = pipe_stdout[PIPE_READ];
 
     errno_clear();
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -232,10 +256,10 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     return instance;
 
 cleanup:
-    if (pipe_stdin[0] >= 0) close(pipe_stdin[0]);
-    if (pipe_stdin[1] >= 0) close(pipe_stdin[1]);
-    if (pipe_stdout[0] >= 0) close(pipe_stdout[0]);
-    if (pipe_stdout[1] >= 0) close(pipe_stdout[1]);
+    if (pipe_stdin[PIPE_READ] >= 0) close(pipe_stdin[PIPE_READ]);
+    if (pipe_stdin[PIPE_WRITE] >= 0) close(pipe_stdin[PIPE_WRITE]);
+    if (pipe_stdout[PIPE_READ] >= 0) close(pipe_stdout[PIPE_READ]);
+    if (pipe_stdout[PIPE_WRITE] >= 0) close(pipe_stdout[PIPE_WRITE]);
     freez(instance);
     return NULL;
 }
@@ -278,10 +302,10 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
                "SPAWN PARENT: child of request No %zu, pid %d, failed to be killed",
                instance->request_id, (int)instance->child_pid);
 
-    if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
-    if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
     CloseHandle(instance->read_handle); instance->read_handle = NULL;
     CloseHandle(instance->write_handle); instance->write_handle = NULL;
+    if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
+    if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
 
     errno_clear();
     if(TerminateProcess(instance->process_handle, STATUS_INTERRUPTED) == 0)
