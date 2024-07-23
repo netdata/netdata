@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18216](https://github.com/netdata/netdata/pull/18216) ([netdatabot](https://github.com/netdatabot))
+- go.d chrony fix client read/write timeout [\#18215](https://github.com/netdata/netdata/pull/18215) ([ilyam8](https://github.com/ilyam8))
+- dont install test bash scripts by default [\#18214](https://github.com/netdata/netdata/pull/18214) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18212](https://github.com/netdata/netdata/pull/18212) ([netdatabot](https://github.com/netdatabot))
+- go.d megacli: add bbu capacity degradation % [\#18211](https://github.com/netdata/netdata/pull/18211) ([ilyam8](https://github.com/ilyam8))
+- Port memcached collector to Go [\#18209](https://github.com/netdata/netdata/pull/18209) ([Ancairon](https://github.com/Ancairon))
+- Bump k8s.io/client-go from 0.30.2 to 0.30.3 in /src/go [\#18208](https://github.com/netdata/netdata/pull/18208) ([dependabot[bot]](https://github.com/apps/dependabot))
 - docs: simplify "Disk Requirements and Retention" [\#18205](https://github.com/netdata/netdata/pull/18205) ([ilyam8](https://github.com/ilyam8))
 - do not rely on the queued flag to queue a context [\#18198](https://github.com/netdata/netdata/pull/18198) ([ktsaou](https://github.com/ktsaou))
 - Do not include REMOVED status in the alert snapshot [\#18197](https://github.com/netdata/netdata/pull/18197) ([stelfrag](https://github.com/stelfrag))
@@ -408,15 +415,6 @@
 - Add valkey to apps\_groups.conf [\#17639](https://github.com/netdata/netdata/pull/17639) ([mohd-akram](https://github.com/mohd-akram))
 - python.d remove hpssa [\#17638](https://github.com/netdata/netdata/pull/17638) ([ilyam8](https://github.com/ilyam8))
 - go.d hpssa [\#17637](https://github.com/netdata/netdata/pull/17637) ([ilyam8](https://github.com/ilyam8))
-- ndsudo add ssacli [\#17635](https://github.com/netdata/netdata/pull/17635) ([ilyam8](https://github.com/ilyam8))
-- health update isc dhcp alarms [\#17634](https://github.com/netdata/netdata/pull/17634) ([ilyam8](https://github.com/ilyam8))
-- add pcre2 to install-required-packages "netdata" for macOS [\#17633](https://github.com/netdata/netdata/pull/17633) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/docker/docker from 26.1.1+incompatible to 26.1.2+incompatible in /src/go/collectors/go.d.plugin [\#17631](https://github.com/netdata/netdata/pull/17631) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Regenerate integrations.js [\#17630](https://github.com/netdata/netdata/pull/17630) ([netdatabot](https://github.com/netdatabot))
-- go.d isc\_dhcpd create a chart for each pool [\#17629](https://github.com/netdata/netdata/pull/17629) ([ilyam8](https://github.com/ilyam8))
-- python.d remove bind\_rndc [\#17628](https://github.com/netdata/netdata/pull/17628) ([ilyam8](https://github.com/ilyam8))
-- Add Sentry support to new CPack packages. [\#17627](https://github.com/netdata/netdata/pull/17627) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#17626](https://github.com/netdata/netdata/pull/17626) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 

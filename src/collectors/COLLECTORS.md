@@ -239,7 +239,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Memcached (community)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/memcached_community.md)
 
-- [Memcached](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/memcached/integrations/memcached.md)
+- [Memcached](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/memcached/integrations/memcached.md)
 
 - [MongoDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/mongodb/integrations/mongodb.md)
 
