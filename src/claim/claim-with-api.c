@@ -398,7 +398,7 @@ bool claim_agent_from_split_files(void) {
     if(!rooms || !*rooms)
         rooms = NULL;
 
-    bool ret = claim_agent(cloud_url(), token, rooms, cloud_proxy(), cloud_insecure());
+    bool ret = claim_agent(cloud_config_url_get(), token, rooms, cloud_config_proxy_get(), cloud_config_insecure_get());
 
     if(ret) {
         snprintfz(filename, sizeof(filename), "%s/token", netdata_configured_cloud_dir);

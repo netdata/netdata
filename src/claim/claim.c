@@ -98,6 +98,13 @@ static ND_UUID claimed_id_load(void) {
     return uuid;
 }
 
+bool is_agent_claimed(void) {
+    rrdhost_aclk_state_lock(localhost);
+    bool ret = localhost->aclk_state.claimed_id != NULL;
+    rrdhost_aclk_state_unlock(localhost);
+    return ret;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
 /* Retrieve the claim id for the agent.

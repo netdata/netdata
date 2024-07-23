@@ -15,11 +15,19 @@ struct config cloud_config = {
     }
 };
 
-const char *cloud_url(void) {
+const char *cloud_config_url_get(void) {
     return appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
 }
 
-const char *cloud_proxy(void) {
+void cloud_config_url_set(const char *url) {
+    if(!url || *url) return;
+
+    const char *existing = cloud_config_url_get();
+    if(strcmp(existing, url) != 0)
+        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", url);
+}
+
+const char *cloud_config_proxy_get(void) {
     // load cloud.conf or internal default
     const char *proxy = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", "env");
 
@@ -40,7 +48,7 @@ const char *cloud_proxy(void) {
     return proxy;
 }
 
-bool cloud_insecure(void) {
+bool cloud_config_insecure_get(void) {
     // load it from cloud.conf or use internal default
     return appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "insecure", CONFIG_BOOLEAN_NO);
 }

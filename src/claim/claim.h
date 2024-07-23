@@ -32,6 +32,7 @@ bool claim_agent_automatically(void);
 
 bool claimed_id_save_to_file(const char *claimed_id_str);
 
+bool is_agent_claimed(void);
 char *aclk_get_claimed_id(void);
 bool load_claiming_state(void);
 void cloud_conf_load(int silent);
@@ -45,8 +46,9 @@ const char *netdata_random_session_id_get_filename(void);
 bool netdata_random_session_id_matches(const char *guid);
 int api_v2_claim(struct web_client *w, char *url);
 
-const char *cloud_url(void);
-const char *cloud_proxy(void);
-bool cloud_insecure(void);
+const char *cloud_config_url_get(void);
+void cloud_config_url_set(const char *url);
+const char *cloud_config_proxy_get(void);
+bool cloud_config_insecure_get(void);
 
 #endif //NETDATA_CLAIM_H

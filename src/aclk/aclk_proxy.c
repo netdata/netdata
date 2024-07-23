@@ -113,7 +113,7 @@ static inline int check_http_enviroment(const char **proxy)
 
 const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
 {
-    const char *proxy = cloud_proxy();
+    const char *proxy = cloud_config_proxy_get();
 
     *type = PROXY_DISABLED;
 

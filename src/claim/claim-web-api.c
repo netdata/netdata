@@ -145,7 +145,7 @@ int api_v2_claim(struct web_client *w, char *url) {
 
         bool success = false;
         const char *msg;
-        if(claim_agent(base_url, token, rooms, cloud_proxy(), cloud_insecure())) {
+        if(claim_agent(base_url, token, rooms, cloud_config_proxy_get(), cloud_config_insecure_get())) {
             msg = "ok";
             success = true;
             can_be_claimed = false;

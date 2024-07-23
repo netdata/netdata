@@ -186,7 +186,7 @@ static int wait_till_agent_claim_ready()
 
         // The NULL return means the value was never initialised, but this value has been initialized in post_conf_load.
         // We trap the impossible NULL here to keep the linter happy without using a fatal() in the code.
-        const char *cloud_base_url = cloud_url();
+        const char *cloud_base_url = cloud_config_url_get();
         if (cloud_base_url == NULL) {
             netdata_log_error("Do not move the cloud base url out of post_conf_load!!");
             return 1;
@@ -583,7 +583,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 #endif
 
     while (service_running(SERVICE_ACLK)) {
-        aclk_cloud_base_url = cloud_url();
+        aclk_cloud_base_url = cloud_config_url_get();
         if (aclk_cloud_base_url == NULL) {
             error_report("Do not move the cloud base url out of post_conf_load!!");
             aclk_status = ACLK_STATUS_NO_CLOUD_URL;
@@ -1063,7 +1063,7 @@ char *aclk_state(void)
     if (agent_id == NULL)
         buffer_strcat(wb, "No\n");
     else {
-        const char *cloud_base_url = cloud_url();
+        const char *cloud_base_url = cloud_config_url_get();
         buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\n", agent_id, cloud_base_url ? cloud_base_url : "null");
         freez(agent_id);
     }
@@ -1187,7 +1187,7 @@ char *aclk_state_json(void)
         tmp = NULL;
     json_object_object_add(msg, "claimed-id", tmp);
 
-    const char *cloud_base_url = cloud_url();
+    const char *cloud_base_url = cloud_config_url_get();
     tmp = cloud_base_url ? json_object_new_string(cloud_base_url) : NULL;
     json_object_object_add(msg, "cloud-url", tmp);
 

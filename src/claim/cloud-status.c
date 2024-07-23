@@ -29,14 +29,8 @@ CLOUD_STATUS cloud_status(void) {
     if(aclk_connected)
         return CLOUD_STATUS_ONLINE;
 
-    {
-        char *agent_id = aclk_get_claimed_id();
-        bool claimed = agent_id != NULL;
-        freez(agent_id);
-
-        if(claimed)
-            return CLOUD_STATUS_OFFLINE;
-    }
+    if(is_agent_claimed())
+        return CLOUD_STATUS_OFFLINE;
 
     if(rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS) &&
         stream_has_capability(localhost->sender, STREAM_CAP_NODE_ID) &&
@@ -90,7 +84,7 @@ CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s) {
             default:
             case CLOUD_STATUS_AVAILABLE:
                 // the agent is not claimed
-                buffer_json_member_add_string(wb, "url", cloud_url());
+                buffer_json_member_add_string(wb, "url", cloud_config_url_get());
                 buffer_json_member_add_string(wb, "reason", claim_agent_failure_reason_get());
                 break;
 
@@ -99,7 +93,7 @@ CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s) {
                 buffer_json_member_add_string(wb, "claim_id", claim_id);
                 buffer_json_member_add_string(wb, "url", cloud_status_aclk_base_url());
                 buffer_json_member_add_string(wb, "reason", "Agent is banned from Netdata Cloud");
-                buffer_json_member_add_string(wb, "url", cloud_url());
+                buffer_json_member_add_string(wb, "url", cloud_config_url_get());
                 break;
 
             case CLOUD_STATUS_OFFLINE:
@@ -121,7 +115,7 @@ CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s) {
                 break;
 
             case CLOUD_STATUS_INDIRECT:
-                buffer_json_member_add_string(wb, "url", cloud_url());
+                buffer_json_member_add_string(wb, "url", cloud_config_url_get());
                 break;
         }
 

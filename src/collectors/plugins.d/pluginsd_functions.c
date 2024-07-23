@@ -419,7 +419,8 @@ void rrdpush_update_child_node_id(RRDHOST *host) {
         char uuid_str[UUID_STR_LEN];
         uuid_unparse_lower(host->node_id, uuid_str);
         char buf[100];
-        snprintfz(buf, sizeof(buf), PLUGINSD_KEYWORD_NODE_ID " %s", uuid_str);
+        snprintfz(buf, sizeof(buf), PLUGINSD_KEYWORD_NODE_ID " '%s' '%s'",
+                  uuid_str, cloud_config_url_get());
         send_to_plugin(buf, host->receiver);
     }
     spinlock_unlock(&host->receiver_lock);
