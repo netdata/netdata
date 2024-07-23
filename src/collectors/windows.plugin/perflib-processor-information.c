@@ -12,7 +12,6 @@ struct processor_info {
     char cpu_freq_id[16];
 
     COUNTER_DATA cpuFrequency;
-    COUNTER_DATA percMaxFrequency;
     COUNTER_DATA percProcessorFrequency;
 };
 
@@ -20,7 +19,6 @@ static struct processor_info total = { 0 };
 
 static void initialize_processor_info_keys(struct processor_info *p) {
     p->cpuFrequency.key = "Processor Frequency";
-    p->percMaxFrequency.key = "% of Maximum Frequency";
     p->percProcessorFrequency.key = "% Processor Performance";
 }
 
@@ -47,9 +45,16 @@ static inline int cpu_dict_callback(const DICTIONARY_ITEM *item __maybe_unused, 
     if (!p->rd_cpu_frequency)
         p->rd_cpu_frequency = rrddim_add(cpufreq, p->cpu_freq_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-    NETDATA_DOUBLE calc = p->cpuFrequency.current.Data;
-    calc *= ((NETDATA_DOUBLE)p->percMaxFrequency.current.Data)/100.0;
-    rrddim_set_by_pointer(cpufreq, p->rd_cpu_frequency, (collected_number)calc);
+    // Calculate frequency in HZ (https://github.com/prometheus-community/windows_exporter/blob/31bb6d03ee78b63849a3f52a98cf81f8ff9f29ac/docs/collector.cpu.md?plain=1#L35)
+    NETDATA_DOUBLE nFreq = p->cpuFrequency.current.Data;
+    nFreq *= 1000;
+    NETDATA_DOUBLE tsc = p->percProcessorFrequency.current.Time;
+    NETDATA_DOUBLE raw = p->percProcessorFrequency.current.Data;
+    nFreq *= raw/tsc;
+
+    // Convert to MHz
+    nFreq /= 1000000;
+    rrddim_set_by_pointer(cpufreq, p->rd_cpu_frequency, (collected_number)nFreq);
 
     return 1;
 }
@@ -94,7 +99,6 @@ static bool do_processors_info(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         }
 
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->cpuFrequency);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->percMaxFrequency);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->percProcessorFrequency);
     }
 
