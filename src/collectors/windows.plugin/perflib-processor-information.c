@@ -54,6 +54,7 @@ static inline int cpu_dict_callback(const DICTIONARY_ITEM *item __maybe_unused, 
 
     // Convert to MHz
     nFreq /= 1000000;
+    //TO DO: CHECK BIG SPIKES BEFORE TO SET DIMENSION
     rrddim_set_by_pointer(cpufreq, p->rd_cpu_frequency, (collected_number)nFreq);
 
     return 1;
