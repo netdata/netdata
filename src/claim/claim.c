@@ -182,7 +182,7 @@ CLOUD_STATUS claim_reload_and_wait_online(void) {
         int ms = 0;
         do {
             status = cloud_status();
-            if (status == CLOUD_STATUS_ONLINE && __atomic_load_n(&localhost->node_id, __ATOMIC_RELAXED))
+            if ((status == CLOUD_STATUS_ONLINE || status == CLOUD_STATUS_INDIRECT) && !uuid_is_null(localhost->host_uuid))
                 break;
 
             sleep_usec(50 * USEC_PER_MS);

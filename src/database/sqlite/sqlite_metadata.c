@@ -244,21 +244,13 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
         return;
 
     if (unlikely(!node_id)) {
-        freez(host->node_id);
-        __atomic_store_n(&host->node_id, NULL, __ATOMIC_RELAXED);
+        uuid_clear(host->node_id);
         return;
     }
 
     struct aclk_sync_cfg_t  *wc = host->aclk_config;
 
-    if (unlikely(!host->node_id)) {
-        nd_uuid_t *t = mallocz(sizeof(*host->node_id));
-        uuid_copy(*t, *node_id);
-        __atomic_store_n(&host->node_id, t, __ATOMIC_RELAXED);
-    }
-    else {
-        uuid_copy(*(host->node_id), *node_id);
-    }
+    uuid_copy(host->node_id, *node_id);
 
     if (unlikely(!wc))
         create_aclk_config(host, &host->host_uuid, node_id);
@@ -302,7 +294,7 @@ done:
 
 #define SQL_UPDATE_NODE_ID  "UPDATE node_instance SET node_id = @node_id WHERE host_id = @host_id"
 
-int update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
+int sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
 {
     sqlite3_stmt *res = NULL;
     RRDHOST *host = NULL;

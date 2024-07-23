@@ -425,7 +425,7 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
 {
 
     char *claim_id = aclk_get_claimed_id();
-    if (!claim_id || !host->node_id)
+    if (!claim_id || uuid_is_null(host->node_id))
         return;
 
     sqlite3_stmt *res = NULL;
@@ -439,7 +439,7 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
 
     char node_id_str[UUID_STR_LEN];
-    uuid_unparse_lower(*host->node_id, node_id_str);
+    uuid_unparse_lower(host->node_id, node_id_str);
 
     struct alarm_log_entry alarm_log;
     alarm_log.node_id = node_id_str;

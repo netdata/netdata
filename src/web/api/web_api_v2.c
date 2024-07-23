@@ -15,11 +15,11 @@ static bool verify_agent_uuids(const char *machine_guid, const char *node_id, co
     bool not_verified = (!agent_claim_id || strcmp(claim_id, agent_claim_id) != 0);
     freez(agent_claim_id);
 
-    if(not_verified || !localhost->node_id)
+    if(not_verified || uuid_is_null(localhost->node_id))
         return false;
 
     char buf[UUID_STR_LEN];
-    uuid_unparse_lower(*localhost->node_id, buf);
+    uuid_unparse_lower(localhost->node_id, buf);
 
     if(strcmp(node_id, buf) != 0)
         return false;

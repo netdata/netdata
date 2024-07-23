@@ -163,9 +163,10 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 
 #ifdef NETDATA_INTERNAL_CHECKS
     char node_str[UUID_STR_LEN] = "<none>";
-    if (likely(host->node_id))
-        uuid_unparse_lower(*host->node_id, node_str);
-    internal_error(true, "Adding archived host \"%s\" with GUID \"%s\" node id = \"%s\"  ephemeral=%d", rrdhost_hostname(host), host->machine_guid, node_str, is_ephemeral);
+    if (likely(!uuid_is_null(host->node_id)))
+        uuid_unparse_lower(host->node_id, node_str);
+    internal_error(true, "Adding archived host \"%s\" with GUID \"%s\" node id = \"%s\"  ephemeral=%d",
+                   rrdhost_hostname(host), host->machine_guid, node_str, is_ephemeral);
 #endif
     return 0;
 }
@@ -321,7 +322,7 @@ static void aclk_synchronization(void *arg)
                     int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
                     struct aclk_sync_cfg_t *ahc = host->aclk_config;
                     if (unlikely(!ahc))
-                        create_aclk_config(host, &host->host_uuid, host->node_id);
+                        create_aclk_config(host, &host->host_uuid, &host->node_id);
                     aclk_host_state_update(host, live, 1);
                     break;
                 case ACLK_DATABASE_NODE_UNREGISTER:
@@ -369,9 +370,8 @@ void create_aclk_config(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __may
         uuid_unparse_lower(*node_id, wc->node_id);
 
     host->aclk_config = wc;
-    if (node_id && !host->node_id) {
-        host->node_id = mallocz(sizeof(*host->node_id));
-        uuid_copy(*host->node_id, *node_id);
+    if (node_id && uuid_is_null(host->node_id)) {
+        uuid_copy(host->node_id, *node_id);
     }
 
     wc->host = host;

@@ -707,8 +707,8 @@ void buffer_json_agent_status_id(BUFFER *wb, size_t ai, usec_t duration_ut) {
 void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status) {
     buffer_json_member_add_string(wb, "mg", host->machine_guid);
 
-    if(host->node_id)
-        buffer_json_member_add_uuid(wb, "nd", host->node_id);
+    if(!uuid_is_null(host->node_id))
+        buffer_json_member_add_uuid(wb, "nd", &host->node_id);
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
     buffer_json_member_add_uint64(wb, "ni", ni);
 
@@ -1160,7 +1160,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
         buffer_json_member_add_object(wb, "agent");
 
     buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
-    buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
+    buffer_json_member_add_uuid(wb, "nd", &localhost->node_id);
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
     buffer_json_member_add_time_t(wb, "now", now_s);
 
@@ -2000,8 +2000,8 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
             if(host) {
                 buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
 
-                if(host->node_id)
-                    buffer_json_member_add_uuid(wb, "node_id", host->node_id);
+                if(!uuid_is_null(host->node_id))
+                    buffer_json_member_add_uuid(wb, "node_id", &host->node_id);
             }
 
             buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);

@@ -401,7 +401,7 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     bool signal_rrdcontext = false;
     bool set_this = false;
 
-    netdata_mutex_lock(&host->receiver_lock);
+    spinlock_lock(&host->receiver_lock);
 
     if (!host->receiver) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
@@ -444,7 +444,7 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         set_this = true;
     }
 
-    netdata_mutex_unlock(&host->receiver_lock);
+    spinlock_unlock(&host->receiver_lock);
 
     if(signal_rrdcontext)
         rrdcontext_host_child_connected(host);
@@ -456,7 +456,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
     RRDHOST *host = rpt->host;
     if(host) {
         bool signal_rrdcontext = false;
-        netdata_mutex_lock(&host->receiver_lock);
+        spinlock_lock(&host->receiver_lock);
 
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
         if(host->receiver == rpt) {
@@ -482,7 +482,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
                 rrdcalc_child_disconnected(host);
         }
 
-        netdata_mutex_unlock(&host->receiver_lock);
+        spinlock_unlock(&host->receiver_lock);
 
         if(signal_rrdcontext)
             rrdcontext_host_child_disconnected(host);
@@ -494,7 +494,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
     bool ret = false;
 
-    netdata_mutex_lock(&host->receiver_lock);
+    spinlock_lock(&host->receiver_lock);
 
     if(host->receiver) {
         if(!host->receiver->exit.shutdown) {
@@ -508,12 +508,12 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
 
     int count = 2000;
     while (host->receiver && count-- > 0) {
-        netdata_mutex_unlock(&host->receiver_lock);
+        spinlock_unlock(&host->receiver_lock);
 
         // let the lock for the receiver thread to exit
         sleep_usec(1 * USEC_PER_MS);
 
-        netdata_mutex_lock(&host->receiver_lock);
+        spinlock_lock(&host->receiver_lock);
     }
 
     if(host->receiver)
@@ -525,7 +525,7 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
     else
         ret = true;
 
-    netdata_mutex_unlock(&host->receiver_lock);
+    spinlock_unlock(&host->receiver_lock);
 
     return ret;
 }
@@ -826,10 +826,10 @@ static void rrdpush_receive(struct receiver_state *rpt)
     // let it reconnect to parent immediately
     rrdpush_reset_destinations_postpone_time(rpt->host);
 
-    size_t count = streaming_parser(rpt, &cd, rpt->fd,
-                                    (rpt->ssl.conn) ? &rpt->ssl : NULL
-                                    );
+    // receive data
+    size_t count = streaming_parser(rpt, &cd, rpt->fd, (rpt->ssl.conn) ? &rpt->ssl : NULL);
 
+    // the parser stopped
     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
 
     {

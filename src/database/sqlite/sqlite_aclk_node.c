@@ -62,11 +62,11 @@ static void build_node_info(RRDHOST *host)
 
     char *host_version = NULL;
     if (host != localhost) {
-        netdata_mutex_lock(&host->receiver_lock);
+        spinlock_lock(&host->receiver_lock);
         host_version = strdupz(
             host->receiver && host->receiver->program_version ? host->receiver->program_version :
                                                                 rrdhost_program_version(host));
-        netdata_mutex_unlock(&host->receiver_lock);
+        spinlock_unlock(&host->receiver_lock);
     }
 
     node_info.data.name = rrdhost_hostname(host);

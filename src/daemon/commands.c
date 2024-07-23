@@ -213,6 +213,10 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args __maybe_unused,
             snprintfz(msg, sizeof(msg),
                       "Netdata Agent is claimed to Netdata Cloud, but it is currently offline: %s",
                       cloud_status_aclk_offline_reason());
+
+        case CLOUD_STATUS_INDIRECT:
+            snprintfz(msg, sizeof(msg),
+                      "Netdata Agent is not claimed to Netdata Cloud, but it is currently online via parent.");
     }
 
     *message = strdupz(msg);
@@ -384,8 +388,7 @@ static cmd_status_t cmd_remove_node(char *args, char **message)
             sql_set_host_label(&host->host_uuid, "_is_ephemeral", "true");
             aclk_host_state_update(host, 0, 0);
             unregister_node(host->machine_guid);
-            freez(host->node_id);
-            host->node_id = NULL;
+            uuid_clear(host->node_id);
             buffer_sprintf(wb, "Unregistering node with machine guid %s, hostname = %s", host->machine_guid, rrdhost_hostname(host));
         }
         else

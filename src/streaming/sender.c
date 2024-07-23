@@ -806,7 +806,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
                  HTTP_1_1 HTTP_ENDL
                  "User-Agent: %s/%s\r\n"
                  "Accept: */*\r\n\r\n"
-                 , host->rrdpush_send_api_key
+                 , host->rrdpush.send.api_key
                  , rrdhost_hostname(host)
                  , rrdhost_registry_hostname(host)
                  , host->machine_guid
@@ -1305,8 +1305,15 @@ void execute_commands(struct sender_state *s) {
                                         );
             }
         }
+        else if(command && strcmp(command, PLUGINSD_KEYWORD_NODE_ID) == 0) {
+            char *node_id  = get_word(s->line.words, s->line.num_words, 1);
+            if(uuid_parse(node_id ? node_id : "", s->host->node_id) != 0)
+                netdata_log_error("STREAM %s [send to %s] received invalid node id: %s",
+                                  rrdhost_hostname(s->host), s->connected_to, node_id ? node_id : "(unset)");
+        }
         else {
-            netdata_log_error("STREAM %s [send to %s] received unknown command over connection: %s", rrdhost_hostname(s->host), s->connected_to, s->line.words[0]?s->line.words[0]:"(unset)");
+            netdata_log_error("STREAM %s [send to %s] received unknown command over connection: %s",
+                              rrdhost_hostname(s->host), s->connected_to, s->line.words[0]?s->line.words[0]:"(unset)");
         }
 
         line_splitter_reset(&s->line);
@@ -1593,9 +1600,9 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, "cumulative compression savings ratio", "%", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
 
-    if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->rrdpush_send_destination ||
-       !*s->host->rrdpush_send_destination || !s->host->rrdpush_send_api_key ||
-       !*s->host->rrdpush_send_api_key) {
+    if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->rrdpush.send.destination ||
+       !*s->host->rrdpush.send.destination || !s->host->rrdpush.send.api_key ||
+       !*s->host->rrdpush.send.api_key) {
         netdata_log_error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
               rrdhost_hostname(s->host), gettid_cached());
         return NULL;

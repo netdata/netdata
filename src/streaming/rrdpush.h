@@ -54,6 +54,7 @@ typedef enum {
     STREAM_CAP_BROTLI           = (1 << 21), // BROTLI compression supported
     STREAM_CAP_PROGRESS         = (1 << 22), // Functions PROGRESS support
     STREAM_CAP_DYNCFG           = (1 << 23), // support for DYNCFG
+    STREAM_CAP_NODE_ID          = (1 << 24), // support for sending NODE_ID back to the child
 
     STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit
@@ -452,6 +453,7 @@ bool rrdset_push_chart_definition_now(RRDSET *st);
 void *rrdpush_sender_thread(void *ptr);
 void rrdpush_send_host_labels(RRDHOST *host);
 void rrdpush_send_claimed_id(RRDHOST *host);
+void rrdpush_update_child_node_id(RRDHOST *host);
 void rrdpush_send_global_functions(RRDHOST *host);
 
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string, void *h2o_ctx);

@@ -16,6 +16,9 @@ const char *cloud_status_to_string(CLOUD_STATUS status) {
 
         case CLOUD_STATUS_ONLINE:
             return "online";
+
+        case CLOUD_STATUS_INDIRECT:
+            return "indirect";
     }
 }
 
@@ -34,6 +37,11 @@ CLOUD_STATUS cloud_status(void) {
         if(claimed)
             return CLOUD_STATUS_OFFLINE;
     }
+
+    if(rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS) &&
+        stream_has_capability(localhost->sender, STREAM_CAP_NODE_ID) &&
+        !uuid_is_null(localhost->node_id))
+        return CLOUD_STATUS_INDIRECT;
 
     return CLOUD_STATUS_AVAILABLE;
 }
@@ -110,6 +118,10 @@ CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s) {
                 buffer_json_member_add_string(wb, "claim_id", claim_id);
                 buffer_json_member_add_string(wb, "url", cloud_status_aclk_base_url());
                 buffer_json_member_add_string(wb, "reason", "");
+                break;
+
+            case CLOUD_STATUS_INDIRECT:
+                buffer_json_member_add_string(wb, "url", cloud_url());
                 break;
         }
 

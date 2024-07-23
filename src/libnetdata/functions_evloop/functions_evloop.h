@@ -71,6 +71,10 @@
 #define PLUGINSD_KEYWORD_CONFIG_ACTION_STATUS   "status"
 #define PLUGINSD_FUNCTION_CONFIG                "config"
 
+// claiming
+#define PLUGINSD_KEYWORD_NODE_ID                "NODE_ID"
+#define PLUGINSD_KEYWORD_CLAIMED_ID             "CLAIMED_ID"
+
 typedef void (*functions_evloop_worker_execute_t)(const char *transaction, char *function, usec_t *stop_monotonic_ut,
                                                   bool *cancelled, BUFFER *payload, HTTP_ACCESS access,
                                                   const char *source, void *data);

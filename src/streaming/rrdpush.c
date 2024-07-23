@@ -168,8 +168,8 @@ static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
             else
                 rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
         }
-        else if(simple_pattern_matches_string(host->rrdpush_send_charts_matching, st->id) ||
-            simple_pattern_matches_string(host->rrdpush_send_charts_matching, st->name))
+        else if(simple_pattern_matches_string(host->rrdpush.send.charts_matching, st->id) ||
+            simple_pattern_matches_string(host->rrdpush.send.charts_matching, st->name))
 
             rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
         else
@@ -584,7 +584,7 @@ void rrdpush_send_claimed_id(RRDHOST *host) {
     BUFFER *wb = sender_start(host->sender);
     rrdhost_aclk_state_lock(host);
 
-    buffer_sprintf(wb, "CLAIMED_ID %s %s\n", host->machine_guid, (host->aclk_state.claimed_id ? host->aclk_state.claimed_id : "NULL") );
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_CLAIMED_ID " %s %s\n", host->machine_guid, (host->aclk_state.claimed_id ? host->aclk_state.claimed_id : "NULL") );
 
     rrdhost_aclk_state_unlock(host);
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
@@ -673,7 +673,7 @@ bool destinations_init_add_one(char *entry, void *data) {
 }
 
 void rrdpush_destinations_init(RRDHOST *host) {
-    if(!host->rrdpush_send_destination) return;
+    if(!host->rrdpush.send.destination) return;
 
     rrdpush_destinations_free(host);
 
@@ -683,7 +683,7 @@ void rrdpush_destinations_init(RRDHOST *host) {
         .count = 0,
     };
 
-    foreach_entry_in_connection_string(host->rrdpush_send_destination, destinations_init_add_one, &t);
+    foreach_entry_in_connection_string(host->rrdpush.send.destination, destinations_init_add_one, &t);
 
     host->destinations = t.list;
 }
@@ -1139,7 +1139,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             host = NULL;
 
         if (host) {
-            netdata_mutex_lock(&host->receiver_lock);
+            spinlock_lock(&host->receiver_lock);
             if (host->receiver) {
                 age = now_monotonic_sec() - host->receiver->last_msg_t;
 
@@ -1148,7 +1148,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
                 else
                     receiver_stale = true;
             }
-            netdata_mutex_unlock(&host->receiver_lock);
+            spinlock_unlock(&host->receiver_lock);
         }
         rrd_rdunlock();
 
@@ -1284,6 +1284,7 @@ static struct {
     {STREAM_CAP_IEEE754,      "IEEE754" },
     {STREAM_CAP_DATA_WITH_ML, "ML" },
     {STREAM_CAP_DYNCFG,       "DYNCFG" },
+    {STREAM_CAP_NODE_ID,       "NODEID" },
     {STREAM_CAP_SLOTS,        "SLOTS" },
     {STREAM_CAP_ZSTD,         "ZSTD" },
     {STREAM_CAP_GZIP,         "GZIP" },
@@ -1342,12 +1343,12 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
         // we have DATA_WITH_ML capability
         // we should remove the DATA_WITH_ML capability if our database does not have anomaly info
         // this can happen under these conditions: 1. we don't run ML, and 2. we don't receive ML
-        netdata_mutex_lock(&host->receiver_lock);
+        spinlock_lock(&host->receiver_lock);
 
         if(!ml_host_running(host) && !stream_has_capability(host->receiver, STREAM_CAP_DATA_WITH_ML))
             disabled_capabilities |= STREAM_CAP_DATA_WITH_ML;
 
-        netdata_mutex_unlock(&host->receiver_lock);
+        spinlock_unlock(&host->receiver_lock);
 
         if(host->sender)
             disabled_capabilities |= host->sender->disabled_capabilities;
@@ -1368,6 +1369,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_PROGRESS |
             STREAM_CAP_COMPRESSIONS_AVAILABLE |
             STREAM_CAP_DYNCFG |
+            STREAM_CAP_NODE_ID |
             STREAM_CAP_IEEE754 |
             STREAM_CAP_DATA_WITH_ML |
             0) & ~disabled_capabilities;

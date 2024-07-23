@@ -954,7 +954,7 @@ static void rrdcontext_dequeue_from_hub_queue(RRDCONTEXT *rc) {
 static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
 
     // check if we have received a streaming command for this host
-    if(!host->node_id || !rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS) || !aclk_connected || !host->rrdctx.hub_queue)
+    if(uuid_is_null(host->node_id) || !rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS) || !aclk_connected || !host->rrdctx.hub_queue)
         return;
 
     // check if there are queued items to send
@@ -986,7 +986,7 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
                         if(!bundle) {
                             // prepare the bundle to send the messages
                             char uuid[UUID_STR_LEN];
-                            uuid_unparse_lower(*host->node_id, uuid);
+                            uuid_unparse_lower(host->node_id, uuid);
 
                             bundle = contexts_updated_new(claim_id, uuid, 0, now_ut);
                         }

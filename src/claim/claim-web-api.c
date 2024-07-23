@@ -114,6 +114,7 @@ int api_v2_claim(struct web_client *w, char *url) {
     switch(status) {
         case CLOUD_STATUS_AVAILABLE:
         case CLOUD_STATUS_OFFLINE:
+        case CLOUD_STATUS_INDIRECT:
             can_be_claimed = true;
             break;
 

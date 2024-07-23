@@ -42,7 +42,7 @@ RRDHOST *find_host_by_node_id(char *node_id) {
 
     RRDHOST *host, *ret = NULL;
     dfe_start_read(rrdhost_root_index, host) {
-        if (host->node_id && uuid_eq(*host->node_id, node_uuid)) {
+        if (uuid_eq(host->node_id, node_uuid)) {
             ret = host;
             break;
         }
@@ -246,11 +246,11 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
 
         host->sender->ssl = NETDATA_SSL_UNSET_CONNECTION;
 
-        host->rrdpush_send_destination = strdupz(rrdpush_destination);
+        host->rrdpush.send.destination = strdupz(rrdpush_destination);
         rrdpush_destinations_init(host);
 
-        host->rrdpush_send_api_key = strdupz(rrdpush_api_key);
-        host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL,
+        host->rrdpush.send.api_key = strdupz(rrdpush_api_key);
+        host->rrdpush.send.charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL,
                                                                    SIMPLE_PATTERN_EXACT, true);
 
         rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
@@ -382,7 +382,7 @@ static RRDHOST *rrdhost_create(
     host->health.health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
     netdata_mutex_init(&host->aclk_state_lock);
-    netdata_mutex_init(&host->receiver_lock);
+    spinlock_init(&host->receiver_lock);
 
     if (likely(!archived)) {
         rrd_functions_host_init(host);
@@ -533,8 +533,8 @@ static RRDHOST *rrdhost_create(
          , rrd_memory_mode_name(host->rrd_memory_mode)
          , host->rrd_history_entries
          , rrdhost_has_rrdpush_sender_enabled(host)?"enabled":"disabled"
-         , host->rrdpush_send_destination?host->rrdpush_send_destination:""
-         , host->rrdpush_send_api_key?host->rrdpush_send_api_key:""
+         , host->rrdpush.send.destination?host->rrdpush.send.destination:""
+         , host->rrdpush.send.api_key?host->rrdpush.send.api_key:""
          , host->health.health_enabled?"enabled":"disabled"
          , host->cache_dir
          , string2str(host->health.health_default_exec)
@@ -1293,14 +1293,13 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     string_freez(host->program_version);
     rrdhost_system_info_free(host->system_info);
     freez(host->cache_dir);
-    freez(host->rrdpush_send_api_key);
-    freez(host->rrdpush_send_destination);
+    freez(host->rrdpush.send.api_key);
+    freez(host->rrdpush.send.destination);
     rrdpush_destinations_free(host);
     string_freez(host->health.health_default_exec);
     string_freez(host->health.health_default_recipient);
     string_freez(host->registry_hostname);
-    simple_pattern_free(host->rrdpush_send_charts_matching);
-    freez(host->node_id);
+    simple_pattern_free(host->rrdpush.send.charts_matching);
 
     rrd_functions_host_destroy(host);
     rrdvariables_destroy(host->rrdvars);
@@ -1439,8 +1438,8 @@ static void rrdhost_load_auto_labels(void) {
     rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_os", string2str(localhost->os), RRDLABEL_SRC_AUTO);
 
-    if (localhost->rrdpush_send_destination)
-        rrdlabels_add(labels, "_streams_to", localhost->rrdpush_send_destination, RRDLABEL_SRC_AUTO);
+    if (localhost->rrdpush.send.destination)
+        rrdlabels_add(labels, "_streams_to", localhost->rrdpush.send.destination, RRDLABEL_SRC_AUTO);
 }
 
 void rrdhost_set_is_parent_label(void) {
@@ -1734,7 +1733,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     s->ingest.since = MAX(host->child_connect_time, host->child_disconnected_time);
     s->ingest.reason = (online) ? STREAM_HANDSHAKE_NEVER : host->rrdpush_last_receiver_exit_reason;
 
-    netdata_mutex_lock(&host->receiver_lock);
+    spinlock_lock(&host->receiver_lock);
     s->ingest.hops = (host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
     bool has_receiver = false;
     if (host->receiver) {
@@ -1747,7 +1746,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
         s->ingest.peers = socket_peers(host->receiver->fd);
         s->ingest.ssl = SSL_connection(&host->receiver->ssl);
     }
-    netdata_mutex_unlock(&host->receiver_lock);
+    spinlock_unlock(&host->receiver_lock);
 
     if (online) {
         if(s->db.status == RRDHOST_DB_STATUS_INITIALIZING)

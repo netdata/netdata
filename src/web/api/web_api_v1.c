@@ -1202,7 +1202,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts_status(BUFFER *
     buffer_json_member_add_boolean(wb, "reachable", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)));
 
     buffer_json_member_add_string(wb, "guid", host->machine_guid);
-    buffer_json_member_add_uuid(wb, "node_id", host->node_id);
+    buffer_json_member_add_uuid(wb, "node_id", &host->node_id);
     rrdhost_aclk_state_lock(host);
     buffer_json_member_add_string(wb, "claim_id", host->aclk_state.claimed_id);
     rrdhost_aclk_state_unlock(host);

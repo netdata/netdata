@@ -889,8 +889,8 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
     if (!aclk_connected)
         return;
 
-    if (host->node_id && !uuid_is_null(*host->node_id)) {
-        uuid_copy(node_id, *host->node_id);
+    if (!uuid_is_null(host->node_id)) {
+        uuid_copy(node_id, host->node_id);
     }
     else {
         ret = get_node_id(&host->host_uuid, &node_id);
@@ -1107,11 +1107,11 @@ char *aclk_state(void)
             rrdhost_aclk_state_unlock(host);
 
 
-            if (host->node_id == NULL || uuid_is_null(*host->node_id)) {
+            if (uuid_is_null(host->node_id)) {
                 buffer_strcat(wb, "\n\tNode ID: null\n");
             } else {
                 char node_id[GUID_LEN + 1];
-                uuid_unparse_lower(*host->node_id, node_id);
+                uuid_unparse_lower(host->node_id, node_id);
                 buffer_sprintf(wb, "\n\tNode ID: %s\n", node_id);
             }
 
@@ -1242,11 +1242,11 @@ char *aclk_state_json(void)
             json_object_object_add(nodeinstance, "claimed_id", NULL);
         rrdhost_aclk_state_unlock(host);
 
-        if (host->node_id == NULL || uuid_is_null(*host->node_id)) {
+        if (uuid_is_null(host->node_id)) {
             json_object_object_add(nodeinstance, "node-id", NULL);
         } else {
             char node_id[GUID_LEN + 1];
-            uuid_unparse_lower(*host->node_id, node_id);
+            uuid_unparse_lower(host->node_id, node_id);
             tmp = json_object_new_string(node_id);
             json_object_object_add(nodeinstance, "node-id", tmp);
         }

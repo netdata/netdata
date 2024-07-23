@@ -9,6 +9,7 @@ typedef enum __attribute__((packed)) {
     CLOUD_STATUS_AVAILABLE = 1,     // cloud and aclk functionality is available, but the agent is not claimed
     CLOUD_STATUS_BANNED,            // the agent has been banned from cloud
     CLOUD_STATUS_OFFLINE,           // the agent tries to connect to cloud, but cannot do it
+    CLOUD_STATUS_INDIRECT,          // the agent is connected to cloud via a parent
     CLOUD_STATUS_ONLINE,            // the agent is connected to cloud
 } CLOUD_STATUS;
 
