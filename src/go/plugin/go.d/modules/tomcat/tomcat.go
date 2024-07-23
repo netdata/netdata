@@ -35,7 +35,7 @@ func New() *Tomcat {
 				},
 			},
 		},
-		charts: &module.Charts{},
+		charts: charts.Copy(),
 	}
 }
 

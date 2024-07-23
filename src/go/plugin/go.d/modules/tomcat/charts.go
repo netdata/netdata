@@ -19,7 +19,7 @@ const (
 	byteToMiB = 1 << 20
 )
 
-var baseCharts = module.Charts{
+var charts = module.Charts{
 	chartAccesses.Copy(),
 	chartBandwidth.Copy(),
 	chartProcessingTime.Copy(),
@@ -106,6 +106,7 @@ var (
 		Dims: module.Dims{
 			{ID: "eden_used", Name: "used", Div: byteToMiB},
 			{ID: "eden_committed", Name: "committed", Div: byteToMiB},
+			{ID: "eden_max", Name: "max", Div: byteToMiB},
 		},
 	}
 	chartJVMSurvivor = module.Chart{
