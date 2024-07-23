@@ -433,6 +433,10 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
             // close all fds except the ones we need
             os_close_all_non_std_open_fds_except(NULL, 0);
 
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: running request No %zu: %s",
+                   rq->request_id, rq->cmdline);
+
             // run the command
             execvp(rq->argv[0], (char **)rq->argv);
 

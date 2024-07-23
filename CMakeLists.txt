@@ -1733,6 +1733,9 @@ if(ENABLE_PLUGIN_DEBUGFS)
     endif()
 endif()
 
+add_executable(spawn-tester src/libnetdata/spawn_server/spawn-tester.c)
+target_link_libraries(spawn-tester libnetdata)
+
 if(ENABLE_PLUGIN_APPS)
     pkg_check_modules(CAP QUIET libcap)
 
