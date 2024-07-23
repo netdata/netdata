@@ -28,7 +28,7 @@ func New() *Tomcat {
 		Config: Config{
 			HTTP: web.HTTP{
 				Request: web.Request{
-					URL: "http://127.0.0.1:8080",
+					URL: "http://127.0.0.1:8080/manager/status?XML=true",
 				},
 				Client: web.Client{
 					Timeout: web.Duration(time.Second * 1),
@@ -53,33 +53,33 @@ type Tomcat struct {
 	httpClient *http.Client
 }
 
-func (ic *Tomcat) Configuration() any {
-	return ic.Config
+func (tc *Tomcat) Configuration() any {
+	return tc.Config
 }
 
-func (ic *Tomcat) Init() error {
-	if ic.URL == "" {
-		ic.Error("URL not set")
+func (tc *Tomcat) Init() error {
+	if tc.URL == "" {
+		tc.Error("URL not set")
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(ic.Client)
+	client, err := web.NewHTTPClient(tc.Client)
 	if err != nil {
-		ic.Error(err)
+		tc.Error(err)
 		return err
 	}
-	ic.httpClient = client
+	tc.httpClient = client
 
-	ic.Debugf("using URL %s", ic.URL)
-	ic.Debugf("using timeout: %s", ic.Timeout)
+	tc.Debugf("using URL %s", tc.URL)
+	tc.Debugf("using timeout: %s", tc.Timeout)
 
 	return nil
 }
 
-func (ic *Tomcat) Check() error {
-	mx, err := ic.collect()
+func (tc *Tomcat) Check() error {
+	mx, err := tc.collect()
 	if err != nil {
-		ic.Error(err)
+		tc.Error(err)
 		return err
 	}
 
@@ -90,14 +90,14 @@ func (ic *Tomcat) Check() error {
 	return nil
 }
 
-func (ic *Tomcat) Charts() *module.Charts {
-	return ic.charts
+func (tc *Tomcat) Charts() *module.Charts {
+	return tc.charts
 }
 
-func (ic *Tomcat) Collect() map[string]int64 {
-	mx, err := ic.collect()
+func (tc *Tomcat) Collect() map[string]int64 {
+	mx, err := tc.collect()
 	if err != nil {
-		ic.Error(err)
+		tc.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -107,8 +107,8 @@ func (ic *Tomcat) Collect() map[string]int64 {
 	return mx
 }
 
-func (ic *Tomcat) Cleanup() {
-	if ic.httpClient != nil {
-		ic.httpClient.CloseIdleConnections()
+func (tc *Tomcat) Cleanup() {
+	if tc.httpClient != nil {
+		tc.httpClient.CloseIdleConnections()
 	}
 }

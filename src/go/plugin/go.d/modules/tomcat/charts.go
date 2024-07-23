@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package apache
+package tomcat
 
 import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 
