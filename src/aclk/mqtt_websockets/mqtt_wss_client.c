@@ -103,8 +103,6 @@ struct mqtt_wss_client_struct {
 
     int mqtt_keepalive;
 
-    pthread_mutex_t pub_lock;
-
 // signifies that we didn't write all MQTT wanted
 // us to write during last cycle (e.g. due to buffer
 // size) and thus we should arm POLLOUT
@@ -117,7 +115,7 @@ struct mqtt_wss_client_struct {
     void (*msg_callback)(const char *, const void *, size_t, int);
     void (*puback_callback)(uint16_t packet_id);
 
-    pthread_mutex_t stat_lock;
+    SPINLOCK stat_lock;
     struct mqtt_wss_stats stats;
 
 #ifdef MQTT_WSS_DEBUG
@@ -175,8 +173,7 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
         goto fail;
     }
 
-    pthread_mutex_init(&client->pub_lock, NULL);
-    pthread_mutex_init(&client->stat_lock, NULL);
+    spinlock_init(&client->stat_lock);
 
     client->msg_callback = msg_callback;
     client->puback_callback = puback_callback;
@@ -267,9 +264,6 @@ void mqtt_wss_destroy(mqtt_wss_client client)
 
     if (client->sockfd > 0)
         close(client->sockfd);
-
-    pthread_mutex_destroy(&client->pub_lock);
-    pthread_mutex_destroy(&client->stat_lock);
 
     mqtt_wss_log_ctx_destroy(client->log);
     freez(client);
@@ -949,9 +943,9 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #ifdef DEBUG_ULTRA_VERBOSE
             mws_debug(client->log, "SSL_Read: Read %d.", ret);
 #endif
-            pthread_mutex_lock(&client->stat_lock);
+            spinlock_lock(&client->stat_lock);
             client->stats.bytes_rx += ret;
-            pthread_mutex_unlock(&client->stat_lock);
+            spinlock_unlock(&client->stat_lock);
             rbuf_bump_head(client->ws_client->buf_read, ret);
         } else {
             int errnobkp = errno;
@@ -1017,9 +1011,9 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #ifdef DEBUG_ULTRA_VERBOSE
             mws_debug(client->log, "SSL_Write: Written %d of avail %d.", ret, size);
 #endif
-            pthread_mutex_lock(&client->stat_lock);
+            spinlock_lock(&client->stat_lock);
             client->stats.bytes_tx += ret;
-            pthread_mutex_unlock(&client->stat_lock);
+            spinlock_unlock(&client->stat_lock);
             rbuf_bump_tail(client->ws_client->buf_write, ret);
         } else {
             int errnobkp = errno;
@@ -1109,10 +1103,10 @@ int mqtt_wss_subscribe(mqtt_wss_client client, char *topic, int max_qos_level)
 struct mqtt_wss_stats mqtt_wss_get_stats(mqtt_wss_client client)
 {
     struct mqtt_wss_stats current;
-    pthread_mutex_lock(&client->stat_lock);
+    spinlock_lock(&client->stat_lock);
     current = client->stats;
     memset(&client->stats, 0, sizeof(client->stats));
-    pthread_mutex_unlock(&client->stat_lock);
+    spinlock_unlock(&client->stat_lock);
     mqtt_ng_get_stats(client->mqtt, &current.mqtt);
     return current;
 }
