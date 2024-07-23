@@ -78,8 +78,6 @@ static BUFFER *argv_to_windows(const char **argv) {
     char b[strlen(argv[0]) * 2 + 1024];
     cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, sizeof(b));
 
-    buffer_strcat(wb, "cmd.exe /C ");
-
     for(size_t i = 0; argv[i] ;i++) {
         const char *s = (i == 0) ? b : argv[i];
         size_t len = strlen(s);
@@ -101,10 +99,12 @@ static BUFFER *argv_to_windows(const char **argv) {
             }
         }
 
-        if(needs_quotes && buffer_strlen(wb))
-            buffer_strcat(wb, " \"");
-        else
-            buffer_putc(wb, ' ');
+        if(buffer_strlen(wb)) {
+            if (needs_quotes)
+                buffer_strcat(wb, " \"");
+            else
+                buffer_putc(wb, ' ');
+        }
 
         for(const char *c = s; *c ; c++) {
             switch(*c) {
@@ -194,10 +194,11 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     si.hStdError = stderr_handle;
 
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
-           "SPAWN PARENT: Running request No %zu, command: %s",
+           "SPAWN PARENT: Running request No %zu, command: '%s'",
            instance->request_id, command);
 
     // Spawn the process
+    errno_clear();
     if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
         spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -216,9 +217,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     close(pipe_stdout[1]); pipe_stdout[1] = -1;
 
     // Store process information in instance
-    instance->child_pid = cygwin_winpid_to_pid(pi.dwProcessId);
-    if(instance->child_pid == -1) instance->child_pid = pi.dwProcessId;
-
+    instance->child_pid = cygwin_winpid_to_pid((pid_t)pi.dwProcessId);
     instance->process_handle = pi.hProcess;
 
     // Convert handles to POSIX file descriptors
@@ -227,8 +226,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     errno_clear();
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
-           "SPAWN PARENT: created process for request No %zu, pid %d, command: %s",
-           instance->request_id, (int)instance->child_pid, command);
+           "SPAWN PARENT: created process for request No %zu, pid %d (winpid %d), command: %s",
+           instance->request_id, (int)instance->child_pid, (int)pi.dwProcessId, command);
 
     return instance;
 
@@ -242,17 +241,30 @@ cleanup:
 }
 
 int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
-    nd_log(NDLS_COLLECTORS, NDLP_ERR,
-           "SPAWN PARENT: child of request No %zu, pid %d, is about to be killed",
-           instance->request_id, (int)instance->child_pid);
+//    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+//           "SPAWN PARENT: child of request No %zu, pid %d, is about to be killed",
+//           instance->request_id, (int)instance->child_pid);
+
+    if(instance->child_pid != -1 && kill(instance->child_pid, SIGTERM) != 0)
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: child of request No %zu, pid %d, failed to be killed",
+               instance->request_id, (int)instance->child_pid);
 
     if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
     CloseHandle(instance->read_handle); instance->read_handle = NULL;
     CloseHandle(instance->write_handle); instance->write_handle = NULL;
 
-    TerminateProcess(instance->process_handle, 0);
+    errno_clear();
+    if(TerminateProcess(instance->process_handle, 0xDEADBEEF) == 0)
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: child of request No %zu, pid %d, failed to be terminated",
+               instance->request_id, (int)instance->child_pid);
 
+    // wait for the process to end
+    WaitForSingleObject(instance->process_handle, INFINITE);
+
+    // get its exit code
     DWORD exit_code;
     GetExitCodeProcess(instance->process_handle, &exit_code);
     CloseHandle(instance->process_handle);
@@ -266,15 +278,16 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 }
 
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
-    nd_log(NDLS_COLLECTORS, NDLP_ERR,
-           "SPAWN PARENT: child of request No %zu, pid %d, is about to be waited for",
-           instance->request_id, (int)instance->child_pid);
+//    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+//           "SPAWN PARENT: child of request No %zu, pid %d, is about to be waited for",
+//           instance->request_id, (int)instance->child_pid);
 
     if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
     CloseHandle(instance->read_handle); instance->read_handle = NULL;
     CloseHandle(instance->write_handle); instance->write_handle = NULL;
 
+    // wait for the process to end
     WaitForSingleObject(instance->process_handle, INFINITE);
 
     DWORD exit_code = -1;
