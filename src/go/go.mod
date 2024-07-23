@@ -37,7 +37,6 @@ require (
 	github.com/mattn/go-xmlrpc v0.0.3
 	github.com/miekg/dns v1.1.61
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/muesli/cancelreader v0.2.2
 	github.com/prometheus-community/pro-bing v0.4.0
 	github.com/prometheus/common v0.55.0
 	github.com/prometheus/prometheus v2.5.0+incompatible
