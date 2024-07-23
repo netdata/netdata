@@ -242,6 +242,10 @@ cleanup:
 }
 
 int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "SPAWN PARENT: child of request No %zu, pid %d, is about to be killed",
+           instance->request_id, (int)instance->child_pid);
+
     if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
     CloseHandle(instance->read_handle); instance->read_handle = NULL;
@@ -262,6 +266,10 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 }
 
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "SPAWN PARENT: child of request No %zu, pid %d, is about to be waited for",
+           instance->request_id, (int)instance->child_pid);
+
     if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
     CloseHandle(instance->read_handle); instance->read_handle = NULL;
