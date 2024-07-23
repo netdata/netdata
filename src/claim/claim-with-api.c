@@ -126,7 +126,7 @@ void curl_add_rooms_json_array(BUFFER *wb, const char *rooms) {
     buffer_json_array_close(wb);
 }
 
-static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure) {
+static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure, bool *can_retry) {
     CURL *curl;
     CURLcode res;
     char target_url[2048];
@@ -149,6 +149,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     if (!fp || fread(public_key, 1, sizeof(public_key), fp) <= 0) {
         claim_agent_failure_reason_set("cannot read public key file '%s'", public_key_file);
         if (fp) fclose(fp);
+        *can_retry = false;
         return false;
     }
     fclose(fp);
@@ -192,6 +193,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     curl = curl_easy_init();
     if(!curl) {
         claim_agent_failure_reason_set("Cannot initialize request (curl_easy_init() failed)");
+        *can_retry = true;
         return false;
     }
 
@@ -229,11 +231,16 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
     }
 
+    // Set timeout options
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5);
+
     // execute the request
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
         claim_agent_failure_reason_set("Request failed with error: %s", curl_easy_strerror(res));
         curl_easy_cleanup(curl);
+        *can_retry = true;
         return false;
     }
 
@@ -243,12 +250,15 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 
     bool ret = false;
     if(http_status_code == 204) {
-        if(!cloud_conf_regenerate(claimed_id_str, machine_guid, hostname, token, rooms, url, proxy, insecure))
+        if(!cloud_conf_regenerate(claimed_id_str, machine_guid, hostname, token, rooms, url, proxy, insecure)) {
             claim_agent_failure_reason_set("Failed to save claiming info to disk");
+        }
         else {
             claim_agent_failure_reason_set(NULL);
             ret = true;
         }
+
+        *can_retry = false;
     }
     else if (http_status_code == 422) {
         if(buffer_strlen(response)) {
@@ -279,21 +289,37 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
         }
         else
             claim_agent_failure_reason_set("Failed with an empty response, code %ld", http_status_code);
+
+        *can_retry = false;
     }
-    else if(http_status_code == 102)
+    else if(http_status_code == 102) {
         claim_agent_failure_reason_set("Claiming is in progress");
-    else if(http_status_code == 403)
+        *can_retry = false;
+    }
+    else if(http_status_code == 403) {
         claim_agent_failure_reason_set("Failed: token is expired, not found, or invalid");
-    else if(http_status_code == 409)
+        *can_retry = false;
+    }
+    else if(http_status_code == 409) {
         claim_agent_failure_reason_set("Failed: agent is already claimed");
-    else if(http_status_code == 500)
+        *can_retry = false;
+    }
+    else if(http_status_code == 500) {
         claim_agent_failure_reason_set("Failed: received Internal Server Error");
-    else if(http_status_code == 503)
+        *can_retry = true;
+    }
+    else if(http_status_code == 503) {
         claim_agent_failure_reason_set("Failed: Netdata Cloud is unavailable");
-    else if(http_status_code == 504)
+        *can_retry = true;
+    }
+    else if(http_status_code == 504) {
         claim_agent_failure_reason_set("Failed: Gateway Timeout");
-    else
+        *can_retry = true;
+    }
+    else {
         claim_agent_failure_reason_set("Failed with response code %ld", http_status_code);
+        *can_retry = true;
+    }
 
     curl_easy_cleanup(curl);
     return ret;
@@ -308,10 +334,14 @@ bool claim_agent(const char *url, const char *token, const char *rooms, const ch
         return false;
     }
 
-    if (!send_curl_request(registry_get_this_machine_guid(), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure)) {
-        spinlock_unlock(&spinlock);
-        return false;
-    }
+    bool done = false, can_retry = true;
+    size_t retries = 0;
+    do {
+        done = send_curl_request(registry_get_this_machine_guid(), registry_get_this_machine_hostname(), token, rooms, url, proxy, insecure, &can_retry);
+        if (done) break;
+        sleep_usec(300 * USEC_PER_MS + 100 * retries * USEC_PER_MS);
+        retries++;
+    } while(!done && can_retry && retries < 5);
 
     spinlock_unlock(&spinlock);
     return true;

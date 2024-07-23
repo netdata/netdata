@@ -213,10 +213,12 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args __maybe_unused,
             snprintfz(msg, sizeof(msg),
                       "Netdata Agent is claimed to Netdata Cloud, but it is currently offline: %s",
                       cloud_status_aclk_offline_reason());
+            break;
 
         case CLOUD_STATUS_INDIRECT:
             snprintfz(msg, sizeof(msg),
                       "Netdata Agent is not claimed to Netdata Cloud, but it is currently online via parent.");
+            break;
     }
 
     *message = strdupz(msg);
