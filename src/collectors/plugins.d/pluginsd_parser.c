@@ -1181,29 +1181,14 @@ bool parser_reconstruct_context(BUFFER *wb, void *ptr) {
     return true;
 }
 
-inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations)
+inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations)
 {
     int enabled = cd->unsafe.enabled;
 
-    if (!fp_plugin_input || !fp_plugin_output || !enabled) {
+    if (fd_input == -1 || fd_output == -1 || !enabled) {
         cd->unsafe.enabled = 0;
         return 0;
     }
-
-    if (unlikely(fileno(fp_plugin_input) == -1)) {
-        netdata_log_error("input file descriptor given is not a valid stream");
-        cd->serial_failures++;
-        return 0;
-    }
-
-    if (unlikely(fileno(fp_plugin_output) == -1)) {
-        netdata_log_error("output file descriptor given is not a valid stream");
-        cd->serial_failures++;
-        return 0;
-    }
-
-    clearerr(fp_plugin_input);
-    clearerr(fp_plugin_output);
 
     PARSER *parser;
     {
@@ -1214,8 +1199,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
                 .trust_durations = trust_durations
         };
 
-        // fp_plugin_output = our input; fp_plugin_input = our output
-        parser = parser_init(&user, fp_plugin_output, fp_plugin_input, -1, PARSER_INPUT_SPLIT, NULL);
+        parser = parser_init(&user, fd_input, fd_output, PARSER_INPUT_SPLIT, NULL);
     }
 
     pluginsd_keywords_init(parser, PARSER_INIT_PLUGINSD);
@@ -1240,10 +1224,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
 
         if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
             buffered_reader_ret_t ret = buffered_reader_read_timeout(
-                    &parser->reader,
-                    fileno((FILE *) parser->fp_input),
-                    2 * 60 * MSEC_PER_SEC, true
-                                                                    );
+                    &parser->reader, parser->fd_input,
+                    2 * 60 * MSEC_PER_SEC, true);
 
             if(unlikely(ret != BUFFERED_READER_READ_OK))
                 break;
@@ -1362,7 +1344,7 @@ void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire) {
 }
 
 int pluginsd_parser_unittest(void) {
-    PARSER *p = parser_init(NULL, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
+    PARSER *p = parser_init(NULL, -1, -1, PARSER_INPUT_SPLIT, NULL);
     pluginsd_keywords_init(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING);
 
     char *lines[] = {

@@ -319,7 +319,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
                 .capabilities = rpt->capabilities,
         };
 
-        parser = parser_init(&user, NULL, NULL, fd, PARSER_INPUT_SPLIT, ssl);
+        parser = parser_init(&user, fd, fd, PARSER_INPUT_SPLIT, ssl);
     }
 
 #ifdef ENABLE_H2O

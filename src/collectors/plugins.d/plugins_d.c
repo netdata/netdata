@@ -181,7 +181,10 @@ static void *pluginsd_worker_thread(void *arg) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        count = pluginsd_process(cd->host, cd, cd->unsafe.pi->child_stdin_fp, cd->unsafe.pi->child_stdout_fp, 0);
+        count = pluginsd_process(cd->host, cd,
+                                 spawn_server_instance_read_fd(cd->unsafe.pi->si),
+                                 spawn_server_instance_write_fd(cd->unsafe.pi->si),
+                                 0);
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",
