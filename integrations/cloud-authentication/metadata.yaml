@@ -33,7 +33,7 @@
 
       ### Netdata Configuration Steps
       1. Click on the Space settings cog (located above your profile icon)
-      2. Click on the **Authentication** tab
+      2. Click on the **User Management** section and access **Authentication and Authorization** tab.
       3. On the Okta SSO card, click on **Configure**
       4. Fill in the [required credentials](https://developer.okta.com/docs/guides/find-your-app-credentials/main/), you get them from **Okta Admin Portal**:
           - **Issuer URL** you can get it from your profile icon on top, e.g. `https://company-name.okta.com`
@@ -82,7 +82,7 @@
 
       ### Netdata Configuration Steps
       1. Click on the Space settings cog (located above your profile icon)
-      2. Click on the **Authentication** tab
+      2. Click on the **User Management** section and access **Authentication and Authorization** tab.
       3. On the OIDC card, click on **Configure**
       4. Fill in the required credentials:
           - **Issuer URL** the Authorization Server Issuer URL, e.g. `https://my-auth-server.com/`
@@ -127,7 +127,7 @@
 
       ### Netdata Configuration Steps
       1. Click on the Space settings cog (located above your profile icon).
-      2. Click on the **User Management** section and access **Authorization and Authentication** tab.
+      2. Click on the **User Management** section and access **Authentication and Authorization** tab.
       3. In the SCIM card, click on **Activate**.
       4. Depending on your situation:
          - If OIDC/SSO integration is already enabled in your Space, click **Activate**.
@@ -141,7 +141,7 @@
 
       Steps to rotate the token:
       1. Click on the Space settings cog (located above your profile icon).
-      2. Click on the **User Management** section and access **Authorization and Authentication** tab.
+      2. Click on the **User Management** section and access **Authentication and Authorization** tab.
       3. In the already configured SCIM card, click **Configure**.
       4. Click **Regenerate Token**.
       5. If successful, you will receive a new token for Bearer Authentication with your SCIM client.
