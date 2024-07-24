@@ -30,7 +30,9 @@ int uv_errno_to_errno(int uv_err) {
         case UV_EAI_ADDRFAMILY: return EAI_ADDRFAMILY;
         case UV_EAI_AGAIN: return EAI_AGAIN;
         case UV_EAI_BADFLAGS: return EAI_BADFLAGS;
+#if defined(EAI_CANCELED)
         case UV_EAI_CANCELED: return EAI_CANCELED;
+#endif
         case UV_EAI_FAIL: return EAI_FAIL;
         case UV_EAI_FAMILY: return EAI_FAMILY;
         case UV_EAI_MEMORY: return EAI_MEMORY;
