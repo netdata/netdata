@@ -1078,15 +1078,51 @@ jobs:
       - name: Set Up Dependencies
         id: deps
         if: needs.file-check.outputs.run == 'true'
+        env:
+          BUILD_DIR: ${{ github.workspace }}\build
         run: ./packaging/windows/install-dependencies.ps1
       - name: Build Netdata
         id: build
         if: needs.file-check.outputs.run == 'true'
+        env:
+          BUILD_DIR: ${{ github.workspace }}\build
         run: ./packaging/windows/build.ps1
+      - name: Sign Agent Code
+        id: sign-agent
+        if: needs.file-check.outputs.run == 'true' && event_name != 'pull_request'
+        uses: azure/trusted-signing-action@v0.4
+        with:
+          azure-tennant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
+          azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
+          endpoint: "https://eus.codesigning.azure.net/"
+          trusted-signing-account-name: Netdata
+          certificate-profile-name: Netdata
+          files-folder: ${{ github.workspace }}\build
+          files-folder-filter: exe,dll
+          files-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
+          timestamp-digest: SHA256
       - name: Package Netdata
         id: package
         if: needs.file-check.outputs.run == 'true'
         run: ./packaging/windows/package.ps1
+      - name: Sign Installer
+        id: sign-installer
+        if: needs.file-check.outputs.run == 'true' && event_name != 'pull_request'
+        uses: azure/trusted-signing-action@v0.4
+        with:
+          azure-tennant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
+          azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
+          endpoint: "https://eus.codesigning.azure.net/"
+          trusted-signing-account-name: Netdata
+          certificate-profile-name: Netdata
+          files: ${{ github.workspace }}\packaging\windows\netdata-installer.exe
+          file-digest: SHA256
+          timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
+          timestamp-digest: SHA256
       - name: Upload Installer
         id: upload
         uses: actions/upload-artifact@v4
