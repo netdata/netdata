@@ -26,6 +26,8 @@ import (
 )
 
 var (
+	cygwinBasePath = os.Getenv("NETDATA_CYGWIN_BASE_PATH")
+
 	name        = "go.d"
 	userDir     = os.Getenv("NETDATA_USER_CONFIG_DIR")
 	stockDir    = os.Getenv("NETDATA_STOCK_CONFIG_DIR")
@@ -34,6 +36,14 @@ var (
 	watchPath   = os.Getenv("NETDATA_PLUGINS_GOD_WATCH_PATH")
 	envLogLevel = os.Getenv("NETDATA_LOG_LEVEL")
 )
+
+func init() {
+	userDir = handleDirOnWin(userDir)
+	stockDir = handleDirOnWin(stockDir)
+	varLibDir = handleDirOnWin(varLibDir)
+	lockDir = handleDirOnWin(lockDir)
+	watchPath = handleDirOnWin(watchPath)
+}
 
 func confDir(opts *cli.Option) multipath.MultiPath {
 	if len(opts.ConfDir) > 0 {
@@ -48,7 +58,10 @@ func confDir(opts *cli.Option) multipath.MultiPath {
 
 	dirs = append(dirs, filepath.Join(executable.Directory, "/../../../../etc/netdata"))
 
-	for _, dir := range []string{"/etc/netdata", "/opt/netdata/etc/netdata"} {
+	for _, dir := range []string{
+		handleDirOnWin("/etc/netdata"),
+		handleDirOnWin("/opt/netdata/etc/netdata"),
+	} {
 		if isDirExists(dir) {
 			dirs = append(dirs, dir)
 			break
@@ -57,7 +70,10 @@ func confDir(opts *cli.Option) multipath.MultiPath {
 
 	dirs = append(dirs, filepath.Join(executable.Directory, "/../../../../usr/lib/netdata/conf.d"))
 
-	for _, dir := range []string{"/usr/lib/netdata/conf.d", "/opt/netdata/usr/lib/netdata/conf.d"} {
+	for _, dir := range []string{
+		handleDirOnWin("/usr/lib/netdata/conf.d"),
+		handleDirOnWin("/opt/netdata/usr/lib/netdata/conf.d"),
+	} {
 		if isDirExists(dir) {
 			dirs = append(dirs, dir)
 			break
@@ -169,4 +185,19 @@ func isDirExists(dir string) bool {
 		return fi.Mode().IsDir()
 	}
 	return !errors.Is(err, fs.ErrNotExist)
+}
+
+func handleDirOnWin(path string) string {
+	base := cygwinBasePath
+
+	// TODO: temp workaround for debug mode
+	if base == "" && strings.HasPrefix(executable.Directory, "C:\\msys64") {
+		base = "C:\\msys64"
+	}
+
+	if base == "" || !strings.HasPrefix(path, "/") {
+		return path
+	}
+
+	return filepath.Join(base, path)
 }
