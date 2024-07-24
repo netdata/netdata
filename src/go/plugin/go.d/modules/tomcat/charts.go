@@ -3,140 +3,194 @@
 package tomcat
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 const (
-	prioAccesses = module.Priority + iota
-	prioBandwidth
-	prioProcessingTime
-	prioThreads
-	prioJVM
-	prioJVMEden
-	prioJVMSurvivor
-	prioJVMTenured
-)
+	prioConnectorRequestsCount = module.Priority + iota
+	prioConnectorRequestsBandwidth
+	prioConnectorRequestsProcessingTime
+	prioConnectorRequestsErrors
 
-const (
-	byteToMiB = 1 << 20
-)
+	prioConnectorRequestThreads
 
-var charts = module.Charts{
-	chartAccesses.Copy(),
-	chartBandwidth.Copy(),
-	chartProcessingTime.Copy(),
-	chartThreads.Copy(),
-	chartJVM.Copy(),
-	chartJVMEden.Copy(),
-	chartJVMSurvivor.Copy(),
-	chartJVMTenured.Copy(),
-}
+	prioJvmMemoryUsage
+
+	prioJvmMemoryPoolMemoryUsage
+)
 
 var (
-	chartAccesses = module.Chart{
-		ID:       "accesses",
-		Title:    "Requests",
-		Units:    "requests/s",
-		Fam:      "statistics",
-		Ctx:      "tomcat.accesses",
-		Type:     module.Area,
-		Priority: prioAccesses,
-		Dims: module.Dims{
-			{ID: "request_count", Name: "accesses", Algo: module.Incremental},
-			{ID: "error_count", Name: "errors"},
-		},
+	defaultCharts = module.Charts{
+		jvmMemoryUsageChart.Copy(),
 	}
-	chartBandwidth = module.Chart{
-		ID:       "bandwidth",
-		Title:    "Bandwidth",
-		Units:    "KiB/s",
-		Fam:      "statistics",
-		Ctx:      "tomcat.bandwidth",
-		Type:     module.Area,
-		Priority: prioBandwidth,
-		Dims: module.Dims{
-			{ID: "bytes_sent", Name: "sent", Div: 1024, Algo: module.Incremental},
-			{ID: "bytes_received", Name: "received", Div: 1024, Algo: module.Incremental},
-		},
-	}
-	chartProcessingTime = module.Chart{
-		ID:       "processing_time",
-		Title:    "Processing time",
-		Units:    "seconds",
-		Fam:      "statistics",
-		Ctx:      "tomcat.processing_time",
-		Type:     module.Area,
-		Priority: prioProcessingTime,
-		Dims: module.Dims{
-			{ID: "processing_time", Name: "processing time", Algo: module.Incremental},
-		},
-	}
-	chartThreads = module.Chart{
-		ID:       "threads",
-		Title:    "Threads",
-		Units:    "current threads",
-		Fam:      "statistics",
-		Ctx:      "tomcat.threads",
-		Type:     module.Area,
-		Priority: prioThreads,
-		Dims: module.Dims{
-			{ID: "current_thread_count", Name: "current"},
-			{ID: "busy_thread_count", Name: "busy"},
-		},
-	}
-	chartJVM = module.Chart{
-		ID:       "jvm",
-		Title:    "JVM Memory Pool Usage",
-		Units:    "MiB",
+
+	jvmMemoryUsageChart = module.Chart{
+		ID:       "jvm_memory_usage",
+		Title:    "JVM Memory Usage",
+		Units:    "bytes",
 		Fam:      "memory",
-		Ctx:      "tomcat.jvm",
+		Ctx:      "tomcat.jvm_memory_usage",
 		Type:     module.Stacked,
-		Priority: prioJVM,
+		Priority: prioJvmMemoryUsage,
 		Dims: module.Dims{
-			{ID: "current_thread_count", Name: "current"},
-			{ID: "busy_thread_count", Name: "busy"},
-		},
-	}
-	chartJVMEden = module.Chart{
-		ID:       "jvm_eden",
-		Title:    "Eden Memory Usage",
-		Units:    "MiB",
-		Fam:      "memory",
-		Ctx:      "tomcat.jvm_eden",
-		Type:     module.Area,
-		Priority: prioJVMEden,
-		Dims: module.Dims{
-			{ID: "eden_used", Name: "used", Div: byteToMiB},
-			{ID: "eden_committed", Name: "committed", Div: byteToMiB},
-			{ID: "eden_max", Name: "max", Div: byteToMiB},
-		},
-	}
-	chartJVMSurvivor = module.Chart{
-		ID:       "jvm_survivor",
-		Title:    "Survivor Memory Usage",
-		Units:    "MiB",
-		Fam:      "memory",
-		Ctx:      "tomcat.jvm_survivor",
-		Type:     module.Area,
-		Priority: prioJVMSurvivor,
-		Dims: module.Dims{
-			{ID: "survivor_used", Name: "used", Div: byteToMiB},
-			{ID: "survivor_committed", Name: "committed", Div: byteToMiB},
-			{ID: "survivor_max", Name: "max", Div: byteToMiB},
-		},
-	}
-	chartJVMTenured = module.Chart{
-		ID:       "jvm_tenured",
-		Title:    "Tenured Memory Usage",
-		Units:    "MiB",
-		Fam:      "memory",
-		Ctx:      "tomcat.jvm_tenured",
-		Type:     module.Area,
-		Priority: prioJVMTenured,
-		Dims: module.Dims{
-			{ID: "tenured_used", Name: "used", Div: byteToMiB},
-			{ID: "tenured_committed", Name: "committed", Div: byteToMiB},
-			{ID: "tenured_max", Name: "max", Div: byteToMiB},
+			{ID: "jvm_memory_free", Name: "free"},
+			{ID: "jvm_memory_used", Name: "used"},
 		},
 	}
 )
+
+var (
+	connectorChartsTmpl = module.Charts{
+		connectorRequestsCountChartTmpl.Copy(),
+		connectorRequestsBandwidthChartTmpl.Copy(),
+		connectorRequestsProcessingTimeChartTmpl.Copy(),
+		connectorRequestsErrorsChartTmpl.Copy(),
+		connectorRequestThreadsChartTmpl.Copy(),
+	}
+
+	connectorRequestsCountChartTmpl = module.Chart{
+		ID:       "connector_%_requests",
+		Title:    "Connector Requests",
+		Units:    "requests/s",
+		Fam:      "requests",
+		Ctx:      "tomcat.connector_requests",
+		Type:     module.Line,
+		Priority: prioConnectorRequestsCount,
+		Dims: module.Dims{
+			{ID: "connector_%s_request_info_request_count", Name: "requests", Algo: module.Incremental},
+		},
+	}
+	connectorRequestsBandwidthChartTmpl = module.Chart{
+		ID:       "connector_%s_requests_bandwidth",
+		Title:    "Connector Requests Bandwidth",
+		Units:    "bytes/s",
+		Fam:      "requests",
+		Ctx:      "tomcat.connector_bandwidth",
+		Type:     module.Area,
+		Priority: prioConnectorRequestsBandwidth,
+		Dims: module.Dims{
+			{ID: "connector_%s_request_info_bytes_received", Name: "received", Algo: module.Incremental},
+			{ID: "connector_%s_request_info_bytes_sent", Name: "sent", Mul: -1, Algo: module.Incremental},
+		},
+	}
+	connectorRequestsProcessingTimeChartTmpl = module.Chart{
+		ID:       "connector_%_requests_processing_time",
+		Title:    "Connector Requests Processing Time",
+		Units:    "milliseconds",
+		Fam:      "requests",
+		Ctx:      "tomcat.connector_requests_processing_time",
+		Type:     module.Line,
+		Priority: prioConnectorRequestsProcessingTime,
+		Dims: module.Dims{
+			{ID: "connector_%s_request_info_processing_time", Name: "processing_time", Algo: module.Incremental},
+		},
+	}
+	connectorRequestsErrorsChartTmpl = module.Chart{
+		ID:       "connector_%_errors",
+		Title:    "Connector Errors",
+		Units:    "errors/s",
+		Fam:      "requests",
+		Ctx:      "tomcat.connector_errors",
+		Type:     module.Line,
+		Priority: prioConnectorRequestsErrors,
+		Dims: module.Dims{
+			{ID: "connector_%s_request_info_error_count", Name: "errors", Algo: module.Incremental},
+		},
+	}
+
+	connectorRequestThreadsChartTmpl = module.Chart{
+		ID:       "connector_%s_request_threads",
+		Title:    "Connector Request Threads",
+		Units:    "threads",
+		Fam:      "threads",
+		Ctx:      "tomcat.connector_request_threads",
+		Type:     module.Stacked,
+		Priority: prioConnectorRequestThreads,
+		Dims: module.Dims{
+			{ID: "connector_%s_thread_info_idle", Name: "idle"},
+			{ID: "connector_%s_thread_info_busy", Name: "busy"},
+		},
+	}
+)
+
+var (
+	jvmMemoryPoolChartsTmpl = module.Charts{
+		jvmMemoryPoolMemoryUsageChartTmpl.Copy(),
+	}
+
+	jvmMemoryPoolMemoryUsageChartTmpl = module.Chart{
+		ID:       "jvm_mem_pool_%s_memory_usage",
+		Title:    "JVM Mem Pool Memory Usage",
+		Units:    "bytes",
+		Fam:      "memory",
+		Ctx:      "tomcat.jvm_mem_pool_memory_usage",
+		Type:     module.Area,
+		Priority: prioJvmMemoryPoolMemoryUsage,
+		Dims: module.Dims{
+			{ID: "jvm_memorypool_%s_commited", Name: "commited"},
+			{ID: "jvm_memorypool_%s_used", Name: "used"},
+			{ID: "jvm_memorypool_%s_max", Name: "max"},
+		},
+	}
+)
+
+func (t *Tomcat) addConnectorCharts(name string) {
+	charts := connectorChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, cleanName(name))
+		chart.Labels = []module.Label{
+			{Key: "connector_name", Value: strings.Trim(name, "\"")},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, cleanName(name))
+		}
+	}
+
+	if err := t.Charts().Add(*charts...); err != nil {
+		t.Warning(err)
+	}
+}
+
+func (t *Tomcat) addMemPoolCharts(name, typ string) {
+	name = strings.ReplaceAll(name, "'", "")
+
+	charts := jvmMemoryPoolChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, cleanName(name))
+		chart.Labels = []module.Label{
+			{Key: "mempool_name", Value: name},
+			{Key: "mempool_type", Value: typ},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, cleanName(name))
+		}
+	}
+
+	if err := t.Charts().Add(*charts...); err != nil {
+		t.Warning(err)
+	}
+}
+
+func (t *Tomcat) removeConnectorCharts(name string) {
+	px := fmt.Sprintf("connector_%s_", cleanName(name))
+	t.removeCharts(px)
+}
+
+func (t *Tomcat) removeMemoryPoolCharts(name string) {
+	px := fmt.Sprintf("jvm_mem_pool_%s_", cleanName(name))
+	t.removeCharts(px)
+}
+
+func (t *Tomcat) removeCharts(prefix string) {
+	for _, chart := range *t.Charts() {
+		if strings.HasPrefix(chart.ID, prefix) {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
+}

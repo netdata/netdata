@@ -4,143 +4,108 @@ package tomcat
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-const (
-	urlPathServerStats = "/manager/status?XML=true"
+var (
+	urlPathServerStatus  = "/manager/status"
+	urlQueryServerStatus = url.Values{"XML": {"true"}}.Encode()
 )
 
-func (tc *Tomcat) collect() (map[string]int64, error) {
-	mx := make(map[string]int64)
-	response, err := tc.queryServerStatus()
+func (t *Tomcat) collect() (map[string]int64, error) {
+	mx, err := t.collectServerStatus()
 	if err != nil {
 		return nil, err
-	}
-
-	// JVM Memory
-	mx["jvm.free"] = int64(response.Jvm.Memory.Free)
-	mx["jvm.total"] = int64(response.Jvm.Memory.Total)
-	mx["jvm.max"] = int64(response.Jvm.Memory.Max)
-
-	for _, pool := range response.Jvm.MemoryPools {
-		name := pool.Name
-		switch name {
-		case "G1 Eden Space":
-			mx["eden_used"] = int64(pool.UsageUsed)
-			mx["eden_committed"] = int64(pool.UsageCommitted)
-			mx["eden_max"] = int64(pool.UsageMax)
-		case "G1 Survivor Space":
-			mx["survivor_used"] = int64(pool.UsageUsed)
-			mx["survivor_committed"] = int64(pool.UsageCommitted)
-			mx["survivor_max"] = int64(pool.UsageMax)
-		case "G1 Old Gen":
-			mx["tenured_used"] = int64(pool.UsageUsed)
-			mx["tenured_committed"] = int64(pool.UsageCommitted)
-			mx["tenured_max"] = int64(pool.UsageMax)
-		case "CodeHeap 'non-nmethods'", "CodeHeap 'non-profiled nmethods'", "CodeHeap 'profiled nmethods'":
-			mx["code_cache_used"] = int64(pool.UsageUsed)
-			mx["code_cache_committed"] = int64(pool.UsageCommitted)
-			mx["code_cache_max"] = int64(pool.UsageMax)
-		case "Compressed Class Space":
-			mx["compressed_used"] = int64(pool.UsageUsed)
-			mx["compressed_committed"] = int64(pool.UsageCommitted)
-			mx["compressed_max"] = int64(pool.UsageMax)
-		case "Metaspace":
-			mx["metaspace_used"] = int64(pool.UsageUsed)
-			mx["metaspace_committed"] = int64(pool.UsageCommitted)
-			mx["metaspace_max"] = int64(pool.UsageMax)
-		}
-	}
-
-	if response.Connector.Name != "" {
-		mx["request_count"] = int64(response.Connector.RequestInfo.RequestCount)
-		mx["error_count"] = int64(response.Connector.RequestInfo.ErrorCount)
-		mx["bytes_sent"] = int64(response.Connector.RequestInfo.BytesSent)
-		mx["bytes_received"] = int64(response.Connector.RequestInfo.BytesReceived)
-		mx["processing_time"] = int64(response.Connector.RequestInfo.ProcessingTime)
-		mx["current_thread_count"] = int64(response.Connector.ThreadInfo.CurrentThreadCount)
-		mx["busy_thread_count"] = int64(response.Connector.ThreadInfo.CurrentThreadsBusy)
-		// connectorName := connector.Name
 	}
 
 	return mx, nil
 }
 
-type Status struct {
-	XMLName   xml.Name  `xml:"status"`
-	Jvm       Jvm       `xml:"jvm"`
-	Connector Connector `xml:"connector"`
-}
-
-type Jvm struct {
-	XMLName     xml.Name     `xml:"jvm"`
-	Memory      Memory       `xml:"memory"`
-	MemoryPools []MemoryPool `xml:"memorypool"`
-}
-
-type Memory struct {
-	XMLName xml.Name `xml:"memory"`
-	Free    int      `xml:"free,attr"`
-	Total   int      `xml:"total,attr"`
-	Max     int      `xml:"max,attr"`
-}
-
-type MemoryPool struct {
-	XMLName        xml.Name `xml:"memorypool"`
-	Name           string   `xml:"name,attr"`
-	Type           string   `xml:"type,attr"`
-	UsageInit      int      `xml:"usageInit,attr"`
-	UsageCommitted int      `xml:"usageCommitted,attr"`
-	UsageMax       int      `xml:"usageMax,attr"`
-	UsageUsed      int      `xml:"usageUsed,attr"`
-}
-
-type Connector struct {
-	XMLName     xml.Name    `xml:"connector"`
-	Name        string      `xml:"name,attr"`
-	ThreadInfo  ThreadInfo  `xml:"threadInfo"`
-	RequestInfo RequestInfo `xml:"requestInfo"`
-}
-
-type ThreadInfo struct {
-	XMLName            xml.Name `xml:"threadInfo"`
-	MaxThreads         int      `xml:"maxThreads,attr"`
-	CurrentThreadCount int      `xml:"currentThreadCount,attr"`
-	CurrentThreadsBusy int      `xml:"currentThreadsBusy,attr"`
-}
-
-type RequestInfo struct {
-	XMLName        xml.Name `xml:"requestInfo"`
-	MaxTime        int      `xml:"maxTime,attr"`
-	ProcessingTime int      `xml:"processingTime,attr"`
-	RequestCount   int      `xml:"requestCount,attr"`
-	ErrorCount     int      `xml:"errorCount,attr"`
-	BytesReceived  int      `xml:"bytesReceived,attr"`
-	BytesSent      int      `xml:"bytesSent,attr"`
-}
-
-func (tc *Tomcat) queryServerStatus() (*Status, error) {
-	req, err := web.NewHTTPRequestWithPath(tc.Request, urlPathServerStats)
+func (t *Tomcat) collectServerStatus() (map[string]int64, error) {
+	resp, err := t.queryServerStatus()
 	if err != nil {
 		return nil, err
 	}
 
-	var stats Status
+	if len(resp.Connectors) == 0 {
+		return nil, errors.New("unexpected response: not tomcat server status data")
+	}
 
-	if err := tc.doOKDecode(req, &stats); err != nil {
+	seenConns, seenPools := make(map[string]bool), make(map[string]bool)
+
+	for i, v := range resp.Connectors {
+		resp.Connectors[i].STMKey = cleanName(v.Name)
+		ti := &resp.Connectors[i].ThreadInfo
+		ti.CurrentThreadsIdle = ti.CurrentThreadCount - ti.CurrentThreadsBusy
+
+		seenConns[v.Name] = true
+		if !t.seenConnectors[v.Name] {
+			t.seenConnectors[v.Name] = true
+			t.addConnectorCharts(v.Name)
+		}
+	}
+
+	for i, v := range resp.JVM.MemoryPools {
+		resp.JVM.MemoryPools[i].STMKey = cleanName(v.Name)
+
+		seenPools[v.Name] = true
+		if !t.seenMemPools[v.Name] {
+			t.seenMemPools[v.Name] = true
+			t.addMemPoolCharts(v.Name, v.Type)
+		}
+	}
+
+	for name := range t.seenConnectors {
+		if !seenConns[name] {
+			delete(t.seenConnectors, name)
+			t.removeConnectorCharts(name)
+		}
+	}
+
+	for name := range t.seenMemPools {
+		if !seenPools[name] {
+			delete(t.seenMemPools, name)
+			t.removeMemoryPoolCharts(name)
+		}
+	}
+
+	resp.JVM.Memory.Used = resp.JVM.Memory.Total - resp.JVM.Memory.Free
+
+	return stm.ToMap(resp), nil
+}
+
+func cleanName(name string) string {
+	r := strings.NewReplacer(" ", "_", ".", "_", "\"", "", "'", "")
+	return strings.ToLower(r.Replace(name))
+}
+
+func (t *Tomcat) queryServerStatus() (*serverStatusResponse, error) {
+	req, err := web.NewHTTPRequestWithPath(t.Request, urlPathServerStatus)
+	if err != nil {
 		return nil, err
 	}
 
-	return &stats, nil
+	req.URL.RawQuery = urlQueryServerStatus
+
+	var status serverStatusResponse
+
+	if err := t.doOKDecode(req, &status); err != nil {
+		return nil, err
+	}
+
+	return &status, nil
 }
 
-func (tc *Tomcat) doOKDecode(req *http.Request, in interface{}) error {
-	resp, err := tc.httpClient.Do(req)
+func (t *Tomcat) doOKDecode(req *http.Request, in interface{}) error {
+	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
@@ -150,16 +115,10 @@ func (tc *Tomcat) doOKDecode(req *http.Request, in interface{}) error {
 		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("error reading response body from '%s': %v", req.URL, err)
-	}
-
-	bodyStr := string(body)
-	err = xml.Unmarshal([]byte(bodyStr), in)
-	if err != nil {
+	if err := xml.NewDecoder(resp.Body).Decode(in); err != nil {
 		return fmt.Errorf("error decoding XML response from '%s': %v", req.URL, err)
 	}
+
 	return nil
 }
 

@@ -5,7 +5,6 @@ package tomcat
 import (
 	_ "embed"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -29,14 +28,16 @@ func New() *Tomcat {
 		Config: Config{
 			HTTP: web.HTTP{
 				Request: web.Request{
-					URL: "http://127.0.0.1:8080/manager/status?XML=true",
+					URL: "http://127.0.0.1:8080",
 				},
 				Client: web.Client{
 					Timeout: web.Duration(time.Second * 1),
 				},
 			},
 		},
-		charts: charts.Copy(),
+		charts:         defaultCharts.Copy(),
+		seenConnectors: make(map[string]bool),
+		seenMemPools:   make(map[string]bool),
 	}
 }
 
@@ -52,42 +53,39 @@ type Tomcat struct {
 	charts *module.Charts
 
 	httpClient *http.Client
+
+	seenConnectors map[string]bool
+	seenMemPools   map[string]bool
 }
 
-func (tc *Tomcat) Configuration() any {
-	return tc.Config
+func (t *Tomcat) Configuration() any {
+	return t.Config
 }
 
-func (tc *Tomcat) Init() error {
-	if tc.URL == "" {
-		tc.Errorf("URL not set")
-		return fmt.Errorf("url not set")
-	}
-
-	if err := tc.validateConfig(); err != nil {
-		tc.Errorf("config validation: %v", err)
+func (t *Tomcat) Init() error {
+	if err := t.validateConfig(); err != nil {
+		t.Errorf("config validation: %v", err)
 		return err
 	}
 
-	httpClient, err := tc.initHTTPClient()
-
+	httpClient, err := t.initHTTPClient()
 	if err != nil {
-		tc.Errorf("init HTTP client: %v", err)
+		t.Errorf("init HTTP client: %v", err)
 		return err
 	}
 
-	tc.httpClient = httpClient
+	t.httpClient = httpClient
 
-	tc.Debugf("using URL %s", tc.URL)
-	tc.Debugf("using timeout: %s", tc.Timeout)
+	t.Debugf("using URL %s", t.URL)
+	t.Debugf("using timeout: %s", t.Timeout)
 
 	return nil
 }
 
-func (tc *Tomcat) Check() error {
-	mx, err := tc.collect()
+func (t *Tomcat) Check() error {
+	mx, err := t.collect()
 	if err != nil {
-		tc.Error(err)
+		t.Error(err)
 		return err
 	}
 
@@ -98,14 +96,14 @@ func (tc *Tomcat) Check() error {
 	return nil
 }
 
-func (tc *Tomcat) Charts() *module.Charts {
-	return tc.charts
+func (t *Tomcat) Charts() *module.Charts {
+	return t.charts
 }
 
-func (tc *Tomcat) Collect() map[string]int64 {
-	mx, err := tc.collect()
+func (t *Tomcat) Collect() map[string]int64 {
+	mx, err := t.collect()
 	if err != nil {
-		tc.Error(err)
+		t.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -115,8 +113,8 @@ func (tc *Tomcat) Collect() map[string]int64 {
 	return mx
 }
 
-func (tc *Tomcat) Cleanup() {
-	if tc.httpClient != nil {
-		tc.httpClient.CloseIdleConnections()
+func (t *Tomcat) Cleanup() {
+	if t.httpClient != nil {
+		t.httpClient.CloseIdleConnections()
 	}
 }

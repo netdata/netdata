@@ -13,9 +13,9 @@
       },
       "url": {
         "title": "URL",
-        "description": "The URL of the Tomcat server [status endpoint](https://tomcat.apache.org/tomcat-10.0-doc/manager-howto.html#Server_Status).",
+        "description": "The base URL of the Tomcat server.",
         "type": "string",
-        "default": "http://127.0.0.1:8080/manager/status?XML=true",
+        "default": "http://127.0.0.1:8080",
         "format": "uri"
       },
       "timeout": {

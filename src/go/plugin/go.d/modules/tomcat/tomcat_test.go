@@ -19,7 +19,7 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataServerStatus, _ = os.ReadFile("testdata/stats.xml")
+	dataServerStatus, _ = os.ReadFile("testdata/server_status.xml")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -53,14 +53,6 @@ func TestTomcat_Init(t *testing.T) {
 				},
 			},
 		},
-		"fail when URL has no wantMetrics suffix": {
-			wantFail: true,
-			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{URL: "http://127.0.0.1:38001"},
-				},
-			},
-		},
 	}
 
 	for name, test := range tests {
@@ -88,7 +80,7 @@ func TestTomcat_Check(t *testing.T) {
 	}{
 		"success case": {
 			wantFail: false,
-			prepare:  caseSuccess,
+			prepare:  prepareCaseSuccess,
 		},
 		"fails on unexpected xml response": {
 			wantFail: true,
@@ -120,46 +112,57 @@ func TestTomcat_Check(t *testing.T) {
 
 func TestTomcat_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare                 func(t *testing.T) (tomcat *Tomcat, cleanup func())
-		wantMetrics             map[string]int64
-		disconnectBeforeCleanup bool
-		disconnectAfterCleanup  bool
-		wantCharts              int
+		prepare     func(t *testing.T) (tomcat *Tomcat, cleanup func())
+		wantMetrics map[string]int64
+		wantCharts  int
 	}{
 		"success case": {
-			prepare:                 caseSuccess,
-			disconnectBeforeCleanup: false,
-			disconnectAfterCleanup:  true,
-			wantCharts:              len(charts),
+			prepare:    prepareCaseSuccess,
+			wantCharts: len(defaultCharts) + len(jvmMemoryPoolChartsTmpl)*8 + len(connectorChartsTmpl)*2,
 			wantMetrics: map[string]int64{
-				"busy_thread_count":    1,
-				"bytes_received":       0,
-				"bytes_sent":           12174519,
-				"code_cache_committed": 13172736,
-				"code_cache_max":       122908672,
-				"code_cache_used":      13132032,
-				"compressed_committed": 1900544,
-				"compressed_max":       1073741824,
-				"compressed_used":      1712872,
-				"current_thread_count": 10,
-				"eden_committed":       108003328,
-				"eden_max":             -1,
-				"eden_used":            23068672,
-				"error_count":          24,
-				"jvm.free":             144529816,
-				"jvm.max":              1914699776,
-				"jvm.total":            179306496,
-				"metaspace_committed":  18939904,
-				"metaspace_max":        -1,
-				"metaspace_used":       18537336,
-				"processing_time":      28326,
-				"request_count":        4838,
-				"survivor_committed":   5242880,
-				"survivor_max":         -1,
-				"survivor_used":        5040192,
-				"tenured_committed":    66060288,
-				"tenured_max":          1914699776,
-				"tenured_used":         6175120,
+				"connector_http-nio-8080_request_info_bytes_received":  0,
+				"connector_http-nio-8080_request_info_bytes_sent":      12174519,
+				"connector_http-nio-8080_request_info_error_count":     24,
+				"connector_http-nio-8080_request_info_processing_time": 28326,
+				"connector_http-nio-8080_request_info_request_count":   4838,
+				"connector_http-nio-8080_thread_info_busy":             1,
+				"connector_http-nio-8080_thread_info_count":            10,
+				"connector_http-nio-8080_thread_info_idle":             9,
+				"connector_http-nio-8081_request_info_bytes_received":  0,
+				"connector_http-nio-8081_request_info_bytes_sent":      12174519,
+				"connector_http-nio-8081_request_info_error_count":     24,
+				"connector_http-nio-8081_request_info_processing_time": 28326,
+				"connector_http-nio-8081_request_info_request_count":   4838,
+				"connector_http-nio-8081_thread_info_busy":             1,
+				"connector_http-nio-8081_thread_info_count":            10,
+				"connector_http-nio-8081_thread_info_idle":             9,
+				"jvm_memory_free":  144529816,
+				"jvm_memory_total": 179306496,
+				"jvm_memory_used":  34776680,
+				"jvm_memorypool_codeheap_non-nmethods_commited":          2555904,
+				"jvm_memorypool_codeheap_non-nmethods_max":               5840896,
+				"jvm_memorypool_codeheap_non-nmethods_used":              1477888,
+				"jvm_memorypool_codeheap_non-profiled_nmethods_commited": 4587520,
+				"jvm_memorypool_codeheap_non-profiled_nmethods_max":      122908672,
+				"jvm_memorypool_codeheap_non-profiled_nmethods_used":     4536704,
+				"jvm_memorypool_codeheap_profiled_nmethods_commited":     13172736,
+				"jvm_memorypool_codeheap_profiled_nmethods_max":          122908672,
+				"jvm_memorypool_codeheap_profiled_nmethods_used":         13132032,
+				"jvm_memorypool_compressed_class_space_commited":         1900544,
+				"jvm_memorypool_compressed_class_space_max":              1073741824,
+				"jvm_memorypool_compressed_class_space_used":             1712872,
+				"jvm_memorypool_g1_eden_space_commited":                  108003328,
+				"jvm_memorypool_g1_eden_space_max":                       -1,
+				"jvm_memorypool_g1_eden_space_used":                      23068672,
+				"jvm_memorypool_g1_old_gen_commited":                     66060288,
+				"jvm_memorypool_g1_old_gen_max":                          1914699776,
+				"jvm_memorypool_g1_old_gen_used":                         6175120,
+				"jvm_memorypool_g1_survivor_space_commited":              5242880,
+				"jvm_memorypool_g1_survivor_space_max":                   -1,
+				"jvm_memorypool_g1_survivor_space_used":                  5040192,
+				"jvm_memorypool_metaspace_commited":                      18939904,
+				"jvm_memorypool_metaspace_max":                           -1,
+				"jvm_memorypool_metaspace_used":                          18537336,
 			},
 		},
 		"fails on unexpected xml response": {
@@ -181,6 +184,7 @@ func TestTomcat_Collect(t *testing.T) {
 			mx := tomcat.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
+
 			if len(test.wantMetrics) > 0 {
 				assert.Equal(t, test.wantCharts, len(*tomcat.Charts()))
 				module.TestMetricsHasAllChartsDims(t, tomcat.Charts(), mx)
@@ -189,14 +193,23 @@ func TestTomcat_Collect(t *testing.T) {
 	}
 }
 
-func caseSuccess(t *testing.T) (*Tomcat, func()) {
+func prepareCaseSuccess(t *testing.T) (*Tomcat, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(dataServerStatus)
+			switch r.URL.Path {
+			case urlPathServerStatus:
+				if r.URL.RawQuery != urlQueryServerStatus {
+					w.WriteHeader(http.StatusNotFound)
+				} else {
+					_, _ = w.Write(dataServerStatus)
+				}
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
 		}))
 	tomcat := New()
-	tomcat.URL = srv.URL + "/status?XML=true"
+	tomcat.URL = srv.URL
 	require.NoError(t, tomcat.Init())
 
 	return tomcat, srv.Close
@@ -205,7 +218,7 @@ func caseSuccess(t *testing.T) (*Tomcat, func()) {
 func prepareCaseConnectionRefused(t *testing.T) (*Tomcat, func()) {
 	t.Helper()
 	tomcat := New()
-	tomcat.URL = "http://127.0.0.1:65001" + urlPathServerStats
+	tomcat.URL = "http://127.0.0.1:65001"
 	require.NoError(t, tomcat.Init())
 
 	return tomcat, func() {}
@@ -238,7 +251,7 @@ func prepareCaseUnexpectedXMLResponse(t *testing.T) (*Tomcat, func()) {
 		}))
 
 	tomcat := New()
-	tomcat.URL = srv.URL + urlPathServerStats
+	tomcat.URL = srv.URL
 	require.NoError(t, tomcat.Init())
 
 	return tomcat, srv.Close
@@ -252,7 +265,7 @@ func prepareCaseInvalidFormatResponse(t *testing.T) (*Tomcat, func()) {
 		}))
 
 	tomcat := New()
-	tomcat.URL = srv.URL + urlPathServerStats
+	tomcat.URL = srv.URL
 	require.NoError(t, tomcat.Init())
 
 	return tomcat, srv.Close

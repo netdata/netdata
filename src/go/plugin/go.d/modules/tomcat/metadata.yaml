@@ -27,16 +27,19 @@ modules:
         metrics_description: |
           This collector monitors Tomcat metrics about bandwidth, processing time, threads and more.
         method_description: |
-          It parses the information provided by the `/manager/status` HTTP endpoint.
+          It parses the information provided by the [Server Status](https://tomcat.apache.org/tomcat-10.0-doc/manager-howto.html#Server_Status) HTTP endpoint.
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "You will need to provide the username and the password, to access the webserver's status page. Create a separate user with read only rights for this particular endpoint"
+        description: >
+          By default, this Tomcat collector cannot access the server's status page.
+          To enable data collection, you will need to configure access credentials with appropriate permissions.
       default_behavior:
         auto_detection:
-          description: "If the Netdata Agent and the Tomcat webserver are in the same host, without configuration, the module attempts to connect to http://localhost:8080/manager/status?XML=true, without any credentials. So it will probably fail."
+          description: >
+            If the Netdata agent and Tomcat are on the same host, the collector will attempt to connect to the Tomcat server's status page at `http://localhost:8080/manager/status?XML=true`.
         limits:
           description: ""
         performance_impact:
@@ -44,8 +47,13 @@ modules:
     setup:
       prerequisites:
         list:
-          - title: User access to the endpoint
-            description: Create a read-only `netdata` user, to monitor the `/status` endpoint. This is necessary for configuring the collector.
+          - title: Access to Tomcat Status Endpoint
+            description: |
+              The Netdata agent needs read-only access to its status endpoint to collect data from the Tomcat server.
+
+              You can achieve this by creating a dedicated user named `netdata` with read-only permissions specifically for accessing the [Server Status](https://tomcat.apache.org/tomcat-10.0-doc/manager-howto.html#Server_Status) endpoint.
+
+              Once you've created the `netdata` user, you'll need to configure the username and password in the collector configuration file.
       configuration:
         file:
           name: "go.d/tomcat.conf"
@@ -66,7 +74,7 @@ modules:
               required: false
             - name: url
               description: Server URL.
-              default_value: http://127.0.0.1:8080/manager/status?XML=true
+              default_value: http://127.0.0.1:8080
               required: true
             - name: timeout
               description: HTTP request timeout.
@@ -136,7 +144,7 @@ modules:
               config: |
                 jobs:
                   - name: local
-                    url: http://127.0.0.1:8080/manager/status?XML=true
+                    url: http://127.0.0.1:8080
                     username: John
                     password: Doe
             - name: Multi-instance
@@ -147,12 +155,12 @@ modules:
               config: |
                 jobs:
                   - name: local
-                    url: http://127.0.0.1:8080/manager/status?XML=true
+                    url: http://127.0.0.1:8080
                     username: admin1
                     password: hackme1
 
                   - name: remote
-                    url: http://192.0.2.1:8080/manager/status?XML=true
+                    url: http://192.0.2.1:8080
                     username: admin2
                     password: hackme2
     troubleshooting:
@@ -170,66 +178,64 @@ modules:
           description: "These metrics refer to the entire monitored application."
           labels: []
           metrics:
-            - name: tomcat.accesses
+            - name: tomcat.jvm_memory_usage
               description: Requests
-              unit: "requests/s"
-              chart_type: area
-              dimensions:
-                - name: accesses
-                - name: errors
-            - name: tomcat.bandwidth
-              description: Bandwidth
-              unit: "KiB/s"
-              chart_type: area
-              dimensions:
-                - name: sent
-                - name: received
-            - name: tomcat.processing_time
-              description: processing time
-              unit: "seconds"
-              chart_type: area
-              dimensions:
-                - name: processing time
-            - name: tomcat.threads
-              description: Threads
-              unit: "current threads"
-              chart_type: area
-              dimensions:
-                - name: current
-                - name: busy
-            - name: tomcat.jvm
-              description: JVM Memory Pool Usage
-              unit: "MiB"
+              unit: bytes
               chart_type: stacked
               dimensions:
                 - name: free
-                - name: eden
-                - name: survivor
-                - name: tenured
-                - name: code cache
-                - name: compressed
-                - name: metaspace
-            - name: tomcat.jvm_eden
-              description: Eden Memory Usage
-              unit: "MiB"
+                - name: used
+        - name: jvm memory pool
+          description: "These metrics refer to the JVM memory pool."
+          labels:
+            - name: mempool_name
+              description: Memory Pool name.
+            - name: mempool_type
+              description: Memory Pool type.
+          metrics:
+            - name: tomcat.jvm_mem_pool_memory_usage
+              description: JVM Mem Pool Memory Usage
+              unit: bytes
               chart_type: area
               dimensions:
+                - name: commited
                 - name: used
-                - name: committed
                 - name: max
-            - name: tomcat.jvm_survivor
-              description: Survivor Memory Usage
-              unit: "MiB"
+        - name: connector
+          description: "These metrics refer to the connector."
+          labels:
+            - name: connector_name
+              description: Connector name.
+          metrics:
+            - name: tomcat.connector_requests
+              description: Connector Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: tomcat.connector_bandwidth
+              description: Connector Bandwidth
+              unit: bytes/s
               chart_type: area
               dimensions:
-                - name: used
-                - name: committed
-                - name: max
-            - name: tomcat.jvm_tenured
-              description: Tenured Memory Usage
-              unit: "MiB"
-              chart_type: area
+                - name: received
+                - name: sent
+            - name: tomcat.connector_requests_processing_time
+              description: Connector Requests Processing Time
+              unit: milliseconds
+              chart_type: line
               dimensions:
-                - name: used
-                - name: committed
-                - name: max
+                - name: processing_time
+            - name: tomcat.connector_errors
+              description: Connector Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: errors
+            - name: tomcat.connector_request_threads
+              description: Connector Request Threads
+              unit: threads
+              chart_type: stacked
+              dimensions:
+                - name: idle
+                - name: busy
