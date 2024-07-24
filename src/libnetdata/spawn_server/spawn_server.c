@@ -77,7 +77,7 @@ static void update_cygpath_env(void) {
     // Convert Cygwin root path to Windows path
     cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path));
 
-    nd_setenv("CYGWIN_BASE_PATH", win_path, 1);
+    nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
 
     nd_log(NDLS_COLLECTORS, NDLP_INFO, "Cygwin/MSYS2 base path set to '%s'", win_path);
 }
