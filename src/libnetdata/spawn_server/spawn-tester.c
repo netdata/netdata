@@ -84,9 +84,7 @@ void test_int_fds(int argc, const char **argv) {
     spawn_server_destroy(server);
 }
 
-void test_popen(int argc, const char **argv) {
-    netdata_main_spawn_server_init("test", argc, argv);
-
+void test_popen(int argc __maybe_unused, const char **argv) {
     char cmd[FILENAME_MAX + 100];
     snprintfz(cmd, sizeof(cmd), "exec %s plugin", argv[0]);
     POPEN_INSTANCE *pi = spawn_popen_run(cmd);
@@ -106,7 +104,7 @@ void test_popen(int argc, const char **argv) {
         size_t rc = fwrite(msg, 1, len, spawn_popen_stdin(pi));
         if (rc != len) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Cannot write to plugin. Expected to write %zd bytes, wrote %zd bytes",
+                   "Cannot write to plugin. Expected to write %zu bytes, wrote %zu bytes",
                    len, rc);
             exit(1);
         }
@@ -115,8 +113,8 @@ void test_popen(int argc, const char **argv) {
         char *s = fgets(buffer, sizeof(buffer), spawn_popen_stdout(pi));
         if (!s || strlen(s) != len) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Cannot read from plugin. Expected to read %zd bytes, read %zd bytes",
-                   len, s ? strlen(s) : 0);
+                   "Cannot read from plugin. Expected to read %zu bytes, read %zu bytes",
+                   len, (size_t)(s ? strlen(s) : 0));
             exit(1);
         }
         if (memcmp(msg, buffer, len) != 0) {
@@ -133,8 +131,6 @@ void test_popen(int argc, const char **argv) {
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
            "child exited with code %d",
            code);
-
-    netdata_main_spawn_server_cleanup();
 }
 
 int main(int argc, const char **argv) {
@@ -152,7 +148,12 @@ int main(int argc, const char **argv) {
     test_int_fds(argc, argv);
 
     fprintf(stderr, "\n\nTESTING popen\n\n");
-    test_popen(argc, argv);
+    netdata_main_spawn_server_init("test", argc, argv);
+    for(size_t i = 0; i < 10; i++) {
+        fprintf(stderr, "\n\nTESTING popen No %zu\n\n", i + 1);
+        test_popen(argc, argv);
+    }
+    netdata_main_spawn_server_cleanup();
 
     exit(0);
 }

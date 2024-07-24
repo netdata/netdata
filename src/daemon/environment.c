@@ -37,23 +37,23 @@ void set_environment_for_plugins_and_scripts(void) {
     {
         char b[16];
         snprintfz(b, sizeof(b) - 1, "%d", default_rrd_update_every);
-        setenv("NETDATA_UPDATE_EVERY", b, 1);
+        nd_setenv("NETDATA_UPDATE_EVERY", b, 1);
     }
 
-    setenv("NETDATA_VERSION", NETDATA_VERSION, 1);
-    setenv("NETDATA_HOSTNAME", netdata_configured_hostname, 1);
-    setenv("NETDATA_CONFIG_DIR", verify_required_directory(netdata_configured_user_config_dir), 1);
-    setenv("NETDATA_USER_CONFIG_DIR", verify_required_directory(netdata_configured_user_config_dir), 1);
-    setenv("NETDATA_STOCK_CONFIG_DIR", verify_required_directory(netdata_configured_stock_config_dir), 1);
-    setenv("NETDATA_PLUGINS_DIR", verify_required_directory(netdata_configured_primary_plugins_dir), 1);
-    setenv("NETDATA_WEB_DIR", verify_required_directory(netdata_configured_web_dir), 1);
-    setenv("NETDATA_CACHE_DIR", verify_or_create_required_directory(netdata_configured_cache_dir), 1);
-    setenv("NETDATA_LIB_DIR", verify_or_create_required_directory(netdata_configured_varlib_dir), 1);
-    setenv("NETDATA_LOCK_DIR", verify_or_create_required_directory(netdata_configured_lock_dir), 1);
-    setenv("NETDATA_LOG_DIR", verify_or_create_required_directory(netdata_configured_log_dir), 1);
-    setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
+    nd_setenv("NETDATA_VERSION", NETDATA_VERSION, 1);
+    nd_setenv("NETDATA_HOSTNAME", netdata_configured_hostname, 1);
+    nd_setenv("NETDATA_CONFIG_DIR", verify_required_directory(netdata_configured_user_config_dir), 1);
+    nd_setenv("NETDATA_USER_CONFIG_DIR", verify_required_directory(netdata_configured_user_config_dir), 1);
+    nd_setenv("NETDATA_STOCK_CONFIG_DIR", verify_required_directory(netdata_configured_stock_config_dir), 1);
+    nd_setenv("NETDATA_PLUGINS_DIR", verify_required_directory(netdata_configured_primary_plugins_dir), 1);
+    nd_setenv("NETDATA_WEB_DIR", verify_required_directory(netdata_configured_web_dir), 1);
+    nd_setenv("NETDATA_CACHE_DIR", verify_or_create_required_directory(netdata_configured_cache_dir), 1);
+    nd_setenv("NETDATA_LIB_DIR", verify_or_create_required_directory(netdata_configured_varlib_dir), 1);
+    nd_setenv("NETDATA_LOCK_DIR", verify_or_create_required_directory(netdata_configured_lock_dir), 1);
+    nd_setenv("NETDATA_LOG_DIR", verify_or_create_required_directory(netdata_configured_log_dir), 1);
+    nd_setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
-    setenv("CLAIMING_DIR", verify_or_create_required_private_directory(netdata_configured_cloud_dir), 1);
+    nd_setenv("CLAIMING_DIR", verify_or_create_required_private_directory(netdata_configured_cloud_dir), 1);
 
     {
         BUFFER *user_plugins_dirs = buffer_create(FILENAME_MAX, NULL);
@@ -64,7 +64,7 @@ void set_environment_for_plugins_and_scripts(void) {
             buffer_strcat(user_plugins_dirs, plugin_directories[i]);
         }
 
-        setenv("NETDATA_USER_PLUGINS_DIRS", buffer_tostring(user_plugins_dirs), 1);
+        nd_setenv("NETDATA_USER_PLUGINS_DIRS", buffer_tostring(user_plugins_dirs), 1);
 
         buffer_free(user_plugins_dirs);
     }
@@ -76,7 +76,7 @@ void set_environment_for_plugins_and_scripts(void) {
         clean = 1;
     }
 
-    setenv("NETDATA_LISTEN_PORT", default_port, 1);
+    nd_setenv("NETDATA_LISTEN_PORT", default_port, 1);
     if (clean)
         freez(default_port);
 

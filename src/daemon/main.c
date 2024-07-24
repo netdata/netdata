@@ -1359,7 +1359,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
                     netdata_log_error("Unexpected environment variable %s=%s", line, value);
                 } else {
-                    setenv(line, value, 1);
+                    nd_setenv(line, value, 1);
                 }
             }
         }
