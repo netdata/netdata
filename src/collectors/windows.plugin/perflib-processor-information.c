@@ -7,19 +7,22 @@
 #define _COMMON_PLUGIN_MODULE_NAME "PerflibProcesses"
 #include "../common-contexts/common-contexts.h"
 
+#define MHZ_TO_HZ 1000000.0
+#define CPU_PROPORTIONAL_CONSTANT 1000
+
 struct processor_info {
     RRDDIM *rd_cpu_frequency;
     char cpu_freq_id[16];
 
     COUNTER_DATA cpuFrequency;
-    COUNTER_DATA percProcessorFrequency;
+    COUNTER_DATA percProcessorPerformance;
 };
 
 static struct processor_info total = { 0 };
 
 static void initialize_processor_info_keys(struct processor_info *p) {
     p->cpuFrequency.key = "Processor Frequency";
-    p->percProcessorFrequency.key = "% Processor Performance";
+    p->percProcessorPerformance.key = "% Processor Performance";
 }
 
 void dict_processor_info_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -45,17 +48,15 @@ static inline int cpu_dict_callback(const DICTIONARY_ITEM *item __maybe_unused, 
     if (!p->rd_cpu_frequency)
         p->rd_cpu_frequency = rrddim_add(cpufreq, p->cpu_freq_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-    // Calculate frequency in HZ (https://github.com/prometheus-community/windows_exporter/blob/31bb6d03ee78b63849a3f52a98cf81f8ff9f29ac/docs/collector.cpu.md?plain=1#L35)
-    NETDATA_DOUBLE nFreq = p->cpuFrequency.current.Data;
-    nFreq *= 1000;
-    NETDATA_DOUBLE tsc = p->percProcessorFrequency.current.Time;
-    NETDATA_DOUBLE raw = p->percProcessorFrequency.current.Data;
-    nFreq *= raw/tsc;
-
     // Convert to MHz
-    nFreq /= 1000000;
-    //TO DO: CHECK BIG SPIKES BEFORE TO SET DIMENSION
-    rrddim_set_by_pointer(cpufreq, p->rd_cpu_frequency, (collected_number)nFreq);
+    NETDATA_DOUBLE cpuFreq = (p->cpuFrequency.current.Data > CPU_PROPORTIONAL_CONSTANT) ?
+                             ((NETDATA_DOUBLE)p->cpuFrequency.current.Data)/CPU_PROPORTIONAL_CONSTANT:
+                             p->cpuFrequency.current.Data;
+    NETDATA_DOUBLE cpuPerformance = (NETDATA_DOUBLE)p->percProcessorPerformance.current.Data;
+
+    // Adjust factor and do conversion
+    cpuFreq *=  (cpuPerformance/(CPU_PROPORTIONAL_CONSTANT* MHZ_TO_HZ));
+    rrddim_set_by_pointer(cpufreq, p->rd_cpu_frequency, (collected_number)cpuFreq);
 
     return 1;
 }
@@ -100,7 +101,7 @@ static bool do_processors_info(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         }
 
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->cpuFrequency);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->percProcessorFrequency);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->percProcessorPerformance);
     }
 
     if (count_cpus)
