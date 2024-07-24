@@ -155,7 +155,7 @@ static inline int registry_person_url_callback_verify_machine_exists(REGISTRY_PE
 
 void registry_update_cloud_base_url() {
     registry.cloud_base_url = cloud_config_url_get();
-    setenv("NETDATA_REGISTRY_CLOUD_BASE_URL", registry.cloud_base_url, 1);
+    nd_setenv("NETDATA_REGISTRY_CLOUD_BASE_URL", registry.cloud_base_url, 1);
 }
 
 // ----------------------------------------------------------------------------

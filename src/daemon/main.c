@@ -1977,7 +1977,7 @@ int netdata_main(int argc, char **argv) {
         // get the debugging flags from the configuration file
 
         char *flags = config_get(CONFIG_SECTION_LOGS, "debug flags",  "0x0000000000000000");
-        setenv("NETDATA_DEBUG_FLAGS", flags, 1);
+        nd_setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
         debug_flags = strtoull(flags, NULL, 0);
         netdata_log_debug(D_OPTIONS, "Debug flags set to '0x%" PRIX64 "'.", debug_flags);
@@ -2074,7 +2074,7 @@ int netdata_main(int argc, char **argv) {
                 st->init_routine();
 
             if(st->env_name)
-                setenv(st->env_name, st->enabled?"YES":"NO", 1);
+                nd_setenv(st->env_name, st->enabled?"YES":"NO", 1);
 
             if(st->global_variable)
                 *st->global_variable = (st->enabled) ? true : false;
@@ -2153,7 +2153,7 @@ int netdata_main(int argc, char **argv) {
         netdata_configured_home_dir = config_get(CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
     }
 
-    setenv("HOME", netdata_configured_home_dir, 1);
+    nd_setenv("HOME", netdata_configured_home_dir, 1);
 
     dyncfg_init(true);
 

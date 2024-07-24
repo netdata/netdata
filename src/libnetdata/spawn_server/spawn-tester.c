@@ -1,13 +1,26 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+#define ENV_VAR_KEY "SPAWN_TESTER"
+#define ENV_VAR_VALUE "1234567890"
+
 int external_plugin() {
+    const char *s = getenv(ENV_VAR_KEY);
+    if(!s || !*s || strcmp(s, ENV_VAR_VALUE) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Wrong environment. Variable '%s' should have value '%s' but it has '%s'",
+               ENV_VAR_KEY, ENV_VAR_VALUE, s ? s : "(unset)");
+
+        exit(1);
+    }
+
     char buffer[1024];
     while (fgets(buffer, sizeof(buffer), stdin) != NULL) {
         fprintf(stderr, "+");
         printf("%s", buffer);
         fflush(stdout);
     }
+
     return 0;
 }
 
@@ -74,12 +87,9 @@ void test_int_fds(int argc, const char **argv) {
 void test_popen(int argc, const char **argv) {
     netdata_main_spawn_server_init("test", argc, argv);
 
-    const char *params[] = {
-        argv[0],
-        "plugin",
-        NULL,
-    };
-    POPEN_INSTANCE *pi = spawn_popen_run_argv(params);
+    char cmd[FILENAME_MAX + 100];
+    snprintfz(cmd, sizeof(cmd), "exec %s plugin", argv[0]);
+    POPEN_INSTANCE *pi = spawn_popen_run(cmd);
     if(!pi) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot run myself as plugin (popen)");
         exit(1);
@@ -93,16 +103,16 @@ void test_popen(int argc, const char **argv) {
         fprintf(stderr, ".");
         memset(buffer, 0, sizeof(buffer));
 
-        size_t rc = fwrite(msg, 1, len, pi->child_stdin_fp);
+        size_t rc = fwrite(msg, 1, len, spawn_popen_stdin(pi));
         if (rc != len) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "Cannot write to plugin. Expected to write %zd bytes, wrote %zd bytes",
                    len, rc);
             exit(1);
         }
-        fflush(pi->child_stdin_fp);
+        fflush(spawn_popen_stdin(pi));
 
-        char *s = fgets(buffer, sizeof(buffer), pi->child_stdout_fp);
+        char *s = fgets(buffer, sizeof(buffer), spawn_popen_stdout(pi));
         if (!s || strlen(s) != len) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "Cannot read from plugin. Expected to read %zd bytes, read %zd bytes",
@@ -135,6 +145,8 @@ int main(int argc, const char **argv) {
         fprintf(stderr, "Run me with 'test' parameter!\n");
         exit(1);
     }
+
+    nd_setenv(ENV_VAR_KEY, ENV_VAR_VALUE, 1);
 
     fprintf(stderr, "\n\nTESTING int fds\n\n");
     test_int_fds(argc, argv);

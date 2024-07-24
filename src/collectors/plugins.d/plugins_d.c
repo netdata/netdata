@@ -158,7 +158,7 @@ static void *pluginsd_worker_thread(void *arg) {
                               rrdhost_hostname(cd->host), cd->cmd);
             break;
         }
-        cd->unsafe.pid = spawn_server_instance_pid(cd->unsafe.pi->si);
+        cd->unsafe.pid = spawn_popen_pid(cd->unsafe.pi);
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: 'host:%s' connected to '%s' running on pid %d",
@@ -182,8 +182,8 @@ static void *pluginsd_worker_thread(void *arg) {
         ND_LOG_STACK_PUSH(lgs);
 
         count = pluginsd_process(cd->host, cd,
-                                 spawn_server_instance_read_fd(cd->unsafe.pi->si),
-                                 spawn_server_instance_write_fd(cd->unsafe.pi->si),
+                                 spawn_popen_read_fd(cd->unsafe.pi),
+                                 spawn_popen_write_fd(cd->unsafe.pi),
                                  0);
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,

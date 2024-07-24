@@ -334,7 +334,7 @@ void analytics_alarms_notifications(void)
     if (instance) {
         char line[200 + 1];
 
-        while (fgets(line, 200, instance->child_stdout_fp) != NULL) {
+        while (fgets(line, 200, spawn_popen_stdout(instance)) != NULL) {
             char *end = line;
             while (*end && *end != '\n')
                 end++;
@@ -894,7 +894,7 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
     POPEN_INSTANCE *instance = spawn_popen_run(command_to_run);
     if (instance) {
         char buffer[4 + 1];
-        char *s = fgets(buffer, 4, instance->child_stdout_fp);
+        char *s = fgets(buffer, 4, spawn_popen_stdout(instance));
         int exit_code = spawn_popen_wait(instance);
         if (exit_code)
 
