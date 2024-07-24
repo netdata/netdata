@@ -11,6 +11,7 @@
 // #define SPAWN_SERVER_VERSION_UV 1
 #else
 #define SPAWN_SERVER_VERSION_NOFORK 1
+// #define SPAWN_SERVER_VERSION_UV 1
 #endif
 
 #if defined(SPAWN_SERVER_VERSION_WINDOWS)
@@ -32,6 +33,7 @@ struct spawn_server {
     uv_loop_t *loop;
     uv_thread_t thread;
     uv_async_t async;
+    bool stopping;
 
     SPINLOCK spinlock;
     struct work_item *work_queue;
@@ -65,6 +67,7 @@ struct spawm_instance {
     pid_t child_pid;
 
 #if defined(SPAWN_SERVER_VERSION_UV)
+    bool started;
     uv_process_t process;
     int exit_code;
     uv_sem_t sem;
