@@ -158,7 +158,7 @@
       - Authentication schemes: OAuth Bearer Token
 
       ### User Keying Between SCIM and OIDC
-      Our SCIM (System for Cross-domain Identity Management) integration utilizes OIDC (OpenID Connect) to authenticate users. 
+      Our SCIM (System for Cross-domain Identity Management) integration utilizes OIDC (OpenID Connect) to authenticate users.
       To ensure users are correctly identified and authenticated between SCIM and OIDC, we use the following mapping:
 
       - SCIM externalID ↔ OIDC sub
