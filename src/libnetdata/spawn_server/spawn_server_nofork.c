@@ -2,7 +2,7 @@
 
 #include "spawn_server_internals.h"
 
-#if !defined(OS_WINDOWS)
+#if defined(SPAWN_SERVER_VERSION_NOFORK)
 
 int spawn_server_instance_read_fd(SPAWN_INSTANCE *si) { return si->read_fd; }
 int spawn_server_instance_write_fd(SPAWN_INSTANCE *si) { return si->write_fd; }

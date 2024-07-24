@@ -737,7 +737,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setenv.h
         src/libnetdata/os/strndup.c
         src/libnetdata/os/strndup.h
-        src/libnetdata/spawn_server/spawn_server.c
+        src/libnetdata/spawn_server/spawn_server_nofork.c
         src/libnetdata/spawn_server/spawn_server.h
         src/libnetdata/spawn_server/spawn_popen.c
         src/libnetdata/spawn_server/spawn_popen.h
@@ -747,6 +747,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setproctitle.h
         src/libnetdata/spawn_server/spawn_server_windows.c
         src/libnetdata/spawn_server/spawn_server_internals.h
+        src/libnetdata/spawn_server/spawn_server_libuv.c
 )
 
 if(ENABLE_PLUGIN_EBPF)

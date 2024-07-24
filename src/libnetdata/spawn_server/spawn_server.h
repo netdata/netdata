@@ -7,16 +7,12 @@
 
 typedef enum __attribute__((packed)) {
     SPAWN_INSTANCE_TYPE_EXEC = 0,
-#if !defined(OS_WINDOWS)
     SPAWN_INSTANCE_TYPE_CALLBACK = 1
-#endif
 } SPAWN_INSTANCE_TYPE;
 
 typedef enum __attribute__((packed)) {
     SPAWN_SERVER_OPTION_EXEC = (1 << 0),
-#if !defined(OS_WINDOWS)
     SPAWN_SERVER_OPTION_CALLBACK = (1 << 1),
-#endif
 } SPAWN_SERVER_OPTIONS;
 
 // this is only used publicly for SPAWN_INSTANCE_TYPE_CALLBACK

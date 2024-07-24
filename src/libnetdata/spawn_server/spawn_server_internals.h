@@ -7,6 +7,13 @@
 #include "spawn_server.h"
 
 #if defined(OS_WINDOWS)
+#define SPAWN_SERVER_VERSION_WINDOWS 1
+// #define SPAWN_SERVER_VERSION_UV 1
+#else
+#define SPAWN_SERVER_VERSION_NOFORK 1
+#endif
+
+#if defined(SPAWN_SERVER_VERSION_WINDOWS)
 #include <windows.h>
 #include <io.h>
 #include <fcntl.h>
@@ -21,7 +28,16 @@ struct spawn_server {
     size_t request_id;
     const char *name;
 
-#if !defined(OS_WINDOWS)
+#if defined(SPAWN_SERVER_VERSION_UV)
+    uv_loop_t *loop;
+    uv_thread_t thread;
+    uv_async_t async;
+
+    SPINLOCK spinlock;
+    struct work_item *work_queue;
+#endif
+
+#if defined(SPAWN_SERVER_VERSION_NOFORK)
     SPAWN_SERVER_OPTIONS options;
 
     ND_UUID magic;          // for authorizing requests, the client needs to know our random UUID
@@ -36,6 +52,9 @@ struct spawn_server {
     int argc;
     const char **argv;
 #endif
+
+#if defined(SPAWN_SERVER_VERSION_WINDOWS)
+#endif
 };
 
 struct spawm_instance {
@@ -45,7 +64,18 @@ struct spawm_instance {
     int read_fd;
     pid_t child_pid;
 
-#if defined(OS_WINDOWS)
+#if defined(SPAWN_SERVER_VERSION_UV)
+    uv_process_t process;
+    int exit_code;
+    uv_sem_t sem;
+    int stdin_pipe[2];
+    int stdout_pipe[2];
+#endif
+
+#if defined(SPAWN_SERVER_VERSION_NOFORK)
+#endif
+
+#if defined(SPAWN_SERVER_VERSION_WINDOWS)
     HANDLE process_handle;
     DWORD dwProcessId;
 #endif
