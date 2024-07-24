@@ -9,9 +9,11 @@
 #if defined(OS_WINDOWS)
 #define SPAWN_SERVER_VERSION_WINDOWS 1
 // #define SPAWN_SERVER_VERSION_UV 1
+// #define SPAWN_SERVER_VERSION_POSIX_SPAWN 1
 #else
 #define SPAWN_SERVER_VERSION_NOFORK 1
 // #define SPAWN_SERVER_VERSION_UV 1
+// #define SPAWN_SERVER_VERSION_POSIX_SPAWN 1
 #endif
 
 #if defined(SPAWN_SERVER_VERSION_WINDOWS)
@@ -55,11 +57,14 @@ struct spawn_server {
     const char **argv;
 #endif
 
+#if defined(SPAWN_SERVER_VERSION_POSIX_SPAWN)
+#endif
+
 #if defined(SPAWN_SERVER_VERSION_WINDOWS)
 #endif
 };
 
-struct spawm_instance {
+struct spawn_instance {
     size_t request_id;
     int sock;
     int write_fd;
@@ -76,6 +81,12 @@ struct spawm_instance {
 #endif
 
 #if defined(SPAWN_SERVER_VERSION_NOFORK)
+#endif
+
+#if defined(SPAWN_SERVER_VERSION_POSIX_SPAWN)
+    uv_sem_t sem;
+    int exit_code;
+    struct spawn_instance *prev, *next;
 #endif
 
 #if defined(SPAWN_SERVER_VERSION_WINDOWS)

@@ -34,7 +34,7 @@ typedef struct spawn_request {
 
 typedef void (*spawn_request_callback_t)(SPAWN_REQUEST *request);
 
-typedef struct spawm_instance SPAWN_INSTANCE;
+typedef struct spawn_instance SPAWN_INSTANCE;
 typedef struct spawn_server SPAWN_SERVER;
 
 SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name, spawn_request_callback_t child_callback, int argc, const char **argv);

@@ -295,7 +295,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     si->request_id = __atomic_add_fetch(&server->request_id, 1, __ATOMIC_RELAXED);
 
     if (uv_sem_init(&si->sem, 0)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_sem_init(exit semaphore) failed");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_sem_init() failed");
         freez(si);
         return NULL;
     }

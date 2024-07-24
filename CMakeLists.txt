@@ -748,6 +748,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/spawn_server/spawn_server_windows.c
         src/libnetdata/spawn_server/spawn_server_internals.h
         src/libnetdata/spawn_server/spawn_server_libuv.c
+        src/libnetdata/spawn_server/spawn_server_posix.c
 )
 
 if(ENABLE_PLUGIN_EBPF)
