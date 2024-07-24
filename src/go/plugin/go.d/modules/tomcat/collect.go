@@ -7,17 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 const (
 	urlPathServerStats = "/manager/status?XML=true"
-)
-
-var (
-	singleQuoteRegex = regexp.MustCompile(`='([^']+)'([^']+)''`)
 )
 
 func (tc *Tomcat) collect() (map[string]int64, error) {
@@ -161,7 +156,6 @@ func (tc *Tomcat) doOKDecode(req *http.Request, in interface{}) error {
 	}
 
 	bodyStr := string(body)
-	bodyStr = singleQuoteRegex.ReplaceAllString(bodyStr, `='\$1'\$2'`)
 	err = xml.Unmarshal([]byte(bodyStr), in)
 	if err != nil {
 		return fmt.Errorf("error decoding XML response from '%s': %v", req.URL, err)
