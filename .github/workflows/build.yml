@@ -1089,7 +1089,7 @@ jobs:
         run: ./packaging/windows/build.ps1
       - name: Sign Agent Code
         id: sign-agent
-        if: needs.file-check.outputs.run == 'true' && event_name != 'pull_request'
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
         uses: azure/trusted-signing-action@v0.4
         with:
           azure-tennant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
@@ -1110,7 +1110,7 @@ jobs:
         run: ./packaging/windows/package.ps1
       - name: Sign Installer
         id: sign-installer
-        if: needs.file-check.outputs.run == 'true' && event_name != 'pull_request'
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
         uses: azure/trusted-signing-action@v0.4
         with:
           azure-tennant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
@@ -1130,6 +1130,32 @@ jobs:
           name: windows-x86_64-installer
           path: packaging\windows\netdata-installer.exe
           retention-days: 30
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Windows build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Updater checks for ${{ matrix.distro }} failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Set Up Dependencies: ${{ steps.deps.outcome }}
+              Build Netdata: ${{ steps.build.outcome }}
+              Sign Agent Code: ${{ steps.sign-agent.outcome }}
+              Package Netdata: ${{ steps.package.outcome }}
+              Sign Installer: ${{ steps.sign-installer.outcome }}
+              Upload Installer: ${{ steps.upload.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
+          }}
 
   updater-check: # Test the generated dist archive using the updater code.
     name: Test Generated Distfile and Updater Code
