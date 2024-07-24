@@ -2,6 +2,11 @@
 
 #include "claim.h"
 
+#if defined(OS_WINDOWS)
+#include <windows.h>
+#include <sys/cygwin.h>
+#endif
+
 static char *netdata_random_session_id_filename = NULL;
 static nd_uuid_t netdata_random_session_id = { 0 };
 
@@ -166,8 +171,38 @@ int api_v2_claim(struct web_client *w, char *url) {
         buffer_json_member_add_string_or_empty(wb, "message", msg);
     }
 
-    if(can_be_claimed)
-        buffer_json_member_add_string(wb, "key_filename", netdata_random_session_id_get_filename());
+    if(can_be_claimed) {
+        const char *filename = netdata_random_session_id_get_filename();
+        CLEAN_BUFFER *buffer = buffer_create(0, NULL);
+
+        const char *os_filename;
+        const char *os_prefix;
+        const char *os_quote;
+        const char *os_message;
+
+#if defined(OS_WINDOWS)
+        char win_path[MAX_PATH];
+        cygwin_conv_path(CCP_POSIX_TO_WIN_A, filename, win_path, sizeof(win_path));
+        os_filename = win_path;
+        os_prefix = "more";
+        os_message = "We need to verify this Windows server is yours. So, open a Command Prompt on this server to run the command. It will give you a UUID. Copy and paste this UUID to this box:";
+#else
+        os_filename = filename;
+        os_prefix = "sudo cat";
+        os_message = "We need to verify this server is yours. SSH to this server and run this command. It will give you a UUID. Copy and paste this UUID to this box:";
+#endif
+
+        // add quotes only when the filename has a space
+        if(strchr(os_filename, ' '))
+            os_quote = "\"";
+        else
+            os_quote = "";
+
+        buffer_sprintf(buffer, "%s %s%s%s", os_prefix, os_quote, os_filename, os_quote);
+        buffer_json_member_add_string(wb, "key_filename", os_filename);
+        buffer_json_member_add_string(wb, "cmd", buffer_tostring(buffer));
+        buffer_json_member_add_string(wb, "help", os_message);
+    }
 
     buffer_json_agents_v2(wb, NULL, now_s, false, false);
     buffer_json_finalize(wb);
