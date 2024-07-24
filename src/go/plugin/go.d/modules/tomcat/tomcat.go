@@ -5,6 +5,7 @@ package tomcat
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -59,16 +60,23 @@ func (tc *Tomcat) Configuration() any {
 
 func (tc *Tomcat) Init() error {
 	if tc.URL == "" {
-		tc.Error("URL not set")
-		return errors.New("url not set")
+		tc.Errorf("URL not set")
+		return fmt.Errorf("url not set")
 	}
 
-	client, err := web.NewHTTPClient(tc.Client)
-	if err != nil {
-		tc.Error(err)
+	if err := tc.validateConfig(); err != nil {
+		tc.Errorf("config validation: %v", err)
 		return err
 	}
-	tc.httpClient = client
+
+	httpClient, err := tc.initHTTPClient()
+
+	if err != nil {
+		tc.Errorf("init HTTP client: %v", err)
+		return err
+	}
+
+	tc.httpClient = httpClient
 
 	tc.Debugf("using URL %s", tc.URL)
 	tc.Debugf("using timeout: %s", tc.Timeout)

@@ -1,0 +1,235 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      plugin_name: go.d.plugin
+      module_name: tomcat
+      monitored_instance:
+        name: Tomcat
+        link: "https://tomcat.apache.org/"
+        categories:
+          - data-collection.web-servers-and-web-proxies
+        icon_filename: "tomcat.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - apache
+        - tomcat
+        - webserver
+        - websocket
+        - jakarta
+        - javaEE
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Tomcat metrics about bandwidth, processing time, threads and more.
+        method_description: |
+          It parses the information provided by the `/manager/status` HTTP endpoint.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: "You will need to provide the username and the password, to access the webserver's status page. Create a separate user with read only rights for this particular endpoint"
+      default_behavior:
+        auto_detection:
+          description: "If the Netdata Agent and the Tomcat webserver are in the same host, without configuration, the module attempts to connect to http://localhost:8080/manager/status?XML=true, without any credentials. So it will probably fail."
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: User access to the endpoint
+            description: Create a read-only `netdata` user, to monitor the `/status` endpoint. This is necessary for configuring the collector.
+      configuration:
+        file:
+          name: "go.d/tomcat.conf"
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:8080/manager/status?XML=true
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: POST
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: "Config"
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080/manager/status?XML=true
+                    username: John
+                    password: Doe
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080/manager/status?XML=true
+                    username: admin1
+                    password: hackme1
+
+                  - name: remote
+                    url: http://192.0.2.1:8080/manager/status?XML=true
+                    username: admin2
+                    password: hackme2
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: tomcat.accesses
+              description: Requests
+              unit: "requests/s"
+              chart_type: area
+              dimensions:
+                - name: accesses
+                - name: errors
+            - name: tomcat.bandwidth
+              description: Bandwidth
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: sent
+                - name: received
+            - name: tomcat.processing_time
+              description: processing time
+              unit: "seconds"
+              chart_type: area
+              dimensions:
+                - name: processing time
+            - name: tomcat.threads
+              description: Threads
+              unit: "current threads"
+              chart_type: area
+              dimensions:
+                - name: current
+                - name: busy
+            - name: tomcat.jvm
+              description: JVM Memory Pool Usage
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: eden
+                - name: survivor
+                - name: tenured
+                - name: code cache
+                - name: compressed
+                - name: metaspace
+            - name: tomcat.jvm_eden
+              description: Eden Memory Usage
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: used
+                - name: committed
+                - name: max
+            - name: tomcat.jvm_survivor
+              description: Survivor Memory Usage
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: used
+                - name: committed
+                - name: max
+            - name: tomcat.jvm_tenured
+              description: Tenured Memory Usage
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: used
+                - name: committed
+                - name: max

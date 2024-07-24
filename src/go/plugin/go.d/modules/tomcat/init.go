@@ -3,7 +3,7 @@
 package tomcat
 
 import (
-	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -12,10 +12,10 @@ import (
 
 func (a *Tomcat) validateConfig() error {
 	if a.URL == "" {
-		return errors.New("url not set")
+		return fmt.Errorf("url not set")
 	}
 	if !strings.HasSuffix(a.URL, "status?XML=true") {
-		return errors.New("invalid URL, should end in 'status?XML=true'")
+		return fmt.Errorf("invalid URL, should end in 'status?XML=true'")
 	}
 	return nil
 }
