@@ -24,13 +24,7 @@ int external_plugin() {
     return 0;
 }
 
-void test_int_fds(int argc, const char **argv) {
-    SPAWN_SERVER *server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC, "test", NULL, argc, argv);
-    if(!server) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create spawn server");
-        exit(1);
-    }
-
+void test_int_fds(SPAWN_SERVER *server, int argc __maybe_unused, const char **argv) {
     const char *params[] = {
         argv[0],
         "plugin",
@@ -47,8 +41,8 @@ void test_int_fds(int argc, const char **argv) {
     ssize_t len = strlen(msg);
     char buffer[len * 2];
 
-    for(size_t j = 0; j < 1000 ;j++) {
-        fprintf(stderr, ".");
+    for(size_t j = 0; j < 30 ;j++) {
+        fprintf(stderr, "-");
         memset(buffer, 0, sizeof(buffer));
 
         ssize_t rc = write(spawn_server_instance_write_fd(si), msg, len);
@@ -80,8 +74,6 @@ void test_int_fds(int argc, const char **argv) {
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
            "child exited with code %d",
            code);
-
-    spawn_server_destroy(server);
 }
 
 void test_popen(int argc __maybe_unused, const char **argv) {
@@ -97,8 +89,8 @@ void test_popen(int argc __maybe_unused, const char **argv) {
     size_t len = strlen(msg);
     char buffer[len * 2];
 
-    for(size_t j = 0; j < 1000 ;j++) {
-        fprintf(stderr, ".");
+    for(size_t j = 0; j < 30 ;j++) {
+        fprintf(stderr, "-");
         memset(buffer, 0, sizeof(buffer));
 
         size_t rc = fwrite(msg, 1, len, spawn_popen_stdin(pi));
@@ -144,8 +136,17 @@ int main(int argc, const char **argv) {
 
     nd_setenv(ENV_VAR_KEY, ENV_VAR_VALUE, 1);
 
-    fprintf(stderr, "\n\nTESTING int fds\n\n");
-    test_int_fds(argc, argv);
+    fprintf(stderr, "\n\nTESTING fds\n\n");
+    SPAWN_SERVER *server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC, "test", NULL, argc, argv);
+    if(!server) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create spawn server");
+        exit(1);
+    }
+    for(size_t i = 0; i < 10; i++) {
+        fprintf(stderr, "\n\nTESTING fds No %zu\n\n", i + 1);
+        test_int_fds(server, argc, argv);
+    }
+    spawn_server_destroy(server);
 
     fprintf(stderr, "\n\nTESTING popen\n\n");
     netdata_main_spawn_server_init("test", argc, argv);
