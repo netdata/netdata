@@ -82,7 +82,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
         return retval;
 
     struct pollfd pfd;
-    pfd.fd = spawn_server_instance_read_fd(pi->si);
+    pfd.fd = spawn_popen_read_fd(pi);
     pfd.events = POLLIN;
 
     int timeout = 3000; // milliseconds
@@ -93,7 +93,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     } else if (ret == 0) {
         collector_info("Cannot get the output of \"%s\" within timeout (%d ms)", exec, timeout);
     } else {
-        while (fgets(buf, MAXSIZE_PROC_CMDLINE, pi->child_stdout_fp) != NULL) {
+        while (fgets(buf, MAXSIZE_PROC_CMDLINE, spawn_popen_stdout(pi)) != NULL) {
             if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
                 end = begin = begin + strlen(SYSTEMD_HIERARCHY_STRING);
                 if (!*begin)
@@ -153,18 +153,18 @@ static enum cgroups_type cgroups_try_detect_version()
     int cgroups2_available = 0;
 
     // 1. check if cgroups2 available on system at all
-    POPEN_INSTANCE *instance = spawn_popen_run("grep cgroup /proc/filesystems");
-    if(!instance) {
+    POPEN_INSTANCE *pi = spawn_popen_run("grep cgroup /proc/filesystems");
+    if(!pi) {
         collector_error("cannot run 'grep cgroup /proc/filesystems'");
         return CGROUPS_AUTODETECT_FAIL;
     }
-    while (fgets(buf, MAXSIZE_PROC_CMDLINE, instance->child_stdout_fp) != NULL) {
+    while (fgets(buf, MAXSIZE_PROC_CMDLINE, spawn_popen_stdout(pi)) != NULL) {
         if (strstr(buf, "cgroup2")) {
             cgroups2_available = 1;
             break;
         }
     }
-    if(spawn_popen_wait(instance) != 0)
+    if(spawn_popen_wait(pi) != 0)
         return CGROUPS_AUTODETECT_FAIL;
 
     if(!cgroups2_available)

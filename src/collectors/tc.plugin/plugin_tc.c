@@ -928,7 +928,7 @@ void *tc_main(void *ptr) {
         }
 
         char buffer[TC_LINE_MAX+1] = "";
-        while(fgets(buffer, TC_LINE_MAX, tc_child_instance->child_stdout_fp) != NULL) {
+        while(fgets(buffer, TC_LINE_MAX, spawn_popen_stdout(tc_child_instance)) != NULL) {
             if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
             buffer[TC_LINE_MAX] = '\0';

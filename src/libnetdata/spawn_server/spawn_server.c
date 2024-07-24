@@ -54,10 +54,14 @@ void spawn_server_instance_read_fd_unset(SPAWN_INSTANCE *si) { si->read_fd = -1;
 void spawn_server_instance_write_fd_unset(SPAWN_INSTANCE *si) { si->write_fd = -1; }
 
 pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si) {
+#if defined(OS_WINDOWS)
     if(si->child_pid != -1)
         return si->child_pid;
 
     return (pid_t)si->dwProcessId;
+#else
+    return si->child_pid;
+#endif
 }
 
 #if defined(OS_WINDOWS)
