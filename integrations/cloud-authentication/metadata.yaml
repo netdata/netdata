@@ -165,7 +165,7 @@
 
       This mapping ensures that the identity of users remains consistent and secure across both systems.
 
-      **Important**: Ensure that your OIDC and SCIM integrations follow this mapping strictly.
+      **Important**: Ensure that your OIDC and SCIM systems follow this mapping strictly.
       The externalID in SCIM must correspond to the sub field in OIDC. Any deviation from this mapping may result
       in incorrect user identification and authentication failures.
 
