@@ -745,6 +745,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/close_range.h
         src/libnetdata/os/setproctitle.c
         src/libnetdata/os/setproctitle.h
+        src/libnetdata/spawn_server/spawn_server_windows.c
+        src/libnetdata/spawn_server/spawn_server_internals.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
