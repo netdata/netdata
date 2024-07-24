@@ -66,7 +66,25 @@ pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si) {
 
 #if defined(OS_WINDOWS)
 
+static void update_cygpath_env(void) {
+    static volatile bool done = false;
+
+    if(done) return;
+    done = true;
+
+    char win_path[MAX_PATH];
+
+    // Convert Cygwin root path to Windows path
+    cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path));
+
+    nd_setenv("CYGWIN_BASE_PATH", win_path, 1);
+
+    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Cygwin/MSYS2 base path set to '%s'", win_path);
+}
+
 SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, const char *name, spawn_request_callback_t cb  __maybe_unused, int argc __maybe_unused, const char **argv __maybe_unused) {
+    update_cygpath_env();
+
     SPAWN_SERVER* server = callocz(1, sizeof(SPAWN_SERVER));
     if(name)
         server->name = strdupz(name);
