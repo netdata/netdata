@@ -2,10 +2,11 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.46.2...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.46.3...HEAD)
 
 **Merged pull requests:**
 
+- go.d drop using cancelreader [\#18219](https://github.com/netdata/netdata/pull/18219) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18216](https://github.com/netdata/netdata/pull/18216) ([netdatabot](https://github.com/netdatabot))
 - go.d chrony fix client read/write timeout [\#18215](https://github.com/netdata/netdata/pull/18215) ([ilyam8](https://github.com/ilyam8))
 - dont install test bash scripts by default [\#18214](https://github.com/netdata/netdata/pull/18214) ([ilyam8](https://github.com/ilyam8))
@@ -173,6 +174,10 @@
 - Run the agent as a Windows service. [\#17766](https://github.com/netdata/netdata/pull/17766) ([vkalintiris](https://github.com/vkalintiris))
 - add Win CPU interrupts [\#17753](https://github.com/netdata/netdata/pull/17753) ([thiagoftsm](https://github.com/thiagoftsm))
 - Relax strict version constraints for DEB package dependencies. [\#17681](https://github.com/netdata/netdata/pull/17681) ([Ferroin](https://github.com/Ferroin))
+
+## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.46.2...v1.46.3)
 
 ## [v1.46.2](https://github.com/netdata/netdata/tree/v1.46.2) (2024-07-10)
 
@@ -414,7 +419,6 @@
 - logs: add ND\_ALERT\_STATUS to facets [\#17641](https://github.com/netdata/netdata/pull/17641) ([ktsaou](https://github.com/ktsaou))
 - Add valkey to apps\_groups.conf [\#17639](https://github.com/netdata/netdata/pull/17639) ([mohd-akram](https://github.com/mohd-akram))
 - python.d remove hpssa [\#17638](https://github.com/netdata/netdata/pull/17638) ([ilyam8](https://github.com/ilyam8))
-- go.d hpssa [\#17637](https://github.com/netdata/netdata/pull/17637) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
