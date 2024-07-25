@@ -183,19 +183,19 @@ static DWORD netdata_windows_get_current_build()
 
 static void netdata_windows_discover_os_version(char *os, size_t length, DWORD build)
 {
-    char productName[256];
-    if (!netdata_registry_get_string(productName,
+    char versionName[256];
+    if (!netdata_registry_get_string(versionName,
                                     255,
                                     HKEY_LOCAL_MACHINE,
                                     "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
-                                    "ProductName"))
+                                    "DisplayVersion"))
     {
-        (void)snprintf(os, length, "Windows");
+        (void)snprintf(os, length, "Microsoft Windows");
         return;
     }
 
     if (IsWindowsServer()) {
-        (void)snprintf(os, length, "%s", productName);
+        (void)snprintf(os, length, "Microsoft Windows Version %s", versionName);
         return;
     }
 
@@ -221,7 +221,7 @@ static void netdata_windows_discover_os_version(char *os, size_t length, DWORD b
     }
     // We are not testing older, because it is not supported anymore by Microsoft
 
-    (void)snprintf(os, length, "%s (%s)", productName, version);
+    (void)snprintf(os, length, "Microsoft Windows Version %s, Build %d (%s)", productName, build, version);
 }
 
 static void netdata_windows_os_version(char *out, DWORD length)
