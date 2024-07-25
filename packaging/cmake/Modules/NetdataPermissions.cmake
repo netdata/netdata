@@ -108,11 +108,13 @@ endif()
 # Add the requested additional permissions to the specified path in the
 # specified component.
 #
-# The permissions may be either `suid`, or one or more Linux capability
+# The permissions may be `suid`, `restrict`, or one or more Linux capability
 # names in lowercase with the `cap_` prefix removed.
 #
-# In either case, the specified file will have ownership updated to
+# In any case, the specified file will have ownership updated to
 # root:netdata and be marked with permissions of 0750.
+#
+# If `restrict` is specified, no further changes will be made.
 #
 # If capabilities are specified, they will be added if supported (with
 # special fallback handling when needed) and not disabled, otherwise the
