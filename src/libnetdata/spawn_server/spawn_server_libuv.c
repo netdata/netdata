@@ -191,7 +191,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, c
     else
         server->name = strdupz("unnamed");
 
-    server->loop = mallocz(sizeof(uv_loop_t));
+    server->loop = callocz(1, sizeof(uv_loop_t));
     if (uv_loop_init(server->loop)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_loop_init() failed");
         freez(server->loop);
