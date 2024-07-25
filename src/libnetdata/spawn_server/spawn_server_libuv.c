@@ -8,7 +8,7 @@ int spawn_server_instance_read_fd(SPAWN_INSTANCE *si) { return si->read_fd; }
 int spawn_server_instance_write_fd(SPAWN_INSTANCE *si) { return si->write_fd; }
 void spawn_server_instance_read_fd_unset(SPAWN_INSTANCE *si) { si->read_fd = -1; }
 void spawn_server_instance_write_fd_unset(SPAWN_INSTANCE *si) { si->write_fd = -1; }
-pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si) { return si->child_pid; }
+pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si) { return uv_process_get_pid(&si->process); }
 
 typedef struct work_item {
     SPAWN_SERVER *server;
@@ -97,11 +97,25 @@ int uv_errno_to_errno(int uv_err) {
     }
 }
 
+static void posix_unmask_sigchld_on_thread(void) {
+    sigset_t sigset;
+    sigemptyset(&sigset);  // Initialize the signal set to empty
+    sigaddset(&sigset, SIGCHLD);  // Add SIGCHLD to the set
+
+    if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) != 0)
+        netdata_log_error("SPAWN SERVER: cannot unmask SIGCHLD");
+}
+
 static void server_thread(void *arg) {
     SPAWN_SERVER *server = (SPAWN_SERVER *)arg;
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
            "SPAWN SERVER: started");
 
+    // this thread needs to process SIGCHLD (by libuv)
+    // so we unblock it
+    posix_unmask_sigchld_on_thread();
+
+    // run the event loop
     uv_run(server->loop, UV_RUN_DEFAULT);
 
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -135,6 +149,8 @@ static void async_callback(uv_async_t *handle) {
                item->options.stdio[1].data.fd, si->stdout_pipe[PIPE_WRITE],
                item->options.stdio[2].data.fd, STDERR_FILENO);
 
+        // uv_spawn() does not close all other open file descriptors
+        // we have to close them manually
         int fds[3] = { item->options.stdio[0].data.fd, item->options.stdio[1].data.fd, item->options.stdio[2].data.fd };
         os_close_all_non_std_open_fds_except(fds, 3, CLOSE_RANGE_CLOEXEC);
 
@@ -156,7 +172,7 @@ static void async_callback(uv_async_t *handle) {
             // Successfully spawned
 
             // get the pid of the process spawned
-            si->child_pid = item->instance->process.pid;
+            si->child_pid = uv_process_get_pid(&si->process);
 
             // close the child sides of the pipes
             if (si->stdin_pipe[PIPE_READ] != -1) { close(si->stdin_pipe[PIPE_READ]); si->stdin_pipe[PIPE_READ] = -1; }

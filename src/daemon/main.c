@@ -2041,8 +2041,7 @@ int netdata_main(int argc, char **argv) {
         // this causes the threads to block signals.
 
         delta_startup_time("initialize signals");
-        signals_block();
-        signals_init(); // setup the signals we want to use
+        nd_initialize_signals(); // setup the signals we want to use
 
         // --------------------------------------------------------------------
         // check which threads are enabled and initialize them
@@ -2281,8 +2280,6 @@ int netdata_main(int argc, char **argv) {
     }
 
     webrtc_initialize();
-    signals_unblock();
-
     return 10;
 }
 
@@ -2293,7 +2290,7 @@ int main(int argc, char *argv[])
     if (rc != 10)
         return rc;
 
-    signals_handle();
+    nd_process_signals();
     return 1;
 }
 #endif

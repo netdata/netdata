@@ -1637,7 +1637,8 @@ close_and_send:
 // ----------------------------------------------------------------------------
 // main, command line arguments parsing
 
-static NORETURN void plugin_exit(int code) {
+static void plugin_exit(int code) NORETURN;
+static void plugin_exit(int code) {
     fflush(stdout);
     function_plugin_should_exit = true;
     exit(code);
