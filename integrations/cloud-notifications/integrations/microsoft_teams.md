@@ -27,7 +27,7 @@ To add Microsoft Teams notifications integration to your Netdata Cloud space you
 - A Netdata Cloud account.
 - Access to the Netdata Cloud space as an **Admin**.
 - The Space to be on a paid plan.
-- A [Microsoft 365 for Business Account](https://www.microsoft.com/en-us/microsoft-365/business). Note that this is a **paid** account.
+- A [Microsoft Teams Essentials subscription](https://www.microsoft.com/en-sg/microsoft-teams/essentials) or higher. Note that this is a **paid** feature.
 
 ### Settings on Microsoft Teams
 
