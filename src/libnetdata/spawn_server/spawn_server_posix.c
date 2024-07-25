@@ -26,25 +26,23 @@ static struct {
     .instances = NULL,
 };
 
-static void sigchld_handler(int signum) {
-    (void) signum; // Unused parameter
-
-    pid_t pid;
-    int status;
-
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        // Find the SPAWN_INSTANCE corresponding to this pid
-        spinlock_lock(&spawn_globals.spinlock);
-        for(SPAWN_INSTANCE *si = spawn_globals.instances; si ;si = si->next) {
-            if (si->child_pid == pid) {
-                __atomic_store_n(&si->waitpid_status, status, __ATOMIC_RELAXED);
-                __atomic_store_n(&si->exited, true, __ATOMIC_RELAXED);
-                break;
-            }
-        }
-        spinlock_unlock(&spawn_globals.spinlock);
-    }
-}
+//static void sigchld_handler(int signum __maybe_unused) {
+//    pid_t pid;
+//    int status;
+//
+//    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+//        // Find the SPAWN_INSTANCE corresponding to this pid
+//        spinlock_lock(&spawn_globals.spinlock);
+//        for(SPAWN_INSTANCE *si = spawn_globals.instances; si ;si = si->next) {
+//            if (si->child_pid == pid) {
+//                __atomic_store_n(&si->waitpid_status, status, __ATOMIC_RELAXED);
+//                __atomic_store_n(&si->exited, true, __ATOMIC_RELAXED);
+//                break;
+//            }
+//        }
+//        spinlock_unlock(&spawn_globals.spinlock);
+//    }
+//}
 
 SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, const char *name, spawn_request_callback_t cb  __maybe_unused, int argc __maybe_unused, const char **argv __maybe_unused) {
     SPAWN_SERVER* server = callocz(1, sizeof(SPAWN_SERVER));
@@ -57,16 +55,16 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, c
     if(!spawn_globals.sigchld_initialized) {
         spawn_globals.sigchld_initialized = true;
 
-        struct sigaction sa;
-        sa.sa_handler = sigchld_handler;
-        sigemptyset(&sa.sa_mask);
-        sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
-        if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Failed to set SIGCHLD handler");
-            freez((void *)server->name);
-            freez(server);
-            return NULL;
-        }
+//        struct sigaction sa;
+//        sa.sa_handler = sigchld_handler;
+//        sigemptyset(&sa.sa_mask);
+//        sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+//        if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+//            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Failed to set SIGCHLD handler");
+//            freez((void *)server->name);
+//            freez(server);
+//            return NULL;
+//        }
     }
 
     return server;

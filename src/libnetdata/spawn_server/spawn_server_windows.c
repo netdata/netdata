@@ -218,6 +218,9 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
            "SPAWN PARENT: Running request No %zu, command: '%s'",
            instance->request_id, command);
 
+    int fds[3] = { pipe_stdin[PIPE_READ], pipe_stdout[PIPE_WRITE], stderr_fd };
+    os_close_all_non_std_open_fds_except(fds, 3, CLOSE_RANGE_CLOEXEC);
+
     // Spawn the process
     errno_clear();
     if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, env_block, NULL, &si, &pi)) {
@@ -323,11 +326,47 @@ static void TerminateChildProcesses(SPAWN_INSTANCE *si) {
     CloseHandle(hSnapshot);
 }
 
-int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
-//    nd_log(NDLS_COLLECTORS, NDLP_ERR,
-//           "SPAWN PARENT: child of request No %zu, pid %d, is about to be killed",
-//           si->request_id, (int)si->child_pid);
+int map_status_code_to_signal(DWORD status_code) {
+    switch (status_code) {
+        case STATUS_ACCESS_VIOLATION:
+            return SIGSEGV;
+        case STATUS_ILLEGAL_INSTRUCTION:
+            return SIGILL;
+        case STATUS_FLOAT_DIVIDE_BY_ZERO:
+        case STATUS_INTEGER_DIVIDE_BY_ZERO:
+        case STATUS_ARRAY_BOUNDS_EXCEEDED:
+        case STATUS_FLOAT_OVERFLOW:
+        case STATUS_FLOAT_UNDERFLOW:
+        case STATUS_FLOAT_INVALID_OPERATION:
+            return SIGFPE;
+        case STATUS_BREAKPOINT:
+        case STATUS_SINGLE_STEP:
+            return SIGTRAP;
+        case STATUS_STACK_OVERFLOW:
+        case STATUS_INVALID_HANDLE:
+        case STATUS_INVALID_PARAMETER:
+        case STATUS_NO_MEMORY:
+        case STATUS_PRIVILEGED_INSTRUCTION:
+        case STATUS_DLL_NOT_FOUND:
+        case STATUS_DLL_INIT_FAILED:
+        case STATUS_ORDINAL_NOT_FOUND:
+        case STATUS_ENTRYPOINT_NOT_FOUND:
+        case STATUS_CONTROL_STACK_VIOLATION:
+        case STATUS_STACK_BUFFER_OVERRUN:
+        case STATUS_ASSERTION_FAILURE:
+        case STATUS_INVALID_CRUNTIME_PARAMETER:
+        case STATUS_HEAP_CORRUPTION:
+            return SIGABRT;
+        case STATUS_CONTROL_C_EXIT:
+            return SIGTERM; // we use this internally as such
+        case STATUS_FATAL_APP_EXIT:
+            return SIGTERM;
+        default:
+            return status_code;
+    }
+}
 
+int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
     if(si->child_pid != -1 && kill(si->child_pid, SIGTERM) != 0)
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be killed",
@@ -345,33 +384,10 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     errno_clear();
     TerminateChildProcesses(si);
 
-    // wait for the process to end
-    WaitForSingleObject(si->process_handle, INFINITE);
-
-    // get its exit code
-    DWORD exit_code;
-    GetExitCodeProcess(si->process_handle, &exit_code);
-    CloseHandle(si->process_handle);
-
-    char *err = GetErrorString(exit_code);
-
-    nd_log(NDLS_COLLECTORS, NDLP_ERR,
-           "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), stopped/killed and returned code %u (0x%x): %s",
-           si->request_id, (int)si->child_pid, si->dwProcessId,
-           (unsigned)exit_code, (unsigned)exit_code, err ? err : "(no reason text)");
-
-    if(err)
-        LocalFree(err);
-
-    freez(si);
-    return (int)exit_code;
+    return spawn_server_exec_wait(server, si);
 }
 
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
-//    nd_log(NDLS_COLLECTORS, NDLP_ERR,
-//           "SPAWN PARENT: child of request No %zu, pid %d, is about to be waited for",
-//           si->request_id, (int)si->child_pid);
-
     if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
 
@@ -393,7 +409,7 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
         LocalFree(err);
 
     freez(si);
-    return (int)exit_code;
+    return map_status_code_to_signal(exit_code);
 }
 
 #endif
