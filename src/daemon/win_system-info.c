@@ -166,7 +166,6 @@ static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *syst
 // Host
 static DWORD netdata_windows_get_current_build()
 {
-    HKEY hKey;
     char cBuild[64];
     if (!netdata_registry_get_string(
             cBuild, 63, HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "CurrentBuild"))
