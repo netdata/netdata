@@ -72,7 +72,6 @@ struct spawn_instance {
     pid_t child_pid;
 
 #if defined(SPAWN_SERVER_VERSION_UV)
-    bool started;
     uv_process_t process;
     int exit_code;
     uv_sem_t sem;

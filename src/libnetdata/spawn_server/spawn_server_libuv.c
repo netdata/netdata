@@ -11,9 +11,10 @@ void spawn_server_instance_write_fd_unset(SPAWN_INSTANCE *si) { si->write_fd = -
 pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si) { return uv_process_get_pid(&si->process); }
 
 typedef struct work_item {
-    SPAWN_SERVER *server;
+    int stderr_fd;
+    const char **argv;
+    uv_sem_t sem;
     SPAWN_INSTANCE *instance;
-    uv_process_options_t options;
     struct work_item *prev;
     struct work_item *next;
 } work_item;
@@ -122,6 +123,107 @@ static void server_thread(void *arg) {
            "SPAWN SERVER: ended");
 }
 
+static void on_process_exit(uv_process_t *req, int64_t exit_status, int term_signal) {
+    SPAWN_INSTANCE *si = (SPAWN_INSTANCE *)req->data;
+    si->exit_code = (int)(term_signal ? term_signal : exit_status << 8);
+    uv_close((uv_handle_t *)req, NULL); // Properly close the process handle
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "SPAWN SERVER: process with pid %d exited with code %d and term_signal %d",
+           si->child_pid, (int)exit_status, term_signal);
+
+    uv_sem_post(&si->sem); // Signal that the process has exited
+}
+
+static SPAWN_INSTANCE *spawn_process_with_libuv(SPAWN_SERVER *server, int stderr_fd, const char **argv) {
+    SPAWN_INSTANCE *si = NULL;
+    bool si_sem_init = false;
+
+    int stdin_pipe[2] = { -1, -1 };
+    int stdout_pipe[2] = { -1, -1 };
+
+    if (pipe(stdin_pipe) == -1) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: stdin pipe() failed");
+        goto cleanup;
+    }
+
+    if (pipe(stdout_pipe) == -1) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: stdout pipe() failed");
+        goto cleanup;
+    }
+
+    si = callocz(1, sizeof(SPAWN_INSTANCE));
+    si->exit_code = -1;
+
+    if (uv_sem_init(&si->sem, 0)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: uv_sem_init() failed");
+        goto cleanup;
+    }
+    si_sem_init = true;
+
+    uv_process_options_t options = { 0 };
+    options.exit_cb = on_process_exit;
+    options.file = argv[0];
+    options.args = (char **)argv;
+    options.env = (char **)environ;
+
+    options.stdio_count = 3;
+    uv_stdio_container_t stdio[3] = { 0 };
+    stdio[0].flags = UV_INHERIT_FD;
+    stdio[0].data.fd = stdin_pipe[PIPE_READ];
+    stdio[1].flags = UV_INHERIT_FD;
+    stdio[1].data.fd = stdout_pipe[PIPE_WRITE];
+    stdio[2].flags = UV_INHERIT_FD;
+    stdio[2].data.fd = stderr_fd;
+    options.stdio = stdio;
+
+    // uv_spawn() does not close all other open file descriptors
+    // we have to close them manually
+    int fds[3] = { stdio[0].data.fd, stdio[1].data.fd, stdio[2].data.fd };
+    os_close_all_non_std_open_fds_except(fds, 3, CLOSE_RANGE_CLOEXEC);
+
+    int rc = uv_spawn(server->loop, &si->process, &options);
+    if (rc) {
+        errno = uv_errno_to_errno(rc);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: uv_spawn() failed with error %s, %s",
+               uv_err_name(rc), uv_strerror(rc));
+        goto cleanup;
+    }
+
+    // Successfully spawned
+
+    // get the pid of the process spawned
+    si->child_pid = uv_process_get_pid(&si->process);
+
+    // on_process_exit() needs this to find the si
+    si->process.data = si;
+
+    nd_log(NDLS_COLLECTORS, NDLP_INFO,
+           "SPAWN SERVER: process created with pid %d", si->child_pid);
+
+    // close the child sides of the pipes
+    close(stdin_pipe[PIPE_READ]);
+    si->write_fd = stdin_pipe[PIPE_WRITE];
+    si->read_fd = stdout_pipe[PIPE_READ];
+    close(stdout_pipe[PIPE_WRITE]);
+
+    return si;
+
+cleanup:
+    if(stdin_pipe[PIPE_READ] != -1) close(stdin_pipe[PIPE_READ]);
+    if(stdin_pipe[PIPE_WRITE] != -1) close(stdin_pipe[PIPE_WRITE]);
+    if(stdout_pipe[PIPE_READ] != -1) close(stdout_pipe[PIPE_READ]);
+    if(stdout_pipe[PIPE_WRITE] != -1) close(stdout_pipe[PIPE_WRITE]);
+    if(si) {
+        if(si_sem_init)
+            uv_sem_destroy(&si->sem);
+
+        freez(si);
+    }
+    return NULL;
+}
+
 static void async_callback(uv_async_t *handle) {
     nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: dequeue commands started");
     SPAWN_SERVER *server = (SPAWN_SERVER *)handle->data;
@@ -140,47 +242,16 @@ static void async_callback(uv_async_t *handle) {
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(server->work_queue, item, prev, next);
         spinlock_unlock(&server->spinlock);
 
-        SPAWN_INSTANCE *si = item->instance;
+        item->instance = spawn_process_with_libuv(server, item->stderr_fd, item->argv);
+        uv_sem_post(&item->sem);
 
-        nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: stdin fd = %d, stdout fd = %d, stderr fd = %d, cmd: %s",
-               item->options.stdio[0].data.fd, item->options.stdio[1].data.fd, item->options.stdio[2].data.fd,
-               item->options.file);
-
-        // uv_spawn() does not close all other open file descriptors
-        // we have to close them manually
-        int fds[3] = { item->options.stdio[0].data.fd, item->options.stdio[1].data.fd, item->options.stdio[2].data.fd };
-        os_close_all_non_std_open_fds_except(fds, 3, CLOSE_RANGE_CLOEXEC);
-
-        int rc = uv_spawn(server->loop, &si->process, &item->options);
-        if (rc) {
-            errno = uv_errno_to_errno(rc);
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: uv_spawn() failed with error %s, %s",
-                   uv_err_name(rc), uv_strerror(rc));
-
-            __atomic_store_n(&si->started, false, __ATOMIC_RELAXED);
-        }
-        else {
-            // Successfully spawned
-
-            // get the pid of the process spawned
-            si->child_pid = uv_process_get_pid(&si->process);
-
-            // on_process_exit() needs this to find the si
-            item->instance->process.data = item->instance;
-
-            nd_log(NDLS_COLLECTORS, NDLP_INFO,
-                   "SPAWN SERVER: process created with pid %d", si->child_pid);
-
-            __atomic_store_n(&si->started, true, __ATOMIC_RELAXED);
-        }
-
-        uv_sem_post(&si->sem);
         spinlock_lock(&server->spinlock);
     }
     spinlock_unlock(&server->spinlock);
 
     nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: dequeue commands done");
 }
+
 
 SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, const char *name, spawn_request_callback_t cb  __maybe_unused, int argc __maybe_unused, const char **argv __maybe_unused) {
     SPAWN_SERVER* server = callocz(1, sizeof(SPAWN_SERVER));
@@ -252,69 +323,18 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
     freez(server);
 }
 
-static void on_process_exit(uv_process_t *req, int64_t exit_status, int term_signal) {
-    SPAWN_INSTANCE *si = (SPAWN_INSTANCE *)req->data;
-    si->exit_code = (int)(term_signal ? term_signal : exit_status << 8);
-    uv_close((uv_handle_t *)req, NULL); // Properly close the process handle
-
-    nd_log(NDLS_COLLECTORS, NDLP_ERR,
-           "SPAWN SERVER: process with pid %d exited with code %d and term_signal %d",
-           si->child_pid, (int)exit_status, term_signal);
-
-    uv_sem_post(&si->sem); // Signal that the process has exited
-}
-
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_unused, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
     if (type != SPAWN_INSTANCE_TYPE_EXEC)
         return NULL;
 
-    int stdin_pipe[2] = { -1, -1 };
-    int stdout_pipe[2] = { -1, -1 };
-
-    SPAWN_INSTANCE *si = callocz(1, sizeof(SPAWN_INSTANCE));
-    si->child_pid = -1;
-    si->exit_code = -1;
-    si->request_id = __atomic_add_fetch(&server->request_id, 1, __ATOMIC_RELAXED);
-
-    if (uv_sem_init(&si->sem, 0)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_sem_init() failed");
-        freez(si);
-        return NULL;
-    }
-
-    if (pipe(stdin_pipe) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdin pipe() failed");
-        uv_sem_destroy(&si->sem);
-        freez(si);
-        return NULL;
-    }
-
-    if (pipe(stdout_pipe) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdout pipe() failed");
-        close(stdin_pipe[PIPE_READ]);
-        close(stdin_pipe[PIPE_WRITE]);
-        uv_sem_destroy(&si->sem);
-        freez(si);
-        return NULL;
-    }
-
     work_item item = { 0 };
-    item.server = server;
-    item.instance = si;
-    item.options.exit_cb = on_process_exit;
-    item.options.file = argv[0];
-    item.options.args = (char **)argv;
-    item.options.env = (char **)environ;
+    item.stderr_fd = stderr_fd;
+    item.argv = argv;
 
-    item.options.stdio_count = 3;
-    uv_stdio_container_t stdio[3];
-    stdio[0].flags = UV_INHERIT_FD;
-    stdio[0].data.fd = stdin_pipe[PIPE_READ];
-    stdio[1].flags = UV_INHERIT_FD;
-    stdio[1].data.fd = stdout_pipe[PIPE_WRITE];
-    stdio[2].flags = UV_INHERIT_FD;
-    stdio[2].data.fd = STDERR_FILENO;
-    item.options.stdio = stdio;
+    if (uv_sem_init(&item.sem, 0)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_sem_init() failed");
+        return NULL;
+    }
 
     spinlock_lock(&server->spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(server->work_queue, &item, prev, next);
@@ -325,31 +345,17 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN PARENT: queued command");
 
     // Wait for the command to be executed
-    uv_sem_wait(&si->sem);
-    bool started = __atomic_load_n(&si->started, __ATOMIC_RELAXED);
+    uv_sem_wait(&item.sem);
+    uv_sem_destroy(&item.sem);
 
-    if(!started) {
+    if (!item.instance) {
         nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN PARENT: process failed to be started");
-
-        close(stdin_pipe[PIPE_READ]);
-        close(stdin_pipe[PIPE_WRITE]);
-        close(stdout_pipe[PIPE_READ]);
-        close(stdout_pipe[PIPE_WRITE]);
-
-        uv_sem_destroy(&si->sem);
-        freez(si);
         return NULL;
     }
 
-    // close the child sides of the pipes
-    close(stdin_pipe[PIPE_READ]);
-    si->write_fd = stdin_pipe[PIPE_WRITE];
-    si->read_fd = stdout_pipe[PIPE_READ];
-    close(stdout_pipe[PIPE_WRITE]);
-
     nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN PARENT: process started");
 
-    return si;
+    return item.instance;
 }
 
 int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
