@@ -99,7 +99,7 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
 
         case SPAWN_INSTANCE_TYPE_EXEC:
             // close all fds except the ones we need
-            os_close_all_non_std_open_fds_except(NULL, 0);
+            os_close_all_non_std_open_fds_except(NULL, 0, 0);
 
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "SPAWN SERVER: running request No %zu: %s",
@@ -1067,7 +1067,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         }
 
         replace_stdio_with_dev_null();
-        os_close_all_non_std_open_fds_except((int[]){ server->sock, server->pipe[1] }, 2);
+        os_close_all_non_std_open_fds_except((int[]){ server->sock, server->pipe[1] }, 2, 0);
         nd_log_reopen_log_files_for_spawn_server();
         spawn_server_event_loop(server);
     }

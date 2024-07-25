@@ -84,8 +84,8 @@ struct spawn_instance {
 #endif
 
 #if defined(SPAWN_SERVER_VERSION_POSIX_SPAWN)
-    uv_sem_t sem;
-    int exit_code;
+    bool exited;
+    int waitpid_status;
     struct spawn_instance *prev, *next;
 #endif
 

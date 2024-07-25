@@ -37,13 +37,8 @@ static void sigchld_handler(int signum) {
         spinlock_lock(&spawn_globals.spinlock);
         for(SPAWN_INSTANCE *si = spawn_globals.instances; si ;si = si->next) {
             if (si->child_pid == pid) {
-                si->exit_code = status;
-
-                nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                       "SPAWN SERVER: process with pid %d exited with status %d",
-                       si->child_pid, (int)status);
-
-                uv_sem_post(&si->sem);
+                __atomic_store_n(&si->waitpid_status, status, __ATOMIC_RELAXED);
+                __atomic_store_n(&si->exited, true, __ATOMIC_RELAXED);
                 break;
             }
         }
@@ -89,21 +84,13 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     SPAWN_INSTANCE *si = callocz(1, sizeof(SPAWN_INSTANCE));
     si->child_pid = -1;
-    si->exit_code = -1;
     si->request_id = __atomic_add_fetch(&server->request_id, 1, __ATOMIC_RELAXED);
 
     int stdin_pipe[2] = { -1, -1 };
     int stdout_pipe[2] = { -1, -1 };
 
-    if (uv_sem_init(&si->sem, 0)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_sem_init() failed");
-        freez(si);
-        return NULL;
-    }
-
     if (pipe(stdin_pipe) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdin pipe() failed");
-        uv_sem_destroy(&si->sem);
         freez(si);
         return NULL;
     }
@@ -112,7 +99,6 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdout pipe() failed");
         close(stdin_pipe[PIPE_READ]);
         close(stdin_pipe[PIPE_WRITE]);
-        uv_sem_destroy(&si->sem);
         freez(si);
         return NULL;
     }
@@ -126,16 +112,20 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         close(stdin_pipe[PIPE_WRITE]);
         close(stdout_pipe[PIPE_READ]);
         close(stdout_pipe[PIPE_WRITE]);
-        uv_sem_destroy(&si->sem);
         freez(si);
         return NULL;
     }
 
     posix_spawn_file_actions_adddup2(&file_actions, stdin_pipe[PIPE_READ], STDIN_FILENO);
     posix_spawn_file_actions_adddup2(&file_actions, stdout_pipe[PIPE_WRITE], STDOUT_FILENO);
-    posix_spawn_file_actions_adddup2(&file_actions, stderr_fd, STDERR_FILENO);
     posix_spawn_file_actions_addclose(&file_actions, stdin_pipe[PIPE_READ]);
+    posix_spawn_file_actions_addclose(&file_actions, stdin_pipe[PIPE_WRITE]);
+    posix_spawn_file_actions_addclose(&file_actions, stdout_pipe[PIPE_READ]);
     posix_spawn_file_actions_addclose(&file_actions, stdout_pipe[PIPE_WRITE]);
+    if(stderr_fd != STDERR_FILENO) {
+        posix_spawn_file_actions_adddup2(&file_actions, stderr_fd, STDERR_FILENO);
+        posix_spawn_file_actions_addclose(&file_actions, stderr_fd);
+    }
 
     if (posix_spawnattr_init(&attr) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_init() failed");
@@ -144,7 +134,6 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         close(stdin_pipe[PIPE_WRITE]);
         close(stdout_pipe[PIPE_READ]);
         close(stdout_pipe[PIPE_WRITE]);
-        uv_sem_destroy(&si->sem);
         freez(si);
         return NULL;
     }
@@ -153,16 +142,24 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(spawn_globals.instances, si, prev, next);
     spinlock_unlock(&spawn_globals.spinlock);
 
+    int fds[3] = { stdin_pipe[PIPE_READ], stdout_pipe[PIPE_WRITE], stderr_fd };
+    os_close_all_non_std_open_fds_except(fds, 3, CLOSE_RANGE_CLOEXEC);
+
     errno_clear();
     if (posix_spawn(&si->child_pid, argv[0], &file_actions, &attr, (char * const *)argv, environ) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: posix_spawn() failed");
+
+        spinlock_lock(&spawn_globals.spinlock);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(spawn_globals.instances, si, prev, next);
+        spinlock_unlock(&spawn_globals.spinlock);
+
         posix_spawnattr_destroy(&attr);
         posix_spawn_file_actions_destroy(&file_actions);
+
         close(stdin_pipe[PIPE_READ]);
         close(stdin_pipe[PIPE_WRITE]);
         close(stdout_pipe[PIPE_READ]);
         close(stdout_pipe[PIPE_WRITE]);
-        uv_sem_destroy(&si->sem);
         freez(si);
         return NULL;
     }
@@ -170,6 +167,10 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     // Destroy the posix_spawnattr_t and posix_spawn_file_actions_t structures
     posix_spawnattr_destroy(&attr);
     posix_spawn_file_actions_destroy(&file_actions);
+
+    // Close the read end of the stdin pipe and the write end of the stdout pipe in the parent process
+    close(stdin_pipe[PIPE_READ]);
+    close(stdout_pipe[PIPE_WRITE]);
 
     si->write_fd = stdin_pipe[PIPE_WRITE];
     si->read_fd = stdout_pipe[PIPE_READ];
@@ -195,16 +196,29 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     if (si->write_fd != -1) close(si->write_fd);
 
     // Wait for the process to exit
-    uv_sem_wait(&si->sem);
-    int exit_code = si->exit_code;
+    int status = __atomic_load_n(&si->waitpid_status, __ATOMIC_RELAXED);
+    bool exited = __atomic_load_n(&si->exited, __ATOMIC_RELAXED);
+    if(!exited) {
+        if(waitpid(si->child_pid, &status, 0) != si->child_pid) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: failed to wait for pid %d", si->child_pid);
+            status = -1;
+        }
+        else {
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                   "SPAWN PARENT: child with pid %d exited with status %d (waitpid)", si->child_pid, status);
+        }
+    }
+    else
+        nd_log(NDLS_COLLECTORS, NDLP_INFO,
+               "SPAWN PARENT: child with pid %d exited with status %d (sighandler)", si->child_pid, status);
 
     spinlock_lock(&spawn_globals.spinlock);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(spawn_globals.instances, si, prev, next);
     spinlock_unlock(&spawn_globals.spinlock);
 
-    uv_sem_destroy(&si->sem);
     freez(si);
-    return exit_code;
+    return status;
 }
 
 #endif

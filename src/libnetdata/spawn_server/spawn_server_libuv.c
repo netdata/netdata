@@ -135,6 +135,9 @@ static void async_callback(uv_async_t *handle) {
                item->options.stdio[1].data.fd, si->stdout_pipe[PIPE_WRITE],
                item->options.stdio[2].data.fd, STDERR_FILENO);
 
+        int fds[3] = { item->options.stdio[0].data.fd, item->options.stdio[1].data.fd, item->options.stdio[2].data.fd };
+        os_close_all_non_std_open_fds_except(fds, 3, CLOSE_RANGE_CLOEXEC);
+
         int rc = uv_spawn(server->loop, &si->process, &item->options);
         if (rc) {
             errno = uv_errno_to_errno(rc);
@@ -269,9 +272,9 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
     freez(server);
 }
 
-static void on_process_exit(uv_process_t *req, int64_t exit_status, int term_signal __maybe_unused) {
+static void on_process_exit(uv_process_t *req, int64_t exit_status, int term_signal) {
     SPAWN_INSTANCE *si = (SPAWN_INSTANCE *)req->data;
-    si->exit_code = (int)exit_status;
+    si->exit_code = (int)(term_signal ? term_signal : exit_status << 8);
     uv_close((uv_handle_t *)req, NULL); // Properly close the process handle
 
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
