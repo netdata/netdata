@@ -2072,6 +2072,9 @@ if(ENABLE_PLUGIN_CUPS)
         install(TARGETS cups.plugin
                 COMPONENT plugin-cups
                 DESTINATION usr/libexec/netdata/plugins.d)
+        netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/cups.plugin
+                                COMPONENT plugin-cups
+                                PERMISSIONS restrict)
 
         if(PACKAGE_TYPE IN_LIST NATIVE_PACKAGE_TYPES)
                 install(FILES
@@ -2559,6 +2562,9 @@ install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-network-helper.sh
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
+netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/cgroup-network-helper.sh
+                        COMPONENT netdata
+                        PERMISSIONS restrict)
 
 configure_file(src/collectors/cgroups.plugin/cgroup-name.sh.in
                src/collectors/cgroups.plugin/cgroup-name.sh @ONLY)
@@ -2893,6 +2899,9 @@ install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/charts.d.plugin/charts.d.plugin
         COMPONENT plugin-chartsd
         DESTINATION usr/libexec/netdata/plugins.d)
+netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/charts.d.plugin
+                        COMPONENT plugin-chartsd
+                        PERMISSIONS restrict)
 
 install(PROGRAMS
         src/collectors/charts.d.plugin/charts.d.dryrun-helper.sh
@@ -2956,6 +2965,9 @@ configure_file(src/collectors/python.d.plugin/python.d.plugin.in src/collectors/
 install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/python.d.plugin/python.d.plugin
         COMPONENT plugin-pythond
         DESTINATION usr/libexec/netdata/plugins.d)
+netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/python.d.plugin
+                        COMPONENT plugin-pythond
+                        PERMISSIONS restrict)
 
 install(DIRECTORY src/collectors/python.d.plugin/python_modules
         COMPONENT plugin-pythond
