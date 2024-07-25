@@ -362,7 +362,7 @@ int map_status_code_to_signal(DWORD status_code) {
         case STATUS_FATAL_APP_EXIT:
             return SIGTERM;
         default:
-            return status_code;
+            return (status_code & 0xFF) << 8;
     }
 }
 
@@ -372,6 +372,8 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
                "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be killed",
                si->request_id, (int)si->child_pid, si->dwProcessId);
 
+    // this gives some warnings at the spawn-tester, but it is generally better
+    // to have them, to avoid abnormal shutdown of the plugins
     if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
 

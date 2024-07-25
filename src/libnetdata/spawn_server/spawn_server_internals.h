@@ -76,8 +76,6 @@ struct spawn_instance {
     uv_process_t process;
     int exit_code;
     uv_sem_t sem;
-    int stdin_pipe[2];
-    int stdout_pipe[2];
 #endif
 
 #if defined(SPAWN_SERVER_VERSION_NOFORK)

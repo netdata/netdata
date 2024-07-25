@@ -55,6 +55,7 @@ void test_int_fds_plugin_kill_to_stop(SPAWN_SERVER *server, int argc __maybe_unu
         memset(buffer, 0, sizeof(buffer));
 
         ssize_t rc = write(spawn_server_instance_write_fd(si), msg, len);
+
         if (rc != len) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "Cannot write to plugin. Expected to write %zd bytes, wrote %zd bytes",
@@ -69,6 +70,7 @@ void test_int_fds_plugin_kill_to_stop(SPAWN_SERVER *server, int argc __maybe_unu
                    len, rc);
             exit(1);
         }
+
         if (memcmp(msg, buffer, len) != 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "Read corrupted data. Expected '%s', Read '%s'",
@@ -84,8 +86,8 @@ void test_int_fds_plugin_kill_to_stop(SPAWN_SERVER *server, int argc __maybe_unu
            "child exited with code %d",
            code);
 
-    if(code != 15) {
-        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "child should exit with code 15, but exited with code %d", code);
+    if(code != 15 && code != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "child should exit with code 0 or 15, but exited with code %d", code);
         warnings++;
     }
 }

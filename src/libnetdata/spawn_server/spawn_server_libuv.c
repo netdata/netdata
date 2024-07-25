@@ -141,13 +141,10 @@ static void async_callback(uv_async_t *handle) {
         spinlock_unlock(&server->spinlock);
 
         SPAWN_INSTANCE *si = item->instance;
-        nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: got an instance, running uv_spawn(), cmd: %s", item->options.file);
 
-        // Check file descriptors before calling uv_spawn
-        nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: stdin fd = %d (%d), stdout fd = %d (%d), stderr fd = %d (%d)",
-               item->options.stdio[0].data.fd, si->stdin_pipe[PIPE_READ],
-               item->options.stdio[1].data.fd, si->stdout_pipe[PIPE_WRITE],
-               item->options.stdio[2].data.fd, STDERR_FILENO);
+        nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: stdin fd = %d, stdout fd = %d, stderr fd = %d, cmd: %s",
+               item->options.stdio[0].data.fd, item->options.stdio[1].data.fd, item->options.stdio[2].data.fd,
+               item->options.file);
 
         // uv_spawn() does not close all other open file descriptors
         // we have to close them manually
@@ -160,12 +157,6 @@ static void async_callback(uv_async_t *handle) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: uv_spawn() failed with error %s, %s",
                    uv_err_name(rc), uv_strerror(rc));
 
-            // close the pipes to make the caller stop
-            if (si->stdin_pipe[PIPE_READ] != -1) { close(si->stdin_pipe[PIPE_READ]); si->stdin_pipe[PIPE_READ] = -1; }
-            if (si->stdin_pipe[PIPE_WRITE] != -1) { close(si->stdin_pipe[PIPE_WRITE]); si->stdin_pipe[PIPE_WRITE] = -1; }
-            if (si->stdout_pipe[PIPE_READ] != -1) { close(si->stdout_pipe[PIPE_READ]); si->stdout_pipe[PIPE_READ] = -1; }
-            if (si->stdout_pipe[PIPE_WRITE] != -1) { close(si->stdout_pipe[PIPE_WRITE]); si->stdout_pipe[PIPE_WRITE] = -1; }
-
             __atomic_store_n(&si->started, false, __ATOMIC_RELAXED);
         }
         else {
@@ -174,21 +165,16 @@ static void async_callback(uv_async_t *handle) {
             // get the pid of the process spawned
             si->child_pid = uv_process_get_pid(&si->process);
 
-            // close the child sides of the pipes
-            if (si->stdin_pipe[PIPE_READ] != -1) { close(si->stdin_pipe[PIPE_READ]); si->stdin_pipe[PIPE_READ] = -1; }
-            if (si->stdout_pipe[PIPE_WRITE] != -1) { close(si->stdout_pipe[PIPE_WRITE]); si->stdout_pipe[PIPE_WRITE] = -1; }
-
             // on_process_exit() needs this to find the si
             item->instance->process.data = item->instance;
 
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
                    "SPAWN SERVER: process created with pid %d", si->child_pid);
 
             __atomic_store_n(&si->started, true, __ATOMIC_RELAXED);
         }
 
         uv_sem_post(&si->sem);
-        freez(item);
         spinlock_lock(&server->spinlock);
     }
     spinlock_unlock(&server->spinlock);
@@ -260,28 +246,6 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
     // Walk through and close any remaining handles
     uv_walk(server->loop, close_handle, NULL);
 
-    // Clean up any remaining work items in the queue
-    spinlock_lock(&server->spinlock);
-    work_item *item = server->work_queue;
-    while (item) {
-        work_item *next_item = item->next;
-        SPAWN_INSTANCE *si = item->instance;
-
-        // Close the pipes if they are still open
-        if (si->stdin_pipe[PIPE_READ] != -1) { close(si->stdin_pipe[PIPE_READ]); si->stdin_pipe[PIPE_READ] = -1; }
-        if (si->stdin_pipe[PIPE_WRITE] != -1) { close(si->stdin_pipe[PIPE_WRITE]); si->stdin_pipe[PIPE_WRITE] = -1; }
-        if (si->stdout_pipe[PIPE_READ] != -1) { close(si->stdout_pipe[PIPE_READ]); si->stdout_pipe[PIPE_READ] = -1; }
-        if (si->stdout_pipe[PIPE_WRITE] != -1) { close(si->stdout_pipe[PIPE_WRITE]); si->stdout_pipe[PIPE_WRITE] = -1; }
-
-        // signal the waiting thread to wake up
-        __atomic_store_n(&si->started, false, __ATOMIC_RELAXED);
-        uv_sem_post(&si->sem);
-        freez(item);
-
-        item = next_item;
-    }
-    spinlock_unlock(&server->spinlock);
-
     uv_loop_close(server->loop);
     freez(server->loop);
     freez((void *)server->name);
@@ -304,13 +268,12 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     if (type != SPAWN_INSTANCE_TYPE_EXEC)
         return NULL;
 
+    int stdin_pipe[2] = { -1, -1 };
+    int stdout_pipe[2] = { -1, -1 };
+
     SPAWN_INSTANCE *si = callocz(1, sizeof(SPAWN_INSTANCE));
     si->child_pid = -1;
     si->exit_code = -1;
-    si->stdin_pipe[PIPE_READ] = -1;
-    si->stdin_pipe[PIPE_WRITE] = -1;
-    si->stdout_pipe[PIPE_READ] = -1;
-    si->stdout_pipe[PIPE_WRITE] = -1;
     si->request_id = __atomic_add_fetch(&server->request_id, 1, __ATOMIC_RELAXED);
 
     if (uv_sem_init(&si->sem, 0)) {
@@ -319,47 +282,42 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
         return NULL;
     }
 
-    if (pipe(si->stdin_pipe) == -1) {
+    if (pipe(stdin_pipe) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdin pipe() failed");
         uv_sem_destroy(&si->sem);
         freez(si);
         return NULL;
     }
 
-    if (pipe(si->stdout_pipe) == -1) {
+    if (pipe(stdout_pipe) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdout pipe() failed");
-        close(si->stdin_pipe[PIPE_READ]);
-        close(si->stdin_pipe[PIPE_WRITE]);
+        close(stdin_pipe[PIPE_READ]);
+        close(stdin_pipe[PIPE_WRITE]);
         uv_sem_destroy(&si->sem);
         freez(si);
         return NULL;
     }
 
-    work_item *item = callocz(1, sizeof(work_item));
-    item->server = server;
-    item->instance = si;
-    item->options.exit_cb = on_process_exit;
-    item->options.file = argv[0];
-    item->options.args = (char **)argv;
-    item->options.env = (char **)environ;
+    work_item item = { 0 };
+    item.server = server;
+    item.instance = si;
+    item.options.exit_cb = on_process_exit;
+    item.options.file = argv[0];
+    item.options.args = (char **)argv;
+    item.options.env = (char **)environ;
 
-    item->options.stdio_count = 3;
+    item.options.stdio_count = 3;
     uv_stdio_container_t stdio[3];
     stdio[0].flags = UV_INHERIT_FD;
-    stdio[0].data.fd = si->stdin_pipe[PIPE_READ];
+    stdio[0].data.fd = stdin_pipe[PIPE_READ];
     stdio[1].flags = UV_INHERIT_FD;
-    stdio[1].data.fd = si->stdout_pipe[PIPE_WRITE];
+    stdio[1].data.fd = stdout_pipe[PIPE_WRITE];
     stdio[2].flags = UV_INHERIT_FD;
     stdio[2].data.fd = STDERR_FILENO;
-    item->options.stdio = stdio;
-
-    si->write_fd = si->stdin_pipe[PIPE_WRITE];
-    si->stdin_pipe[PIPE_WRITE] = -1;
-    si->read_fd = si->stdout_pipe[PIPE_READ];
-    si->stdout_pipe[PIPE_READ] = -1;
+    item.options.stdio = stdio;
 
     spinlock_lock(&server->spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(server->work_queue, item, prev, next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(server->work_queue, &item, prev, next);
     spinlock_unlock(&server->spinlock);
 
     uv_async_send(&server->async);
@@ -371,16 +329,35 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     bool started = __atomic_load_n(&si->started, __ATOMIC_RELAXED);
 
     if(!started) {
+        nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN PARENT: process failed to be started");
+
+        close(stdin_pipe[PIPE_READ]);
+        close(stdin_pipe[PIPE_WRITE]);
+        close(stdout_pipe[PIPE_READ]);
+        close(stdout_pipe[PIPE_WRITE]);
+
         uv_sem_destroy(&si->sem);
         freez(si);
         return NULL;
     }
+
+    // close the child sides of the pipes
+    close(stdin_pipe[PIPE_READ]);
+    si->write_fd = stdin_pipe[PIPE_WRITE];
+    si->read_fd = stdout_pipe[PIPE_READ];
+    close(stdout_pipe[PIPE_WRITE]);
+
+    nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN PARENT: process started");
 
     return si;
 }
 
 int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
     if(!si) return -1;
+
+    // close all pipe descriptors to force the child to exit
+    if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
+    if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
 
     if (uv_process_kill(&si->process, SIGTERM)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_process_kill() failed");
@@ -394,12 +371,8 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     if (!si) return -1;
 
     // close all pipe descriptors to force the child to exit
-    if(si->read_fd != -1) close(si->read_fd);
-    if(si->write_fd != -1) close(si->write_fd);
-    if(si->stdin_pipe[PIPE_READ] != -1) { close(si->stdin_pipe[PIPE_READ]); si->stdin_pipe[PIPE_READ] = -1; }
-    if(si->stdin_pipe[PIPE_WRITE] != -1) { close(si->stdin_pipe[PIPE_WRITE]); si->stdin_pipe[PIPE_WRITE] = -1; }
-    if(si->stdout_pipe[PIPE_READ] != -1) { close(si->stdout_pipe[PIPE_READ]); si->stdout_pipe[PIPE_READ] = -1; }
-    if(si->stdout_pipe[PIPE_WRITE] != -1) { close(si->stdout_pipe[PIPE_WRITE]); si->stdout_pipe[PIPE_WRITE] = -1; }
+    if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
+    if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
 
     // Wait for the process to exit
     uv_sem_wait(&si->sem);
