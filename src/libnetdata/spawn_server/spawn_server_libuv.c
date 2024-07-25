@@ -112,7 +112,7 @@ static void server_thread(void *arg) {
            "SPAWN SERVER: started");
 
     // this thread needs to process SIGCHLD (by libuv)
-    // so we unblock it
+    // otherwise the on_exit() callback is never run
     posix_unmask_sigchld_on_thread();
 
     // run the event loop

@@ -140,11 +140,17 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(spawn_globals.instances, si, prev, next);
     spinlock_unlock(&spawn_globals.spinlock);
 
+    // unfortunately, on CYGWIN/MSYS posix_spawn() is not thread safe
+    // so, we run it one by one.
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    spinlock_lock(&spinlock);
+
     int fds[3] = { stdin_pipe[PIPE_READ], stdout_pipe[PIPE_WRITE], stderr_fd };
     os_close_all_non_std_open_fds_except(fds, 3, CLOSE_RANGE_CLOEXEC);
 
     errno_clear();
     if (posix_spawn(&si->child_pid, argv[0], &file_actions, &attr, (char * const *)argv, environ) != 0) {
+        spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: posix_spawn() failed");
 
         spinlock_lock(&spawn_globals.spinlock);
@@ -161,6 +167,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         freez(si);
         return NULL;
     }
+    spinlock_unlock(&spinlock);
 
     // Destroy the posix_spawnattr_t and posix_spawn_file_actions_t structures
     posix_spawnattr_destroy(&attr);

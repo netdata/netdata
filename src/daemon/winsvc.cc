@@ -4,7 +4,7 @@ extern "C" {
 #include "libnetdata/libnetdata.h"
 
 int netdata_main(int argc, char *argv[]);
-void signals_handle(void);
+void nd_process_signals(void);
 
 }
 
@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
         if (rc != 10)
             return rc;
 
-        signals_handle();
+        nd_process_signals();
         return 1;
     }
     else
