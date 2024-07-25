@@ -169,10 +169,18 @@ function(_nd_extract_permissions var entry)
   set(${var} "${entry_perms}" PARENT_SCOPE)
 endfunction()
 
+# Add shell script to the specified variable to handle restricting
+# the permissions of the specified path to the Netdata user
+function(_nd_perms_mark_path_restricted var path)
+  set(tmp_var "${${var}}chown -f 'root:${NETDATA_GROUP}' '${PATH}'\n")
+  set(tmp_var "${tmp_var}chmod -f 0750 '${path}'\n")
+  set(${var} "${tmp_var}" PARENT_SCOPE)
+endfunction()
+
 # Add shell script to the specified variable to handle marking the
 # specified path SUID.
 function(_nd_perms_mark_path_suid var path)
-  set(tmp_var "${${var}}chown -f 'root:${NETDATA_USER}' '${path}'\n")
+  set(tmp_var "${${var}}chown -f 'root:${NETDATA_GROUP}' '${path}'\n")
   set(tmp_var "${tmp_var}chmod -f 4750 '${path}'\n")
   set(${var} "${tmp_var}" PARENT_SCOPE)
 endfunction()
@@ -180,7 +188,7 @@ endfunction()
 # Add shell script to the specified variable to handle marking the
 # specified path with the specified filecaps.
 function(_nd_perms_mark_path_filecaps var path capset)
-  set(tmp_var "${${var}}chown -f 'root:${NETDATA_USER}' '${path}'\n")
+  set(tmp_var "${${var}}chown -f 'root:${NETDATA_GROUP}' '${path}'\n")
   set(tmp_var "${tmpvar}chmod -f 0750 '${path}'\n")
   set(tmp_var "${tmp_var}if ! capset '${capset}' '${path}' 2>/dev/null; then\n")
 
@@ -204,7 +212,9 @@ function(_nd_perms_generate_entry_script var entry)
   _nd_extract_path(entry_path "${entry}")
   _nd_extract_permissions(entry_perms "${entry}")
 
-  if("${entry_perms}" STREQUAL "suid" OR NOT USE_FILE_CAPABILITIES)
+  if("${entry_perms}" STREQUAL "restrict")
+    _nd_perms_mark_path_restricted(result "${entry_path}")
+  elseif("${entry_perms}" STREQUAL "suid" OR NOT USE_FILE_CAPABILITIES)
     _nd_perms_mark_path_suid(result "${entry_path}")
   else()
     list(TRANSFORM entry_perms PREPEND "cap_")
