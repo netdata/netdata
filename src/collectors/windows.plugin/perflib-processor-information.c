@@ -7,7 +7,7 @@
 #define _COMMON_PLUGIN_MODULE_NAME "PerflibProcesses"
 #include "../common-contexts/common-contexts.h"
 
-#define MHZ_TO_HZ 1000000.0
+#define PERFORMANCE_TO_ND 10000000.0
 #define CPU_PROPORTIONAL_CONSTANT 1000
 
 struct processor_info {
@@ -49,14 +49,16 @@ static inline int cpu_dict_callback(const DICTIONARY_ITEM *item __maybe_unused, 
         p->rd_cpu_frequency = rrddim_add(cpufreq, p->cpu_freq_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
     // Convert to MHz
-    NETDATA_DOUBLE cpuFreq = (p->cpuFrequency.current.Data > CPU_PROPORTIONAL_CONSTANT) ?
+    NETDATA_DOUBLE cpuFreq = (p->cpuFrequency.current.Data >= CPU_PROPORTIONAL_CONSTANT) ?
                              ((NETDATA_DOUBLE)p->cpuFrequency.current.Data)/CPU_PROPORTIONAL_CONSTANT:
                              p->cpuFrequency.current.Data;
     NETDATA_DOUBLE cpuPerformance = (NETDATA_DOUBLE)p->percProcessorPerformance.current.Data;
 
     // Adjust factor and do conversion
-    cpuFreq *=  (cpuPerformance/(CPU_PROPORTIONAL_CONSTANT* MHZ_TO_HZ));
+    cpuFreq *=  (cpuPerformance/(100.0));
+    cpuFreq /= PERFORMANCE_TO_ND; 
     rrddim_set_by_pointer(cpufreq, p->rd_cpu_frequency, (collected_number)cpuFreq);
+
 
     return 1;
 }
