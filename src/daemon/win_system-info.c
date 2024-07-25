@@ -183,10 +183,19 @@ static DWORD netdata_windows_get_current_build()
 
 static void netdata_windows_discover_os_version(char *os, size_t length, DWORD build)
 {
-    char *commonName = {"Windows"};
+    char productName[256];
+    if (!netdata_registry_get_string(productName,
+                                    255,
+                                    HKEY_LOCAL_MACHINE,
+                                    "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                                    "ProductName"))
+    {
+        (void)snprintf(os, length, "Windows");
+        return;
+    }
 
     if (IsWindowsServer()) {
-        (void)snprintf(os, length, "%s Server", commonName);
+        (void)snprintf(os, length, "%s", productName);
         return;
     }
 
@@ -212,7 +221,7 @@ static void netdata_windows_discover_os_version(char *os, size_t length, DWORD b
     }
     // We are not testing older, because it is not supported anymore by Microsoft
 
-    (void)snprintf(os, length, "%s %s Client", commonName, version);
+    (void)snprintf(os, length, "%s (%s)", productName, version);
 }
 
 static void netdata_windows_os_version(char *out, DWORD length)
