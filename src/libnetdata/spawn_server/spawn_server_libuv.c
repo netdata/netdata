@@ -135,7 +135,7 @@ static void on_process_exit(uv_process_t *req, int64_t exit_status, int term_sig
     uv_sem_post(&si->sem); // Signal that the process has exited
 }
 
-static SPAWN_INSTANCE *spawn_process_with_libuv(SPAWN_SERVER *server, int stderr_fd, const char **argv) {
+static SPAWN_INSTANCE *spawn_process_with_libuv(uv_loop_t *loop, int stderr_fd, const char **argv) {
     SPAWN_INSTANCE *si = NULL;
     bool si_sem_init = false;
 
@@ -161,13 +161,6 @@ static SPAWN_INSTANCE *spawn_process_with_libuv(SPAWN_SERVER *server, int stderr
     }
     si_sem_init = true;
 
-    uv_process_options_t options = { 0 };
-    options.exit_cb = on_process_exit;
-    options.file = argv[0];
-    options.args = (char **)argv;
-    options.env = (char **)environ;
-
-    options.stdio_count = 3;
     uv_stdio_container_t stdio[3] = { 0 };
     stdio[0].flags = UV_INHERIT_FD;
     stdio[0].data.fd = stdin_pipe[PIPE_READ];
@@ -175,14 +168,21 @@ static SPAWN_INSTANCE *spawn_process_with_libuv(SPAWN_SERVER *server, int stderr
     stdio[1].data.fd = stdout_pipe[PIPE_WRITE];
     stdio[2].flags = UV_INHERIT_FD;
     stdio[2].data.fd = stderr_fd;
+
+    uv_process_options_t options = { 0 };
+    options.stdio_count = 3;
     options.stdio = stdio;
+    options.exit_cb = on_process_exit;
+    options.file = argv[0];
+    options.args = (char **)argv;
+    options.env = (char **)environ;
 
     // uv_spawn() does not close all other open file descriptors
     // we have to close them manually
     int fds[3] = { stdio[0].data.fd, stdio[1].data.fd, stdio[2].data.fd };
     os_close_all_non_std_open_fds_except(fds, 3, CLOSE_RANGE_CLOEXEC);
 
-    int rc = uv_spawn(server->loop, &si->process, &options);
+    int rc = uv_spawn(loop, &si->process, &options);
     if (rc) {
         errno = uv_errno_to_errno(rc);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -242,7 +242,7 @@ static void async_callback(uv_async_t *handle) {
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(server->work_queue, item, prev, next);
         spinlock_unlock(&server->spinlock);
 
-        item->instance = spawn_process_with_libuv(server, item->stderr_fd, item->argv);
+        item->instance = spawn_process_with_libuv(server->loop, item->stderr_fd, item->argv);
         uv_sem_post(&item->sem);
 
         spinlock_lock(&server->spinlock);

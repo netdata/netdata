@@ -33,9 +33,9 @@ int plugin_kill_to_stop() {
     return 0;
 }
 
-void test_int_fds_plugin_kill_to_stop(SPAWN_SERVER *server, int argc __maybe_unused, const char **argv) {
+void test_int_fds_plugin_kill_to_stop(SPAWN_SERVER *server, const char *argv0) {
     const char *params[] = {
-        argv[0],
+        argv0,
         "plugin-kill-to-stop",
         NULL,
     };
@@ -92,9 +92,9 @@ void test_int_fds_plugin_kill_to_stop(SPAWN_SERVER *server, int argc __maybe_unu
     }
 }
 
-void test_popen_plugin_kill_to_stop(int argc __maybe_unused, const char **argv) {
+void test_popen_plugin_kill_to_stop(const char *argv0) {
     char cmd[FILENAME_MAX + 100];
-    snprintfz(cmd, sizeof(cmd), "exec %s plugin-kill-to-stop", argv[0]);
+    snprintfz(cmd, sizeof(cmd), "exec %s plugin-kill-to-stop", argv0);
     POPEN_INSTANCE *pi = spawn_popen_run(cmd);
     if(!pi) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot run myself as plugin (popen)");
@@ -163,9 +163,9 @@ int plugin_close_to_stop() {
     exit(1);
 }
 
-void test_int_fds_plugin_close_to_stop(SPAWN_SERVER *server, int argc __maybe_unused, const char **argv) {
+void test_int_fds_plugin_close_to_stop(SPAWN_SERVER *server, const char *argv0) {
     const char *params[] = {
-        argv[0],
+        argv0,
         "plugin-close-to-stop",
         NULL,
     };
@@ -222,9 +222,9 @@ void test_int_fds_plugin_close_to_stop(SPAWN_SERVER *server, int argc __maybe_un
     }
 }
 
-void test_popen_plugin_close_to_stop(int argc __maybe_unused, const char **argv) {
+void test_popen_plugin_close_to_stop(const char *argv0) {
     char cmd[FILENAME_MAX + 100];
-    snprintfz(cmd, sizeof(cmd), "exec %s plugin-close-to-stop", argv[0]);
+    snprintfz(cmd, sizeof(cmd), "exec %s plugin-close-to-stop", argv0);
     POPEN_INSTANCE *pi = spawn_popen_run(cmd);
     if(!pi) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot run myself as plugin (popen)");
@@ -290,9 +290,9 @@ int plugin_echo_and_exit() {
     exit(0);
 }
 
-void test_int_fds_plugin_echo_and_exit(SPAWN_SERVER *server, int argc __maybe_unused, const char **argv) {
+void test_int_fds_plugin_echo_and_exit(SPAWN_SERVER *server, const char *argv0) {
     const char *params[] = {
-        argv[0],
+        argv0,
         "plugin-echo-and-exit",
         NULL,
     };
@@ -350,9 +350,9 @@ void test_int_fds_plugin_echo_and_exit(SPAWN_SERVER *server, int argc __maybe_un
     }
 }
 
-void test_popen_plugin_echo_and_exit(int argc __maybe_unused, const char **argv) {
+void test_popen_plugin_echo_and_exit(const char *argv0) {
     char cmd[FILENAME_MAX + 100];
-    snprintfz(cmd, sizeof(cmd), "exec %s plugin-echo-and-exit", argv[0]);
+    snprintfz(cmd, sizeof(cmd), "exec %s plugin-echo-and-exit", argv0);
     POPEN_INSTANCE *pi = spawn_popen_run(cmd);
     if(!pi) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot run myself as plugin (popen)");
@@ -429,15 +429,15 @@ int main(int argc, const char **argv) {
     }
     for(size_t i = 0; i < 5; i++) {
         fprintf(stderr, "\n\nTESTING fds No %zu (kill to stop)\n\n", i + 1);
-        test_int_fds_plugin_kill_to_stop(server, argc, argv);
+        test_int_fds_plugin_kill_to_stop(server, argv[0]);
     }
     for(size_t i = 0; i < 5; i++) {
         fprintf(stderr, "\n\nTESTING fds No %zu (echo and exit)\n\n", i + 1);
-        test_int_fds_plugin_echo_and_exit(server, argc, argv);
+        test_int_fds_plugin_echo_and_exit(server, argv[0]);
     }
     for(size_t i = 0; i < 5; i++) {
         fprintf(stderr, "\n\nTESTING fds No %zu (close to stop)\n\n", i + 1);
-        test_int_fds_plugin_close_to_stop(server, argc, argv);
+        test_int_fds_plugin_close_to_stop(server, argv[0]);
     }
     spawn_server_destroy(server);
 
@@ -445,15 +445,15 @@ int main(int argc, const char **argv) {
     netdata_main_spawn_server_init("test", argc, argv);
     for(size_t i = 0; i < 5; i++) {
         fprintf(stderr, "\n\nTESTING popen No %zu (kill to stop)\n\n", i + 1);
-        test_popen_plugin_kill_to_stop(argc, argv);
+        test_popen_plugin_kill_to_stop(argv[0]);
     }
     for(size_t i = 0; i < 5; i++) {
         fprintf(stderr, "\n\nTESTING popen No %zu (echo and exit)\n\n", i + 1);
-        test_popen_plugin_echo_and_exit(argc, argv);
+        test_popen_plugin_echo_and_exit(argv[0]);
     }
     for(size_t i = 0; i < 5; i++) {
         fprintf(stderr, "\n\nTESTING popen No %zu (close to stop)\n\n", i + 1);
-        test_popen_plugin_close_to_stop(argc, argv);
+        test_popen_plugin_close_to_stop(argv[0]);
     }
     netdata_main_spawn_server_cleanup();
 
