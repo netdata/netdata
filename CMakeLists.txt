@@ -200,8 +200,9 @@ cmake_dependent_option(USE_FILE_CAPABILITIES "Enable usage of file capabilities 
 option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
 mark_as_advanced(ENABLE_SENTRY)
 
-option(BUILD_FOR_PACKAGING "Build for a packaging target." False)
+option(BUILD_FOR_PACKAGING "Build for a packaging target" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
+cmake_dependent_option(CREATE_USER "Create the netdata user and group if they don’t exist on the system" True "NOT BUILD_FOR_PACKAGING AND NOT OS_WINDOWS" False)
 if(BUILD_FOR_PACKAGING)
     set(PACKAGE_TYPE "none" CACHE STRING "Specify the type of package to build for.")
     mark_as_advanced(PACKAGE_TYPE)
