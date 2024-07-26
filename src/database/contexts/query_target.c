@@ -958,7 +958,7 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
 
 void query_target_generate_name(QUERY_TARGET *qt) {
     char options_buffer[100 + 1];
-    web_client_api_request_v1_data_options_to_string(options_buffer, 100, qt->request.options);
+    web_client_api_request_data_vX_options_to_string(options_buffer, 100, qt->request.options);
 
     char resampling_buffer[20 + 1] = "";
     if(qt->request.resampling_time > 1)

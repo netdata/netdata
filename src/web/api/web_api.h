@@ -6,10 +6,10 @@
 #include "daemon/common.h"
 #include "web/api/http_header.h"
 #include "web/api/http_auth.h"
-#include "web/api/badges/web_buffer_svg.h"
-#include "web/api/ilove/ilove.h"
 #include "web/api/formatters/rrd2json.h"
 #include "web/api/queries/weights.h"
+
+void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key);
 
 struct web_api_command {
     const char *api;
@@ -37,7 +37,11 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
 
 bool web_client_interrupt_callback(void *data);
 
+char *format_value_and_unit(char *value_string, size_t value_string_len,
+                            NETDATA_DOUBLE value, const char *units, int precision);
+
 #include "web_api_v1.h"
 #include "web_api_v2.h"
+#include "web_api_v3.h"
 
 #endif //NETDATA_WEB_API_H

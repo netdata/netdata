@@ -84,7 +84,7 @@ static bool check_claim_param(const char *s) {
     return true;
 }
 
-int api_v2_claim(struct web_client *w, char *url) {
+int api_v3_claim(struct web_client *w, char *url) {
     char *key = NULL;
     char *token = NULL;
     char *rooms = NULL;

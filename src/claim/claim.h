@@ -44,7 +44,7 @@ CLOUD_STATUS claim_reload_and_wait_online(void);
 bool netdata_random_session_id_generate(void);
 const char *netdata_random_session_id_get_filename(void);
 bool netdata_random_session_id_matches(const char *guid);
-int api_v2_claim(struct web_client *w, char *url);
+int api_v3_claim(struct web_client *w, char *url);
 
 const char *cloud_config_url_get(void);
 void cloud_config_url_set(const char *url);

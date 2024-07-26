@@ -904,16 +904,13 @@ set(API_PLUGIN_FILES
         src/web/api/web_api_v1.h
         src/web/api/web_api_v2.c
         src/web/api/web_api_v2.h
+        src/web/api/web_api_v3.c
+        src/web/api/web_api_v3.h
         src/web/api/http_auth.c
         src/web/api/http_auth.h
         src/web/api/http_header.c
         src/web/api/http_header.h
-        src/web/api/badges/web_buffer_svg.c
-        src/web/api/badges/web_buffer_svg.h
-        src/web/api/exporters/allmetrics.c
-        src/web/api/exporters/allmetrics.h
-        src/web/api/exporters/shell/allmetrics_shell.c
-        src/web/api/exporters/shell/allmetrics_shell.h
+        src/web/api/v3/api_v3_badge/web_buffer_svg.c
         src/web/api/queries/rrdr.c
         src/web/api/queries/rrdr.h
         src/web/api/queries/query.c
@@ -960,10 +957,37 @@ set(API_PLUGIN_FILES
         src/web/api/formatters/charts2json.h
         src/web/api/formatters/rrdset2json.c
         src/web/api/formatters/rrdset2json.h
-        src/web/api/ilove/ilove.c
-        src/web/api/ilove/ilove.h
+        src/web/api/v3/api_v3_ilove/ilove.c
         src/web/rtc/webrtc.c
         src/web/rtc/webrtc.h
+        src/web/api/v3/api_v3_bearer.c
+        src/web/api/v3/api_v3_calls.h
+        src/web/api/v3/api_v3_data.c
+        src/web/api/v3/api_v3_progress.c
+        src/web/api/v3/api_v3_weights.c
+        src/web/api/v3/api_v3_alert_config.c
+        src/web/api/v3/api_v3_contexts.c
+        src/web/api/v3/api_v3_claim.c
+        src/web/api/v3/api_v3_webrtc.c
+        src/web/api/v3/api_v3_function.c
+        src/web/api/v1/api_v1_manage.c
+        src/web/api/v1/api_v1_calls.h
+        src/web/api/v1/api_v1_dbengine.c
+        src/web/api/v3/api_v3_config.c
+        src/web/api/v1/api_v1_functions.c
+        src/web/api/v1/api_v1_weights.c
+        src/web/api/v1/api_v1_info.c
+        src/web/api/v1/api_v1_registry.c
+        src/web/api/v1/api_v1_data.c
+        src/web/api/v1/api_v1_contexts.c
+        src/web/api/v1/api_v1_ml_info.c
+        src/web/api/v1/api_v1_aclk.c
+        src/web/api/v1/api_v1_context.c
+        src/web/api/v1/api_v1_alarms.c
+        src/web/api/v1/api_v1_charts.c
+        src/web/api/maps/rrdr_options.c
+        src/web/api/maps/rrdr_options.h
+        src/web/api/v3/api_v3_allmetrics.c
 )
 
 set(EXPORTING_ENGINE_FILES

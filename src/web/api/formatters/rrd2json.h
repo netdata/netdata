@@ -22,7 +22,6 @@ typedef enum {
 
 #include "web/api/web_api_v1.h"
 
-#include "web/api/exporters/allmetrics.h"
 #include "web/api/queries/rrdr.h"
 
 #include "web/api/formatters/csv/csv.h"

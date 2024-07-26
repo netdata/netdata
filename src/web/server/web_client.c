@@ -587,7 +587,9 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
     // get the api version
     char *tok = strsep_skip_consecutive_separators(&url_path_fragment, "/");
     if(tok && *tok) {
-        if(strcmp(tok, "v2") == 0)
+        if(strcmp(tok, "v3") == 0)
+            return web_client_api_request_v3(host, w, url_path_fragment);
+        else if(strcmp(tok, "v2") == 0)
             return web_client_api_request_v2(host, w, url_path_fragment);
         else if(strcmp(tok, "v1") == 0)
             return web_client_api_request_v1(host, w, url_path_fragment);

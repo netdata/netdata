@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "web_buffer_svg.h"
+#include "libnetdata/libnetdata.h"
+#include "../../../server/web_client.h"
 
 #define BADGE_HORIZONTAL_PADDING 4
 #define VERDANA_KERNING 0.2
@@ -360,7 +361,7 @@ static struct units_formatter {
         { NULL,          0, UNITS_FORMAT_NONE }
 };
 
-inline char *format_value_and_unit(char *value_string, size_t value_string_len,
+char *format_value_and_unit(char *value_string, size_t value_string_len,
     NETDATA_DOUBLE value, const char *units, int precision) {
     static int max = -1;
     int i;
@@ -734,7 +735,7 @@ static const char *parse_color_argument(const char *arg, const char *def)
     return color_map(arg, def);
 }
 
-void buffer_svg(BUFFER *wb, const char *label,
+static void buffer_svg(BUFFER *wb, const char *label,
     NETDATA_DOUBLE value, const char *units, const char *label_color, const char *value_color, int precision, int scale, uint32_t options, int fixed_width_lbl, int fixed_width_val, const char* text_color_lbl, const char* text_color_val) {
     char    value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
@@ -864,7 +865,7 @@ void buffer_svg(BUFFER *wb, const char *label,
 #define BADGE_URL_ARG_LBL_COLOR "text_color_lbl"
 #define BADGE_URL_ARG_VAL_COLOR "text_color_val"
 
-int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
+int web_client_api_request_v3_badge(RRDHOST *host, struct web_client *w, char *url) {
     int ret = HTTP_RESP_BAD_REQUEST;
     buffer_flush(w->response.data);
 

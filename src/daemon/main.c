@@ -2084,7 +2084,7 @@ int netdata_main(int argc, char **argv) {
 
         delta_startup_time("initialize web server");
 
-        web_client_api_v1_init();
+        nd_web_api_init();
         web_server_threading_selection();
 
         if(web_server_mode != WEB_SERVER_MODE_NONE) {

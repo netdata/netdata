@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "web_api_v2.h"
+#include "web_api_v3.h"
 #include "v3/api_v3_calls.h"
 
-static struct web_api_command api_commands_v2[] = {
+static struct web_api_command api_commands_v3[] = {
     // time-series multi-node multi-instance data APIs
     {
         .api = "data",
@@ -22,6 +22,16 @@ static struct web_api_command api_commands_v2[] = {
         .allow_subpaths = 0
     },
 
+    // badges can be fetched with both dashboard and badge ACL
+    {
+     .api = "badge.svg",
+     .hash = 0,
+     .acl = HTTP_ACL_BADGES,
+     .access = HTTP_ACCESS_ANONYMOUS_DATA,
+     .callback = web_client_api_request_v3_badge,
+     .allow_subpaths = 0
+    },
+
     // time-series multi-node multi-instance metadata APIs
     {
         .api = "contexts",
@@ -31,13 +41,24 @@ static struct web_api_command api_commands_v2[] = {
         .callback = web_client_api_request_v3_contexts,
         .allow_subpaths = 0
     },
+
+    // full text search
     {
-        // full text search
-        .api = "q",
+     .api = "q",
+     .hash = 0,
+     .acl = HTTP_ACL_DASHBOARD,
+     .access = HTTP_ACCESS_ANONYMOUS_DATA,
+     .callback = web_client_api_request_v3_q,
+     .allow_subpaths = 0
+    },
+
+    // exporting API
+    {
+        .api = "allmetrics",
         .hash = 0,
         .acl = HTTP_ACL_DASHBOARD,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
-        .callback = web_client_api_request_v3_q,
+        .callback = web_client_api_request_v3_allmetrics,
         .allow_subpaths = 0
     },
 
@@ -84,7 +105,7 @@ static struct web_api_command api_commands_v2[] = {
         .callback = web_client_api_request_v3_nodes,
         .allow_subpaths = 0
     },
-        {
+    {
         .api = "node_instances",
         .hash = 0,
         .acl = HTTP_ACL_DASHBOARD,
@@ -111,6 +132,14 @@ static struct web_api_command api_commands_v2[] = {
 
     // functions APIs
     {
+        .api = "function",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v3_function,
+        .allow_subpaths = 0
+    },
+    {
         .api = "functions",
         .hash = 0,
         .acl = HTTP_ACL_DASHBOARD,
@@ -126,6 +155,16 @@ static struct web_api_command api_commands_v2[] = {
         .acl = HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS,
         .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE,
         .callback = web_client_api_request_v3_webrtc,
+        .allow_subpaths = 0
+    },
+
+    // dyncfg APIs
+    {
+        .api = "config",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v3_config,
         .allow_subpaths = 0
     },
 
@@ -165,26 +204,25 @@ static struct web_api_command api_commands_v2[] = {
         .allow_subpaths = 0
     },
 
-    {
-        // terminator
-        .api = NULL,
-        .hash = 0,
-        .acl = HTTP_ACL_NONE,
-        .access = HTTP_ACCESS_NONE,
-        .callback = NULL,
-        .allow_subpaths = 0
+    {// terminator
+     .api = NULL,
+     .hash = 0,
+     .acl = HTTP_ACL_NONE,
+     .access = HTTP_ACCESS_NONE,
+     .callback = NULL,
+     .allow_subpaths = 0
     },
 };
 
-inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
+inline int web_client_api_request_v3(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
     static int initialized = 0;
 
     if(unlikely(initialized == 0)) {
         initialized = 1;
 
-        for(int i = 0; api_commands_v2[i].api ; i++)
-            api_commands_v2[i].hash = simple_hash(api_commands_v2[i].api);
+        for(int i = 0; api_commands_v3[i].api ; i++)
+            api_commands_v3[i].hash = simple_hash(api_commands_v3[i].api);
     }
 
-    return web_client_api_request_vX(host, w, url_path_endpoint, api_commands_v2);
+    return web_client_api_request_vX(host, w, url_path_endpoint, api_commands_v3);
 }
