@@ -3014,7 +3014,7 @@ static int ebpf_load_collector_config(char *path, int *disable_cgroups, int upda
 /**
  * Set global variables reading environment variables
  */
-void set_global_variables()
+static void ebpf_set_global_variables()
 {
     // Get environment variables
     ebpf_plugin_dir = getenv("NETDATA_PLUGINS_DIR");
@@ -3974,17 +3974,17 @@ int main(int argc, char **argv)
     clocks_init();
     nd_log_initialize_for_external_plugins(NETDATA_EBPF_PLUGIN_NAME);
 
-    main_thread_id = gettid_cached();
-
-    set_global_variables();
-    ebpf_parse_args(argc, argv);
-    ebpf_manage_pid(getpid());
-
+    ebpf_set_global_variables();
     if (ebpf_can_plugin_load_code(running_on_kernel, NETDATA_EBPF_PLUGIN_NAME))
         return 2;
 
     if (ebpf_adjust_memory_limit())
         return 3;
+
+    main_thread_id = gettid_cached();
+
+    ebpf_parse_args(argc, argv);
+    ebpf_manage_pid(getpid());
 
     signal(SIGINT, ebpf_stop_threads);
     signal(SIGQUIT, ebpf_stop_threads);
