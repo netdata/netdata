@@ -166,7 +166,6 @@ static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *syst
 // Host
 static DWORD netdata_windows_get_current_build()
 {
-    HKEY hKey;
     char cBuild[64];
     if (!netdata_registry_get_string(
             cBuild, 63, HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "CurrentBuild"))
@@ -183,10 +182,19 @@ static DWORD netdata_windows_get_current_build()
 
 static void netdata_windows_discover_os_version(char *os, size_t length, DWORD build)
 {
-    char *commonName = {"Windows"};
+    char versionName[256];
+    if (!netdata_registry_get_string(versionName,
+                                    255,
+                                    HKEY_LOCAL_MACHINE,
+                                    "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                                    "DisplayVersion"))
+    {
+        (void)snprintf(os, length, "Microsoft Windows");
+        return;
+    }
 
     if (IsWindowsServer()) {
-        (void)snprintf(os, length, "%s Server", commonName);
+        (void)snprintf(os, length, "Microsoft Windows Version %s", versionName);
         return;
     }
 
@@ -212,7 +220,7 @@ static void netdata_windows_discover_os_version(char *os, size_t length, DWORD b
     }
     // We are not testing older, because it is not supported anymore by Microsoft
 
-    (void)snprintf(os, length, "%s %s Client", commonName, version);
+    (void)snprintf(os, length, "Microsoft Windows Version %s, Build %d (Name: Windows %s)", versionName, build, version);
 }
 
 static void netdata_windows_os_version(char *out, DWORD length)
