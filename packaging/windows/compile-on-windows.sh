@@ -40,7 +40,7 @@ ${GITHUB_ACTIONS+echo "::group::Configuring"}
     -DCMAKE_C_FLAGS="-fstack-protector-all -O0 -ggdb -Wall -Wextra -Wno-char-subscripts -Wa,-mbig-obj -pipe -DNETDATA_INTERNAL_CHECKS=1 -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1" \
     -DBUILD_FOR_PACKAGING=On \
     -DNETDATA_USER="${USER}" \
-    -DDEFAULT_FEATURE_STATE=Off \
+    -DENABLE_PLUGIN_GO=On \
     -DENABLE_H2O=Off \
     -DENABLE_ACLK=On \
     -DENABLE_CLOUD=On \
