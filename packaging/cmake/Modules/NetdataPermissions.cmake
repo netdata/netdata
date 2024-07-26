@@ -174,7 +174,7 @@ endfunction()
 # Add shell script to the specified variable to handle restricting
 # the permissions of the specified path to the Netdata user
 function(_nd_perms_mark_path_restricted var path)
-  set(tmp_var "${${var}}chown -f 'root:${NETDATA_GROUP}' '${PATH}'\n")
+  set(tmp_var "${${var}}chown -f 'root:${NETDATA_GROUP}' '${path}'\n")
   set(tmp_var "${tmp_var}chmod -f 0750 '${path}'\n")
   set(${var} "${tmp_var}" PARENT_SCOPE)
 endfunction()
