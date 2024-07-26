@@ -3,7 +3,7 @@
 
 Name "Netdata"
 Outfile "netdata-installer.exe"
-InstallDir "$PROGRAMFILES\netdata"
+InstallDir "$PROGRAMFILES\Netdata"
 RequestExecutionLevel admin
 
 !define MUI_ICON "NetdataWhite.ico"
