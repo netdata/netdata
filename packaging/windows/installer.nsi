@@ -25,29 +25,7 @@ RequestExecutionLevel admin
 
 !insertmacro MUI_LANGUAGE "English"
 
-Section "Install Netdata"
-	SetOutPath $INSTDIR
-	SetCompress off
-
-	File /r "C:\msys64\opt\netdata\*.*"
-
-	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" create Netdata binPath= "$INSTDIR\usr\bin\netdata.exe" start= delayed-auto'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to create Netdata service."
-
-	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" description Netdata "Real-time system monitoring service"'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to add Netdata service description."
-
-	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" start Netdata'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to start Netdata service."
-
-	WriteUninstaller "$INSTDIR\Uninstall.exe"
-
+Function NetdataUninstallRegistry
         WriteRegStr HKLM "${ND_UININSTALL_REG}" \
                          "DisplayName" "Netdata - Real-time system monitoring."
         WriteRegStr HKLM "${ND_UININSTALL_REG}" \
@@ -74,6 +52,32 @@ Section "Install Netdata"
         ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
         IntFmt $0 "0x%08X" $0
         WriteRegDWORD HKLM "${ND_UININSTALL_REG}" "EstimatedSize" "$0"
+FunctionEnd
+
+Section "Install Netdata"
+	SetOutPath $INSTDIR
+	SetCompress off
+
+	File /r "C:\msys64\opt\netdata\*.*"
+
+	ClearErrors
+	ExecWait '"$SYSDIR\sc.exe" create Netdata binPath= "$INSTDIR\usr\bin\netdata.exe" start= delayed-auto'
+	IfErrors 0 +2
+	DetailPrint "Warning: Failed to create Netdata service."
+
+	ClearErrors
+	ExecWait '"$SYSDIR\sc.exe" description Netdata "Real-time system monitoring service"'
+	IfErrors 0 +2
+	DetailPrint "Warning: Failed to add Netdata service description."
+
+	ClearErrors
+	ExecWait '"$SYSDIR\sc.exe" start Netdata'
+	IfErrors 0 +2
+	DetailPrint "Warning: Failed to start Netdata service."
+
+	WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+        Call NetdataUninstallRegistry
 SectionEnd
 
 Section "Uninstall"
@@ -91,3 +95,4 @@ Section "Uninstall"
 
         DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata"
 SectionEnd
+
