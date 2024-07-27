@@ -393,6 +393,10 @@ static void ebpf_swap_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    pthread_mutex_lock(&lock);
+    collect_pids &= ~(1<<EBPF_MODULE_SWAP_IDX);
+    pthread_mutex_unlock(&lock);
+
     if (ebpf_read_swap.thread)
         nd_thread_signal_cancel(ebpf_read_swap.thread);
 

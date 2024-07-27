@@ -30,6 +30,7 @@ int ebpf_nprocs;
 int isrh = 0;
 int main_thread_id = 0;
 int process_pid_fd = -1;
+uint64_t collect_pids = 0;
 static size_t global_iterations_counter = 1;
 bool publish_internal_metrics = true;
 
@@ -4018,7 +4019,7 @@ int main(int argc, char **argv)
         ebpf_cgroup_integration,
         NULL);
 
-    int i;
+    uint32_t i;
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
         struct netdata_static_thread *st = &ebpf_threads[i];
 
@@ -4028,6 +4029,10 @@ int main(int argc, char **argv)
         if (em->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) {
             em->enabled = NETDATA_THREAD_EBPF_RUNNING;
             em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
+
+            if (em->apps_charts || em->cgroup_charts) {
+                collect_pids |= 1<<i;
+            }
             st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, em);
         } else {
             em->lifetime = EBPF_DEFAULT_LIFETIME;
@@ -4057,12 +4062,14 @@ int main(int argc, char **argv)
         if (++update_apps_list == update_apps_every) {
             update_apps_list = 0;
             pthread_mutex_lock(&lock);
-            pthread_mutex_lock(&collect_data_mutex);
-            ebpf_cleanup_exited_pids(max_period);
-            collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
+            if (collect_pids) {
+                pthread_mutex_lock(&collect_data_mutex);
+                ebpf_cleanup_exited_pids(max_period);
+                collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
 
-            ebpf_create_apps_charts(apps_groups_root_target);
-            pthread_mutex_unlock(&collect_data_mutex);
+                ebpf_create_apps_charts(apps_groups_root_target);
+                pthread_mutex_unlock(&collect_data_mutex);
+            }
             pthread_mutex_unlock(&lock);
         }
     }
