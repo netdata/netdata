@@ -334,6 +334,38 @@ static inline int ebpf_fs_load_and_attach(ebpf_local_maps_t *map, struct filesys
  *****************************************************************/
 
 /**
+ * Obsolete Cleanup Struct
+ *
+ * Clean allocatged data durinc obsolete steps
+ *
+ * @param efp
+ */
+static void ebpf_obsolete_cleanup_struct(ebpf_filesystem_partitions_t *efp) {
+    freez(efp->hread.name);
+    efp->hread.name = NULL;
+    freez(efp->hread.title);
+    efp->hread.title = NULL;
+
+    freez(efp->hwrite.name);
+    efp->hwrite.name = NULL;
+    freez(efp->hwrite.title);
+    efp->hwrite.title = NULL;
+
+    freez(efp->hopen.name);
+    efp->hopen.name = NULL;
+    freez(efp->hopen.title);
+    efp->hopen.title = NULL;
+
+    freez(efp->hadditional.name);
+    efp->hadditional.name = NULL;
+    freez(efp->hadditional.title);
+    efp->hadditional.title = NULL;
+
+    freez(efp->family_name);
+    efp->family_name = NULL;
+}
+
+/**
  * Create Filesystem chart
  *
  * Create latency charts
@@ -348,7 +380,7 @@ static void ebpf_obsolete_fs_charts(int update_every)
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         uint32_t flags = efp->flags;
         if ((flags & test) == test) {
-            flags &= ~NETDATA_FILESYSTEM_FLAG_CHART_CREATED;
+            flags &= ~test;
 
             ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
                                       "",
@@ -370,6 +402,8 @@ static void ebpf_obsolete_fs_charts(int update_every)
                                       EBPF_COMMON_UNITS_CALLS_PER_SEC, efp->family_name,
                                       NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hadditional.order,
                                       update_every);
+
+            ebpf_obsolete_cleanup_struct(efp);
         }
         efp->flags = flags;
     }
