@@ -380,6 +380,7 @@ void ebpf_read_local_addresses_unsafe();
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
 extern bool ebpf_plugin_exit;
+extern uint64_t collect_pids;
 
 static inline bool ebpf_plugin_stop(void) {
     return ebpf_plugin_exit || nd_thread_signaled_to_cancel();

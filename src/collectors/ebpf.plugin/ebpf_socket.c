@@ -497,6 +497,10 @@ static void ebpf_socket_free(ebpf_module_t *em )
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    pthread_mutex_lock(&lock);
+    collect_pids &= ~(1<<EBPF_MODULE_SOCKET_IDX);
+    pthread_mutex_unlock(&lock);
 }
 
 /**
