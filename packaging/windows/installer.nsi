@@ -26,6 +26,7 @@ RequestExecutionLevel admin
 !insertmacro MUI_LANGUAGE "English"
 
 Function NetdataUninstallRegistry
+        ClearErrors
         WriteRegStr HKLM "${ND_UININSTALL_REG}" \
                          "DisplayName" "Netdata - Real-time system monitoring."
         WriteRegStr HKLM "${ND_UININSTALL_REG}" \
@@ -49,9 +50,17 @@ Function NetdataUninstallRegistry
         WriteRegStr HKLM "${ND_UININSTALL_REG}" \
                          "VersionMinor" "${MINORVERSION}"
 
+        IfErrors 0 +2
+        MessageBox MB_ICONEXCLAMATION|MB_OK "Unable to create an entry in the Control Panel!" IDOK end
+
+        ClearErrors
         ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
         IntFmt $0 "0x%08X" $0
         WriteRegDWORD HKLM "${ND_UININSTALL_REG}" "EstimatedSize" "$0"
+
+        IfErrors 0 +2
+        MessageBox MB_ICONEXCLAMATION|MB_OK "Cannot estimate the installation size." IDOK end
+        end:
 FunctionEnd
 
 Section "Install Netdata"
