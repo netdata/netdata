@@ -345,21 +345,29 @@ static void ebpf_obsolete_cleanup_struct(ebpf_filesystem_partitions_t *efp) {
     efp->hread.name = NULL;
     freez(efp->hread.title);
     efp->hread.title = NULL;
+    freez(efp->hread.ctx);
+    efp->hread.ctx = NULL;
 
     freez(efp->hwrite.name);
     efp->hwrite.name = NULL;
     freez(efp->hwrite.title);
     efp->hwrite.title = NULL;
+    freez(efp->hwrite.ctx);
+    efp->hwrite.ctx = NULL;
 
     freez(efp->hopen.name);
     efp->hopen.name = NULL;
     freez(efp->hopen.title);
     efp->hopen.title = NULL;
+    freez(efp->hopen.ctx);
+    efp->hopen.ctx = NULL;
 
     freez(efp->hadditional.name);
     efp->hadditional.name = NULL;
     freez(efp->hadditional.title);
     efp->hadditional.title = NULL;
+    freez(efp->hadditional.ctx);
+    efp->hadditional.ctx = NULL;
 
     freez(efp->family_name);
     efp->family_name = NULL;
@@ -429,9 +437,10 @@ static void ebpf_create_fs_charts(int update_every)
             snprintfz(title, sizeof(title) - 1, "%s latency for each read request.", efp->filesystem);
             snprintfz(family, sizeof(family) - 1, "%s_latency", efp->family);
             snprintfz(chart_name, sizeof(chart_name) - 1, "%s_read_latency", efp->filesystem);
+            snprintfz(ctx, sizeof(ctx) - 1, "filesystem.%s_read_latency", efp->filesystem);
             efp->hread.name = strdupz(chart_name);
             efp->hread.title = strdupz(title);
-            efp->hread.ctx = NULL;
+            efp->hread.ctx = strdupz(ctx);
             efp->hread.order = order;
             efp->family_name = strdupz(family);
 
@@ -446,9 +455,10 @@ static void ebpf_create_fs_charts(int update_every)
 
             snprintfz(title, sizeof(title) - 1, "%s latency for each write request.", efp->filesystem);
             snprintfz(chart_name, sizeof(chart_name) - 1, "%s_write_latency", efp->filesystem);
+            snprintfz(ctx, sizeof(ctx) - 1, "filesystem.%s_write_latency", efp->filesystem);
             efp->hwrite.name = strdupz(chart_name);
             efp->hwrite.title = strdupz(title);
-            efp->hwrite.ctx = NULL;
+            efp->hwrite.ctx = strdupz(ctx);
             efp->hwrite.order = order;
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hwrite.name,
                               efp->hwrite.title,
@@ -461,9 +471,10 @@ static void ebpf_create_fs_charts(int update_every)
 
             snprintfz(title, sizeof(title) - 1, "%s latency for each open request.", efp->filesystem);
             snprintfz(chart_name, sizeof(chart_name) - 1, "%s_open_latency", efp->filesystem);
+            snprintfz(ctx, sizeof(ctx) - 1, "filesystem.%s_open_latency", efp->filesystem);
             efp->hopen.name = strdupz(chart_name);
             efp->hopen.title = strdupz(title);
-            efp->hopen.ctx = NULL;
+            efp->hopen.ctx = strdupz(ctx);
             efp->hopen.order = order;
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name,
                               efp->hopen.title,
@@ -477,7 +488,7 @@ static void ebpf_create_fs_charts(int update_every)
             char *type = (efp->flags & NETDATA_FILESYSTEM_ATTR_CHARTS) ? "attribute" : "sync";
             snprintfz(title, sizeof(title) - 1, "%s latency for each %s request.", efp->filesystem, type);
             snprintfz(chart_name, sizeof(chart_name) - 1, "%s_%s_latency", efp->filesystem, type);
-            snprintfz(ctx, sizeof(ctx) - 1, "filesystem.%s_latency", type);
+            snprintfz(ctx, sizeof(ctx) - 1, "filesystem.%s_%s_latency", efp->filesystem, type);
             efp->hadditional.name = strdupz(chart_name);
             efp->hadditional.title = strdupz(title);
             efp->hadditional.ctx = strdupz(ctx);
@@ -609,7 +620,9 @@ static int ebpf_read_local_partitions()
             ebpf_filesystem_partitions_t *w = &localfs[i];
             if (w->enabled && (!strcmp(fs, w->filesystem) ||
                               (w->optional_filesystem && !strcmp(fs, w->optional_filesystem)))) {
-                localfs[i].flags |= NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
+                if (!(localfs[i].flags & NETDATA_FILESYSTEM_FLAG_CHART_CREATED))
+                    localfs[i].flags |= NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
+
                 localfs[i].flags &= ~NETDATA_FILESYSTEM_REMOVE_CHARTS;
                 count++;
                 break;
@@ -926,9 +939,9 @@ static void read_filesystem_tables(int maps_per_core)
  */
 void ebpf_filesystem_read_hash(ebpf_module_t *em)
 {
-    ebpf_obsolete_fs_charts(em->update_every);
-
     (void) ebpf_update_partitions(em);
+
+    ebpf_obsolete_fs_charts(em->update_every);
 
     if (em->optional)
         return;
