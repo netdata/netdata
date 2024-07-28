@@ -2035,6 +2035,9 @@ void *ebpf_read_vfs_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
+    int collect_pid = (em->apps_charts || em->cgroup_charts);
+    if (!collect_pid)
+        return NULL;
 
     int counter = update_every - 1;
 
@@ -2622,7 +2625,8 @@ void *ebpf_vfs_thread(void *ptr)
 
     pthread_mutex_unlock(&lock);
 
-    ebpf_read_vfs.thread = nd_thread_create(ebpf_read_vfs.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_vfs_thread, em);
+    ebpf_read_vfs.thread = nd_thread_create(ebpf_read_vfs.name, NETDATA_THREAD_OPTION_DEFAULT,
+                                            ebpf_read_vfs_thread, em);
 
     vfs_collector(em);
 
