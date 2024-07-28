@@ -1064,6 +1064,9 @@ void *ebpf_read_shm_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
+    int collect_pid = (em->apps_charts || em->cgroup_charts);
+    if (!collect_pid)
+        return NULL;
 
     int counter = update_every - 1;
 
@@ -1367,7 +1370,8 @@ void *ebpf_shm_thread(void *ptr)
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     pthread_mutex_unlock(&lock);
 
-    ebpf_read_shm.thread = nd_thread_create(ebpf_read_shm.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_shm_thread, em);
+    ebpf_read_shm.thread = nd_thread_create(ebpf_read_shm.name, NETDATA_THREAD_OPTION_DEFAULT,
+                                            ebpf_read_shm_thread, em);
 
     shm_collector(em);
 

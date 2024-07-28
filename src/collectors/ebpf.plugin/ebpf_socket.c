@@ -1810,6 +1810,9 @@ void *ebpf_read_socket_thread(void *ptr)
 
     int update_every = em->update_every;
     int counter = update_every - 1;
+    int collect_pid = (em->apps_charts || em->cgroup_charts);
+    if (!collect_pid)
+        return NULL;
 
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;

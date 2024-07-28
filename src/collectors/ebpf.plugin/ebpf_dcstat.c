@@ -639,6 +639,9 @@ void *ebpf_read_dcstat_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
+    int collect_pid = (em->apps_charts || em->cgroup_charts);
+    if (!collect_pid)
+        return NULL;
 
     int counter = update_every - 1;
 
