@@ -48,6 +48,14 @@ enum cachestat_counters {
     NETDATA_CACHESTAT_END
 };
 
+enum cachestat_stats {
+    NETDATA_CACHESTAT_KEY_TOTAL,
+    NETDATA_CACHESTAT_KEY_MISSES,
+    NETDATA_CACHESTAT_KEY_DIRTY,
+
+    NETDATA_CACHESTAT_KEYS_END
+};
+
 enum cachestat_account_dirty_pages {
     NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY,
     NETDATA_CACHESTAT_SET_PAGE_DIRTY,
@@ -76,10 +84,9 @@ typedef struct netdata_publish_cachestat_pid {
     uint32_t gid;
     char name[TASK_COMM_LEN];
 
-    uint64_t add_to_page_cache_lru;
-    uint64_t mark_page_accessed;
-    uint64_t account_page_dirtied;
-    uint64_t mark_buffer_dirty;
+    int64_t total;
+    int64_t misses;
+    uint64_t dirty;
 } netdata_cachestat_pid_t;
 
 typedef struct netdata_publish_cachestat {

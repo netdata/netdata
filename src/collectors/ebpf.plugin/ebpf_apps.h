@@ -116,6 +116,7 @@ extern struct ebpf_target *groups_root_target;
 
 typedef struct ebpf_pid_stat {
     int32_t pid;
+    uint64_t thread_collecting;
     char comm[EBPF_MAX_COMPARE_NAME + 1];
     char *cmdline;
 
@@ -241,6 +242,7 @@ void ebpf_shm_aral_init();
 netdata_publish_shm_t *ebpf_shm_stat_get(void);
 void ebpf_shm_release(netdata_publish_shm_t *stat);
 void ebpf_cleanup_exited_pids(int max);
+void ebpf_del_pid_entry(pid_t pid);
 
 // ARAL Section end
 
