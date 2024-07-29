@@ -1,7 +1,7 @@
 #!/bin/bash
 
 repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
-BUILD_TYPE="Debug"
+CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 
 if [ -n "${BUILD_DIR}" ]; then
     build="${BUILD_DIR}"
@@ -31,13 +31,21 @@ if command -v ninja >/dev/null 2>&1; then
     build_args="-k 1"
 fi
 
+COMMON_CFLAGS="-Wa,-mbig-obj -pipe -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1"
+
+if [ "${CMAKE_BUILD_TYPE}" = "Debug" ]; then
+    BUILD_CFLAGS="-fstack-protector-all -O0 -ggdb -Wall -Wextra -Wno-char-subscripts -DNETDATA_INTERNAL_CHECKS=1 ${COMMON_CFLAGS} ${CFLAGS:-}"
+else
+    BUILD_CFLAGS="-O2 ${COMMON_CFLAGS} ${CFLAGS:-}"
+fi
+
 ${GITHUB_ACTIONS+echo "::group::Configuring"}
 # shellcheck disable=SC2086
-/usr/bin/cmake -S "${repo_root}" -B "${build}" \
+CFLAGS="${BUILD_CFLAGS}" /usr/bin/cmake \
+    -S "${repo_root}" \
+    -B "${build}" \
     -G "${generator}" \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
-    -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-    -DCMAKE_C_FLAGS="-fstack-protector-all -O0 -ggdb -Wall -Wextra -Wno-char-subscripts -Wa,-mbig-obj -pipe -DNETDATA_INTERNAL_CHECKS=1 -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1" \
     -DBUILD_FOR_PACKAGING=On \
     -DNETDATA_USER="${USER}" \
     -DENABLE_ACLK=On \
