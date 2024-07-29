@@ -1065,6 +1065,12 @@ jobs:
         with:
           submodules: recursive
           lfs: true
+      - name: Set Up Go
+        id: golang
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "^1.22"
       - name: Set Up Dependencies
         id: deps
         if: needs.file-check.outputs.run == 'true'
