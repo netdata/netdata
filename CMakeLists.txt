@@ -141,6 +141,8 @@ endif()
 
 # This is intended to make life easier for developers who are working on one
 # specific feature.
+#
+# NOTE: DO NOT USE THIS OPTION FOR PRODUCTION BUILDS.
 option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" True)
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
