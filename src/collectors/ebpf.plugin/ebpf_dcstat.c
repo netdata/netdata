@@ -528,6 +528,9 @@ static void ebpf_dcstat_apps_accumulator(netdata_dcstat_pid_t *out, int maps_per
 
         if (w->ct > ct)
             ct = w->ct;
+
+        if (!total->name[0] && w->name[0])
+            strncpyz(total->name, w->name, sizeof(total->name) - 1);
     }
     total->ct = ct;
 }
@@ -555,15 +558,19 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
 
         ebpf_dcstat_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(key, cv->tgid);
+        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_and_link(key, cv->tgid, cv->name);
         if (pid_stat) {
             netdata_publish_dcstat_t *publish = &pid_stat->dc;
             if (!publish->ct || publish->ct != cv->ct) {
                 memcpy(&publish->curr, &cv[0], sizeof(netdata_dcstat_pid_t));
+                pid_stat->thread_collecting |= 1<<EBPF_MODULE_DCSTAT_IDX;
                 pid_stat->not_updated = 0;
             } else if (++pid_stat->not_updated >= max_period) {
                 bpf_map_delete_elem(fd, &key);
                 pid_stat->not_updated = 0;
+                pid_stat->thread_collecting &= ~(1<<EBPF_MODULE_DCSTAT_IDX);
+                if (!pid_stat->thread_collecting)
+                    ebpf_del_pid_entry((pid_t)key);
             }
         }
 
