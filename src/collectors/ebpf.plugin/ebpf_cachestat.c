@@ -676,6 +676,9 @@ static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_pe
         total->total += w->total;
         if (w->ct > ct)
             ct = w->ct;
+
+        if (!total->name[0] && w->name[0])
+            strncpyz(total->name, w->name, sizeof(total->name) - 1);
     }
     total->ct = ct;
 }
@@ -723,7 +726,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
 
         cachestat_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, cv->tgid);
+        ebpf_pid_stat_t *local_pid = ebpf_get_pid_and_link(key, cv->tgid, cv->name);
         if (!local_pid)
             goto end_cachestat_loop;
 
@@ -843,6 +846,7 @@ void *ebpf_read_cachestat_thread(void *ptr)
 
     int counter = update_every - 1;
 
+    fprintf(stderr, "KILLME_START");
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
