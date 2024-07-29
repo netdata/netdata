@@ -846,7 +846,6 @@ void *ebpf_read_cachestat_thread(void *ptr)
 
     int counter = update_every - 1;
 
-    fprintf(stderr, "KILLME_START");
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
