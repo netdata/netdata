@@ -22,7 +22,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/godbus/dbus/v5 v5.1.0
-	github.com/gofrs/flock v0.12.0
+	github.com/gofrs/flock v0.12.1
 	github.com/golang/mock v1.6.0
 	github.com/gosnmp/gosnmp v1.37.0
 	github.com/ilyam8/hashstructure v1.1.0
