@@ -499,6 +499,7 @@ static inline void assign_target_to_pid(struct ebpf_pid_stat *p)
     size_t pclen = strlen(p->comm);
 
     struct ebpf_target *w;
+    bool assigned = false;
     for (w = apps_groups_root_target; w; w = w->next) {
         // if(debug_enabled || (p->target && p->target->debug_enabled)) debug_log_int("\t\tcomparing '%s' with '%s'", w->compare, p->comm);
 
@@ -521,10 +522,45 @@ static inline void assign_target_to_pid(struct ebpf_pid_stat *p)
             if (debug_enabled || (p->target && p->target->debug_enabled))
                 debug_log_int("%s linked to target %s", p->comm, p->target->name);
 
+            w->processes++;
+            assigned = true;
+
             break;
         }
     }
+
+    if (!assigned) {
+        apps_groups_default_target->processes++;
+        p->target = apps_groups_default_target;
+    }
 }
+
+/**
+ * Get PID and link
+ *
+ * @param pid  the current PID
+ * @param tgid The parent PID
+ * @param name The process name
+ *
+ * @return It returns the pid_stat already associated to a target.
+ */
+ebpf_pid_stat_t *ebpf_get_pid_and_link(pid_t pid, pid_t tgid, char *name)
+{
+    ebpf_pid_stat_t *pe = ebpf_get_pid_entry(pid, tgid);
+
+    // mark it as updated
+    pe->updated = 1;
+    pe->keep = 0;
+    pe->keeploops = 0;
+
+    strncpyz(pe->comm, name, sizeof(pe->comm) -1);
+
+    if (!pe->target)
+        assign_target_to_pid(pe);
+
+    return pe;
+}
+
 
 // ----------------------------------------------------------------------------
 // update pids from proc
