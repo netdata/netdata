@@ -139,8 +139,6 @@ function(netdata_add_permissions)
     message(FATAL_ERROR "No additional permissions specified")
   endif()
 
-  set(nd_perms_PATH "${CMAKE_INSTALL_PREFIX}/${nd_perms_PATH}")
-
   list(JOIN nd_perms_PERMISSIONS "," nd_perms_PERMISSIONS_ITEMS)
   file(APPEND "${_nd_perms_list_file}" "${nd_perms_PATH}::${nd_perms_COMPONENT}::${nd_perms_PERMISSIONS_ITEMS}\n")
 endfunction()
@@ -231,17 +229,18 @@ endfunction()
 # Prepare an install hook for the specified path in the specified component
 # with the specified permissions.
 function(nd_perms_generate_cmake_install_hook path component perms)
-  file(MAKE_DIRECTORY "${_nd_perms_hooks_dir}")
-  string(REPLACE "/" "_" hook_name "${path}")
+  set(prefix [[${CMAKE_INSTALL_PREFIX}]])
 
   message(STATUS "Adding post-install hook for supplementary permissions for ${path}")
 
-  if(USE_FILE_CAPABILITIES AND NOT "${perms}" STREQUAL "suid")
+  if(perms STREQUAL "restrict")
+    install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-perms-hook.sh ${prefix}/${path} ${NETDATA_GROUP} '0750')" COMPONENT "${component}")
+  elseif(USE_FILE_CAPABILITIES AND NOT "${perms}" STREQUAL "suid")
     list(JOIN perms " " caps)
 
-    install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-linux-caps-hook.sh ${path} ${NETDATA_GROUP} ${caps})" COMPONENT "${component}")
+    install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-linux-caps-hook.sh ${prefix}/${path} ${NETDATA_GROUP} ${caps})" COMPONENT "${component}")
   else()
-    install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-suid-hook.sh ${path} ${NETDATA_GROUP})" COMPONENT "${component}")
+    install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-perms-hook.sh ${prefix}/${path} ${NETDATA_GROUP} '4750')" COMPONENT "${component}")
   endif()
 endfunction()
 
@@ -305,9 +304,10 @@ function(netdata_install_extra_permissions)
   file(STRINGS "${_nd_perms_list_file}" extra_perms_entries REGEX "^.+::.+::.+$")
   set(completed_items)
   set(user_components)
+  set(nd_homedir [[${CMAKE_INSTALL_PREFIX}/var/lib/netdata]])
 
   if(CREATE_USER AND NOT BUILD_FOR_PACKAGING)
-    install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-user-hook.sh ${NETDATA_USER} ${NETDATA_GROUP} ${CMAKE_INSTALL_PREFIX}/var/lib/netdata)" COMPONENT netdata)
+    install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-user-hook.sh ${NETDATA_USER} ${NETDATA_GROUP} ${nd_homedir})" COMPONENT netdata)
     list(APPEND user_components "netdata")
   endif()
 
@@ -327,7 +327,7 @@ function(netdata_install_extra_permissions)
 
       if(CREATE_USER)
         if(NOT entry_component IN_LIST user_components)
-          install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-user-hook.sh ${NETDATA_USER} ${NETDATA_GROUP} ${CMAKE_INSTALL_PREFIX}/var/lib/netdata)" COMPONENT "${component}")
+          install(CODE "execute_process(COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/install-user-hook.sh ${NETDATA_USER} ${NETDATA_GROUP} ${nd_homedir})" COMPONENT "${entry_component}")
           list(APPEND user_components "${entry_component}")
         endif()
       endif()
