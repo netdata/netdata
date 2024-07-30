@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "api_v3_calls.h"
+#include "api_v2_calls.h"
 
 #define GROUP_BY_KEY_MAX_LENGTH 30
 static struct {
@@ -17,7 +17,7 @@ __attribute__((constructor)) void initialize_group_by_keys(void) {
     }
 }
 
-int web_client_api_request_v3_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     usec_t received_ut = now_monotonic_usec();
 
     int ret = HTTP_RESP_BAD_REQUEST;
@@ -101,7 +101,7 @@ int web_client_api_request_v3_data(RRDHOST *host __maybe_unused, struct web_clie
             if(aggregation_idx >= MAX_QUERY_GROUP_BY_PASSES)
                 aggregation_idx = MAX_QUERY_GROUP_BY_PASSES - 1;
         }
-        else if(!strcmp(name, "format")) format = web_client_api_request_vX_data_format(value);
+        else if(!strcmp(name, "format")) format = datasource_format_str_to_id(value);
         else if(!strcmp(name, "options")) options |= rrdr_options_parse(value);
         else if(!strcmp(name, "time_group")) time_group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
         else if(!strcmp(name, "time_group_options")) time_group_options = value;
@@ -132,7 +132,7 @@ int web_client_api_request_v3_data(RRDHOST *host __maybe_unused, struct web_clie
                 }
                 else if(!strcmp(tqx_name, "out")) {
                     google_out = tqx_value;
-                    format = web_client_api_request_vX_data_google_format(google_out);
+                    format = google_data_format_str_to_id(google_out);
                 }
                 else if(!strcmp(tqx_name, "responseHandler"))
                     responseHandler = tqx_value;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "api_v3_calls.h"
+#include "api_v2_calls.h"
 
 static bool verify_agent_uuids(const char *machine_guid, const char *node_id, const char *claim_id) {
     if(!machine_guid || !node_id || !claim_id)
@@ -26,7 +26,7 @@ static bool verify_agent_uuids(const char *machine_guid, const char *node_id, co
     return true;
 }
 
-int api_v3_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w __maybe_unused, char *url) {
+int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w __maybe_unused, char *url) {
     char *machine_guid = NULL;
     char *claim_id = NULL;
     char *node_id = NULL;
@@ -71,7 +71,7 @@ int api_v3_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
     return HTTP_RESP_OK;
 }
 
-int api_v3_bearer_token(RRDHOST *host __maybe_unused, struct web_client *w __maybe_unused, char *url __maybe_unused) {
+int api_v2_bearer_token(RRDHOST *host __maybe_unused, struct web_client *w __maybe_unused, char *url __maybe_unused) {
     char *machine_guid = NULL;
     char *claim_id = NULL;
     char *node_id = NULL;

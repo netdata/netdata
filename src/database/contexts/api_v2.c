@@ -252,7 +252,7 @@ struct rrdcontext_to_json_v2_data {
     struct api_v2_contexts_request *request;
 
     CONTEXTS_V2_MODE mode;
-    CONTEXTS_V2_OPTIONS options;
+    CONTEXTS_OPTIONS options;
     struct query_versions versions;
 
     struct {
@@ -554,30 +554,30 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
                 if(ctl->alerts.alarm_id_filter && ctl->alerts.alarm_id_filter != rcl->id)
                     continue;
 
-                size_t m = ctl->request->alerts.status & CONTEXTS_V2_ALERT_STATUSES ? 0 : 1;
+                size_t m = ctl->request->alerts.status & CONTEXTS_ALERT_STATUSES ? 0 : 1;
 
                 if (!m) {
-                    if ((ctl->request->alerts.status & CONTEXT_V2_ALERT_UNINITIALIZED) &&
+                    if ((ctl->request->alerts.status & CONTEXT_ALERT_UNINITIALIZED) &&
                         rcl->status == RRDCALC_STATUS_UNINITIALIZED)
                         m++;
 
-                    if ((ctl->request->alerts.status & CONTEXT_V2_ALERT_UNDEFINED) &&
+                    if ((ctl->request->alerts.status & CONTEXT_ALERT_UNDEFINED) &&
                         rcl->status == RRDCALC_STATUS_UNDEFINED)
                         m++;
 
-                    if ((ctl->request->alerts.status & CONTEXT_V2_ALERT_CLEAR) &&
+                    if ((ctl->request->alerts.status & CONTEXT_ALERT_CLEAR) &&
                         rcl->status == RRDCALC_STATUS_CLEAR)
                         m++;
 
-                    if ((ctl->request->alerts.status & CONTEXT_V2_ALERT_RAISED) &&
+                    if ((ctl->request->alerts.status & CONTEXT_ALERT_RAISED) &&
                         rcl->status >= RRDCALC_STATUS_RAISED)
                         m++;
 
-                    if ((ctl->request->alerts.status & CONTEXT_V2_ALERT_WARNING) &&
+                    if ((ctl->request->alerts.status & CONTEXT_ALERT_WARNING) &&
                         rcl->status == RRDCALC_STATUS_WARNING)
                         m++;
 
-                    if ((ctl->request->alerts.status & CONTEXT_V2_ALERT_CRITICAL) &&
+                    if ((ctl->request->alerts.status & CONTEXT_ALERT_CRITICAL) &&
                         rcl->status == RRDCALC_STATUS_CRITICAL)
                         m++;
 
@@ -633,7 +633,7 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
                                         sizeof(struct alert_by_x_entry),
                                         rcl);
 
-                if (ctl->options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES | CONTEXT_V2_OPTION_ALERTS_WITH_VALUES)) {
+                if (ctl->options & (CONTEXTS_OPTION_ALERTS_WITH_INSTANCES | CONTEXTS_OPTION_ALERTS_WITH_VALUES)) {
                     char key[20 + 1];
                     snprintfz(key, sizeof(key) - 1, "%p", rcl);
 
@@ -1540,10 +1540,10 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
         buffer_json_member_add_string(wb, "ch", string2str(t->chart_id));
         buffer_json_member_add_string(wb, "ch_n", string2str(t->chart_name));
 
-        if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY)
+        if(ctl->request->options & CONTEXTS_OPTION_ALERTS_WITH_SUMMARY)
             buffer_json_member_add_uint64(wb, "ati", t->ati);
 
-        if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES) {
+        if(ctl->request->options & CONTEXTS_OPTION_ALERTS_WITH_INSTANCES) {
             buffer_json_member_add_string(wb, "units", string2str(t->units));
             buffer_json_member_add_string(wb, "fami", string2str(t->family));
             buffer_json_member_add_string(wb, "info", string2str(t->info));
@@ -1566,7 +1566,7 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
             // rrdcalc_flags_to_json_array  (wb, "flags", t->flags);
         }
 
-        if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_VALUES) {
+        if(ctl->request->options & CONTEXTS_OPTION_ALERTS_WITH_VALUES) {
             // Netdata Cloud fetched these by querying the agents
             buffer_json_member_add_double(wb, "v", t->value);
             buffer_json_member_add_time_t(wb, "t", t->last_updated);
@@ -1627,7 +1627,7 @@ static void contexts_v2_alert_instances_to_json(BUFFER *wb, const char *key, str
 }
 
 static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl, bool debug) {
-    if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY) {
+    if(ctl->request->options & CONTEXTS_OPTION_ALERTS_WITH_SUMMARY) {
         buffer_json_member_add_array(wb, "alerts");
         {
             struct alert_v2_entry *t;
@@ -1693,7 +1693,7 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
         contexts_v2_alerts_by_x_to_json(wb, ctl->alerts.by_module, "alerts_by_module");
     }
 
-    if(ctl->request->options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES|CONTEXT_V2_OPTION_ALERTS_WITH_VALUES)) {
+    if(ctl->request->options & (CONTEXTS_OPTION_ALERTS_WITH_INSTANCES | CONTEXTS_OPTION_ALERTS_WITH_VALUES)) {
         contexts_v2_alert_instances_to_json(wb, "alert_instances", ctl, debug);
     }
 }
@@ -2048,7 +2048,7 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
     }
     buffer_json_array_close(wb); // all transitions
 
-    if(ctl->options & CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS) {
+    if(ctl->options & CONTEXTS_OPTION_ALERTS_WITH_CONFIGURATIONS) {
         DICTIONARY *configs = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
 
         for(struct sql_alert_transition_fixed_size *t = data.base; t ; t = t->next) {
@@ -2128,15 +2128,16 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     if(mode & CONTEXTS_V2_ALERTS) {
         mode |= CONTEXTS_V2_NODES;
-        req->options &= ~CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS;
+        req->options &= ~CONTEXTS_OPTION_ALERTS_WITH_CONFIGURATIONS;
 
-        if(!(req->options & (CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY|CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES|CONTEXT_V2_OPTION_ALERTS_WITH_VALUES)))
-            req->options |= CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY;
+        if(!(req->options & (CONTEXTS_OPTION_ALERTS_WITH_SUMMARY | CONTEXTS_OPTION_ALERTS_WITH_INSTANCES |
+                              CONTEXTS_OPTION_ALERTS_WITH_VALUES)))
+            req->options |= CONTEXTS_OPTION_ALERTS_WITH_SUMMARY;
     }
 
     if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
         mode |= CONTEXTS_V2_NODES;
-        req->options &= ~CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES;
+        req->options &= ~CONTEXTS_OPTION_ALERTS_WITH_INSTANCES;
     }
 
     struct rrdcontext_to_json_v2_data ctl = {
@@ -2162,7 +2163,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             }
     };
 
-    bool debug = ctl.options & CONTEXT_V2_OPTION_DEBUG;
+    bool debug = ctl.options & CONTEXTS_OPTION_DEBUG;
 
     if(mode & CONTEXTS_V2_NODES) {
         ctl.nodes.dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
@@ -2190,7 +2191,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     if(mode & CONTEXTS_V2_ALERTS) {
         if(req->alerts.transition) {
-            ctl.options |= CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES|CONTEXT_V2_OPTION_ALERTS_WITH_VALUES;
+            ctl.options |= CONTEXTS_OPTION_ALERTS_WITH_INSTANCES | CONTEXTS_OPTION_ALERTS_WITH_VALUES;
             run = sql_find_alert_transition(req->alerts.transition, rrdcontext_v2_set_transition_filter, &ctl);
             if(!run) {
                 resp = HTTP_RESP_NOT_FOUND;
@@ -2235,7 +2236,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         dictionary_register_insert_callback(ctl.alerts.by_module, alerts_by_x_insert_callback, NULL);
         dictionary_register_conflict_callback(ctl.alerts.by_module, alerts_by_x_conflict_callback, NULL);
 
-        if(ctl.options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES | CONTEXT_V2_OPTION_ALERTS_WITH_VALUES)) {
+        if(ctl.options & (CONTEXTS_OPTION_ALERTS_WITH_INSTANCES | CONTEXTS_OPTION_ALERTS_WITH_VALUES)) {
             ctl.alerts.alert_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                                     NULL, sizeof(struct sql_alert_instance_v2_entry));
 
@@ -2255,15 +2256,15 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         ctl.now = now_realtime_sec();
 
     buffer_json_initialize(wb, "\"", "\"", 0, true,
-                           ((req->options & CONTEXT_V2_OPTION_MINIFY) && !(req->options & CONTEXT_V2_OPTION_DEBUG)) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
+                           ((req->options & CONTEXTS_OPTION_MINIFY) && !(req->options & CONTEXTS_OPTION_DEBUG)) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
     buffer_json_member_add_uint64(wb, "api", 2);
 
-    if(req->options & CONTEXT_V2_OPTION_DEBUG) {
+    if(req->options & CONTEXTS_OPTION_DEBUG) {
         buffer_json_member_add_object(wb, "request");
         {
             buffer_json_contexts_v2_mode_to_array(wb, "mode", mode);
-            web_client_api_request_v2_contexts_options_to_buffer_json_array(wb, "options", req->options);
+            contexts_options_to_buffer_json_array(wb, "options", req->options);
 
             buffer_json_member_add_object(wb, "scope");
             {
@@ -2284,7 +2285,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                     buffer_json_member_add_object(wb, "alerts");
 
                     if(mode & CONTEXTS_V2_ALERTS)
-                        web_client_api_request_v2_contexts_alerts_status_to_buffer_json_array(wb, "status", req->alerts.status);
+                        contexts_alerts_status_to_buffer_json_array(wb, "status", req->alerts.status);
 
                     if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
                         buffer_json_member_add_string(wb, "context", req->contexts);

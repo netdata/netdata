@@ -865,7 +865,7 @@ static void buffer_svg(BUFFER *wb, const char *label,
 #define BADGE_URL_ARG_LBL_COLOR "text_color_lbl"
 #define BADGE_URL_ARG_VAL_COLOR "text_color_val"
 
-int web_client_api_request_v3_badge(RRDHOST *host, struct web_client *w, char *url) {
+int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
     int ret = HTTP_RESP_BAD_REQUEST;
     buffer_flush(w->response.data);
 

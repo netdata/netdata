@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "api_v3_calls.h"
+#include "api_v2_calls.h"
 
-int web_client_api_request_v3_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_MODE mode) {
+// --------------------------------------------------------------------------------------------------------------------
+
+int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_MODE mode) {
     struct api_v2_contexts_request req = { 0 };
 
     while(url) {
@@ -27,7 +29,7 @@ int web_client_api_request_v3_contexts_internal(RRDHOST *host __maybe_unused, st
         else if((mode & CONTEXTS_V2_SEARCH) && !strcmp(name, "q"))
             req.q = value;
         else if(!strcmp(name, "options"))
-            req.options = web_client_api_request_v2_context_options(value);
+            req.options = contexts_options_str_to_id(value);
         else if(!strcmp(name, "after"))
             req.after = str2l(value);
         else if(!strcmp(name, "before"))
@@ -41,7 +43,7 @@ int web_client_api_request_v3_contexts_internal(RRDHOST *host __maybe_unused, st
                 req.alerts.transition = value;
             else if(mode & CONTEXTS_V2_ALERTS) {
                 if (!strcmp(name, "status"))
-                    req.alerts.status = web_client_api_request_v2_alert_status(value);
+                    req.alerts.status = contexts_alert_status_str_to_id(value);
             }
             else if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
                 if (!strcmp(name, "last"))
@@ -69,58 +71,51 @@ int web_client_api_request_v3_contexts_internal(RRDHOST *host __maybe_unused, st
     return rrdcontext_to_json_v2(w->response.data, &req, mode);
 }
 
-int web_client_api_request_v3_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v3_contexts_internal(
-        host, w, url,
-        CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
+int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(
+        host, w, url, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
 }
 
-int web_client_api_request_v3_alert_transitions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v3_contexts_internal(
-        host, w, url,
-        CONTEXTS_V2_ALERT_TRANSITIONS | CONTEXTS_V2_NODES);
+int web_client_api_request_v2_alert_transitions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_ALERT_TRANSITIONS | CONTEXTS_V2_NODES);
 }
 
-int web_client_api_request_v3_alerts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v3_contexts_internal(
-        host, w, url,
-        CONTEXTS_V2_ALERTS | CONTEXTS_V2_NODES);
+int web_client_api_request_v2_alerts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_ALERTS | CONTEXTS_V2_NODES);
 }
 
-int web_client_api_request_v3_functions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v3_contexts_internal(
-        host, w, url,
-        CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
+int web_client_api_request_v2_functions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(
+        host, w, url, CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
 }
 
-int web_client_api_request_v3_versions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v3_contexts_internal(
-        host, w, url,
-        CONTEXTS_V2_VERSIONS);
+int web_client_api_request_v2_versions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_VERSIONS);
 }
 
-int web_client_api_request_v3_q(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v3_contexts_internal(
-        host, w, url,
+int web_client_api_request_v2_q(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(
+        host,
+        w,
+        url,
         CONTEXTS_V2_SEARCH | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
 }
 
-int web_client_api_request_v3_nodes(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v3_contexts_internal(
-        host, w, url,
-        CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INFO);
+int web_client_api_request_v2_nodes(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INFO);
 }
 
-int web_client_api_request_v3_info(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v3_contexts_internal(
-        host, w, url,
-        CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO);
+int web_client_api_request_v2_info(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO);
 }
 
-int web_client_api_request_v3_node_instances(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v3_contexts_internal(
-        host, w, url,
-        CONTEXTS_V2_NODES | CONTEXTS_V2_NODE_INSTANCES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO | CONTEXTS_V2_VERSIONS);
+int web_client_api_request_v2_node_instances(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(
+        host,
+        w,
+        url,
+        CONTEXTS_V2_NODES | CONTEXTS_V2_NODE_INSTANCES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO |
+            CONTEXTS_V2_VERSIONS);
 }
 
 

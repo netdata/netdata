@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "api_v3_calls.h"
+#include "api_v1_calls.h"
 
-int web_client_api_request_v3_function(RRDHOST *host, struct web_client *w, char *url) {
+int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     if (!netdata_ready)
         return HTTP_RESP_SERVICE_UNAVAILABLE;
 

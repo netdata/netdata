@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "api_v3_calls.h"
+#include "api_v2_calls.h"
 
-int web_client_api_request_v3_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
+int web_client_api_request_v2_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
     char *action = "tree";
     char *path = "/";
     char *id = NULL;

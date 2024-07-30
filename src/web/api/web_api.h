@@ -3,11 +3,21 @@
 #ifndef NETDATA_WEB_API_H
 #define NETDATA_WEB_API_H 1
 
+#define ENABLE_API_V1 1
+#define ENABLE_API_v2 1
+
+struct web_client;
+
 #include "daemon/common.h"
+
 #include "web/api/http_header.h"
 #include "web/api/http_auth.h"
 #include "web/api/formatters/rrd2json.h"
 #include "web/api/queries/weights.h"
+
+void nd_web_api_init(void);
+void web_client_api_request_vX_source_to_buffer(struct web_client *w, BUFFER *source);
+void web_client_progress_functions_update(void *data, size_t done, size_t all);
 
 void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key);
 

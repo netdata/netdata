@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "api_v3_calls.h"
+#include "api_v2_calls.h"
 
-int web_client_api_request_v3_alert_config(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+int web_client_api_request_v2_alert_config(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     const char *config = NULL;
 
     while(url) {

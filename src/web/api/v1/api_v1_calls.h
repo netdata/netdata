@@ -30,10 +30,16 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
 int web_client_api_request_v1_aclk(RRDHOST *host, struct web_client *w, char *url);
 
 int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url);
+
 int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char *url);
 
+int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url);
+
 // common library calls
 int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf));
+void web_client_api_v1_management_init(void);
 
 #endif //NETDATA_API_V1_CALLS_H

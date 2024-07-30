@@ -133,7 +133,7 @@ void web_client_api_request_data_vX_options_to_string(char *buf, size_t size, RR
     *write = *end = '\0';
 }
 
-void rrdr_option_init(void) {
+void rrdr_options_init(void) {
     for(size_t i = 0; rrdr_options[i].name ; i++)
         rrdr_options[i].hash = simple_hash(rrdr_options[i].name);
 }

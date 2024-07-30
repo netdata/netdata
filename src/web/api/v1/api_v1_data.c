@@ -67,7 +67,7 @@ int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *ur
             group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
         }
         else if(!strcmp(name, "format")) {
-            format = web_client_api_request_vX_data_format(value);
+            format = datasource_format_str_to_id(value);
         }
         else if(!strcmp(name, "options")) {
             options |= rrdr_options_parse(value);
@@ -101,7 +101,7 @@ int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *ur
                 }
                 else if(!strcmp(tqx_name, "out")) {
                     google_out = tqx_value;
-                    format = web_client_api_request_vX_data_google_format(google_out);
+                    format = google_data_format_str_to_id(google_out);
                 }
                 else if(!strcmp(tqx_name, "responseHandler"))
                     responseHandler = tqx_value;

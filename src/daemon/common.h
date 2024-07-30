@@ -34,6 +34,8 @@
 // ----------------------------------------------------------------------------
 // netdata include files
 
+#include "web/api/maps/maps.h"
+
 #include "daemon/config/dyncfg.h"
 
 #include "global_statistics.h"

@@ -1025,6 +1025,8 @@ void dbengine_init(char *hostname) {
 #endif
 }
 
+void web_client_api_v1_management_init(void);
+
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
     rrdhost_init();
 

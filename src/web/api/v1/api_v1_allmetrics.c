@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "api_v3_calls.h"
+#include "api_v1_calls.h"
 
 #define ALLMETRICS_FORMAT_SHELL                 "shell"
 #define ALLMETRICS_FORMAT_PROMETHEUS            "prometheus"
@@ -191,7 +191,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
     simple_pattern_free(filter);
 }
 
-int web_client_api_request_v3_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
+int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
     int format = ALLMETRICS_SHELL;
     const char *filter = NULL;
     const char *prometheus_server = w->client_ip;
