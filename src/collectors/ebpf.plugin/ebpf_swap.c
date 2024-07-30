@@ -560,7 +560,7 @@ static void ebpf_read_swap_apps_table(int maps_per_core, int max_period)
 
         swap_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, cv->tgid);
+        ebpf_pid_stat_t *local_pid = ebpf_get_pid_and_link(key, cv->tgid, cv->name);
         if (!local_pid)
             goto end_swap_loop;
 
