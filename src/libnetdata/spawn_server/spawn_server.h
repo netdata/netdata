@@ -23,7 +23,7 @@ typedef struct spawn_request {
     pid_t pid;                          // the pid of the child
     int sock;                           // the socket for this request
     int fds[SPAWN_SERVER_TRANSFER_FDS]; // 0 = stdin, 1 = stdout, 2 = stderr, 3 = custom
-    const char **environment;           // the environment of the parent process
+    const char **envp;                  // the environment of the parent process
     const char **argv;                  // the command line and its parameters
     const void *data;                   // the data structure for the callback
     size_t data_size;                   // the data structure size
@@ -32,7 +32,7 @@ typedef struct spawn_request {
     struct spawn_request *prev, *next;  // linking of active requests at the spawn server
 } SPAWN_REQUEST;
 
-typedef void (*spawn_request_callback_t)(SPAWN_REQUEST *request);
+typedef int (*spawn_request_callback_t)(SPAWN_REQUEST *request);
 
 typedef struct spawn_instance SPAWN_INSTANCE;
 typedef struct spawn_server SPAWN_SERVER;

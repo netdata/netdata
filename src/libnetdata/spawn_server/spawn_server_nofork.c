@@ -92,38 +92,10 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
     close(stderr_fd); stderr_fd = rq->fds[2] = STDERR_FILENO;
 
     // overwrite the process environment
-    environ = (char **)rq->environment;
+    environ = (char **)rq->envp;
 
-    // Perform different actions based on the type
-    switch (rq->type) {
-
-        case SPAWN_INSTANCE_TYPE_EXEC:
-            // close all fds except the ones we need
-            os_close_all_non_std_open_fds_except(NULL, 0, 0);
-
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "SPAWN SERVER: running request No %zu: %s",
-                   rq->request_id, rq->cmdline);
-
-            // run the command
-            execvp(rq->argv[0], (char **)rq->argv);
-
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                "SPAWN SERVER: Failed to execute command of request No %zu: %s",
-                rq->request_id, rq->cmdline);
-
-            exit(1);
-            break;
-
-        case SPAWN_INSTANCE_TYPE_CALLBACK:
-            server->cb(rq);
-            exit(0);
-            break;
-
-        default:
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: unknown request type %u", rq->type);
-            exit(1);
-    }
+    // run the callback and return its code
+    exit(server->cb(rq));
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -333,40 +305,79 @@ static void request_free(SPAWN_REQUEST *rq) {
     if(rq->fds[3] != -1) close(rq->fds[3]);
     if(rq->sock != -1) close(rq->sock);
     freez((void *)rq->argv);
-    freez((void *)rq->environment);
+    freez((void *)rq->envp);
     freez((void *)rq->data);
     freez((void *)rq->cmdline);
     freez((void *)rq);
 }
 
-static void spawn_server_execute_request(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
-    switch(rq->type) {
-        case SPAWN_INSTANCE_TYPE_EXEC:
-            // close custom_fd - it is not needed for exec mode
-            if(rq->fds[3] != -1) { close(rq->fds[3]); rq->fds[3] = -1; }
+static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_REQUEST *rq) {
+    // close custom_fd - it is not needed for exec mode
+    if(rq->fds[3] != -1) { close(rq->fds[3]); rq->fds[3] = -1; }
 
-            // create the cmdline for logs
-            if(rq->argv) {
-                CLEAN_BUFFER *wb = argv_to_cmdline_buffer(rq->argv);
-                rq->cmdline = strdupz(buffer_tostring(wb));
-            }
-            break;
+    if(!rq->argv) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: there is no argv pointer to exec");
+        return false;
+    }
 
-        case SPAWN_INSTANCE_TYPE_CALLBACK:
-            if(server->cb == NULL) {
-                errno = ENOSYS;
-                spawn_server_send_status_failure(rq);
-                request_free(rq);
-                return;
-            }
-            rq->cmdline = strdupz("callback() function");
-            break;
+    if(rq->fds[0] == -1 || rq->fds[1] == -1 || rq->fds[2] == -1) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdio fds are missing from the request");
+        return false;
+    }
 
-        default:
-            errno = EINVAL;
-            spawn_server_send_status_failure(rq);
-            request_free(rq);
-            return;
+    CLEAN_BUFFER *wb = argv_to_cmdline_buffer(rq->argv);
+    rq->cmdline = strdupz(buffer_tostring(wb));
+
+    posix_spawn_file_actions_t file_actions;
+    if (posix_spawn_file_actions_init(&file_actions) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawn_file_actions_init() failed");
+        return false;
+    }
+
+    posix_spawn_file_actions_adddup2(&file_actions, rq->fds[0], STDIN_FILENO);
+    posix_spawn_file_actions_adddup2(&file_actions, rq->fds[1], STDOUT_FILENO);
+    posix_spawn_file_actions_adddup2(&file_actions, rq->fds[2], STDERR_FILENO);
+    posix_spawn_file_actions_addclose(&file_actions, rq->fds[0]);
+    posix_spawn_file_actions_addclose(&file_actions, rq->fds[1]);
+    posix_spawn_file_actions_addclose(&file_actions, rq->fds[2]);
+
+    posix_spawnattr_t attr;
+    if (posix_spawnattr_init(&attr) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_init() failed");
+        posix_spawn_file_actions_destroy(&file_actions);
+        return false;
+    }
+
+    os_close_all_non_std_open_fds_except(rq->fds, 3, CLOSE_RANGE_CLOEXEC);
+
+    errno_clear();
+    if (posix_spawn(&rq->pid, rq->argv[0], &file_actions, &attr, (char * const *)rq->argv, (char * const *)rq->envp) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: posix_spawn() failed");
+
+        posix_spawnattr_destroy(&attr);
+        posix_spawn_file_actions_destroy(&file_actions);
+        return false;
+    }
+
+    // Destroy the posix_spawnattr_t and posix_spawn_file_actions_t structures
+    posix_spawnattr_destroy(&attr);
+    posix_spawn_file_actions_destroy(&file_actions);
+
+    // Close the read end of the stdin pipe and the write end of the stdout pipe in the parent process
+    close(rq->fds[0]); rq->fds[0] = -1;
+    close(rq->fds[1]); rq->fds[1] = -1;
+    close(rq->fds[2]); rq->fds[2] = -1;
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: process created with pid %d", rq->pid);
+    return true;
+}
+
+static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN_REQUEST *rq) {
+    rq->cmdline = strdupz("callback() function");
+
+    if(server->cb == NULL) {
+        errno = ENOSYS;
+        return false;
     }
 
     pid_t pid = fork();
@@ -374,9 +385,7 @@ static void spawn_server_execute_request(SPAWN_SERVER *server, SPAWN_REQUEST *rq
         // fork failed
 
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to fork() child.");
-        spawn_server_send_status_failure(rq);
-        request_free(rq);
-        return;
+        return false;
     }
     else if (pid == 0) {
         // the child
@@ -388,11 +397,37 @@ static void spawn_server_execute_request(SPAWN_SERVER *server, SPAWN_REQUEST *rq
     // the parent
     rq->pid = pid;
 
+    return true;
+}
+
+static void spawn_server_execute_request(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
+    bool done;
+    switch(rq->type) {
+        case SPAWN_INSTANCE_TYPE_EXEC:
+            done = spawn_external_command(server, rq);
+            break;
+
+        case SPAWN_INSTANCE_TYPE_CALLBACK:
+            done = spawn_server_run_callback(server, rq);
+            break;
+
+        default:
+            errno = EINVAL;
+            done = false;
+            break;
+    }
+
+    if(!done) {
+        spawn_server_send_status_failure(rq);
+        request_free(rq);
+        return;
+    }
+
     // let the parent know
     spawn_server_send_status_success(rq);
 
     // do not keep data we don't need at the parent
-    freez((void *)rq->environment); rq->environment = NULL;
+    freez((void *)rq->envp); rq->envp = NULL;
     freez((void *)rq->argv); rq->argv = NULL;
     freez((void *)rq->data); rq->data = NULL;
     rq->data_size = 0;
@@ -478,7 +513,7 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
     bool ret = false;
 
     size_t env_size = 0;
-    void *encoded_env = argv_encode(request->environment, &env_size);
+    void *encoded_env = argv_encode(request->envp, &env_size);
     if (!encoded_env)
         goto cleanup;
 
@@ -705,7 +740,7 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
             [2] = stderr_fd,
             [3] = custom_fd,
         },
-        .environment = argv_decode(envp_encoded, env_size),
+        .envp = argv_decode(envp_encoded, env_size),
         .argv = argv_decode(argv_encoded, argv_size),
         .data = data,
         .data_size = data_size,
@@ -1190,7 +1225,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
             [2] = stderr_fd,
             [3] = custom_fd,
         },
-        .environment = (const char **)environ,
+        .envp = (const char **)environ,
         .argv = argv,
         .data = data,
         .data_size = data_size,

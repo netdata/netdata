@@ -17,10 +17,38 @@ void child_check_environment(void) {
     }
 }
 
+static bool is_valid_fd(int fd) {
+    errno_clear();
+    return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
+}
+
+void child_check_fds(void) {
+    for(int fd = 0; fd < 3; fd++) {
+        if(!is_valid_fd(fd)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "fd No %d should be a valid file descriptor - but it isn't.", fd);
+
+            exit(1);
+        }
+    }
+
+    for(int fd = 3; fd < /* os_get_fd_open_max() */ 1024; fd++) {
+        if(is_valid_fd(fd)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "fd No %d is a valid file descriptor - it shouldn't.", fd);
+
+            exit(1);
+        }
+    }
+
+    errno_clear();
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // kill to stop
 
 int plugin_kill_to_stop() {
+    child_check_fds();
     child_check_environment();
 
     char buffer[1024];
@@ -150,6 +178,7 @@ void test_popen_plugin_kill_to_stop(const char *argv0) {
 // close to stop
 
 int plugin_close_to_stop() {
+    child_check_fds();
     child_check_environment();
 
     char buffer[1024];
@@ -284,6 +313,7 @@ void test_popen_plugin_close_to_stop(const char *argv0) {
 #define ECHO_AND_EXIT_MSG "GOODBYE\n"
 
 int plugin_echo_and_exit() {
+    child_check_fds();
     child_check_environment();
 
     printf(ECHO_AND_EXIT_MSG);
