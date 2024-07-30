@@ -19,7 +19,7 @@ fi
 set -exu -o pipefail
 
 ${GITHUB_ACTIONS+echo "::group::Installing"}
-ninja -C "${build}" -k 1 install
+cmake --install "${build}"
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 if [ ! -f "/msys2-installer.exe" ]; then

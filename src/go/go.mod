@@ -16,13 +16,13 @@ require (
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/docker/docker v27.0.3+incompatible
+	github.com/docker/docker v27.1.1+incompatible
 	github.com/facebook/time v0.0.0-20240626113945-18207c5d8ddc
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/godbus/dbus/v5 v5.1.0
-	github.com/gofrs/flock v0.12.0
+	github.com/gofrs/flock v0.12.1
 	github.com/golang/mock v1.6.0
 	github.com/gosnmp/gosnmp v1.37.0
 	github.com/ilyam8/hashstructure v1.1.0
@@ -37,13 +37,13 @@ require (
 	github.com/mattn/go-xmlrpc v0.0.3
 	github.com/miekg/dns v1.1.61
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/prometheus-community/pro-bing v0.4.0
+	github.com/prometheus-community/pro-bing v0.4.1
 	github.com/prometheus/common v0.55.0
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/stretchr/testify v1.9.0
 	github.com/tidwall/gjson v1.17.1
 	github.com/valyala/fastjson v1.6.4
-	github.com/vmware/govmomi v0.38.0
+	github.com/vmware/govmomi v0.39.0
 	go.mongodb.org/mongo-driver v1.16.0
 	golang.org/x/net v0.27.0
 	golang.org/x/text v0.16.0

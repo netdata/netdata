@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xsl" href="/manager/xform.xsl" ?>
+<status>
+    <jvm>
+        <memory free='144529816' total='179306496' max='1914699776'/>
+        <memorypool name='G1 Eden Space' type='Heap memory' usageInit='24117248' usageCommitted='108003328'
+                    usageMax='-1' usageUsed='23068672'/>
+        <memorypool name='G1 Old Gen' type='Heap memory' usageInit='97517568' usageCommitted='66060288'
+                    usageMax='1914699776' usageUsed='6175120'/>
+        <memorypool name='G1 Survivor Space' type='Heap memory' usageInit='0' usageCommitted='5242880' usageMax='-1'
+                    usageUsed='5040192'/>
+        <memorypool name='CodeHeap &apos;non-nmethods&apos;' type='Non-heap memory' usageInit='2555904'
+                    usageCommitted='2555904' usageMax='5840896' usageUsed='1477888'/>
+        <memorypool name='CodeHeap &apos;non-profiled nmethods&apos;' type='Non-heap memory' usageInit='2555904'
+                    usageCommitted='4587520' usageMax='122908672' usageUsed='4536704'/>
+        <memorypool name='CodeHeap &apos;profiled nmethods&apos;' type='Non-heap memory' usageInit='2555904'
+                    usageCommitted='13172736' usageMax='122908672' usageUsed='13132032'/>
+        <memorypool name='Compressed Class Space' type='Non-heap memory' usageInit='0' usageCommitted='1900544'
+                    usageMax='1073741824' usageUsed='1712872'/>
+        <memorypool name='Metaspace' type='Non-heap memory' usageInit='0' usageCommitted='18939904' usageMax='-1'
+                    usageUsed='18537336'/>
+    </jvm>
+    <connector name='"http-nio-8080"'>
+        <threadInfo maxThreads="200" currentThreadCount="10" currentThreadsBusy="1"/>
+        <requestInfo maxTime="247" processingTime="28326" requestCount="4838" errorCount="24" bytesReceived="0"
+                     bytesSent="12174519"/>
+        <workers>
+            <worker stage="R" requestProcessingTime="0" requestBytesSent="0" requestBytesReceived="0" remoteAddr="&#63;"
+                    virtualHost="&#63;" method="&#63;" currentUri="&#63;" currentQueryString="&#63;" protocol="&#63;"/>
+            <worker stage="R" requestProcessingTime="0" requestBytesSent="0" requestBytesReceived="0" remoteAddr="&#63;"
+                    virtualHost="&#63;" method="&#63;" currentUri="&#63;" currentQueryString="&#63;" protocol="&#63;"/>
+            <worker stage="R" requestProcessingTime="0" requestBytesSent="0" requestBytesReceived="0" remoteAddr="&#63;"
+                    virtualHost="&#63;" method="&#63;" currentUri="&#63;" currentQueryString="&#63;" protocol="&#63;"/>
+            <worker stage="S" requestProcessingTime="30" requestBytesSent="0" requestBytesReceived="0"
+                    remoteAddr="127.0.0.1" virtualHost="127.0.0.1" method="GET" currentUri="&#47;manager&#47;status"
+                    currentQueryString="XML=true" protocol="HTTP&#47;1.1"/>
+        </workers>
+    </connector>
+    <connector name='"http-nio-8081"'>
+        <threadInfo maxThreads="200" currentThreadCount="10" currentThreadsBusy="1"/>
+        <requestInfo maxTime="247" processingTime="28326" requestCount="4838" errorCount="24" bytesReceived="0"
+                     bytesSent="12174519"/>
+        <workers>
+            <worker stage="R" requestProcessingTime="0" requestBytesSent="0" requestBytesReceived="0" remoteAddr="&#63;"
+                    virtualHost="&#63;" method="&#63;" currentUri="&#63;" currentQueryString="&#63;" protocol="&#63;"/>
+            <worker stage="R" requestProcessingTime="0" requestBytesSent="0" requestBytesReceived="0" remoteAddr="&#63;"
+                    virtualHost="&#63;" method="&#63;" currentUri="&#63;" currentQueryString="&#63;" protocol="&#63;"/>
+            <worker stage="R" requestProcessingTime="0" requestBytesSent="0" requestBytesReceived="0" remoteAddr="&#63;"
+                    virtualHost="&#63;" method="&#63;" currentUri="&#63;" currentQueryString="&#63;" protocol="&#63;"/>
+            <worker stage="S" requestProcessingTime="30" requestBytesSent="0" requestBytesReceived="0"
+                    remoteAddr="127.0.0.1" virtualHost="127.0.0.1" method="GET" currentUri="&#47;manager&#47;status"
+                    currentQueryString="XML=true" protocol="HTTP&#47;1.1"/>
+        </workers>
+    </connector>
+</status>

@@ -36,7 +36,6 @@ pacman -S --noconfirm \
     msys/libuv-devel \
     msys/pcre2-devel \
     msys/zlib-devel \
-    ninja \
     openssl-devel \
     protobuf-devel \
     python \

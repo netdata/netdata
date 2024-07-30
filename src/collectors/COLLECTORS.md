@@ -1155,7 +1155,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Tengine](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/tengine/integrations/tengine.md)
 
-- [Tomcat](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/tomcat/integrations/tomcat.md)
+- [Tomcat](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/tomcat/integrations/tomcat.md)
 
 - [Traefik](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/traefik/integrations/traefik.md)
 

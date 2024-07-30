@@ -132,6 +132,7 @@ see the appropriate collector readme.
 | [supervisord](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/supervisord)               |          Supervisor           |
 | [systemdunits](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/systemdunits)             |      Systemd unit state       |
 | [tengine](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/tengine)                       |            Tengine            |
+| [tomcat](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/tomcat)                         |            Tomcat             |
 | [traefik](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/traefik)                       |            Traefik            |
 | [upsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/upsd)                             |          UPSd (Nut)           |
 | [unbound](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/unbound)                       |            Unbound            |

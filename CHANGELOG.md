@@ -6,6 +6,18 @@
 
 **Merged pull requests:**
 
+- Bump github.com/prometheus-community/pro-bing from 0.4.0 to 0.4.1 in /src/go [\#18237](https://github.com/netdata/netdata/pull/18237) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/vmware/govmomi from 0.38.0 to 0.39.0 in /src/go [\#18236](https://github.com/netdata/netdata/pull/18236) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/gofrs/flock from 0.12.0 to 0.12.1 in /src/go [\#18235](https://github.com/netdata/netdata/pull/18235) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/docker/docker from 27.0.3+incompatible to 27.1.1+incompatible in /src/go [\#18234](https://github.com/netdata/netdata/pull/18234) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Windows build fix [\#18231](https://github.com/netdata/netdata/pull/18231) ([Ferroin](https://github.com/Ferroin))
+- Default to release with debug symbols for Windows builds. [\#18230](https://github.com/netdata/netdata/pull/18230) ([Ferroin](https://github.com/Ferroin))
+- Fix up CMake feature handling for Windows. [\#18229](https://github.com/netdata/netdata/pull/18229) ([Ferroin](https://github.com/Ferroin))
+- Improve windows agent [\#18227](https://github.com/netdata/netdata/pull/18227) ([thiagoftsm](https://github.com/thiagoftsm))
+- Update libbpf \(1.45.0\) [\#18226](https://github.com/netdata/netdata/pull/18226) ([thiagoftsm](https://github.com/thiagoftsm))
+- Regenerate integrations.js [\#18225](https://github.com/netdata/netdata/pull/18225) ([netdatabot](https://github.com/netdatabot))
+- go.d fix netdata dir path on win under msys [\#18221](https://github.com/netdata/netdata/pull/18221) ([ilyam8](https://github.com/ilyam8))
+- Port Tomcat collector to Go [\#18220](https://github.com/netdata/netdata/pull/18220) ([Ancairon](https://github.com/Ancairon))
 - go.d drop using cancelreader [\#18219](https://github.com/netdata/netdata/pull/18219) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18216](https://github.com/netdata/netdata/pull/18216) ([netdatabot](https://github.com/netdatabot))
 - go.d chrony fix client read/write timeout [\#18215](https://github.com/netdata/netdata/pull/18215) ([ilyam8](https://github.com/ilyam8))
@@ -409,16 +421,6 @@
 - go.d hpssa fix cache battery chart ctx [\#17654](https://github.com/netdata/netdata/pull/17654) ([ilyam8](https://github.com/ilyam8))
 - files movearound [\#17653](https://github.com/netdata/netdata/pull/17653) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#17652](https://github.com/netdata/netdata/pull/17652) ([netdatabot](https://github.com/netdatabot))
-- Update libbpf [\#17650](https://github.com/netdata/netdata/pull/17650) ([thiagoftsm](https://github.com/thiagoftsm))
-- Support offline installs in the updater code. [\#17648](https://github.com/netdata/netdata/pull/17648) ([Ferroin](https://github.com/Ferroin))
-- Update the claim readme [\#17646](https://github.com/netdata/netdata/pull/17646) ([Ancairon](https://github.com/Ancairon))
-- remove doc and consolidate info to main section page [\#17645](https://github.com/netdata/netdata/pull/17645) ([Ancairon](https://github.com/Ancairon))
-- Bump github.com/vmware/govmomi from 0.37.1 to 0.37.2 in /src/go/collectors/go.d.plugin [\#17644](https://github.com/netdata/netdata/pull/17644) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Fix incorrect bind failure warning [\#17643](https://github.com/netdata/netdata/pull/17643) ([stelfrag](https://github.com/stelfrag))
-- go.d ping add missing setting to schema [\#17642](https://github.com/netdata/netdata/pull/17642) ([ilyam8](https://github.com/ilyam8))
-- logs: add ND\_ALERT\_STATUS to facets [\#17641](https://github.com/netdata/netdata/pull/17641) ([ktsaou](https://github.com/ktsaou))
-- Add valkey to apps\_groups.conf [\#17639](https://github.com/netdata/netdata/pull/17639) ([mohd-akram](https://github.com/mohd-akram))
-- python.d remove hpssa [\#17638](https://github.com/netdata/netdata/pull/17638) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
