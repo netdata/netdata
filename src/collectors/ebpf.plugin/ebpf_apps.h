@@ -230,7 +230,8 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
 // ARAL Sectiion
 extern void ebpf_aral_init(void);
 extern ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid, pid_t tgid);
-ebpf_pid_stat_t *ebpf_get_pid_and_link(pid_t pid, pid_t tgid, char *name);
+extern void ebpf_release_and_unlink_pid_stat(ebpf_pid_stat_t *eps, int fd, uint32_t key, uint32_t idx);
+extern ebpf_pid_stat_t *ebpf_get_pid_and_link(pid_t pid, pid_t tgid, char *name);
 extern ebpf_process_stat_t *process_stat_vector;
 
 extern ARAL *ebpf_aral_vfs_pid;

@@ -566,11 +566,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
                 pid_stat->thread_collecting |= 1<<EBPF_MODULE_DCSTAT_IDX;
                 pid_stat->not_updated = 0;
             } else if (++pid_stat->not_updated >= max_period) {
-                bpf_map_delete_elem(fd, &key);
-                pid_stat->not_updated = 0;
-                pid_stat->thread_collecting &= ~(1<<EBPF_MODULE_DCSTAT_IDX);
-                if (!pid_stat->thread_collecting)
-                    ebpf_del_pid_entry((pid_t)key);
+                ebpf_release_and_unlink_pid_stat(pid_stat, fd, key, EBPF_MODULE_DCSTAT_IDX);
             }
         }
 

@@ -736,11 +736,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
             local_pid->thread_collecting |= 1<<EBPF_MODULE_CACHESTAT_IDX;
             local_pid->not_updated = 0;
         } else if (++local_pid->not_updated >= max_period) {
-            bpf_map_delete_elem(fd, &key);
-            local_pid->not_updated = 0;
-            local_pid->thread_collecting &= ~(1<<EBPF_MODULE_CACHESTAT_IDX);
-            if (!local_pid->thread_collecting)
-                ebpf_del_pid_entry((pid_t)key);
+            ebpf_release_and_unlink_pid_stat(local_pid, fd, key, EBPF_MODULE_CACHESTAT_IDX);
         }
 
 end_cachestat_loop:
