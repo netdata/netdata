@@ -15,8 +15,21 @@ if(GO_FOUND)
     return()
 endif()
 
-# Two passes are needed here so that we prefer a copy in `/usr/local/go/bin` over a system copy.
-find_program(GO_EXECUTABLE go PATHS /usr/local/go/bin DOC "Go toolchain" NO_DEFAULT_PATH)
+# The complexity below is needed to account for the complex rules we use for finding the Go install.
+#
+# If GOROOT is set, we honor that. Otherwise, we check known third-party install paths for the platform in question
+# and fall back to looking in PATH. For the specific case of MSYS2, we prefer a Windows install over an MSYS2 install.
+if(DEFINED $ENV{GOROOT})
+  find_program(GO_EXECUTABLE go PATHS "$ENV{GOROOT}/bin" DOC "Go toolchain" NO_DEFAULT_PATH)
+elseif(OS_WINDOWS)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    find_program(GO_EXECUTABLE go PATHS C:/go/bin "C:/Program Files/go/bin" DOC "Go toolchain" NO_DEFAULT_PATH)
+  else()
+    find_program(GO_EXECUTABLE go PATHS /c/go/bin "/c/Program Files/go/bin" /mingw64/bin /ucrt64/bin /clang64/bin DOC "Go toolchain" NO_DEFAULT_PATH)
+  endif()
+else()
+  find_program(GO_EXECUTABLE go PATHS /usr/local/go/bin DOC "Go toolchain" NO_DEFAULT_PATH)
+endif()
 find_program(GO_EXECUTABLE go DOC "Go toolchain")
 
 if (GO_EXECUTABLE)
