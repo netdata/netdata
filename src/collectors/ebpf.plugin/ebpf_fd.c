@@ -699,7 +699,7 @@ static void ebpf_read_fd_apps_table(int maps_per_core, int max_period)
 
         fd_apps_accumulator(fv, maps_per_core);
 
-        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(key, fv->tgid);
+        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_and_link(key, fv->tgid, fv->name);
         if (pid_stat) {
             netdata_fd_stat_t *publish_fd = &pid_stat->fd;
             if (!publish_fd->ct || publish_fd->ct != fv->ct) {

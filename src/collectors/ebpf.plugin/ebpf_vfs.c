@@ -1239,7 +1239,7 @@ static void ebpf_vfs_read_apps(int maps_per_core, int max_period)
 
         vfs_apps_accumulator(vv, maps_per_core);
 
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, vv->tgid);
+        ebpf_pid_stat_t *local_pid = ebpf_get_pid_and_link(key, vv->tgid, vv->name);
         if (!local_pid)
             goto end_vfs_loop;
 
