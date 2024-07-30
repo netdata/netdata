@@ -88,13 +88,7 @@ static void build_node_info(RRDHOST *host)
     node_info.data.custom_info = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
     node_info.data.machine_guid = host->machine_guid;
 
-    struct capability node_caps[] = {
-        {.name = "ml", .version = host->system_info->ml_capable, .enabled = host->system_info->ml_enabled},
-        {.name = "mc",
-         .version = host->system_info->mc_version ? host->system_info->mc_version : 0,
-         .enabled = host->system_info->mc_version ? 1 : 0},
-        {.name = NULL, .version = 0, .enabled = 0}};
-    node_info.node_capabilities = node_caps;
+    node_info.node_capabilities = (struct capability *)aclk_get_agent_capas();
 
     node_info.data.ml_info.ml_capable = host->system_info->ml_capable;
     node_info.data.ml_info.ml_enabled = host->system_info->ml_enabled;
