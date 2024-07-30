@@ -514,12 +514,19 @@ static void shm_apps_accumulator(netdata_publish_shm_t *out, int maps_per_core)
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     netdata_publish_shm_t *total = &out[0];
+    uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
         netdata_publish_shm_t *w = &out[i];
         total->get += w->get;
         total->at += w->at;
         total->dt += w->dt;
         total->ctl += w->ctl;
+
+        if (w->ct > ct)
+            ct = w->ct;
+
+        if (!total->name[0] && w->name[0])
+            strncpyz(total->name, w->name, sizeof(total->name) - 1);
     }
 }
 
@@ -583,14 +590,13 @@ static void ebpf_read_shm_apps_table(int maps_per_core, int max_period)
         if (!local_pid)
             goto end_shm_loop;
 
-
         netdata_publish_shm_t *publish = &local_pid->shm;
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, &cv[0], sizeof(netdata_publish_shm_t));
+            local_pid->thread_collecting |= 1<<EBPF_MODULE_SHM_IDX;
             local_pid->not_updated = 0;
         } else if (++local_pid->not_updated >= max_period){
-            bpf_map_delete_elem(fd, &key);
-            local_pid->not_updated = 0;
+            ebpf_release_and_unlink_pid_stat(local_pid, fd, key, EBPF_MODULE_SHM_IDX);
         }
 
 end_shm_loop:
