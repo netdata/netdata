@@ -561,6 +561,25 @@ ebpf_pid_stat_t *ebpf_get_pid_and_link(pid_t pid, pid_t tgid, char *name)
     return pe;
 }
 
+/**
+ * Release and Ulink PID stat
+ *
+ * Release the PID stat pid and also remove from apps group.
+ *
+ * @param eps a structure with data to test and update.
+ * @param fd  the file descriptor where data is stored inside kernel ring.
+ * @param key the key (pid value) of the hash table.
+ * @param idx the thread index.
+ */
+void ebpf_release_and_unlink_pid_stat(ebpf_pid_stat_t *eps, int fd, uint32_t key, uint32_t idx)
+{
+    bpf_map_delete_elem(fd, &key);
+    eps->not_updated = 0;
+    eps->updated = 0;
+    eps->thread_collecting &= ~(1<<idx);
+    if (!eps->thread_collecting)
+        ebpf_del_pid_entry((pid_t)key);
+}
 
 // ----------------------------------------------------------------------------
 // update pids from proc
