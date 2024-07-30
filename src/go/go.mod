@@ -41,7 +41,7 @@ require (
 	github.com/prometheus/common v0.55.0
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/stretchr/testify v1.9.0
-	github.com/tidwall/gjson v1.17.1
+	github.com/tidwall/gjson v1.17.3
 	github.com/valyala/fastjson v1.6.4
 	github.com/vmware/govmomi v0.39.0
 	go.mongodb.org/mongo-driver v1.16.0
