@@ -17,7 +17,7 @@ __attribute__((constructor)) void initialize_group_by_keys(void) {
     }
 }
 
-int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     usec_t received_ut = now_monotonic_usec();
 
     int ret = HTTP_RESP_BAD_REQUEST;

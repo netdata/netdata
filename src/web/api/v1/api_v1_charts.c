@@ -2,7 +2,7 @@
 
 #include "api_v1_calls.h"
 
-int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf)) {
+int api_v1_single_chart_helper(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf)) {
     int ret = HTTP_RESP_BAD_REQUEST;
     char *chart = NULL;
 
@@ -49,7 +49,7 @@ cleanup:
     return ret;
 }
 
-int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_charts(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
 
     buffer_flush(w->response.data);
@@ -58,7 +58,7 @@ int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *
     return HTTP_RESP_OK;
 }
 
-int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_single_chart(host, w, url, rrd_stats_api_v1_chart);
+int api_v1_chart(RRDHOST *host, struct web_client *w, char *url) {
+    return api_v1_single_chart_helper(host, w, url, rrd_stats_api_v1_chart);
 }
 

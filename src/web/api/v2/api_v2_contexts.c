@@ -4,7 +4,7 @@
 
 // --------------------------------------------------------------------------------------------------------------------
 
-int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_MODE mode) {
+int api_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_MODE mode) {
     struct api_v2_contexts_request req = { 0 };
 
     while(url) {
@@ -71,46 +71,46 @@ int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unused, st
     return rrdcontext_to_json_v2(w->response.data, &req, mode);
 }
 
-int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(
+int api_v2_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v2_contexts_internal(
         host, w, url, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
 }
 
-int web_client_api_request_v2_alert_transitions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_ALERT_TRANSITIONS | CONTEXTS_V2_NODES);
+int api_v2_alert_transitions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v2_contexts_internal(host, w, url, CONTEXTS_V2_ALERT_TRANSITIONS | CONTEXTS_V2_NODES);
 }
 
-int web_client_api_request_v2_alerts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_ALERTS | CONTEXTS_V2_NODES);
+int api_v2_alerts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v2_contexts_internal(host, w, url, CONTEXTS_V2_ALERTS | CONTEXTS_V2_NODES);
 }
 
-int web_client_api_request_v2_functions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(
+int api_v2_functions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v2_contexts_internal(
         host, w, url, CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
 }
 
-int web_client_api_request_v2_versions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_VERSIONS);
+int api_v2_versions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v2_contexts_internal(host, w, url, CONTEXTS_V2_VERSIONS);
 }
 
-int web_client_api_request_v2_q(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(
+int api_v2_q(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v2_contexts_internal(
         host,
         w,
         url,
         CONTEXTS_V2_SEARCH | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
 }
 
-int web_client_api_request_v2_nodes(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INFO);
+int api_v2_nodes(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INFO);
 }
 
-int web_client_api_request_v2_info(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO);
+int api_v2_info(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v2_contexts_internal(host, w, url, CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO);
 }
 
-int web_client_api_request_v2_node_instances(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(
+int api_v2_node_instances(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v2_contexts_internal(
         host,
         w,
         url,

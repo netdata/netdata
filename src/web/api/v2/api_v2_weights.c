@@ -147,6 +147,6 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
     return web_api_v12_weights(wb, &qwr);
 }
 
-int web_client_api_request_v2_weights(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+int api_v2_weights(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_VALUE, WEIGHTS_FORMAT_MULTINODE, 2);
 }

@@ -2,7 +2,7 @@
 
 #include "api_v2_calls.h"
 
-int web_client_api_request_v2_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
+int api_v2_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
     char *action = "tree";
     char *path = "/";
     char *id = NULL;

@@ -16,7 +16,7 @@
 //
 // Impersonate:
 // /api/v1/registry?action=switch&machine=${machine_guid}&name=${hostname}&url=${url}&to=${new_person_guid}
-int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
     static uint32_t hash_action = 0, hash_access = 0, hash_hello = 0, hash_delete = 0, hash_search = 0,
                     hash_switch = 0, hash_machine = 0, hash_url = 0, hash_name = 0, hash_delete_url = 0, hash_for = 0,
                     hash_to = 0 /*, hash_redirects = 0 */;

@@ -2,7 +2,7 @@
 
 #include "api_v1_calls.h"
 
-int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_context(RRDHOST *host, struct web_client *w, char *url) {
     char *context = NULL;
     RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
     time_t after = 0, before = 0;

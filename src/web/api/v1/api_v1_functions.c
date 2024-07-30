@@ -2,7 +2,7 @@
 
 #include "api_v1_calls.h"
 
-int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
+int api_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
     if (!netdata_ready)
         return HTTP_RESP_SERVICE_UNAVAILABLE;
 

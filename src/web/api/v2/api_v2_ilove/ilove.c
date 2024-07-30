@@ -277,7 +277,7 @@ static void generate_ilove_svg(BUFFER *wb, const char *love) {
     wb->content_type = CT_IMAGE_SVG_XML;
 }
 
-int web_client_api_request_v2_ilove(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+int api_v2_ilove(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     char *love = "TROUBLE";
 
     while(url) {

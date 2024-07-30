@@ -70,7 +70,7 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
     );
 }
 
-int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
+int api_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
     if (!netdata_ready)
         return HTTP_RESP_SERVICE_UNAVAILABLE;
 

@@ -58,13 +58,13 @@ If any call is expected to pause the caller (ie the caller is attempting a read 
 ```
 RW_LOCK ON LOCK 0x0x5651c9fcce20: 4190039 'HEALTH' (function health_execute_pending_updates() 661@health/health.c) WANTS a 'W' lock (while holding 1 rwlocks and 1 mutexes).
 There are 7 readers and 0 writers are holding the lock:
-     => 1: RW_LOCK: process 4190091 'WEB_SERVER[static14]' (function web_client_api_request_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 709847 usec.
-     => 2: RW_LOCK: process 4190079 'WEB_SERVER[static6]' (function web_client_api_request_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 709869 usec.
-     => 3: RW_LOCK: process 4190084 'WEB_SERVER[static10]' (function web_client_api_request_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 709948 usec.
-     => 4: RW_LOCK: process 4190076 'WEB_SERVER[static3]' (function web_client_api_request_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 710190 usec.
-     => 5: RW_LOCK: process 4190092 'WEB_SERVER[static15]' (function web_client_api_request_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 710195 usec.
-     => 6: RW_LOCK: process 4190077 'WEB_SERVER[static4]' (function web_client_api_request_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 710208 usec.
-     => 7: RW_LOCK: process 4190044 'WEB_SERVER[static1]' (function web_client_api_request_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 710221 usec.
+     => 1: RW_LOCK: process 4190091 'WEB_SERVER[static14]' (function api_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 709847 usec.
+     => 2: RW_LOCK: process 4190079 'WEB_SERVER[static6]' (function api_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 709869 usec.
+     => 3: RW_LOCK: process 4190084 'WEB_SERVER[static10]' (function api_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 709948 usec.
+     => 4: RW_LOCK: process 4190076 'WEB_SERVER[static3]' (function api_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 710190 usec.
+     => 5: RW_LOCK: process 4190092 'WEB_SERVER[static15]' (function api_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 710195 usec.
+     => 6: RW_LOCK: process 4190077 'WEB_SERVER[static4]' (function api_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 710208 usec.
+     => 7: RW_LOCK: process 4190044 'WEB_SERVER[static1]' (function api_v1_data() 526@web/api/web_api_v1.c) is having 1 'R' lock for 710221 usec.
 ```
 
 And each of the above is paired with a `GOT` log, like this:

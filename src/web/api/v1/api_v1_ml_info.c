@@ -2,7 +2,7 @@
 
 #include "api_v1_calls.h"
 
-int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_ml_info(RRDHOST *host, struct web_client *w, char *url) {
     (void) url;
 #if defined(ENABLE_ML)
 

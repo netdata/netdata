@@ -2,7 +2,7 @@
 
 #include "api_v1_calls.h"
 
-int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_contexts(RRDHOST *host, struct web_client *w, char *url) {
     RRDCONTEXT_TO_JSON_OPTIONS options = RRDCONTEXT_OPTION_NONE;
     time_t after = 0, before = 0;
     const char *chart_label_key = NULL, *chart_labels_filter = NULL;

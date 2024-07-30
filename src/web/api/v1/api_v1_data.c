@@ -2,7 +2,7 @@
 
 #include "api_v1_calls.h"
 
-int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
     int ret = HTTP_RESP_BAD_REQUEST;

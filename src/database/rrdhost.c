@@ -1025,7 +1025,7 @@ void dbengine_init(char *hostname) {
 #endif
 }
 
-void web_client_api_v1_management_init(void);
+void api_v1_management_init(void);
 
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
     rrdhost_init();
@@ -1131,7 +1131,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     if (likely(system_info)) {
         detect_machine_guid_change(&localhost->host_uuid);
         sql_aclk_sync_init();
-        web_client_api_v1_management_init();
+        api_v1_management_init();
     }
 
     return 0;

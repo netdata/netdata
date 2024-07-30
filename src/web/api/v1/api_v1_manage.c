@@ -62,12 +62,12 @@ temp_key:
     return guid;
 }
 
-void web_client_api_v1_management_init(void) {
+void api_v1_management_init(void) {
     api_secret = get_mgmt_api_key();
 }
 
 #define HLT_MGM "manage/health"
-int web_client_api_request_v1_manage(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_manage(RRDHOST *host, struct web_client *w, char *url) {
     const char *haystack = buffer_tostring(w->url_path_decoded);
     char *needle;
 

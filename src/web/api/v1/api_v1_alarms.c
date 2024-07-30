@@ -15,7 +15,7 @@ static int web_client_api_request_v1_alarms_select(char *url) {
     return all;
 }
 
-int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
     int all = web_client_api_request_v1_alarms_select(url);
 
     buffer_flush(w->response.data);
@@ -25,7 +25,7 @@ int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *
     return HTTP_RESP_OK;
 }
 
-int web_client_api_request_v1_alarms_values(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_alarms_values(RRDHOST *host, struct web_client *w, char *url) {
     int all = web_client_api_request_v1_alarms_select(url);
 
     buffer_flush(w->response.data);
@@ -35,7 +35,7 @@ int web_client_api_request_v1_alarms_values(RRDHOST *host, struct web_client *w,
     return HTTP_RESP_OK;
 }
 
-int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url) {
     RRDCALC_STATUS status = RRDCALC_STATUS_RAISED;
     BUFFER *contexts = NULL;
 
@@ -79,7 +79,7 @@ int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_client *w, c
     return 200;
 }
 
-int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
     time_t after = 0;
     char *chart = NULL;
 
@@ -101,7 +101,7 @@ int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, cha
     return HTTP_RESP_OK;
 }
 
-int web_client_api_request_v1_variable(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_variable(RRDHOST *host, struct web_client *w, char *url) {
     int ret = HTTP_RESP_BAD_REQUEST;
     char *chart = NULL;
     char *variable = NULL;
@@ -147,7 +147,7 @@ cleanup:
     return ret;
 }
 
-int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_single_chart(host, w, url, health_api_v1_chart_variables2json);
+int api_v1_alarm_variables(RRDHOST *host, struct web_client *w, char *url) {
+    return api_v1_single_chart_helper(host, w, url, health_api_v1_chart_variables2json);
 }
 

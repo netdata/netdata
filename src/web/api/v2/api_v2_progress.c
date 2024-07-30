@@ -2,7 +2,7 @@
 
 #include "api_v2_calls.h"
 
-int web_client_api_request_v2_progress(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+int api_v2_progress(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     char *transaction = NULL;
 
     while(url) {

@@ -199,7 +199,7 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     return 0;
 }
 
-int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
+int api_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
     if (!netdata_ready) return HTTP_RESP_SERVICE_UNAVAILABLE;
     BUFFER *wb = w->response.data;
