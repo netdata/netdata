@@ -132,11 +132,6 @@ void nd_web_api_init(void) {
     contexts_options_init();
     datasource_formats_init();
     time_grouping_init();
-
-    nd_uuid_t uuid;
-    uuid_generate(uuid);
-    char uuid_str[37];
-    uuid_unparse_lower(uuid, uuid_str);
 }
 
 void web_client_api_request_vX_source_to_buffer(struct web_client *w, BUFFER *source) {
