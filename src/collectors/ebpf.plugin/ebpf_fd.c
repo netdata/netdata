@@ -660,12 +660,19 @@ static void fd_apps_accumulator(netdata_fd_stat_t *out, int maps_per_core)
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     netdata_fd_stat_t *total = &out[0];
+    uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
         netdata_fd_stat_t *w = &out[i];
         total->open_call += w->open_call;
         total->close_call += w->close_call;
         total->open_err += w->open_err;
         total->close_err += w->close_err;
+
+        if (w->ct > ct)
+            ct = w->ct;
+
+        if (!total->name[0] && w->name[0])
+            strncpyz(total->name, w->name, sizeof(total->name) - 1);
     }
 }
 
@@ -697,10 +704,10 @@ static void ebpf_read_fd_apps_table(int maps_per_core, int max_period)
             netdata_fd_stat_t *publish_fd = &pid_stat->fd;
             if (!publish_fd->ct || publish_fd->ct != fv->ct) {
                 memcpy(publish_fd, &fv[0], sizeof(netdata_fd_stat_t));
+                pid_stat->thread_collecting |= 1<<EBPF_MODULE_FD_IDX;
                 pid_stat->not_updated = 0;
             } else if (++pid_stat->not_updated >= max_period) {
-                bpf_map_delete_elem(fd, &key);
-                pid_stat->not_updated = 0;
+                ebpf_release_and_unlink_pid_stat(pid_stat, fd, key, EBPF_MODULE_FD_IDX);
             }
         }
 
