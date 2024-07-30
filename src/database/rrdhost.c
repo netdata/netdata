@@ -1112,21 +1112,10 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 
     dyncfg_host_init(localhost);
 
-    if(!unittest) {
+    if(!unittest)
         health_plugin_init();
-    }
 
-    // we register this only on localhost
-    // for the other nodes, the origin server should register it
-    rrd_function_add_inline(localhost, NULL, "streaming", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT + 1, RRDFUNCTIONS_STREAMING_HELP, "top",
-                            HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
-                            rrdhost_function_streaming);
-
-    rrd_function_add_inline(localhost, NULL, "netdata-api-calls", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT + 2, RRDFUNCTIONS_PROGRESS_HELP, "top",
-                            HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
-                            rrdhost_function_progress);
+    global_functions_add();
 
     if (likely(system_info)) {
         detect_machine_guid_change(&localhost->host_uuid);

@@ -9,6 +9,8 @@
 struct web_client;
 
 #include "daemon/common.h"
+#include "maps/maps.h"
+#include "functions/functions.h"
 
 #include "web/api/http_header.h"
 #include "web/api/http_auth.h"

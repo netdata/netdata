@@ -90,7 +90,5 @@ bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, rrd_
 #include "rrdfunctions-inline.h"
 #include "rrdfunctions-inflight.h"
 #include "rrdfunctions-exporters.h"
-#include "rrdfunctions-streaming.h"
-#include "rrdfunctions-progress.h"
 
 #endif // NETDATA_RRDFUNCTIONS_H

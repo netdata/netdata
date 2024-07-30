@@ -912,6 +912,15 @@ set(API_PLUGIN_FILES
         src/web/api/http_auth.h
         src/web/api/http_header.c
         src/web/api/http_header.h
+        src/web/api/maps/rrdr_options.c
+        src/web/api/maps/rrdr_options.h
+        src/web/api/maps/contexts_options.c
+        src/web/api/maps/contexts_options.h
+        src/web/api/maps/datasource_formats.c
+        src/web/api/maps/datasource_formats.h
+        src/web/api/maps/maps.h
+        src/web/api/maps/contexts_alert_statuses.c
+        src/web/api/maps/contexts_alert_statuses.h
         src/web/api/v1/api_v1_allmetrics.c
         src/web/api/v1/api_v1_badge/web_buffer_svg.c
         src/web/api/v1/api_v1_function.c
@@ -940,6 +949,12 @@ set(API_PLUGIN_FILES
         src/web/api/v2/api_v2_contexts.c
         src/web/api/v2/api_v2_claim.c
         src/web/api/v2/api_v2_webrtc.c
+        src/web/api/functions/functions.c
+        src/web/api/functions/functions.h
+        src/web/api/functions/function-progress.c
+        src/web/api/functions/function-progress.h
+        src/web/api/functions/function-streaming.c
+        src/web/api/functions/function-streaming.h
         src/web/api/queries/rrdr.c
         src/web/api/queries/rrdr.h
         src/web/api/queries/query.c
@@ -988,15 +1003,6 @@ set(API_PLUGIN_FILES
         src/web/api/formatters/rrdset2json.h
         src/web/rtc/webrtc.c
         src/web/rtc/webrtc.h
-        src/web/api/maps/rrdr_options.c
-        src/web/api/maps/rrdr_options.h
-        src/web/api/maps/contexts_options.c
-        src/web/api/maps/contexts_options.h
-        src/web/api/maps/datasource_formats.c
-        src/web/api/maps/datasource_formats.h
-        src/web/api/maps/maps.h
-        src/web/api/maps/contexts_alert_statuses.c
-        src/web/api/maps/contexts_alert_statuses.h
 )
 
 set(EXPORTING_ENGINE_FILES
@@ -1105,10 +1111,6 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions.h
         src/database/rrdfunctions-inline.c
         src/database/rrdfunctions-inline.h
-        src/database/rrdfunctions-progress.c
-        src/database/rrdfunctions-progress.h
-        src/database/rrdfunctions-streaming.c
-        src/database/rrdfunctions-streaming.h
         src/database/rrdhost.c
         src/database/rrdlabels.c
         src/database/rrd.c

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrdfunctions-streaming.h"
+#include "function-streaming.h"
 
-int rrdhost_function_streaming(BUFFER *wb, const char *function __maybe_unused) {
+int function_streaming(BUFFER *wb, const char *function __maybe_unused) {
 
     time_t now = now_realtime_sec();
 
