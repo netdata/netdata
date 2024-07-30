@@ -8,26 +8,19 @@ NON_INTERACTIVE=0
 DONT_WAIT=0
 
 package_tree="
-  git
-  autoconf
-  autoconf-archive
-  autogen
-  automake
-  libtool
-  pkgconf
   cmake
   curl
-  gzip
-  lzlib
   e2fsprogs-libuuid
+  git
+  gzip
   json-c
-  libyaml
-  libuv
   liblz4
+  libuv
+  libyaml
+  lzlib
   openssl
+  pkgconf
   python3
-  bison
-  flex
   "
 
 prompt() {
