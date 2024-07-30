@@ -136,6 +136,24 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         return NULL;
     }
 
+    // Set the flags to reset the signal mask and signal actions
+    sigset_t empty_mask;
+    sigemptyset(&empty_mask);
+    if (posix_spawnattr_setsigmask(&attr, &empty_mask) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigmask() failed");
+        posix_spawn_file_actions_destroy(&file_actions);
+        posix_spawnattr_destroy(&attr);
+        return false;
+    }
+
+    short flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
+    if (posix_spawnattr_setflags(&attr, flags) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setflags() failed");
+        posix_spawn_file_actions_destroy(&file_actions);
+        posix_spawnattr_destroy(&attr);
+        return false;
+    }
+
     spinlock_lock(&spawn_globals.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(spawn_globals.instances, si, prev, next);
     spinlock_unlock(&spawn_globals.spinlock);

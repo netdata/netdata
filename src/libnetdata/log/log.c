@@ -463,7 +463,7 @@ static struct {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                         .method = NDLM_DEFAULT,
                         .format = NDLF_LOGFMT,
-                        .filename = LOG_DIR "/collectors.log",
+                        .filename = LOG_DIR "/collector.log",
                         .fd = STDERR_FILENO,
                         .fp = NULL,
                         .min_priority = NDLP_INFO,

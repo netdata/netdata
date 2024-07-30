@@ -16,7 +16,7 @@ typedef enum  __attribute__((__packed__)) {
     NDLS_UNSET = 0,   // internal use only
     NDLS_ACCESS,      // access.log
     NDLS_ACLK,        // aclk.log
-    NDLS_COLLECTORS,  // collectors.log
+    NDLS_COLLECTORS,  // collector.log
     NDLS_DAEMON,      // error.log
     NDLS_HEALTH,      // health.log
     NDLS_DEBUG,       // debug.log

@@ -71,19 +71,19 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
             "SPAWN SERVER: cannot dup2(%d) stdin of request No %zu: %s",
             stdin_fd, rq->request_id, rq->cmdline);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     if (dup2(stdout_fd, STDOUT_FILENO) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
             "SPAWN SERVER: cannot dup2(%d) stdin of request No %zu: %s",
             stdout_fd, rq->request_id, rq->cmdline);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     if (dup2(stderr_fd, STDERR_FILENO) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
             "SPAWN SERVER: cannot dup2(%d) stderr of request No %zu: %s",
             stderr_fd, rq->request_id, rq->cmdline);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     // close the excess fds
@@ -312,7 +312,7 @@ static void request_free(SPAWN_REQUEST *rq) {
 }
 
 static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_REQUEST *rq) {
-    // close custom_fd - it is not needed for exec mode
+    // Close custom_fd - it is not needed for exec mode
     if(rq->fds[3] != -1) { close(rq->fds[3]); rq->fds[3] = -1; }
 
     if(!rq->argv) {
@@ -330,7 +330,7 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
 
     posix_spawn_file_actions_t file_actions;
     if (posix_spawn_file_actions_init(&file_actions) != 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawn_file_actions_init() failed");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawn_file_actions_init() failed: %s", rq->cmdline);
         return false;
     }
 
@@ -343,8 +343,26 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
 
     posix_spawnattr_t attr;
     if (posix_spawnattr_init(&attr) != 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_init() failed");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_init() failed: %s", rq->cmdline);
         posix_spawn_file_actions_destroy(&file_actions);
+        return false;
+    }
+
+    // Set the flags to reset the signal mask and signal actions
+    sigset_t empty_mask;
+    sigemptyset(&empty_mask);
+    if (posix_spawnattr_setsigmask(&attr, &empty_mask) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigmask() failed: %s", rq->cmdline);
+        posix_spawn_file_actions_destroy(&file_actions);
+        posix_spawnattr_destroy(&attr);
+        return false;
+    }
+
+    short flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
+    if (posix_spawnattr_setflags(&attr, flags) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setflags() failed: %s", rq->cmdline);
+        posix_spawn_file_actions_destroy(&file_actions);
+        posix_spawnattr_destroy(&attr);
         return false;
     }
 
@@ -352,7 +370,7 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
 
     errno_clear();
     if (posix_spawn(&rq->pid, rq->argv[0], &file_actions, &attr, (char * const *)rq->argv, (char * const *)rq->envp) != 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: posix_spawn() failed");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: posix_spawn() failed: %s", rq->cmdline);
 
         posix_spawnattr_destroy(&attr);
         posix_spawn_file_actions_destroy(&file_actions);
@@ -368,7 +386,7 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
     close(rq->fds[1]); rq->fds[1] = -1;
     close(rq->fds[2]); rq->fds[2] = -1;
 
-    nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: process created with pid %d", rq->pid);
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: process created with pid %d: %s", rq->pid, rq->cmdline);
     return true;
 }
 
@@ -384,7 +402,7 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
     if (pid < 0) {
         // fork failed
 
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to fork() child.");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to fork() child for callback.");
         return false;
     }
     else if (pid == 0) {
