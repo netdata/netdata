@@ -483,7 +483,7 @@ static void ebpf_update_swap_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_swap_t *out = &pids->swap;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_and_link(pid, 0, NULL);
             if (local_pid) {
                 netdata_publish_swap_t *in = &local_pid->swap;
 
@@ -509,7 +509,7 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_
 
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+        ebpf_pid_stat_t *local_pid = ebpf_get_pid_and_link(pid, 0, NULL);
         if (local_pid) {
             netdata_publish_swap_t *w = &local_pid->swap;
             local_write += w->write;

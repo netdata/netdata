@@ -591,7 +591,7 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
     netdata_dcstat_pid_t *dst = &publish->curr;
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(pid, 0);
+        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_and_link(pid, 0, NULL);
         if (pid_stat) {
             netdata_publish_dcstat_t *w = &pid_stat->dc;
             netdata_dcstat_pid_t *src = &w->curr;
@@ -781,7 +781,7 @@ static void ebpf_update_dc_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_and_link(pid, 0, NULL);
             if (local_pid) {
                 netdata_publish_dcstat_t *in = &local_pid->dc;
 

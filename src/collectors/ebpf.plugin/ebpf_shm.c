@@ -552,7 +552,7 @@ static void ebpf_update_shm_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_shm_t *out = &pids->shm;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_and_link(pid, 0, NULL);
             if (local_pid) {
                 netdata_publish_shm_t *in = &local_pid->shm;
 
@@ -666,7 +666,7 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_tar
     memset(shm, 0, sizeof(netdata_publish_shm_t));
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(pid, 0);
+        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_and_link(pid, 0, NULL);
         if (pid_stat) {
             netdata_publish_shm_t *w = &pid_stat->shm;
             shm->get += w->get;
