@@ -574,24 +574,6 @@ void rrdpush_send_global_functions(RRDHOST *host) {
     sender_thread_buffer_free();
 }
 
-void rrdpush_send_claimed_id(RRDHOST *host) {
-    if(!stream_has_capability(host->sender, STREAM_CAP_CLAIM))
-        return;
-
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)))
-        return;
-    
-    BUFFER *wb = sender_start(host->sender);
-    rrdhost_aclk_state_lock(host);
-
-    buffer_sprintf(wb, PLUGINSD_KEYWORD_CLAIMED_ID " %s %s\n", host->machine_guid, (host->aclk_state.claimed_id ? host->aclk_state.claimed_id : "NULL") );
-
-    rrdhost_aclk_state_unlock(host);
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-
-    sender_thread_buffer_free();
-}
-
 int connect_to_one_of_destinations(
     RRDHOST *host,
     int default_port,

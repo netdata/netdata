@@ -188,7 +188,7 @@ CLOUD_STATUS claim_reload_and_wait_online(void) {
     cloud_conf_load(0);
     bool claimed = load_claiming_state();
     registry_update_cloud_base_url();
-    rrdpush_send_claimed_id(localhost);
+    rrdpush_sender_send_claimed_id(localhost);
     nd_log_limits_reset();
 
     CLOUD_STATUS status = cloud_status();

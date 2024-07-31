@@ -1081,52 +1081,7 @@ static inline PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_wo
     return PARSER_RC_STOP;
 }
 
-static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PARSER *parser)
-{
-    const char *host_uuid_str = get_word(words, num_words, 1);
-    const char *claim_id_str = get_word(words, num_words, 2);
-
-    if (!host_uuid_str || !claim_id_str) {
-        netdata_log_error("Command CLAIMED_ID came malformed, uuid = '%s', claim_id = '%s'",
-              host_uuid_str ? host_uuid_str : "[unset]",
-              claim_id_str ? claim_id_str : "[unset]");
-        return PARSER_RC_ERROR;
-    }
-
-    nd_uuid_t uuid;
-    RRDHOST *host = parser->user.host;
-
-    // We don't need the parsed UUID
-    // just do it to check the format
-    if(uuid_parse(host_uuid_str, uuid)) {
-        netdata_log_error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", host_uuid_str);
-        return PARSER_RC_ERROR;
-    }
-    if(uuid_parse(claim_id_str, uuid) && strcmp(claim_id_str, "NULL") != 0) {
-        netdata_log_error("2nd parameter (Claim ID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", claim_id_str);
-        return PARSER_RC_ERROR;
-    }
-
-    if(strcmp(host_uuid_str, host->machine_guid) != 0) {
-        netdata_log_error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", host_uuid_str, host->machine_guid);
-        return PARSER_RC_OK; //the message is OK problem must be somewhere else
-    }
-
-    rrdhost_aclk_state_lock(host);
-
-    if (host->aclk_state.claimed_id)
-        freez(host->aclk_state.claimed_id);
-
-    host->aclk_state.claimed_id = strcmp(claim_id_str, "NULL") ? strdupz(claim_id_str) : NULL;
-
-    rrdhost_aclk_state_unlock(host);
-
-    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID |RRDHOST_FLAG_METADATA_UPDATE);
-
-    rrdpush_send_claimed_id(host);
-
-    return PARSER_RC_OK;
-}
+PARSER_RC rrdpush_receiver_pluginsd_claimed_id(char **words, size_t num_words, PARSER *parser);
 
 // ----------------------------------------------------------------------------
 
@@ -1302,7 +1257,7 @@ PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **w
         case PLUGINSD_KEYWORD_ID_VARIABLE:
             return pluginsd_variable(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_CLAIMED_ID:
-            return streaming_claimed_id(words, num_words, parser);
+            return rrdpush_receiver_pluginsd_claimed_id(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_HOST:
             return pluginsd_host(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_HOST_DEFINE:

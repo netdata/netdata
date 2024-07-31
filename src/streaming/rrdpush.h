@@ -452,7 +452,6 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
 bool rrdset_push_chart_definition_now(RRDSET *st);
 void *rrdpush_sender_thread(void *ptr);
 void rrdpush_send_host_labels(RRDHOST *host);
-void rrdpush_send_claimed_id(RRDHOST *host);
 void rrdpush_send_global_functions(RRDHOST *host);
 
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string, void *h2o_ctx);

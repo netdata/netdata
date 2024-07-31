@@ -1687,7 +1687,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 break;
 
             now_s = s->last_traffic_seen_t = now_monotonic_sec();
-            rrdpush_send_claimed_id(s->host);
+            rrdpush_sender_send_claimed_id(s->host);
             rrdpush_send_host_labels(s->host);
             rrdpush_send_global_functions(s->host);
             s->replication.oldest_request_after_t = 0;

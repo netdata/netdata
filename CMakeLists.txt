@@ -1241,6 +1241,7 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/protocol/command-nodeid.c
         src/streaming/protocol/commands.c
         src/streaming/protocol/commands.h
+        src/streaming/protocol/command-claimed_id.c
 )
 
 set(WEB_PLUGIN_FILES
