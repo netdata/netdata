@@ -26,4 +26,15 @@ void global_functions_add(void) {
         "top",
         HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
         function_progress);
+
+    rrd_function_add_inline(
+        localhost,
+        NULL,
+        RRDFUNCTIONS_BEARER_GET_TOKEN,
+        10,
+        RRDFUNCTIONS_PRIORITY_DEFAULT + 3,
+        RRDFUNCTIONS_BEARER_GET_TOKEN_HELP,
+        RRDFUNCTIONS_TAG_HIDDEN,
+        HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
+        function_bearer_get_token);
 }

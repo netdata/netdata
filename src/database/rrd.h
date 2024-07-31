@@ -1188,7 +1188,7 @@ struct rrdhost {
     struct rrdhost_system_info *system_info;        // information collected from the host environment
 
     // ------------------------------------------------------------------------
-    // streaming of data to remote hosts - rrdpush sender
+    // streaming of data to remote hosts - rrdpush
 
     struct {
         struct {

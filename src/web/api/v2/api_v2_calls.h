@@ -31,7 +31,8 @@ int api_v2_webrtc(RRDHOST *host, struct web_client *w, char *url);
 
 int api_v2_progress(RRDHOST *host, struct web_client *w, char *url);
 
-int api_v2_bearer_token(RRDHOST *host, struct web_client *w, char *url);
+int api_v2_bearer_get_token(RRDHOST *host, struct web_client *w, char *url);
+int bearer_get_token_json_response(BUFFER *wb, RRDHOST *host, const char *claim_id, const char *machine_guid, const char *node_id, HTTP_USER_ROLE user_role, HTTP_ACCESS access, nd_uuid_t cloud_account_id, const char *client_name);
 int api_v2_bearer_protection(RRDHOST *host, struct web_client *w, char *url);
 
 #endif //NETDATA_API_V2_CALLS_H

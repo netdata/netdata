@@ -394,8 +394,8 @@ static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
 #define RRDFUNCTIONS_CGTOP_HELP "View running containers"
 #define RRDFUNCTIONS_SYSTEMD_SERVICES_HELP "View systemd services"
 
-int cgroup_function_cgroup_top(BUFFER *wb, const char *function);
-int cgroup_function_systemd_top(BUFFER *wb, const char *function);
+int cgroup_function_cgroup_top(BUFFER *wb, const char *function, BUFFER *payload);
+int cgroup_function_systemd_top(BUFFER *wb, const char *function, BUFFER *payload);
 
 void cgroup_netdev_link_init(void);
 const DICTIONARY_ITEM *cgroup_netdev_get(struct cgroup *cg);

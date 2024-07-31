@@ -7,6 +7,7 @@
 
 #include "function-streaming.h"
 #include "function-progress.h"
+#include "function-bearer_get_token.h"
 
 void global_functions_add(void);
 

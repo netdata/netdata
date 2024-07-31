@@ -152,7 +152,7 @@ static struct web_api_command api_commands_v2[] = {
         .hash = 0,
         .acl = HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS,
         .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE,
-        .callback = api_v2_bearer_token,
+        .callback = api_v2_bearer_get_token,
         .allow_subpaths = 0
     },
 #endif

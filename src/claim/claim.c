@@ -119,6 +119,13 @@ char *aclk_get_claimed_id()
     return result;
 }
 
+bool aclk_matches_claimed_id(const char *claim_id) {
+    rrdhost_aclk_state_lock(localhost);
+    bool matches = localhost->aclk_state.claimed_id && claim_id && strcasecmp(localhost->aclk_state.claimed_id, claim_id) == 0;
+    rrdhost_aclk_state_unlock(localhost);
+    return matches;
+}
+
 /* Change the claimed state of the agent.
  *
  * This only happens when the user has explicitly requested it:

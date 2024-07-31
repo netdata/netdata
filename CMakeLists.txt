@@ -1005,6 +1005,8 @@ set(API_PLUGIN_FILES
         src/web/api/formatters/rrdset2json.h
         src/web/rtc/webrtc.c
         src/web/rtc/webrtc.h
+        src/web/api/functions/function-bearer_get_token.c
+        src/web/api/functions/function-bearer_get_token.h
 )
 
 set(EXPORTING_ENGINE_FILES

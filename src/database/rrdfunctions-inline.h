@@ -5,7 +5,7 @@
 
 #include "rrd.h"
 
-typedef int (*rrd_function_execute_inline_cb_t)(BUFFER *wb, const char *function);
+typedef int (*rrd_function_execute_inline_cb_t)(BUFFER *wb, const char *function, BUFFER *payload);
 
 void rrd_function_add_inline(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority,
                              const char *help, const char *tags,

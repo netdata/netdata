@@ -59,7 +59,7 @@ void bearer_tokens_init(void) {
         NULL, sizeof(struct bearer_token));
 }
 
-time_t bearer_create_token(nd_uuid_t *uuid, struct web_client *w) {
+time_t bearer_create_token(nd_uuid_t *uuid, HTTP_USER_ROLE user_role, HTTP_ACCESS access, nd_uuid_t cloud_account_id, const char *client_name) {
     char uuid_str[UUID_COMPACT_STR_LEN];
 
     uuid_generate_random(*uuid);
@@ -70,10 +70,10 @@ time_t bearer_create_token(nd_uuid_t *uuid, struct web_client *w) {
     if(!z->created_s) {
         z->created_s = now_monotonic_sec();
         z->expires_s = z->created_s + BEARER_TOKEN_EXPIRATION;
-        z->user_role = w->user_role;
-        z->access = w->access;
-        uuid_copy(z->cloud_account_id, w->auth.cloud_account_id);
-        strncpyz(z->cloud_user_name, w->auth.client_name, sizeof(z->cloud_account_id) - 1);
+        z->user_role = user_role;
+        z->access = access;
+        uuid_copy(z->cloud_account_id, cloud_account_id);
+        strncpyz(z->cloud_user_name, client_name, sizeof(z->cloud_account_id) - 1);
     }
 
     bearer_token_cleanup();

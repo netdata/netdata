@@ -34,6 +34,7 @@ bool claimed_id_save_to_file(const char *claimed_id_str);
 
 bool is_agent_claimed(void);
 char *aclk_get_claimed_id(void);
+bool aclk_matches_claimed_id(const char *claim_id);
 bool load_claiming_state(void);
 void cloud_conf_load(int silent);
 void cloud_conf_init_after_registry(void);

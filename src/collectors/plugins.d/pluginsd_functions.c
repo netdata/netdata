@@ -416,11 +416,13 @@ void rrdpush_update_child_node_id(RRDHOST *host) {
 
     spinlock_lock(&host->receiver_lock);
     if(host->receiver && stream_has_capability(host->receiver, STREAM_CAP_NODE_ID)) {
-        char uuid_str[UUID_STR_LEN];
-        uuid_unparse_lower(host->node_id, uuid_str);
+        char node_id_str[UUID_STR_LEN];
+        uuid_unparse_lower(host->node_id, node_id_str);
+
         char buf[100];
         snprintfz(buf, sizeof(buf), PLUGINSD_KEYWORD_NODE_ID " '%s' '%s'",
-                  uuid_str, cloud_config_url_get());
+                  node_id_str, cloud_config_url_get());
+
         send_to_plugin(buf, host->receiver);
     }
     spinlock_unlock(&host->receiver_lock);

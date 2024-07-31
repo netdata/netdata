@@ -98,7 +98,7 @@ void cgroup_netdev_get_bandwidth(struct cgroup *cg, NETDATA_DOUBLE *received, NE
     *sent = t->sent[slot];
 }
 
-int cgroup_function_cgroup_top(BUFFER *wb, const char *function __maybe_unused) {
+int cgroup_function_cgroup_top(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload __maybe_unused) {
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
@@ -341,7 +341,7 @@ int cgroup_function_cgroup_top(BUFFER *wb, const char *function __maybe_unused) 
     return HTTP_RESP_OK;
 }
 
-int cgroup_function_systemd_top(BUFFER *wb, const char *function __maybe_unused) {
+int cgroup_function_systemd_top(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload __maybe_unused) {
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);

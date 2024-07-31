@@ -7,6 +7,7 @@
 #include "libnetdata/libnetdata.h"
 
 #define RRDFUNCTIONS_PRIORITY_DEFAULT 100
+#define RRDFUNCTIONS_TAG_HIDDEN "hidden"
 
 #define RRDFUNCTIONS_TIMEOUT_EXTENSION_UT (1 * USEC_PER_SEC)
 
