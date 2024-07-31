@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Bump github.com/tidwall/gjson from 1.17.1 to 1.17.3 in /src/go [\#18244](https://github.com/netdata/netdata/pull/18244) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Clean up unneeded depencdencies. [\#18242](https://github.com/netdata/netdata/pull/18242) ([Ferroin](https://github.com/Ferroin))
+- Update node info payload [\#18240](https://github.com/netdata/netdata/pull/18240) ([stelfrag](https://github.com/stelfrag))
 - Bump github.com/prometheus-community/pro-bing from 0.4.0 to 0.4.1 in /src/go [\#18237](https://github.com/netdata/netdata/pull/18237) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/vmware/govmomi from 0.38.0 to 0.39.0 in /src/go [\#18236](https://github.com/netdata/netdata/pull/18236) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/gofrs/flock from 0.12.0 to 0.12.1 in /src/go [\#18235](https://github.com/netdata/netdata/pull/18235) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -19,6 +22,7 @@
 - go.d fix netdata dir path on win under msys [\#18221](https://github.com/netdata/netdata/pull/18221) ([ilyam8](https://github.com/ilyam8))
 - Port Tomcat collector to Go [\#18220](https://github.com/netdata/netdata/pull/18220) ([Ancairon](https://github.com/Ancairon))
 - go.d drop using cancelreader [\#18219](https://github.com/netdata/netdata/pull/18219) ([ilyam8](https://github.com/ilyam8))
+- Support IPV6 when establishing MQTT connection to the cloud [\#18217](https://github.com/netdata/netdata/pull/18217) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18216](https://github.com/netdata/netdata/pull/18216) ([netdatabot](https://github.com/netdatabot))
 - go.d chrony fix client read/write timeout [\#18215](https://github.com/netdata/netdata/pull/18215) ([ilyam8](https://github.com/ilyam8))
 - dont install test bash scripts by default [\#18214](https://github.com/netdata/netdata/pull/18214) ([ilyam8](https://github.com/ilyam8))
@@ -416,11 +420,6 @@
 - go.d update config dirs [\#17661](https://github.com/netdata/netdata/pull/17661) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17660](https://github.com/netdata/netdata/pull/17660) ([netdatabot](https://github.com/netdatabot))
 - go.d cockroachdb fix calculation [\#17659](https://github.com/netdata/netdata/pull/17659) ([ilyam8](https://github.com/ilyam8))
-- Fall back to querying libc.so.6 if ldd can’t detect libc implementation. [\#17657](https://github.com/netdata/netdata/pull/17657) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#17655](https://github.com/netdata/netdata/pull/17655) ([netdatabot](https://github.com/netdatabot))
-- go.d hpssa fix cache battery chart ctx [\#17654](https://github.com/netdata/netdata/pull/17654) ([ilyam8](https://github.com/ilyam8))
-- files movearound [\#17653](https://github.com/netdata/netdata/pull/17653) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations.js [\#17652](https://github.com/netdata/netdata/pull/17652) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
