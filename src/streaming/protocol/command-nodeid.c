@@ -3,62 +3,106 @@
 #include "commands.h"
 #include "collectors/plugins.d/pluginsd_internals.h"
 
-void rrdpush_send_child_node_id(RRDHOST *host) {
+// the child disconnected from the parent, and it has to clear the parent's claim id
+void rrdpush_sender_clear_child_claim_id(RRDHOST *host) {
+    uuid_clear(host->aclk.claim_id_of_parent);
+}
+
+// the parent sends to the child its claim id, node id and cloud url
+void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
     if(host == localhost) return;
 
     spinlock_lock(&host->receiver_lock);
     if(host->receiver && stream_has_capability(host->receiver, STREAM_CAP_NODE_ID)) {
-        char node_id_str[UUID_STR_LEN];
+        char node_id_str[UUID_STR_LEN] = "";
         uuid_unparse_lower(host->node_id, node_id_str);
 
-        char buf[100];
-        snprintfz(buf, sizeof(buf), PLUGINSD_KEYWORD_NODE_ID " '%s' '%s'",
-                  node_id_str, cloud_config_url_get());
+        char claim_id_str[UUID_STR_LEN] = "";
 
-        send_to_plugin(buf, host->receiver);
+        if((!is_agent_claimed() || !aclk_connected) && !uuid_is_null(host->aclk.claim_id_of_parent)) {
+            // the agent is not claimed or not connected, and it has a parent claim id
+            // we use it, to allow the connection flow
+            uuid_unparse_lower(host->aclk.claim_id_of_parent, claim_id_str);
+        }
+        else {
+            // the agent is claimed and connected, or there is no parent claim id
+            char *x = aclk_get_claimed_id();
+            if(x) {
+                strncpyz(claim_id_str, x, sizeof(claim_id_str) - 1);
+                freez(x);
+            }
+        }
+
+        if(claim_id_str[0] && node_id_str[0]) {
+            char buf[100];
+            snprintfz(buf, sizeof(buf),
+                      PLUGINSD_KEYWORD_NODE_ID " '%s' '%s' '%s'",
+                      claim_id_str, node_id_str, cloud_config_url_get());
+
+            send_to_plugin(buf, host->receiver);
+        }
     }
     spinlock_unlock(&host->receiver_lock);
 }
 
-void streaming_sender_command_node_id_parser(struct sender_state *s) {
-    if(!aclk_connected) {
-        nd_uuid_t node_uuid, claim_uuid;
+// the sender of the child receives node id, claim id and cloud url from the receiver of the parent
+void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
+    char *claim_id = get_word(s->line.words, s->line.num_words, 1);
+    char *node_id = get_word(s->line.words, s->line.num_words, 2);
+    char *url = get_word(s->line.words, s->line.num_words, 3);
 
-        char *claim_id = get_word(s->line.words, s->line.num_words, 1);
-        char *node_id = get_word(s->line.words, s->line.num_words, 2);
-        char *url = get_word(s->line.words, s->line.num_words, 3);
-
-        bool doit = true;
-        if (uuid_parse(claim_id ? claim_id : "", claim_uuid) != 0) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM %s [send to %s] received invalid claim id '%s'",
-                   rrdhost_hostname(s->host), s->connected_to,
-                   claim_id ? claim_id : "(unset)");
-            doit = false;
-        }
-
-        if(uuid_parse(node_id ? node_id : "", node_uuid) != 0 || (!uuid_is_null(s->host->node_id) && !uuid_eq(node_uuid, s->host->node_id))) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM %s [send to %s] received an invalid/different node id '%s'",
-                   rrdhost_hostname(s->host), s->connected_to,
-                   node_id ? node_id : "(unset)");
-            doit = false;
-        }
-
-        if(doit) {
-            if (!uuid_is_null(s->host->aclk.claim_id_of_parent) && !uuid_eq(s->host->aclk.claim_id_of_parent, claim_uuid))
-                nd_log(NDLS_DAEMON, NDLP_INFO,
-                       "STREAM %s [send to %s] changed parent's claim id to %s",
-                       rrdhost_hostname(s->host), s->connected_to, claim_id ? claim_id : "(unset)");
-
-            uuid_copy(s->host->node_id, node_uuid);
-            uuid_copy(s->host->aclk.claim_id_of_parent, claim_uuid);
-
-            if(!is_agent_claimed())
-                cloud_config_url_set(url);
-
-            // send it down the line (to children)
-            rrdpush_send_child_node_id(s->host);
-        }
+    nd_uuid_t claim_uuid;
+    if (uuid_parse(claim_id ? claim_id : "", claim_uuid) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM %s [send to %s] received invalid claim id '%s'",
+               rrdhost_hostname(s->host), s->connected_to,
+               claim_id ? claim_id : "(unset)");
+        return;
     }
+
+    nd_uuid_t node_uuid;
+    if(uuid_parse(node_id ? node_id : "", node_uuid) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM %s [send to %s] received an invalid node id '%s'",
+               rrdhost_hostname(s->host), s->connected_to,
+               node_id ? node_id : "(unset)");
+        return;
+    }
+
+    if(!url || !*url) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM %s [send to %s] received an invalid cloud URL '%s'",
+               rrdhost_hostname(s->host), s->connected_to,
+               url ? url : "(unset)");
+        return;
+    }
+
+    if (!uuid_is_null(s->host->aclk.claim_id_of_parent) && !uuid_eq(s->host->aclk.claim_id_of_parent, claim_uuid))
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "STREAM %s [send to %s] changed parent's claim id to %s",
+               rrdhost_hostname(s->host), s->connected_to, claim_id ? claim_id : "(unset)");
+
+    uuid_copy(s->host->aclk.claim_id_of_parent, claim_uuid);
+
+    // There are some very strange corner cases here:
+    //
+    // - Agent is claimed but offline, and it receives node_id and cloud_url from a different Netdata Cloud.
+    // - Agent is configured to talk to an on-prem Netdata Cloud, it is offline, but the parent is connected
+    //   to a different Netdata Cloud.
+    //
+    // The solution below, tries to get the agent online, using the latest information.
+    // So, if the agent is not claimed or not connected, we inherit whatever information sent from the parent,
+    // to allow the user work with it.
+
+    if(is_agent_claimed() && aclk_connected)
+        // we are directly claimed and connected, ignore node id and cloud url
+        return;
+
+    uuid_copy(s->host->node_id, node_uuid);
+
+    // we change the URL, to allow the agent dashboard to work with Netdata Cloud on-prem, if any.
+    cloud_config_url_set(url);
+
+    // send it down the line (to children)
+    rrdpush_receiver_send_node_and_claim_id_to_child(s->host);
 }

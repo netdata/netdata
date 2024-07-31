@@ -347,6 +347,9 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     // do not flush the circular buffer here
     // this function is called sometimes with the mutex lock, sometimes without the lock
     rrdpush_sender_charts_and_replication_reset(host);
+
+    // clear the parent's claim id
+    rrdpush_sender_clear_child_claim_id(host);
 }
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host) {
@@ -1306,7 +1309,7 @@ void execute_commands(struct sender_state *s) {
             }
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_NODE_ID) == 0) {
-            streaming_sender_command_node_id_parser(s);
+            rrdpush_sender_get_node_and_claim_id_from_parent(s);
         }
         else {
             netdata_log_error("STREAM %s [send to %s] received unknown command over connection: %s",
