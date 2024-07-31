@@ -488,7 +488,7 @@ static void ebpf_create_fs_charts(int update_every)
             char *type = (efp->flags & NETDATA_FILESYSTEM_ATTR_CHARTS) ? "attribute" : "sync";
             snprintfz(title, sizeof(title) - 1, "%s latency for each %s request.", efp->filesystem, type);
             snprintfz(chart_name, sizeof(chart_name) - 1, "%s_%s_latency", efp->filesystem, type);
-            snprintfz(ctx, sizeof(ctx) - 1, "filesystem.%s_latency", efp->filesystem, type);
+            snprintfz(ctx, sizeof(ctx) - 1, "filesystem.%s_latency", efp->filesystem);
             efp->hadditional.name = strdupz(chart_name);
             efp->hadditional.title = strdupz(title);
             efp->hadditional.ctx = strdupz(ctx);
