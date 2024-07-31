@@ -80,6 +80,9 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     if (type != SPAWN_INSTANCE_TYPE_EXEC)
         return NULL;
 
+    CLEAN_BUFFER *cmdline_wb = argv_to_cmdline_buffer(argv);
+    const char *cmdline = buffer_tostring(cmdline_wb);
+
     SPAWN_INSTANCE *si = callocz(1, sizeof(SPAWN_INSTANCE));
     si->child_pid = -1;
     si->request_id = __atomic_add_fetch(&server->request_id, 1, __ATOMIC_RELAXED);
@@ -88,13 +91,13 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     int stdout_pipe[2] = { -1, -1 };
 
     if (pipe(stdin_pipe) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdin pipe() failed");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdin pipe() failed: %s", cmdline);
         freez(si);
         return NULL;
     }
 
     if (pipe(stdout_pipe) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdout pipe() failed");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: stdout pipe() failed: %s", cmdline);
         close(stdin_pipe[PIPE_READ]);
         close(stdin_pipe[PIPE_WRITE]);
         freez(si);
@@ -105,7 +108,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     posix_spawnattr_t attr;
 
     if (posix_spawn_file_actions_init(&file_actions) != 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawn_file_actions_init() failed");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawn_file_actions_init() failed: %s", cmdline);
         close(stdin_pipe[PIPE_READ]);
         close(stdin_pipe[PIPE_WRITE]);
         close(stdout_pipe[PIPE_READ]);
@@ -126,7 +129,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     }
 
     if (posix_spawnattr_init(&attr) != 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_init() failed");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_init() failed: %s", cmdline);
         posix_spawn_file_actions_destroy(&file_actions);
         close(stdin_pipe[PIPE_READ]);
         close(stdin_pipe[PIPE_WRITE]);
@@ -140,7 +143,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     sigset_t empty_mask;
     sigemptyset(&empty_mask);
     if (posix_spawnattr_setsigmask(&attr, &empty_mask) != 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigmask() failed");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigmask() failed: %s", cmdline);
         posix_spawn_file_actions_destroy(&file_actions);
         posix_spawnattr_destroy(&attr);
         return false;
@@ -148,7 +151,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     short flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
     if (posix_spawnattr_setflags(&attr, flags) != 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setflags() failed");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setflags() failed: %s", cmdline);
         posix_spawn_file_actions_destroy(&file_actions);
         posix_spawnattr_destroy(&attr);
         return false;
@@ -169,7 +172,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     errno_clear();
     if (posix_spawn(&si->child_pid, argv[0], &file_actions, &attr, (char * const *)argv, environ) != 0) {
         spinlock_unlock(&spinlock);
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: posix_spawn() failed");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: posix_spawn() failed: %s", cmdline);
 
         spinlock_lock(&spawn_globals.spinlock);
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(spawn_globals.instances, si, prev, next);
@@ -197,8 +200,11 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     si->write_fd = stdin_pipe[PIPE_WRITE];
     si->read_fd = stdout_pipe[PIPE_READ];
+    si->cmdline = strdupz(cmdline);
 
-    nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: process created with pid %d", si->child_pid);
+    nd_log(NDLS_COLLECTORS, NDLP_INFO,
+           "SPAWN SERVER: process created with pid %d: %s",
+           si->child_pid, cmdline);
     return si;
 }
 
@@ -206,7 +212,9 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si) {
     if (!si) return -1;
 
     if (kill(si->child_pid, SIGTERM))
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: kill() failed");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: kill() of pid %d failed: %s",
+               si->child_pid, si->cmdline);
 
     return spawn_server_exec_wait(server, si);
 }
@@ -224,22 +232,26 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     if(!exited) {
         if(waitpid(si->child_pid, &status, 0) != si->child_pid) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "SPAWN PARENT: failed to wait for pid %d", si->child_pid);
+                   "SPAWN PARENT: failed to wait for pid %d: %s",
+                   si->child_pid, si->cmdline);
             status = -1;
         }
         else {
             nd_log(NDLS_COLLECTORS, NDLP_INFO,
-                   "SPAWN PARENT: child with pid %d exited with status %d (waitpid)", si->child_pid, status);
+                   "SPAWN PARENT: child with pid %d exited with status %d (waitpid): %s",
+                   si->child_pid, status, si->cmdline);
         }
     }
     else
         nd_log(NDLS_COLLECTORS, NDLP_INFO,
-               "SPAWN PARENT: child with pid %d exited with status %d (sighandler)", si->child_pid, status);
+               "SPAWN PARENT: child with pid %d exited with status %d (sighandler): %s",
+               si->child_pid, status, si->cmdline);
 
     spinlock_lock(&spawn_globals.spinlock);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(spawn_globals.instances, si, prev, next);
     spinlock_unlock(&spawn_globals.spinlock);
 
+    freez((void *)si->cmdline);
     freez(si);
     return status;
 }

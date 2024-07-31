@@ -743,14 +743,16 @@ set(LIBNETDATA_FILES
         src/libnetdata/spawn_server/spawn_server.h
         src/libnetdata/spawn_server/spawn_popen.c
         src/libnetdata/spawn_server/spawn_popen.h
-        src/libnetdata/os/close_range.c
-        src/libnetdata/os/close_range.h
-        src/libnetdata/os/setproctitle.c
-        src/libnetdata/os/setproctitle.h
         src/libnetdata/spawn_server/spawn_server_windows.c
         src/libnetdata/spawn_server/spawn_server_internals.h
         src/libnetdata/spawn_server/spawn_server_libuv.c
         src/libnetdata/spawn_server/spawn_server_posix.c
+        src/libnetdata/spawn_server/spawn_library.c
+        src/libnetdata/spawn_server/spawn_library.h
+        src/libnetdata/os/close_range.c
+        src/libnetdata/os/close_range.h
+        src/libnetdata/os/setproctitle.c
+        src/libnetdata/os/setproctitle.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

@@ -5,6 +5,7 @@
 
 #include "../libnetdata.h"
 #include "spawn_server.h"
+#include "spawn_library.h"
 
 #if defined(OS_WINDOWS)
 // #define SPAWN_SERVER_VERSION_WINDOWS 1
@@ -81,6 +82,7 @@ struct spawn_instance {
 #endif
 
 #if defined(SPAWN_SERVER_VERSION_POSIX_SPAWN)
+    const char *cmdline;
     bool exited;
     int waitpid_status;
     struct spawn_instance *prev, *next;
