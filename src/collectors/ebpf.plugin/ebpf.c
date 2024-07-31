@@ -2681,7 +2681,10 @@ static void ebpf_allocate_common_vectors()
 {
     ebpf_judy_pid.pid_table = ebpf_allocate_pid_aral(NETDATA_EBPF_PID_SOCKET_ARAL_TABLE_NAME,
                                                      sizeof(netdata_ebpf_judy_pid_stats_t));
-    ebpf_all_pids = callocz((size_t)pid_max, sizeof(struct ebpf_pid_stat *));
+    if (ebpf_modules[EBPF_MODULE_FD_IDX].enabled || ebpf_modules[EBPF_MODULE_VFS_IDX].enabled)
+        ebpf_vector_pids = callocz((size_t)pid_max, sizeof(struct ebpf_pid_stat));
+    else
+        ebpf_all_pids = callocz((size_t)pid_max, sizeof(struct ebpf_pid_stat *));
     ebpf_aral_init();
 }
 
