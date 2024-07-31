@@ -939,7 +939,7 @@ static inline void post_aggregate_targets(struct ebpf_target *root)
  */
 void ebpf_del_pid_entry(pid_t pid)
 {
-    struct ebpf_pid_stat *p = (!ebpf_all_pids) ? ebpf_all_pids[pid] : &ebpf_vector_pids[pid];
+    struct ebpf_pid_stat *p = (ebpf_all_pids) ? ebpf_all_pids[pid] : &ebpf_vector_pids[pid];
 
     if (unlikely(!p)) {
         netdata_log_error("attempted to free pid %d that is not allocated.", pid);
@@ -983,6 +983,8 @@ void ebpf_del_pid_entry(pid_t pid)
     if (ebpf_all_pids) {
         ebpf_pid_stat_release(p);
         ebpf_all_pids[pid] = NULL;
+    } else if (ebpf_vector_pids) {
+        memset(&ebpf_vector_pids[pid], 0, sizeof(struct ebpf_pid_stat));
     }
 
     ebpf_all_pids_count--;
