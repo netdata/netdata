@@ -201,6 +201,7 @@ static inline void debug_log_int(const char *fmt, ...)
 // Exported variabled and functions
 //
 extern struct ebpf_pid_stat **ebpf_all_pids;
+extern struct ebpf_pid_stat *ebpf_vector_pids;
 
 int ebpf_read_apps_groups_conf(struct ebpf_target **apps_groups_default_target,
                                struct ebpf_target **apps_groups_root_target,
