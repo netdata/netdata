@@ -10,7 +10,7 @@ static netdata_publish_syscall_t cachestat_counter_publish_aggregated[NETDATA_CA
 
 netdata_cachestat_pid_t *cachestat_vector = NULL;
 
-static netdata_idx_t cachestat_hash_values[NETDATA_CACHESTAT_KEYS_END];
+static netdata_idx_t cachestat_hash_values[NETDATA_CACHESTAT_END];
 static netdata_idx_t *cachestat_values = NULL;
 
 ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_global", .internal_input = NETDATA_CACHESTAT_END,
@@ -587,9 +587,8 @@ static void ebpf_cachestat_exit(void *pptr)
  * @param out  structure that will receive data.
  * @param etotal  access to page cache.
  * @param emisses missed data in hash table.
- * @param edirty  modified pages.
  */
-void cachestat_update_publish(netdata_publish_cachestat_t *out, uint64_t etotal, uint64_t emisses, uint64_t edirty)
+void cachestat_update_publish(netdata_publish_cachestat_t *out, uint64_t etotal, uint64_t emisses)
 {
     // Adapted algorithm from https://github.com/iovisor/bcc/blob/master/tools/cachestat.py#L126-L138
     NETDATA_DOUBLE total = (NETDATA_DOUBLE)etotal;
@@ -641,12 +640,11 @@ static void calculate_stats(netdata_publish_cachestat_t *publish) {
 
     uint64_t total = cachestat_hash_values[NETDATA_CACHESTAT_KEY_TOTAL] - publish->prev.total;
     uint64_t misses = cachestat_hash_values[NETDATA_CACHESTAT_KEY_MISSES] - publish->prev.misses;
-    uint64_t dirty = cachestat_hash_values[NETDATA_CACHESTAT_KEY_DIRTY] - publish->prev.dirty;
 
     save_previous_values(publish);
 
     // We are changing the original algorithm to have a smooth ratio.
-    cachestat_update_publish(publish, total, misses, dirty);
+    cachestat_update_publish(publish, total, misses);
 }
 
 
@@ -1032,7 +1030,7 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
         w->cachestat.dirty = (long long)dirty;
         uint64_t misses = current->misses - prev->misses;
 
-        cachestat_update_publish(&w->cachestat, total, misses, dirty);
+        cachestat_update_publish(&w->cachestat, total, misses);
 
         value = (collected_number) w->cachestat.ratio;
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_cachestat_hit_ratio");
@@ -1101,7 +1099,7 @@ void ebpf_cachestat_calc_chart_values()
         ect->publish_cachestat.dirty = (long long)dirty;
         uint64_t misses = current->misses - prev->misses;
 
-        cachestat_update_publish(&ect->publish_cachestat, total, misses, dirty);
+        cachestat_update_publish(&ect->publish_cachestat, total, misses);
     }
 }
 
