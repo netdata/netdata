@@ -290,7 +290,6 @@ int create_node_instance_result(const char *msg, size_t msg_len)
             node_state_update.hops = host->system_info->hops;
         }
         node_state_update.capabilities = aclk_get_node_instance_capas(host);
-        rrdpush_update_child_node_id(host);
     }
 
     rrdhost_aclk_state_lock(localhost);

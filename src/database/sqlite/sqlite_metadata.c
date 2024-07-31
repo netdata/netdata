@@ -256,6 +256,8 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
         create_aclk_config(host, &host->host_uuid, node_id);
     else
         uuid_unparse_lower(*node_id, wc->node_id);
+
+    rrdpush_send_child_node_id(host);
 }
 
 #define SQL_SET_HOST_LABEL                                                                                             \

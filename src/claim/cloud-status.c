@@ -78,8 +78,6 @@ CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s) {
         buffer_json_member_add_time_t(wb, "since", last_change);
         buffer_json_member_add_time_t(wb, "age", now_s - last_change);
 
-        char *claim_id = aclk_get_claimed_id();
-
         switch(status) {
             default:
             case CLOUD_STATUS_AVAILABLE:
@@ -88,17 +86,22 @@ CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s) {
                 buffer_json_member_add_string(wb, "reason", claim_agent_failure_reason_get());
                 break;
 
-            case CLOUD_STATUS_BANNED:
+            case CLOUD_STATUS_BANNED: {
                 // the agent is claimed, but has been banned from NC
+                char *claim_id = aclk_get_claimed_id();
                 buffer_json_member_add_string(wb, "claim_id", claim_id);
+                freez(claim_id);
                 buffer_json_member_add_string(wb, "url", cloud_status_aclk_base_url());
                 buffer_json_member_add_string(wb, "reason", "Agent is banned from Netdata Cloud");
                 buffer_json_member_add_string(wb, "url", cloud_config_url_get());
                 break;
+            }
 
-            case CLOUD_STATUS_OFFLINE:
+            case CLOUD_STATUS_OFFLINE: {
                 // the agent is claimed, but cannot get online
+                char *claim_id = aclk_get_claimed_id();
                 buffer_json_member_add_string(wb, "claim_id", claim_id);
+                freez(claim_id);
                 buffer_json_member_add_string(wb, "url", cloud_status_aclk_base_url());
                 buffer_json_member_add_string(wb, "reason", cloud_status_aclk_offline_reason());
                 if (next_connect > now_s) {
@@ -106,20 +109,25 @@ CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s) {
                     buffer_json_member_add_time_t(wb, "next_in", next_connect - now_s);
                 }
                 break;
+            }
 
-            case CLOUD_STATUS_ONLINE:
+            case CLOUD_STATUS_ONLINE: {
                 // the agent is claimed and online
+                char *claim_id = aclk_get_claimed_id();
                 buffer_json_member_add_string(wb, "claim_id", claim_id);
+                freez(claim_id);
                 buffer_json_member_add_string(wb, "url", cloud_status_aclk_base_url());
                 buffer_json_member_add_string(wb, "reason", "");
                 break;
+            }
 
-            case CLOUD_STATUS_INDIRECT:
+            case CLOUD_STATUS_INDIRECT: {
+                if(!uuid_is_null(localhost->aclk.claim_id_of_parent))
+                    buffer_json_member_add_uuid(wb, "claim_id", &localhost->aclk.claim_id_of_parent);
                 buffer_json_member_add_string(wb, "url", cloud_config_url_get());
                 break;
+            }
         }
-
-        freez(claim_id);
     }
     buffer_json_object_close(wb); // cloud
 

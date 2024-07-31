@@ -1238,6 +1238,9 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/replication.c
         src/streaming/replication.h
         src/streaming/common.h
+        src/streaming/protocol/command-nodeid.c
+        src/streaming/protocol/commands.c
+        src/streaming/protocol/commands.h
 )
 
 set(WEB_PLUGIN_FILES

@@ -1313,6 +1313,10 @@ struct rrdhost {
     netdata_mutex_t aclk_state_lock;
     aclk_rrdhost_state aclk_state;
 
+    struct {
+        nd_uuid_t claim_id_of_parent;
+    } aclk;
+
     struct rrdhost *next;
     struct rrdhost *prev;
 };

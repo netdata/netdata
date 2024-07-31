@@ -453,7 +453,6 @@ bool rrdset_push_chart_definition_now(RRDSET *st);
 void *rrdpush_sender_thread(void *ptr);
 void rrdpush_send_host_labels(RRDHOST *host);
 void rrdpush_send_claimed_id(RRDHOST *host);
-void rrdpush_update_child_node_id(RRDHOST *host);
 void rrdpush_send_global_functions(RRDHOST *host);
 
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string, void *h2o_ctx);
@@ -755,5 +754,7 @@ bool rrdpush_decompression_initialize(struct receiver_state *rpt);
 void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *order);
 void rrdpush_select_receiver_compression_algorithm(struct receiver_state *rpt);
 void rrdpush_compression_deactivate(struct sender_state *s);
+
+#include "protocol/commands.h"
 
 #endif //NETDATA_RRDPUSH_H

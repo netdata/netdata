@@ -410,20 +410,3 @@ PARSER_RC pluginsd_function_progress(char **words, size_t num_words, PARSER *par
 
     return PARSER_RC_OK;
 }
-
-void rrdpush_update_child_node_id(RRDHOST *host) {
-    if(host == localhost) return;
-
-    spinlock_lock(&host->receiver_lock);
-    if(host->receiver && stream_has_capability(host->receiver, STREAM_CAP_NODE_ID)) {
-        char node_id_str[UUID_STR_LEN];
-        uuid_unparse_lower(host->node_id, node_id_str);
-
-        char buf[100];
-        snprintfz(buf, sizeof(buf), PLUGINSD_KEYWORD_NODE_ID " '%s' '%s'",
-                  node_id_str, cloud_config_url_get());
-
-        send_to_plugin(buf, host->receiver);
-    }
-    spinlock_unlock(&host->receiver_lock);
-}

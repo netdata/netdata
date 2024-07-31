@@ -1306,31 +1306,7 @@ void execute_commands(struct sender_state *s) {
             }
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_NODE_ID) == 0) {
-            if(!aclk_connected) {
-                nd_uuid_t uuid;
-
-                char *node_id = get_word(s->line.words, s->line.num_words, 1);
-                char *url = get_word(s->line.words, s->line.num_words, 2);
-
-                if (uuid_parse(node_id ? node_id : "", uuid) != 0)
-                    netdata_log_error(
-                        "STREAM %s [send to %s] received invalid node id: %s",
-                        rrdhost_hostname(s->host), s->connected_to, node_id ? node_id : "(unset)");
-                else {
-                    if (!uuid_is_null(s->host->node_id) && !uuid_eq(s->host->node_id, uuid))
-                        netdata_log_error(
-                            "STREAM %s [send to %s] changed node id to %s",
-                            rrdhost_hostname(s->host), s->connected_to, node_id ? node_id : "(unset)");
-
-                    memcpy(s->host->node_id, uuid, sizeof(uuid));
-
-                    if(!is_agent_claimed())
-                        cloud_config_url_set(url);
-
-                    // send it down the line (to children)
-                    rrdpush_update_child_node_id(s->host);
-                }
-            }
+            streaming_sender_command_node_id_parser(s);
         }
         else {
             netdata_log_error("STREAM %s [send to %s] received unknown command over connection: %s",
