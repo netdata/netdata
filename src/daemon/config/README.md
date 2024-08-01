@@ -128,7 +128,7 @@ Please note that your data history will be lost if you have modified `history` p
 
 ### [logs] section options
 
-There are additional configuration options for the logs. For more info, see [Netdata Logging](https://learn.netdata.cloud/docs/developer-and-contributor-corner/libnetdata/log).
+There are additional configuration options for the logs. For more info, see [Netdata Logging](/src/libnetdata/log/README.md).
 
 |              setting               |            default            | info                                                                                                                                                                                                                                                                                                                             |
 |:----------------------------------:|:-----------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
