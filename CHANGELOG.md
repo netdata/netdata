@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Bump github.com/tidwall/gjson from 1.17.1 to 1.17.3 in /src/go [\#18244](https://github.com/netdata/netdata/pull/18244) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Fix OS detection messages in CMake. [\#18243](https://github.com/netdata/netdata/pull/18243) ([Ferroin](https://github.com/Ferroin))
 - Clean up unneeded depencdencies. [\#18242](https://github.com/netdata/netdata/pull/18242) ([Ferroin](https://github.com/Ferroin))
 - Update node info payload [\#18240](https://github.com/netdata/netdata/pull/18240) ([stelfrag](https://github.com/stelfrag))
 - Bump github.com/prometheus-community/pro-bing from 0.4.0 to 0.4.1 in /src/go [\#18237](https://github.com/netdata/netdata/pull/18237) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -418,8 +419,6 @@
 - python.d remove litespeed [\#17663](https://github.com/netdata/netdata/pull/17663) ([ilyam8](https://github.com/ilyam8))
 - files movearound [\#17662](https://github.com/netdata/netdata/pull/17662) ([Ancairon](https://github.com/Ancairon))
 - go.d update config dirs [\#17661](https://github.com/netdata/netdata/pull/17661) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17660](https://github.com/netdata/netdata/pull/17660) ([netdatabot](https://github.com/netdatabot))
-- go.d cockroachdb fix calculation [\#17659](https://github.com/netdata/netdata/pull/17659) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
