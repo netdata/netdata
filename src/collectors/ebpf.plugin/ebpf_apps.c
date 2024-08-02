@@ -410,25 +410,25 @@ static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
                 switch (log) {
                     case PID_LOG_IO:
                         netdata_log_error(
-                            "Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid,
+                            "Cannot process %s/proc/%u/io (command '%s')", netdata_configured_host_prefix, p->pid,
                             p->comm);
                         break;
 
                     case PID_LOG_STATUS:
                         netdata_log_error(
-                            "Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid,
+                            "Cannot process %s/proc/%u/status (command '%s')", netdata_configured_host_prefix, p->pid,
                             p->comm);
                         break;
 
                     case PID_LOG_CMDLINE:
                         netdata_log_error(
-                            "Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid,
+                            "Cannot process %s/proc/%u/cmdline (command '%s')", netdata_configured_host_prefix, p->pid,
                             p->comm);
                         break;
 
                     case PID_LOG_FDS:
                         netdata_log_error(
-                            "Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix,
+                            "Cannot process entries in %s/proc/%u/fd (command '%s')", netdata_configured_host_prefix,
                             p->pid, p->comm);
                         break;
 
@@ -436,7 +436,7 @@ static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
                         break;
 
                     default:
-                        netdata_log_error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
+                        netdata_log_error("unhandled error for pid %u, command '%s'", p->pid, p->comm);
                         break;
                 }
             }
@@ -742,7 +742,7 @@ static inline int ebpf_collect_data_for_pid(pid_t pid, void *ptr)
 
     // check its parent pid
     if (unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-        netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
+        netdata_log_error("Pid %u (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
         p->ppid = 0;
     }
 
@@ -1088,7 +1088,7 @@ static inline void aggregate_pid_on_target(struct ebpf_target *w, struct ebpf_pi
     }
 
     if (unlikely(!w)) {
-        netdata_log_error("pid %d %s was left without a target!", p->pid, p->comm);
+        netdata_log_error("pid %u %s was left without a target!", p->pid, p->comm);
         return;
     }
 
