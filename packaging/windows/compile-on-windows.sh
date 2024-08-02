@@ -5,6 +5,7 @@ CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 
 if [ -n "${BUILD_DIR}" ]; then
     build="${BUILD_DIR}"
+    unset BUILD_DIR
 elif [ -n "${OSTYPE}" ]; then
     if [ -n "${MSYSTEM}" ]; then
         build="${repo_root}/build-${OSTYPE}-${MSYSTEM}"

@@ -4,6 +4,7 @@ repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/nu
 
 if [ -n "${BUILD_DIR}" ]; then
     build="${BUILD_DIR}"
+    unset BUILD_DIR
 elif [ -n "${OSTYPE}" ]; then
     if [ -n "${MSYSTEM}" ]; then
         build="${repo_root}/build-${OSTYPE}-${MSYSTEM}"
