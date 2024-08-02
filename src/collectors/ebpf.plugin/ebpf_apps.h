@@ -108,14 +108,13 @@ struct ebpf_target {
     struct ebpf_target *target; // the one that will be reported to netdata
     struct ebpf_target *next;
 };
-
 extern struct ebpf_target *apps_groups_default_target;
 extern struct ebpf_target *apps_groups_root_target;
 extern struct ebpf_target *users_root_target;
 extern struct ebpf_target *groups_root_target;
 
 typedef struct ebpf_pid_stat {
-    int32_t pid;
+    uint32_t pid;
     uint64_t thread_collecting;
     char comm[EBPF_MAX_COMPARE_NAME + 1];
     char *cmdline;
@@ -123,7 +122,7 @@ typedef struct ebpf_pid_stat {
     uint32_t log_thrown;
 
     // char state;
-    int32_t ppid;
+    uint32_t ppid;
 
     int children_count;              // number of processes directly referencing this
     unsigned char keep : 1;          // 1 when we need to keep this process in memory even after it exited
@@ -166,6 +165,27 @@ typedef struct ebpf_pid_stat {
     struct ebpf_pid_stat *next;
 } ebpf_pid_stat_t;
 
+extern struct ebpf_pid_stat *ebpf_vector_pids;
+
+static inline ebpf_pid_stat_t *ebpf_get_pid_address(uint32_t pid, uint32_t tgid, char *name, size_t length)
+{
+    ebpf_pid_stat_t *ptr = &ebpf_vector_pids[pid];
+
+    if (ptr->pid == pid && ptr->ppid == tgid)
+        return ptr;
+
+    // mark it as updated
+    ptr->updated = 1;
+    ptr->keep = 0;
+    ptr->keeploops = 0;
+
+    if (length)
+        memcpy(ptr->comm, name, length);
+
+    return ptr;
+}
+
+
 // ----------------------------------------------------------------------------
 // target
 //
@@ -201,7 +221,6 @@ static inline void debug_log_int(const char *fmt, ...)
 // Exported variabled and functions
 //
 extern struct ebpf_pid_stat **ebpf_all_pids;
-extern struct ebpf_pid_stat *ebpf_vector_pids;
 
 int ebpf_read_apps_groups_conf(struct ebpf_target **apps_groups_default_target,
                                struct ebpf_target **apps_groups_root_target,
