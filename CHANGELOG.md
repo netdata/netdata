@@ -20,6 +20,7 @@
 - Improve windows agent [\#18227](https://github.com/netdata/netdata/pull/18227) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update libbpf \(1.45.0\) [\#18226](https://github.com/netdata/netdata/pull/18226) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations.js [\#18225](https://github.com/netdata/netdata/pull/18225) ([netdatabot](https://github.com/netdatabot))
+- Update Cloud MSTeam documentation [\#18224](https://github.com/netdata/netdata/pull/18224) ([car12o](https://github.com/car12o))
 - go.d fix netdata dir path on win under msys [\#18221](https://github.com/netdata/netdata/pull/18221) ([ilyam8](https://github.com/ilyam8))
 - Port Tomcat collector to Go [\#18220](https://github.com/netdata/netdata/pull/18220) ([Ancairon](https://github.com/Ancairon))
 - go.d drop using cancelreader [\#18219](https://github.com/netdata/netdata/pull/18219) ([ilyam8](https://github.com/ilyam8))
@@ -418,7 +419,6 @@
 - Correctly handle required compilation flags for dependencies. [\#17664](https://github.com/netdata/netdata/pull/17664) ([Ferroin](https://github.com/Ferroin))
 - python.d remove litespeed [\#17663](https://github.com/netdata/netdata/pull/17663) ([ilyam8](https://github.com/ilyam8))
 - files movearound [\#17662](https://github.com/netdata/netdata/pull/17662) ([Ancairon](https://github.com/Ancairon))
-- go.d update config dirs [\#17661](https://github.com/netdata/netdata/pull/17661) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
