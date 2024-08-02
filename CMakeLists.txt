@@ -2440,12 +2440,6 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION usr/libexec/netdata)
 
-configure_file(system/cron/netdata-updater-daily.in system/cron/netdata-updater-daily @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/cron/netdata-updater-daily
-        COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/cron)
-
 configure_file(system/launchd/netdata.plist.in system/launchd/netdata.plist @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/launchd/netdata.plist
@@ -2521,28 +2515,10 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
-configure_file(system/systemd/netdata-updater.service.in system/systemd/netdata-updater.service @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
-        COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/systemd)
-
-install(FILES
-        system/systemd/netdata-updater.timer
-        COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/systemd)
 
 if(BUILD_FOR_PACKAGING)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
-                COMPONENT netdata
-                DESTINATION lib/systemd/system)
-        install(FILES
-                ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
-                COMPONENT netdata
-                DESTINATION lib/systemd/system)
-        install(FILES
-                system/systemd/netdata-updater.timer
                 COMPONENT netdata
                 DESTINATION lib/systemd/system)
         install(DIRECTORY
@@ -2581,12 +2557,6 @@ else()
         set(NETDATA_CONF_DEST "usr/lib/netdata/conf.d")
 endif()
 
-install(FILES
-        system/netdata.conf
-        system/netdata-updater.conf
-        COMPONENT netdata
-        DESTINATION ${NETDATA_CONF_DEST})
-
 #
 # misc files
 #
@@ -2602,10 +2572,50 @@ if(BUILD_FOR_PACKAGING)
                 DESTINATION etc/init.d)
 endif()
 
-install(PROGRAMS
-        packaging/installer/netdata-updater.sh
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata)
+if(NOT OS_WINDOWS)
+  install(PROGRAMS
+          packaging/installer/netdata-updater.sh
+          COMPONENT netdata
+          DESTINATION usr/libexec/netdata)
+
+  install(FILES
+          system/netdata.conf
+          system/netdata-updater.conf
+          COMPONENT netdata
+          DESTINATION ${NETDATA_CONF_DEST})
+
+  configure_file(system/cron/netdata-updater-daily.in
+                 system/cron/netdata-updater-daily
+                 @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/cron/netdata-updater-daily
+          COMPONENT netdata
+          DESTINATION usr/lib/netdata/system/cron)
+
+  configure_file(system/systemd/netdata-updater.service.in
+                 system/systemd/netdata-updater.service
+                 @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
+          COMPONENT netdata
+          DESTINATION usr/lib/netdata/system/systemd)
+
+  install(FILES
+          system/systemd/netdata-updater.timer
+          COMPONENT netdata
+          DESTINATION usr/lib/netdata/system/systemd)
+
+  if(BUILD_FOR_PACKAGING)
+    install(FILES
+            ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
+            COMPONENT netdata
+            DESTINATION lib/systemd/system)
+    install(FILES
+            system/systemd/netdata-updater.timer
+            COMPONENT netdata
+            DESTINATION lib/systemd/system)
+  endif()
+endif()
 
 #
 # TODO: check the following files for correct substitutions
