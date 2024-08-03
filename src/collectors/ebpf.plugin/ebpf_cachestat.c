@@ -728,16 +728,17 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
 
         cachestat_apps_accumulator(cv, maps_per_core);
 
-        //ebpf_pid_stat_t *local_pid = &ebpf_vector_pids[key];
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_address(key, cv->tgid, cv->name, strlen(cv->name));
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, strlen(cv->name));
+        if (!local_pid)
+            goto end_cachestat_loop;
         netdata_publish_cachestat_t *publish = &local_pid->cachestat;
         if (!publish->ct || publish->ct != cv->ct){
             cachestat_save_pid_values(publish, cv);
             local_pid->thread_collecting |= 1<<EBPF_MODULE_CACHESTAT_IDX;
             local_pid->not_updated = 0;
-        }/* else if (++local_pid->not_updated >= max_period) {
-            ebpf_release_and_unlink_pid_stat(local_pid, fd, key, EBPF_MODULE_CACHESTAT_IDX);
-        } */
+        } else if (++local_pid->not_updated >= max_period) {
+            ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_CACHESTAT_IDX);
+        }
 
 end_cachestat_loop:
         // We are cleaning to avoid passing data read from one process to other.
@@ -762,7 +763,7 @@ static void ebpf_update_cachestat_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
             netdata_cachestat_pid_t *out = &pids->cachestat;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_address(pid, 0, NULL, 0);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, 0);
             if (local_pid) {
                 netdata_publish_cachestat_t *in = &local_pid->cachestat;
 
@@ -789,7 +790,7 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
     netdata_cachestat_pid_t *dst = &publish->current;
     while (root) {
         uint32_t pid = root->pid;
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_address(pid, 0, NULL, 0);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, 0);
         if (local_pid) {
             netdata_publish_cachestat_t *w = &local_pid->cachestat;
             netdata_cachestat_pid_t *src = &w->current;
