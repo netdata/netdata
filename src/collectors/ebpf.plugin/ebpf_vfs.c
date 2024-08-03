@@ -1047,7 +1047,7 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_tar
 
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_and_link(pid, 0, NULL);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, 0);
         if (local_pid) {
             netdata_publish_vfs_t *w = &local_pid->vfs;
             accumulator.write_call += w->write_call;
@@ -1239,17 +1239,14 @@ static void ebpf_vfs_read_apps(int maps_per_core, int max_period)
 
         vfs_apps_accumulator(vv, maps_per_core);
 
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_and_link(key, vv->tgid, vv->name);
-        if (!local_pid)
-            goto end_vfs_loop;
-
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, vv->tgid, vv->name, strlen(vv->name));
         netdata_publish_vfs_t *publish = &local_pid->vfs;
         if (!publish->ct || publish->ct != vv->ct) {
             memcpy(publish, vv, sizeof(netdata_publish_vfs_t));
             local_pid->thread_collecting |= 1<<EBPF_MODULE_VFS_IDX;
             local_pid->not_updated = 0;
         } else if (++local_pid->not_updated >= max_period){
-            ebpf_release_and_unlink_pid_stat(local_pid, fd, key, EBPF_MODULE_VFS_IDX);
+            ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_VFS_IDX);
         }
 
 end_vfs_loop:
@@ -1275,7 +1272,7 @@ static void read_update_vfs_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_vfs_t *out = &pids->vfs;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_and_link(pid, 0, NULL);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, 0);
             if (local_pid) {
                 netdata_publish_vfs_t *in = &local_pid->vfs;
 

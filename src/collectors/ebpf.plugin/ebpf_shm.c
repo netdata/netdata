@@ -552,7 +552,7 @@ static void ebpf_update_shm_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_shm_t *out = &pids->shm;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_and_link(pid, 0, NULL);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, 0);
             if (local_pid) {
                 netdata_publish_shm_t *in = &local_pid->shm;
 
@@ -586,17 +586,14 @@ static void ebpf_read_shm_apps_table(int maps_per_core, int max_period)
 
         shm_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_and_link(key, cv->tgid, cv->name);
-        if (!local_pid)
-            goto end_shm_loop;
-
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, strlen(cv->name));
         netdata_publish_shm_t *publish = &local_pid->shm;
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, &cv[0], sizeof(netdata_publish_shm_t));
             local_pid->thread_collecting |= 1<<EBPF_MODULE_SHM_IDX;
             local_pid->not_updated = 0;
         } else if (++local_pid->not_updated >= max_period){
-            ebpf_release_and_unlink_pid_stat(local_pid, fd, key, EBPF_MODULE_SHM_IDX);
+            ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_SHM_IDX);
         }
 
 end_shm_loop:
@@ -666,7 +663,7 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_tar
     memset(shm, 0, sizeof(netdata_publish_shm_t));
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_and_link(pid, 0, NULL);
+        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, 0);
         if (pid_stat) {
             netdata_publish_shm_t *w = &pid_stat->shm;
             shm->get += w->get;
