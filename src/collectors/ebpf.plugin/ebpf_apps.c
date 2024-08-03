@@ -335,6 +335,7 @@ int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **a
 struct ebpf_pid_stat **ebpf_all_pids = NULL;    // to avoid allocations, we pre-allocate the entire pid space.
 struct ebpf_pid_stat *ebpf_vector_pids = NULL; //
 struct ebpf_pid_stat *ebpf_root_of_pids = NULL; // global list of all processes running
+ebpf_pid_data_t *ebpf_pids = NULL;
 
 size_t ebpf_all_pids_count = 0; // the number of processes running
 
