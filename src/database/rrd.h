@@ -1310,11 +1310,9 @@ struct rrdhost {
     nd_uuid_t  host_uuid;                              // Global GUID for this host
     nd_uuid_t  node_id;                                // Cloud node_id
 
-    netdata_mutex_t aclk_state_lock;
-    aclk_rrdhost_state aclk_state;
-
     struct {
-        nd_uuid_t claim_id_of_parent;
+        ND_UUID claim_id_of_origin;
+        ND_UUID claim_id_of_parent;
     } aclk;
 
     struct rrdhost *next;
@@ -1329,9 +1327,6 @@ extern RRDHOST *localhost;
 #define rrdhost_abbrev_timezone(host) string2str((host)->abbrev_timezone)
 #define rrdhost_program_name(host) string2str((host)->program_name)
 #define rrdhost_program_version(host) string2str((host)->program_version)
-
-#define rrdhost_aclk_state_lock(host) netdata_mutex_lock(&((host)->aclk_state_lock))
-#define rrdhost_aclk_state_unlock(host) netdata_mutex_unlock(&((host)->aclk_state_lock))
 
 #define rrdhost_receiver_replicating_charts(host) (__atomic_load_n(&((host)->rrdpush_receiver_replicating_charts), __ATOMIC_RELAXED))
 #define rrdhost_receiver_replicating_charts_plus_one(host) (__atomic_add_fetch(&((host)->rrdpush_receiver_replicating_charts), 1, __ATOMIC_RELAXED))

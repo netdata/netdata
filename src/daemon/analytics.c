@@ -524,9 +524,7 @@ void analytics_gather_mutable_meta_data(void)
     analytics_set_data(
         &analytics_data.netdata_config_is_parent, (rrdhost_hosts_available() > 1 || configured_as_parent()) ? "true" : "false");
 
-    char *claim_id = aclk_get_claimed_id();
-    analytics_set_data(&analytics_data.netdata_host_agent_claimed, claim_id ? "true" : "false");
-    freez(claim_id);
+    analytics_set_data(&analytics_data.netdata_host_agent_claimed, is_agent_claimed() ? "true" : "false");
 
     {
         char b[21];

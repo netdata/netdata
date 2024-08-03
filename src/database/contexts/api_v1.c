@@ -409,7 +409,8 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
     buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
     buffer_json_member_add_string(wb, "machine_guid", host->machine_guid);
     buffer_json_member_add_string(wb, "node_id", node_uuid);
-    buffer_json_member_add_string(wb, "claim_id", host->aclk_state.claimed_id ? host->aclk_state.claimed_id : "");
+    CLAIM_ID claim_id = rrdhost_claim_id_get(host);
+    buffer_json_member_add_string(wb, "claim_id", claim_id.str);
 
     if(options & RRDCONTEXT_OPTION_SHOW_LABELS) {
         buffer_json_member_add_object(wb, "host_labels");

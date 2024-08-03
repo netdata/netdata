@@ -973,9 +973,9 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
 
                 worker_is_busy(WORKER_JOB_QUEUED);
                 usec_t dispatch_ut = rrdcontext_calculate_queued_dispatch_time_ut(rc, now_ut);
-                char *claim_id = aclk_get_claimed_id();
+                CLAIM_ID claim_id = claim_id_get();
 
-                if(unlikely(now_ut >= dispatch_ut) && claim_id) {
+                if(unlikely(now_ut >= dispatch_ut) && claim_id_is_set(claim_id)) {
                     worker_is_busy(WORKER_JOB_CHECK);
 
                     rrdcontext_lock(rc);
@@ -988,7 +988,7 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
                             char uuid[UUID_STR_LEN];
                             uuid_unparse_lower(host->node_id, uuid);
 
-                            bundle = contexts_updated_new(claim_id, uuid, 0, now_ut);
+                            bundle = contexts_updated_new(claim_id.str, uuid, 0, now_ut);
                         }
                         // update the hub data of the context, give a new version, pack the message
                         // and save an update to SQL
@@ -1026,7 +1026,6 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
                     else
                         rrdcontext_unlock(rc);
                 }
-                freez(claim_id);
             }
     dfe_done(rc);
 

@@ -4,6 +4,7 @@
 #define NETDATA_CLAIM_H 1
 
 #include "daemon/common.h"
+#include "claim_id.h"
 
 typedef enum __attribute__((packed)) {
     CLOUD_STATUS_AVAILABLE = 1,     // cloud and aclk functionality is available, but the agent is not claimed
@@ -33,7 +34,6 @@ bool claim_agent_automatically(void);
 bool claimed_id_save_to_file(const char *claimed_id_str);
 
 bool is_agent_claimed(void);
-char *aclk_get_claimed_id(void);
 bool aclk_matches_claimed_id(const char *claim_id);
 bool load_claiming_state(void);
 void cloud_conf_load(int silent);

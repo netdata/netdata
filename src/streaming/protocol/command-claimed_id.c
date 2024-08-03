@@ -14,18 +14,20 @@ PARSER_RC rrdpush_receiver_pluginsd_claimed_id(char **words, size_t num_words, P
         return PARSER_RC_ERROR;
     }
 
-    nd_uuid_t uuid;
     RRDHOST *host = parser->user.host;
 
-    // We don't need the parsed UUID
-    // just do it to check the format
-    if(uuid_parse(machine_guid_str, uuid)) {
+    nd_uuid_t machine_uuid;
+    if(uuid_parse(machine_guid_str, machine_uuid)) {
         netdata_log_error("PLUGINSD: parameter machine guid to CLAIMED_ID command is not valid UUID. "
                           "Received: '%s'.", machine_guid_str);
         return PARSER_RC_ERROR;
     }
 
-    if(uuid_parse(claim_id_str, uuid) && strcmp(claim_id_str, "NULL") != 0) {
+    nd_uuid_t claim_uuid;
+    if(strcmp(claim_id_str, "NULL") == 0)
+        uuid_clear(claim_uuid);
+
+    else if(uuid_parse(claim_id_str, claim_uuid) != 0) {
         netdata_log_error("PLUGINSD: parameter claim id to CLAIMED_ID command is not valid UUID. "
                           "Received: '%s'.", claim_id_str);
         return PARSER_RC_ERROR;
@@ -37,18 +39,16 @@ PARSER_RC rrdpush_receiver_pluginsd_claimed_id(char **words, size_t num_words, P
         return PARSER_RC_OK; //the message is OK problem must be somewhere else
     }
 
-    rrdhost_aclk_state_lock(host);
+    if(host == localhost) {
+        netdata_log_error("PLUGINSD: CLAIMED_ID command cannot be used to set the claimed id of localhost. "
+                          "Received: '%s'.", claim_id_str);
+        return PARSER_RC_OK;
+    }
 
-    if (host->aclk_state.claimed_id)
-        freez(host->aclk_state.claimed_id);
-
-    host->aclk_state.claimed_id = strcmp(claim_id_str, "NULL") ? strdupz(claim_id_str) : NULL;
-
-    rrdhost_aclk_state_unlock(host);
-
-    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID | RRDHOST_FLAG_METADATA_UPDATE);
-
-    rrdpush_sender_send_claimed_id(host);
+    if(!uuid_is_null(claim_uuid)) {
+        uuid_copy(host->aclk.claim_id_of_origin.uuid, claim_uuid);
+        rrdpush_sender_send_claimed_id(host);
+    }
 
     return PARSER_RC_OK;
 }
@@ -61,13 +61,17 @@ void rrdpush_sender_send_claimed_id(RRDHOST *host) {
         return;
 
     BUFFER *wb = sender_start(host->sender);
-    rrdhost_aclk_state_lock(host);
+
+    char str[UUID_STR_LEN] = "";
+    ND_UUID uuid = host->aclk.claim_id_of_origin;
+    if(!UUIDeq(uuid, UUID_ZERO))
+        uuid_unparse_lower(uuid.uuid, str);
+    else
+        strncpyz(str, "NULL", sizeof(str) - 1);
 
     buffer_sprintf(wb, PLUGINSD_KEYWORD_CLAIMED_ID " '%s' '%s'\n",
-                   host->machine_guid,
-                   (host->aclk_state.claimed_id ? host->aclk_state.claimed_id : "NULL") );
+                   host->machine_guid, str);
 
-    rrdhost_aclk_state_unlock(host);
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 
     sender_thread_buffer_free();

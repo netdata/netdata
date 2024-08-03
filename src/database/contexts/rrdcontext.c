@@ -198,21 +198,16 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
 // ----------------------------------------------------------------------------
 // ACLK interface
 
-static bool rrdhost_check_our_claim_id(const char *claim_id) {
-    if(!localhost->aclk_state.claimed_id) return false;
-    return (strcasecmp(claim_id, localhost->aclk_state.claimed_id) == 0) ? true : false;
-}
-
 void rrdcontext_hub_checkpoint_command(void *ptr) {
     struct ctxs_checkpoint *cmd = ptr;
 
-    if(!rrdhost_check_our_claim_id(cmd->claim_id)) {
+    if(!aclk_matches_claimed_id(cmd->claim_id)) {
+        CLAIM_ID claim_id = claim_id_get();
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received checkpoint command for claim_id '%s', node id '%s', "
                "but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
                cmd->claim_id, cmd->node_id,
-               localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
-               cmd->claim_id);
+               claim_id.str, cmd->claim_id);
 
         return;
     }
@@ -278,13 +273,13 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 void rrdcontext_hub_stop_streaming_command(void *ptr) {
     struct stop_streaming_ctxs *cmd = ptr;
 
-    if(!rrdhost_check_our_claim_id(cmd->claim_id)) {
+    if(!aclk_matches_claimed_id(cmd->claim_id)) {
+        CLAIM_ID claim_id = claim_id_get();
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received stop streaming command for claim_id '%s', node id '%s', "
                "but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
                cmd->claim_id, cmd->node_id,
-               localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
-               cmd->claim_id);
+               claim_id.str, cmd->claim_id);
 
         return;
     }

@@ -157,14 +157,13 @@ biofailed:
 static int wait_till_agent_claimed(void)
 {
     //TODO prevent malloc and freez
-    char *agent_id = aclk_get_claimed_id();
-    while (likely(!agent_id)) {
+    ND_UUID uuid = claim_id_get_uuid();
+    while (likely(UUIDiszero(uuid))) {
         sleep_usec(USEC_PER_SEC * 1);
         if (!service_running(SERVICE_ACLK))
             return 1;
-        agent_id = aclk_get_claimed_id();
+        uuid = claim_id_get_uuid();
     }
-    freez(agent_id);
     return 0;
 }
 
@@ -903,15 +902,17 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
             // node_id not found
             aclk_query_t create_query;
             create_query = aclk_query_new(REGISTER_NODE);
-            rrdhost_aclk_state_lock(localhost);
+            CLAIM_ID claim_id = claim_id_get();
+
             node_instance_creation_t node_instance_creation = {
-                .claim_id = localhost->aclk_state.claimed_id,
+                .claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL,
                 .hops = host->system_info->hops,
                 .hostname = rrdhost_hostname(host),
                 .machine_guid = host->machine_guid};
+
             create_query->data.bin_payload.payload =
                 generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
-            rrdhost_aclk_state_unlock(localhost);
+
             create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
             create_query->data.bin_payload.msg_name = "CreateNodeInstance";
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -934,10 +935,9 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 
     node_state_update.capabilities = aclk_get_agent_capas();
 
-    rrdhost_aclk_state_lock(localhost);
-    node_state_update.claim_id = localhost->aclk_state.claimed_id;
+    CLAIM_ID claim_id = claim_id_get();
+    node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
     query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-    rrdhost_aclk_state_unlock(localhost);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "Queuing status update for node=%s, live=%d, hops=%u, queryable=%d",
@@ -979,10 +979,9 @@ void aclk_send_node_instances()
             }
             node_state_update.capabilities = aclk_get_node_instance_capas(host);
 
-            rrdhost_aclk_state_lock(localhost);
-            node_state_update.claim_id = localhost->aclk_state.claimed_id;
+            CLAIM_ID claim_id = claim_id_get();
+            node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
             query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-            rrdhost_aclk_state_unlock(localhost);
 
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "Queuing status update for node=%s, live=%d, hops=%d, queryable=1",
@@ -1004,10 +1003,10 @@ void aclk_send_node_instances()
             uuid_unparse_lower(list->host_id, (char*)node_instance_creation.machine_guid);
             create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
             create_query->data.bin_payload.msg_name = "CreateNodeInstance";
-            rrdhost_aclk_state_lock(localhost);
-            node_instance_creation.claim_id = localhost->aclk_state.claimed_id,
+
+            CLAIM_ID claim_id = claim_id_get();
+            node_instance_creation.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL,
             create_query->data.bin_payload.payload = generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
-            rrdhost_aclk_state_unlock(localhost);
 
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "Queuing registration for host=%s, hops=%d",
@@ -1059,13 +1058,12 @@ char *aclk_state(void)
     );
     buffer_sprintf(wb, "Protocol Used: Protobuf\nMQTT Version: %d\nClaimed: ", 5);
 
-    char *agent_id = aclk_get_claimed_id();
-    if (agent_id == NULL)
+    CLAIM_ID claim_id = claim_id_get();
+    if (!claim_id_is_set(claim_id))
         buffer_strcat(wb, "No\n");
     else {
         const char *cloud_base_url = cloud_config_url_get();
-        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\n", agent_id, cloud_base_url ? cloud_base_url : "null");
-        freez(agent_id);
+        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null");
     }
 
     buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_connected ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
@@ -1099,17 +1097,15 @@ char *aclk_state(void)
             buffer_sprintf(wb, "\n\n> Node Instance for mGUID: \"%s\" hostname \"%s\"\n", host->machine_guid, rrdhost_hostname(host));
 
             buffer_strcat(wb, "\tClaimed ID: ");
-            rrdhost_aclk_state_lock(host);
-            if (host->aclk_state.claimed_id)
-                buffer_strcat(wb, host->aclk_state.claimed_id);
+            claim_id = rrdhost_claim_id_get(host);
+            if(claim_id_is_set(claim_id))
+                buffer_strcat(wb, claim_id.str);
             else
                 buffer_strcat(wb, "null");
-            rrdhost_aclk_state_unlock(host);
 
-
-            if (uuid_is_null(host->node_id)) {
+            if (uuid_is_null(host->node_id))
                 buffer_strcat(wb, "\n\tNode ID: null\n");
-            } else {
+            else {
                 char node_id[GUID_LEN + 1];
                 uuid_unparse_lower(host->node_id, node_id);
                 buffer_sprintf(wb, "\n\tNode ID: %s\n", node_id);
@@ -1176,14 +1172,13 @@ char *aclk_state_json(void)
     json_object_array_add(grp, tmp);
     json_object_object_add(msg, "protocols-supported", grp);
 
-    char *agent_id = aclk_get_claimed_id();
-    tmp = json_object_new_boolean(agent_id != NULL);
+    CLAIM_ID claim_id = claim_id_get();
+    tmp = json_object_new_boolean(claim_id_is_set(claim_id));
     json_object_object_add(msg, "agent-claimed", tmp);
 
-    if (agent_id) {
-        tmp = json_object_new_string(agent_id);
-        freez(agent_id);
-    } else
+    if (claim_id_is_set(claim_id))
+        tmp = json_object_new_string(claim_id.str);
+    else
         tmp = NULL;
     json_object_object_add(msg, "claimed-id", tmp);
 
@@ -1234,13 +1229,12 @@ char *aclk_state_json(void)
         tmp = json_object_new_string(host->machine_guid);
         json_object_object_add(nodeinstance, "mguid", tmp);
 
-        rrdhost_aclk_state_lock(host);
-        if (host->aclk_state.claimed_id) {
-            tmp = json_object_new_string(host->aclk_state.claimed_id);
+        claim_id = rrdhost_claim_id_get(host);
+        if(claim_id_is_set(claim_id)) {
+            tmp = json_object_new_string(claim_id.str);
             json_object_object_add(nodeinstance, "claimed_id", tmp);
         } else
             json_object_object_add(nodeinstance, "claimed_id", NULL);
-        rrdhost_aclk_state_unlock(host);
 
         if (uuid_is_null(host->node_id)) {
             json_object_object_add(nodeinstance, "node-id", NULL);

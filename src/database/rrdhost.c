@@ -381,7 +381,6 @@ static RRDHOST *rrdhost_create(
     host->rrd_history_entries        = align_entries_to_pagesize(memory_mode, entries);
     host->health.health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
-    netdata_mutex_init(&host->aclk_state_lock);
     spinlock_init(&host->receiver_lock);
 
     if (likely(!archived)) {
@@ -1273,9 +1272,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     // ------------------------------------------------------------------------
     // free it
 
-    pthread_mutex_destroy(&host->aclk_state_lock);
-    freez(host->aclk_state.claimed_id);
-    freez(host->aclk_state.prev_claimed_id);
     rrdlabels_destroy(host->rrdlabels);
     string_freez(host->os);
     string_freez(host->timezone);

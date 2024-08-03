@@ -30,16 +30,18 @@ static void build_node_collectors(RRDHOST *host)
     struct update_node_collectors upd_node_collectors;
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
+    CLAIM_ID claim_id = claim_id_get();
     upd_node_collectors.node_id = wc->node_id;
-    upd_node_collectors.claim_id = aclk_get_claimed_id();
+    upd_node_collectors.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
 
     upd_node_collectors.node_collectors = collectors_from_charts(host, dict);
     aclk_update_node_collectors(&upd_node_collectors);
 
     dictionary_destroy(dict);
-    freez(upd_node_collectors.claim_id);
 
-    nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK RES [%s (%s)]: NODE COLLECTORS SENT", wc->node_id, rrdhost_hostname(host));
+    nd_log(NDLS_ACCESS, NDLP_DEBUG,
+           "ACLK RES [%s (%s)]: NODE COLLECTORS SENT",
+           wc->node_id, rrdhost_hostname(host));
 }
 
 static void build_node_info(RRDHOST *host)
@@ -48,9 +50,11 @@ static void build_node_info(RRDHOST *host)
 
     struct aclk_sync_cfg_t *wc = host->aclk_config;
 
+    CLAIM_ID claim_id = claim_id_get();
+
     rrd_rdlock();
     node_info.node_id = wc->node_id;
-    node_info.claim_id = aclk_get_claimed_id();
+    node_info.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
     node_info.machine_guid = host->machine_guid;
     node_info.child = (host != localhost);
     node_info.ml_info.ml_capable = ml_capable();
@@ -106,7 +110,6 @@ static void build_node_info(RRDHOST *host)
         host == localhost ? "parent" : "child");
 
     rrd_rdunlock();
-    freez(node_info.claim_id);
     freez(node_info.node_instance_capabilities);
     freez(host_version);
 

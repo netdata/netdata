@@ -488,16 +488,15 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     unsigned char *challenge = NULL;
     int challenge_bytes;
 
-    char *agent_id = aclk_get_claimed_id();
-    if (agent_id == NULL) {
+    CLAIM_ID claim_id = claim_id_get();
+    if (!claim_id_is_set(claim_id)) {
         netdata_log_error("Agent was not claimed - cannot perform challenge/response");
         return 1;
     }
 
     // Get Challenge
-    if (aclk_get_otp_challenge(target, agent_id, &challenge, &challenge_bytes)) {
+    if (aclk_get_otp_challenge(target, claim_id.str, &challenge, &challenge_bytes)) {
         netdata_log_error("Error getting challenge");
-        freez(agent_id);
         return 1;
     }
 
@@ -508,17 +507,15 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
         netdata_log_error("Couldn't decrypt the challenge received");
         freez(response_plaintext);
         freez(challenge);
-        freez(agent_id);
         return 1;
     }
     freez(challenge);
 
     // Encode and Send Challenge
     struct auth_data data = { .client_id = NULL, .passwd = NULL, .username = NULL };
-    if (aclk_send_otp_response(agent_id, response_plaintext, response_plaintext_bytes, target, &data)) {
+    if (aclk_send_otp_response(claim_id.str, response_plaintext, response_plaintext_bytes, target, &data)) {
         netdata_log_error("Error getting response");
         freez(response_plaintext);
-        freez(agent_id);
         return 1;
     }
 
@@ -527,7 +524,6 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     *mqtt_id = data.client_id;
 
     freez(response_plaintext);
-    freez(agent_id);
     return 0;
 }
 
@@ -831,17 +827,14 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
 
     req.request_type = HTTP_REQ_GET;
 
-    char *agent_id = aclk_get_claimed_id();
-    if (agent_id == NULL)
-    {
+    CLAIM_ID claim_id = claim_id_get();
+    if (!claim_id_is_set(claim_id)) {
         netdata_log_error("Agent was not claimed - cannot perform challenge/response");
         buffer_free(buf);
         return 1;
     }
 
-    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=proto,ctx&claim_id=%s", &(NETDATA_VERSION[1]) /* skip 'v' at beginning */, agent_id);
-
-    freez(agent_id);
+    buffer_sprintf(buf, "/api/v1/env?v=%s&cap=proto,ctx&claim_id=%s", &(NETDATA_VERSION[1]) /* skip 'v' at beginning */, claim_id.str);
 
     req.host = (char*)aclk_hostname;
     req.port = aclk_port;

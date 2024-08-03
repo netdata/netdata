@@ -423,17 +423,15 @@ void health_alarm_log_populate(
 
 static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
 {
+    CLAIM_ID claim_id = claim_id_get();
 
-    char *claim_id = aclk_get_claimed_id();
-    if (!claim_id || uuid_is_null(host->node_id))
+    if (!claim_id_is_set(claim_id) || uuid_is_null(host->node_id))
         return;
 
     sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_PUSH, &res)) {
-        freez(claim_id);
+    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_PUSH, &res))
         return;
-    }
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
@@ -443,7 +441,7 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
 
     struct alarm_log_entry alarm_log;
     alarm_log.node_id = node_id_str;
-    alarm_log.claim_id = claim_id;
+    alarm_log.claim_id = claim_id.str;
 
     int64_t first_id = 0;
     int64_t last_id = 0;
@@ -483,8 +481,6 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
-
-    freez(claim_id);
 }
 
 #define SQL_DELETE_PROCESSED_ROWS                                                                                      \
@@ -907,16 +903,14 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
         return;
     }
 
-    char *claim_id = aclk_get_claimed_id();
-    if (unlikely(!claim_id))
+    CLAIM_ID claim_id = claim_id_get();
+    if (unlikely(!claim_id_is_set(claim_id)))
         return;
 
     // Check database for this node to see how many alerts we will need to put in the snapshot
     int cnt = calculate_alert_snapshot_entries(&host->host_uuid);
-    if (!cnt) {
-        freez(claim_id);
+    if (!cnt)
         return;
-    }
 
     sqlite3_stmt *res = NULL;
     if (!PREPARE_STATEMENT(db_meta, SQL_GET_SNAPSHOT_ENTRIES, &res))
@@ -943,13 +937,13 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     struct alarm_log_entry alarm_log;
 
     alarm_snap.node_id = wc->node_id;
-    alarm_snap.claim_id = claim_id;
+    alarm_snap.claim_id = claim_id.str;
     alarm_snap.snapshot_uuid = snapshot_uuid;
     alarm_snap.chunks = chunks;
     alarm_snap.chunk = 1;
 
     alarm_log.node_id = wc->node_id;
-    alarm_log.claim_id = claim_id;
+    alarm_log.claim_id = claim_id.str;
 
     cnt = 0;
     param = 0;
@@ -994,8 +988,6 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
-
-    freez(claim_id);
 }
 
 // Start streaming alerts
@@ -1029,23 +1021,24 @@ void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_vers
 {
     nd_uuid_t node_uuid;
 
-    if (unlikely(!node_id || !claim_id || !claimed() || uuid_parse(node_id, node_uuid)))
+    if (unlikely(!node_id || !claim_id || !is_agent_claimed() || uuid_parse(node_id, node_uuid)))
         return;
 
-    char *agent_claim_id = aclk_get_claimed_id();
-    if (claim_id && agent_claim_id && strcmp(agent_claim_id, claim_id) != 0) {
-        nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT VALIDATION REQUEST RECEIVED WITH INVALID CLAIM ID", node_id);
-        goto done;
+    CLAIM_ID agent_claim_id = claim_id_get();
+    if (claim_id && claim_id_is_set(agent_claim_id) && strcmp(agent_claim_id.str, claim_id) != 0) {
+        nd_log(NDLS_ACCESS, NDLP_NOTICE,
+               "ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT VALIDATION REQUEST RECEIVED WITH INVALID CLAIM ID",
+               node_id);
+        return;
     }
 
     struct aclk_sync_cfg_t *wc;
     RRDHOST *host = find_host_by_node_id(node_id);
 
     if ((!host || !(wc = host->aclk_config)))
-        nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT VALIDATION REQUEST RECEIVED FOR INVALID NODE", node_id);
+        nd_log(NDLS_ACCESS, NDLP_NOTICE,
+               "ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT VALIDATION REQUEST RECEIVED FOR INVALID NODE",
+               node_id);
     else
         schedule_alert_snapshot_if_needed(wc, cloud_version);
-
-done:
-    freez(agent_claim_id);
 }

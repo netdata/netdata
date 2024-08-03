@@ -5,7 +5,7 @@
 
 // the child disconnected from the parent, and it has to clear the parent's claim id
 void rrdpush_sender_clear_child_claim_id(RRDHOST *host) {
-    uuid_clear(host->aclk.claim_id_of_parent);
+    host->aclk.claim_id_of_parent = UUID_ZERO;
 }
 
 // the parent sends to the child its claim id, node id and cloud url
@@ -17,27 +17,20 @@ void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
         char node_id_str[UUID_STR_LEN] = "";
         uuid_unparse_lower(host->node_id, node_id_str);
 
-        char claim_id_str[UUID_STR_LEN] = "";
+        CLAIM_ID claim_id = claim_id_get();
 
-        if((!is_agent_claimed() || !aclk_connected) && !uuid_is_null(host->aclk.claim_id_of_parent)) {
+        if((!claim_id_is_set(claim_id) || !aclk_connected) && !UUIDiszero(host->aclk.claim_id_of_parent)) {
             // the agent is not claimed or not connected, and it has a parent claim id
             // we use it, to allow the connection flow
-            uuid_unparse_lower(host->aclk.claim_id_of_parent, claim_id_str);
-        }
-        else {
-            // the agent is claimed and connected, or there is no parent claim id
-            char *x = aclk_get_claimed_id();
-            if(x) {
-                strncpyz(claim_id_str, x, sizeof(claim_id_str) - 1);
-                freez(x);
-            }
+            claim_id.uuid = host->aclk.claim_id_of_parent;
+            uuid_unparse_lower(claim_id.uuid.uuid, claim_id.str);
         }
 
-        if(claim_id_str[0] && node_id_str[0]) {
+        if(claim_id_is_set(claim_id) && claim_id.str[0] && node_id_str[0]) {
             char buf[100];
             snprintfz(buf, sizeof(buf),
                       PLUGINSD_KEYWORD_NODE_ID " '%s' '%s' '%s'",
-                      claim_id_str, node_id_str, cloud_config_url_get());
+                      claim_id.str, node_id_str, cloud_config_url_get());
 
             send_to_plugin(buf, host->receiver);
         }
@@ -51,8 +44,8 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     char *node_id = get_word(s->line.words, s->line.num_words, 2);
     char *url = get_word(s->line.words, s->line.num_words, 3);
 
-    nd_uuid_t claim_uuid;
-    if (uuid_parse(claim_id ? claim_id : "", claim_uuid) != 0) {
+    ND_UUID claim_uuid;
+    if (uuid_parse(claim_id ? claim_id : "", claim_uuid.uuid) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s] received invalid claim id '%s'",
                rrdhost_hostname(s->host), s->connected_to,
@@ -60,8 +53,8 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
         return;
     }
 
-    nd_uuid_t node_uuid;
-    if(uuid_parse(node_id ? node_id : "", node_uuid) != 0) {
+    ND_UUID node_uuid;
+    if(uuid_parse(node_id ? node_id : "", node_uuid.uuid) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s] received an invalid node id '%s'",
                rrdhost_hostname(s->host), s->connected_to,
@@ -77,12 +70,12 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
         return;
     }
 
-    if (!uuid_is_null(s->host->aclk.claim_id_of_parent) && !uuid_eq(s->host->aclk.claim_id_of_parent, claim_uuid))
+    if (!UUIDiszero(s->host->aclk.claim_id_of_parent) && !UUIDeq(s->host->aclk.claim_id_of_parent, claim_uuid))
         nd_log(NDLS_DAEMON, NDLP_INFO,
                "STREAM %s [send to %s] changed parent's claim id to %s",
                rrdhost_hostname(s->host), s->connected_to, claim_id ? claim_id : "(unset)");
 
-    uuid_copy(s->host->aclk.claim_id_of_parent, claim_uuid);
+    s->host->aclk.claim_id_of_parent = claim_uuid;
 
     // There are some very strange corner cases here:
     //
@@ -98,7 +91,7 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
         // we are directly claimed and connected, ignore node id and cloud url
         return;
 
-    uuid_copy(s->host->node_id, node_uuid);
+    uuid_copy(s->host->node_id, node_uuid.uuid);
 
     // we change the URL, to allow the agent dashboard to work with Netdata Cloud on-prem, if any.
     cloud_config_url_set(url);

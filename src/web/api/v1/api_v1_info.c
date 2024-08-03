@@ -43,9 +43,8 @@ static inline void web_client_api_request_v1_info_mirrored_hosts_status(BUFFER *
 
     buffer_json_member_add_string(wb, "guid", host->machine_guid);
     buffer_json_member_add_uuid(wb, "node_id", &host->node_id);
-    rrdhost_aclk_state_lock(host);
-    buffer_json_member_add_string(wb, "claim_id", host->aclk_state.claimed_id);
-    rrdhost_aclk_state_unlock(host);
+    CLAIM_ID claim_id = rrdhost_claim_id_get(host);
+    buffer_json_member_add_string(wb, "claim_id", claim_id_is_set(claim_id) ? claim_id.str : NULL);
 
     buffer_json_object_close(wb);
 }
@@ -154,11 +153,7 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_json_member_add_boolean(wb, "cloud-enabled", true);
     buffer_json_member_add_boolean(wb, "cloud-available", true);
-
-    char *agent_id = aclk_get_claimed_id();
-    buffer_json_member_add_boolean(wb, "agent-claimed", agent_id != NULL);
-    freez(agent_id);
-
+    buffer_json_member_add_boolean(wb, "agent-claimed", is_agent_claimed());
     buffer_json_member_add_boolean(wb, "aclk-available", aclk_connected);
 
     buffer_json_member_add_string(wb, "memory-mode", rrd_memory_mode_name(host->rrd_memory_mode));

@@ -1929,10 +1929,10 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_CLAIMID))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_CLAIMID);
-            nd_uuid_t uuid;
             int rc;
-            if (likely(host->aclk_state.claimed_id && !uuid_parse(host->aclk_state.claimed_id, uuid)))
-                rc = store_claim_id(&host->host_uuid, &uuid);
+            ND_UUID uuid = claim_id_get_uuid();
+            if(!UUIDiszero(uuid))
+                rc = store_claim_id(&host->host_uuid, &uuid.uuid);
             else
                 rc = store_claim_id(&host->host_uuid, NULL);
 

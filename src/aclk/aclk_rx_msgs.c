@@ -292,10 +292,9 @@ int create_node_instance_result(const char *msg, size_t msg_len)
         node_state_update.capabilities = aclk_get_node_instance_capas(host);
     }
 
-    rrdhost_aclk_state_lock(localhost);
-    node_state_update.claim_id = localhost->aclk_state.claimed_id;
+    CLAIM_ID claim_id = claim_id_get();
+    node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
     query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-    rrdhost_aclk_state_unlock(localhost);
 
     freez((void *)node_state_update.capabilities);
 

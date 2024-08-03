@@ -1258,6 +1258,8 @@ set(WEB_PLUGIN_FILES
 set(CLAIM_PLUGIN_FILES
         src/claim/claim.c
         src/claim/claim.h
+        src/claim/claim_id.c
+        src/claim/claim_id.h
         src/claim/claim-web-api.c
         src/claim/cloud-conf.c
         src/claim/claim-with-api.c

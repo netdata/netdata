@@ -54,7 +54,7 @@ bool claimed_id_save_to_file(const char *claimed_id_str) {
 static ND_UUID claimed_id_parse(const char *claimed_id, const char *source) {
     ND_UUID uuid;
 
-    if(uuid_parse(claimed_id, uuid.uuid) != 0) {
+    if(uuid_parse_flexi(claimed_id, uuid.uuid) != 0) {
         uuid = UUID_ZERO;
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "CLAIM: claimed_id '%s' (loaded from '%s'), is not a valid UUID.",
@@ -99,31 +99,17 @@ static ND_UUID claimed_id_load(void) {
 }
 
 bool is_agent_claimed(void) {
-    rrdhost_aclk_state_lock(localhost);
-    bool ret = localhost->aclk_state.claimed_id != NULL;
-    rrdhost_aclk_state_unlock(localhost);
-    return ret;
+    ND_UUID uuid = claim_id_get_uuid();
+    return !UUIDiszero(uuid);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
-/* Retrieve the claim id for the agent.
- * Caller owns the string.
-*/
-char *aclk_get_claimed_id()
-{
-    char *result;
-    rrdhost_aclk_state_lock(localhost);
-    result = (localhost->aclk_state.claimed_id == NULL) ? NULL : strdupz(localhost->aclk_state.claimed_id);
-    rrdhost_aclk_state_unlock(localhost);
-    return result;
-}
-
 bool aclk_matches_claimed_id(const char *claim_id) {
-    rrdhost_aclk_state_lock(localhost);
-    bool matches = localhost->aclk_state.claimed_id && claim_id && strcasecmp(localhost->aclk_state.claimed_id, claim_id) == 0;
-    rrdhost_aclk_state_unlock(localhost);
-    return matches;
+    ND_UUID having = claim_id_get_uuid();
+    ND_UUID this_one;
+    uuid_parse_flexi(claim_id, this_one.uuid);
+    return UUIDeq(having, this_one);
 }
 
 /* Change the claimed state of the agent.
@@ -134,14 +120,6 @@ bool aclk_matches_claimed_id(const char *claim_id) {
  * If this happens with the ACLK active under an old claim then we MUST KILL THE LINK
  */
 bool load_claiming_state(void) {
-    rrdhost_aclk_state_lock(localhost);
-    if (localhost->aclk_state.claimed_id) {
-        if (aclk_connected)
-            localhost->aclk_state.prev_claimed_id = strdupz(localhost->aclk_state.claimed_id);
-        freez(localhost->aclk_state.claimed_id);
-        localhost->aclk_state.claimed_id = NULL;
-    }
-
     if (aclk_connected) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "CLAIM: agent was already connected to NC - forcing reconnection under new credentials");
@@ -159,12 +137,10 @@ bool load_claiming_state(void) {
     bool have_claimed_id = false;
     if(!UUIDeq(uuid, UUID_ZERO)) {
         // we go it somehow
-        localhost->aclk_state.claimed_id = mallocz(UUID_STR_LEN);
-        uuid_unparse_lower(uuid.uuid, localhost->aclk_state.claimed_id);
+        claim_id_set(uuid);
         have_claimed_id = true;
     }
 
-    rrdhost_aclk_state_unlock(localhost);
     invalidate_node_instances(&localhost->host_uuid, have_claimed_id ? &uuid.uuid : NULL);
     metaqueue_store_claim_id(&localhost->host_uuid, have_claimed_id ? &uuid.uuid : NULL);
 

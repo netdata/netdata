@@ -174,11 +174,9 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w, bool do_not
         if(!uuid_is_null(localhost->node_id))
             buffer_json_member_add_uuid(w->response.data, "node_id", &localhost->node_id);
 
-        char *claim_id = aclk_get_claimed_id();
-        if (claim_id) {
-            buffer_json_member_add_string(w->response.data, "claim_id", claim_id);
-            freez(claim_id);
-        }
+        CLAIM_ID claim_id = claim_id_get();
+        if (claim_id_is_set(claim_id))
+            buffer_json_member_add_string(w->response.data, "claim_id", claim_id.str);
 
         buffer_json_member_add_boolean(w->response.data, "bearer_protection", netdata_is_protected_by_bearer);
     }

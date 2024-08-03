@@ -15,11 +15,6 @@ static inline int uuid_parse_fix(char *in, nd_uuid_t uuid)
     return uuid_parse(in, uuid);
 }
 
-static inline int claimed()
-{
-    return localhost->aclk_state.claimed_id != NULL;
-}
-
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
     ACLK_DATABASE_NODE_STATE,
