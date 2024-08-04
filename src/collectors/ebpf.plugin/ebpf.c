@@ -4065,10 +4065,13 @@ int main(int argc, char **argv)
             pthread_mutex_lock(&lock);
             if (collect_pids) {
                 pthread_mutex_lock(&collect_data_mutex);
+                ebpf_read_proc_filesystem();
+                /*
                 if (collect_pids & (1<<EBPF_MODULE_PROCESS_IDX)) {
                     ebpf_cleanup_exited_pids(max_period);
                     collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
                 }
+                 */
 
                 ebpf_create_apps_charts(apps_groups_root_target);
                 pthread_mutex_unlock(&collect_data_mutex);
