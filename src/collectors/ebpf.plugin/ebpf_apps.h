@@ -112,14 +112,20 @@ extern struct ebpf_target *apps_groups_default_target;
 extern struct ebpf_target *apps_groups_root_target;
 extern struct ebpf_target *users_root_target;
 extern struct ebpf_target *groups_root_target;
+extern uint64_t collect_pids;
 
 typedef struct ebpf_pid_data {
     uint32_t pid;
     uint32_t ppid;
     uint64_t thread_collecting;
+
     char comm[EBPF_MAX_COMPARE_NAME + 1];
+    char name[EBPF_MAX_NAME + 1];
+    char clean_name[EBPF_MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
+    char *cmdline;
 
     uint32_t not_updated;
+    uint32_t log_thrown;
 
     // each process gets a unique number
     netdata_publish_cachestat_t cachestat;
@@ -130,17 +136,18 @@ typedef struct ebpf_pid_data {
     netdata_publish_swap_t swap;
     ebpf_socket_publish_apps_t socket;
     netdata_publish_vfs_t vfs;
+
+    struct ebpf_target *target; // the one that will be reported to netdata
 } ebpf_pid_data_t;
 
 extern ebpf_pid_data_t *ebpf_pids;
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, size_t length) {
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
-    if ((ptr->pid == pid && ptr->ppid == tgid) || (!name))
+    if (ptr->pid == pid)
         return ptr;
 
-    memset(ptr, 0, sizeof(ebpf_pid_data_t));
-    if (length)
-        memcpy(ptr->comm, name, length);
+    if (name)
+        strncpyz(ptr->comm, name, EBPF_MAX_COMPARE_NAME);
 
     ptr->pid = pid;
     ptr->ppid = tgid;
@@ -152,6 +159,10 @@ static inline void ebpf_release_pid_data(ebpf_pid_data_t *eps, int fd, uint32_t 
 {
     bpf_map_delete_elem(fd, &key);
     eps->thread_collecting &= ~(1<<idx);
+    if (!eps->thread_collecting) {
+        freez(eps->cmdline);
+        memset(eps, 0, sizeof(ebpf_pid_data_t));
+    }
     /*
     if (!eps->thread_collecting)
         ebpf_del_pid_entry((pid_t)key);
@@ -310,6 +321,7 @@ netdata_publish_shm_t *ebpf_shm_stat_get(void);
 void ebpf_shm_release(netdata_publish_shm_t *stat);
 void ebpf_cleanup_exited_pids(int max);
 void ebpf_del_pid_entry(pid_t pid);
+void ebpf_read_proc_filesystem();
 
 // ARAL Section end
 

@@ -400,7 +400,7 @@ static inline void debug_log_dummy(void)
  *
  * @return It returns the status value.
  */
-static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
+static inline int managed_log(ebpf_pid_data_t *p, uint32_t log, int status)
 {
     if (unlikely(!status)) {
         // netdata_log_error("command failed log %u, errno %d", log, errno);
@@ -502,7 +502,7 @@ ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid, pid_t tgid)
  *
  * @param p the pid_stat structure to assign for a target.
  */
-static inline void assign_target_to_pid(struct ebpf_pid_stat *p)
+static inline void assign_target_to_pid(ebpf_pid_data_t *p)
 {
     targets_assignment_counter++;
 
@@ -566,8 +566,10 @@ ebpf_pid_stat_t *ebpf_get_pid_and_link(pid_t pid, pid_t tgid, char *name)
 
     strncpyz(pe->comm, name, sizeof(pe->comm) -1);
 
+    /*
     if (!pe->target)
         assign_target_to_pid(pe);
+        */
 
     return pe;
 }
@@ -602,18 +604,15 @@ void ebpf_release_and_unlink_pid_stat(ebpf_pid_stat_t *eps, int fd, uint32_t key
  *
  * @return It returns 1 on success and 0 otherwise.
  */
-static inline int read_proc_pid_cmdline(struct ebpf_pid_stat *p)
+static inline int read_proc_pid_cmdline(ebpf_pid_data_t *p)
 {
     static char cmdline[MAX_CMDLINE + 1];
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
 
     int ret = 0;
-    if (unlikely(!p->cmdline_filename)) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
-        p->cmdline_filename = strdupz(filename);
-    }
 
-    int fd = open(p->cmdline_filename, procfile_open_flags, 0666);
+    int fd = open(filename, procfile_open_flags, 0666);
     if (unlikely(fd == -1))
         goto cleanup;
 
@@ -629,7 +628,7 @@ static inline int read_proc_pid_cmdline(struct ebpf_pid_stat *p)
             cmdline[i] = ' ';
     }
 
-    debug_log("Read file '%s' contents: %s", p->cmdline_filename, p->cmdline);
+    debug_log("Read file '%s' contents: %s", filename, p->cmdline);
 
     ret = 1;
 
@@ -639,11 +638,13 @@ cleanup:
         freez(p->cmdline);
     p->cmdline = strdupz(p->comm);
 
-    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
-    if (pid_ptr)
-        pid_ptr->cmdline = p->cmdline;
-    rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+    if (collect_pids & EBPF_MODULE_SOCKET_IDX) {
+        rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
+        if (pid_ptr)
+            pid_ptr->cmdline = p->cmdline;
+        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+    }
 
     return ret;
 }
@@ -655,42 +656,33 @@ cleanup:
  * @param p the pid stat structure to store the data.
  * @param ptr an useless argument.
  */
-static inline int read_proc_pid_stat(struct ebpf_pid_stat *p, void *ptr)
+static inline int read_proc_pid_stat(ebpf_pid_data_t *p, void *ptr)
 {
     UNUSED(ptr);
 
-    static procfile *ff = NULL;
+    procfile *ff;
 
-    if (unlikely(!p->stat_filename)) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", netdata_configured_host_prefix, p->pid);
-        p->stat_filename = strdupz(filename);
-    }
-
-    int set_quotes = (!ff) ? 1 : 0;
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", netdata_configured_host_prefix, p->pid);
 
     struct stat statbuf;
-    if (stat(p->stat_filename, &statbuf))
+    if (stat(filename, &statbuf))
         return 0;
 
-    ff = procfile_reopen(ff, p->stat_filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+    ff = procfile_open(filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
     if (unlikely(!ff))
         return 0;
 
-    if (unlikely(set_quotes))
-        procfile_set_open_close(ff, "(", ")");
+    procfile_set_open_close(ff, "(", ")");
 
     ff = procfile_readall(ff);
     if (unlikely(!ff))
         return 0;
 
-    p->last_stat_collected_usec = p->stat_collected_usec;
-    p->stat_collected_usec = now_monotonic_usec();
-    calls_counter++;
-
     char *comm = procfile_lineword(ff, 0, 1);
     p->ppid = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
 
+    read_proc_pid_cmdline(p);
     if (strcmp(p->comm, comm) != 0) {
         if (unlikely(debug_enabled)) {
             if (p->comm[0])
@@ -701,18 +693,15 @@ static inline int read_proc_pid_stat(struct ebpf_pid_stat *p, void *ptr)
 
         strncpyz(p->comm, comm, EBPF_MAX_COMPARE_NAME);
 
-        // /proc/<pid>/cmdline
-        if (likely(proc_pid_cmdline_is_needed))
-            managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
-
         assign_target_to_pid(p);
     }
 
     if (unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
         debug_log_int(
-            "READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu)",
-            netdata_configured_host_prefix, p->pid, p->comm, (p->target) ? p->target->name : "UNSET",
-            p->stat_collected_usec - p->last_stat_collected_usec);
+            "READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s'",
+            netdata_configured_host_prefix, p->pid, p->comm, (p->target) ? p->target->name : "UNSET");
+
+    procfile_close(ff);
 
     return 1;
 }
@@ -721,21 +710,20 @@ static inline int read_proc_pid_stat(struct ebpf_pid_stat *p, void *ptr)
  * Collect data for PID
  *
  * @param pid the current pid that we are working
- * @param ptr a NULL value
  *
  * @return It returns 1 on success and 0 otherwise
  */
-static inline int ebpf_collect_data_for_pid(pid_t pid, void *ptr)
+static inline int ebpf_collect_data_for_pid(pid_t pid)
 {
+    void *ptr = NULL;
     if (unlikely(pid < 0 || pid > pid_max)) {
         netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
         return 0;
     }
 
-    ebpf_pid_stat_t *p = ebpf_get_pid_entry(pid, 0);
-    if (unlikely(!p || p->read))
-        return 0;
-    p->read = 1;
+    ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL, 0);
+    if (p->comm[0])
+        return 1;
 
     if (unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr))))
         // there is no reason to proceed if we cannot get its status
@@ -743,14 +731,9 @@ static inline int ebpf_collect_data_for_pid(pid_t pid, void *ptr)
 
     // check its parent pid
     if (unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-        netdata_log_error("Pid %u (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
+        netdata_log_error("Pid %u (command '%s') states invalid parent pid %u. Using 0.", pid, p->comm, p->ppid);
         p->ppid = 0;
     }
-
-    // mark it as updated
-    p->updated = 1;
-    p->keep = 0;
-    p->keeploops = 0;
 
     return 1;
 }
@@ -1044,7 +1027,7 @@ void ebpf_cleanup_exited_pids(int max)
  *
  * @return It returns 0 on success and -1 otherwise.
  */
-static inline void read_proc_filesystem()
+void ebpf_read_proc_filesystem()
 {
     char dirname[FILENAME_MAX + 1];
 
@@ -1067,7 +1050,7 @@ static inline void read_proc_filesystem()
         if (unlikely(endptr == de->d_name || *endptr != '\0'))
             continue;
 
-        ebpf_collect_data_for_pid(pid, NULL);
+        ebpf_collect_data_for_pid(pid);
     }
     closedir(dir);
 }
@@ -1177,7 +1160,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
         pids = pids->next;
     }
 
-    read_proc_filesystem();
+    ebpf_read_proc_filesystem();
 
     pids = ebpf_root_of_pids; // global list of all processes running
 
