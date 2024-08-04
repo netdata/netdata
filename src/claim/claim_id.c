@@ -8,7 +8,6 @@ static struct {
     ND_UUID claim_uuid_saved;
 } claim = {
     .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-    .claim_uuid = UUID_ZERO,
 };
 
 void claim_id_clear_previous_working(void) {
