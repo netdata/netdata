@@ -483,7 +483,7 @@ static void ebpf_update_swap_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_swap_t *out = &pids->swap;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, 0);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
             if (local_pid) {
                 netdata_publish_swap_t *in = &local_pid->swap;
 
@@ -509,7 +509,7 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_
 
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, 0);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
         if (local_pid) {
             netdata_publish_swap_t *w = &local_pid->swap;
             local_write += w->write;
@@ -560,7 +560,7 @@ static void ebpf_read_swap_apps_table(int maps_per_core, int max_period)
 
         swap_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, strlen(cv->name));
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name);
         netdata_publish_swap_t *publish = &local_pid->swap;
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, cv, sizeof(netdata_publish_swap_t));
