@@ -604,9 +604,8 @@ void ebpf_release_and_unlink_pid_stat(ebpf_pid_stat_t *eps, int fd, uint32_t key
  *
  * @return It returns 1 on success and 0 otherwise.
  */
-static inline int read_proc_pid_cmdline(ebpf_pid_data_t *p)
+static inline int read_proc_pid_cmdline(ebpf_pid_data_t *p, char *cmdline)
 {
-    static char cmdline[MAX_CMDLINE + 1];
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
 
@@ -633,18 +632,7 @@ static inline int read_proc_pid_cmdline(ebpf_pid_data_t *p)
     ret = 1;
 
 cleanup:
-    // copy the command to the command line
-    if (p->cmdline)
-        freez(p->cmdline);
-    p->cmdline = strdupz(p->comm);
-
-    if (collect_pids & EBPF_MODULE_SOCKET_IDX) {
-        rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
-        if (pid_ptr)
-            pid_ptr->cmdline = p->cmdline;
-        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
-    }
+    p->cmdline[0] = '\0';
 
     return ret;
 }
@@ -682,7 +670,9 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p, void *ptr)
     char *comm = procfile_lineword(ff, 0, 1);
     p->ppid = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
 
-    read_proc_pid_cmdline(p);
+    char cmdline[MAX_CMDLINE + 1];
+    p->cmdline = cmdline;
+    read_proc_pid_cmdline(p, cmdline);
     if (strcmp(p->comm, comm) != 0) {
         if (unlikely(debug_enabled)) {
             if (p->comm[0])
@@ -721,9 +711,11 @@ static inline int ebpf_collect_data_for_pid(pid_t pid)
         return 0;
     }
 
-    ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL, 0);
-    if (p->comm[0])
+    ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL);
+    if (p->has_proc_file)
         return 1;
+
+    p->has_proc_file = true;
 
     if (unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr))))
         // there is no reason to proceed if we cannot get its status

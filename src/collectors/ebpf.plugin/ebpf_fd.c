@@ -699,7 +699,7 @@ static void ebpf_read_fd_apps_table(int maps_per_core, int max_period)
 
         fd_apps_accumulator(fv, maps_per_core);
 
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, fv->tgid, fv->name, strlen(fv->name));
+        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, fv->tgid, fv->name);
         if (pid_stat) {
             netdata_fd_stat_t *publish_fd = &pid_stat->fd;
             if (!publish_fd->ct || publish_fd->ct != fv->ct) {
@@ -732,7 +732,7 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
 
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, 0);
+        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL);
         if (pid_stat) {
             netdata_fd_stat_t *w = &pid_stat->fd;
             fd->open_call += w->open_call;
@@ -830,7 +830,7 @@ static void ebpf_update_fd_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_fd_stat_t *out = &pids->fd;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, 0);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
             if (local_pid) {
                 netdata_fd_stat_t *in = &local_pid->fd;
 

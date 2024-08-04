@@ -124,6 +124,7 @@ typedef struct ebpf_pid_data {
     char clean_name[EBPF_MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
     char *cmdline;
 
+    bool has_proc_file;
     uint32_t not_updated;
     uint32_t log_thrown;
 
@@ -141,7 +142,7 @@ typedef struct ebpf_pid_data {
 } ebpf_pid_data_t;
 
 extern ebpf_pid_data_t *ebpf_pids;
-static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, size_t length) {
+static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name) {
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
     if (ptr->pid == pid)
         return ptr;
