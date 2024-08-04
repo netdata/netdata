@@ -1187,6 +1187,8 @@ static inline int local_sockets_spawn_server_callback(SPAWN_REQUEST *request) {
     };
     local_sockets_send_to_parent(&ls, &zero, &cw);
 
+    local_sockets_cleanup(&ls);
+
     return EXIT_SUCCESS;
 }
 
