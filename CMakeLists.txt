@@ -929,7 +929,7 @@ set(API_PLUGIN_FILES
         src/web/api/v1/api_v1_manage.c
         src/web/api/v1/api_v1_calls.h
         src/web/api/v1/api_v1_dbengine.c
-        src/web/api/v2/api_v2_config.c
+        src/web/api/v1/api_v1_config.c
         src/web/api/v1/api_v1_functions.c
         src/web/api/v1/api_v1_weights.c
         src/web/api/v1/api_v1_info.c

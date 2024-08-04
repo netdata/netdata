@@ -7,6 +7,8 @@
 
 int api_v1_info(RRDHOST *host, struct web_client *w, char *url);
 
+int api_v1_config(RRDHOST *host, struct web_client *w, char *url);
+
 int api_v1_registry(RRDHOST *host, struct web_client *w, char *url);
 
 int api_v1_manage(RRDHOST *host, struct web_client *w, char *url);

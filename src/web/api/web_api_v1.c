@@ -42,15 +42,6 @@ static struct web_api_command api_commands_v1[] = {
         .callback = api_v1_allmetrics,
         .allow_subpaths = 0
     },
-    {
-        // badges can be fetched with both dashboard and badge ACL
-        .api = "badge.svg",
-        .hash = 0,
-        .acl = HTTP_ACL_BADGES,
-        .access = HTTP_ACCESS_ANONYMOUS_DATA,
-        .callback = api_v1_badge,
-        .allow_subpaths = 0
-    },
 
     // alerts APIs
 #if defined(ENABLE_API_V1)
@@ -225,7 +216,7 @@ static struct web_api_command api_commands_v1[] = {
         .hash = 0,
         .acl = HTTP_ACL_DASHBOARD,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
-        .callback = api_v2_config,
+        .callback = api_v1_config,
         .allow_subpaths = 0
     },
 

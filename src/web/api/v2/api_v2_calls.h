@@ -6,8 +6,6 @@
 
 int api_v2_info(RRDHOST *host, struct web_client *w, char *url);
 
-int api_v2_config(RRDHOST *host, struct web_client *w, char *url);
-
 int api_v2_data(RRDHOST *host, struct web_client *w, char *url);
 int api_v2_weights(RRDHOST *host, struct web_client *w, char *url);
 
