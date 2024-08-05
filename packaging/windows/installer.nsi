@@ -1,4 +1,5 @@
 !include "MUI2.nsh"
+!include "nsDialogs.nsh"
 !include "FileFunc.nsh"
 
 Name "Netdata"
@@ -24,6 +25,11 @@ RequestExecutionLevel admin
 !insertmacro MUI_UNPAGE_FINISH
 
 !insertmacro MUI_LANGUAGE "English"
+
+Function .onInit
+        nsExec::ExecToLog '$SYSDIR\sc.exe stop Netdata'
+        pop $0
+FunctionEnd
 
 Function NetdataUninstallRegistry
         ClearErrors
