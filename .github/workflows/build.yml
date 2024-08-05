@@ -519,7 +519,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2.1.0
       - name: Upload Artifacts
         id: upload
-        uses: google-github-actions/upload-cloud-storage@v2.1.0
+        uses: google-github-actions/upload-cloud-storage@v2.1.1
         with:
           destination: ${{ secrets.GCP_NIGHTLY_STORAGE_BUCKET }}
           gzip: false
