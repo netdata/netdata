@@ -337,7 +337,10 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     }
 
     spinlock_lock(&server->spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(server->work_queue, &item, prev, next);
+    // item is in the stack, but the server will remove it before sending to us
+    // the semaphore, so it is safe to have the item in the stack.
+    work_item *item_ptr = &item;
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(server->work_queue, item_ptr, prev, next);
     spinlock_unlock(&server->spinlock);
 
     uv_async_send(&server->async);

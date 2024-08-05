@@ -146,7 +146,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     // Read the public key
     CLEAN_CHAR_P *public_key_file = strdupz_path_subpath(netdata_configured_cloud_dir, "public.pem");
     fp = fopen(public_key_file, "r");
-    if (!fp || fread(public_key, 1, sizeof(public_key), fp) <= 0) {
+    if (!fp || fread(public_key, 1, sizeof(public_key), fp) == 0) {
         claim_agent_failure_reason_set("cannot read public key file '%s'", public_key_file);
         if (fp) fclose(fp);
         *can_retry = false;
@@ -341,10 +341,10 @@ bool claim_agent(const char *url, const char *token, const char *rooms, const ch
         if (done) break;
         sleep_usec(300 * USEC_PER_MS + 100 * retries * USEC_PER_MS);
         retries++;
-    } while(!done && can_retry && retries < 5);
+    } while(can_retry && retries < 5);
 
     spinlock_unlock(&spinlock);
-    return true;
+    return done;
 }
 
 bool claim_agent_from_environment(void) {
