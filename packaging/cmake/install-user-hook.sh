@@ -27,11 +27,11 @@ fi
 
 if [ "${need_group}" -ne 0 ]; then
     if command -v groupadd 1> /dev/null 2>&1; then
-        run groupadd -r "${group}" && return 0
+        groupadd -r "${group}" && return 0
     elif command -v pw 1> /dev/null 2>&1; then
-        run pw groupadd "${group}" && return 0
+        pw groupadd "${group}" && return 0
     elif command -v addgroup 1> /dev/null 2>&1; then
-        run addgroup "${group}" && return 0
+        addgroup "${group}" && return 0
     elif command -v dseditgroup 1> /dev/null 2>&1; then
         dseditgroup -o create "${group}" && return 0
     fi
@@ -55,17 +55,17 @@ if [ "${need_user}" -ne 0 ]; then
     nologin="$(command -v nologin || echo '/bin/false')"
 
     if command -v useradd 1> /dev/null 2>&1; then
-        run useradd -r -g "${user}" -c "${user}" -s "${nologin}" --no-create-home -d "${homedir}" "${user}" && return 0
+        useradd -r -g "${user}" -c "${user}" -s "${nologin}" --no-create-home -d "${homedir}" "${user}" && return 0
     elif command -v pw 1> /dev/null 2>&1; then
-        run pw useradd "${user}" -d "${homedir}" -g "${user}" -s "${nologin}" && return 0
+        pw useradd "${user}" -d "${homedir}" -g "${user}" -s "${nologin}" && return 0
     elif command -v adduser 1> /dev/null 2>&1; then
-        run adduser -h "${homedir}" -s "${nologin}" -D -G "${user}" "${user}" && return 0
+        adduser -h "${homedir}" -s "${nologin}" -D -G "${user}" "${user}" && return 0
     elif command -v sysadminctl 1> /dev/null 2>&1; then
         gid=$(dscl . read /Groups/"${group}" 2>/dev/null | grep PrimaryGroupID | grep -Eo "[0-9]+")
-        if run sysadminctl -addUser "${user}" -shell /usr/bin/false -home /var/empty -GID "$gid"; then
+        if sysadminctl -addUser "${user}" -shell /usr/bin/false -home /var/empty -GID "$gid"; then
             # FIXME: I think the proper solution is to create a role account:
             # -roleAccount + name starting with _ and UID in 200-400 range.
-            run dscl . create /Users/"${user}" IsHidden 1
+            dscl . create /Users/"${user}" IsHidden 1
         fi
     fi
 fi
