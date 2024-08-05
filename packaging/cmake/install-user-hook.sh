@@ -27,13 +27,13 @@ fi
 
 if [ "${need_group}" -ne 0 ]; then
     if command -v groupadd 1> /dev/null 2>&1; then
-        groupadd -r "${group}" && return 0
+        groupadd -r "${group}"
     elif command -v pw 1> /dev/null 2>&1; then
-        pw groupadd "${group}" && return 0
+        pw groupadd "${group}"
     elif command -v addgroup 1> /dev/null 2>&1; then
-        addgroup "${group}" && return 0
+        addgroup "${group}"
     elif command -v dseditgroup 1> /dev/null 2>&1; then
-        dseditgroup -o create "${group}" && return 0
+        dseditgroup -o create "${group}"
     fi
 fi
 
@@ -55,11 +55,11 @@ if [ "${need_user}" -ne 0 ]; then
     nologin="$(command -v nologin || echo '/bin/false')"
 
     if command -v useradd 1> /dev/null 2>&1; then
-        useradd -r -g "${user}" -c "${user}" -s "${nologin}" --no-create-home -d "${homedir}" "${user}" && return 0
+        useradd -r -g "${user}" -c "${user}" -s "${nologin}" --no-create-home -d "${homedir}" "${user}"
     elif command -v pw 1> /dev/null 2>&1; then
-        pw useradd "${user}" -d "${homedir}" -g "${user}" -s "${nologin}" && return 0
+        pw useradd "${user}" -d "${homedir}" -g "${user}" -s "${nologin}"
     elif command -v adduser 1> /dev/null 2>&1; then
-        adduser -h "${homedir}" -s "${nologin}" -D -G "${user}" "${user}" && return 0
+        adduser -h "${homedir}" -s "${nologin}" -D -G "${user}" "${user}"
     elif command -v sysadminctl 1> /dev/null 2>&1; then
         gid=$(dscl . read /Groups/"${group}" 2>/dev/null | grep PrimaryGroupID | grep -Eo "[0-9]+")
         if sysadminctl -addUser "${user}" -shell /usr/bin/false -home /var/empty -GID "$gid"; then
