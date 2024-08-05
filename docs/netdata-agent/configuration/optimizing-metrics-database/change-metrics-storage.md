@@ -5,11 +5,13 @@ space**. This provides greater control and helps you optimize storage usage for 
 
 **Default Retention Limits**:
 
-| Tier |     Resolution      | Time Limit | Size Limit |
-|:----:|:-------------------:|:----------:|:----------:|
-|  0   |  high (per second)  |  14 days   |   1 GiB    |
-|  1   | middle (per minute) |  3 months  |   1 GiB    |
-|  2   |   low (per hour)    |  2 years   |   1 GiB    |
+| Tier |     Resolution      | Time Limit | Size Limit (min 256 MB) |
+|:----:|:-------------------:|:----------:|:-----------------------:|
+|  0   |  high (per second)  |  14 days   |          1 GiB          |
+|  1   | middle (per minute) |  3 months  |          1 GiB          |
+|  2   |   low (per hour)    |  2 years   |          1 GiB          |
+
+> **Note**: If a user sets a disk space size less than 256 MB for a tier, Netdata will automatically adjust it to 256 MB.
 
 With these defaults, Netdata requires approximately 4 GiB of storage space (including metadata).
 
