@@ -70,19 +70,25 @@ Section "Install Netdata"
 	File /r "C:\msys64\opt\netdata\*.*"
 
 	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" create Netdata binPath= "$INSTDIR\usr\bin\netdata.exe" start= delayed-auto'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to create Netdata service."
+        nsExec::ExecToLog '$SYSDIR\sc.exe create Netdata binPath= "$INSTDIR\usr\bin\netdata.exe" start= delayed-auto'
+        pop $0
+        ${If} $0 != 0
+	    DetailPrint "Warning: Failed to create Netdata service."
+        ${EndIf}
 
 	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" description Netdata "Real-time system monitoring service"'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to add Netdata service description."
+        nsExec::ExecToLog '$SYSDIR\sc.exe description Netdata "Real-time system monitoring service"'
+        pop $0
+        ${If} $0 != 0
+	    DetailPrint "Warning: Failed to add Netdata service description."
+        ${EndIf}
 
 	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" start Netdata'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to start Netdata service."
+        nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
+        pop $0
+        ${If} $0 != 0
+	    DetailPrint "Warning: Failed to start Netdata service."
+        ${EndIf}
 
 	WriteUninstaller "$INSTDIR\Uninstall.exe"
 
@@ -91,14 +97,18 @@ SectionEnd
 
 Section "Uninstall"
 	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" stop Netdata'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to stop Netdata service."
+        nsExec::ExecToLog '$SYSDIR\sc.exe stop Netdata'
+        pop $0
+        ${If} $0 != 0
+	    DetailPrint "Warning: Failed to stop Netdata service."
+        ${EndIf}
 
 	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" delete Netdata'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to delete Netdata service."
+        nsExec::ExecToLog '$SYSDIR\sc.exe delete Netdata'
+        pop $0
+        ${If} $0 != 0
+	    DetailPrint "Warning: Failed to delete Netdata service."
+        ${EndIf}
 
 	RMDir /r "$INSTDIR"
 
