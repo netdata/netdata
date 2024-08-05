@@ -2768,7 +2768,6 @@ install(FILES
         src/collectors/python.d.plugin/alarms/alarms.conf
         src/collectors/python.d.plugin/am2320/am2320.conf
         src/collectors/python.d.plugin/anomalies/anomalies.conf
-        src/collectors/python.d.plugin/beanstalk/beanstalk.conf
         src/collectors/python.d.plugin/boinc/boinc.conf
         src/collectors/python.d.plugin/ceph/ceph.conf
         src/collectors/python.d.plugin/changefinder/changefinder.conf
@@ -2803,7 +2802,6 @@ install(FILES
         src/collectors/python.d.plugin/alarms/alarms.chart.py
         src/collectors/python.d.plugin/am2320/am2320.chart.py
         src/collectors/python.d.plugin/anomalies/anomalies.chart.py
-        src/collectors/python.d.plugin/beanstalk/beanstalk.chart.py
         src/collectors/python.d.plugin/boinc/boinc.chart.py
         src/collectors/python.d.plugin/ceph/ceph.chart.py
         src/collectors/python.d.plugin/changefinder/changefinder.chart.py
