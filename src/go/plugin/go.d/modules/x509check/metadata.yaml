@@ -138,11 +138,11 @@ modules:
     alerts:
       - name: x509check_days_until_expiration
         metric: x509check.time_until_expiration
-        info: time until x509 certificate expires
+        info: "Time until x509 certificate expires for ${label:source}"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf
       - name: x509check_revocation_status
         metric: x509check.revocation_status
-        info: "x509 certificate revocation status (0: revoked, 1: valid)"
+        info: "x509 certificate revocation status for ${label:source}"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf
     metrics:
       folding:
@@ -168,4 +168,5 @@ modules:
               unit: boolean
               chart_type: line
               dimensions:
+                - name: not_revoked
                 - name: revoked
