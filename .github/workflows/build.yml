@@ -1078,8 +1078,6 @@ jobs:
       - name: Set Up Dependencies
         id: deps
         if: needs.file-check.outputs.run == 'true'
-        env:
-          BUILD_DIR: ${{ github.workspace }}\build
         run: ./packaging/windows/install-dependencies.ps1
       - name: Build Netdata
         id: build
@@ -1107,6 +1105,8 @@ jobs:
       - name: Package Netdata
         id: package
         if: needs.file-check.outputs.run == 'true'
+        env:
+          BUILD_DIR: ${{ github.workspace }}\build
         run: ./packaging/windows/package.ps1
       - name: Sign Installer
         id: sign-installer
