@@ -27,7 +27,7 @@ modules:
         method_description: |
           Using the [beanstalkd protocol](https://github.com/beanstalkd/beanstalkd/blob/master/doc/protocol.txt), it communicates with the Beanstalk daemon to gather essential metrics that help understand the server's performance and activity.
           Executed commands:
-          
+
           - [stats](https://github.com/beanstalkd/beanstalkd/blob/91c54fc05dc759ef27459ce4383934e1a4f2fb4b/doc/protocol.txt#L553).
           - [list-tubes](https://github.com/beanstalkd/beanstalkd/blob/91c54fc05dc759ef27459ce4383934e1a4f2fb4b/doc/protocol.txt#L688).
           - [stats-tube](https://github.com/beanstalkd/beanstalkd/blob/91c54fc05dc759ef27459ce4383934e1a4f2fb4b/doc/protocol.txt#L497).

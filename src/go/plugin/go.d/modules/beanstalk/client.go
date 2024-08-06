@@ -97,6 +97,13 @@ func newBeanstalkConn(conf Config, log *logger.Logger) beanstalkConn {
 	}
 }
 
+const (
+	cmdQuit      = "quit"
+	cmdStats     = "stats"
+	cmdListTubes = "list-tubes"
+	cmdStatsTube = "stats-tube"
+)
+
 type beanstalkClient struct {
 	*logger.Logger
 
@@ -108,13 +115,12 @@ func (c *beanstalkClient) connect() error {
 }
 
 func (c *beanstalkClient) disconnect() error {
-	cmd := "quit"
-	_, _, _ = c.query(cmd)
+	_, _, _ = c.query(cmdQuit)
 	return c.client.Disconnect()
 }
 
 func (c *beanstalkClient) queryStats() (*beanstalkdStats, error) {
-	cmd := "stats"
+	cmd := cmdStats
 
 	resp, data, err := c.query(cmd)
 	if err != nil {
@@ -134,7 +140,7 @@ func (c *beanstalkClient) queryStats() (*beanstalkdStats, error) {
 }
 
 func (c *beanstalkClient) queryListTubes() ([]string, error) {
-	cmd := "list-tubes"
+	cmd := cmdListTubes
 
 	resp, data, err := c.query(cmd)
 	if err != nil {
@@ -154,7 +160,7 @@ func (c *beanstalkClient) queryListTubes() ([]string, error) {
 }
 
 func (c *beanstalkClient) queryStatsTube(tubeName string) (*tubeStats, error) {
-	cmd := fmt.Sprintf("stats-tube %s", tubeName)
+	cmd := fmt.Sprintf("%s %s", cmdStatsTube, tubeName)
 
 	resp, data, err := c.query(cmd)
 	if err != nil {

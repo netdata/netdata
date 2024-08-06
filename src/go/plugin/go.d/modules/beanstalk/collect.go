@@ -75,7 +75,7 @@ func (b *Beanstalk) collectTubesStats(mx map[string]int64) error {
 		}
 
 		if stats == nil {
-			b.Debugf("tube '%s' stats object not found (tube does not exist)", tube)
+			b.Infof("tube '%s' stats object not found (tube does not exist)", tube)
 			b.discoveredTubes[i] = ""
 			continue
 		}
