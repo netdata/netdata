@@ -397,7 +397,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         env:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/
-        run: packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
+        run: sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -466,7 +466,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         env:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/
-        run: packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
+        run: sh -x packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
