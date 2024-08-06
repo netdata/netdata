@@ -46,9 +46,13 @@ func (x *X509Check) collectRevocation(mx map[string]int64, certs []*x509.Certifi
 	if !ok {
 		return
 	}
+
+	mx["revoked"] = 0
+	mx["not_revoked"] = 0
+
 	if rev {
 		mx["revoked"] = 1
 	} else {
-		mx["revoked"] = 0
+		mx["not_revoked"] = 1
 	}
 }

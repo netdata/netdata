@@ -1,4 +1,5 @@
 !include "MUI2.nsh"
+!include "nsDialogs.nsh"
 !include "FileFunc.nsh"
 
 Name "Netdata"
@@ -25,29 +26,13 @@ RequestExecutionLevel admin
 
 !insertmacro MUI_LANGUAGE "English"
 
-Section "Install Netdata"
-	SetOutPath $INSTDIR
-	SetCompress off
+Function .onInit
+        nsExec::ExecToLog '$SYSDIR\sc.exe stop Netdata'
+        pop $0
+FunctionEnd
 
-	File /r "C:\msys64\opt\netdata\*.*"
-
-	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" create Netdata binPath= "$INSTDIR\usr\bin\netdata.exe" start= delayed-auto'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to create Netdata service."
-
-	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" description Netdata "Real-time system monitoring service"'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to add Netdata service description."
-
-	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" start Netdata'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to start Netdata service."
-
-	WriteUninstaller "$INSTDIR\Uninstall.exe"
-
+Function NetdataUninstallRegistry
+        ClearErrors
         WriteRegStr HKLM "${ND_UININSTALL_REG}" \
                          "DisplayName" "Netdata - Real-time system monitoring."
         WriteRegStr HKLM "${ND_UININSTALL_REG}" \
@@ -71,23 +56,68 @@ Section "Install Netdata"
         WriteRegStr HKLM "${ND_UININSTALL_REG}" \
                          "VersionMinor" "${MINORVERSION}"
 
+        IfErrors 0 +2
+        MessageBox MB_ICONEXCLAMATION|MB_OK "Unable to create an entry in the Control Panel!" IDOK end
+
+        ClearErrors
         ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
         IntFmt $0 "0x%08X" $0
         WriteRegDWORD HKLM "${ND_UININSTALL_REG}" "EstimatedSize" "$0"
+
+        IfErrors 0 +2
+        MessageBox MB_ICONEXCLAMATION|MB_OK "Cannot estimate the installation size." IDOK end
+        end:
+FunctionEnd
+
+Section "Install Netdata"
+	SetOutPath $INSTDIR
+	SetCompress off
+
+	File /r "C:\msys64\opt\netdata\*.*"
+
+	ClearErrors
+        nsExec::ExecToLog '$SYSDIR\sc.exe create Netdata binPath= "$INSTDIR\usr\bin\netdata.exe" start= delayed-auto'
+        pop $0
+        ${If} $0 != 0
+	    DetailPrint "Warning: Failed to create Netdata service."
+        ${EndIf}
+
+	ClearErrors
+        nsExec::ExecToLog '$SYSDIR\sc.exe description Netdata "Real-time system monitoring service"'
+        pop $0
+        ${If} $0 != 0
+	    DetailPrint "Warning: Failed to add Netdata service description."
+        ${EndIf}
+
+	ClearErrors
+        nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
+        pop $0
+        ${If} $0 != 0
+	    DetailPrint "Warning: Failed to start Netdata service."
+        ${EndIf}
+
+	WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+        Call NetdataUninstallRegistry
 SectionEnd
 
 Section "Uninstall"
 	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" stop Netdata'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to stop Netdata service."
+        nsExec::ExecToLog '$SYSDIR\sc.exe stop Netdata'
+        pop $0
+        ${If} $0 != 0
+	    DetailPrint "Warning: Failed to stop Netdata service."
+        ${EndIf}
 
 	ClearErrors
-	ExecWait '"$SYSDIR\sc.exe" delete Netdata'
-	IfErrors 0 +2
-	DetailPrint "Warning: Failed to delete Netdata service."
+        nsExec::ExecToLog '$SYSDIR\sc.exe delete Netdata'
+        pop $0
+        ${If} $0 != 0
+	    DetailPrint "Warning: Failed to delete Netdata service."
+        ${EndIf}
 
 	RMDir /r "$INSTDIR"
 
         DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata"
 SectionEnd
+

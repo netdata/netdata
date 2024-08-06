@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18262](https://github.com/netdata/netdata/pull/18262) ([netdatabot](https://github.com/netdatabot))
+- go.d x509check add not\_revoked dimension [\#18261](https://github.com/netdata/netdata/pull/18261) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18258](https://github.com/netdata/netdata/pull/18258) ([netdatabot](https://github.com/netdatabot))
+- docs: improve "Settings on Microsoft Teams" description [\#18257](https://github.com/netdata/netdata/pull/18257) ([ilyam8](https://github.com/ilyam8))
+- docs: add a note that the min dbengine tier size is 256 MB [\#18256](https://github.com/netdata/netdata/pull/18256) ([ilyam8](https://github.com/ilyam8))
+- Update Installer Code \(Services\) [\#18253](https://github.com/netdata/netdata/pull/18253) ([thiagoftsm](https://github.com/thiagoftsm))
+- Update README.md [\#18246](https://github.com/netdata/netdata/pull/18246) ([Steve8291](https://github.com/Steve8291))
 - Bump github.com/tidwall/gjson from 1.17.1 to 1.17.3 in /src/go [\#18244](https://github.com/netdata/netdata/pull/18244) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Fix OS detection messages in CMake. [\#18243](https://github.com/netdata/netdata/pull/18243) ([Ferroin](https://github.com/Ferroin))
 - Clean up unneeded depencdencies. [\#18242](https://github.com/netdata/netdata/pull/18242) ([Ferroin](https://github.com/Ferroin))
@@ -412,13 +419,6 @@
 - fix broken links and links pointing to Learn [\#17675](https://github.com/netdata/netdata/pull/17675) ([Ancairon](https://github.com/Ancairon))
 - add rspamd to apps\_groups.conf [\#17674](https://github.com/netdata/netdata/pull/17674) ([ilyam8](https://github.com/ilyam8))
 - Fix compilation without h2o, cloud enabled [\#17673](https://github.com/netdata/netdata/pull/17673) ([stelfrag](https://github.com/stelfrag))
-- Include the Host in the HTTP header [\#17670](https://github.com/netdata/netdata/pull/17670) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#17668](https://github.com/netdata/netdata/pull/17668) ([netdatabot](https://github.com/netdatabot))
-- Fix CentOS 7 builds for ML. [\#17667](https://github.com/netdata/netdata/pull/17667) ([vkalintiris](https://github.com/vkalintiris))
-- go.d litespeed [\#17665](https://github.com/netdata/netdata/pull/17665) ([ilyam8](https://github.com/ilyam8))
-- Correctly handle required compilation flags for dependencies. [\#17664](https://github.com/netdata/netdata/pull/17664) ([Ferroin](https://github.com/Ferroin))
-- python.d remove litespeed [\#17663](https://github.com/netdata/netdata/pull/17663) ([ilyam8](https://github.com/ilyam8))
-- files movearound [\#17662](https://github.com/netdata/netdata/pull/17662) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 

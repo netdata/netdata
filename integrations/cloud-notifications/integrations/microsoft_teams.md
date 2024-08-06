@@ -31,16 +31,15 @@ To add Microsoft Teams notifications integration to your Netdata Cloud space you
 
 ### Settings on Microsoft Teams
 
-- The integration gets enabled at a team's channel level.
-- Click on the `...` (aka three dots) icon showing up next to the channel name, it should appear when you hover over it.
-- Click on `Workflows`.
-- Select `Post to a channel when a webhook request is received`.
-- Provide a name for your Incoming Workflow, for example _Netdata Alerts_.
-- Click `Next`.
-- Select `Team` and `Channel` where notifications will be posted to.
-- Click `Add workflow`.
-- The _Workflow Webhook URL_ is created.
-- That is the URL to be provided to the Netdata Cloud configuration.
+1. **Access the Channel Settings**: Navigate to the desired Microsoft Teams channel and hover over the channel name. Click the three dots (ellipsis) icon that appears.
+2. **Create a New Workflow**: Select "Workflows" from the options, then choose "Post to a channel when a webhook request is received."
+3. **Configure Workflow Details**:
+    - Give your workflow a descriptive name, such as "Netdata Alerts."
+    - Select the target team and channel to receive notifications.
+    - Click "Add workflow."
+4. **Obtain the Webhook URL**:
+    - Once the workflow is created, you will receive a unique Workflow Webhook URL.
+    - Copy this URL, as it will be required to configure Netdata Cloud.
 
 ### Settings on Netdata Cloud
 
