@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
@@ -28,52 +29,40 @@ func New() *Beanstalk {
 	return &Beanstalk{
 		Config: Config{
 			Address:      "127.0.0.1:11300",
-			Timeout:      web.Duration(time.Second * 5),
+			Timeout:      web.Duration(time.Second * 1),
 			TubeSelector: "*",
 		},
 
-		charts:             &module.Charts{},
-		tubeSr:             matcher.TRUE(),
+		charts:             statsCharts.Copy(),
+		newConn:            newBeanstalkConn,
 		discoverTubesEvery: time.Minute * 1,
+		tubeSr:             matcher.TRUE(),
 		seenTubes:          make(map[string]bool),
-		newBeanstalkConn:   newBeanstalkConn,
 	}
 }
 
 type Config struct {
 	UpdateEvery  int          `yaml:"update_every,omitempty" json:"update_every"`
 	Address      string       `yaml:"address" json:"address"`
-	Timeout      web.Duration `yaml:"timeout" json:"timeout"`
-	TubeSelector string       `yaml:"tube_selector" json:"tube_selector"`
+	Timeout      web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	TubeSelector string       `yaml:"tube_selector,omitempty" json:"tube_selector"`
 }
 
-type (
-	Beanstalk struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Beanstalk struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		newBeanstalkConn func(Config) beanstalkConn
-		conn             beanstalkConn
+	charts *module.Charts
 
-		charts *module.Charts
+	newConn func(Config, *logger.Logger) beanstalkConn
+	conn    beanstalkConn
 
-		discoverTubesEvery    time.Duration
-		lastDiscoverTubesTime time.Time
-		discoveredTubes       []string
-
-		tubeSr matcher.Matcher
-
-		seenTubes map[string]bool
-	}
-
-	beanstalkConn interface {
-		connect() error
-		disconnect() error
-		queryStats() (*beanstalkdStats, error)
-		queryListTubes() ([]string, error)
-		queryStatsTube(string) (*tubeStats, error)
-	}
-)
+	discoverTubesEvery    time.Duration
+	lastDiscoverTubesTime time.Time
+	discoveredTubes       []string
+	tubeSr                matcher.Matcher
+	seenTubes             map[string]bool
+}
 
 func (b *Beanstalk) Configuration() any {
 	return b.Config

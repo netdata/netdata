@@ -108,7 +108,7 @@ func (b *Beanstalk) collectTubesStats(mx map[string]int64) error {
 }
 
 func (b *Beanstalk) establishConn() (beanstalkConn, error) {
-	conn := b.newBeanstalkConn(b.Config)
+	conn := b.newConn(b.Config, b.Logger)
 
 	if err := conn.connect(); err != nil {
 		return nil, err

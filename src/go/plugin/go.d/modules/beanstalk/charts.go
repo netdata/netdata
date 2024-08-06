@@ -10,78 +10,112 @@ import (
 )
 
 const (
-	prioCpuUsage = module.Priority + iota
+	prioCurrentJobs = module.Priority + iota
 	prioJobsRate
-	prioConnectionsRate
-	prioCommandsRate
+	prioJobsTimeouts
+
 	prioCurrentTubes
-	prioCurrentJobs
+
+	prioCommandsRate
+
 	prioCurrentConnections
-	prioBinlog
+	prioConnectionsRate
+
+	prioBinlogRecords
+
+	prioCpuUsage
+
 	prioUptime
 
-	prioJobsRateTubeTmpl
-	prioJobsTubeTmpl
-	prioConnectionsTubeTmpl
-	prioCommandsTubeTmpl
-	prioPauseTubeTmpl
+	prioTubeCurrentJobs
+	prioTubeJobsRate
+
+	prioTubeCommands
+
+	prioTubeCurrentConnections
+
+	prioTubePauseTime
 )
 
 var (
-	baseCharts = module.Charts{
-		cpuUsageChart.Copy(),
-		jobsRateChart.Copy(),
-		connectionsRateChart.Copy(),
-		commandsRateChart.Copy(),
-		currentTubesChart.Copy(),
+	statsCharts = module.Charts{
 		currentJobs.Copy(),
+		jobsRateChart.Copy(),
+		jobsTimeoutsChart.Copy(),
+
+		currentTubesChart.Copy(),
+
+		commandsRateChart.Copy(),
+
 		currentConnectionsChart.Copy(),
-		binlogChart.Copy(),
+		connectionsRateChart.Copy(),
+
+		binlogRecordsChart.Copy(),
+
+		cpuUsageChart.Copy(),
+
 		uptimeChart.Copy(),
 	}
-	cpuUsageChart = module.Chart{
-		ID:       "cpu_usage",
-		Title:    "CPU Usage",
-		Units:    "cpu time",
-		Fam:      "server statistics",
-		Ctx:      "beanstalk.cpu_usage",
-		Type:     module.Area,
-		Priority: prioCpuUsage,
+
+	currentJobs = module.Chart{
+		ID:       "current_jobs",
+		Title:    "Current Jobs",
+		Units:    "jobs",
+		Fam:      "jobs",
+		Ctx:      "beanstalk.current_jobs",
+		Type:     module.Stacked,
+		Priority: prioCurrentJobs,
 		Dims: module.Dims{
-			{ID: "rusage-utime", Name: "user", Algo: module.Incremental},
-			{ID: "rusage-stime", Name: "system", Algo: module.Incremental},
+			{ID: "current-jobs-ready", Name: "ready"},
+			{ID: "current-jobs-buried", Name: "buried"},
+			{ID: "current-jobs-urgent", Name: "urgent"},
+			{ID: "current-jobs-delayed", Name: "delayed"},
+			{ID: "current-jobs-reserved", Name: "reserved"},
 		},
 	}
 	jobsRateChart = module.Chart{
 		ID:       "jobs_rate",
 		Title:    "Jobs Rate",
 		Units:    "jobs/s",
-		Fam:      "server statistics",
+		Fam:      "jobs",
 		Ctx:      "beanstalk.jobs_rate",
 		Type:     module.Line,
 		Priority: prioJobsRate,
 		Dims: module.Dims{
-			{ID: "total-jobs", Name: "total", Algo: module.Incremental},
+			{ID: "total-jobs", Name: "created", Algo: module.Incremental},
+		},
+	}
+	jobsTimeoutsChart = module.Chart{
+		ID:       "jobs_timeouts",
+		Title:    "Timed Out Jobs",
+		Units:    "jobs/s",
+		Fam:      "jobs",
+		Ctx:      "beanstalk.jobs_timeouts",
+		Type:     module.Line,
+		Priority: prioJobsTimeouts,
+		Dims: module.Dims{
 			{ID: "job-timeouts", Name: "timeouts", Algo: module.Incremental},
 		},
 	}
-	connectionsRateChart = module.Chart{
-		ID:       "connections_rate",
-		Title:    "Connections Rate",
-		Units:    "connections/s",
-		Fam:      "server statistics",
-		Ctx:      "beanstalk.connections_rate",
-		Type:     module.Area,
-		Priority: prioConnectionsRate,
+
+	currentTubesChart = module.Chart{
+		ID:       "current_tubes",
+		Title:    "Current Tubes",
+		Units:    "tubes",
+		Fam:      "tubes",
+		Ctx:      "beanstalk.current_tubes",
+		Type:     module.Line,
+		Priority: prioCurrentTubes,
 		Dims: module.Dims{
-			{ID: "total-connections", Name: "connections", Algo: module.Incremental},
+			{ID: "current-tubes", Name: "tubes"},
 		},
 	}
+
 	commandsRateChart = module.Chart{
 		ID:       "commands_rate",
 		Title:    "Commands Rate",
 		Units:    "commands/s",
-		Fam:      "server statistics",
+		Fam:      "commands",
 		Ctx:      "beanstalk.commands_rate",
 		Type:     module.Stacked,
 		Priority: prioCommandsRate,
@@ -92,6 +126,8 @@ var (
 			{ID: "cmd-peek-delayed", Name: "peek-delayed", Algo: module.Incremental},
 			{ID: "cmd-peek-buried", Name: "peek-buried", Algo: module.Incremental},
 			{ID: "cmd-reserve", Name: "reserve", Algo: module.Incremental},
+			{ID: "cmd-reserve-with-timeout", Name: "reserve-with-timeout", Algo: module.Incremental},
+			{ID: "cmd-touch", Name: "touch", Algo: module.Incremental},
 			{ID: "cmd-use", Name: "use", Algo: module.Incremental},
 			{ID: "cmd-watch", Name: "watch", Algo: module.Incremental},
 			{ID: "cmd-ignore", Name: "ignore", Algo: module.Incremental},
@@ -108,67 +144,68 @@ var (
 			{ID: "cmd-pause-tube", Name: "pause-tube", Algo: module.Incremental},
 		},
 	}
-	currentTubesChart = module.Chart{
-		ID:       "current_tubes",
-		Title:    "Current Tubes",
-		Units:    "tubes",
-		Fam:      "server statistics",
-		Ctx:      "beanstalk.current_tubes",
-		Type:     module.Area,
-		Priority: prioCurrentTubes,
-		Dims: module.Dims{
-			{ID: "current-tubes", Name: "tubes"},
-		},
-	}
-	currentJobs = module.Chart{
-		ID:       "current_jobs",
-		Title:    "Current Jobs",
-		Units:    "jobs",
-		Fam:      "server statistics",
-		Ctx:      "beanstalk.current_jobs",
-		Type:     module.Stacked,
-		Priority: prioCurrentJobs,
-		Dims: module.Dims{
-			{ID: "current-jobs-urgent", Name: "urgent"},
-			{ID: "current-jobs-ready", Name: "ready"},
-			{ID: "current-jobs-reserved", Name: "reserved"},
-			{ID: "current-jobs-delayed", Name: "delayed"},
-			{ID: "current-jobs-buried", Name: "buried"},
-		},
-	}
+
 	currentConnectionsChart = module.Chart{
 		ID:       "current_connections",
 		Title:    "Current Connections",
 		Units:    "connections",
-		Fam:      "server statistics",
+		Fam:      "connections",
 		Ctx:      "beanstalk.current_connections",
 		Type:     module.Line,
 		Priority: prioCurrentConnections,
 		Dims: module.Dims{
-			{ID: "current-connections", Name: "written"},
+			{ID: "current-connections", Name: "open"},
 			{ID: "current-producers", Name: "producers"},
 			{ID: "current-workers", Name: "workers"},
 			{ID: "current-waiting", Name: "waiting"},
 		},
 	}
-	binlogChart = module.Chart{
-		ID:       "binlog",
-		Title:    "Binlog",
-		Units:    "records/s",
-		Fam:      "server statistics",
-		Ctx:      "beanstalk.binlog",
+	connectionsRateChart = module.Chart{
+		ID:       "connections_rate",
+		Title:    "Connections Rate",
+		Units:    "connections/s",
+		Fam:      "connections",
+		Ctx:      "beanstalk.connections_rate",
 		Type:     module.Line,
-		Priority: prioBinlog,
+		Priority: prioConnectionsRate,
+		Dims: module.Dims{
+			{ID: "total-connections", Name: "created", Algo: module.Incremental},
+		},
+	}
+
+	binlogRecordsChart = module.Chart{
+		ID:       "binlog_records",
+		Title:    "Binlog Records",
+		Units:    "records/s",
+		Fam:      "binlog",
+		Ctx:      "beanstalk.binlog_records",
+		Type:     module.Line,
+		Priority: prioBinlogRecords,
 		Dims: module.Dims{
 			{ID: "binlog-records-written", Name: "written", Algo: module.Incremental},
 			{ID: "binlog-records-migrated", Name: "migrated", Algo: module.Incremental},
 		},
 	}
+
+	cpuUsageChart = module.Chart{
+		ID:       "cpu_usage",
+		Title:    "CPU Usage",
+		Units:    "percent",
+		Fam:      "cpu usage",
+		Ctx:      "beanstalk.cpu_usage",
+		Type:     module.Stacked,
+		Priority: prioCpuUsage,
+		Dims: module.Dims{
+			{ID: "rusage-utime", Name: "user", Algo: module.Incremental, Mul: 100, Div: 1000},
+			{ID: "rusage-stime", Name: "system", Algo: module.Incremental, Mul: 100, Div: 1000},
+		},
+	}
+
 	uptimeChart = module.Chart{
 		ID:       "uptime",
 		Title:    "Uptime",
 		Units:    "seconds",
-		Fam:      "server statistics",
+		Fam:      "uptime",
 		Ctx:      "beanstalk.uptime",
 		Type:     module.Line,
 		Priority: prioUptime,
@@ -178,103 +215,96 @@ var (
 	}
 )
 
-// templates
 var (
-	chartsTmplTube = module.Charts{
+	tubeChartsTmpl = module.Charts{
+		tubeCurrentJobsChartTmpl.Copy(),
 		tubeJobsRateChartTmpl.Copy(),
-		tubeJobsChartTmpl.Copy(),
-		tubeConnectionsChartTmpl.Copy(),
-		tubeCommandsChartTmpl.Copy(),
-		tubePauseChartTmpl.Copy(),
+
+		tubeCommandsRateChartTmpl.Copy(),
+
+		tubeCurrentConnectionsChartTmpl.Copy(),
+
+		tubePauseTimeChartTmpl.Copy(),
 	}
 
-	tubeJobsRateChartTmpl = module.Chart{
-		ID:       "%s_jobs_rate",
-		Title:    "Job Rate",
-		Units:    "jobs/s",
-		Fam:      "tube %s",
-		Ctx:      "beanstalk.jobs_rate",
-		Type:     module.Area,
-		Priority: prioJobsRateTubeTmpl,
-		Dims: module.Dims{
-			{ID: "%s_total-jobs", Name: "jobs", Algo: module.Incremental},
-		},
-	}
-	tubeJobsChartTmpl = module.Chart{
-		ID:       "%s_jobs",
-		Title:    "Jobs",
+	tubeCurrentJobsChartTmpl = module.Chart{
+		ID:       "tube_%s_current_jobs",
+		Title:    "Tube Current Jobs",
 		Units:    "jobs",
-		Fam:      "tube %s",
-		Ctx:      "beanstalk.jobs_rate",
+		Fam:      "tube jobs",
+		Ctx:      "beanstalk.tube_current_jobs",
 		Type:     module.Stacked,
-		Priority: prioJobsTubeTmpl,
+		Priority: prioTubeCurrentJobs,
 		Dims: module.Dims{
-			{ID: "%s_current-jobs-urgent", Name: "urgent"},
-			{ID: "%s_current-jobs-ready", Name: "ready"},
-			{ID: "%s_current-jobs-reserved", Name: "reserved"},
-			{ID: "%s_current-jobs-delayed", Name: "delayed"},
-			{ID: "%s_current-jobs-buried", Name: "buried"},
+			{ID: "tube_%s_current-jobs-ready", Name: "ready"},
+			{ID: "tube_%s_current-jobs-buried", Name: "buried"},
+			{ID: "tube_%s_current-jobs-urgent", Name: "urgent"},
+			{ID: "tube_%s_current-jobs-delayed", Name: "delayed"},
+			{ID: "tube_%s_current-jobs-reserved", Name: "reserved"},
 		},
 	}
-	tubeConnectionsChartTmpl = module.Chart{
-		ID:       "%s_connections",
-		Title:    "Connections",
-		Units:    "connections",
-		Fam:      "tube %s",
-		Ctx:      "beanstalk.connections",
-		Type:     module.Stacked,
-		Priority: prioConnectionsTubeTmpl,
+	tubeJobsRateChartTmpl = module.Chart{
+		ID:       "tube_%s_jobs_rate",
+		Title:    "Tube Jobs Rate",
+		Units:    "jobs/s",
+		Fam:      "tube jobs",
+		Ctx:      "beanstalk.tube_jobs_rate",
+		Type:     module.Line,
+		Priority: prioTubeJobsRate,
 		Dims: module.Dims{
-			{ID: "%s_current-using", Name: "using"},
-			{ID: "%s_current-waiting", Name: "waiting"},
-			{ID: "%s_current-watching", Name: "watching"},
+			{ID: "tube_%s_total-jobs", Name: "created", Algo: module.Incremental},
 		},
 	}
-	tubeCommandsChartTmpl = module.Chart{
-		ID:       "%s_commands",
-		Title:    "Commands",
+	tubeCommandsRateChartTmpl = module.Chart{
+		ID:       "tube_%s_commands_rate",
+		Title:    "Tube Commands",
 		Units:    "commands/s",
-		Fam:      "tube %s",
-		Ctx:      "beanstalk.commands",
+		Fam:      "tube commands",
+		Ctx:      "beanstalk.tube_commands_rate",
 		Type:     module.Stacked,
-		Priority: prioCommandsTubeTmpl,
+		Priority: prioTubeCommands,
 		Dims: module.Dims{
-			{ID: "%s_cmd-delete", Name: "deletes", Algo: module.Incremental},
-			{ID: "%s_cmd-pause-tube", Name: "pauses", Algo: module.Incremental},
+			{ID: "tube_%s_cmd-delete", Name: "delete", Algo: module.Incremental},
+			{ID: "tube_%s_cmd-pause-tube", Name: "pause-tube", Algo: module.Incremental},
 		},
 	}
-	tubePauseChartTmpl = module.Chart{
-		ID:       "%s_pause",
-		Title:    "Pause",
-		Units:    "seconds",
-		Fam:      "tube %s",
-		Ctx:      "beanstalk.pause",
+	tubeCurrentConnectionsChartTmpl = module.Chart{
+		ID:       "tube_%s_current_connections",
+		Title:    "Tube Current Connections",
+		Units:    "connections",
+		Fam:      "tube connections",
+		Ctx:      "beanstalk.tube_current_connections",
 		Type:     module.Stacked,
-		Priority: prioPauseTubeTmpl,
+		Priority: prioTubeCurrentConnections,
 		Dims: module.Dims{
-			{ID: "%s_pause", Name: "since"},
-			{ID: "%s_pause-time-left", Name: "left"},
+			{ID: "tube_%s_current-using", Name: "using"},
+			{ID: "tube_%s_current-waiting", Name: "waiting"},
+			{ID: "tube_%s_current-watching", Name: "watching"},
+		},
+	}
+	tubePauseTimeChartTmpl = module.Chart{
+		ID:       "tube_%s_pause_time",
+		Title:    "Tube Pause Time",
+		Units:    "seconds",
+		Fam:      "tube pause",
+		Ctx:      "beanstalk.tube_pause",
+		Type:     module.Line,
+		Priority: prioTubePauseTime,
+		Dims: module.Dims{
+			{ID: "tube_%s_pause", Name: "since"},
+			{ID: "tube_%s_pause-time-left", Name: "left"},
 		},
 	}
 )
 
-func (b *Beanstalk) addBaseCharts() {
-	charts := baseCharts.Copy()
-
-	if err := b.Charts().Add(*charts...); err != nil {
-		b.Warning(err)
-	}
-}
-
 func (b *Beanstalk) addTubeCharts(name string) {
-	charts := chartsTmplTube.Copy()
+	charts := tubeChartsTmpl.Copy()
 
 	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, name)
+		chart.ID = fmt.Sprintf(chart.ID, cleanTubeName(name))
 		chart.Labels = []module.Label{
-			{Key: "tube", Value: name},
+			{Key: "tube_name", Value: name},
 		}
-		chart.Fam = fmt.Sprintf(chart.Fam, name)
 
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, name)
@@ -287,7 +317,7 @@ func (b *Beanstalk) addTubeCharts(name string) {
 }
 
 func (b *Beanstalk) removeTubeCharts(name string) {
-	px := fmt.Sprintf("%s_", name)
+	px := fmt.Sprintf("tube_%s_", cleanTubeName(name))
 
 	for _, chart := range *b.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
@@ -295,4 +325,9 @@ func (b *Beanstalk) removeTubeCharts(name string) {
 			chart.MarkNotCreated()
 		}
 	}
+}
+
+func cleanTubeName(name string) string {
+	r := strings.NewReplacer(" ", "_", ".", "_", ",", "_")
+	return r.Replace(name)
 }

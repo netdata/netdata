@@ -1,0 +1,54 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Beanstalk collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "address": {
+        "title": "Address",
+        "description": "The IP address and port where the Beanstalk service listens for connections.",
+        "type": "string",
+        "default": "127.0.0.1:11300"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for establishing a connection and communication (reading and writing) in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 1
+      },
+      "tube_selector": {
+        "title": "Tube selector",
+        "description": "Specifies a [pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) for which Beanstalk tubes Netdata will collect statistics. Only tubes whose names match the provided pattern will be included.",
+        "type": "string",
+        "minimum": 1,
+        "default": "*"
+      }
+    },
+    "required": [
+      "address"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "tube_selector": {
+      "ui:help": "Leave blank or use `*` to collect data for all tubes."
+    }
+  }
+}
