@@ -1,0 +1,16 @@
+OK 265
+---
+name: default
+current-jobs-urgent: 0
+current-jobs-ready: 0
+current-jobs-reserved: 0
+current-jobs-delayed: 0
+current-jobs-buried: 0
+total-jobs: 0
+current-using: 2
+current-watching: 2
+current-waiting: 0
+cmd-delete: 0
+cmd-pause-tube: 0
+pause: 0
+pause-time-left: 0
