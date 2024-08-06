@@ -44,6 +44,8 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     char *node_id = get_word(s->line.words, s->line.num_words, 2);
     char *url = get_word(s->line.words, s->line.num_words, 3);
 
+    bool claimed = is_agent_claimed();
+
     ND_UUID claim_uuid;
     if (uuid_parse(claim_id ? claim_id : "", claim_uuid.uuid) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -62,6 +64,24 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
         return;
     }
 
+    if (!UUIDiszero(s->host->aclk.claim_id_of_parent) && !UUIDeq(s->host->aclk.claim_id_of_parent, claim_uuid))
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "STREAM %s [send to %s] changed parent's claim id to %s",
+               rrdhost_hostname(s->host), s->connected_to, claim_id ? claim_id : "(unset)");
+
+    if(!uuid_is_null(s->host->node_id) && uuid_compare(s->host->node_id, node_uuid.uuid) != 0) {
+        if(claimed) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM %s [send to %s] parent reports different node id '%s', but we are claimed. Ignoring it.",
+                   rrdhost_hostname(s->host), s->connected_to, node_id ? node_id : "(unset)");
+            return;
+        }
+        else
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM %s [send to %s] changed node id to %s",
+                   rrdhost_hostname(s->host), s->connected_to, node_id ? node_id : "(unset)");
+    }
+
     if(!url || !*url) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s] received an invalid cloud URL '%s'",
@@ -69,16 +89,6 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
                url ? url : "(unset)");
         return;
     }
-
-    if (!UUIDiszero(s->host->aclk.claim_id_of_parent) && !UUIDeq(s->host->aclk.claim_id_of_parent, claim_uuid))
-        nd_log(NDLS_DAEMON, NDLP_INFO,
-               "STREAM %s [send to %s] changed parent's claim id to %s",
-               rrdhost_hostname(s->host), s->connected_to, claim_id ? claim_id : "(unset)");
-
-    if(!uuid_is_null(s->host->node_id) && uuid_compare(s->host->node_id, node_uuid.uuid) != 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM %s [send to %s] changed node id to %s",
-               rrdhost_hostname(s->host), s->connected_to, node_id ? node_id : "(unset)");
 
     s->host->aclk.claim_id_of_parent = claim_uuid;
 
@@ -92,11 +102,12 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     // So, if the agent is not claimed or not connected, we inherit whatever information sent from the parent,
     // to allow the user to work with it.
 
-    if(is_agent_claimed() && aclk_connected)
+    if(claimed && aclk_connected)
         // we are directly claimed and connected, ignore node id and cloud url
         return;
 
-    uuid_copy(s->host->node_id, node_uuid.uuid);
+    if(uuid_is_null(s->host->node_id))
+        uuid_copy(s->host->node_id, node_uuid.uuid);
 
     // we change the URL, to allow the agent dashboard to work with Netdata Cloud on-prem, if any.
     cloud_config_url_set(url);
