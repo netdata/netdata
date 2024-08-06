@@ -4073,7 +4073,7 @@ int main(int argc, char **argv)
                 }
                  */
 
-                ebpf_create_apps_charts(apps_groups_root_target);
+//                ebpf_create_apps_charts(apps_groups_root_target);
                 pthread_mutex_unlock(&collect_data_mutex);
             }
             pthread_mutex_unlock(&lock);
