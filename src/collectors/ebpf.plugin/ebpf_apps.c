@@ -333,7 +333,6 @@ int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **a
 #define MAX_CMDLINE 16384
 
 struct ebpf_pid_stat **ebpf_all_pids = NULL;    // to avoid allocations, we pre-allocate the entire pid space.
-struct ebpf_pid_stat *ebpf_vector_pids = NULL; //
 struct ebpf_pid_stat *ebpf_root_of_pids = NULL; // global list of all processes running
 
 ebpf_pid_data_t *ebpf_pids = NULL;            // to avoid allocations, we pre-allocate the entire pid space.
@@ -465,6 +464,7 @@ static inline int managed_log(ebpf_pid_data_t *p, uint32_t log, int status)
  */
 ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid, pid_t tgid)
 {
+    /*
     struct ebpf_pid_stat *p;
     if (unlikely(!ebpf_vector_pids)) {
         ebpf_pid_stat_t *ptr = ebpf_all_pids[pid];
@@ -497,6 +497,8 @@ ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid, pid_t tgid)
     ebpf_all_pids_count++;
 
     return p;
+     */
+    return NULL;
 }
 
 /**
@@ -919,7 +921,7 @@ static inline void post_aggregate_targets(struct ebpf_target *root)
  */
 void ebpf_del_pid_entry(pid_t pid)
 {
-    struct ebpf_pid_stat *p = (ebpf_all_pids) ? ebpf_all_pids[pid] : &ebpf_vector_pids[pid];
+    struct ebpf_pid_stat *p = ebpf_all_pids[pid];
 
     if (unlikely(!p)) {
         netdata_log_error("attempted to free pid %d that is not allocated.", pid);
@@ -963,8 +965,6 @@ void ebpf_del_pid_entry(pid_t pid)
     if (ebpf_all_pids) {
         ebpf_pid_stat_release(p);
         ebpf_all_pids[pid] = NULL;
-    } else if (ebpf_vector_pids) {
-        memset(&ebpf_vector_pids[pid], 0, sizeof(struct ebpf_pid_stat));
     }
 
     ebpf_all_pids_count--;

@@ -235,27 +235,6 @@ typedef struct ebpf_pid_stat {
     struct ebpf_pid_stat *next;
 } ebpf_pid_stat_t;
 
-extern struct ebpf_pid_stat *ebpf_vector_pids;
-
-static inline ebpf_pid_stat_t *ebpf_get_pid_address(uint32_t pid, uint32_t tgid, char *name, size_t length)
-{
-    ebpf_pid_stat_t *ptr = &ebpf_vector_pids[pid];
-
-    if (ptr->pid == pid && ptr->ppid == tgid)
-        return ptr;
-
-    // mark it as updated
-    ptr->updated = 1;
-    ptr->keep = 0;
-    ptr->keeploops = 0;
-
-    if (length)
-        memcpy(ptr->comm, name, length);
-
-    return ptr;
-}
-
-
 // ----------------------------------------------------------------------------
 // target
 //
