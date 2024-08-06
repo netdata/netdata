@@ -921,29 +921,21 @@ static inline void post_aggregate_targets(struct ebpf_target *root)
  */
 void ebpf_del_pid_entry(pid_t pid)
 {
-    /*
-    struct ebpf_pid_stat *p = ebpf_all_pids[pid];
-
-    if (unlikely(!p)) {
-        netdata_log_error("attempted to free pid %d that is not allocated.", pid);
-        return;
-    }
+    ebpf_pid_data_t *p = &ebpf_pids[pid];
 
     debug_log("process %d %s exited, deleting it.", pid, p->comm);
 
-    if (ebpf_root_of_pids == p)
-        ebpf_root_of_pids = p->next;
+    if (ebpf_pids_link_list == p)
+        ebpf_pids_link_list = p->next;
 
     if (p->next)
         p->next->prev = p->prev;
     if (p->prev)
         p->prev->next = p->next;
 
-    freez(p->stat_filename);
-    freez(p->status_filename);
-    freez(p->io_filename);
-    freez(p->cmdline_filename);
+    memset(p, 0, sizeof(ebpf_pid_data_t));
 
+    /*
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
     if (pid_ptr) {
@@ -961,12 +953,6 @@ void ebpf_del_pid_entry(pid_t pid)
         JudyLDel(&ebpf_judy_pid.index.JudyLArray, p->pid, PJE0);
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
-
-    freez(p->cmdline);
-    if (ebpf_all_pids) {
-        ebpf_pid_stat_release(p);
-        ebpf_all_pids[pid] = NULL;
-    }
      */
 
     ebpf_all_pids_count--;

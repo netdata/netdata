@@ -147,6 +147,8 @@ typedef struct ebpf_pid_data {
 extern ebpf_pid_data_t *ebpf_pids;
 extern ebpf_pid_data_t *ebpf_pids_link_list;
 extern size_t ebpf_all_pids_count;
+void ebpf_del_pid_entry(pid_t pid);
+
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name) {
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
     if (ptr->pid == pid) {
@@ -174,13 +176,9 @@ static inline void ebpf_release_pid_data(ebpf_pid_data_t *eps, int fd, uint32_t 
 {
     bpf_map_delete_elem(fd, &key);
     eps->thread_collecting &= ~(1<<idx);
-    if (!eps->thread_collecting) {
-        memset(eps, 0, sizeof(ebpf_pid_data_t));
-    }
-    /*
-    if (!eps->thread_collecting)
+    if (!eps->thread_collecting && !eps->has_proc_file) {
         ebpf_del_pid_entry((pid_t)key);
-        */
+    }
 }
 
 typedef struct ebpf_pid_stat {
@@ -313,7 +311,6 @@ void ebpf_shm_aral_init();
 netdata_publish_shm_t *ebpf_shm_stat_get(void);
 void ebpf_shm_release(netdata_publish_shm_t *stat);
 void ebpf_cleanup_exited_pids(int max);
-void ebpf_del_pid_entry(pid_t pid);
 void ebpf_read_proc_filesystem();
 
 // ARAL Section end
