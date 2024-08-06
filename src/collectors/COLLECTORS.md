@@ -779,7 +779,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Apache Pulsar](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/pulsar/integrations/apache_pulsar.md)
 
-- [Beanstalk](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/beanstalk/integrations/beanstalk.md)
+- [Beanstalk](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/beanstalk/integrations/beanstalk.md)
 
 - [IBM MQ](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/ibm_mq.md)
 
