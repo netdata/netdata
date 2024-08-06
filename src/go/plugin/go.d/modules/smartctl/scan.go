@@ -5,7 +5,6 @@ package smartctl
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 )
 
@@ -54,11 +53,6 @@ func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
 
 		if !s.deviceSr.MatchString(dev.infoName) {
 			s.Debugf("device %s does not match selector, skipping it", dev.infoName)
-			continue
-		}
-
-		if i := slices.IndexFunc(s.ExtraDevices, func(d ConfigExtraDevice) bool { return d.Name == dev.name }); i >= 0 {
-			s.Debugf("device %s exists in extra devices", dev.infoName)
 			continue
 		}
 
