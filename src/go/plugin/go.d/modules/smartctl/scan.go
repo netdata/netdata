@@ -5,6 +5,7 @@ package smartctl
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -56,21 +57,18 @@ func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
 			continue
 		}
 
+		if i := slices.IndexFunc(s.ExtraDevices, func(d ConfigExtraDevice) bool { return d.Name == dev.name }); i >= 0 {
+			s.Debugf("device %s exists in extra devices", dev.infoName)
+			continue
+		}
+
 		if !scanOpen && dev.typ == "scsi" {
 			// `smartctl --scan` attempts to guess the device type based on the path, but this can be unreliable.
 			// Accurate device type information is crucial because we use the `--device` option to gather data.
 			// Using the wrong type can lead to issues.
 			// For example, using 'scsi' for 'sat' devices prevents `smartctl` from issuing the necessary ATA commands.
-			d := scanDevice{name: dev.name, typ: "sat"}
-			if _, ok := s.scannedDevices[d.key()]; ok {
-				dev.typ = "sat"
-			} else {
-				resp, _ := s.exec.deviceInfo(dev.name, dev.typ, s.NoCheckPowerMode)
-				if resp != nil && isExitStatusHasBit(resp, 2) {
-					s.Debugf("changing device '%s' type 'scsi' -> 'sat'", dev.name)
-					dev.typ = "sat"
-				}
-			}
+
+			s.handleGuessedScsiScannedDevice(dev)
 		}
 
 		s.Debugf("smartctl scan found device '%s' type '%s' info_name '%s'", dev.name, dev.typ, dev.infoName)
@@ -81,10 +79,8 @@ func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
 	s.Debugf("smartctl scan found %d devices", len(devices))
 
 	for _, v := range s.ExtraDevices {
-		if v.Name == "" || v.Type == "" {
-			continue
-		}
 		dev := &scanDevice{name: v.Name, typ: v.Type, extra: true}
+
 		if _, ok := devices[dev.key()]; !ok {
 			devices[dev.key()] = dev
 		}
@@ -95,4 +91,35 @@ func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
 	}
 
 	return devices, nil
+}
+
+func (s *Smartctl) handleGuessedScsiScannedDevice(dev *scanDevice) {
+	if dev.typ != "scsi" || s.hasScannedDevice(dev) {
+		return
+	}
+
+	d := &scanDevice{name: dev.name, typ: "sat"}
+
+	if s.hasScannedDevice(d) {
+		dev.typ = d.typ
+		return
+	}
+
+	resp, _ := s.exec.deviceInfo(dev.name, "sat", s.NoCheckPowerMode)
+	if resp == nil || resp.Get("smartctl.exit_status").Int() != 0 {
+		return
+	}
+
+	atts, ok := newSmartDevice(resp).ataSmartAttributeTable()
+	if !ok || len(atts) == 0 {
+		return
+	}
+
+	s.Debugf("changing device '%s' type 'scsi' -> 'sat'", dev.name)
+	dev.typ = "sat"
+}
+
+func (s *Smartctl) hasScannedDevice(d *scanDevice) bool {
+	_, ok := s.scannedDevices[d.key()]
+	return ok
 }
