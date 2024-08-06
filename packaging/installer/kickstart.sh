@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F051A
+# Next unused error code: F051B
 
 # ======================================================================
 # Constants
@@ -610,8 +610,8 @@ set_tmpdir() {
   if [ -z "${tmpdir}" ] || [ ! -d "${tmpdir}" ]; then
     tmpdir="$(create_tmp_directory)"
     progress "Using ${tmpdir} as a temporary directory."
+    cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
   fi
-  cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
 }
 
 check_for_remote_file() {
@@ -1938,6 +1938,7 @@ build_and_install() {
   run_script ./netdata-installer.sh ${opts}
 
   case $? in
+    0) ;;
     1)
       if [ -n "${EXIT_REASON}" ]; then
         fatal "netdata-installer.sh failed to run: ${EXIT_REASON}" "${EXIT_CODE}"
@@ -1946,6 +1947,7 @@ build_and_install() {
       fi
       ;;
     2) fatal "Insufficient RAM to install netdata." F0008 ;;
+    *) fatal "netdata-installer.sh failed to run: Encountered an unhandled error in the installer code." F051A ;;
   esac
 }
 
