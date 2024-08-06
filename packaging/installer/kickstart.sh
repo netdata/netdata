@@ -378,12 +378,14 @@ trap 'trap_handler 15 0' TERM
 # Utility functions
 
 canonical_path() {
+  OLDPWD="$(pwd)"
   cd "$(dirname "${1}")" || exit 1
   case "$(basename "${1}")" in
     ..) dirname "$(pwd -P)" ;;
     .) pwd -P ;;
     *) echo "$(pwd -P)/$(basename "${1}")" ;;
   esac
+  cd "${OLDPWD}" || exit 1
 }
 
 setup_terminal() {
@@ -608,8 +610,8 @@ set_tmpdir() {
   if [ -z "${tmpdir}" ] || [ ! -d "${tmpdir}" ]; then
     tmpdir="$(create_tmp_directory)"
     progress "Using ${tmpdir} as a temporary directory."
-    cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
   fi
+  cd "${tmpdir}" || fatal "Failed to change current working directory to ${tmpdir}." F000A
 }
 
 check_for_remote_file() {
@@ -1794,11 +1796,11 @@ try_static_install() {
     return 2
   fi
 
-  if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "${tmpdir}/${netdata_agent}"; then
+  if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "./${netdata_agent}"; then
     fatal "Unable to download static build archive for ${SYSARCH}. ${BADNET_MSG}." F0208
   fi
 
-  if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"; then
+  if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
     fatal "Unable to fetch checksums to verify static build archive. ${BADNET_MSG}." F0206
   fi
 
@@ -1806,7 +1808,7 @@ try_static_install() {
     progress "Would validate SHA256 checksum of downloaded static build archive."
   else
     if [ -z "${INSTALL_VERSION}" ]; then
-      if ! grep "${netdata_agent}" "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+      if ! grep "${netdata_agent}" ./sha256sum.txt | safe_sha256sum -c - > /dev/null 2>&1; then
         fatal "Static binary checksum validation failed. ${BADCACHE_MSG}." F0207
       fi
     fi
@@ -1824,7 +1826,7 @@ try_static_install() {
 
   progress "Installing netdata"
   # shellcheck disable=SC2086
-  if ! run_as_root ${env_cmd} /bin/sh "${tmpdir}/${netdata_agent}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
+  if ! run_as_root ${env_cmd} /bin/sh "./${netdata_agent}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
     warning "Failed to install static build of Netdata on ${SYSARCH}."
     run rm -rf /opt/netdata
     return 2
@@ -1963,14 +1965,14 @@ try_build_install() {
   set_source_archive_urls "${SELECTED_RELEASE_CHANNEL}"
 
   if [ -n "${INSTALL_VERSION}" ]; then
-    if ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "${tmpdir}/netdata-v${INSTALL_VERSION}.tar.gz"; then
+    if ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "./netdata-v${INSTALL_VERSION}.tar.gz"; then
       fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
     fi
-  elif ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "${tmpdir}/netdata-latest.tar.gz"; then
+  elif ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "./netdata-latest.tar.gz"; then
     fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
   fi
 
-  if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"; then
+  if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
     fatal "Failed to download checksums for source tarball verification. ${BADNET_MSG}." F000C
   fi
 
@@ -1979,18 +1981,18 @@ try_build_install() {
   else
     if [ -z "${INSTALL_VERSION}" ]; then
       # shellcheck disable=SC2086
-      if ! grep netdata-latest.tar.gz "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+      if ! grep netdata-latest.tar.gz "./sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
         fatal "Tarball checksum validation failed. ${BADCACHE_MSG}." F0005
       fi
     fi
   fi
 
   if [ -n "${INSTALL_VERSION}" ]; then
-    run tar -xf "${tmpdir}/netdata-v${INSTALL_VERSION}.tar.gz" -C "${tmpdir}"
-    rm -rf "${tmpdir}/netdata-v${INSTALL_VERSION}.tar.gz" > /dev/null 2>&1
+    run tar -xf "./netdata-v${INSTALL_VERSION}.tar.gz" -C "${tmpdir}"
+    rm -rf "./netdata-v${INSTALL_VERSION}.tar.gz" > /dev/null 2>&1
   else
-    run tar -xf "${tmpdir}/netdata-latest.tar.gz" -C "${tmpdir}"
-    rm -rf "${tmpdir}/netdata-latest.tar.gz" > /dev/null 2>&1
+    run tar -xf "./netdata-latest.tar.gz" -C "${tmpdir}"
+    rm -rf "./netdata-latest.tar.gz" > /dev/null 2>&1
   fi
 
   if [ "${DRY_RUN}" -ne 1 ]; then
