@@ -144,8 +144,9 @@ typedef struct ebpf_pid_data {
 extern ebpf_pid_data_t *ebpf_pids;
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name) {
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
-    if (ptr->pid == pid)
+    if (ptr->pid == pid) {
         return ptr;
+    }
 
     if (name)
         strncpyz(ptr->comm, name, EBPF_MAX_COMPARE_NAME);
@@ -161,7 +162,6 @@ static inline void ebpf_release_pid_data(ebpf_pid_data_t *eps, int fd, uint32_t 
     bpf_map_delete_elem(fd, &key);
     eps->thread_collecting &= ~(1<<idx);
     if (!eps->thread_collecting) {
-        freez(eps->cmdline);
         memset(eps, 0, sizeof(ebpf_pid_data_t));
     }
     /*
