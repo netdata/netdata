@@ -104,7 +104,6 @@ static void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host,
     buffer_json_object_close(wb);
 }
 
-extern int aclk_connected;
 static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb) {
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 

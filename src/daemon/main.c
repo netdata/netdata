@@ -1398,6 +1398,7 @@ int unittest_rrdpush_compressions(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
+bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
 int windows_perflib_dump(const char *key);

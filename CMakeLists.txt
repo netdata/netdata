@@ -1260,10 +1260,10 @@ set(CLAIM_PLUGIN_FILES
         src/claim/claim.h
         src/claim/claim_id.c
         src/claim/claim_id.h
-        src/claim/claim-web-api.c
         src/claim/cloud-conf.c
         src/claim/claim-with-api.c
         src/claim/cloud-status.c
+        src/claim/cloud-status.h
 )
 
 set(ACLK_ALWAYS_BUILD
