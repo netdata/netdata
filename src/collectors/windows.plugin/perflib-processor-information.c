@@ -7,7 +7,7 @@
 #define _COMMON_PLUGIN_MODULE_NAME "PerflibProcesses"
 #include "../common-contexts/common-contexts.h"
 
-#define PERFORMANCE_TO_ND 10000000.0
+#define PERFORMANCE_TO_ND 100000000.0
 #define CPU_PROPORTIONAL_CONSTANT 1000
 
 struct processor_info {
@@ -15,14 +15,14 @@ struct processor_info {
     char cpu_freq_id[16];
 
     COUNTER_DATA cpuFrequency;
-    COUNTER_DATA percProcessorPerformance;
+    COUNTER_DATA percMax
 };
 
 static struct processor_info total = { 0 };
 
 static void initialize_processor_info_keys(struct processor_info *p) {
     p->cpuFrequency.key = "Processor Frequency";
-    p->percProcessorPerformance.key = "% Processor Performance";
+    p->percMax.key = "% of Maximum Frequency";
 }
 
 void dict_processor_info_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -48,17 +48,13 @@ static inline int cpu_dict_callback(const DICTIONARY_ITEM *item __maybe_unused, 
     if (!p->rd_cpu_frequency)
         p->rd_cpu_frequency = rrddim_add(cpufreq, p->cpu_freq_id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-    // Convert to MHz
-    NETDATA_DOUBLE cpuFreq = (p->cpuFrequency.current.Data >= CPU_PROPORTIONAL_CONSTANT) ?
-                             ((NETDATA_DOUBLE)p->cpuFrequency.current.Data)/CPU_PROPORTIONAL_CONSTANT:
-                             p->cpuFrequency.current.Data;
-    NETDATA_DOUBLE cpuPerformance = (NETDATA_DOUBLE)p->percProcessorPerformance.current.Data;
+    NETDATA_DOUBLE cpuFreq = (NETDATA_DOUBLE)p->cpuFrequency.current.Data;
 
-    // Adjust factor and do conversion
-    cpuFreq *=  (cpuPerformance/(100.0));
-    cpuFreq /= PERFORMANCE_TO_ND; 
+    NETDATA_DOUBLE percFreq = (NETDATA_DOUBLE)p->percMax.current.Data;
+
+    cpuFreq *= percFreq/100.0;
+
     rrddim_set_by_pointer(cpufreq, p->rd_cpu_frequency, (collected_number)cpuFreq);
-
 
     return 1;
 }
@@ -103,7 +99,7 @@ static bool do_processors_info(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         }
 
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->cpuFrequency);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->percProcessorPerformance);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->percMax);
     }
 
     if (count_cpus)
