@@ -734,7 +734,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
             cachestat_save_pid_values(publish, cv);
             local_pid->thread_collecting |= 1<<EBPF_MODULE_CACHESTAT_IDX;
             local_pid->not_updated = 0;
-        } else if (++local_pid->not_updated >= max_period) {
+        } else if (++local_pid->not_updated >= 2 && !local_pid->has_proc_file) {
             ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_CACHESTAT_IDX);
         }
 

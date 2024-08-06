@@ -651,6 +651,7 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p, void *ptr)
     procfile *ff;
 
     char filename[FILENAME_MAX + 1];
+    int ret = 0;
     snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", netdata_configured_host_prefix, p->pid);
 
     struct stat statbuf;
@@ -659,13 +660,13 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p, void *ptr)
 
     ff = procfile_open(filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
     if (unlikely(!ff))
-        return 0;
+        goto cleanup_pid_stat;
 
     procfile_set_open_close(ff, "(", ")");
 
     ff = procfile_readall(ff);
     if (unlikely(!ff))
-        return 0;
+        goto cleanup_pid_stat;
 
     char *comm = procfile_lineword(ff, 0, 1);
     p->ppid = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
@@ -682,18 +683,21 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p, void *ptr)
         }
 
         strncpyz(p->comm, comm, EBPF_MAX_COMPARE_NAME);
-
-        assign_target_to_pid(p);
     }
+    if (!p->target)
+        assign_target_to_pid(p);
 
     if (unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
         debug_log_int(
             "READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s'",
             netdata_configured_host_prefix, p->pid, p->comm, (p->target) ? p->target->name : "UNSET");
 
+    p->has_proc_file = true;
+    ret = 1;
+cleanup_pid_stat:
     procfile_close(ff);
 
-    return 1;
+    return ret;
 }
 
 /**
@@ -714,8 +718,6 @@ static inline int ebpf_collect_data_for_pid(pid_t pid)
     ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL);
     if (p->has_proc_file)
         return 1;
-
-    p->has_proc_file = true;
 
     if (unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr))))
         // there is no reason to proceed if we cannot get its status
