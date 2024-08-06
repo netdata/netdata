@@ -7,6 +7,6 @@
 
 #define RRDFUNCTIONS_STREAMING_HELP "Streaming status for parents and children."
 
-int function_streaming(BUFFER *wb, const char *function, BUFFER *payload);
+int function_streaming(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
 
 #endif //NETDATA_FUNCTION_STREAMING_H

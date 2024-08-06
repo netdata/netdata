@@ -17,7 +17,7 @@ static int rrd_function_run_inline(struct rrd_function_execute *rfe, void *data)
     if(rfe->is_cancelled.cb && rfe->is_cancelled.cb(rfe->is_cancelled.data))
         code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     else
-        code = fi->cb(rfe->result.wb, rfe->function, rfe->payload);
+        code = fi->cb(rfe->result.wb, rfe->function, rfe->payload, rfe->source);
 
     if(code == HTTP_RESP_CLIENT_CLOSED_REQUEST || (rfe->is_cancelled.cb && rfe->is_cancelled.cb(rfe->is_cancelled.data))) {
         buffer_flush(rfe->result.wb);

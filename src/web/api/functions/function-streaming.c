@@ -2,7 +2,7 @@
 
 #include "function-streaming.h"
 
-int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload __maybe_unused) {
+int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload __maybe_unused, const char *source __maybe_unused) {
 
     time_t now = now_realtime_sec();
 

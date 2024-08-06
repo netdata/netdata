@@ -398,7 +398,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                      rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                     BUFFER *payload, const char *source) {
+                     BUFFER *payload, const char *source, bool hidden) {
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
@@ -435,6 +435,18 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     }
 
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
+
+    if((rdcf->options & RRD_FUNCTION_HIDDEN) && !hidden) {
+        code = rrd_call_function_error(result_wb,
+                                       "You cannot access a hidden function like this. ",
+                                       HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+        dictionary_acquired_item_release(host->functions, host_function_acquired);
+
+        if(result_cb)
+            result_cb(result_wb, code, result_cb_data);
+
+        return code;
+    }
 
     if(!http_access_user_has_enough_access_level_for_endpoint(user_access, rdcf->access)) {
 

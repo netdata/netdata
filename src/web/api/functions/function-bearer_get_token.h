@@ -5,7 +5,7 @@
 
 #include "daemon/common.h"
 
-int function_bearer_get_token(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload __maybe_unused);
+int function_bearer_get_token(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
 int call_function_bearer_get_token(RRDHOST *host, struct web_client *w, const char *claim_id, const char *machine_guid, const char *node_id);
 
 #define RRDFUNCTIONS_BEARER_GET_TOKEN "bearer_get_token"

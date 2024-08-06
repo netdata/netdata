@@ -18,6 +18,8 @@ struct web_client;
 #include "web/api/queries/weights.h"
 
 void nd_web_api_init(void);
+
+bool source_comes_from_cloud(const char *source);
 void web_client_api_request_vX_source_to_buffer(struct web_client *w, BUFFER *source);
 void web_client_progress_functions_update(void *data, size_t done, size_t all);
 

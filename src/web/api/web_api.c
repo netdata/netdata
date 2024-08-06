@@ -134,6 +134,11 @@ void nd_web_api_init(void) {
     time_grouping_init();
 }
 
+
+bool source_comes_from_cloud(const char *source) {
+    return source && *source && strstartswith(source, "method=NC,");
+}
+
 void web_client_api_request_vX_source_to_buffer(struct web_client *w, BUFFER *source) {
     if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_CLOUD))
         buffer_sprintf(source, "method=NC");

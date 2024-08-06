@@ -80,7 +80,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                      rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                     BUFFER *payload, const char *source);
+                     BUFFER *payload, const char *source, bool hidden);
 
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 

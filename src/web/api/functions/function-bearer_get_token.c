@@ -24,27 +24,24 @@ static bool parse_payload(json_object *jobj, const char *path, struct bearer_tok
     return true;
 }
 
-int function_bearer_get_token(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload) {
-    if(!payload || !buffer_strlen(payload)) {
-        buffer_reset(wb);
-        buffer_strcat(wb, "No payload to generate token for");
-        return HTTP_RESP_BAD_REQUEST;
-    }
+int function_bearer_get_token(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload, const char *source) {
+    if(!source_comes_from_cloud(source))
+        return rrd_call_function_error(wb, "You cannot access this function from outside Netdata Cloud", HTTP_RESP_BAD_REQUEST);
+
+    if(!payload || !buffer_strlen(payload))
+        return rrd_call_function_error(wb, "No payload to generate token for", HTTP_RESP_BAD_REQUEST);
 
     struct json_tokener *tokener = json_tokener_new();
-    if (!tokener) {
-        buffer_reset(wb);
-        buffer_strcat(wb, "Cannot initialize json parser");
-        return HTTP_RESP_INTERNAL_SERVER_ERROR;
-    }
+    if (!tokener)
+        return rrd_call_function_error(wb, "Cannot initialize json parser", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
     CLEAN_JSON_OBJECT *jobj = json_tokener_parse_ex(tokener, buffer_tostring(payload), (int)buffer_strlen(payload));
     if (json_tokener_get_error(tokener) != json_tokener_success) {
         const char *error_msg = json_tokener_error_desc(json_tokener_get_error(tokener));
-        buffer_reset(wb);
-        buffer_sprintf(wb, "JSON parser failed: %s", error_msg);
+        char tmp[strlen(error_msg) + 100];
+        snprintf(tmp, sizeof(tmp), "JSON parser failed: %s", error_msg);
         json_tokener_free(tokener);
-        return HTTP_RESP_INTERNAL_SERVER_ERROR;
+        return rrd_call_function_error(wb, tmp, HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
     json_tokener_free(tokener);
 
@@ -52,9 +49,9 @@ int function_bearer_get_token(BUFFER *wb, const char *function __maybe_unused, B
     struct bearer_token_request rq = { 0 };
     if(!parse_payload(jobj, "", &rq, error)) {
         string_freez(rq.client_name);
-        buffer_reset(wb);
-        buffer_sprintf(wb, "JSON parser failed: %s", buffer_tostring(error));
-        return HTTP_RESP_BAD_REQUEST;
+        char tmp[buffer_strlen(error) + 100];
+        snprintfz(tmp, sizeof(tmp), "JSON parser failed: %s", buffer_tostring(error));
+        return rrd_call_function_error(wb, tmp, HTTP_RESP_BAD_REQUEST);
     }
 
     char claim_id[UUID_STR_LEN];
@@ -96,5 +93,5 @@ int call_function_bearer_get_token(RRDHOST *host, struct web_client *w, const ch
                             transaction_str, NULL, NULL,
                             NULL, NULL,
                             NULL, NULL,
-                            payload, buffer_tostring(source));
+                            payload, buffer_tostring(source), true);
 }
