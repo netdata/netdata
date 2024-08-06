@@ -201,7 +201,7 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
 void rrdcontext_hub_checkpoint_command(void *ptr) {
     struct ctxs_checkpoint *cmd = ptr;
 
-    if(!aclk_matches_claimed_id(cmd->claim_id)) {
+    if(!claim_id_matches(cmd->claim_id)) {
         CLAIM_ID claim_id = claim_id_get();
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received checkpoint command for claim_id '%s', node id '%s', "
@@ -273,7 +273,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 void rrdcontext_hub_stop_streaming_command(void *ptr) {
     struct stop_streaming_ctxs *cmd = ptr;
 
-    if(!aclk_matches_claimed_id(cmd->claim_id)) {
+    if(!claim_id_matches(cmd->claim_id)) {
         CLAIM_ID claim_id = claim_id_get();
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received stop streaming command for claim_id '%s', node id '%s', "

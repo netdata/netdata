@@ -18,7 +18,8 @@ bool claim_agent_automatically(void);
 bool claimed_id_save_to_file(const char *claimed_id_str);
 
 bool is_agent_claimed(void);
-bool aclk_matches_claimed_id(const char *claim_id);
+bool claim_id_matches(const char *claim_id);
+bool claim_id_matches_any(const char *claim_id);
 bool load_claiming_state(void);
 void cloud_conf_load(int silent);
 void cloud_conf_init_after_registry(void);

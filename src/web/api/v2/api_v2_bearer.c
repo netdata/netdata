@@ -46,7 +46,7 @@ int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
             node_id = value;
     }
 
-    if(!aclk_matches_claimed_id(claim_id)) {
+    if(!claim_id_matches(claim_id)) {
         buffer_reset(w->response.data);
         buffer_strcat(w->response.data, "The request is for a different claimed agent");
         return HTTP_RESP_BAD_REQUEST;
@@ -70,7 +70,7 @@ int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
 }
 
 int bearer_get_token_json_response(BUFFER *wb, RRDHOST *host, const char *claim_id, const char *machine_guid, const char *node_id, HTTP_USER_ROLE user_role, HTTP_ACCESS access, nd_uuid_t cloud_account_id, const char *client_name) {
-    if(!aclk_matches_claimed_id(claim_id)) {
+    if(!claim_id_matches_any(claim_id)) {
         buffer_reset(wb);
         buffer_strcat(wb, "The request is for a different claimed agent");
         return HTTP_RESP_BAD_REQUEST;
@@ -116,7 +116,7 @@ int api_v2_bearer_get_token(RRDHOST *host, struct web_client *w, char *url) {
             node_id = value;
     }
 
-    if(!aclk_matches_claimed_id(claim_id)) {
+    if(!claim_id_matches(claim_id)) {
         buffer_reset(w->response.data);
         buffer_strcat(w->response.data, "The request is for a different claimed agent");
         return HTTP_RESP_BAD_REQUEST;

@@ -105,11 +105,36 @@ bool is_agent_claimed(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-bool aclk_matches_claimed_id(const char *claim_id) {
+bool claim_id_matches(const char *claim_id) {
+    ND_UUID this_one = UUID_ZERO;
+    if(uuid_parse_flexi(claim_id, this_one.uuid) != 0 || UUIDiszero(this_one))
+        return false;
+
     ND_UUID having = claim_id_get_uuid();
-    ND_UUID this_one;
-    uuid_parse_flexi(claim_id, this_one.uuid);
-    return UUIDeq(having, this_one);
+    if(!UUIDiszero(having) && UUIDeq(having, this_one))
+        return true;
+
+    return false;
+}
+
+bool claim_id_matches_any(const char *claim_id) {
+    ND_UUID this_one = UUID_ZERO;
+    if(uuid_parse_flexi(claim_id, this_one.uuid) != 0 || UUIDiszero(this_one))
+        return false;
+
+    ND_UUID having = claim_id_get_uuid();
+    if(!UUIDiszero(having) && UUIDeq(having, this_one))
+        return true;
+
+    having = localhost->aclk.claim_id_of_parent;
+    if(!UUIDiszero(having) && UUIDeq(having, this_one))
+        return true;
+
+    having = localhost->aclk.claim_id_of_origin;
+    if(!UUIDiszero(having) && UUIDeq(having, this_one))
+        return true;
+
+    return false;
 }
 
 /* Change the claimed state of the agent.
