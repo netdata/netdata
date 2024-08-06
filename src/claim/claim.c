@@ -145,7 +145,7 @@ bool claim_id_matches_any(const char *claim_id) {
  * If this happens with the ACLK active under an old claim then we MUST KILL THE LINK
  */
 bool load_claiming_state(void) {
-    if (aclk_connected) {
+    if (aclk_online()) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "CLAIM: agent was already connected to NC - forcing reconnection under new credentials");
         aclk_kill_link = 1;

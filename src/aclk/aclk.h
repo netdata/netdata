@@ -37,11 +37,15 @@ extern ACLK_STATUS aclk_status;
 extern const char *aclk_cloud_base_url;
 const char *aclk_status_to_string(void);
 
-extern int aclk_connected;
 extern int aclk_ctx_based;
 extern int aclk_disable_runtime;
 extern int aclk_stats_enabled;
 extern int aclk_kill_link;
+
+bool aclk_online(void);
+bool aclk_online_for_contexts(void);
+bool aclk_online_for_alerts(void);
+bool aclk_online_for_nodes(void);
 
 extern time_t last_conn_time_mqtt;
 extern time_t last_conn_time_appl;

@@ -26,7 +26,7 @@ CLOUD_STATUS cloud_status(void) {
     if(unlikely(aclk_disable_runtime))
         return CLOUD_STATUS_BANNED;
 
-    if(likely(aclk_connected))
+    if(likely(aclk_online()))
         return CLOUD_STATUS_ONLINE;
 
     if(localhost->sender &&

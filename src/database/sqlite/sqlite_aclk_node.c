@@ -134,7 +134,7 @@ void aclk_check_node_info_and_collectors(void)
 {
     RRDHOST *host;
 
-    if (unlikely(!aclk_connected))
+    if (unlikely(!aclk_online_for_nodes()))
         return;
 
     size_t context_loading = 0;

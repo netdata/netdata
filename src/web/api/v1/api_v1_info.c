@@ -153,7 +153,7 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_boolean(wb, "cloud-enabled", true);
     buffer_json_member_add_boolean(wb, "cloud-available", true);
     buffer_json_member_add_boolean(wb, "agent-claimed", is_agent_claimed());
-    buffer_json_member_add_boolean(wb, "aclk-available", aclk_connected);
+    buffer_json_member_add_boolean(wb, "aclk-available", aclk_online());
 
     buffer_json_member_add_string(wb, "memory-mode", rrd_memory_mode_name(host->rrd_memory_mode));
 #ifdef ENABLE_DBENGINE

@@ -438,13 +438,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
 
     if(!http_access_user_has_enough_access_level_for_endpoint(user_access, rdcf->access)) {
 
-        if(!aclk_connected)
-            code = rrd_call_function_error(result_wb,
-                                           "This Netdata must be connected to Netdata Cloud for Single-Sign-On (SSO) "
-                                           "access this feature. Claim this Netdata to Netdata Cloud to enable access.",
-                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
-
-        else if((rdcf->access & HTTP_ACCESS_SIGNED_ID) && !(user_access & HTTP_ACCESS_SIGNED_ID))
+        if((rdcf->access & HTTP_ACCESS_SIGNED_ID) && !(user_access & HTTP_ACCESS_SIGNED_ID))
             code = rrd_call_function_error(result_wb,
                                            "You need to be authenticated via Netdata Cloud Single-Sign-On (SSO) "
                                            "to access this feature. Sign-in on this dashboard, "

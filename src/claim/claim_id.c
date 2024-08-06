@@ -20,7 +20,7 @@ void claim_id_set(ND_UUID new_claim_id) {
     spinlock_lock(&claim.spinlock);
 
     if(!UUIDiszero(claim.claim_uuid)) {
-        if(aclk_connected)
+        if(aclk_online())
             claim.claim_uuid_saved = claim.claim_uuid;
         claim.claim_uuid = UUID_ZERO;
     }

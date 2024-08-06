@@ -907,7 +907,7 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     if (unlikely(!claim_id_is_set(claim_id)))
         return;
 
-    // Check database for this node to see how many alerts we will need to put in the snapshot
+    // Check the database for this node to see how many alerts we will need to put in the snapshot
     int cnt = calculate_alert_snapshot_entries(&host->host_uuid);
     if (!cnt)
         return;
@@ -962,7 +962,7 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
         version += alarm_log.version;
 
         if (cnt == ALARM_EVENTS_PER_CHUNK) {
-            if (aclk_connected)
+            if (aclk_online_for_alerts())
                 aclk_send_alarm_snapshot(snapshot_proto);
             cnt = 0;
             if (alarm_snap.chunk < chunks) {

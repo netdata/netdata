@@ -260,7 +260,7 @@ static void timer_cb(uv_timer_t *handle)
     uv_update_time(handle->loop);
 
     struct aclk_database_cmd cmd = { 0 };
-    if (aclk_connected) {
+    if (aclk_online_for_alerts()) {
         cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
         aclk_database_enq_cmd(&cmd);
         aclk_check_node_info_and_collectors();

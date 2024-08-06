@@ -19,7 +19,7 @@ void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
 
         CLAIM_ID claim_id = claim_id_get();
 
-        if((!claim_id_is_set(claim_id) || !aclk_connected) && !UUIDiszero(host->aclk.claim_id_of_parent)) {
+        if((!claim_id_is_set(claim_id) || !aclk_online()) && !UUIDiszero(host->aclk.claim_id_of_parent)) {
             // the agent is not claimed or not connected, and it has a parent claim id
             // we use it, to allow the connection flow
             claim_id.uuid = host->aclk.claim_id_of_parent;
@@ -102,7 +102,7 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     // So, if the agent is not claimed or not connected, we inherit whatever information sent from the parent,
     // to allow the user to work with it.
 
-    if(claimed && aclk_connected)
+    if(claimed && aclk_online())
         // we are directly claimed and connected, ignore node id and cloud url
         return;
 

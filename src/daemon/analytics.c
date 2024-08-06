@@ -486,7 +486,7 @@ void analytics_misc(void)
 
 void analytics_aclk(void)
 {
-    if (aclk_connected) {
+    if (aclk_online()) {
         analytics_set_data(&analytics_data.netdata_host_aclk_available, "true");
         analytics_set_data_str(&analytics_data.netdata_host_aclk_protocol, "New");
     }
