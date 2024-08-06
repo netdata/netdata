@@ -64,7 +64,7 @@ void rrdpush_sender_send_claimed_id(RRDHOST *host) {
 
     char str[UUID_STR_LEN] = "";
     ND_UUID uuid = host->aclk.claim_id_of_origin;
-    if(!UUIDeq(uuid, UUID_ZERO))
+    if(!UUIDiszero(uuid))
         uuid_unparse_lower(uuid.uuid, str);
     else
         strncpyz(str, "NULL", sizeof(str) - 1);

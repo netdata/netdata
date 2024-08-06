@@ -75,6 +75,11 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
                "STREAM %s [send to %s] changed parent's claim id to %s",
                rrdhost_hostname(s->host), s->connected_to, claim_id ? claim_id : "(unset)");
 
+    if(!uuid_is_null(s->host->node_id) && uuid_compare(s->host->node_id, node_uuid.uuid) != 0)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM %s [send to %s] changed node id to %s",
+               rrdhost_hostname(s->host), s->connected_to, node_id ? node_id : "(unset)");
+
     s->host->aclk.claim_id_of_parent = claim_uuid;
 
     // There are some very strange corner cases here:
@@ -85,7 +90,7 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     //
     // The solution below, tries to get the agent online, using the latest information.
     // So, if the agent is not claimed or not connected, we inherit whatever information sent from the parent,
-    // to allow the user work with it.
+    // to allow the user to work with it.
 
     if(is_agent_claimed() && aclk_connected)
         // we are directly claimed and connected, ignore node id and cloud url

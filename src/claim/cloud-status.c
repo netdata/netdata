@@ -23,19 +23,21 @@ const char *cloud_status_to_string(CLOUD_STATUS status) {
 }
 
 CLOUD_STATUS cloud_status(void) {
-    if(aclk_disable_runtime)
+    if(unlikely(aclk_disable_runtime))
         return CLOUD_STATUS_BANNED;
 
-    if(aclk_connected)
+    if(likely(aclk_connected))
         return CLOUD_STATUS_ONLINE;
+
+    if(localhost->sender &&
+        rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS) &&
+        stream_has_capability(localhost->sender, STREAM_CAP_NODE_ID) &&
+        !uuid_is_null(localhost->node_id) &&
+        !UUIDiszero(localhost->aclk.claim_id_of_parent))
+        return CLOUD_STATUS_INDIRECT;
 
     if(is_agent_claimed())
         return CLOUD_STATUS_OFFLINE;
-
-    if(rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS) &&
-        stream_has_capability(localhost->sender, STREAM_CAP_NODE_ID) &&
-        !uuid_is_null(localhost->node_id))
-        return CLOUD_STATUS_INDIRECT;
 
     return CLOUD_STATUS_AVAILABLE;
 }

@@ -92,7 +92,7 @@ static ND_UUID claimed_id_get_from_cloud_conf(void) {
 
 static ND_UUID claimed_id_load(void) {
     ND_UUID uuid = claimed_id_get_from_cloud_conf();
-    if(UUIDeq(uuid, UUID_ZERO))
+    if(UUIDiszero(uuid))
         uuid = claimed_id_load_from_file();
 
     return uuid;
@@ -128,14 +128,14 @@ bool load_claiming_state(void) {
     aclk_disable_runtime = 0;
 
     ND_UUID uuid = claimed_id_load();
-    if(UUIDeq(uuid, UUID_ZERO)) {
+    if(UUIDiszero(uuid)) {
         // not found
         if(claim_agent_automatically())
             uuid = claimed_id_load();
     }
 
     bool have_claimed_id = false;
-    if(!UUIDeq(uuid, UUID_ZERO)) {
+    if(!UUIDiszero(uuid)) {
         // we go it somehow
         claim_id_set(uuid);
         have_claimed_id = true;
