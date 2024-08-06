@@ -47,6 +47,9 @@ bool aclk_online_for_contexts(void);
 bool aclk_online_for_alerts(void);
 bool aclk_online_for_nodes(void);
 
+void aclk_config_get_query_scope(void);
+bool aclk_query_scope_has(HTTP_ACL acl);
+
 extern time_t last_conn_time_mqtt;
 extern time_t last_conn_time_appl;
 extern time_t last_disconnect_time;

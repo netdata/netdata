@@ -9,7 +9,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "data",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_data,
         .allow_subpaths = 0
@@ -18,7 +18,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "weights",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_weights,
         .allow_subpaths = 0
@@ -27,7 +27,7 @@ static struct web_api_command api_commands_v1[] = {
         // deprecated - do not use anymore - use "weights"
         .api = "metric_correlations",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_metric_correlations,
         .allow_subpaths = 0
@@ -37,7 +37,7 @@ static struct web_api_command api_commands_v1[] = {
         // exporting API
         .api = "allmetrics",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_allmetrics,
         .allow_subpaths = 0
@@ -48,7 +48,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "alarms",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_ALERTS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_alarms,
         .allow_subpaths = 0
@@ -56,7 +56,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "alarms_values",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_ALERTS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_alarms_values,
         .allow_subpaths = 0
@@ -64,7 +64,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "alarm_log",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_ALERTS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_alarm_log,
         .allow_subpaths = 0
@@ -72,7 +72,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "alarm_variables",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_ALERTS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_alarm_variables,
         .allow_subpaths = 0
@@ -80,7 +80,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "variable",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_ALERTS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_variable,
         .allow_subpaths = 0
@@ -88,7 +88,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "alarm_count",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_ALERTS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_alarm_count,
         .allow_subpaths = 0
@@ -99,7 +99,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "function",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_FUNCTIONS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_function,
         .allow_subpaths = 0
@@ -109,7 +109,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "functions",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_FUNCTIONS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_functions,
         .allow_subpaths = 0
@@ -121,7 +121,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "chart",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_chart,
         .allow_subpaths = 0
@@ -130,7 +130,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "charts",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_charts,
         .allow_subpaths = 0
@@ -138,7 +138,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "context",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_context,
         .allow_subpaths = 0
@@ -146,7 +146,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "contexts",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_contexts,
         .allow_subpaths = 0
@@ -170,7 +170,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "info",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_NODES,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_info,
         .allow_subpaths = 0
@@ -178,7 +178,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "aclk",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_NODES,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_aclk,
         .allow_subpaths = 0
@@ -187,7 +187,7 @@ static struct web_api_command api_commands_v1[] = {
         // deprecated - use /api/v2/info
         .api = "dbengine_stats",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_NODES,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_dbengine_stats,
         .allow_subpaths = 0
@@ -195,7 +195,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "ml_info",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_NODES,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_ml_info,
         .allow_subpaths = 0
@@ -214,7 +214,7 @@ static struct web_api_command api_commands_v1[] = {
     {
         .api = "config",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_DYNCFG,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_config,
         .allow_subpaths = 0

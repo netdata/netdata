@@ -882,6 +882,8 @@ static void log_init(void) {
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
         nd_log_set_user_settings(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
     }
+
+    aclk_config_get_query_scope();
 }
 
 static char *get_varlib_subdir_from_config(const char *prefix, const char *dir) {

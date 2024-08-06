@@ -41,15 +41,15 @@ inline bool aclk_online(void) {
 }
 
 bool aclk_online_for_contexts(void) {
-    return aclk_online();
+    return aclk_online() && aclk_query_scope_has(HTTP_ACL_METRICS);
 }
 
 bool aclk_online_for_alerts(void) {
-    return aclk_online();
+    return aclk_online() && aclk_query_scope_has(HTTP_ACL_ALERTS);
 }
 
 bool aclk_online_for_nodes(void) {
-    return aclk_online();
+    return aclk_online() && aclk_query_scope_has(HTTP_ACL_NODES);
 }
 
 int aclk_ctx_based = 0;

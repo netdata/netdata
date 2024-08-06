@@ -7,6 +7,8 @@
 
 #define WEB_HDR_ACCEPT_ENC "Accept-Encoding:"
 
+static HTTP_ACL default_aclk_http_acl = HTTP_ACL_ALL_FEATURES;
+
 pthread_cond_t query_cond_wait = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
 #define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait)
@@ -23,6 +25,18 @@ struct pending_req_list {
 
 static struct pending_req_list *pending_req_list_head = NULL;
 static pthread_mutex_t pending_req_list_lock = PTHREAD_MUTEX_INITIALIZER;
+
+void aclk_config_get_query_scope(void) {
+    const char *s = config_get(CONFIG_SECTION_CLOUD, "scope", "full");
+    if(strcmp(s, "license manager") == 0)
+        default_aclk_http_acl = HTTP_ACL_ACLK_LICENSE_MANAGER;
+    else
+        default_aclk_http_acl = HTTP_ACL_ALL_FEATURES;
+}
+
+bool aclk_query_scope_has(HTTP_ACL acl) {
+    return (default_aclk_http_acl & acl) == acl;
+}
 
 static struct pending_req_list *pending_req_list_add(const char *msg_id)
 {
@@ -106,7 +120,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
 
     struct web_client *w = web_client_get_from_cache();
     web_client_set_conn_cloud(w);
-    w->port_acl = HTTP_ACL_ACLK | HTTP_ACL_ALL_FEATURES;
+    w->port_acl = HTTP_ACL_ACLK | default_aclk_http_acl;
     w->acl = w->port_acl;
     web_client_set_permissions(w, HTTP_ACCESS_MAP_OLD_MEMBER, HTTP_USER_ROLE_MEMBER, WEB_CLIENT_FLAG_AUTH_CLOUD);
 

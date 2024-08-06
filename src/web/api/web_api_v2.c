@@ -9,7 +9,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "data",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_data,
         .allow_subpaths = 0
@@ -17,7 +17,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "weights",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_weights,
         .allow_subpaths = 0
@@ -27,7 +27,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "contexts",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_contexts,
         .allow_subpaths = 0
@@ -36,7 +36,7 @@ static struct web_api_command api_commands_v2[] = {
         // full text search
         .api = "q",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_q,
         .allow_subpaths = 0
@@ -46,7 +46,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "alerts",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_ALERTS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_alerts,
         .allow_subpaths = 0
@@ -54,7 +54,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "alert_transitions",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_ALERTS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_alert_transitions,
         .allow_subpaths = 0
@@ -62,7 +62,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "alert_config",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_ALERTS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_alert_config,
         .allow_subpaths = 0
@@ -72,7 +72,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "info",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_NODES,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_info,
         .allow_subpaths = 0
@@ -80,7 +80,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "nodes",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_NODES,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_nodes,
         .allow_subpaths = 0
@@ -88,7 +88,7 @@ static struct web_api_command api_commands_v2[] = {
         {
         .api = "node_instances",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_NODES,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_node_instances,
         .allow_subpaths = 0
@@ -96,7 +96,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "versions",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_NODES,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_versions,
         .allow_subpaths = 0
@@ -104,7 +104,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "progress",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_NOCHECK,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_progress,
         .allow_subpaths = 0
@@ -114,7 +114,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "functions",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_FUNCTIONS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_functions,
         .allow_subpaths = 0
@@ -161,7 +161,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "ilove.svg",
         .hash = 0,
-        .acl = HTTP_ACL_DASHBOARD,
+        .acl = HTTP_ACL_NOCHECK,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_ilove,
         .allow_subpaths = 0
