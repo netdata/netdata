@@ -44,7 +44,7 @@ STREAM_CAPABILITIES globally_disabled_capabilities = STREAM_CAP_NONE;
 unsigned int default_rrdpush_compression_enabled = 1;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
-char *default_rrdpush_send_charts_matching = NULL;
+char *default_rrdpush_send_charts_matching = "*";
 bool default_rrdpush_enable_replication = true;
 time_t default_rrdpush_seconds_to_replicate = 86400;
 time_t default_rrdpush_replication_step = 600;
@@ -98,7 +98,7 @@ int rrdpush_init() {
     default_rrdpush_enabled     = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
-    default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
+    default_rrdpush_send_charts_matching = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", default_rrdpush_send_charts_matching);
 
     default_rrdpush_enable_replication = config_get_boolean(CONFIG_SECTION_DB, "enable replication", default_rrdpush_enable_replication);
     default_rrdpush_seconds_to_replicate = config_get_number(CONFIG_SECTION_DB, "seconds to replicate", default_rrdpush_seconds_to_replicate);
@@ -168,8 +168,9 @@ static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
             else
                 rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
         }
-        else if(simple_pattern_matches_string(host->rrdpush.send.charts_matching, st->id) ||
-            simple_pattern_matches_string(host->rrdpush.send.charts_matching, st->name))
+        else if(simple_pattern_matches_string(host->rrdpush.send.charts_matching, st->context) ||
+                 simple_pattern_matches_string(host->rrdpush.send.charts_matching, st->id) ||
+                 simple_pattern_matches_string(host->rrdpush.send.charts_matching, st->name))
 
             rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
         else

@@ -30,8 +30,6 @@ void aclk_config_get_query_scope(void) {
     const char *s = config_get(CONFIG_SECTION_CLOUD, "scope", "full");
     if(strcmp(s, "license manager") == 0)
         default_aclk_http_acl = HTTP_ACL_ACLK_LICENSE_MANAGER;
-    else
-        default_aclk_http_acl = HTTP_ACL_ALL_FEATURES;
 }
 
 bool aclk_query_scope_has(HTTP_ACL acl) {
