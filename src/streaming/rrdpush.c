@@ -168,13 +168,31 @@ static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
             else
                 rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
         }
-        else if(simple_pattern_matches_string(host->rrdpush.send.charts_matching, st->context) ||
-                 simple_pattern_matches_string(host->rrdpush.send.charts_matching, st->id) ||
-                 simple_pattern_matches_string(host->rrdpush.send.charts_matching, st->name))
+        else {
+            int negative = 0, positive = 0;
+            SIMPLE_PATTERN_RESULT r;
 
-            rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
-        else
-            rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
+            r = simple_pattern_matches_string_extract(host->rrdpush.send.charts_matching, st->context, NULL, 0);
+            if(r == SP_MATCHED_POSITIVE) positive++;
+            else if(r == SP_MATCHED_NEGATIVE) negative++;
+
+            if(!negative) {
+                r = simple_pattern_matches_string_extract(host->rrdpush.send.charts_matching, st->name, NULL, 0);
+                if (r == SP_MATCHED_POSITIVE) positive++;
+                else if (r == SP_MATCHED_NEGATIVE) negative++;
+            }
+
+            if(!negative) {
+                r = simple_pattern_matches_string_extract(host->rrdpush.send.charts_matching, st->id, NULL, 0);
+                if (r == SP_MATCHED_POSITIVE) positive++;
+                else if (r == SP_MATCHED_NEGATIVE) negative++;
+            }
+
+            if(!negative && positive)
+                rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
+            else
+                rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
+        }
 
         // get the flags again, to know how to respond
         flags = rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND|RRDSET_FLAG_UPSTREAM_IGNORE);
