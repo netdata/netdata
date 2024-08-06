@@ -139,9 +139,14 @@ typedef struct ebpf_pid_data {
     netdata_publish_vfs_t vfs;
 
     struct ebpf_target *target; // the one that will be reported to netdata
+
+    struct ebpf_pid_data *prev;
+    struct ebpf_pid_data *next;
 } ebpf_pid_data_t;
 
 extern ebpf_pid_data_t *ebpf_pids;
+extern ebpf_pid_data_t *ebpf_pids_link_list;
+extern size_t ebpf_all_pids_count;
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name) {
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
     if (ptr->pid == pid) {
@@ -153,6 +158,14 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
 
     ptr->pid = pid;
     ptr->ppid = tgid;
+
+    if (likely(ebpf_pids_link_list))
+        ebpf_pids_link_list->prev = ptr;
+
+    ptr->next = ebpf_pids_link_list;
+    ebpf_pids_link_list = ptr;
+
+    ebpf_all_pids_count++;
 
     return ptr;
 }
