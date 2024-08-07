@@ -455,7 +455,7 @@ deferred_warnings() {
 
 fatal() {
   deferred_warnings
-  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
+  printf >&2 "%b\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
   printf >&2 "%s\n" "For community support, you can connect with us on:"
   support_list
   telemetry_event "INSTALL_FAILED" "${1}" "${2}"
