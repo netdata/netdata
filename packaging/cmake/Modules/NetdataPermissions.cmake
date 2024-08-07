@@ -171,7 +171,7 @@ endfunction()
 
 # Add an install hook.
 function(_nd_add_install_hook cmd component)
-  install(CODE "execute_process(COMMAND ${cmd})\nmessage(STATUS Calling: ${cmd})")
+  install(CODE "execute_process(COMMAND ${cmd})\nmessage(STATUS [=[Calling: ${cmd}]=])")
 endfunction()
 
 # Add shell script to the specified variable to handle restricting
