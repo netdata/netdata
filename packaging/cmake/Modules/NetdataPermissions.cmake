@@ -171,7 +171,7 @@ endfunction()
 
 # Add an install hook.
 function(_nd_add_install_hook cmd component)
-  set(code "message(STATUS [=[Calling: ${cmd}]=]\n")
+  set(code "message(STATUS [=[Calling: ${cmd}]=])\n")
   set(code "${code}execute_process(COMMAND ${cmd} RESULT_VARIABLE hook_status)\n")
   set(code "${code}if(hook_status)\n")
   set(code "${code}  message(WARNING [=[Install hook failed: ${cmd}]=])\n")
