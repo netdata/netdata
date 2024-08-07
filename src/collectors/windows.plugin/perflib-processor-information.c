@@ -21,8 +21,11 @@ struct processor_info {
 static struct processor_info total = { 0 };
 
 static void initialize_processor_info_keys(struct processor_info *p) {
+    // Microsoft offers four different methods to display frequencies using the metrics listed below.
+    // We will use the method most commonly recommended in forums and their official documentation.
     p->cpuNominalFrequency.key = "Processor Frequency";
 //    p->percCPUFrequency.key = "% Processor Performance";
+//    p->percCPUFrequency.key = "% of Maximum Frequency";
     p->percCPUFrequency.key = "% Processor Utility";
 }
 
