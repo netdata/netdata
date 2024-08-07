@@ -18,29 +18,24 @@ import (
 var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
-
-	dataServerStatsMultiSource, _  = os.ReadFile("testdata/stats_multi_source.json")
-	dataServerStatsSingleSource, _ = os.ReadFile("testdata/stats_single_source.json")
-	dataServerStatsNoSources, _    = os.ReadFile("testdata/stats_no_sources.json")
+	dataCounters, _   = os.ReadFile("testdata/counters.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON":              dataConfigJSON,
-		"dataConfigYAML":              dataConfigYAML,
-		"dataServerStats":             dataServerStatsMultiSource,
-		"dataServerStatsSingleSource": dataServerStatsSingleSource,
-		"dataServerStatsNoSources":    dataServerStatsNoSources,
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+		"dataCounters":   dataCounters,
 	} {
 		require.NotNil(t, data, name)
 	}
 }
 
-func TestIcecast_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Icecast{}, dataConfigJSON, dataConfigYAML)
+func TestSquid_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Squid{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestIcecast_Init(t *testing.T) {
+func TestSquid_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -61,46 +56,38 @@ func TestIcecast_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			icecast := New()
-			icecast.Config = test.config
+			squid := New()
+			squid.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, icecast.Init())
+				assert.Error(t, squid.Init())
 			} else {
-				assert.NoError(t, icecast.Init())
+				assert.NoError(t, squid.Init())
 			}
 		})
 	}
 }
 
-func TestIcecast_Charts(t *testing.T) {
+func TestSquid_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestIcecast_Check(t *testing.T) {
+func TestSquid_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (*Icecast, func())
+		prepare  func(t *testing.T) (*Squid, func())
 	}{
-		"success multiple sources": {
+		"success case": {
 			wantFail: false,
-			prepare:  prepareCaseMultipleSources,
+			prepare:  prepareCaseSuccess,
 		},
-		"success single source": {
-			wantFail: false,
-			prepare:  prepareCaseMultipleSources,
-		},
-		"fails on no sources": {
+		"fails on unexpected response": {
 			wantFail: true,
-			prepare:  prepareCaseNoSources,
+			prepare:  prepareCaseUnexpectedResponse,
 		},
-		"fails on unexpected json response": {
+		"fails on empty response": {
 			wantFail: true,
-			prepare:  prepareCaseUnexpectedJsonResponse,
-		},
-		"fails on invalid format response": {
-			wantFail: true,
-			prepare:  prepareCaseInvalidFormatResponse,
+			prepare:  prepareCaseEmptyResponse,
 		},
 		"fails on connection refused": {
 			wantFail: true,
@@ -110,47 +97,43 @@ func TestIcecast_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			icecast, cleanup := test.prepare(t)
+			squid, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, icecast.Check())
+				assert.Error(t, squid.Check())
 			} else {
-				assert.NoError(t, icecast.Check())
+				assert.NoError(t, squid.Check())
 			}
 		})
 	}
 }
 
-func TestIcecast_Collect(t *testing.T) {
+func TestSquid_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func(t *testing.T) (*Icecast, func())
+		prepare     func(t *testing.T) (*Squid, func())
 		wantMetrics map[string]int64
 		wantCharts  int
 	}{
-		"success multiple sources": {
-			prepare:    prepareCaseMultipleSources,
-			wantCharts: len(sourceChartsTmpl) * 2,
+		"success case": {
+			prepare: prepareCaseSuccess,
 			wantMetrics: map[string]int64{
-				"source_abc_listeners": 1,
-				"source_efg_listeners": 10,
+				"client_http.errors":         5,
+				"client_http.hit_kbytes_out": 11,
+				"client_http.hits":           1,
+				"client_http.kbytes_in":      566,
+				"client_http.requests":       9019,
+				"server.all.errors":          0,
+				"server.all.kbytes_in":       0,
+				"server.all.kbytes_out":      0,
+				"server.all.requests":        0,
 			},
 		},
-		"success single source": {
-			prepare:    prepareCaseSingleSource,
-			wantCharts: len(sourceChartsTmpl) * 1,
-			wantMetrics: map[string]int64{
-				"source_abc_listeners": 1,
-			},
+		"fails on unexpected response": {
+			prepare: prepareCaseUnexpectedResponse,
 		},
-		"fails on no sources": {
-			prepare: prepareCaseNoSources,
-		},
-		"fails on unexpected json response": {
-			prepare: prepareCaseUnexpectedJsonResponse,
-		},
-		"fails on invalid format response": {
-			prepare: prepareCaseInvalidFormatResponse,
+		"fails on empty response": {
+			prepare: prepareCaseEmptyResponse,
 		},
 		"fails on connection refused": {
 			prepare: prepareCaseConnectionRefused,
@@ -159,127 +142,79 @@ func TestIcecast_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			icecast, cleanup := test.prepare(t)
+			squid, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := icecast.Collect()
+			mx := squid.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {
-				assert.Equal(t, test.wantCharts, len(*icecast.Charts()))
-				module.TestMetricsHasAllChartsDims(t, icecast.Charts(), mx)
+				assert.Equal(t, test.wantCharts, len(*squid.Charts()))
+				module.TestMetricsHasAllChartsDims(t, squid.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareCaseMultipleSources(t *testing.T) (*Icecast, func()) {
+func prepareCaseSuccess(t *testing.T) (*Squid, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case urlPathServerStats:
-				_, _ = w.Write(dataServerStatsMultiSource)
+				_, _ = w.Write(dataCounters)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
 
-	icecast := New()
-	icecast.URL = srv.URL
-	require.NoError(t, icecast.Init())
+	squid := New()
+	squid.URL = srv.URL
+	require.NoError(t, squid.Init())
 
-	return icecast, srv.Close
+	return squid, srv.Close
 }
 
-func prepareCaseSingleSource(t *testing.T) (*Icecast, func()) {
+func prepareCaseUnexpectedResponse(t *testing.T) (*Squid, func()) {
 	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			switch r.URL.Path {
-			case urlPathServerStats:
-				_, _ = w.Write(dataServerStatsSingleSource)
-			default:
-				w.WriteHeader(http.StatusNotFound)
-			}
-		}))
+	resp := []byte(`
+Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+Nulla malesuada erat id magna mattis, eu viverra tellus rhoncus.
+Fusce et felis pulvinar, posuere sem non, porttitor eros.`)
 
-	icecast := New()
-	icecast.URL = srv.URL
-	require.NoError(t, icecast.Init())
-
-	return icecast, srv.Close
-}
-
-func prepareCaseNoSources(t *testing.T) (*Icecast, func()) {
-	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			switch r.URL.Path {
-			case urlPathServerStats:
-				_, _ = w.Write(dataServerStatsNoSources)
-			default:
-				w.WriteHeader(http.StatusNotFound)
-			}
-		}))
-
-	icecast := New()
-	icecast.URL = srv.URL
-	require.NoError(t, icecast.Init())
-
-	return icecast, srv.Close
-}
-
-func prepareCaseUnexpectedJsonResponse(t *testing.T) (*Icecast, func()) {
-	t.Helper()
-	resp := `
-{
-    "elephant": {
-        "burn": false,
-        "mountain": true,
-        "fog": false,
-        "skin": -1561907625,
-        "burst": "anyway",
-        "shadow": 1558616893
-    },
-    "start": "ever",
-    "base": 2093056027,
-    "mission": -2007590351,
-    "victory": 999053756,
-    "die": false
-}
-`
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(resp))
 		}))
 
-	icecast := New()
-	icecast.URL = srv.URL
-	require.NoError(t, icecast.Init())
+	squid := New()
+	squid.URL = srv.URL
+	require.NoError(t, squid.Init())
 
-	return icecast, srv.Close
+	return squid, srv.Close
 }
 
-func prepareCaseInvalidFormatResponse(t *testing.T) (*Icecast, func()) {
+func prepareCaseEmptyResponse(t *testing.T) (*Squid, func()) {
 	t.Helper()
+	resp := []byte(``)
+
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write([]byte("hello and\n goodbye"))
+			_, _ = w.Write([]byte(resp))
 		}))
 
-	icecast := New()
-	icecast.URL = srv.URL
-	require.NoError(t, icecast.Init())
+	squid := New()
+	squid.URL = srv.URL
+	require.NoError(t, squid.Init())
 
-	return icecast, srv.Close
+	return squid, srv.Close
 }
 
-func prepareCaseConnectionRefused(t *testing.T) (*Icecast, func()) {
+func prepareCaseConnectionRefused(t *testing.T) (*Squid, func()) {
 	t.Helper()
-	icecast := New()
-	icecast.URL = "http://127.0.0.1:65001"
-	require.NoError(t, icecast.Init())
+	squid := New()
+	squid.URL = "http://127.0.0.1:65001"
+	require.NoError(t, squid.Init())
 
-	return icecast, func() {}
+	return squid, func() {}
 }

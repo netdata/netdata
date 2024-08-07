@@ -45,22 +45,30 @@ func (sq *Squid) collectCounters(mx map[string]int64) error {
 		return err
 	}
 
-	if !strings.HasPrefix(*rawStats, "sample_time") {
-		return fmt.Errorf("unexpected response: not a squid counters response")
-	}
-
 	if len(*rawStats) == 0 {
 		return fmt.Errorf("empty response")
 	}
 
+	if !strings.HasPrefix(*rawStats, "sample_time") {
+		return fmt.Errorf("unexpected response: not a squid counters response %s", *rawStats)
+	}
+
 	lines := strings.Split(*rawStats, "\n")
+
+	if len(lines) < 1 {
+		return fmt.Errorf("empty response")
+	}
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 
 		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
+
+		if len(line) < 1 {
+			sq.Debug("empty line in the response")
 			continue
+		} else if len(parts) != 2 {
+			return fmt.Errorf(line, "not like x = y")
 		}
 
 		key := strings.TrimSpace(parts[0])
