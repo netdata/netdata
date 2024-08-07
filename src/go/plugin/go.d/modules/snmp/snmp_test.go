@@ -594,6 +594,12 @@ func setMockClientSysExpect(m *snmpmock.MockHandler) {
 }
 
 func setMockClientIfMibExpect(m *snmpmock.MockHandler) {
+	m.EXPECT().WalkAll(oidIfIndex).Return([]gosnmp.SnmpPDU{
+		{Name: oidIfIndex + ".1", Value: 1, Type: gosnmp.Integer},
+		{Name: oidIfIndex + ".2", Value: 2, Type: gosnmp.Integer},
+		{Name: oidIfIndex + ".17", Value: 17, Type: gosnmp.Integer},
+		{Name: oidIfIndex + ".18", Value: 18, Type: gosnmp.Integer},
+	}, nil).MinTimes(1)
 	m.EXPECT().WalkAll(rootOidIfMibIfTable).Return([]gosnmp.SnmpPDU{
 		{Name: oidIfIndex + ".1", Value: 1, Type: gosnmp.Integer},
 		{Name: oidIfIndex + ".2", Value: 2, Type: gosnmp.Integer},
