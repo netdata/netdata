@@ -720,9 +720,6 @@ static inline int ebpf_collect_data_for_pid(pid_t pid)
     }
 
     ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL);
-    if (p->has_proc_file)
-        return 1;
-
     if (unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr))))
         // there is no reason to proceed if we cannot get its status
         return 0;
@@ -1011,7 +1008,7 @@ void ebpf_cleanup_exited_pids(int max)
  *
  * @return It returns 0 on success and -1 otherwise.
  */
-void ebpf_read_proc_filesystem()
+static void ebpf_read_proc_filesystem()
 {
     char dirname[FILENAME_MAX + 1];
 
@@ -1046,11 +1043,11 @@ void ebpf_read_proc_filesystem()
  * @param p the pid with information to update
  * @param o never used
  */
-static inline void aggregate_pid_on_target(struct ebpf_target *w, struct ebpf_pid_stat *p, struct ebpf_target *o)
+static inline void aggregate_pid_on_target(struct ebpf_target *w, ebpf_pid_data_t *p, struct ebpf_target *o)
 {
     UNUSED(o);
 
-    if (unlikely(!p->updated)) {
+    if (unlikely(!p->has_proc_file)) {
         // the process is not running
         return;
     }
@@ -1182,9 +1179,6 @@ end_process_loop:
 
     // this has to be done, before the cleanup
     // // concentrate everything on the targets
-    for (pids = ebpf_root_of_pids; pids; pids = pids->next)
-        aggregate_pid_on_target(pids->target, pids, NULL);
-
     post_aggregate_targets(apps_groups_root_target);
 
     struct ebpf_target *w;
@@ -1194,4 +1188,24 @@ end_process_loop:
 
         ebpf_process_sum_values_for_pids(&w->process, w->root_pid);
     }
+}
+
+/**
+ *
+ */
+void ebpf_parse_proc_files()
+{
+    ebpf_pid_data_t *pids = ebpf_pids_link_list;
+    while (pids) {
+        pids->has_proc_file = false;
+
+        pids = pids->next;
+    }
+
+    ebpf_read_proc_filesystem();
+
+    apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
+
+    for (pids = ebpf_pids_link_list; pids; pids = pids->next)
+        aggregate_pid_on_target(pids->target, pids, NULL);
 }
