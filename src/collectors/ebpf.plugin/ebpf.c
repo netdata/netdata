@@ -4064,7 +4064,7 @@ int main(int argc, char **argv)
             pthread_mutex_lock(&lock);
             if (collect_pids) {
                 pthread_mutex_lock(&collect_data_mutex);
-                ebpf_read_proc_filesystem();
+                ebpf_parse_proc_files();
                 /*
                 if (collect_pids & (1<<EBPF_MODULE_PROCESS_IDX)) {
                     ebpf_cleanup_exited_pids(max_period);

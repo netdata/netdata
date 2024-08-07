@@ -295,10 +295,10 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
 #define NETDATA_EBPF_ALLOC_MIN_ELEMENTS 256
 
 // ARAL Sectiion
-extern void ebpf_aral_init(void);
-extern ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid, pid_t tgid);
-extern void ebpf_release_and_unlink_pid_stat(ebpf_pid_stat_t *eps, int fd, uint32_t key, uint32_t idx);
-extern ebpf_pid_stat_t *ebpf_get_pid_and_link(pid_t pid, pid_t tgid, char *name);
+void ebpf_aral_init(void);
+ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid, pid_t tgid);
+void ebpf_release_and_unlink_pid_stat(ebpf_pid_stat_t *eps, int fd, uint32_t key, uint32_t idx);
+ebpf_pid_stat_t *ebpf_get_pid_and_link(pid_t pid, pid_t tgid, char *name);
 extern ebpf_process_stat_t *process_stat_vector;
 
 extern ARAL *ebpf_aral_vfs_pid;
@@ -311,7 +311,7 @@ void ebpf_shm_aral_init();
 netdata_publish_shm_t *ebpf_shm_stat_get(void);
 void ebpf_shm_release(netdata_publish_shm_t *stat);
 void ebpf_cleanup_exited_pids(int max);
-void ebpf_read_proc_filesystem();
+void ebpf_parse_proc_files();
 
 // ARAL Section end
 
