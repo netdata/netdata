@@ -439,7 +439,7 @@ func checkDim(d *Dim) error {
 	if d.ID == "" {
 		return errors.New("empty dim ID")
 	}
-	if id := checkID(d.ID); id != -1 {
+	if id := checkID(d.ID); id != -1 && (d.Name == "" || checkID(d.Name) != -1) {
 		return fmt.Errorf("unacceptable symbol in dim ID '%s' : '%c'", d.ID, id)
 	}
 	return nil
