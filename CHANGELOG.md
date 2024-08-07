@@ -6,12 +6,20 @@
 
 **Merged pull requests:**
 
+- go.d smartctl: undo extra\_devices skip from \#18269 [\#18270](https://github.com/netdata/netdata/pull/18270) ([ilyam8](https://github.com/ilyam8))
+- go.d smartctl: improve checking scsi-sat in scan [\#18269](https://github.com/netdata/netdata/pull/18269) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18268](https://github.com/netdata/netdata/pull/18268) ([netdatabot](https://github.com/netdatabot))
+- apps conf add beanstalkd [\#18267](https://github.com/netdata/netdata/pull/18267) ([ilyam8](https://github.com/ilyam8))
+- Fix CI issues in build workflow. [\#18266](https://github.com/netdata/netdata/pull/18266) ([Ferroin](https://github.com/Ferroin))
+- go.d beanstalk [\#18263](https://github.com/netdata/netdata/pull/18263) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18262](https://github.com/netdata/netdata/pull/18262) ([netdatabot](https://github.com/netdatabot))
 - go.d x509check add not\_revoked dimension [\#18261](https://github.com/netdata/netdata/pull/18261) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/beanstalk [\#18259](https://github.com/netdata/netdata/pull/18259) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18258](https://github.com/netdata/netdata/pull/18258) ([netdatabot](https://github.com/netdatabot))
 - docs: improve "Settings on Microsoft Teams" description [\#18257](https://github.com/netdata/netdata/pull/18257) ([ilyam8](https://github.com/ilyam8))
 - docs: add a note that the min dbengine tier size is 256 MB [\#18256](https://github.com/netdata/netdata/pull/18256) ([ilyam8](https://github.com/ilyam8))
 - Update Installer Code \(Services\) [\#18253](https://github.com/netdata/netdata/pull/18253) ([thiagoftsm](https://github.com/thiagoftsm))
+- Don’t install netdata-updater code on Windows. [\#18251](https://github.com/netdata/netdata/pull/18251) ([Ferroin](https://github.com/Ferroin))
 - Update README.md [\#18246](https://github.com/netdata/netdata/pull/18246) ([Steve8291](https://github.com/Steve8291))
 - Bump github.com/tidwall/gjson from 1.17.1 to 1.17.3 in /src/go [\#18244](https://github.com/netdata/netdata/pull/18244) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Fix OS detection messages in CMake. [\#18243](https://github.com/netdata/netdata/pull/18243) ([Ferroin](https://github.com/Ferroin))
@@ -198,7 +206,6 @@
 - sysinfo \(WinAPI\) [\#17857](https://github.com/netdata/netdata/pull/17857) ([thiagoftsm](https://github.com/thiagoftsm))
 - Run the agent as a Windows service. [\#17766](https://github.com/netdata/netdata/pull/17766) ([vkalintiris](https://github.com/vkalintiris))
 - add Win CPU interrupts [\#17753](https://github.com/netdata/netdata/pull/17753) ([thiagoftsm](https://github.com/thiagoftsm))
-- Relax strict version constraints for DEB package dependencies. [\#17681](https://github.com/netdata/netdata/pull/17681) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
@@ -411,14 +418,6 @@
 - go.d dyncfg add userconfig action [\#17684](https://github.com/netdata/netdata/pull/17684) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17683](https://github.com/netdata/netdata/pull/17683) ([netdatabot](https://github.com/netdatabot))
 - Re-enable ML for RHEL 7 and AL 2 RPM packages. [\#17682](https://github.com/netdata/netdata/pull/17682) ([Ferroin](https://github.com/Ferroin))
-- Clean up DEB package dependencies. [\#17680](https://github.com/netdata/netdata/pull/17680) ([Ferroin](https://github.com/Ferroin))
-- add go.d/rspamd [\#17679](https://github.com/netdata/netdata/pull/17679) ([ilyam8](https://github.com/ilyam8))
-- Restructure packaging related files to better reflect usage. [\#17678](https://github.com/netdata/netdata/pull/17678) ([Ferroin](https://github.com/Ferroin))
-- Do not specify linker in compilation flags. [\#17677](https://github.com/netdata/netdata/pull/17677) ([vkalintiris](https://github.com/vkalintiris))
-- Regenerate integrations.js [\#17676](https://github.com/netdata/netdata/pull/17676) ([netdatabot](https://github.com/netdatabot))
-- fix broken links and links pointing to Learn [\#17675](https://github.com/netdata/netdata/pull/17675) ([Ancairon](https://github.com/Ancairon))
-- add rspamd to apps\_groups.conf [\#17674](https://github.com/netdata/netdata/pull/17674) ([ilyam8](https://github.com/ilyam8))
-- Fix compilation without h2o, cloud enabled [\#17673](https://github.com/netdata/netdata/pull/17673) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
