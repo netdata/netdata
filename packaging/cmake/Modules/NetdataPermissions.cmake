@@ -244,13 +244,13 @@ function(nd_perms_generate_cmake_install_hook path component perms)
   message(STATUS "Adding post-install hook for supplementary permissions for ${path}")
 
   if(perms STREQUAL "restrict")
-    _nd_add_install_hook("${CMAKE_SOURCE_DIR}/packaging/cmake/install-perms-hook.sh ${prefix}/${path} ${NETDATA_GROUP} '0750'" "${component}")
+    _nd_add_install_hook("${CMAKE_SOURCE_DIR}/packaging/cmake/install-perms-hook.sh ${prefix}/${path} ${NETDATA_GROUP} 0750" "${component}")
   elseif(USE_FILE_CAPABILITIES AND NOT "${perms}" STREQUAL "suid")
     list(JOIN perms " " caps)
 
     _nd_add_install_hook("${CMAKE_SOURCE_DIR}/packaging/cmake/install-linux-caps-hook.sh ${prefix}/${path} ${NETDATA_GROUP} ${caps}" "${component}")
   else()
-    _nd_add_install_hook("${CMAKE_SOURCE_DIR}/packaging/cmake/install-perms-hook.sh ${prefix}/${path} ${NETDATA_GROUP} '4750'" "${component}")
+    _nd_add_install_hook("${CMAKE_SOURCE_DIR}/packaging/cmake/install-perms-hook.sh ${prefix}/${path} ${NETDATA_GROUP} 4750" "${component}")
   endif()
 endfunction()
 
