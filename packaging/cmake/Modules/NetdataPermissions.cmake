@@ -246,6 +246,7 @@ function(nd_perms_generate_cmake_install_hook path component perms)
   if(perms STREQUAL "restrict")
     _nd_add_install_hook("${CMAKE_SOURCE_DIR}/packaging/cmake/install-perms-hook.sh ${prefix}/${path} ${NETDATA_GROUP} 0750" "${component}")
   elseif(USE_FILE_CAPABILITIES AND NOT "${perms}" STREQUAL "suid")
+    list(TRANSFORM perms PREPEND "cap_")
     list(JOIN perms " " caps)
 
     _nd_add_install_hook("${CMAKE_SOURCE_DIR}/packaging/cmake/install-linux-caps-hook.sh ${prefix}/${path} ${NETDATA_GROUP} ${caps}" "${component}")
