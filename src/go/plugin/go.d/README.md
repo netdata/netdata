@@ -128,6 +128,7 @@ see the appropriate collector readme.
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/scaleio)                       |       Dell EMC ScaleIO        |
 | [sensors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/sensors)                       |       Hardware Sensors        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/snmp)                             |             SNMP              |
+| [squid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/squid)                           |             Squid             |
 | [squidlog](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/squidlog)                     |             Squid             |
 | [smartctl](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/smartctl)                     |   S.M.A.R.T Storage Devices   |
 | [storcli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/storcli)                       |    Broadcom Hardware RAID     |
