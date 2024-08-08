@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- set GOPROXY when building go.d.plugin [\#18275](https://github.com/netdata/netdata/pull/18275) ([ilyam8](https://github.com/ilyam8))
+- go.d snmp: adjust max repetitions automatically [\#18274](https://github.com/netdata/netdata/pull/18274) ([ilyam8](https://github.com/ilyam8))
+- go.d fix dimension id check [\#18272](https://github.com/netdata/netdata/pull/18272) ([ilyam8](https://github.com/ilyam8))
 - go.d smartctl: undo extra\_devices skip from \#18269 [\#18270](https://github.com/netdata/netdata/pull/18270) ([ilyam8](https://github.com/ilyam8))
 - go.d smartctl: improve checking scsi-sat in scan [\#18269](https://github.com/netdata/netdata/pull/18269) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18268](https://github.com/netdata/netdata/pull/18268) ([netdatabot](https://github.com/netdatabot))
@@ -414,10 +417,6 @@
 - Fix timex slow shutdown [\#17688](https://github.com/netdata/netdata/pull/17688) ([stelfrag](https://github.com/stelfrag))
 - Rename a variable in FreeIMPI \(WolfSSL support\) [\#17687](https://github.com/netdata/netdata/pull/17687) ([thiagoftsm](https://github.com/thiagoftsm))
 - go.d sd fix rspamd classify match [\#17686](https://github.com/netdata/netdata/pull/17686) ([ilyam8](https://github.com/ilyam8))
-- Properly detect attribute format types [\#17685](https://github.com/netdata/netdata/pull/17685) ([vkalintiris](https://github.com/vkalintiris))
-- go.d dyncfg add userconfig action [\#17684](https://github.com/netdata/netdata/pull/17684) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17683](https://github.com/netdata/netdata/pull/17683) ([netdatabot](https://github.com/netdatabot))
-- Re-enable ML for RHEL 7 and AL 2 RPM packages. [\#17682](https://github.com/netdata/netdata/pull/17682) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
