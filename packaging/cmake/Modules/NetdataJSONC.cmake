@@ -75,7 +75,7 @@ macro(netdata_detect_jsonc)
         endif()
 
         if(NOT JSONC_FOUND)
-                set(ENABLE_BUNDLED_JSONC True PARENT_SCOPE)
+                set(ENABLE_BUNDLED_JSONC True)
                 netdata_bundle_jsonc()
                 set(NETDATA_JSONC_LDFLAGS json-c)
                 set(NETDATA_JSONC_INCLUDE_DIRS ${PROJECT_BINARY_DIR}/include)
