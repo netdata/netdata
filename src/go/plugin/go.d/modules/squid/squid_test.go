@@ -116,12 +116,14 @@ func TestSquid_Collect(t *testing.T) {
 		wantCharts  int
 	}{
 		"success case": {
-			prepare: prepareCaseSuccess,
+			prepare:    prepareCaseSuccess,
+			wantCharts: len(charts),
 			wantMetrics: map[string]int64{
 				"client_http.errors":         5,
 				"client_http.hit_kbytes_out": 11,
 				"client_http.hits":           1,
 				"client_http.kbytes_in":      566,
+				"client_http.kbytes_out":     16081,
 				"client_http.requests":       9019,
 				"server.all.errors":          0,
 				"server.all.kbytes_in":       0,
@@ -148,6 +150,7 @@ func TestSquid_Collect(t *testing.T) {
 			mx := squid.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
+
 			if len(test.wantMetrics) > 0 {
 				assert.Equal(t, test.wantCharts, len(*squid.Charts()))
 				module.TestMetricsHasAllChartsDims(t, squid.Charts(), mx)

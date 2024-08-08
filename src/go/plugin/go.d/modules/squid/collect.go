@@ -3,6 +3,7 @@
 package squid
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,11 +14,13 @@ import (
 )
 
 const (
-	urlPathServerStats = "/squid-internal-mgr/counters" // https://wiki.squid-cache.org/Features/CacheManager/Index#controlling-access-to-the-cache-manager
+	// https://wiki.squid-cache.org/Features/CacheManager/Index#controlling-access-to-the-cache-manager
+	urlPathServerStats = "/squid-internal-mgr/counters"
 )
 
 var statsCounters = map[string]bool{
 	"client_http.kbytes_in":      true,
+	"client_http.kbytes_out":     true,
 	"server.all.errors":          true,
 	"server.all.requests":        true,
 	"server.all.kbytes_out":      true,
@@ -28,97 +31,70 @@ var statsCounters = map[string]bool{
 	"client_http.hit_kbytes_out": true,
 }
 
-func (sq *Squid) collect() (map[string]int64, error) {
+func (s *Squid) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := sq.collectCounters(mx); err != nil {
+	if err := s.collectCounters(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (sq *Squid) collectCounters(mx map[string]int64) error {
-	rawStats, err := sq.queryCounters()
-
+func (s *Squid) collectCounters(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(s.Request, urlPathServerStats)
 	if err != nil {
 		return err
 	}
 
-	if len(*rawStats) == 0 {
-		return fmt.Errorf("empty response")
-	}
+	if err := s.doOK(req, func(body io.Reader) error {
+		sc := bufio.NewScanner(body)
 
-	if !strings.HasPrefix(*rawStats, "sample_time") {
-		return fmt.Errorf("unexpected response: not a squid counters response %s", *rawStats)
-	}
+		for sc.Scan() {
+			key, value, ok := strings.Cut(sc.Text(), "=")
+			if !ok {
+				continue
+			}
 
-	lines := strings.Split(*rawStats, "\n")
+			key, value = strings.TrimSpace(key), strings.TrimSpace(value)
 
-	if len(lines) < 1 {
-		return fmt.Errorf("empty response")
-	}
+			if !statsCounters[key] {
+				continue
+			}
 
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
+			v, err := strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				s.Debugf("failed to parse key %s value %s: %v", key, value, err)
+				continue
+			}
 
-		parts := strings.SplitN(line, "=", 2)
-
-		if len(line) < 1 {
-			sq.Debug("empty line in the response")
-			continue
-		} else if len(parts) != 2 {
-			return fmt.Errorf(line, "not like x = y")
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-
-		if !statsCounters[key] {
-			continue
-		}
-		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 			mx[key] = v
 		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if len(mx) == 0 {
+		return fmt.Errorf("unexpected response from '%s': no metrics found", req.URL)
 	}
 
 	return nil
 }
 
-func (sq *Squid) queryCounters() (*string, error) {
-	req, err := web.NewHTTPRequestWithPath(sq.Request, urlPathServerStats)
-	if err != nil {
-		return nil, err
-	}
-
-	var stats string
-
-	if err := sq.doOKDecode(req, &stats); err != nil {
-		return nil, err
-	}
-
-	return &stats, nil
-}
-
-func (sq *Squid) doOKDecode(req *http.Request, returnString *string) error {
-	resp, err := sq.httpClient.Do(req)
+func (s *Squid) doOK(req *http.Request, parse func(body io.Reader) error) error {
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
+
 	defer closeBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("error reading response body: %v", err)
-	}
-
-	*returnString = string(body)
-
-	return nil
+	return parse(resp.Body)
 }
 
 func closeBody(resp *http.Response) {

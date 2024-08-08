@@ -16,8 +16,8 @@ const (
 var charts = module.Charts{
 	clientsNetChart.Copy(),
 	clientsRequestsChart.Copy(),
-	ServersNetChart.Copy(),
-	ServersRequestsChart.Copy(),
+	serversNetChart.Copy(),
+	serversRequestsChart.Copy(),
 }
 
 var (
@@ -51,7 +51,7 @@ var (
 		},
 	}
 
-	ServersNetChart = module.Chart{
+	serversNetChart = module.Chart{
 		ID:       "servers_net",
 		Title:    "Squid Server Bandwidth",
 		Units:    "kilobits/s",
@@ -65,7 +65,7 @@ var (
 		},
 	}
 
-	ServersRequestsChart = module.Chart{
+	serversRequestsChart = module.Chart{
 		ID:       "servers_requests",
 		Title:    "Squid Server Requests",
 		Units:    "requests/s",

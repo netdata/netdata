@@ -1,11 +1,12 @@
 plugin_name: go.d.plugin
 modules:
   - meta:
+      id: collector-go.d.plugin-squid
       plugin_name: go.d.plugin
       module_name: squid
       monitored_instance:
         name: Squid
-        link: "http://www.squid-cache.org/"
+        link: "https://www.squid-cache.org/"
         categories:
           - data-collection.web-servers-and-web-proxies
         icon_filename: "squid.png"
@@ -23,7 +24,7 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors statistics about the Squid Clients and Servers, like bandwidth and requests.
-        method_description: "It collects metrics from the `squid-internal-mgr/counters` endpoint"
+        method_description: "It collects metrics from the `squid-internal-mgr/counters` endpoint."
       supported_platforms:
         include: []
         exclude: []
@@ -32,7 +33,11 @@ modules:
         description: ""
       default_behavior:
         auto_detection:
-          description: "By default, this collector will try to autodetect where Squid presents its `counters` data, by trying various configurations."
+          description: |
+            By default, it detects Squid instances running on localhost that are listening on port 3128.
+            On startup, it tries to collect metrics from:
+
+            - https://127.0.0.1:3128
         limits:
           description: ""
         performance_impact:

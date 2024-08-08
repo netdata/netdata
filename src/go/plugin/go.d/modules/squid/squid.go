@@ -53,33 +53,33 @@ type Squid struct {
 	httpClient *http.Client
 }
 
-func (sq *Squid) Configuration() any {
-	return sq.Config
+func (s *Squid) Configuration() any {
+	return s.Config
 }
 
-func (sq *Squid) Init() error {
-	if sq.URL == "" {
-		sq.Error("URL not set")
+func (s *Squid) Init() error {
+	if s.URL == "" {
+		s.Error("URL not set")
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(sq.Client)
+	client, err := web.NewHTTPClient(s.Client)
 	if err != nil {
-		sq.Error(err)
+		s.Error(err)
 		return err
 	}
-	sq.httpClient = client
+	s.httpClient = client
 
-	sq.Debugf("using URL %s", sq.URL)
-	sq.Debugf("using timeout: %s", sq.Timeout)
+	s.Debugf("using URL %s", s.URL)
+	s.Debugf("using timeout: %s", s.Timeout)
 
 	return nil
 }
 
-func (sq *Squid) Check() error {
-	mx, err := sq.collect()
+func (s *Squid) Check() error {
+	mx, err := s.collect()
 	if err != nil {
-		sq.Error(err)
+		s.Error(err)
 		return err
 	}
 
@@ -90,14 +90,14 @@ func (sq *Squid) Check() error {
 	return nil
 }
 
-func (sq *Squid) Charts() *module.Charts {
-	return sq.charts
+func (s *Squid) Charts() *module.Charts {
+	return s.charts
 }
 
-func (sq *Squid) Collect() map[string]int64 {
-	mx, err := sq.collect()
+func (s *Squid) Collect() map[string]int64 {
+	mx, err := s.collect()
 	if err != nil {
-		sq.Error(err)
+		s.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -107,8 +107,8 @@ func (sq *Squid) Collect() map[string]int64 {
 	return mx
 }
 
-func (sq *Squid) Cleanup() {
-	if sq.httpClient != nil {
-		sq.httpClient.CloseIdleConnections()
+func (s *Squid) Cleanup() {
+	if s.httpClient != nil {
+		s.httpClient.CloseIdleConnections()
 	}
 }
