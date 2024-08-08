@@ -29,6 +29,10 @@ RequestExecutionLevel admin
 Function .onInit
         nsExec::ExecToLog '$SYSDIR\sc.exe stop Netdata'
         pop $0
+        ${If} $0 == 0
+            nsExec::ExecToLog '$SYSDIR\sc.exe delete Netdata'
+            pop $0
+        ${EndIf}
 FunctionEnd
 
 Function NetdataUninstallRegistry
