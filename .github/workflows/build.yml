@@ -1090,7 +1090,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
         uses: azure/trusted-signing-action@v0.4.0
         with:
-          azure-tennant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
+          azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
           azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
           endpoint: "https://eus.codesigning.azure.net/"
@@ -1098,7 +1098,7 @@ jobs:
           certificate-profile-name: Netdata
           files-folder: ${{ github.workspace }}\build
           files-folder-filter: exe,dll
-          files-recurse: true
+          files-folder-recurse: true
           file-digest: SHA256
           timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
           timestamp-digest: SHA256
@@ -1113,7 +1113,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
         uses: azure/trusted-signing-action@v0.4.0
         with:
-          azure-tennant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
+          azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
           azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
           endpoint: "https://eus.codesigning.azure.net/"
