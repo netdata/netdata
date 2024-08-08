@@ -1,0 +1,1 @@
+integrations/squid.md

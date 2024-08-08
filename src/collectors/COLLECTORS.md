@@ -1151,7 +1151,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Squid log files](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/squidlog/integrations/squid_log_files.md)
 
-- [Squid](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/squid/integrations/squid.md)
+- [Squid](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/squid/integrations/squid.md)
 
 - [Tengine](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/tengine/integrations/tengine.md)
 
