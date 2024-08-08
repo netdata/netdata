@@ -12,30 +12,15 @@ import (
 
 type (
 	// https://rethinkdb.com/docs/system-stats/
-
-	clusterStats struct {
-		ID          []string `json:"id"`
-		QueryEngine struct {
-			ClientConnections int64   `json:"client_connections" stm:"client_connections""`
-			ClientsActive     int64   `json:"clients_active" stm:"client_active"`
-			QueriesPerSec     float64 `json:"queries_per_sec" stm:"queries_per_sec"`
-			ReadDocsPerSec    float64 `json:"read_docs_per_sec" stm:"read_docs_per_sec"`
-			WrittenDocsPerSec float64 `json:"written_docs_per_sec" stm:"written_docs_per_sec"`
-		} `json:"query_engine" stm:""`
-	}
-
 	serverStats struct {
 		ID          []string `json:"id"`
 		Server      string   `json:"server"`
 		QueryEngine struct {
-			ClientConnections int64   `json:"client_connections" stm:"client_connections"`
-			ClientsActive     int64   `json:"clients_active" stm:"client_active"`
-			QueriesPerSec     float64 `json:"queries_per_sec" stm:"queries_per_sec"`
-			QueriesTotal      int64   `json:"queries_total" stm:"queries_total"`
-			ReadDocsPerSec    float64 `json:"read_docs_per_sec" stm:"read_docs_per_sec"`
-			ReadDocsTotal     int64   `json:"read_docs_total" stm:"read_docs_total"`
-			WrittenDocsPerSec float64 `json:"written_docs_per_sec" stm:"written_docs_per_sec"`
-			WrittenDocsTotal  int64   `json:"written_docs_total" stm:"written_docs_total"`
+			ClientConnections int64 `json:"client_connections" stm:"client_connections"`
+			ClientsActive     int64 `json:"clients_active" stm:"clients_active"`
+			QueriesTotal      int64 `json:"queries_total" stm:"queries_total"`
+			ReadDocsTotal     int64 `json:"read_docs_total" stm:"read_docs_total"`
+			WrittenDocsTotal  int64 `json:"written_docs_total" stm:"written_docs_total"`
 		} `json:"query_engine" stm:""`
 
 		Error string `json:"error"`
@@ -57,10 +42,6 @@ func (r *Rethinkdb) collect() (map[string]int64, error) {
 		return nil, err
 	}
 
-	for k, v := range mx {
-		fmt.Println(k, v)
-	}
-
 	return mx, nil
 }
 
@@ -74,42 +55,67 @@ func (r *Rethinkdb) collectStats(mx map[string]int64) error {
 		return errors.New("empty stats response from server")
 	}
 
-	var cs clusterStats
-	if err := json.Unmarshal(resp[0], &cs); err != nil {
-		return err
+	for _, v := range []string{
+		"cluster_servers_stats_request_success",
+		"cluster_servers_stats_request_timeout",
+		"cluster_client_connections",
+		"cluster_clients_active",
+		"cluster_queries_total",
+		"cluster_read_docs_total",
+		"cluster_written_docs_total",
+	} {
+		mx[v] = 0
 	}
 
-	if len(cs.ID) != 1 || cs.ID[0] != "cluster" {
-		return fmt.Errorf("invalid stats response from server: invalid cluster id: '%v'", cs.ID)
-	}
+	seen := make(map[string]bool)
 
-	for k, v := range stm.ToMap(cs) {
-		mx["cluster_"+k] = v
-	}
-
-	for _, bs := range resp[1:] {
+	for _, bs := range resp[1:] { // skip cluster
 		var srv serverStats
 
 		if err := json.Unmarshal(bs, &srv); err != nil {
-			return err
+			return fmt.Errorf("invalid stats response: failed to unmarshal server data: %v", err)
 		}
-
-		if len(srv.ID) != 2 {
-			return fmt.Errorf("invalid stats response from server: invalid server id: '%v'", srv.ID)
+		if len(srv.ID[0]) == 0 {
+			return errors.New("invalid stats response: empty id")
 		}
-
 		if srv.ID[0] != "server" {
 			continue
 		}
+		if len(srv.ID) != 2 {
+			return fmt.Errorf("invalid stats response: unexpected server id: '%v'", srv.ID)
+		}
 
-		if srv.Error != "" {
-			continue
+		srvUUID := srv.ID[1]
+
+		seen[srvUUID] = true
+
+		if !r.seenServers[srvUUID] {
+			r.seenServers[srvUUID] = true
+			r.addServerCharts(srvUUID, srv.Server)
 		}
 
 		px := fmt.Sprintf("server_%s_", srv.ID[1]) // uuid
 
-		for k, v := range stm.ToMap(srv) {
+		mx[px+"stats_request_status_success"] = 0
+		mx[px+"stats_request_status_timeout"] = 0
+		if srv.Error != "" {
+			mx["cluster_servers_stats_request_timed_out"]++
+			mx[px+"stats_request_status_timeout"] = 1
+			continue
+		}
+		mx["cluster_servers_stats_request_success"]++
+		mx[px+"stats_request_status_success"] = 1
+
+		for k, v := range stm.ToMap(srv.QueryEngine) {
+			mx["cluster_"+k] += v
 			mx[px+k] = v
+		}
+	}
+
+	for k := range r.seenServers {
+		if !seen[k] {
+			delete(r.seenServers, k)
+			r.removeServerCharts(k)
 		}
 	}
 

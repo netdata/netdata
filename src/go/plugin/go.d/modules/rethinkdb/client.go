@@ -10,7 +10,12 @@ import (
 	"gopkg.in/rethinkdb/rethinkdb-go.v6"
 )
 
-func newRethinkdbConn(cfg Config) (rethinkdbConn, error) {
+type rdbConn interface {
+	stats() ([][]byte, error)
+	close() error
+}
+
+func newRethinkdbConn(cfg Config) (rdbConn, error) {
 	sess, err := rethinkdb.Connect(rethinkdb.ConnectOpts{
 		Address:  cfg.Address,
 		Username: cfg.Username,

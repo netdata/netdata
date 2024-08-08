@@ -9,8 +9,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
-	"gopkg.in/rethinkdb/rethinkdb-go.v6"
 )
 
 //go:embed "config_schema.json"
@@ -28,12 +26,12 @@ func New() *Rethinkdb {
 	return &Rethinkdb{
 		Config: Config{
 			Address: "127.0.0.1:28015",
-			Timeout: web.Duration(time.Second * 2),
+			Timeout: web.Duration(time.Second * 1),
 		},
 
-		charts: &module.Charts{},
-
-		newConn: newRethinkdbConn,
+		charts:      clusterCharts.Copy(),
+		newConn:     newRethinkdbConn,
+		seenServers: make(map[string]bool),
 	}
 }
 
@@ -52,15 +50,10 @@ type (
 
 		charts *module.Charts
 
-		newConn func(cfg Config) (rethinkdbConn, error)
-		rdb     rethinkdbConn
+		newConn func(cfg Config) (rdbConn, error)
+		rdb     rdbConn
 
-		sess *rethinkdb.Session
-	}
-
-	rethinkdbConn interface {
-		stats() ([][]byte, error)
-		close() error
+		seenServers map[string]bool
 	}
 )
 
@@ -69,12 +62,14 @@ func (r *Rethinkdb) Configuration() any {
 }
 
 func (r *Rethinkdb) Init() error {
+	if r.Address == "" {
+		r.Error("address is not set")
+		return errors.New("address is not set")
+	}
 	return nil
 }
 
 func (r *Rethinkdb) Check() error {
-	return nil
-
 	mx, err := r.collect()
 	if err != nil {
 		r.Error(err)
@@ -103,10 +98,10 @@ func (r *Rethinkdb) Collect() map[string]int64 {
 }
 
 func (r *Rethinkdb) Cleanup() {
-	if r.sess != nil {
-		if err := r.sess.Close(); err != nil {
+	if r.rdb != nil {
+		if err := r.rdb.close(); err != nil {
 			r.Warningf("cleanup: error on closing client [%s]: %v", r.Address, err)
 		}
-		r.sess = nil
+		r.rdb = nil
 	}
 }
