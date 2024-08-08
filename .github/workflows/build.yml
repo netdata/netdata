@@ -516,7 +516,7 @@ jobs:
           credentials_json: ${{ secrets.GCS_STORAGE_SERVICE_KEY_JSON }}
       - name: Setup GCS
         id: gcs-setup
-        uses: google-github-actions/setup-gcloud@v2.1.0
+        uses: google-github-actions/setup-gcloud@v2.1.1
       - name: Upload Artifacts
         id: upload
         uses: google-github-actions/upload-cloud-storage@v2.1.2
