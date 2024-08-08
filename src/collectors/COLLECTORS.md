@@ -267,7 +267,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Redis](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/redis/integrations/redis.md)
 
-- [RethinkDB](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/rethinkdbs/integrations/rethinkdb.md)
+- [RethinkDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/rethinkdb/integrations/rethinkdb.md)
 
 - [RiakKV](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/riakkv/integrations/riakkv.md)
 
