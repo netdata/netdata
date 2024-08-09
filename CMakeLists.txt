@@ -2775,7 +2775,6 @@ install(FILES src/collectors/python.d.plugin/python.d.conf
         DESTINATION usr/lib/netdata/conf.d)
 
 install(FILES
-        src/collectors/python.d.plugin/alarms/alarms.conf
         src/collectors/python.d.plugin/am2320/am2320.conf
         src/collectors/python.d.plugin/anomalies/anomalies.conf
         src/collectors/python.d.plugin/boinc/boinc.conf
@@ -2807,7 +2806,6 @@ install(FILES
         DESTINATION usr/lib/netdata/conf.d/python.d)
 
 install(FILES
-        src/collectors/python.d.plugin/alarms/alarms.chart.py
         src/collectors/python.d.plugin/am2320/am2320.chart.py
         src/collectors/python.d.plugin/anomalies/anomalies.chart.py
         src/collectors/python.d.plugin/boinc/boinc.chart.py
