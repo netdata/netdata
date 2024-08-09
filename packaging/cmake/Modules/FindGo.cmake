@@ -52,7 +52,9 @@ if (GO_EXECUTABLE)
       OUTPUT_VARIABLE GO_ROOT
       RESULT_VARIABLE RESULT
     )
-    if(NOT RESULT EQUAL 0)
+    if(RESULT EQUAL 0)
+      string(REGEX REPLACE "\n$" "" GO_ROOT "${GO_ROOT}")
+    else()
       unset(GO_ROOT)
     endif()
   endif()
