@@ -6,7 +6,6 @@ gpgcheck=1
 gpgkey=https://repo.netdata.cloud/netdatabot.gpg.key
 enabled=1
 sslverify=1
-sslcacert=/etc/pki/tls/certs/ca-bundle.crt
 priority=50
 
 [netdata-repoconfig]
@@ -17,5 +16,4 @@ gpgcheck=1
 gpgkey=https://repo.netdata.cloud/netdatabot.gpg.key
 enabled=1
 sslverify=1
-sslcacert=/etc/pki/tls/certs/ca-bundle.crt
 priority=50
