@@ -283,7 +283,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [BOINC](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/boinc/integrations/boinc.md)
 
-- [Gearman](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/gearman/integrations/gearman.md)
+- [Gearman](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/gearman/integrations/gearman.md)
 
 ### DNS and DHCP Servers
 
