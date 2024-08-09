@@ -497,6 +497,10 @@ static void ebpf_socket_free(ebpf_module_t *em )
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    pthread_mutex_lock(&lock);
+    collect_pids &= ~(1<<EBPF_MODULE_SOCKET_IDX);
+    pthread_mutex_unlock(&lock);
 }
 
 /**
@@ -1767,7 +1771,7 @@ void ebpf_socket_resume_apps_data()
         memset(&w->socket, 0, sizeof(ebpf_socket_publish_apps_t));
         while (move) {
             int32_t pid = move->pid;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
             if (local_pid) {
                 ebpf_socket_publish_apps_t *ws = &local_pid->socket;
                 values->call_tcp_v4_connection = ws->call_tcp_v4_connection;
@@ -1806,6 +1810,9 @@ void *ebpf_read_socket_thread(void *ptr)
 
     int update_every = em->update_every;
     int counter = update_every - 1;
+    int collect_pid = (em->apps_charts || em->cgroup_charts);
+    if (!collect_pid)
+        return NULL;
 
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
@@ -1971,7 +1978,7 @@ static void ebpf_socket_read_hash_global_tables(netdata_idx_t *stats, int maps_p
  */
 void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns)
 {
-    ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(current_pid, 0);
+    ebpf_pid_data_t *local_pid = ebpf_get_pid_data(current_pid, 0, NULL);
     if (!local_pid)
         return;
 
@@ -2005,7 +2012,7 @@ static void ebpf_update_socket_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
             if (local_pid) {
                 ebpf_socket_publish_apps_t *in = &local_pid->socket;
 

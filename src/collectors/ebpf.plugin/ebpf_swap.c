@@ -393,6 +393,10 @@ static void ebpf_swap_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    pthread_mutex_lock(&lock);
+    collect_pids &= ~(1<<EBPF_MODULE_SWAP_IDX);
+    pthread_mutex_unlock(&lock);
+
     if (ebpf_read_swap.thread)
         nd_thread_signal_cancel(ebpf_read_swap.thread);
 
@@ -451,10 +455,17 @@ static void swap_apps_accumulator(netdata_publish_swap_t *out, int maps_per_core
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     netdata_publish_swap_t *total = &out[0];
+    uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
         netdata_publish_swap_t *w = &out[i];
         total->write += w->write;
         total->read += w->read;
+
+        if (w->ct > ct)
+            ct = w->ct;
+
+        if (!total->name[0] && w->name[0])
+            strncpyz(total->name, w->name, sizeof(total->name) - 1);
     }
 }
 
@@ -472,7 +483,7 @@ static void ebpf_update_swap_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_swap_t *out = &pids->swap;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
             if (local_pid) {
                 netdata_publish_swap_t *in = &local_pid->swap;
 
@@ -498,7 +509,7 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_
 
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
         if (local_pid) {
             netdata_publish_swap_t *w = &local_pid->swap;
             local_write += w->write;
@@ -549,17 +560,14 @@ static void ebpf_read_swap_apps_table(int maps_per_core, int max_period)
 
         swap_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, cv->tgid);
-        if (!local_pid)
-            goto end_swap_loop;
-
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name);
         netdata_publish_swap_t *publish = &local_pid->swap;
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, cv, sizeof(netdata_publish_swap_t));
+            local_pid->thread_collecting |= 1<<EBPF_MODULE_SWAP_IDX;
             local_pid->not_updated = 0;
         } else if (++local_pid->not_updated >= max_period) {
-            bpf_map_delete_elem(fd, &key);
-            local_pid->not_updated = 0;
+            ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_SWAP_IDX);
         }
 
         // We are cleaning to avoid passing data read from one process to other.
@@ -587,6 +595,9 @@ void *ebpf_read_swap_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
+    int collect_pid = (em->apps_charts || em->cgroup_charts);
+    if (!collect_pid)
+        return NULL;
 
     int counter = update_every - 1;
 

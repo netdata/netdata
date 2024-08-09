@@ -108,21 +108,89 @@ struct ebpf_target {
     struct ebpf_target *target; // the one that will be reported to netdata
     struct ebpf_target *next;
 };
-
 extern struct ebpf_target *apps_groups_default_target;
 extern struct ebpf_target *apps_groups_root_target;
 extern struct ebpf_target *users_root_target;
 extern struct ebpf_target *groups_root_target;
+extern uint64_t collect_pids;
+
+typedef struct ebpf_pid_data {
+    uint32_t pid;
+    uint32_t ppid;
+    uint64_t thread_collecting;
+
+    char comm[EBPF_MAX_COMPARE_NAME + 1];
+    char name[EBPF_MAX_NAME + 1];
+    char clean_name[EBPF_MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
+    char *cmdline;
+
+    bool has_proc_file;
+    uint32_t not_updated;
+    uint32_t log_thrown;
+
+    // each process gets a unique number
+    netdata_publish_cachestat_t cachestat;
+    netdata_publish_dcstat_t dc;
+    netdata_fd_stat_t fd;
+    ebpf_process_stat_t process;
+    netdata_publish_shm_t shm;
+    netdata_publish_swap_t swap;
+    ebpf_socket_publish_apps_t socket;
+    netdata_publish_vfs_t vfs;
+
+    struct ebpf_target *target; // the one that will be reported to netdata
+
+    struct ebpf_pid_data *prev;
+    struct ebpf_pid_data *next;
+} ebpf_pid_data_t;
+
+extern ebpf_pid_data_t *ebpf_pids;
+extern ebpf_pid_data_t *ebpf_pids_link_list;
+extern size_t ebpf_all_pids_count;
+void ebpf_del_pid_entry(pid_t pid);
+
+static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name) {
+    ebpf_pid_data_t *ptr = &ebpf_pids[pid];
+    if (ptr->pid == pid) {
+        return ptr;
+    }
+
+    if (name)
+        strncpyz(ptr->comm, name, EBPF_MAX_COMPARE_NAME);
+
+    ptr->pid = pid;
+    ptr->ppid = tgid;
+
+    if (likely(ebpf_pids_link_list))
+        ebpf_pids_link_list->prev = ptr;
+
+    ptr->next = ebpf_pids_link_list;
+    ebpf_pids_link_list = ptr;
+
+    ebpf_all_pids_count++;
+
+    return ptr;
+}
+
+static inline void ebpf_release_pid_data(ebpf_pid_data_t *eps, int fd, uint32_t key, uint32_t idx)
+{
+    bpf_map_delete_elem(fd, &key);
+    eps->thread_collecting &= ~(1<<idx);
+    if (!eps->thread_collecting && !eps->has_proc_file) {
+        ebpf_del_pid_entry((pid_t)key);
+    }
+}
 
 typedef struct ebpf_pid_stat {
-    int32_t pid;
+    uint32_t pid;
+    uint64_t thread_collecting;
     char comm[EBPF_MAX_COMPARE_NAME + 1];
     char *cmdline;
 
     uint32_t log_thrown;
 
     // char state;
-    int32_t ppid;
+    uint32_t ppid;
 
     int children_count;              // number of processes directly referencing this
     unsigned char keep : 1;          // 1 when we need to keep this process in memory even after it exited
@@ -227,8 +295,10 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
 #define NETDATA_EBPF_ALLOC_MIN_ELEMENTS 256
 
 // ARAL Sectiion
-extern void ebpf_aral_init(void);
-extern ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid, pid_t tgid);
+void ebpf_aral_init(void);
+ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid, pid_t tgid);
+void ebpf_release_and_unlink_pid_stat(ebpf_pid_stat_t *eps, int fd, uint32_t key, uint32_t idx);
+ebpf_pid_stat_t *ebpf_get_pid_and_link(pid_t pid, pid_t tgid, char *name);
 extern ebpf_process_stat_t *process_stat_vector;
 
 extern ARAL *ebpf_aral_vfs_pid;
@@ -241,6 +311,7 @@ void ebpf_shm_aral_init();
 netdata_publish_shm_t *ebpf_shm_stat_get(void);
 void ebpf_shm_release(netdata_publish_shm_t *stat);
 void ebpf_cleanup_exited_pids(int max);
+void ebpf_parse_proc_files();
 
 // ARAL Section end
 

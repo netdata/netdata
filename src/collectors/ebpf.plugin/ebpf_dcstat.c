@@ -456,6 +456,10 @@ static void ebpf_dcstat_exit(void *pptr)
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!em) return;
 
+    pthread_mutex_lock(&lock);
+    collect_pids &= ~(1<<EBPF_MODULE_DCSTAT_IDX);
+    pthread_mutex_unlock(&lock);
+
     if (ebpf_read_dcstat.thread)
         nd_thread_signal_cancel(ebpf_read_dcstat.thread);
 
@@ -524,6 +528,9 @@ static void ebpf_dcstat_apps_accumulator(netdata_dcstat_pid_t *out, int maps_per
 
         if (w->ct > ct)
             ct = w->ct;
+
+        if (!total->name[0] && w->name[0])
+            strncpyz(total->name, w->name, sizeof(total->name) - 1);
     }
     total->ct = ct;
 }
@@ -551,15 +558,15 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
 
         ebpf_dcstat_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(key, cv->tgid);
+        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, cv->tgid, cv->name);
         if (pid_stat) {
             netdata_publish_dcstat_t *publish = &pid_stat->dc;
             if (!publish->ct || publish->ct != cv->ct) {
                 memcpy(&publish->curr, &cv[0], sizeof(netdata_dcstat_pid_t));
+                pid_stat->thread_collecting |= 1<<EBPF_MODULE_DCSTAT_IDX;
                 pid_stat->not_updated = 0;
             } else if (++pid_stat->not_updated >= max_period) {
-                bpf_map_delete_elem(fd, &key);
-                pid_stat->not_updated = 0;
+                ebpf_release_pid_data(pid_stat, fd, key, EBPF_MODULE_DCSTAT_IDX);
             }
         }
 
@@ -584,7 +591,7 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
     netdata_dcstat_pid_t *dst = &publish->curr;
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(pid, 0);
+        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL);
         if (pid_stat) {
             netdata_publish_dcstat_t *w = &pid_stat->dc;
             netdata_dcstat_pid_t *src = &w->curr;
@@ -635,6 +642,9 @@ void *ebpf_read_dcstat_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
+    int collect_pid = (em->apps_charts || em->cgroup_charts);
+    if (!collect_pid)
+        return NULL;
 
     int counter = update_every - 1;
 
@@ -771,7 +781,7 @@ static void ebpf_update_dc_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
             if (local_pid) {
                 netdata_publish_dcstat_t *in = &local_pid->dc;
 
