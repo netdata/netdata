@@ -22,6 +22,14 @@ struct command {
         },
     },
     {
+        .name = "sv-status-all",
+        .params = "-p -c $*/* - exec sv status {{serviceDir}}",
+        .search = {
+            [0] = "sh",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "dmsetup-status-cache",
         .params = "status --target cache --noflush",
         .search = {
