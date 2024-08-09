@@ -479,3 +479,19 @@ func TestMetricsHasAllChartsDims(t *testing.T, charts *Charts, mx map[string]int
 		}
 	}
 }
+
+func TestMetricsHasAllChartsDimsSkip(t *testing.T, charts *Charts, mx map[string]int64, skip func(chart *Chart) bool) {
+	for _, chart := range *charts {
+		if chart.Obsolete || (skip != nil && skip(chart)) {
+			continue
+		}
+		for _, dim := range chart.Dims {
+			_, ok := mx[dim.ID]
+			assert.Truef(t, ok, "missing data for dimension '%s' in chart '%s'", dim.ID, chart.ID)
+		}
+		for _, v := range chart.Vars {
+			_, ok := mx[v.ID]
+			assert.Truef(t, ok, "missing data for variable '%s' in chart '%s'", v.ID, chart.ID)
+		}
+	}
+}
