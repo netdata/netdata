@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -153,18 +154,25 @@ func TestRethinkdb_Collect(t *testing.T) {
 		prepare     func() *Rethinkdb
 		wantMetrics map[string]int64
 		wantCharts  int
+		skipChart   func(chart *module.Chart) bool
 	}{
 		"success on valid response": {
 			prepare:    prepareCaseOk,
-			wantCharts: len(clusterCharts) + len(serverChartsTmpl)*2,
+			wantCharts: len(clusterCharts) + len(serverChartsTmpl)*3,
+			skipChart: func(chart *module.Chart) bool {
+				return strings.HasPrefix(chart.ID, "server_0f74c641-af5f-48d6-a005-35b8983c576a") &&
+					!strings.Contains(chart.ID, "stats_request_status")
+			},
 			wantMetrics: map[string]int64{
-				"cluster_client_connections":                                               3,
-				"cluster_clients_active":                                                   3,
-				"cluster_queries_total":                                                    27,
-				"cluster_read_docs_total":                                                  3,
-				"cluster_servers_stats_request_success":                                    2,
-				"cluster_servers_stats_request_timeout":                                    0,
-				"cluster_written_docs_total":                                               3,
+				"cluster_client_connections":            3,
+				"cluster_clients_active":                3,
+				"cluster_queries_total":                 27,
+				"cluster_read_docs_total":               3,
+				"cluster_servers_stats_request_success": 2,
+				"cluster_servers_stats_request_timeout": 1,
+				"cluster_written_docs_total":            3,
+				"server_0f74c641-af5f-48d6-a005-35b8983c576a_stats_request_status_success": 0,
+				"server_0f74c641-af5f-48d6-a005-35b8983c576a_stats_request_status_timeout": 1,
 				"server_b7730db2-4303-4719-aef8-2a3c339c672b_client_connections":           1,
 				"server_b7730db2-4303-4719-aef8-2a3c339c672b_clients_active":               1,
 				"server_b7730db2-4303-4719-aef8-2a3c339c672b_queries_total":                13,
@@ -204,7 +212,7 @@ func TestRethinkdb_Collect(t *testing.T) {
 			assert.Equal(t, test.wantCharts, len(*rdb.Charts()))
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, rdb.Charts(), mx)
+				module.TestMetricsHasAllChartsDimsSkip(t, rdb.Charts(), mx, test.skipChart)
 			}
 
 			if m, ok := rdb.rdb.(*mockRethinkdbConn); ok {

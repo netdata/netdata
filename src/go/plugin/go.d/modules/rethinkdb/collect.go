@@ -99,7 +99,7 @@ func (r *Rethinkdb) collectStats(mx map[string]int64) error {
 		mx[px+"stats_request_status_success"] = 0
 		mx[px+"stats_request_status_timeout"] = 0
 		if srv.Error != "" {
-			mx["cluster_servers_stats_request_timed_out"]++
+			mx["cluster_servers_stats_request_timeout"]++
 			mx[px+"stats_request_status_timeout"] = 1
 			continue
 		}
