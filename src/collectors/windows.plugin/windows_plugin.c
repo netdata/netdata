@@ -13,18 +13,19 @@ static struct proc_module {
 } win_modules[] = {
 
     // system metrics
-    {.name = "GetSystemUptime",     .dim = "GetSystemUptime",         .func = do_GetSystemUptime},
-    {.name = "GetSystemRAM",        .dim = "GetSystemRAM",            .func = do_GetSystemRAM},
+    {.name = "GetSystemUptime",         .dim = "GetSystemUptime",         .func = do_GetSystemUptime},
+    {.name = "GetSystemRAM",            .dim = "GetSystemRAM",            .func = do_GetSystemRAM},
 
     // the same is provided by PerflibProcessor, with more detailed analysis
-    //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",            .func = do_GetSystemCPU},
+    //{.name = "GetSystemCPU",          .dim = "GetSystemCPU",            .func = do_GetSystemCPU},
 
-    {.name = "PerflibProcesses",    .dim = "PerflibProcesses",        .func = do_PerflibProcesses},
-    {.name = "PerflibProcessor",    .dim = "PerflibProcessor",        .func = do_PerflibProcessor},
-    {.name = "PerflibMemory",       .dim = "PerflibMemory",           .func = do_PerflibMemory},
-    {.name = "PerflibStorage",      .dim = "PerflibStorage",          .func = do_PerflibStorage},
-    {.name = "PerflibNetwork",      .dim = "PerflibNetwork",          .func = do_PerflibNetwork},
-    {.name = "PerflibObjects",      .dim = "PerflibObjects",          .func = do_PerflibObjects},
+    {.name = "PerflibProcesses",        .dim = "PerflibProcesses",        .func = do_PerflibProcesses},
+    {.name = "PerflibProcessor",        .dim = "PerflibProcessor",        .func = do_PerflibProcessor},
+    {.name = "PerflibProcessorInfo",    .dim = "PerflibProcessor",        .func = do_PerflibProcessorInfo},
+    {.name = "PerflibMemory",           .dim = "PerflibMemory",           .func = do_PerflibMemory},
+    {.name = "PerflibStorage",          .dim = "PerflibStorage",          .func = do_PerflibStorage},
+    {.name = "PerflibNetwork",          .dim = "PerflibNetwork",          .func = do_PerflibNetwork},
+    {.name = "PerflibObjects",          .dim = "PerflibObjects",          .func = do_PerflibObjects},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}

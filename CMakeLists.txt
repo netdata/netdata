@@ -1029,6 +1029,7 @@ endif()
 
 set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/common-contexts.h
+        src/collectors/common-contexts/cpu.cpufreq.h
         src/collectors/common-contexts/disk.io.h
         src/collectors/common-contexts/system.io.h
         src/collectors/common-contexts/system.interrupts.h
@@ -1294,6 +1295,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-dump.c
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
+        src/collectors/windows.plugin/perflib-processor-information.c
         src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-memory.c

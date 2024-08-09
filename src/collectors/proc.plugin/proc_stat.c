@@ -892,24 +892,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             if(likely(r != -1 && (do_cpu_freq == CONFIG_BOOLEAN_YES || r > 0))) {
                 do_cpu_freq = CONFIG_BOOLEAN_YES;
 
-                static RRDSET *st_scaling_cur_freq = NULL;
-
-                if(unlikely(!st_scaling_cur_freq)) {
-                    st_scaling_cur_freq = rrdset_create_localhost(
-                            "cpu"
-                            , "cpufreq"
-                            , NULL
-                            , "cpufreq"
-                            , "cpufreq.cpufreq"
-                            , "Current CPU Frequency"
-                            , "MHz"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_STAT_NAME
-                            , NETDATA_CHART_PRIO_CPUFREQ_SCALING_CUR_FREQ
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-                }
+                RRDSET *st_scaling_cur_freq = common_cpu_cpufreq(update_every);
 
                 chart_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CPU_FREQ_INDEX, st_scaling_cur_freq, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                 rrdset_done(st_scaling_cur_freq);
