@@ -46,7 +46,7 @@ modules:
         list: []
       configuration:
         file:
-          name: go.d/memcached.conf
+          name: go.d/gearman.conf
         options:
           description: |
             The following options can be defined globally: update_every, autodetection_retry.
