@@ -106,7 +106,6 @@ extern size_t pagesize;
 // ----------------------------------------------------------------------------
 // string lengths
 
-#define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
 #define MAX_CMDLINE 65536
 
@@ -173,12 +172,8 @@ struct pid_on_target {
 };
 
 struct target {
-    char compare[MAX_COMPARE_NAME + 1];
-    uint32_t comparehash;
-    size_t comparelen;
-
-    char id[MAX_NAME + 1];
-    uint32_t idhash;
+    STRING *compare;
+    STRING *id;
 
     char name[MAX_NAME + 1];
     char clean_name[MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
@@ -306,7 +301,7 @@ struct pid_stat {
 
     char state;
 
-    char comm[MAX_COMPARE_NAME + 1];
+    STRING *comm;
     char *cmdline;
 
     // these are raw values collected
@@ -443,21 +438,6 @@ struct pid_stat {
 
 // ----------------------------------------------------------------------------
 
-struct user_or_group_id {
-    avl_t avl;
-
-    union {
-        uid_t uid;
-        gid_t gid;
-    } id;
-
-    char *name;
-
-    int updated;
-
-    struct user_or_group_id * next;
-};
-
 extern struct target
     *apps_groups_default_target,
     *apps_groups_root_target,
@@ -469,10 +449,6 @@ extern struct pid_stat *root_of_pids;
 extern int update_every;
 extern unsigned int time_factor;
 extern kernel_uint_t MemTotal;
-
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-extern pid_t *all_pids_sortlist;
-#endif
 
 #define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
 
@@ -488,8 +464,8 @@ struct target *get_groups_target(gid_t gid);
 int read_apps_groups_conf(const char *path, const char *file);
 
 void users_and_groups_init(void);
-struct user_or_group_id *user_id_find(struct user_or_group_id *user_id_to_find);
-struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find);
+void apps_username_get_from_uid(uid_t uid, char *dst, size_t dst_size);
+void apps_groupname_get_from_gid(gid_t gid, char *dst, size_t dst_size);
 
 // ----------------------------------------------------------------------------
 // debugging

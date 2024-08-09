@@ -12,32 +12,16 @@ struct target *get_users_target(uid_t uid) {
         if(w->uid == uid) return w;
 
     w = callocz(sizeof(struct target), 1);
-    snprintfz(w->compare, MAX_COMPARE_NAME, "%u", uid);
-    w->comparehash = simple_hash(w->compare);
-    w->comparelen = strlen(w->compare);
+    {
+        char buf[50];
+        snprintfz(buf, sizeof(buf), "%u", uid);
 
-    snprintfz(w->id, MAX_NAME, "%u", uid);
-    w->idhash = simple_hash(w->id);
-
-    struct user_or_group_id user_id_to_find = {
-        .id = {
-            .uid = uid,
-        }
-    };
-    struct user_or_group_id *user_or_group_id = user_id_find(&user_id_to_find);
-
-    if(user_or_group_id && user_or_group_id->name && *user_or_group_id->name)
-        snprintfz(w->name, MAX_NAME, "%s", user_or_group_id->name);
-
-    else {
-        struct passwd *pw = getpwuid(uid);
-        if(!pw || !pw->pw_name || !*pw->pw_name)
-            snprintfz(w->name, MAX_NAME, "%u", uid);
-        else
-            snprintfz(w->name, MAX_NAME, "%s", pw->pw_name);
+        w->compare = string_strdupz(buf);
+        w->id = string_dup(w->compare);
     }
 
-    strncpyz(w->clean_name, w->name, MAX_NAME);
+    apps_username_get_from_uid(uid, w->name, sizeof(w->name));
+    strncpyz(w->clean_name, w->name, sizeof(w->clean_name) - 1);
     netdata_fix_chart_name(w->clean_name);
 
     w->uid = uid;
@@ -56,32 +40,17 @@ struct target *get_groups_target(gid_t gid) {
         if(w->gid == gid) return w;
 
     w = callocz(sizeof(struct target), 1);
-    snprintfz(w->compare, MAX_COMPARE_NAME, "%u", gid);
-    w->comparehash = simple_hash(w->compare);
-    w->comparelen = strlen(w->compare);
+    {
+        char buf[50];
+        snprintfz(buf, sizeof(buf), "%u", gid);
 
-    snprintfz(w->id, MAX_NAME, "%u", gid);
-    w->idhash = simple_hash(w->id);
-
-    struct user_or_group_id group_id_to_find = {
-        .id = {
-            .gid = gid,
-        }
-    };
-    struct user_or_group_id *group_id = group_id_find(&group_id_to_find);
-
-    if(group_id && group_id->name && *group_id->name) {
-        snprintfz(w->name, MAX_NAME, "%s", group_id->name);
-    }
-    else {
-        struct group *gr = getgrgid(gid);
-        if(!gr || !gr->gr_name || !*gr->gr_name)
-            snprintfz(w->name, MAX_NAME, "%u", gid);
-        else
-            snprintfz(w->name, MAX_NAME, "%s", gr->gr_name);
+        w->compare = string_strdupz(buf);
+        w->id = string_dup(w->compare);
     }
 
-    strncpyz(w->clean_name, w->name, MAX_NAME);
+    apps_groupname_get_from_gid(gid, w->name, sizeof(w->name));
+
+    strncpyz(w->clean_name, w->name, sizeof(w->name) - 1);
     netdata_fix_chart_name(w->clean_name);
 
     w->gid = gid;
@@ -107,12 +76,13 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
         if(nid[0] == '*') ends_with = 1;
         nid++;
     }
-    uint32_t hash = simple_hash(id);
+
+    STRING *nidstr = string_strdupz(nid);
 
     // find if it already exists
     struct target *w, *last = apps_groups_root_target;
     for(w = apps_groups_root_target ; w ; w = w->next) {
-        if(w->idhash == hash && strncmp(nid, w->id, MAX_NAME) == 0)
+        if(nidstr == w->id)
             return w;
 
         last = w;
@@ -132,47 +102,48 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
 
         if(unlikely(debug_enabled)) {
             if(unlikely(target))
-                debug_log("REUSING TARGET NAME '%s' on ID '%s'", target->name, target->id);
+                debug_log("REUSING TARGET NAME '%s' on ID '%s'", target->name, string2str(target->id));
             else
                 debug_log("NEW TARGET NAME '%s' on ID '%s'", name, id);
         }
     }
 
     if(target && target->target)
-        fatal("Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'", id, target->id, target->target->id);
+        fatal("Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'",
+            id, string2str(target->id), string2str(target->target->id));
 
     w = callocz(sizeof(struct target), 1);
-    strncpyz(w->id, nid, MAX_NAME);
-    w->idhash = simple_hash(w->id);
+    w->id = string_strdupz(nid);
 
     if(unlikely(!target))
         // copy the name
-        strncpyz(w->name, name, MAX_NAME);
+        strncpyz(w->name, name, sizeof(w->name));
     else
         // copy the id
-        strncpyz(w->name, nid, MAX_NAME);
+        strncpyz(w->name, nid, sizeof(w->name));
 
     // dots are used to distinguish chart type and id in streaming, so we should replace them
-    strncpyz(w->clean_name, w->name, MAX_NAME);
+    strncpyz(w->clean_name, w->name, sizeof(w->name) - 1);
     netdata_fix_chart_name(w->clean_name);
     for (char *d = w->clean_name; *d; d++) {
         if (*d == '.')
             *d = '_';
     }
 
-    strncpyz(w->compare, nid, MAX_COMPARE_NAME);
-    size_t len = strlen(w->compare);
-    if(w->compare[len - 1] == '*') {
-        w->compare[len - 1] = '\0';
-        w->starts_with = 1;
+    {
+        size_t len = strlen(nid);
+        char buf[len + 1];
+        memcpy(buf, nid, sizeof(buf));
+        if(buf[len - 1] == '*') {
+            buf[len - 1] = '\0';
+            w->starts_with = 1;
+        }
+        w->ends_with = ends_with;
+        w->compare = string_strdupz(buf);
     }
-    w->ends_with = ends_with;
 
     if(w->starts_with && w->ends_with)
         proc_pid_cmdline_is_needed = true;
-
-    w->comparehash = simple_hash(w->compare);
-    w->comparelen = strlen(w->compare);
 
     w->hidden = thidden;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -188,9 +159,10 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
     else apps_groups_root_target = w;
 
     debug_log("ADDING TARGET ID '%s', process name '%s' (%s), aggregated on target '%s', options: %s %s"
-              , w->id
-              , w->compare, (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
-                  , w->target?w->target->name:w->name
+              , string2str(w->id)
+              , string2str(w->compare)
+              , (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
+              , w->target?w->target->name:w->name
               , (w->hidden)?"hidden":"-"
               , (w->debug_enabled)?"debug":"-"
     );
@@ -202,7 +174,7 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
 int read_apps_groups_conf(const char *path, const char *file) {
     char filename[FILENAME_MAX + 1];
 
-    snprintfz(filename, FILENAME_MAX, "%s/apps_%s.conf", path, file);
+    snprintfz(filename, sizeof(filename), "%s/apps_%s.conf", path, file);
 
     debug_log("process groups file: '%s'", filename);
 

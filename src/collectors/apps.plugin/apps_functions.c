@@ -218,7 +218,7 @@ void function_processes(const char *transaction, char *function,
         if(group && p->group_target != group)
             continue;
 
-        if(process_name && ((strcmp(p->comm, process_name) != 0 && !p->parent) || (p->parent && strcmp(p->comm, process_name) != 0 && strcmp(p->parent->comm, process_name) != 0)))
+        if(process_name && ((string_strcmp(p->comm, process_name) != 0 && !p->parent) || (p->parent && string_strcmp(p->comm, process_name) != 0 && string_strcmp(p->parent->comm, process_name) != 0)))
             continue;
 
         if(filter_pid && p->pid != pid && p->ppid != pid)
@@ -241,11 +241,11 @@ void function_processes(const char *transaction, char *function,
         buffer_json_add_array_item_uint64(wb, p->pid);
 
         // cmd
-        buffer_json_add_array_item_string(wb, p->comm);
+        buffer_json_add_array_item_string(wb, string2str(p->comm));
 
         // cmdline
         if (show_cmdline) {
-            buffer_json_add_array_item_string(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
+            buffer_json_add_array_item_string(wb, (p->cmdline && *p->cmdline) ? p->cmdline : string2str(p->comm));
         }
 
         // ppid
