@@ -897,8 +897,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [GitHub repository](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/github_repository.md)
 
-- [Netdata Agent alarms](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/alarms/integrations/netdata_agent_alarms.md)
-
 - [python.d changefinder](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/changefinder/integrations/python.d_changefinder.md)
 
 - [python.d zscores](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/zscores/integrations/python.d_zscores.md)
