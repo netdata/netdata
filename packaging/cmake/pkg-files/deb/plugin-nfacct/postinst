@@ -3,10 +3,7 @@
 set -e
 
 case "$1" in
-  configure|reconfigure)
-    chown root:netdata /usr/libexec/netdata/plugins.d/nfacct.plugin
-    chmod -f 4750 /usr/libexec/netdata/plugins.d/nfacct.plugin
-    ;;
+  configure|reconfigure) @ND_APPLY_PERMISSIONS@ ;;
 esac
 
 exit 0
