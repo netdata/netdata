@@ -955,9 +955,11 @@ static void rrdcontext_dequeue_from_hub_queue(RRDCONTEXT *rc) {
 
 static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
 
+#ifdef ENABLE_ACLK
     // check if we have received a streaming command for this host
     if(!host->node_id || !rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS) || !aclk_connected || !host->rrdctx.hub_queue)
         return;
+#endif
 
     // check if there are queued items to send
     if(!dictionary_entries(host->rrdctx.hub_queue))

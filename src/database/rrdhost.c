@@ -1425,7 +1425,9 @@ static void rrdhost_load_auto_labels(void) {
     if (localhost->system_info->prebuilt_dist)
         rrdlabels_add(labels, "_prebuilt_dist", localhost->system_info->prebuilt_dist, RRDLABEL_SRC_AUTO);
 
+#ifdef ENABLE_ACLK
     add_aclk_host_labels();
+#endif
 
     // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
     // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.

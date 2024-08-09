@@ -104,6 +104,7 @@
 // enabled features
 
 #cmakedefine ENABLE_OPENSSL
+#cmakedefine ENABLE_WOLFSSL
 #cmakedefine ENABLE_CLOUD
 #cmakedefine ENABLE_ACLK
 #cmakedefine ENABLE_ML
