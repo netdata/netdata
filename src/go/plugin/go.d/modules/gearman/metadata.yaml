@@ -96,11 +96,7 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: gearman_function_waiting_jobs
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/gearman.conf
-        metric: gearman.function_queued_jobs_activity
-        info: Average number of waiting jobs for ${label:task_name} function over the last 10 minutes
+    alerts: []
     metrics:
       folding:
         title: Metrics
