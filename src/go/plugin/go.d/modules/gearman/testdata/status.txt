@@ -1,0 +1,5 @@
+prefix generic_worker4 78   78  500
+generic_worker2 78  78  500
+generic_worker3 2   1   760
+generic_worker1 4   3   500
+.

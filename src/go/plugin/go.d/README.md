@@ -78,6 +78,7 @@ see the appropriate collector readme.
 | [filecheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/filecheck)                   |     Files and Directories     |
 | [fluentd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/fluentd)                       |            Fluentd            |
 | [freeradius](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/freeradius)                 |          FreeRADIUS           |
+| [gearman](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/gearman)                       |            Gearman            |
 | [haproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/haproxy)                       |            HAProxy            |
 | [hddtemp](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hddtemp)                       |       Disks temperature       |
 | [hdfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hdfs)                             |             HDFS              |

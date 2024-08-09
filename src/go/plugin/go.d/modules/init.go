@@ -32,6 +32,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/filecheck"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/fluentd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/freeradius"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/gearman"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/geth"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/haproxy"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/hddtemp"
