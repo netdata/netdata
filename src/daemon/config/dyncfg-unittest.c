@@ -473,7 +473,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
                               NULL, NULL,
                               NULL, NULL,
                               NULL, NULL,
-                              pld, source);
+                              pld, source, false);
     if(!DYNCFG_RESP_SUCCESS(rc)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run: %s; returned code %d", cmd, rc);
         dyncfg_unittest_register_error(NULL, NULL);

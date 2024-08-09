@@ -96,7 +96,7 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe
         dyncfg_echo_cb, e,
         NULL, NULL,
         NULL, NULL,
-        NULL, string2str(df->dyncfg.source));
+        NULL, string2str(df->dyncfg.source), false);
 }
 
 // ----------------------------------------------------------------------------
@@ -129,7 +129,7 @@ void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id)
         dyncfg_echo_cb, e,
         NULL, NULL,
         NULL, NULL,
-        df->dyncfg.payload, string2str(df->dyncfg.source));
+        df->dyncfg.payload, string2str(df->dyncfg.source), false);
 }
 
 // ----------------------------------------------------------------------------
@@ -164,7 +164,7 @@ static void dyncfg_echo_payload_add(const DICTIONARY_ITEM *item_template __maybe
         dyncfg_echo_cb, e,
         NULL, NULL,
         NULL, NULL,
-        df_job->dyncfg.payload, string2str(df_job->dyncfg.source));
+        df_job->dyncfg.payload, string2str(df_job->dyncfg.source), false);
 }
 
 void dyncfg_echo_add(const DICTIONARY_ITEM *item_template, const DICTIONARY_ITEM *item_job, DYNCFG *df_template, DYNCFG *df_job, const char *template_id, const char *job_name) {

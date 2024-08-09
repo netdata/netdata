@@ -998,7 +998,7 @@ static void disk_labels_cb(RRDSET *st, void *data) {
     add_labels_to_disk(data, st);
 }
 
-static int diskstats_function_block_devices(BUFFER *wb, const char *function __maybe_unused) {
+static int diskstats_function_block_devices(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload __maybe_unused, const char *source __maybe_unused) {
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);

@@ -515,7 +515,6 @@ HTTP_ACL socket_ssl_acl(char *acl) {
         //Due the format of the SSL command it is always the last command,
         //we finish it here to avoid problems with the ACLs
         *ssl = '\0';
-#ifdef ENABLE_HTTPS
         ssl++;
         if (!strncmp("SSL=",ssl,4)) {
             ssl += 4;
@@ -526,7 +525,6 @@ HTTP_ACL socket_ssl_acl(char *acl) {
                 return HTTP_ACL_SSL_FORCE;
             }
         }
-#endif
     }
 
     return HTTP_ACL_NONE;
@@ -927,9 +925,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                     int timeout_ms = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
 
                     switch(wait_on_socket_or_cancel_with_timeout(
-#ifdef ENABLE_HTTPS
-                    NULL,
-#endif
+                        NULL,
                         fd, timeout_ms, POLLOUT, NULL)) {
                         case  0: // proceed
                             nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -1172,9 +1168,7 @@ int connect_to_one_of_urls(const char *destination, int default_port, struct tim
 // returns: -1 = thread cancelled, 0 = proceed to read/write, 1 = time exceeded, 2 = error on fd
 // timeout parameter can be zero to wait forever
 inline int wait_on_socket_or_cancel_with_timeout(
-#ifdef ENABLE_HTTPS
     NETDATA_SSL *ssl,
-#endif
     int fd, int timeout_ms, short int poll_events, short int *revents) {
     struct pollfd pfd = {
         .fd = fd,
@@ -1190,10 +1184,8 @@ inline int wait_on_socket_or_cancel_with_timeout(
             return -1;
         }
 
-#ifdef ENABLE_HTTPS
         if(poll_events == POLLIN && ssl && SSL_connection(ssl) && netdata_ssl_has_pending(ssl))
             return 0;
-#endif
 
         const int wait_ms = (timeout_ms >= ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS || forever) ?
                                             ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS : timeout_ms;
@@ -1233,16 +1225,10 @@ inline int wait_on_socket_or_cancel_with_timeout(
     return 1;
 }
 
-ssize_t recv_timeout(
-#ifdef ENABLE_HTTPS
-    NETDATA_SSL *ssl,
-#endif
-    int sockfd, void *buf, size_t len, int flags, int timeout) {
+ssize_t recv_timeout(NETDATA_SSL *ssl, int sockfd, void *buf, size_t len, int flags, int timeout) {
 
     switch(wait_on_socket_or_cancel_with_timeout(
-#ifdef ENABLE_HTTPS
-    ssl,
-#endif
+        ssl,
         sockfd, timeout * 1000, POLLIN, NULL)) {
         case 0: // data are waiting
             break;
@@ -1256,25 +1242,16 @@ ssize_t recv_timeout(
             return -1;
     }
 
-#ifdef ENABLE_HTTPS
-    if (SSL_connection(ssl)) {
+    if (SSL_connection(ssl))
         return netdata_ssl_read(ssl, buf, len);
-    }
-#endif
 
     return recv(sockfd, buf, len, flags);
 }
 
-ssize_t send_timeout(
-#ifdef ENABLE_HTTPS
-    NETDATA_SSL *ssl,
-#endif
-    int sockfd, void *buf, size_t len, int flags, int timeout) {
+ssize_t send_timeout(NETDATA_SSL *ssl, int sockfd, void *buf, size_t len, int flags, int timeout) {
 
     switch(wait_on_socket_or_cancel_with_timeout(
-#ifdef ENABLE_HTTPS
-    ssl,
-#endif
+        ssl,
         sockfd, timeout * 1000, POLLOUT, NULL)) {
         case 0: // data are waiting
             break;
@@ -1288,7 +1265,6 @@ ssize_t send_timeout(
             return -1;
     }
 
-#ifdef ENABLE_HTTPS
     if(ssl->conn) {
         if (SSL_connection(ssl)) {
             return netdata_ssl_write(ssl, buf, len);
@@ -1300,7 +1276,7 @@ ssize_t send_timeout(
             return -1;
         }
     }
-#endif
+
     return send(sockfd, buf, len, flags);
 }
 

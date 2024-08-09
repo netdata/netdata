@@ -15,11 +15,6 @@ static inline int uuid_parse_fix(char *in, nd_uuid_t uuid)
     return uuid_parse(in, uuid);
 }
 
-static inline int claimed()
-{
-    return localhost->aclk_state.claimed_id != NULL;
-}
-
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
     ACLK_DATABASE_NODE_STATE,
@@ -56,8 +51,6 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid, nd_uuid_t *node_id)
 void sql_aclk_sync_init(void);
 void aclk_push_alert_config(const char *node_id, const char *config_hash);
 void schedule_node_info_update(RRDHOST *host);
-#ifdef ENABLE_ACLK
 void unregister_node(const char *machine_guid);
-#endif
 
 #endif //NETDATA_SQLITE_ACLK_H

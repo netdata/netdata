@@ -42,7 +42,7 @@ RRDHOST *find_host_by_node_id(char *node_id) {
 
     RRDHOST *host, *ret = NULL;
     dfe_start_read(rrdhost_root_index, host) {
-        if (host->node_id && uuid_eq(*host->node_id, node_uuid)) {
+        if (uuid_eq(host->node_id, node_uuid)) {
             ret = host;
             break;
         }
@@ -244,15 +244,13 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
 
         rrdhost_streaming_sender_structures_init(host);
 
-#ifdef ENABLE_HTTPS
         host->sender->ssl = NETDATA_SSL_UNSET_CONNECTION;
-#endif
 
-        host->rrdpush_send_destination = strdupz(rrdpush_destination);
+        host->rrdpush.send.destination = strdupz(rrdpush_destination);
         rrdpush_destinations_init(host);
 
-        host->rrdpush_send_api_key = strdupz(rrdpush_api_key);
-        host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL,
+        host->rrdpush.send.api_key = strdupz(rrdpush_api_key);
+        host->rrdpush.send.charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL,
                                                                    SIMPLE_PATTERN_EXACT, true);
 
         rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
@@ -383,8 +381,7 @@ static RRDHOST *rrdhost_create(
     host->rrd_history_entries        = align_entries_to_pagesize(memory_mode, entries);
     host->health.health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
-    netdata_mutex_init(&host->aclk_state_lock);
-    netdata_mutex_init(&host->receiver_lock);
+    spinlock_init(&host->receiver_lock);
 
     if (likely(!archived)) {
         rrd_functions_host_init(host);
@@ -535,8 +532,8 @@ static RRDHOST *rrdhost_create(
          , rrd_memory_mode_name(host->rrd_memory_mode)
          , host->rrd_history_entries
          , rrdhost_has_rrdpush_sender_enabled(host)?"enabled":"disabled"
-         , host->rrdpush_send_destination?host->rrdpush_send_destination:""
-         , host->rrdpush_send_api_key?host->rrdpush_send_api_key:""
+         , host->rrdpush.send.destination?host->rrdpush.send.destination:""
+         , host->rrdpush.send.api_key?host->rrdpush.send.api_key:""
          , host->health.health_enabled?"enabled":"disabled"
          , host->cache_dir
          , string2str(host->health.health_default_exec)
@@ -1027,12 +1024,14 @@ void dbengine_init(char *hostname) {
 #endif
 }
 
+void api_v1_management_init(void);
+
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
     rrdhost_init();
 
     if (unlikely(sql_init_meta_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-            set_late_global_environment(system_info);
+            set_late_analytics_variables(system_info);
             fatal("Failed to initialize SQLite");
         }
 
@@ -1112,26 +1111,15 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 
     dyncfg_host_init(localhost);
 
-    if(!unittest) {
+    if(!unittest)
         health_plugin_init();
-    }
 
-    // we register this only on localhost
-    // for the other nodes, the origin server should register it
-    rrd_function_add_inline(localhost, NULL, "streaming", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT + 1, RRDFUNCTIONS_STREAMING_HELP, "top",
-                            HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
-                            rrdhost_function_streaming);
-
-    rrd_function_add_inline(localhost, NULL, "netdata-api-calls", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT + 2, RRDFUNCTIONS_PROGRESS_HELP, "top",
-                            HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
-                            rrdhost_function_progress);
+    global_functions_add();
 
     if (likely(system_info)) {
         detect_machine_guid_change(&localhost->host_uuid);
         sql_aclk_sync_init();
-        web_client_api_v1_management_init();
+        api_v1_management_init();
     }
 
     return 0;
@@ -1284,9 +1272,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     // ------------------------------------------------------------------------
     // free it
 
-    pthread_mutex_destroy(&host->aclk_state_lock);
-    freez(host->aclk_state.claimed_id);
-    freez(host->aclk_state.prev_claimed_id);
     rrdlabels_destroy(host->rrdlabels);
     string_freez(host->os);
     string_freez(host->timezone);
@@ -1295,14 +1280,13 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     string_freez(host->program_version);
     rrdhost_system_info_free(host->system_info);
     freez(host->cache_dir);
-    freez(host->rrdpush_send_api_key);
-    freez(host->rrdpush_send_destination);
+    freez(host->rrdpush.send.api_key);
+    freez(host->rrdpush.send.destination);
     rrdpush_destinations_free(host);
     string_freez(host->health.health_default_exec);
     string_freez(host->health.health_default_recipient);
     string_freez(host->registry_hostname);
-    simple_pattern_free(host->rrdpush_send_charts_matching);
-    freez(host->node_id);
+    simple_pattern_free(host->rrdpush.send.charts_matching);
 
     rrd_functions_host_destroy(host);
     rrdvariables_destroy(host->rrdvars);
@@ -1441,8 +1425,8 @@ static void rrdhost_load_auto_labels(void) {
     rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_os", string2str(localhost->os), RRDLABEL_SRC_AUTO);
 
-    if (localhost->rrdpush_send_destination)
-        rrdlabels_add(labels, "_streams_to", localhost->rrdpush_send_destination, RRDLABEL_SRC_AUTO);
+    if (localhost->rrdpush.send.destination)
+        rrdlabels_add(labels, "_streams_to", localhost->rrdpush.send.destination, RRDLABEL_SRC_AUTO);
 }
 
 void rrdhost_set_is_parent_label(void) {
@@ -1453,11 +1437,7 @@ void rrdhost_set_is_parent_label(void) {
         rrdlabels_add(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
         //queue a node info
-#ifdef ENABLE_ACLK
-        if (netdata_cloud_enabled) {
-            aclk_queue_node_info(localhost, false);
-        }
-#endif
+        aclk_queue_node_info(localhost, false);
     }
 }
 
@@ -1498,7 +1478,7 @@ static void rrdhost_load_kubernetes_labels(void) {
     if(!instance) return;
 
     char buffer[1000 + 1];
-    while (fgets(buffer, 1000, instance->child_stdout_fp) != NULL)
+    while (fgets(buffer, 1000, spawn_popen_stdout(instance)) != NULL)
         rrdlabels_add_pair(localhost->rrdlabels, buffer, RRDLABEL_SRC_AUTO|RRDLABEL_SRC_K8S);
 
     // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
@@ -1740,7 +1720,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     s->ingest.since = MAX(host->child_connect_time, host->child_disconnected_time);
     s->ingest.reason = (online) ? STREAM_HANDSHAKE_NEVER : host->rrdpush_last_receiver_exit_reason;
 
-    netdata_mutex_lock(&host->receiver_lock);
+    spinlock_lock(&host->receiver_lock);
     s->ingest.hops = (host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
     bool has_receiver = false;
     if (host->receiver) {
@@ -1751,11 +1731,9 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
         s->ingest.capabilities = host->receiver->capabilities;
         s->ingest.peers = socket_peers(host->receiver->fd);
-#ifdef ENABLE_HTTPS
         s->ingest.ssl = SSL_connection(&host->receiver->ssl);
-#endif
     }
-    netdata_mutex_unlock(&host->receiver_lock);
+    spinlock_unlock(&host->receiver_lock);
 
     if (online) {
         if(s->db.status == RRDHOST_DB_STATUS_INITIALIZING)
@@ -1812,9 +1790,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
         s->stream.since = host->sender->last_state_since_t;
         s->stream.peers = socket_peers(host->sender->rrdpush_sender_socket);
-#ifdef ENABLE_HTTPS
         s->stream.ssl = SSL_connection(&host->sender->ssl);
-#endif
 
         memcpy(s->stream.sent_bytes_on_this_connection_per_type,
                host->sender->sent_bytes_on_this_connection_per_type,

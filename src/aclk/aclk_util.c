@@ -2,8 +2,6 @@
 
 #include "aclk_util.h"
 
-#ifdef ENABLE_ACLK
-
 #include "aclk_proxy.h"
 
 #include "daemon/common.h"
@@ -186,20 +184,18 @@ static void topic_generate_final(struct aclk_topic *t) {
     if (!replace_tag)
         return;
 
-    rrdhost_aclk_state_lock(localhost);
-    if (unlikely(!localhost->aclk_state.claimed_id)) {
+    CLAIM_ID claim_id = claim_id_get();
+    if (unlikely(!claim_id_is_set(claim_id))) {
         netdata_log_error("This should never be called if agent not claimed");
-        rrdhost_aclk_state_unlock(localhost);
         return;
     }
 
-    t->topic = mallocz(strlen(t->topic_recvd) + 1 - strlen(CLAIM_ID_REPLACE_TAG) + strlen(localhost->aclk_state.claimed_id));
+    t->topic = mallocz(strlen(t->topic_recvd) + 1 - strlen(CLAIM_ID_REPLACE_TAG) + strlen(claim_id.str));
     memcpy(t->topic, t->topic_recvd, replace_tag - t->topic_recvd);
     dest = t->topic + (replace_tag - t->topic_recvd);
 
-    memcpy(dest, localhost->aclk_state.claimed_id, strlen(localhost->aclk_state.claimed_id));
-    dest += strlen(localhost->aclk_state.claimed_id);
-    rrdhost_aclk_state_unlock(localhost);
+    memcpy(dest, claim_id.str, strlen(claim_id.str));
+    dest += strlen(claim_id.str);
     replace_tag += strlen(CLAIM_ID_REPLACE_TAG);
     strcpy(dest, replace_tag);
     dest += strlen(replace_tag);
@@ -440,7 +436,6 @@ void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd, enum mqtt
 
     freez(proxy);
 }
-#endif /* ENABLE_ACLK */
 
 #if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
 static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)

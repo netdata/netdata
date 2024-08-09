@@ -67,7 +67,7 @@ gunzip netdata*.tar.gz && tar xf netdata*.tar && rm -rf netdata*.tar
 Install Netdata in `/opt/netdata`. If you want to enable automatic updates, add `--auto-update` or `-u` to install `netdata-updater` in `cron` (**need root permission**):
 
 ```sh
-cd netdata-v* && ./netdata-installer.sh --install-prefix /opt && cp /opt/netdata/usr/sbin/netdata-claim.sh /usr/sbin/
+cd netdata-v* && ./netdata-installer.sh --install-prefix /opt
 ```
 
 You also need to enable the `netdata` service in `/etc/rc.conf`:
@@ -113,9 +113,6 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--native-only`: Only install if native binary packages are available.
 - `--static-only`: Only install if a static build is available.
 - `--build-only`: Only install using a local build.
-- `--disable-cloud`: For local builds, don’t build any of the cloud code at all. For native packages and static builds,
-    use runtime configuration to disable cloud support.
-- `--require-cloud`: Only install if Netdata Cloud can be enabled. Overrides `--disable-cloud`.
 - `--install-prefix`: Specify an installation prefix for local builds (by default, we use a sane prefix based on the type of system).
 - `--install-version`: Specify the version of Netdata to install.
 - `--old-install-prefix`: Specify the custom local build's installation prefix that should be removed.

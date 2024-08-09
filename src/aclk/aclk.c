@@ -2,7 +2,6 @@
 
 #include "aclk.h"
 
-#ifdef ENABLE_ACLK
 #include "aclk_stats.h"
 #include "mqtt_websockets/mqtt_wss_client.h"
 #include "aclk_otp.h"
@@ -14,7 +13,6 @@
 #include "https_client.h"
 #include "schema-wrappers/schema_wrappers.h"
 #include "aclk_capas.h"
-
 #include "aclk_proxy.h"
 
 #ifdef ACLK_LOG_CONVERSATION_DIR
@@ -25,14 +23,35 @@
 
 #define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
 
-#endif /* ENABLE_ACLK */
-
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 int aclk_rcvd_cloud_msgs = 0;
 int aclk_connection_counter = 0;
 int disconnect_req = 0;
 
-int aclk_connected = 0;
+static bool aclk_connected = false;
+static inline void aclk_set_connected(void) {
+    __atomic_store_n(&aclk_connected, true, __ATOMIC_RELAXED);
+}
+static inline void aclk_set_disconnected(void) {
+    __atomic_store_n(&aclk_connected, false, __ATOMIC_RELAXED);
+}
+
+inline bool aclk_online(void) {
+    return __atomic_load_n(&aclk_connected, __ATOMIC_RELAXED);
+}
+
+bool aclk_online_for_contexts(void) {
+    return aclk_online() && aclk_query_scope_has(HTTP_ACL_METRICS);
+}
+
+bool aclk_online_for_alerts(void) {
+    return aclk_online() && aclk_query_scope_has(HTTP_ACL_ALERTS);
+}
+
+bool aclk_online_for_nodes(void) {
+    return aclk_online() && aclk_query_scope_has(HTTP_ACL_NODES);
+}
+
 int aclk_ctx_based = 0;
 int aclk_disable_runtime = 0;
 int aclk_stats_enabled;
@@ -49,7 +68,6 @@ float last_backoff_value = 0;
 
 time_t aclk_block_until = 0;
 
-#ifdef ENABLE_ACLK
 mqtt_wss_client mqttwss_client;
 
 //netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -152,19 +170,6 @@ biofailed:
     return 1;
 }
 
-static int wait_till_cloud_enabled()
-{
-    nd_log(NDLS_DAEMON, NDLP_INFO,
-           "Waiting for Cloud to be enabled");
-
-    while (!netdata_cloud_enabled) {
-        sleep_usec(USEC_PER_SEC * 1);
-        if (!service_running(SERVICE_ACLK))
-            return 1;
-    }
-    return 0;
-}
-
 /**
  * Will block until agent is claimed. Returns only if agent claimed
  * or if agent needs to shutdown.
@@ -175,14 +180,13 @@ static int wait_till_cloud_enabled()
 static int wait_till_agent_claimed(void)
 {
     //TODO prevent malloc and freez
-    char *agent_id = get_agent_claimid();
-    while (likely(!agent_id)) {
+    ND_UUID uuid = claim_id_get_uuid();
+    while (likely(UUIDiszero(uuid))) {
         sleep_usec(USEC_PER_SEC * 1);
         if (!service_running(SERVICE_ACLK))
             return 1;
-        agent_id = get_agent_claimid();
+        uuid = claim_id_get_uuid();
     }
-    freez(agent_id);
     return 0;
 }
 
@@ -204,7 +208,7 @@ static int wait_till_agent_claim_ready()
 
         // The NULL return means the value was never initialised, but this value has been initialized in post_conf_load.
         // We trap the impossible NULL here to keep the linter happy without using a fatal() in the code.
-        char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+        const char *cloud_base_url = cloud_config_url_get();
         if (cloud_base_url == NULL) {
             netdata_log_error("Do not move the cloud base url out of post_conf_load!!");
             return 1;
@@ -387,7 +391,7 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
         mqtt_wss_subscribe(client, topic, 1);
 
     aclk_stats_upd_online(1);
-    aclk_connected = 1;
+    aclk_set_connected();
     aclk_pubacks_per_conn = 0;
     aclk_rcvd_cloud_msgs = 0;
     aclk_connection_counter++;
@@ -427,7 +431,7 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
 
     aclk_stats_upd_online(0);
     last_disconnect_time = now_realtime_sec();
-    aclk_connected = 0;
+    aclk_set_disconnected();
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "Attempting to gracefully shutdown the MQTT/WSS connection");
@@ -601,7 +605,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
 #endif
 
     while (service_running(SERVICE_ACLK)) {
-        aclk_cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+        aclk_cloud_base_url = cloud_config_url_get();
         if (aclk_cloud_base_url == NULL) {
             error_report("Do not move the cloud base url out of post_conf_load!!");
             aclk_status = ACLK_STATUS_NO_CLOUD_URL;
@@ -817,17 +821,7 @@ void *aclk_main(void *ptr)
 
     unsigned int proto_hdl_cnt = aclk_init_rx_msg_handlers();
 
-#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-    nd_log(NDLS_DAEMON, NDLP_INFO,
-           "Killing ACLK thread -> cloud functionality has been disabled");
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-    return NULL;
-#endif
     query_threads.count = read_query_thread_count();
-
-    if (wait_till_cloud_enabled())
-        goto exit;
 
     if (wait_till_agent_claim_ready())
         goto exit;
@@ -875,7 +869,7 @@ void *aclk_main(void *ptr)
         if (handle_connection(mqttwss_client)) {
             aclk_stats_upd_online(0);
             last_disconnect_time = now_realtime_sec();
-            aclk_connected = 0;
+            aclk_set_disconnected();
             nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK DISCONNECTED");
         }
     } while (service_running(SERVICE_ACLK));
@@ -914,11 +908,11 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
     nd_uuid_t node_id;
     int ret = 0;
 
-    if (!aclk_connected)
+    if (!aclk_online())
         return;
 
-    if (host->node_id && !uuid_is_null(*host->node_id)) {
-        uuid_copy(node_id, *host->node_id);
+    if (!uuid_is_null(host->node_id)) {
+        uuid_copy(node_id, host->node_id);
     }
     else {
         ret = get_node_id(&host->host_uuid, &node_id);
@@ -931,15 +925,17 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
             // node_id not found
             aclk_query_t create_query;
             create_query = aclk_query_new(REGISTER_NODE);
-            rrdhost_aclk_state_lock(localhost);
+            CLAIM_ID claim_id = claim_id_get();
+
             node_instance_creation_t node_instance_creation = {
-                .claim_id = localhost->aclk_state.claimed_id,
+                .claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL,
                 .hops = host->system_info->hops,
                 .hostname = rrdhost_hostname(host),
                 .machine_guid = host->machine_guid};
+
             create_query->data.bin_payload.payload =
                 generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
-            rrdhost_aclk_state_unlock(localhost);
+
             create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
             create_query->data.bin_payload.msg_name = "CreateNodeInstance";
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -962,10 +958,9 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 
     node_state_update.capabilities = aclk_get_agent_capas();
 
-    rrdhost_aclk_state_lock(localhost);
-    node_state_update.claim_id = localhost->aclk_state.claimed_id;
+    CLAIM_ID claim_id = claim_id_get();
+    node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
     query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-    rrdhost_aclk_state_unlock(localhost);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "Queuing status update for node=%s, live=%d, hops=%u, queryable=%d",
@@ -1007,10 +1002,9 @@ void aclk_send_node_instances()
             }
             node_state_update.capabilities = aclk_get_node_instance_capas(host);
 
-            rrdhost_aclk_state_lock(localhost);
-            node_state_update.claim_id = localhost->aclk_state.claimed_id;
+            CLAIM_ID claim_id = claim_id_get();
+            node_state_update.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
             query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-            rrdhost_aclk_state_unlock(localhost);
 
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "Queuing status update for node=%s, live=%d, hops=%d, queryable=1",
@@ -1032,10 +1026,10 @@ void aclk_send_node_instances()
             uuid_unparse_lower(list->host_id, (char*)node_instance_creation.machine_guid);
             create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
             create_query->data.bin_payload.msg_name = "CreateNodeInstance";
-            rrdhost_aclk_state_lock(localhost);
-            node_instance_creation.claim_id = localhost->aclk_state.claimed_id,
+
+            CLAIM_ID claim_id = claim_id_get();
+            node_instance_creation.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL,
             create_query->data.bin_payload.payload = generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
-            rrdhost_aclk_state_unlock(localhost);
 
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "Queuing registration for host=%s, hops=%d",
@@ -1087,16 +1081,15 @@ char *aclk_state(void)
     );
     buffer_sprintf(wb, "Protocol Used: Protobuf\nMQTT Version: %d\nClaimed: ", 5);
 
-    char *agent_id = get_agent_claimid();
-    if (agent_id == NULL)
+    CLAIM_ID claim_id = claim_id_get();
+    if (!claim_id_is_set(claim_id))
         buffer_strcat(wb, "No\n");
     else {
-        char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
-        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\n", agent_id, cloud_base_url ? cloud_base_url : "null");
-        freez(agent_id);
+        const char *cloud_base_url = cloud_config_url_get();
+        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null");
     }
 
-    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_connected ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
+    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_online() ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
     if (last_conn_time_mqtt && (tmptr = localtime_r(&last_conn_time_mqtt, &tmbuf)) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
@@ -1112,13 +1105,13 @@ char *aclk_state(void)
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         buffer_sprintf(wb, "Last Disconnect Time: %s\n", timebuf);
     }
-    if (!aclk_connected && next_connection_attempt && (tmptr = localtime_r(&next_connection_attempt, &tmbuf)) ) {
+    if (!aclk_online() && next_connection_attempt && (tmptr = localtime_r(&next_connection_attempt, &tmbuf)) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         buffer_sprintf(wb, "Next Connection Attempt At: %s\nLast Backoff: %.3f", timebuf, last_backoff_value);
     }
 
-    if (aclk_connected) {
+    if (aclk_online()) {
         buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d", aclk_rcvd_cloud_msgs, aclk_pubacks_per_conn);
 
         RRDHOST *host;
@@ -1127,19 +1120,17 @@ char *aclk_state(void)
             buffer_sprintf(wb, "\n\n> Node Instance for mGUID: \"%s\" hostname \"%s\"\n", host->machine_guid, rrdhost_hostname(host));
 
             buffer_strcat(wb, "\tClaimed ID: ");
-            rrdhost_aclk_state_lock(host);
-            if (host->aclk_state.claimed_id)
-                buffer_strcat(wb, host->aclk_state.claimed_id);
+            claim_id = rrdhost_claim_id_get(host);
+            if(claim_id_is_set(claim_id))
+                buffer_strcat(wb, claim_id.str);
             else
                 buffer_strcat(wb, "null");
-            rrdhost_aclk_state_unlock(host);
 
-
-            if (host->node_id == NULL || uuid_is_null(*host->node_id)) {
+            if (uuid_is_null(host->node_id))
                 buffer_strcat(wb, "\n\tNode ID: null\n");
-            } else {
+            else {
                 char node_id[GUID_LEN + 1];
-                uuid_unparse_lower(*host->node_id, node_id);
+                uuid_unparse_lower(host->node_id, node_id);
                 buffer_sprintf(wb, "\n\tNode ID: %s\n", node_id);
             }
 
@@ -1204,22 +1195,21 @@ char *aclk_state_json(void)
     json_object_array_add(grp, tmp);
     json_object_object_add(msg, "protocols-supported", grp);
 
-    char *agent_id = get_agent_claimid();
-    tmp = json_object_new_boolean(agent_id != NULL);
+    CLAIM_ID claim_id = claim_id_get();
+    tmp = json_object_new_boolean(claim_id_is_set(claim_id));
     json_object_object_add(msg, "agent-claimed", tmp);
 
-    if (agent_id) {
-        tmp = json_object_new_string(agent_id);
-        freez(agent_id);
-    } else
+    if (claim_id_is_set(claim_id))
+        tmp = json_object_new_string(claim_id.str);
+    else
         tmp = NULL;
     json_object_object_add(msg, "claimed-id", tmp);
 
-    char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
+    const char *cloud_base_url = cloud_config_url_get();
     tmp = cloud_base_url ? json_object_new_string(cloud_base_url) : NULL;
     json_object_object_add(msg, "cloud-url", tmp);
 
-    tmp = json_object_new_boolean(aclk_connected);
+    tmp = json_object_new_boolean(aclk_online());
     json_object_object_add(msg, "online", tmp);
 
     tmp = json_object_new_string("Protobuf");
@@ -1240,9 +1230,9 @@ char *aclk_state_json(void)
     json_object_object_add(msg, "last-connect-time-utc", timestamp_to_json(&last_conn_time_mqtt));
     json_object_object_add(msg, "last-connect-time-puback-utc", timestamp_to_json(&last_conn_time_appl));
     json_object_object_add(msg, "last-disconnect-time-utc", timestamp_to_json(&last_disconnect_time));
-    json_object_object_add(msg, "next-connection-attempt-utc", !aclk_connected ? timestamp_to_json(&next_connection_attempt) : NULL);
+    json_object_object_add(msg, "next-connection-attempt-utc", !aclk_online() ? timestamp_to_json(&next_connection_attempt) : NULL);
     tmp = NULL;
-    if (!aclk_connected && last_backoff_value)
+    if (!aclk_online() && last_backoff_value)
         tmp = json_object_new_double(last_backoff_value);
     json_object_object_add(msg, "last-backoff-value", tmp);
 
@@ -1262,19 +1252,18 @@ char *aclk_state_json(void)
         tmp = json_object_new_string(host->machine_guid);
         json_object_object_add(nodeinstance, "mguid", tmp);
 
-        rrdhost_aclk_state_lock(host);
-        if (host->aclk_state.claimed_id) {
-            tmp = json_object_new_string(host->aclk_state.claimed_id);
+        claim_id = rrdhost_claim_id_get(host);
+        if(claim_id_is_set(claim_id)) {
+            tmp = json_object_new_string(claim_id.str);
             json_object_object_add(nodeinstance, "claimed_id", tmp);
         } else
             json_object_object_add(nodeinstance, "claimed_id", NULL);
-        rrdhost_aclk_state_unlock(host);
 
-        if (host->node_id == NULL || uuid_is_null(*host->node_id)) {
+        if (uuid_is_null(host->node_id)) {
             json_object_object_add(nodeinstance, "node-id", NULL);
         } else {
             char node_id[GUID_LEN + 1];
-            uuid_unparse_lower(*host->node_id, node_id);
+            uuid_unparse_lower(host->node_id, node_id);
             tmp = json_object_new_string(node_id);
             json_object_object_add(nodeinstance, "node-id", tmp);
         }
@@ -1301,12 +1290,10 @@ char *aclk_state_json(void)
     json_object_put(msg);
     return str;
 }
-#endif /* ENABLE_ACLK */
 
 void add_aclk_host_labels(void) {
     RRDLABELS *labels = localhost->rrdlabels;
 
-#ifdef ENABLE_ACLK
     rrdlabels_add(labels, "_aclk_available", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
     ACLK_PROXY_TYPE aclk_proxy;
     char *proxy_str;
@@ -1327,9 +1314,6 @@ void add_aclk_host_labels(void) {
     rrdlabels_add(labels, "_mqtt_version", "5", RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_aclk_proxy", proxy_str, RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_aclk_ng_new_cloud_protocol", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
-#else
-    rrdlabels_add(labels, "_aclk_available", "false", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
-#endif
 }
 
 void aclk_queue_node_info(RRDHOST *host, bool immediate)

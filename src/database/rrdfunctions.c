@@ -225,6 +225,10 @@ void rrd_functions_host_destroy(RRDHOST *host) {
 
 // ----------------------------------------------------------------------------
 
+static inline bool is_function_hidden(const char *name, const char *tags) {
+    return (name && name[0] == '_' && name[1] == '_') || (tags && strstr(tags, RRDFUNCTIONS_TAG_HIDDEN) != NULL);
+}
+
 static inline bool is_function_dyncfg(const char *name) {
     if(!name || !*name)
         return false;
@@ -237,6 +241,15 @@ static inline bool is_function_dyncfg(const char *name) {
         return true;
 
     return false;
+}
+
+static inline RRD_FUNCTION_OPTIONS get_function_options(RRDSET *st, const char *name, const char *tags) {
+    if(is_function_dyncfg(name))
+        return RRD_FUNCTION_DYNCFG;
+
+    RRD_FUNCTION_OPTIONS options = st ? RRD_FUNCTION_LOCAL : RRD_FUNCTION_GLOBAL;
+
+    return options | (is_function_hidden(name, tags) ? RRD_FUNCTION_HIDDEN : 0);
 }
 
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority,
@@ -263,7 +276,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     struct rrd_host_function tmp = {
         .sync = sync,
         .timeout = timeout,
-        .options = st ? RRD_FUNCTION_LOCAL: (is_function_dyncfg(name) ? RRD_FUNCTION_DYNCFG : RRD_FUNCTION_GLOBAL),
+        .options = get_function_options(st, name, tags),
         .access = access,
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
@@ -295,13 +308,11 @@ void rrd_function_del(RRDHOST *host, RRDSET *st, const char *name) {
 }
 
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
-    char buffer[PLUGINSD_LINE_MAX];
-    json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
-
-    buffer_flush(wb);
-    buffer_sprintf(wb, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
-    wb->content_type = CT_APPLICATION_JSON;
-    buffer_no_cacheable(wb);
+    buffer_reset(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    buffer_json_member_add_int64(wb, "status", code);
+    buffer_json_member_add_string(wb, "error_message", msg);
+    buffer_json_finalize(wb);
     return code;
 }
 

@@ -10,46 +10,6 @@ void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
     buffer_json_finalize(wb);
 }
 
-const char *rrdr_format_to_string(DATASOURCE_FORMAT format)  {
-    switch(format) {
-        case DATASOURCE_JSON:
-            return DATASOURCE_FORMAT_JSON;
-
-        case DATASOURCE_JSON2:
-            return DATASOURCE_FORMAT_JSON2;
-
-        case DATASOURCE_DATATABLE_JSON:
-            return DATASOURCE_FORMAT_DATATABLE_JSON;
-
-        case DATASOURCE_DATATABLE_JSONP:
-            return DATASOURCE_FORMAT_DATATABLE_JSONP;
-
-        case DATASOURCE_JSONP:
-            return DATASOURCE_FORMAT_JSONP;
-
-        case DATASOURCE_SSV:
-            return DATASOURCE_FORMAT_SSV;
-
-        case DATASOURCE_CSV:
-            return DATASOURCE_FORMAT_CSV;
-
-        case DATASOURCE_TSV:
-            return DATASOURCE_FORMAT_TSV;
-
-        case DATASOURCE_HTML:
-            return DATASOURCE_FORMAT_HTML;
-
-        case DATASOURCE_JS_ARRAY:
-            return DATASOURCE_FORMAT_JS_ARRAY;
-
-        case DATASOURCE_SSV_COMMA:
-            return DATASOURCE_FORMAT_SSV_COMMA;
-
-        default:
-            return "unknown";
-    }
-}
-
 int rrdset2value_api_v1(
         RRDSET *st
         , BUFFER *wb

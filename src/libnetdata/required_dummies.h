@@ -13,11 +13,6 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     exit(ret);
 }
 
-// callbacks required by popen()
-void signals_block(void){}
-void signals_unblock(void){}
-void signals_reset(void){}
-
 void rrdset_thread_rda_free(void){}
 void sender_thread_buffer_free(void){}
 void query_target_free(void){}

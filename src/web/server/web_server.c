@@ -134,11 +134,7 @@ void web_client_update_acl_matches(struct web_client *w) {
 void web_server_log_connection(struct web_client *w, const char *msg) {
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
-#ifdef ENABLE_HTTPS
             ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, SSL_connection(&w->ssl) ? "https" : "http"),
-#else
-            ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, "http"),
-#endif
             ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_HOST, w->forwarded_host),

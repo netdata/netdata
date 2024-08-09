@@ -20,9 +20,7 @@ typedef enum cmd {
     CMD_ACLK_STATE,
     CMD_VERSION,
     CMD_DUMPCONFIG,
-#ifdef ENABLE_ACLK
     CMD_REMOVE_NODE,
-#endif
     CMD_TOTAL_COMMANDS
 } cmd_t;
 

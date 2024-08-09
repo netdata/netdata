@@ -67,6 +67,7 @@
 #cmakedefine HAVE_GETPRIORITY
 #cmakedefine HAVE_SETENV
 #cmakedefine HAVE_DLSYM
+#cmakedefine HAVE_LIBCURL
 
 #cmakedefine HAVE_BACKTRACE
 #cmakedefine HAVE_CLOSE_RANGE
@@ -103,14 +104,10 @@
 
 // enabled features
 
-#cmakedefine ENABLE_OPENSSL
-#cmakedefine ENABLE_CLOUD
-#cmakedefine ENABLE_ACLK
 #cmakedefine ENABLE_ML
 #cmakedefine ENABLE_EXPORTING_MONGODB
 #cmakedefine ENABLE_H2O
 #cmakedefine ENABLE_DBENGINE
-#cmakedefine ENABLE_HTTPS
 #cmakedefine ENABLE_LZ4
 #cmakedefine ENABLE_ZSTD
 #cmakedefine ENABLE_BROTLI
@@ -182,7 +179,6 @@
 // #cmakedefine ENABLE_PROMETHEUS_REMOTE_WRITE
 
 // /* NSA spy stuff */
-// #define ENABLE_HTTPS 1
 // #cmakedefine01 HAVE_X509_VERIFY_PARAM_set1_host
 
 #define HAVE_CRYPTO

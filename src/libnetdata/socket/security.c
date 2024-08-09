@@ -1,7 +1,5 @@
 #include "../libnetdata.h"
 
-#ifdef ENABLE_HTTPS
-
 SSL_CTX *netdata_ssl_exporting_ctx =NULL;
 SSL_CTX *netdata_ssl_streaming_sender_ctx =NULL;
 SSL_CTX *netdata_ssl_web_server_ctx =NULL;
@@ -751,4 +749,3 @@ int ssl_security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
 
     return 0;
 }
-#endif

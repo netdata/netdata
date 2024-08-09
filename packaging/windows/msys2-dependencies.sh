@@ -15,11 +15,23 @@ pacman -S --noconfirm --needed \
     base-devel \
     cmake \
     git \
+    ninja \
+    python \
     liblz4-devel \
     libutil-linux \
     libutil-linux-devel \
     libyaml-devel \
     libzstd-devel \
+    msys2-devel \
+    msys/brotli-devel \
+    msys/libuv-devel \
+    msys/pcre2-devel \
+    msys/zlib-devel \
+    msys/libcurl-devel \
+    openssl-devel \
+    protobuf-devel \
+    mingw-w64-x86_64-toolchain \
+    mingw-w64-ucrt-x86_64-toolchain \
     mingw64/mingw-w64-x86_64-brotli \
     mingw64/mingw-w64-x86_64-go \
     mingw64/mingw-w64-x86_64-libuv \
@@ -29,16 +41,6 @@ pacman -S --noconfirm --needed \
     mingw64/mingw-w64-x86_64-pcre2 \
     mingw64/mingw-w64-x86_64-protobuf \
     mingw64/mingw-w64-x86_64-zlib \
-    mingw-w64-ucrt-x86_64-toolchain \
-    mingw-w64-x86_64-toolchain \
-    msys2-devel \
-    msys/brotli-devel \
-    msys/libuv-devel \
-    msys/pcre2-devel \
-    msys/zlib-devel \
-    openssl-devel \
-    protobuf-devel \
-    python \
     ucrt64/mingw-w64-ucrt-x86_64-brotli \
     ucrt64/mingw-w64-ucrt-x86_64-go \
     ucrt64/mingw-w64-ucrt-x86_64-libuv \

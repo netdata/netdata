@@ -1618,34 +1618,37 @@ char *read_by_filename(const char *filename, long *file_size)
     FILE *f = fopen(filename, "r");
     if (!f)
         return NULL;
+
     if (fseek(f, 0, SEEK_END) < 0) {
         fclose(f);
         return NULL;
     }
+
     long size = ftell(f);
     if (size <= 0 || fseek(f, 0, SEEK_END) < 0) {
         fclose(f);
         return NULL;
     }
+
     char *contents = callocz(size + 1, 1);
-    if (!contents) {
-        fclose(f);
-        return NULL;
-    }
     if (fseek(f, 0, SEEK_SET) < 0) {
         fclose(f);
         freez(contents);
         return NULL;
     }
+
     size_t res = fread(contents, 1, size, f);
     if ( res != (size_t)size) {
         freez(contents);
         fclose(f);
         return NULL;
     }
+
     fclose(f);
+
     if (file_size)
         *file_size = size;
+
     return contents;
 }
 
@@ -1685,7 +1688,7 @@ BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_l
     POPEN_INSTANCE *pi = spawn_popen_run(command);
     if(pi) {
         char buffer[max_line_length + 1];
-        while (fgets(buffer, max_line_length, pi->child_stdout_fp)) {
+        while (fgets(buffer, max_line_length, spawn_popen_stdout(pi))) {
             buffer[max_line_length] = '\0';
             buffer_strcat(wb, buffer);
         }
@@ -1705,7 +1708,7 @@ bool run_command_and_copy_output_to_stdout(const char *command, int max_line_len
     if(pi) {
         char buffer[max_line_length + 1];
 
-        while (fgets(buffer, max_line_length, pi->child_stdout_fp))
+        while (fgets(buffer, max_line_length, spawn_popen_stdout(pi)))
             fprintf(stdout, "%s", buffer);
 
         spawn_popen_kill(pi);
@@ -1831,7 +1834,6 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step) {
     }
 }
 
-#ifdef ENABLE_HTTPS
 int hash256_string(const unsigned char *string, size_t size, char *hash) {
     EVP_MD_CTX *ctx;
     ctx = EVP_MD_CTX_create();
@@ -1856,7 +1858,6 @@ int hash256_string(const unsigned char *string, size_t size, char *hash) {
     EVP_MD_CTX_destroy(ctx);
     return 1;
 }
-#endif
 
 
 bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now) {

@@ -125,9 +125,7 @@ struct web_client *web_client_get_from_cache(void) {
 
 void web_client_release_to_cache(struct web_client *w) {
 
-#ifdef ENABLE_HTTPS
     netdata_ssl_close(&w->ssl);
-#endif
 
     // unlink it from the used
     spinlock_lock(&web_clients_cache.used.spinlock);

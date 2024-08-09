@@ -315,7 +315,7 @@ const char *registry_get_this_machine_guid(void) {
         close(fd);
     }
 
-    setenv("NETDATA_REGISTRY_UNIQUE_ID", guid, 1);
+    nd_setenv("NETDATA_REGISTRY_UNIQUE_ID", guid, 1);
 
     return guid;
 }

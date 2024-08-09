@@ -2,7 +2,6 @@
 
 #include "exporting_engine.h"
 
-#ifdef ENABLE_HTTPS
 /**
  * Check if TLS is enabled in the configuration
  *
@@ -19,7 +18,6 @@ static int exporting_tls_is_enabled(EXPORTING_CONNECTOR_TYPE type __maybe_unused
             type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE) &&
            options & EXPORTING_OPTION_USE_TLS;
 }
-#endif
 
 /**
  * Discard response
@@ -69,28 +67,23 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
         response = buffer_create(4096, &netdata_buffers_statistics.buffers_exporters);
 
     struct stats *stats = &instance->stats;
-#ifdef ENABLE_HTTPS
     uint32_t options = (uint32_t)instance->config.options;
     struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 
     if (options & EXPORTING_OPTION_USE_TLS)
         ERR_clear_error();
-#endif
 
     errno_clear();
 
     // loop through to collect all data
     while (*sock != -1 && errno != EWOULDBLOCK) {
         ssize_t r;
-#ifdef ENABLE_HTTPS
         if (SSL_connection(&connector_specific_data->ssl))
             r = netdata_ssl_read(&connector_specific_data->ssl, &response->buffer[response->len],
                                  (int) (response->size - response->len));
         else
             r = recv(*sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
-#else
-        r = recv(*sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
-#endif
+
         if (likely(r > 0)) {
             // we received some data
             response->len += r;
@@ -136,13 +129,11 @@ void simple_connector_send_buffer(
     flags += MSG_NOSIGNAL;
 #endif
 
-#ifdef ENABLE_HTTPS
     uint32_t options = (uint32_t)instance->config.options;
     struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 
     if (options & EXPORTING_OPTION_USE_TLS)
         ERR_clear_error();
-#endif
 
     struct stats *stats = &instance->stats;
     ssize_t header_sent_bytes = 0;
@@ -150,7 +141,6 @@ void simple_connector_send_buffer(
     size_t header_len = buffer_strlen(header);
     size_t buffer_len = buffer_strlen(buffer);
 
-#ifdef ENABLE_HTTPS
     if (SSL_connection(&connector_specific_data->ssl)) {
 
         if (header_len)
@@ -166,12 +156,6 @@ void simple_connector_send_buffer(
         if ((size_t)header_sent_bytes == header_len)
             buffer_sent_bytes = send(*sock, buffer_tostring(buffer), buffer_len, flags);
     }
-#else
-    if (header_len)
-        header_sent_bytes = send(*sock, buffer_tostring(header), header_len, flags);
-    if ((size_t)header_sent_bytes == header_len)
-        buffer_sent_bytes = send(*sock, buffer_tostring(buffer), buffer_len, flags);
-#endif
 
     if ((size_t)buffer_sent_bytes == buffer_len) {
         // we sent the data successfully
@@ -221,12 +205,11 @@ void simple_connector_worker(void *instance_p)
     snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPSMPL[%zu]", instance->index);
     uv_thread_set_name_np(threadname);
 
-#ifdef ENABLE_HTTPS
     uint32_t options = (uint32_t)instance->config.options;
 
     if (options & EXPORTING_OPTION_USE_TLS)
         ERR_clear_error();
-#endif
+
     struct simple_connector_config *connector_specific_config = instance->config.connector_specific_config;
 
     int sock = -1;
@@ -303,7 +286,7 @@ void simple_connector_worker(void *instance_p)
                 &reconnects,
                 connector_specific_data->connected_to,
                 CONNECTED_TO_MAX);
-#ifdef ENABLE_HTTPS
+
             if (exporting_tls_is_enabled(instance->config.type, options) && sock != -1) {
                 if (netdata_ssl_exporting_ctx) {
                     if (sock_delnonblock(sock) < 0)
@@ -326,7 +309,6 @@ void simple_connector_worker(void *instance_p)
                     }
                 }
             }
-#endif
 
             stats->reconnects += reconnects;
         }

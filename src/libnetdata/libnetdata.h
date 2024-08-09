@@ -9,10 +9,6 @@ extern "C" {
 
 #include "config.h"
 
-#ifdef ENABLE_OPENSSL
-#define ENABLE_HTTPS 1
-#endif
-
 #ifdef HAVE_LIBDATACHANNEL
 #define ENABLE_WEBRTC 1
 #endif
@@ -479,9 +475,7 @@ extern char *netdata_configured_host_prefix;
 #include "spawn_server/spawn_server.h"
 #include "spawn_server/spawn_popen.h"
 #include "simple_pattern/simple_pattern.h"
-#ifdef ENABLE_HTTPS
-# include "socket/security.h"
-#endif
+#include "socket/security.h"
 #include "socket/socket.h"
 #include "config/appconfig.h"
 #include "log/journal.h"
