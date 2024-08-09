@@ -558,6 +558,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
 
         ebpf_dcstat_apps_accumulator(cv, maps_per_core);
 
+        /*
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, cv->tgid, cv->name);
         if (pid_stat) {
             netdata_publish_dcstat_t *publish = &pid_stat->dc;
@@ -569,6 +570,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
                 ebpf_release_pid_data(pid_stat, fd, key, EBPF_MODULE_DCSTAT_IDX);
             }
         }
+        */
 
 end_dc_loop:
         // We are cleaning to avoid passing data read from one process to other.
@@ -591,6 +593,7 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
     netdata_dcstat_pid_t *dst = &publish->curr;
     while (root) {
         int32_t pid = root->pid;
+        /*
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL);
         if (pid_stat) {
             netdata_publish_dcstat_t *w = &pid_stat->dc;
@@ -599,6 +602,7 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
             dst->file_system += src->file_system;
             dst->not_found += src->not_found;
         }
+         */
 
         root = root->next;
     }
@@ -782,11 +786,13 @@ static void ebpf_update_dc_cgroup()
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
             ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
+            /*
             if (local_pid) {
                 netdata_publish_dcstat_t *in = &local_pid->dc;
 
                 memcpy(out, &in->curr, sizeof(netdata_dcstat_pid_t));
             }
+             */
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);

@@ -39,7 +39,7 @@
 #include "ebpf_swap.h"
 #include "ebpf_vfs.h"
 
-#define EBPF_MAX_COMPARE_NAME 100
+#define EBPF_MAX_COMPARE_NAME 95
 #define EBPF_MAX_NAME 100
 
 #define EBPF_CLEANUP_FACTOR 10
@@ -120,13 +120,16 @@ typedef struct ebpf_pid_data {
     uint64_t thread_collecting;
 
     char comm[EBPF_MAX_COMPARE_NAME + 1];
+    /*
     char name[EBPF_MAX_NAME + 1];
     char clean_name[EBPF_MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
+     */
     char *cmdline;
 
     bool has_proc_file;
     uint32_t not_updated;
     uint32_t log_thrown;
+    /*
 
     // each process gets a unique number
     netdata_publish_cachestat_t cachestat;
@@ -137,6 +140,7 @@ typedef struct ebpf_pid_data {
     netdata_publish_swap_t swap;
     ebpf_socket_publish_apps_t socket;
     netdata_publish_vfs_t vfs;
+     */
 
     struct ebpf_target *target; // the one that will be reported to netdata
 
@@ -155,11 +159,11 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
         return ptr;
     }
 
-    if (name)
-        strncpyz(ptr->comm, name, EBPF_MAX_COMPARE_NAME);
-
     ptr->pid = pid;
     ptr->ppid = tgid;
+
+    if (name)
+        strncpyz(ptr->comm, name, EBPF_MAX_COMPARE_NAME);
 
     if (likely(ebpf_pids_link_list))
         ebpf_pids_link_list->prev = ptr;

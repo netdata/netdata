@@ -1771,6 +1771,7 @@ void ebpf_socket_resume_apps_data()
         memset(&w->socket, 0, sizeof(ebpf_socket_publish_apps_t));
         while (move) {
             int32_t pid = move->pid;
+            /*
             ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
             if (local_pid) {
                 ebpf_socket_publish_apps_t *ws = &local_pid->socket;
@@ -1784,6 +1785,7 @@ void ebpf_socket_resume_apps_data()
                 values->call_udp_sent = ws->call_udp_sent;
                 values->call_udp_received = ws->call_udp_received;
             }
+             */
 
             move = move->next;
         }
@@ -1978,6 +1980,7 @@ static void ebpf_socket_read_hash_global_tables(netdata_idx_t *stats, int maps_p
  */
 void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns)
 {
+    /*
     ebpf_pid_data_t *local_pid = ebpf_get_pid_data(current_pid, 0, NULL);
     if (!local_pid)
         return;
@@ -1995,6 +1998,7 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns)
 
     curr->call_udp_sent = ns->udp.call_udp_sent;
     curr->call_udp_received = ns->udp.call_udp_received;
+     */
 }
 
 /**
@@ -2012,6 +2016,7 @@ static void ebpf_update_socket_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
+            /*
             ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
             if (local_pid) {
                 ebpf_socket_publish_apps_t *in = &local_pid->socket;
@@ -2027,6 +2032,7 @@ static void ebpf_update_socket_cgroup()
                 publish->call_tcp_v4_connection = in->call_tcp_v4_connection;
                 publish->call_tcp_v6_connection = in->call_tcp_v6_connection;
             }
+             */
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);

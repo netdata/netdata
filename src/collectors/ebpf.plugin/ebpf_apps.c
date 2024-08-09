@@ -652,6 +652,7 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p, void *ptr)
 {
     UNUSED(ptr);
 
+    return 1;
     procfile *ff;
 
     char filename[FILENAME_MAX + 1];
