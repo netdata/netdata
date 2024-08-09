@@ -11,7 +11,7 @@ pacman -Syuu --noconfirm
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Installing dependencies"}
-pacman -S --noconfirm \
+pacman -S --noconfirm --needed \
     base-devel \
     cmake \
     git \

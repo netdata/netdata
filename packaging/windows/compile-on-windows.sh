@@ -1,21 +1,10 @@
 #!/bin/bash
 
-repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
+REPO_ROOT="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 
-if [ -n "${BUILD_DIR}" ]; then
-    build="${BUILD_DIR}"
-elif [ -n "${OSTYPE}" ]; then
-    if [ -n "${MSYSTEM}" ]; then
-        build="${repo_root}/build-${OSTYPE}-${MSYSTEM}"
-    else
-        build="${repo_root}/build-${OSTYPE}"
-    fi
-elif [ "$USER" = "vk" ]; then
-    build="${repo_root}/build"
-else
-    build="${repo_root}/build"
-fi
+# shellcheck source=./win-build-dir.sh
+. "${REPO_ROOT}/packaging/windows/win-build-dir.sh"
 
 set -exu -o pipefail
 
@@ -42,7 +31,7 @@ fi
 ${GITHUB_ACTIONS+echo "::group::Configuring"}
 # shellcheck disable=SC2086
 CFLAGS="${BUILD_CFLAGS}" /usr/bin/cmake \
-    -S "${repo_root}" \
+    -S "${REPO_ROOT}" \
     -B "${build}" \
     -G "${generator}" \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \

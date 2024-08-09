@@ -267,7 +267,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Redis](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/redis/integrations/redis.md)
 
-- [RethinkDB](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/rethinkdbs/integrations/rethinkdb.md)
+- [RethinkDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/rethinkdb/integrations/rethinkdb.md)
 
 - [RiakKV](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/riakkv/integrations/riakkv.md)
 
@@ -283,7 +283,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [BOINC](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/boinc/integrations/boinc.md)
 
-- [Gearman](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/gearman/integrations/gearman.md)
+- [Gearman](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/gearman/integrations/gearman.md)
 
 ### DNS and DHCP Servers
 
@@ -779,7 +779,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Apache Pulsar](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/pulsar/integrations/apache_pulsar.md)
 
-- [Beanstalk](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/beanstalk/integrations/beanstalk.md)
+- [Beanstalk](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/beanstalk/integrations/beanstalk.md)
 
 - [IBM MQ](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/ibm_mq.md)
 
@@ -896,8 +896,6 @@ If you don't see the app/service you'd like to monitor in this list:
 - [GitHub API rate limit](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/github_api_rate_limit.md)
 
 - [GitHub repository](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/github_repository.md)
-
-- [Netdata Agent alarms](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/alarms/integrations/netdata_agent_alarms.md)
 
 - [python.d changefinder](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/changefinder/integrations/python.d_changefinder.md)
 
@@ -1151,7 +1149,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Squid log files](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/squidlog/integrations/squid_log_files.md)
 
-- [Squid](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/squid/integrations/squid.md)
+- [Squid](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/squid/integrations/squid.md)
 
 - [Tengine](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/tengine/integrations/tengine.md)
 

@@ -516,10 +516,10 @@ jobs:
           credentials_json: ${{ secrets.GCS_STORAGE_SERVICE_KEY_JSON }}
       - name: Setup GCS
         id: gcs-setup
-        uses: google-github-actions/setup-gcloud@v2.1.0
+        uses: google-github-actions/setup-gcloud@v2.1.1
       - name: Upload Artifacts
         id: upload
-        uses: google-github-actions/upload-cloud-storage@v2.1.0
+        uses: google-github-actions/upload-cloud-storage@v2.1.2
         with:
           destination: ${{ secrets.GCP_NIGHTLY_STORAGE_BUCKET }}
           gzip: false
@@ -1076,11 +1076,47 @@ jobs:
       - name: Build Netdata
         id: build
         if: needs.file-check.outputs.run == 'true'
+        env:
+          BUILD_DIR: ${{ github.workspace }}\build
         run: ./packaging/windows/build.ps1
+      - name: Sign Agent Code
+        id: sign-agent
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
+        uses: azure/trusted-signing-action@v0.4.0
+        with:
+          azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
+          azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
+          endpoint: "https://eus.codesigning.azure.net/"
+          trusted-signing-account-name: Netdata
+          certificate-profile-name: Netdata
+          files-folder: ${{ github.workspace }}\build
+          files-folder-filter: exe,dll
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
+          timestamp-digest: SHA256
       - name: Package Netdata
         id: package
         if: needs.file-check.outputs.run == 'true'
+        env:
+          BUILD_DIR: ${{ github.workspace }}\build
         run: ./packaging/windows/package.ps1
+      - name: Sign Installer
+        id: sign-installer
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
+        uses: azure/trusted-signing-action@v0.4.0
+        with:
+          azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
+          azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
+          endpoint: "https://eus.codesigning.azure.net/"
+          trusted-signing-account-name: Netdata
+          certificate-profile-name: Netdata
+          files: ${{ github.workspace }}\packaging\windows\netdata-installer.exe
+          file-digest: SHA256
+          timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
+          timestamp-digest: SHA256
       - name: Upload Installer
         id: upload
         uses: actions/upload-artifact@v4
@@ -1088,6 +1124,32 @@ jobs:
           name: windows-x86_64-installer
           path: packaging\windows\netdata-installer.exe
           retention-days: 30
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Windows build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Updater checks for ${{ matrix.distro }} failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Set Up Dependencies: ${{ steps.deps.outcome }}
+              Build Netdata: ${{ steps.build.outcome }}
+              Sign Agent Code: ${{ steps.sign-agent.outcome }}
+              Package Netdata: ${{ steps.package.outcome }}
+              Sign Installer: ${{ steps.sign-installer.outcome }}
+              Upload Installer: ${{ steps.upload.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
+          }}
 
   updater-check: # Test the generated dist archive using the updater code.
     name: Test Generated Distfile and Updater Code

@@ -5,6 +5,7 @@ package snmp
 import (
 	_ "embed"
 	"errors"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 
@@ -46,6 +47,7 @@ func New() *SNMP {
 
 		newSnmpClient: gosnmp.NewHandler,
 
+		checkMaxReps:  true,
 		collectIfMib:  true,
 		netInterfaces: make(map[string]*netInterface),
 	}
@@ -63,6 +65,7 @@ type SNMP struct {
 	netIfaceFilterByName matcher.Matcher
 	netIfaceFilterByType matcher.Matcher
 
+	checkMaxReps  bool
 	collectIfMib  bool
 	netInterfaces map[string]*netInterface
 	sysName       string

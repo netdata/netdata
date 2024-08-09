@@ -341,6 +341,9 @@ func TestDim_check(t *testing.T) {
 	dim = &Dim{ID: "id"}
 	dim.ID = "invalid id"
 	assert.Error(t, checkDim(dim))
+
+	dim = &Dim{ID: "i d", Name: "id"}
+	assert.NoError(t, checkDim(dim))
 }
 
 func TestVar_check(t *testing.T) {
