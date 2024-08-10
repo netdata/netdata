@@ -42,7 +42,7 @@
 #define EBPF_MAX_COMPARE_NAME 95
 #define EBPF_MAX_NAME 100
 
-#define EBPF_CLEANUP_FACTOR 10
+#define EBPF_CLEANUP_FACTOR 2
 
 // ----------------------------------------------------------------------------
 // Structures used to read information from kernel ring
@@ -133,10 +133,10 @@ typedef struct ebpf_pid_data {
     struct ebpf_pid_data *prev;
     struct ebpf_pid_data *next;
 
-    netdata_publish_cachestat_t cachestat;
+    // netdata_publish_cachestat_t cachestat;
+    netdata_fd_stat_t fd;
     /*
     netdata_publish_dcstat_t dc;
-    netdata_fd_stat_t fd;
     ebpf_process_stat_t process;
     netdata_publish_shm_t shm;
     netdata_publish_swap_t swap;

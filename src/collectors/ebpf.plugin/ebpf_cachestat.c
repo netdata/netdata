@@ -707,6 +707,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
 
         cachestat_apps_accumulator(cv, maps_per_core);
 
+        /*
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name);
         netdata_publish_cachestat_t *publish = &local_pid->cachestat;
         if (!publish->ct || publish->ct != cv->ct){
@@ -716,6 +717,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
         } else if (++local_pid->not_updated >= 2 && !local_pid->has_proc_file) {
             ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_CACHESTAT_IDX);
         }
+         */
 
 end_cachestat_loop:
         // We are cleaning to avoid passing data read from one process to other.
@@ -738,6 +740,7 @@ static void ebpf_update_cachestat_cgroup()
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
+            /*
             uint32_t pid = pids->pid;
             netdata_cachestat_pid_t *out = &pids->cachestat;
             ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
@@ -746,6 +749,7 @@ static void ebpf_update_cachestat_cgroup()
 
                 memcpy(out, &in->current, sizeof(netdata_cachestat_pid_t));
             }
+             */
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -765,6 +769,7 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
 
     netdata_cachestat_pid_t *dst = &publish->current;
     while (root) {
+        /*
         uint32_t pid = root->pid;
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
         netdata_publish_cachestat_t *w = &local_pid->cachestat;
@@ -772,6 +777,7 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
         dst->misses += src->misses;
         dst->dirty += src->dirty;
         dst->total += src->total;
+         */
 
         root = root->next;
     }

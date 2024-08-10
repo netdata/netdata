@@ -699,19 +699,15 @@ static void ebpf_read_fd_apps_table(int maps_per_core, int max_period)
 
         fd_apps_accumulator(fv, maps_per_core);
 
-        /*
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, fv->tgid, fv->name);
-        if (pid_stat) {
-            netdata_fd_stat_t *publish_fd = &pid_stat->fd;
-            if (!publish_fd->ct || publish_fd->ct != fv->ct) {
-                memcpy(publish_fd, &fv[0], sizeof(netdata_fd_stat_t));
-                pid_stat->thread_collecting |= 1<<EBPF_MODULE_FD_IDX;
-                pid_stat->not_updated = 0;
-            } else if (++pid_stat->not_updated >= max_period) {
-                ebpf_release_pid_data(pid_stat, fd, key, EBPF_MODULE_FD_IDX);
-            }
+        netdata_fd_stat_t *publish_fd = &pid_stat->fd;
+        if (!publish_fd->ct || publish_fd->ct != fv->ct) {
+            memcpy(publish_fd, &fv[0], sizeof(netdata_fd_stat_t));
+            pid_stat->thread_collecting |= 1<<EBPF_MODULE_FD_IDX;
+            pid_stat->not_updated = 0;
+        } else if (++pid_stat->not_updated >= max_period) {
+            ebpf_release_pid_data(pid_stat, fd, key, EBPF_MODULE_FD_IDX);
         }
-         */
 
 end_fd_loop:
         // We are cleaning to avoid passing data read from one process to other.
@@ -734,16 +730,12 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
 
     while (root) {
         int32_t pid = root->pid;
-        /*
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL);
-        if (pid_stat) {
-            netdata_fd_stat_t *w = &pid_stat->fd;
-            fd->open_call += w->open_call;
-            fd->close_call += w->close_call;
-            fd->open_err += w->open_err;
-            fd->close_err += w->close_err;
-        }
-         */
+        netdata_fd_stat_t *w = &pid_stat->fd;
+        fd->open_call += w->open_call;
+        fd->close_call += w->close_call;
+        fd->open_err += w->open_err;
+        fd->close_err += w->close_err;
 
         root = root->next;
     }
@@ -790,7 +782,7 @@ void *ebpf_read_fd_thread(void *ptr)
 
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
-    usec_t period = update_every * USEC_PER_SEC;
+    int period = USEC_PER_SEC;
     int max_period = update_every * EBPF_CLEANUP_FACTOR;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
@@ -834,14 +826,10 @@ static void ebpf_update_fd_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_fd_stat_t *out = &pids->fd;
-            /*
             ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
-            if (local_pid) {
-                netdata_fd_stat_t *in = &local_pid->fd;
+            netdata_fd_stat_t *in = &local_pid->fd;
 
-                memcpy(out, in, sizeof(netdata_fd_stat_t));
-            }
-             */
+            memcpy(out, in, sizeof(netdata_fd_stat_t));
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
