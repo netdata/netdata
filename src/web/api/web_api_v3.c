@@ -3,6 +3,7 @@
 #include "web_api_v3.h"
 #include "v1/api_v1_calls.h"
 #include "v2/api_v2_calls.h"
+#include "v3/api_v3_calls.h"
 
 static struct web_api_command api_commands_v3[] = {
     // time-series multi-node multi-instance data APIs
@@ -171,6 +172,16 @@ static struct web_api_command api_commands_v3[] = {
         .acl = HTTP_ACL_DYNCFG,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v1_config,
+        .allow_subpaths = 0
+    },
+
+    // settings APIs
+    {
+        .api = "settings",
+        .hash = 0,
+        .acl = HTTP_ACL_NOCHECK,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v3_settings,
         .allow_subpaths = 0
     },
 

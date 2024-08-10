@@ -1007,6 +1007,8 @@ set(API_PLUGIN_FILES
         src/web/rtc/webrtc.h
         src/web/api/functions/function-bearer_get_token.c
         src/web/api/functions/function-bearer_get_token.h
+        src/web/api/v3/api_v3_calls.h
+        src/web/api/v3/api_v3_settings.c
 )
 
 set(EXPORTING_ENGINE_FILES

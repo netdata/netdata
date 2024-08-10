@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web_api_v2.h"
+#include "v1/api_v1_calls.h"
 #include "v2/api_v2_calls.h"
+#include "v3/api_v3_calls.h"
 
 static struct web_api_command api_commands_v2[] = {
 #if defined(ENABLE_API_v2)

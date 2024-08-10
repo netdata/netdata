@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef NETDATA_API_V2_CALLS_H
 #define NETDATA_API_V2_CALLS_H
 
-#include "../web_api_v3.h"
+#include "../web_api_v2.h"
 
 int api_v2_info(RRDHOST *host, struct web_client *w, char *url);
 
