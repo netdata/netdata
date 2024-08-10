@@ -126,12 +126,14 @@ typedef struct ebpf_pid_data {
      */
     char *cmdline;
 
-    bool has_proc_file;
+    uint32_t has_proc_file;
     uint32_t not_updated;
-    uint32_t log_thrown;
-    /*
 
-    // each process gets a unique number
+    struct ebpf_target *target; // the one that will be reported to netdata
+    struct ebpf_pid_data *prev;
+    struct ebpf_pid_data *next;
+
+    /*
     netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dc;
     netdata_fd_stat_t fd;
@@ -142,10 +144,6 @@ typedef struct ebpf_pid_data {
     netdata_publish_vfs_t vfs;
      */
 
-    struct ebpf_target *target; // the one that will be reported to netdata
-
-    struct ebpf_pid_data *prev;
-    struct ebpf_pid_data *next;
 } ebpf_pid_data_t;
 
 extern ebpf_pid_data_t *ebpf_pids;
@@ -178,9 +176,11 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
 
 static inline void ebpf_release_pid_data(ebpf_pid_data_t *eps, int fd, uint32_t key, uint32_t idx)
 {
-    bpf_map_delete_elem(fd, &key);
+    if (fd) {
+        bpf_map_delete_elem(fd, &key);
+    }
     eps->thread_collecting &= ~(1<<idx);
-    if (!eps->thread_collecting && !eps->has_proc_file) {
+    if (!eps->thread_collecting) {
         ebpf_del_pid_entry((pid_t)key);
     }
 }
@@ -314,7 +314,6 @@ extern ARAL *ebpf_aral_shm_pid;
 void ebpf_shm_aral_init();
 netdata_publish_shm_t *ebpf_shm_stat_get(void);
 void ebpf_shm_release(netdata_publish_shm_t *stat);
-void ebpf_cleanup_exited_pids(int max);
 void ebpf_parse_proc_files();
 
 // ARAL Section end

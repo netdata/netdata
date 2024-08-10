@@ -400,7 +400,6 @@ static inline void debug_log_dummy(void)
  * @param status    the return from a function.
  *
  * @return It returns the status value.
- */
 static inline int managed_log(ebpf_pid_data_t *p, uint32_t log, int status)
 {
     if (unlikely(!status)) {
@@ -451,6 +450,7 @@ static inline int managed_log(ebpf_pid_data_t *p, uint32_t log, int status)
 
     return status;
 }
+ */
 
 /**
  * Get PID entry
@@ -652,7 +652,6 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p, void *ptr)
 {
     UNUSED(ptr);
 
-    return 1;
     procfile *ff;
 
     char filename[FILENAME_MAX + 1];
@@ -697,7 +696,7 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p, void *ptr)
             "READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s'",
             netdata_configured_host_prefix, p->pid, p->comm, (p->target) ? p->target->name : "UNSET");
 
-    p->has_proc_file = true;
+    p->has_proc_file = 1;
     ret = 1;
 cleanup_pid_stat:
     procfile_close(ff);
@@ -721,9 +720,12 @@ static inline int ebpf_collect_data_for_pid(pid_t pid)
     }
 
     ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL);
+    read_proc_pid_stat(p, ptr);
+    /*
     if (unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr))))
         // there is no reason to proceed if we cannot get its status
         return 0;
+        */
 
     // check its parent pid
     if (unlikely(p->ppid < 0 || p->ppid > pid_max)) {
@@ -986,20 +988,14 @@ int get_pid_comm(pid_t pid, size_t n, char *dest)
 /**
  * Remove PIDs when they are not running more.
  */
-void ebpf_cleanup_exited_pids(int max)
+static void ebpf_cleanup_exited_pids()
 {
-    struct ebpf_pid_stat *p = NULL;
-
-    for (p = ebpf_root_of_pids; p;) {
-        if (p->not_updated >= max) {
-            if (unlikely(debug_enabled && (p->keep || p->keeploops)))
-                debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, p->comm);
-
-            pid_t r = p->pid;
-            p = p->next;
-
-            ebpf_del_pid_entry(r);
+    ebpf_pid_data_t *p = NULL;
+    for (p = ebpf_pids_link_list; p;) {
+        if (!p->has_proc_file) {
+            ebpf_release_pid_data(p, 0, p->pid, EBPF_OPTION_ALL_CHARTS);
         }
+
         p = p->next;
     }
 }
@@ -1198,7 +1194,7 @@ void ebpf_parse_proc_files()
 {
     ebpf_pid_data_t *pids = ebpf_pids_link_list;
     while (pids) {
-        pids->has_proc_file = false;
+        pids->has_proc_file = 0;
 
         pids = pids->next;
     }
@@ -1209,4 +1205,6 @@ void ebpf_parse_proc_files()
 
     for (pids = ebpf_pids_link_list; pids; pids = pids->next)
         aggregate_pid_on_target(pids->target, pids, NULL);
+
+    ebpf_cleanup_exited_pids();
 }

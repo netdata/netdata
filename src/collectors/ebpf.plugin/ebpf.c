@@ -4067,7 +4067,6 @@ int main(int argc, char **argv)
                 ebpf_parse_proc_files();
                 /*
                 if (collect_pids & (1<<EBPF_MODULE_PROCESS_IDX)) {
-                    ebpf_cleanup_exited_pids(max_period);
                     collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
                 }
                  */
