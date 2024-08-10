@@ -700,9 +700,14 @@ static void ebpf_read_fd_apps_table(int maps_per_core, int max_period)
         fd_apps_accumulator(fv, maps_per_core);
 
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, fv->tgid, fv->name);
-        netdata_fd_stat_t *publish_fd = &pid_stat->fd;
+        netdata_publish_fd_stat_t *publish_fd = &pid_stat->fd;
         if (!publish_fd->ct || publish_fd->ct != fv->ct) {
-            memcpy(publish_fd, &fv[0], sizeof(netdata_fd_stat_t));
+            publish_fd->ct = fv->ct;
+            publish_fd->open_call = fv->open_call;
+            publish_fd->close_call = fv->close_call;
+            publish_fd->open_err = fv->open_err;
+            publish_fd->close_err = fv->close_err;
+
             pid_stat->thread_collecting |= 1<<EBPF_MODULE_FD_IDX;
             pid_stat->not_updated = 0;
         } else if (++pid_stat->not_updated >= max_period) {
@@ -731,7 +736,7 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
     while (root) {
         int32_t pid = root->pid;
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL);
-        netdata_fd_stat_t *w = &pid_stat->fd;
+        netdata_publish_fd_stat_t *w = &pid_stat->fd;
         fd->open_call += w->open_call;
         fd->close_call += w->close_call;
         fd->open_err += w->open_err;
@@ -825,11 +830,10 @@ static void ebpf_update_fd_cgroup()
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            netdata_fd_stat_t *out = &pids->fd;
+            netdata_publish_fd_stat_t *out = &pids->fd;
             ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
-            netdata_fd_stat_t *in = &local_pid->fd;
-
-            memcpy(out, in, sizeof(netdata_fd_stat_t));
+            netdata_publish_fd_stat_t *in = &local_pid->fd;
+            memcpy(out, in, sizeof(netdata_publish_fd_stat_t));
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -880,13 +884,13 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
  * @param fd  structure used to store data
  * @param pids input data
  */
-static void ebpf_fd_sum_cgroup_pids(netdata_fd_stat_t *fd, struct pid_on_target2 *pids)
+static void ebpf_fd_sum_cgroup_pids(netdata_publish_fd_stat_t *fd, struct pid_on_target2 *pids)
 {
     netdata_fd_stat_t accumulator;
     memset(&accumulator, 0, sizeof(accumulator));
 
     while (pids) {
-        netdata_fd_stat_t *w = &pids->fd;
+        netdata_publish_fd_stat_t *w = &pids->fd;
 
         accumulator.open_err += w->open_err;
         accumulator.open_call += w->open_call;
@@ -1003,7 +1007,7 @@ static void ebpf_obsolete_specific_fd_charts(char *type, ebpf_module_t *em)
  * @param type   chart type
  * @param values structure with values that will be sent to netdata
  */
-static void ebpf_send_specific_fd_data(char *type, netdata_fd_stat_t *values, ebpf_module_t *em)
+static void ebpf_send_specific_fd_data(char *type, netdata_publish_fd_stat_t *values, ebpf_module_t *em)
 {
     ebpf_write_begin_chart(type, NETDATA_SYSCALL_APPS_FILE_OPEN, "");
     write_chart_dimension(fd_publish_aggregated[NETDATA_FD_SYSCALL_OPEN].name, (long long)values->open_call);

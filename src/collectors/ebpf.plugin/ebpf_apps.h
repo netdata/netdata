@@ -134,7 +134,7 @@ typedef struct ebpf_pid_data {
     struct ebpf_pid_data *next;
 
     // netdata_publish_cachestat_t cachestat;
-    netdata_fd_stat_t fd;
+    netdata_publish_fd_stat_t fd;
     /*
     netdata_publish_dcstat_t dc;
     ebpf_process_stat_t process;
