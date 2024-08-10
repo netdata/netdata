@@ -615,33 +615,13 @@ void cachestat_update_publish(netdata_publish_cachestat_t *out, uint64_t etotal,
 }
 
 /**
- * Save previous values
- *
- * Save values used this time.
- *
- * @param publish
- */
-static void save_previous_values(netdata_publish_cachestat_t *publish) {
-    publish->prev.total = cachestat_hash_values[NETDATA_CACHESTAT_KEY_TOTAL];
-    publish->prev.misses = cachestat_hash_values[NETDATA_CACHESTAT_KEY_MISSES];
-    publish->prev.dirty = cachestat_hash_values[NETDATA_CACHESTAT_KEY_DIRTY];
-}
-
-/**
  * Calculate statistics
  *
  * @param publish the structure where we will store the data.
  */
 static void calculate_stats(netdata_publish_cachestat_t *publish) {
-    if (!publish->prev.total) {
-        save_previous_values(publish);
-        return;
-    }
-
-    uint64_t total = cachestat_hash_values[NETDATA_CACHESTAT_KEY_TOTAL] - publish->prev.total;
-    uint64_t misses = cachestat_hash_values[NETDATA_CACHESTAT_KEY_MISSES] - publish->prev.misses;
-
-    save_previous_values(publish);
+    uint64_t total = cachestat_hash_values[NETDATA_CACHESTAT_KEY_TOTAL];
+    uint64_t misses = cachestat_hash_values[NETDATA_CACHESTAT_KEY_MISSES];
 
     // We are changing the original algorithm to have a smooth ratio.
     cachestat_update_publish(publish, total, misses);
@@ -700,7 +680,6 @@ static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, n
         return;
     }
 
-    memcpy(&out->prev, &out->current, sizeof(netdata_cachestat_pid_t));
     memcpy(&out->current, &in[0], sizeof(netdata_cachestat_pid_t));
 }
 
@@ -728,7 +707,6 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
 
         cachestat_apps_accumulator(cv, maps_per_core);
 
-        /*
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name);
         netdata_publish_cachestat_t *publish = &local_pid->cachestat;
         if (!publish->ct || publish->ct != cv->ct){
@@ -738,7 +716,6 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
         } else if (++local_pid->not_updated >= 2 && !local_pid->has_proc_file) {
             ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_CACHESTAT_IDX);
         }
-         */
 
 end_cachestat_loop:
         // We are cleaning to avoid passing data read from one process to other.
@@ -764,13 +741,11 @@ static void ebpf_update_cachestat_cgroup()
             uint32_t pid = pids->pid;
             netdata_cachestat_pid_t *out = &pids->cachestat;
             ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
-            /*
             if (local_pid) {
                 netdata_publish_cachestat_t *in = &local_pid->cachestat;
 
                 memcpy(out, &in->current, sizeof(netdata_cachestat_pid_t));
             }
-             */
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -786,22 +761,17 @@ static void ebpf_update_cachestat_cgroup()
  */
 void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_pid_on_target *root)
 {
-    memcpy(&publish->prev, &publish->current,sizeof(publish->current));
     memset(&publish->current, 0, sizeof(publish->current));
 
     netdata_cachestat_pid_t *dst = &publish->current;
     while (root) {
         uint32_t pid = root->pid;
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
-        /*
-        if (local_pid) {
-            netdata_publish_cachestat_t *w = &local_pid->cachestat;
-            netdata_cachestat_pid_t *src = &w->current;
-            dst->misses += src->misses;
-            dst->dirty += src->dirty;
-            dst->total += src->total;
-        }
-         */
+        netdata_publish_cachestat_t *w = &local_pid->cachestat;
+        netdata_cachestat_pid_t *src = &w->current;
+        dst->misses += src->misses;
+        dst->dirty += src->dirty;
+        dst->total += src->total;
 
         root = root->next;
     }
@@ -1030,12 +1000,11 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
             continue;
 
         netdata_cachestat_pid_t *current = &w->cachestat.current;
-        netdata_cachestat_pid_t *prev = &w->cachestat.prev;
 
-        uint64_t total = current->total - prev->total;
-        uint64_t dirty = current->dirty - prev->dirty;
+        uint64_t total = current->total;
+        uint64_t dirty = current->dirty;
         w->cachestat.dirty = (long long)dirty;
-        uint64_t misses = current->misses - prev->misses;
+        uint64_t misses = current->misses;
 
         cachestat_update_publish(&w->cachestat, total, misses);
 
@@ -1072,7 +1041,6 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
  */
 void ebpf_cachestat_sum_cgroup_pids(netdata_publish_cachestat_t *publish, struct pid_on_target2 *root)
 {
-    memcpy(&publish->prev, &publish->current,sizeof(publish->current));
     memset(&publish->current, 0, sizeof(publish->current));
 
     netdata_cachestat_pid_t *dst = &publish->current;
@@ -1099,12 +1067,11 @@ void ebpf_cachestat_calc_chart_values()
         ebpf_cachestat_sum_cgroup_pids(&ect->publish_cachestat, ect->pids);
 
         netdata_cachestat_pid_t *current = &ect->publish_cachestat.current;
-        netdata_cachestat_pid_t *prev = &ect->publish_cachestat.prev;
 
-        uint64_t total = current->total - prev->total;
-        uint64_t dirty = current->dirty - prev->dirty;
+        uint64_t total = current->total;
+        uint64_t dirty = current->dirty;
         ect->publish_cachestat.dirty = (long long)dirty;
-        uint64_t misses = current->misses - prev->misses;
+        uint64_t misses = current->misses;
 
         cachestat_update_publish(&ect->publish_cachestat, total, misses);
     }

@@ -98,7 +98,6 @@ typedef struct netdata_publish_cachestat {
     long long miss;
 
     netdata_cachestat_pid_t current;
-    netdata_cachestat_pid_t prev;
 } netdata_publish_cachestat_t;
 
 void *ebpf_cachestat_thread(void *ptr);
