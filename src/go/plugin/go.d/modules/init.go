@@ -58,6 +58,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nginx"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nginxplus"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nginxvts"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nsd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/ntpd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nvidia_smi"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nvme"
