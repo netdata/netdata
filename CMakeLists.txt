@@ -2786,7 +2786,6 @@ install(FILES
         src/collectors/python.d.plugin/go_expvar/go_expvar.conf
         src/collectors/python.d.plugin/haproxy/haproxy.conf
         src/collectors/python.d.plugin/monit/monit.conf
-        src/collectors/python.d.plugin/nsd/nsd.conf
         src/collectors/python.d.plugin/nvidia_smi/nvidia_smi.conf
         src/collectors/python.d.plugin/openldap/openldap.conf
         src/collectors/python.d.plugin/oracledb/oracledb.conf
@@ -2816,7 +2815,6 @@ install(FILES
         src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
         src/collectors/python.d.plugin/haproxy/haproxy.chart.py
         src/collectors/python.d.plugin/monit/monit.chart.py
-        src/collectors/python.d.plugin/nsd/nsd.chart.py
         src/collectors/python.d.plugin/nvidia_smi/nvidia_smi.chart.py
         src/collectors/python.d.plugin/openldap/openldap.chart.py
         src/collectors/python.d.plugin/oracledb/oracledb.chart.py
