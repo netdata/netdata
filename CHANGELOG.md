@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18299](https://github.com/netdata/netdata/pull/18299) ([netdatabot](https://github.com/netdatabot))
+- go.d gearman fix meta [\#18298](https://github.com/netdata/netdata/pull/18298) ([ilyam8](https://github.com/ilyam8))
+- add go.d/gearman [\#18294](https://github.com/netdata/netdata/pull/18294) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18292](https://github.com/netdata/netdata/pull/18292) ([netdatabot](https://github.com/netdatabot))
+- remove python.d/gearman [\#18291](https://github.com/netdata/netdata/pull/18291) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/alarms [\#18290](https://github.com/netdata/netdata/pull/18290) ([ilyam8](https://github.com/ilyam8))
+- go.d rethinkdb fix cluster\_servers\_stats\_request [\#18289](https://github.com/netdata/netdata/pull/18289) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/gosnmp/gosnmp from 1.37.0 to 1.38.0 in /src/go [\#18287](https://github.com/netdata/netdata/pull/18287) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump go.mongodb.org/mongo-driver from 1.16.0 to 1.16.1 in /src/go [\#18286](https://github.com/netdata/netdata/pull/18286) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump golang.org/x/net from 0.27.0 to 0.28.0 in /src/go [\#18284](https://github.com/netdata/netdata/pull/18284) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -408,13 +415,6 @@
 - Fix compilation with disable-cloud [\#17714](https://github.com/netdata/netdata/pull/17714) ([stelfrag](https://github.com/stelfrag))
 - fix on link [\#17712](https://github.com/netdata/netdata/pull/17712) ([Ancairon](https://github.com/Ancairon))
 - gha labeler add collectors/windows [\#17711](https://github.com/netdata/netdata/pull/17711) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/likexian/whois-parser from 1.24.15 to 1.24.16 in /src/go/collectors/go.d.plugin [\#17710](https://github.com/netdata/netdata/pull/17710) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump k8s.io/client-go from 0.30.0 to 0.30.1 in /src/go/collectors/go.d.plugin [\#17708](https://github.com/netdata/netdata/pull/17708) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/docker/docker from 26.1.2+incompatible to 26.1.3+incompatible in /src/go/collectors/go.d.plugin [\#17706](https://github.com/netdata/netdata/pull/17706) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Fix multipler on Windows \("Memory"\) [\#17705](https://github.com/netdata/netdata/pull/17705) ([thiagoftsm](https://github.com/thiagoftsm))
-- Win processes \("System" name\) [\#17704](https://github.com/netdata/netdata/pull/17704) ([thiagoftsm](https://github.com/thiagoftsm))
-- some markdown fixes [\#17703](https://github.com/netdata/netdata/pull/17703) ([ilyam8](https://github.com/ilyam8))
-- go.d fix some JB code inspection issues [\#17702](https://github.com/netdata/netdata/pull/17702) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
