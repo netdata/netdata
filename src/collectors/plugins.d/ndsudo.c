@@ -14,6 +14,14 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "nsd-control-stats",
+        .params = "stats_noreset",
+        .search = {
+            [0] = "nsd-control",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "chronyc-serverstats",
         .params = "serverstats",
         .search = {
