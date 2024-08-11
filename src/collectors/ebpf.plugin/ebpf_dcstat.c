@@ -558,19 +558,20 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
 
         ebpf_dcstat_apps_accumulator(cv, maps_per_core);
 
-        /*
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, cv->tgid, cv->name);
-        if (pid_stat) {
-            netdata_publish_dcstat_t *publish = &pid_stat->dc;
-            if (!publish->ct || publish->ct != cv->ct) {
-                memcpy(&publish->curr, &cv[0], sizeof(netdata_dcstat_pid_t));
-                pid_stat->thread_collecting |= 1<<EBPF_MODULE_DCSTAT_IDX;
-                pid_stat->not_updated = 0;
-            } else if (++pid_stat->not_updated >= max_period) {
-                ebpf_release_pid_data(pid_stat, fd, key, EBPF_MODULE_DCSTAT_IDX);
-            }
+        netdata_publish_dcstat_t *publish = pid_stat->dc;
+        if (!publish)
+            pid_stat->dc = ebpf_dcallocate_publish();
+
+        if (!publish->ct || publish->ct != cv->ct) {
+            memcpy(&publish->curr, &cv[0], sizeof(netdata_dcstat_pid_t));
+            pid_stat->thread_collecting |= 1<<EBPF_MODULE_DCSTAT_IDX;
+            pid_stat->not_updated = 0;
+        } else if (++pid_stat->not_updated >= max_period) {
+            ebpf_release_pid_data(pid_stat, fd, key, EBPF_MODULE_DCSTAT_IDX);
+            ebpf_dc_release_publish(publish);
+            pid_stat->dc = NULL;
         }
-        */
 
 end_dc_loop:
         // We are cleaning to avoid passing data read from one process to other.
@@ -590,19 +591,16 @@ end_dc_loop:
 void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_target *root)
 {
     memset(&publish->curr, 0, sizeof(netdata_dcstat_pid_t));
-    netdata_dcstat_pid_t *dst = &publish->curr;
     while (root) {
         int32_t pid = root->pid;
-        /*
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL);
-        if (pid_stat) {
-            netdata_publish_dcstat_t *w = &pid_stat->dc;
-            netdata_dcstat_pid_t *src = &w->curr;
-            dst->cache_access += src->cache_access;
-            dst->file_system += src->file_system;
-            dst->not_found += src->not_found;
-        }
-         */
+        netdata_publish_dcstat_t *w = pid_stat->dc;
+        if (!w)
+            continue;
+
+        publish->curr.cache_access += w->curr.cache_access;
+        publish->curr.file_system += w->curr.file_system;
+        publish->curr.not_found += w->curr.not_found;
 
         root = root->next;
     }
@@ -655,7 +653,7 @@ void *ebpf_read_dcstat_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
-    int max_period = update_every * EBPF_CLEANUP_FACTOR;
+    int max_period = EBPF_CLEANUP_FACTOR;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
         if (ebpf_plugin_stop() || ++counter != update_every)
@@ -786,13 +784,12 @@ static void ebpf_update_dc_cgroup()
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
             ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
-            /*
-            if (local_pid) {
-                netdata_publish_dcstat_t *in = &local_pid->dc;
+            if (!local_pid)
+                continue;
 
-                memcpy(out, &in->curr, sizeof(netdata_dcstat_pid_t));
-            }
-             */
+            netdata_publish_dcstat_t *in = local_pid->dc;
+
+            memcpy(out, &in->curr, sizeof(netdata_dcstat_pid_t));
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -1017,13 +1014,12 @@ static void ebpf_obsolete_specific_dc_charts(char *type, int update_every)
 void ebpf_dc_sum_cgroup_pids(netdata_publish_dcstat_t *publish, struct pid_on_target2 *root)
 {
     memset(&publish->curr, 0, sizeof(netdata_dcstat_pid_t));
-    netdata_dcstat_pid_t *dst = &publish->curr;
     while (root) {
         netdata_dcstat_pid_t *src = &root->dc;
 
-        dst->cache_access += src->cache_access;
-        dst->file_system += src->file_system;
-        dst->not_found += src->not_found;
+        publish->curr.cache_access += src->cache_access;
+        publish->curr.file_system += src->file_system;
+        publish->curr.not_found += src->not_found;
 
         root = root->next;
     }

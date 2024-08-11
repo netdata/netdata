@@ -81,7 +81,7 @@ typedef struct netdata_publish_dcstat_pid {
     uint64_t not_found;
 } netdata_dcstat_pid_t;
 
-typedef struct netdata_publish_dcstat {
+typedef struct __attribute__((packed)) netdata_publish_dcstat {
     uint64_t ct;
 
     long long ratio;
@@ -90,6 +90,16 @@ typedef struct netdata_publish_dcstat {
     netdata_dcstat_pid_t curr;
     netdata_dcstat_pid_t prev;
 } netdata_publish_dcstat_t;
+
+static inline void *ebpf_dcallocate_publish()
+{
+    return callocz(1, sizeof(netdata_publish_dcstat_t));
+}
+
+static inline void *ebpf_dc_release_publish(netdata_publish_dcstat_t *ptr)
+{
+    freez(ptr);
+}
 
 void *ebpf_dcstat_thread(void *ptr);
 void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr);
