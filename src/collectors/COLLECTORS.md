@@ -303,7 +303,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [ISC DHCP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/isc_dhcpd/integrations/isc_dhcp.md)
 
-- [Name Server Daemon](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/nsd/integrations/name_server_daemon.md)
+- [NSD](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/nsd/integrations/nsd.md)
 
 - [NextDNS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/nextdns.md)
 
