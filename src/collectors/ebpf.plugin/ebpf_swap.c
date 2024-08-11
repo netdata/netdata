@@ -10,7 +10,7 @@ static netdata_publish_syscall_t swap_publish_aggregated[NETDATA_SWAP_END];
 static netdata_idx_t swap_hash_values[NETDATA_SWAP_END];
 static netdata_idx_t *swap_values = NULL;
 
-netdata_publish_swap_t *swap_vector = NULL;
+netdata_ebpf_swap_t *swap_vector = NULL;
 
 struct config swap_config = { .first_section = NULL,
     .last_section = NULL,
@@ -451,13 +451,13 @@ static void ebpf_swap_exit(void *ptr)
  * @param out the vector with read values.
  * @param maps_per_core do I need to read all cores?
  */
-static void swap_apps_accumulator(netdata_publish_swap_t *out, int maps_per_core)
+static void swap_apps_accumulator(netdata_ebpf_swap_t *out, int maps_per_core)
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
-    netdata_publish_swap_t *total = &out[0];
+    netdata_ebpf_swap_t *total = &out[0];
     uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
-        netdata_publish_swap_t *w = &out[i];
+        netdata_ebpf_swap_t *w = &out[i];
         total->write += w->write;
         total->read += w->read;
 
@@ -483,14 +483,9 @@ static void ebpf_update_swap_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_swap_t *out = &pids->swap;
-            /*
             ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
-            if (local_pid) {
-                netdata_publish_swap_t *in = &local_pid->swap;
-
-                memcpy(out, in, sizeof(netdata_publish_swap_t));
-            }
-             */
+            netdata_publish_swap_t *in = &local_pid->swap;
+            memcpy(out, in, sizeof(netdata_publish_swap_t));
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -511,14 +506,11 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_
 
     while (root) {
         int32_t pid = root->pid;
-        /*
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
-        if (local_pid) {
-            netdata_publish_swap_t *w = &local_pid->swap;
-            local_write += w->write;
-            local_read += w->read;
-        }
-         */
+        netdata_publish_swap_t *w = &local_pid->swap;
+        local_write += w->write;
+        local_read += w->read;
+
         root = root->next;
     }
 
@@ -550,9 +542,9 @@ void ebpf_swap_resume_apps_data() {
  */
 static void ebpf_read_swap_apps_table(int maps_per_core, int max_period)
 {
-    netdata_publish_swap_t *cv = swap_vector;
+    netdata_ebpf_swap_t *cv = swap_vector;
     int fd = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
-    size_t length = sizeof(netdata_publish_swap_t);
+    size_t length = sizeof(netdata_ebpf_swap_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
@@ -564,17 +556,15 @@ static void ebpf_read_swap_apps_table(int maps_per_core, int max_period)
 
         swap_apps_accumulator(cv, maps_per_core);
 
-        /*
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name);
         netdata_publish_swap_t *publish = &local_pid->swap;
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, cv, sizeof(netdata_publish_swap_t));
             local_pid->thread_collecting |= 1<<EBPF_MODULE_SWAP_IDX;
             local_pid->not_updated = 0;
-        } else if (++local_pid->not_updated >= max_period) {
+        } else if (++local_pid->not_updated >= max_period && !local_pid->has_proc_file) {
             ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_SWAP_IDX);
         }
-         */
 
         // We are cleaning to avoid passing data read from one process to other.
 end_swap_loop:
@@ -610,7 +600,7 @@ void *ebpf_read_swap_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
-    int max_period = update_every * EBPF_CLEANUP_FACTOR;
+    int max_period = EBPF_CLEANUP_FACTOR;
 
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
@@ -1034,7 +1024,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_swap_allocate_global_vectors()
 {
-    swap_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_swap_t));
+    swap_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_ebpf_swap_t));
 
     swap_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 

@@ -133,13 +133,13 @@ typedef struct ebpf_pid_data {
     struct ebpf_pid_data *prev;
     struct ebpf_pid_data *next;
 
-    // netdata_publish_cachestat_t cachestat;
     netdata_publish_fd_stat_t fd;
+    netdata_publish_swap_t swap;
     /*
+    netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dc;
     ebpf_process_stat_t process;
     netdata_publish_shm_t shm;
-    netdata_publish_swap_t swap;
     ebpf_socket_publish_apps_t socket;
     netdata_publish_vfs_t vfs;
      */

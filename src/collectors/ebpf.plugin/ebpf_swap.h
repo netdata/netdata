@@ -26,6 +26,13 @@
 
 typedef struct netdata_publish_swap {
     uint64_t ct;
+
+    uint64_t read;
+    uint64_t write;
+} netdata_publish_swap_t;
+
+typedef struct netdata_ebpf_swap {
+    uint64_t ct;
     uint32_t tgid;
     uint32_t uid;
     uint32_t gid;
@@ -33,7 +40,7 @@ typedef struct netdata_publish_swap {
 
     uint64_t read;
     uint64_t write;
-} netdata_publish_swap_t;
+} netdata_ebpf_swap_t;
 
 enum swap_tables {
     NETDATA_PID_SWAP_TABLE,
