@@ -7,7 +7,7 @@ static char *shm_dimension_name[NETDATA_SHM_END] = { "get", "at", "dt", "ctl" };
 static netdata_syscall_stat_t shm_aggregated_data[NETDATA_SHM_END];
 static netdata_publish_syscall_t shm_publish_aggregated[NETDATA_SHM_END];
 
-netdata_publish_shm_t *shm_vector = NULL;
+netdata_ebpf_shm_t *shm_vector = NULL;
 
 static netdata_idx_t shm_hash_values[NETDATA_SHM_END];
 static netdata_idx_t *shm_values = NULL;
@@ -510,13 +510,13 @@ static void ebpf_shm_exit(void *pptr)
  * @param out the vector with read values.
  * @param maps_per_core do I need to read all cores?
  */
-static void shm_apps_accumulator(netdata_publish_shm_t *out, int maps_per_core)
+static void shm_apps_accumulator(netdata_ebpf_shm_t *out, int maps_per_core)
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
-    netdata_publish_shm_t *total = &out[0];
+    netdata_ebpf_shm_t *total = &out[0];
     uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
-        netdata_publish_shm_t *w = &out[i];
+        netdata_ebpf_shm_t *w = &out[i];
         total->get += w->get;
         total->at += w->at;
         total->dt += w->dt;
@@ -539,7 +539,7 @@ static void shm_apps_accumulator(netdata_publish_shm_t *out, int maps_per_core)
  */
 static void ebpf_update_shm_cgroup()
 {
-    netdata_publish_shm_t *cv = shm_vector;
+    netdata_ebpf_shm_t *cv = shm_vector;
     size_t length = sizeof(netdata_publish_shm_t);
 
     ebpf_cgroup_target_t *ect;
@@ -552,14 +552,12 @@ static void ebpf_update_shm_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_shm_t *out = &pids->shm;
-            /*
             ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
-            if (local_pid) {
-                netdata_publish_shm_t *in = &local_pid->shm;
+            netdata_publish_shm_t *in = local_pid->shm;
+            if (!in)
+                continue;
 
-                memcpy(out, in, sizeof(netdata_publish_shm_t));
-            }
-             */
+            memcpy(out, in, sizeof(netdata_publish_shm_t));
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -574,9 +572,9 @@ static void ebpf_update_shm_cgroup()
  */
 static void ebpf_read_shm_apps_table(int maps_per_core, int max_period)
 {
-    netdata_publish_shm_t *cv = shm_vector;
+    netdata_ebpf_shm_t *cv = shm_vector;
     int fd = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
-    size_t length = sizeof(netdata_publish_shm_t);
+    size_t length = sizeof(netdata_ebpf_shm_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
@@ -588,17 +586,20 @@ static void ebpf_read_shm_apps_table(int maps_per_core, int max_period)
 
         shm_apps_accumulator(cv, maps_per_core);
 
-        /*
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name);
-        netdata_publish_shm_t *publish = &local_pid->shm;
+        netdata_publish_shm_t *publish = local_pid->shm;
+        if (!publish)
+            local_pid->shm = ebpf_shm_allocate_publish();
+
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, &cv[0], sizeof(netdata_publish_shm_t));
             local_pid->thread_collecting |= 1<<EBPF_MODULE_SHM_IDX;
             local_pid->not_updated = 0;
         } else if (++local_pid->not_updated >= max_period){
             ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_SHM_IDX);
+            ebpf_shm_release_publish(publish);
+            local_pid->shm = NULL;
         }
-         */
 
 end_shm_loop:
         // now that we've consumed the value, zero it out in the map.
@@ -667,22 +668,17 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_tar
     memset(shm, 0, sizeof(netdata_publish_shm_t));
     while (root) {
         int32_t pid = root->pid;
-        /*
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL);
         if (pid_stat) {
-            netdata_publish_shm_t *w = &pid_stat->shm;
+            netdata_publish_shm_t *w = pid_stat->shm;
+            if (!w)
+                continue;
+
             shm->get += w->get;
             shm->at += w->at;
             shm->dt += w->dt;
             shm->ctl += w->ctl;
-
-            // reset for next collection.
-            w->get = 0;
-            w->at = 0;
-            w->dt = 0;
-            w->ctl = 0;
         }
-         */
         root = root->next;
     }
 }

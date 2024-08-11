@@ -28,7 +28,16 @@
 #define NETDATA_SYSTEMD_SHM_DT_CONTEXT "systemd.service.shmdt"
 #define NETDATA_SYSTEMD_SHM_CTL_CONTEXT "systemd.service.shmctl"
 
-typedef struct netdata_publish_shm {
+typedef struct __attribute__((packed)) netdata_publish_shm {
+    uint64_t ct;
+
+    uint32_t get;
+    uint32_t at;
+    uint32_t dt;
+    uint32_t ctl;
+} netdata_publish_shm_t;
+
+typedef struct netdata_ebpf_shm {
     uint64_t ct;
     uint32_t tgid;
     uint32_t uid;
@@ -39,7 +48,7 @@ typedef struct netdata_publish_shm {
     uint64_t at;
     uint64_t dt;
     uint64_t ctl;
-} netdata_publish_shm_t;
+} netdata_ebpf_shm_t;
 
 enum shm_tables {
     NETDATA_PID_SHM_TABLE,
@@ -56,6 +65,16 @@ enum shm_counters {
     // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_SHM_END
 };
+
+static inline void *ebpf_shm_allocate_publish()
+{
+    return callocz(1, sizeof(netdata_publish_shm_t));
+}
+
+static inline void *ebpf_shm_release_publish(netdata_publish_shm_t *ptr)
+{
+    freez(ptr);
+}
 
 void *ebpf_shm_thread(void *ptr);
 void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr);
