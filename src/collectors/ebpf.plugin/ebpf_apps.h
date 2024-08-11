@@ -180,7 +180,7 @@ static inline void ebpf_release_pid_data(ebpf_pid_data_t *eps, int fd, uint32_t 
         bpf_map_delete_elem(fd, &key);
     }
     eps->thread_collecting &= ~(1<<idx);
-    if (!eps->thread_collecting) {
+    if (!eps->thread_collecting && !eps->has_proc_file) {
         ebpf_del_pid_entry((pid_t)key);
     }
 }

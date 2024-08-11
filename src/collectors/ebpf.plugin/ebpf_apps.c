@@ -646,12 +646,9 @@ cleanup:
  * Assign target to pid
  *
  * @param p the pid stat structure to store the data.
- * @param ptr an useless argument.
  */
-static inline int read_proc_pid_stat(ebpf_pid_data_t *p, void *ptr)
+static inline int read_proc_pid_stat(ebpf_pid_data_t *p)
 {
-    UNUSED(ptr);
-
     procfile *ff;
 
     char filename[FILENAME_MAX + 1];
@@ -659,8 +656,10 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p, void *ptr)
     snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", netdata_configured_host_prefix, p->pid);
 
     struct stat statbuf;
-    if (stat(filename, &statbuf))
+    if (stat(filename, &statbuf)) {
+        p->has_proc_file = 0;
         return 0;
+    }
 
     ff = procfile_open(filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
     if (unlikely(!ff))
@@ -697,6 +696,7 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p, void *ptr)
             netdata_configured_host_prefix, p->pid, p->comm, (p->target) ? p->target->name : "UNSET");
 
     p->has_proc_file = 1;
+    p->not_updated = 0;
     ret = 1;
 cleanup_pid_stat:
     procfile_close(ff);
@@ -713,19 +713,13 @@ cleanup_pid_stat:
  */
 static inline int ebpf_collect_data_for_pid(pid_t pid)
 {
-    void *ptr = NULL;
     if (unlikely(pid < 0 || pid > pid_max)) {
         netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
         return 0;
     }
 
     ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL);
-    read_proc_pid_stat(p, ptr);
-    /*
-    if (unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr))))
-        // there is no reason to proceed if we cannot get its status
-        return 0;
-        */
+    read_proc_pid_stat(p);
 
     // check its parent pid
     if (unlikely(p->ppid < 0 || p->ppid > pid_max)) {
@@ -1005,14 +999,14 @@ static void ebpf_cleanup_exited_pids()
  *
  * @return It returns 0 on success and -1 otherwise.
  */
-static void ebpf_read_proc_filesystem()
+static int ebpf_read_proc_filesystem()
 {
     char dirname[FILENAME_MAX + 1];
 
     snprintfz(dirname, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
     DIR *dir = opendir(dirname);
     if (!dir)
-        return;
+        return -1;
 
     struct dirent *de = NULL;
 
@@ -1031,6 +1025,8 @@ static void ebpf_read_proc_filesystem()
         ebpf_collect_data_for_pid(pid);
     }
     closedir(dir);
+
+    return 0;
 }
 
 /**
@@ -1138,7 +1134,8 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
         pids = pids->next;
     }
 
-    ebpf_read_proc_filesystem();
+    if (ebpf_read_proc_filesystem())
+        return;
 
     pids = ebpf_root_of_pids; // global list of all processes running
 
@@ -1194,12 +1191,13 @@ void ebpf_parse_proc_files()
 {
     ebpf_pid_data_t *pids = ebpf_pids_link_list;
     while (pids) {
-        pids->has_proc_file = 0;
+        pids->not_updated = EBPF_CLEANUP_FACTOR;
 
         pids = pids->next;
     }
 
-    ebpf_read_proc_filesystem();
+    if (ebpf_read_proc_filesystem())
+        return;
 
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 
