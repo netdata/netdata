@@ -24,11 +24,11 @@
 #define NETDATA_SYSTEMD_SWAP_READ_CONTEXT "systemd.service.swap_read"
 #define NETDATA_SYSTEMD_SWAP_WRITE_CONTEXT "systemd.service.swap_write"
 
-typedef struct netdata_publish_swap {
+typedef struct __attribute__((packed)) netdata_publish_swap {
     uint64_t ct;
 
-    uint64_t read;
-    uint64_t write;
+    uint32_t read;
+    uint32_t write;
 } netdata_publish_swap_t;
 
 typedef struct netdata_ebpf_swap {
@@ -55,6 +55,16 @@ enum swap_counters {
     // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_SWAP_END
 };
+
+static inline void *ebpf_swap_allocate_publish_swap()
+{
+    return callocz(1, sizeof(netdata_publish_swap_t));
+}
+
+static inline void *ebpf_release_publish_swap(netdata_publish_swap_t *ptr)
+{
+    freez(ptr);
+}
 
 void *ebpf_swap_thread(void *ptr);
 void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr);

@@ -40,7 +40,7 @@
 // ARAL name
 #define NETDATA_EBPF_FD_ARAL_NAME "ebpf_fd"
 
-typedef struct netdata_publish_fd_stat {
+typedef struct __attribute__((packed)) netdata_publish_fd_stat {
     uint64_t ct;
 
     uint32_t open_call;                    // Open syscalls (open and openat)
@@ -99,6 +99,16 @@ enum fd_close_syscall {
 
     NETDATA_FD_CLOSE_END
 };
+
+static inline void *ebpf_fd_allocate_publish_fd()
+{
+    return callocz(1, sizeof(netdata_publish_fd_stat_t));
+}
+
+static inline void *ebpf_fd_release_publish_fd(netdata_publish_fd_stat_t *ptr)
+{
+    freez(ptr);
+}
 
 #define NETDATA_EBPF_MAX_FD_TARGETS 2
 

@@ -114,16 +114,12 @@ extern struct ebpf_target *users_root_target;
 extern struct ebpf_target *groups_root_target;
 extern uint64_t collect_pids;
 
-typedef struct ebpf_pid_data {
+typedef struct __attribute__((packed)) ebpf_pid_data {
     uint32_t pid;
     uint32_t ppid;
     uint64_t thread_collecting;
 
     char comm[EBPF_MAX_COMPARE_NAME + 1];
-    /*
-    char name[EBPF_MAX_NAME + 1];
-    char clean_name[EBPF_MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
-     */
     char *cmdline;
 
     uint32_t has_proc_file;
@@ -133,8 +129,8 @@ typedef struct ebpf_pid_data {
     struct ebpf_pid_data *prev;
     struct ebpf_pid_data *next;
 
-    netdata_publish_fd_stat_t fd;
-    netdata_publish_swap_t swap;
+    netdata_publish_fd_stat_t *fd;
+    netdata_publish_swap_t *swap;
     /*
     netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dc;
