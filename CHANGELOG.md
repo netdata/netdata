@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- add nsd-control to ndsudo [\#18301](https://github.com/netdata/netdata/pull/18301) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18299](https://github.com/netdata/netdata/pull/18299) ([netdatabot](https://github.com/netdatabot))
 - go.d gearman fix meta [\#18298](https://github.com/netdata/netdata/pull/18298) ([ilyam8](https://github.com/ilyam8))
 - add go.d/gearman [\#18294](https://github.com/netdata/netdata/pull/18294) ([ilyam8](https://github.com/ilyam8))
@@ -414,7 +415,6 @@
 - Fix mongodb default config indentation [\#17715](https://github.com/netdata/netdata/pull/17715) ([louis-lau](https://github.com/louis-lau))
 - Fix compilation with disable-cloud [\#17714](https://github.com/netdata/netdata/pull/17714) ([stelfrag](https://github.com/stelfrag))
 - fix on link [\#17712](https://github.com/netdata/netdata/pull/17712) ([Ancairon](https://github.com/Ancairon))
-- gha labeler add collectors/windows [\#17711](https://github.com/netdata/netdata/pull/17711) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
