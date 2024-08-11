@@ -747,7 +747,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Dovecot](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/dovecot/integrations/dovecot.md)
 
-- [Exim](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/exim/integrations/exim.md)
+- [Exim](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/exim/integrations/exim.md)
 
 - [Halon](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/halon.md)
 
