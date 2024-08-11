@@ -69,7 +69,13 @@ enum directory_cache_targets {
     NETDATA_DC_TARGET_D_LOOKUP
 };
 
-typedef struct netdata_publish_dcstat_pid {
+typedef struct __attribute__((packed)) netdata_publish_dcstat_pid {
+    uint64_t cache_access;
+    uint32_t file_system;
+    uint32_t not_found;
+} netdata_publish_dcstat_pid_t;
+
+typedef struct netdata_dcstat_pid {
     uint64_t ct;
     uint32_t tgid;
     uint32_t uid;
@@ -87,8 +93,8 @@ typedef struct __attribute__((packed)) netdata_publish_dcstat {
     long long ratio;
     long long cache_access;
 
-    netdata_dcstat_pid_t curr;
-    netdata_dcstat_pid_t prev;
+    netdata_publish_dcstat_pid_t curr;
+    netdata_publish_dcstat_pid_t prev;
 } netdata_publish_dcstat_t;
 
 static inline void *ebpf_dcallocate_publish()

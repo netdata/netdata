@@ -44,10 +44,10 @@ typedef struct netdata_ebpf_shm {
     uint32_t gid;
     char name[TASK_COMM_LEN];
 
-    uint64_t get;
-    uint64_t at;
-    uint64_t dt;
-    uint64_t ctl;
+    uint32_t get;
+    uint32_t at;
+    uint32_t dt;
+    uint32_t ctl;
 } netdata_ebpf_shm_t;
 
 enum shm_tables {

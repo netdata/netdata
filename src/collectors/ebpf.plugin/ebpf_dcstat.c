@@ -564,7 +564,11 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
             pid_stat->dc = ebpf_dcallocate_publish();
 
         if (!publish->ct || publish->ct != cv->ct) {
-            memcpy(&publish->curr, &cv[0], sizeof(netdata_dcstat_pid_t));
+            publish->ct = cv->ct;
+            publish->curr.not_found = cv[0].not_found;
+            publish->curr.file_system = cv[0].file_system;
+            publish->curr.cache_access = cv[0].cache_access;
+
             pid_stat->thread_collecting |= 1<<EBPF_MODULE_DCSTAT_IDX;
             pid_stat->not_updated = 0;
         } else if (++pid_stat->not_updated >= max_period) {
@@ -590,7 +594,7 @@ end_dc_loop:
  */
 void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_target *root)
 {
-    memset(&publish->curr, 0, sizeof(netdata_dcstat_pid_t));
+    memset(&publish->curr, 0, sizeof(netdata_publish_dcstat_pid_t));
     while (root) {
         int32_t pid = root->pid;
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL);
@@ -789,7 +793,7 @@ static void ebpf_update_dc_cgroup()
 
             netdata_publish_dcstat_t *in = local_pid->dc;
 
-            memcpy(out, &in->curr, sizeof(netdata_dcstat_pid_t));
+            memcpy(out, &in->curr, sizeof(netdata_publish_dcstat_pid_t));
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
