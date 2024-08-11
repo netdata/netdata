@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package nsd
+package exim
 
 import (
 	_ "embed"
@@ -15,7 +15,7 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("nsd", module.Creator{
+	module.Register("exim", module.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: module.Defaults{
 			UpdateEvery: 10,
@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Nsd {
-	return &Nsd{
+func New() *Exim {
+	return &Exim{
 		Config: Config{
 			Timeout: web.Duration(time.Second * 2),
 		},
@@ -39,34 +39,34 @@ type Config struct {
 	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type Nsd struct {
+type Exim struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
-	exec nsdControlBinary
+	exec eximBinary
 }
 
-func (n *Nsd) Configuration() any {
-	return n.Config
+func (e *Exim) Configuration() any {
+	return e.Config
 }
 
-func (n *Nsd) Init() error {
-	nsdControl, err := n.initNsdControlExec()
+func (e *Exim) Init() error {
+	exim, err := e.initEximExec()
 	if err != nil {
-		n.Errorf("nsd-control exec initialization: %v", err)
+		e.Errorf("exim exec initialization: %v", err)
 		return err
 	}
-	n.exec = nsdControl
+	e.exec = exim
 
 	return nil
 }
 
-func (n *Nsd) Check() error {
-	mx, err := n.collect()
+func (e *Exim) Check() error {
+	mx, err := e.collect()
 	if err != nil {
-		n.Error(err)
+		e.Error(err)
 		return err
 	}
 
@@ -77,14 +77,14 @@ func (n *Nsd) Check() error {
 	return nil
 }
 
-func (n *Nsd) Charts() *module.Charts {
-	return n.charts
+func (e *Exim) Charts() *module.Charts {
+	return e.charts
 }
 
-func (n *Nsd) Collect() map[string]int64 {
-	mx, err := n.collect()
+func (e *Exim) Collect() map[string]int64 {
+	mx, err := e.collect()
 	if err != nil {
-		n.Error(err)
+		e.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -94,4 +94,4 @@ func (n *Nsd) Collect() map[string]int64 {
 	return mx
 }
 
-func (n *Nsd) Cleanup() {}
+func (e *Exim) Cleanup() {}
