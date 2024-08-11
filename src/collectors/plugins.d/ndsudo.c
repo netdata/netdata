@@ -14,6 +14,15 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "exim-bpc",
+        .params = "-bpc",
+        .search =
+            {
+                [0] = "exim",
+                [1] = NULL,
+            },
+    },
+    {
         .name = "nsd-control-stats",
         .params = "stats_noreset",
         .search = {
