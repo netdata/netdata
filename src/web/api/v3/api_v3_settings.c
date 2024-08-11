@@ -59,23 +59,29 @@ static inline bool settings_ensure_path_exists(void) {
     if (stat(path, &st) != 0) {
         if (errno == ENOENT) {
             // Directory does not exist, attempt to create it
-            if (mkdir(path, 0755) != 0)
+            if (mkdir(path, 0755) != 0) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "cannot create directory '%s'", path);
                 return false; // Failed to create the directory
+            }
         }
-        else
-            // Stat failed for some other reason (e.g., permission issue)
+        else {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "cannot stat() directory '%s'", path);
             return false;
+        }
 
     }
-    else if (!S_ISDIR(st.st_mode))
-        // The path exists but is not a directory
+    else if (!S_ISDIR(st.st_mode)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "path '%s' exists but it is not a directory", path);
         return false;
+    }
 
     // Check if the directory is accessible
-    if (access(path, R_OK | W_OK | X_OK) != 0)
-        return false; // Directory is not accessible (no read/write/execute permissions)
+    if (access(path, R_OK | W_OK | X_OK) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "directory '%s' exists but I don't have access to it", path);
+        return false;
+    }
 
-    return true; // Everything is okay
+    return true;
 }
 
 static inline size_t settings_extract_json_version(const char *json) {
@@ -118,8 +124,10 @@ static inline void settings_get(BUFFER *wb, const char *file, bool have_lock) {
 
     if(rc) {
         size_t version = settings_extract_json_version(buffer_tostring(wb));
-        if (!version)
+        if (!version) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "file '%s' cannot be parsed to extract version", filename);
             settings_initial_version(wb);
+        }
         else {
             wb->content_type = CT_APPLICATION_JSON;
             buffer_no_cacheable(wb);
@@ -193,6 +201,7 @@ static inline int settings_put(struct web_client *w, char *file) {
     FILE *fp = fopen(tmp_filename, "w");
     if (fp == NULL) {
         rw_spinlock_write_unlock(&settings_spinlock);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "cannot open/create settings file '%s'", tmp_filename);
         return rrd_call_function_error(
             w->response.data,
             "Cannot create payload file '%s'",
@@ -203,6 +212,7 @@ static inline int settings_put(struct web_client *w, char *file) {
         fclose(fp);
         unlink(tmp_filename);
         rw_spinlock_write_unlock(&settings_spinlock);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "cannot save settings to file '%s'", tmp_filename);
         return rrd_call_function_error(
             w->response.data,
             "Cannot save payload to file '%s'",
@@ -217,11 +227,13 @@ static inline int settings_put(struct web_client *w, char *file) {
 
     rw_spinlock_write_unlock(&settings_spinlock);
 
-    if(!renamed)
+    if(!renamed) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "cannot rename file '%s' to '%s'", tmp_filename, filename);
         return rrd_call_function_error(
             w->response.data,
             "Failed to move the payload file to its final location",
             HTTP_RESP_INTERNAL_SERVER_ERROR);
+    }
 
     return rrd_call_function_error(
         w->response.data,
