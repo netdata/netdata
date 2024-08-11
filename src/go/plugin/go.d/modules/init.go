@@ -28,6 +28,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/elasticsearch"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/envoy"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/example"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/exim"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/fail2ban"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/filecheck"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/fluentd"

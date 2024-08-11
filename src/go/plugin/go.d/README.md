@@ -74,6 +74,7 @@ see the appropriate collector readme.
 | [elasticsearch](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/elasticsearch)           |   Elasticsearch/OpenSearch    |
 | [envoy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/envoy)                           |             Envoy             |
 | [example](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/example)                       |               -               |
+| [exim](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/exim)                             |             Exim              |
 | [fail2ban](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/fail2ban)                     |        Fail2Ban Jails         |
 | [filecheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/filecheck)                   |     Files and Directories     |
 | [fluentd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/fluentd)                       |            Fluentd            |
@@ -103,6 +104,7 @@ see the appropriate collector readme.
 | [nginx](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginx)                           |             NGINX             |
 | [nginxplus](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginxplus)                   |          NGINX Plus           |
 | [nginxvts](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginxvts)                     |           NGINX VTS           |
+| [nsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nsd)                               |       NSD (NLnet Labs)        |
 | [ntpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ntpd)                             |          NTP daemon           |
 | [nvme](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nvme)                             |         NVMe devices          |
 | [openvpn](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/openvpn)                       |            OpenVPN            |
