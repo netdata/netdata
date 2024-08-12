@@ -8,7 +8,7 @@ import (
 	"os/exec"
 )
 
-func (nv *NvidiaSMI) initNvidiaSMIExec() (nvidiaSMI, error) {
+func (nv *NvidiaSmi) initNvidiaSmiExec() (nvidiaSmiBinary, error) {
 	binPath := nv.BinaryPath
 	if _, err := os.Stat(binPath); os.IsNotExist(err) {
 		path, err := exec.LookPath(nv.binName)
@@ -18,5 +18,5 @@ func (nv *NvidiaSMI) initNvidiaSMIExec() (nvidiaSMI, error) {
 		binPath = path
 	}
 
-	return newNvidiaSMIExec(binPath, nv.Config, nv.Logger)
+	return newNvidiaSmiExec(binPath, nv.Config, nv.Logger)
 }

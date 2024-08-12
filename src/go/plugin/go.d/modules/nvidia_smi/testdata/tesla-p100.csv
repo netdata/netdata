@@ -1,2 +1,0 @@
-name, uuid, fan.speed [%], pstate, memory.reserved [MiB], memory.used [MiB], memory.free [MiB], utilization.gpu [%], utilization.memory [%], temperature.gpu, power.draw [W], clocks.current.graphics [MHz], clocks.current.sm [MHz], clocks.current.memory [MHz], clocks.current.video [MHz]
-Tesla P100-PCIE-16GB, GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6, [N/A], P0, 103, 0, 16280, 0, 0, 37, 28.16, 405, 405, 715, 835
