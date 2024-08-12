@@ -15,7 +15,7 @@
         "title": "URI",
         "description": "The URI specifying the connection details for the Redis server.",
         "type": "string",
-        "default": "redis://@localhost:9221"
+        "default": "redis://@localhost:6379"
       },
       "timeout": {
         "title": "Timeout",
