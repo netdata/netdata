@@ -101,16 +101,6 @@ typedef struct __attribute__((packed)) netdata_publish_cachestat {
     netdata_cachestat_t prev;
 } netdata_publish_cachestat_t;
 
-static inline void *ebpf_cachestat_allocate_publish()
-{
-    return callocz(1, sizeof(netdata_publish_cachestat_t));
-}
-
-static inline void ebpf_cachestat_release_publish(netdata_publish_cachestat_t *ptr)
-{
-    freez(ptr);
-}
-
 void *ebpf_cachestat_thread(void *ptr);
 void ebpf_cachestat_release(netdata_publish_cachestat_t *stat);
 

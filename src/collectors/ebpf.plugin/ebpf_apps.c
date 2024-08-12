@@ -338,7 +338,8 @@ struct ebpf_pid_stat *ebpf_root_of_pids = NULL; // global list of all processes 
 ebpf_pid_data_t *ebpf_pids = NULL;            // to avoid allocations, we pre-allocate the entire pid space.
 ebpf_pid_data_t *ebpf_pids_link_list = NULL;  // global list of all processes running
 
-size_t ebpf_all_pids_count = 0; // the number of processes running
+size_t ebpf_all_pids_count = 0; // the number of processes running read from /proc
+size_t ebpf_hash_table_pids_count = 0; // the number of tasks in our hash tables
 
 struct ebpf_target
     *apps_groups_default_target = NULL, // the default target

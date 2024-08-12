@@ -56,16 +56,6 @@ enum swap_counters {
     NETDATA_SWAP_END
 };
 
-static inline void *ebpf_swap_allocate_publish_swap()
-{
-    return callocz(1, sizeof(netdata_publish_swap_t));
-}
-
-static inline void ebpf_release_publish_swap(netdata_publish_swap_t *ptr)
-{
-    freez(ptr);
-}
-
 void *ebpf_swap_thread(void *ptr);
 void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr);
 

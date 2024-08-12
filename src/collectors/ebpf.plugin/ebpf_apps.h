@@ -78,16 +78,6 @@ typedef struct __attribute__((packed)) ebpf_publish_process {
     uint32_t task_err;
 } ebpf_publish_process_t;
 
-static inline void *ebpf_process_allocate_publish()
-{
-    return callocz(1, sizeof(ebpf_publish_process_t));
-}
-
-static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
-{
-    freez(ptr);
-}
-
 // ----------------------------------------------------------------------------
 // pid_stat
 //
@@ -164,7 +154,104 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
 extern ebpf_pid_data_t *ebpf_pids;
 extern ebpf_pid_data_t *ebpf_pids_link_list;
 extern size_t ebpf_all_pids_count;
+extern size_t ebpf_hash_table_pids_count;
 void ebpf_del_pid_entry(pid_t pid);
+
+static inline void *ebpf_cachestat_allocate_publish()
+{
+    ebpf_hash_table_pids_count++;
+    return callocz(1, sizeof(netdata_publish_cachestat_t));
+}
+
+static inline void ebpf_cachestat_release_publish(netdata_publish_cachestat_t *ptr)
+{
+    ebpf_hash_table_pids_count--;
+    freez(ptr);
+}
+
+static inline void *ebpf_dcallocate_publish()
+{
+    ebpf_hash_table_pids_count++;
+    return callocz(1, sizeof(netdata_publish_dcstat_t));
+}
+
+static inline void ebpf_dc_release_publish(netdata_publish_dcstat_t *ptr)
+{
+    ebpf_hash_table_pids_count--;
+    freez(ptr);
+}
+
+static inline void *ebpf_fd_allocate_publish()
+{
+    ebpf_hash_table_pids_count++;
+    return callocz(1, sizeof(netdata_publish_fd_stat_t));
+}
+
+static inline void ebpf_fd_release_publish(netdata_publish_fd_stat_t *ptr)
+{
+    ebpf_hash_table_pids_count--;
+    freez(ptr);
+}
+
+static inline void *ebpf_shm_allocate_publish()
+{
+    ebpf_hash_table_pids_count++;
+    return callocz(1, sizeof(netdata_publish_shm_t));
+}
+
+static inline void ebpf_shm_release_publish(netdata_publish_shm_t *ptr)
+{
+    ebpf_hash_table_pids_count--;
+    freez(ptr);
+}
+
+static inline void *ebpf_socket_allocate_publish()
+{
+    ebpf_hash_table_pids_count++;
+    return callocz(1, sizeof(ebpf_socket_publish_apps_t));
+}
+
+static inline void ebpf_socket_release_publish(ebpf_socket_publish_apps_t *ptr)
+{
+    ebpf_hash_table_pids_count--;
+    freez(ptr);
+}
+
+static inline void *ebpf_swap_allocate_publish_swap()
+{
+    ebpf_hash_table_pids_count++;
+    return callocz(1, sizeof(netdata_publish_swap_t));
+}
+
+static inline void ebpf_release_publish_swap(netdata_publish_swap_t *ptr)
+{
+    ebpf_hash_table_pids_count--;
+    freez(ptr);
+}
+
+static inline void *ebpf_vfs_allocate_publish()
+{
+    ebpf_hash_table_pids_count++;
+    return callocz(1, sizeof(netdata_publish_vfs_t));
+}
+
+static inline void ebpf_vfs_release_publish(netdata_publish_vfs_t *ptr)
+{
+    ebpf_hash_table_pids_count--;
+    freez(ptr);
+}
+
+static inline void *ebpf_process_allocate_publish()
+{
+    ebpf_hash_table_pids_count++;
+    return callocz(1, sizeof(ebpf_publish_process_t));
+}
+
+static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
+{
+    ebpf_hash_table_pids_count--;
+    freez(ptr);
+}
 
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name) {
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];

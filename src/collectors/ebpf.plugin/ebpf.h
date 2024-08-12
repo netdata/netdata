@@ -37,6 +37,7 @@
 #define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
 #define NETDATA_EBPF_CONFIG_FILE "ebpf.d.conf"
 
+extern size_t ebpf_hash_table_pids_count;
 #ifdef LIBBPF_MAJOR_VERSION // BTF code
 #include "cachestat.skel.h"
 #include "dc.skel.h"

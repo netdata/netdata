@@ -344,16 +344,6 @@ void ebpf_parse_ports(char *ptr);
 void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em);
 void ebpf_socket_fill_publish_apps(ebpf_socket_publish_apps_t *curr, netdata_socket_t *ns);
 
-static inline void *ebpf_socket_allocate_publish()
-{
-    return callocz(1, sizeof(ebpf_socket_publish_apps_t));
-}
-
-static inline void ebpf_socket_release_publish(ebpf_socket_publish_apps_t *ptr)
-{
-    freez(ptr);
-}
-
 extern struct config socket_config;
 extern netdata_ebpf_targets_t socket_targets[];
 

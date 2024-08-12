@@ -66,16 +66,6 @@ enum shm_counters {
     NETDATA_SHM_END
 };
 
-static inline void *ebpf_shm_allocate_publish()
-{
-    return callocz(1, sizeof(netdata_publish_shm_t));
-}
-
-static inline void ebpf_shm_release_publish(netdata_publish_shm_t *ptr)
-{
-    freez(ptr);
-}
-
 void *ebpf_shm_thread(void *ptr);
 void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr);
 void ebpf_shm_release(netdata_publish_shm_t *stat);

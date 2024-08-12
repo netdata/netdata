@@ -3,6 +3,8 @@
 #ifndef NETDATA_EBPF_DCSTAT_H
 #define NETDATA_EBPF_DCSTAT_H 1
 
+#include "ebpf.h"
+
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_DCSTAT "dcstat"
 #define NETDATA_EBPF_DC_MODULE_DESC "Monitor file access using directory cache. This thread is integrated with apps and cgroup."
@@ -96,16 +98,6 @@ typedef struct __attribute__((packed)) netdata_publish_dcstat {
     netdata_publish_dcstat_pid_t curr;
     netdata_publish_dcstat_pid_t prev;
 } netdata_publish_dcstat_t;
-
-static inline void *ebpf_dcallocate_publish()
-{
-    return callocz(1, sizeof(netdata_publish_dcstat_t));
-}
-
-static inline void ebpf_dc_release_publish(netdata_publish_dcstat_t *ptr)
-{
-    freez(ptr);
-}
 
 void *ebpf_dcstat_thread(void *ptr);
 void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr);
