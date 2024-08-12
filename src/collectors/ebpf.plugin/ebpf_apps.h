@@ -157,9 +157,7 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
     netdata_publish_vfs_t *vfs;
     netdata_publish_cachestat_t *cachestat;
     ebpf_publish_process_t *process;
-    /*
     ebpf_socket_publish_apps_t *socket;
-     */
 
 } ebpf_pid_data_t;
 

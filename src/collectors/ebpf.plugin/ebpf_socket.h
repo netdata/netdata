@@ -157,7 +157,7 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_EBPF_PID_SOCKET_ARAL_TABLE_NAME "ebpf_pid_socket"
 #define NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME "ebpf_socket_tbl"
 
-typedef struct ebpf_socket_publish_apps {
+typedef struct __attribute__((packed)) ebpf_socket_publish_apps {
     // Data read
     uint64_t bytes_sent;            // Bytes sent
     uint64_t bytes_received;        // Bytes received
@@ -342,8 +342,17 @@ void ebpf_parse_service_name_section(struct config *cfg);
 void ebpf_parse_ips_unsafe(char *ptr);
 void ebpf_parse_ports(char *ptr);
 void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em);
-void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns);
+void ebpf_socket_fill_publish_apps(ebpf_socket_publish_apps_t *curr, netdata_socket_t *ns);
 
+static inline void *ebpf_socket_allocate_publish()
+{
+    return callocz(1, sizeof(ebpf_socket_publish_apps_t));
+}
+
+static inline void ebpf_socket_release_publish(ebpf_socket_publish_apps_t *ptr)
+{
+    freez(ptr);
+}
 
 extern struct config socket_config;
 extern netdata_ebpf_targets_t socket_targets[];
