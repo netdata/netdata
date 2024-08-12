@@ -561,7 +561,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, cv->tgid, cv->name);
         netdata_publish_dcstat_t *publish = pid_stat->dc;
         if (!publish)
-            pid_stat->dc = ebpf_dcallocate_publish();
+            pid_stat->dc = publish = ebpf_dcallocate_publish();
 
         if (!publish->ct || publish->ct != cv->ct) {
             publish->ct = cv->ct;

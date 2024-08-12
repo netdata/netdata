@@ -1266,7 +1266,7 @@ static void ebpf_vfs_read_apps(int maps_per_core, int max_period)
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, vv->tgid, vv->name);
         netdata_publish_vfs_t *publish = local_pid->vfs;
         if (!publish)
-            local_pid->vfs = ebpf_vfs_allocate_publish();
+            local_pid->vfs = publish = ebpf_vfs_allocate_publish();
         if (!publish->ct || publish->ct != vv->ct) {
             vfs_aggregate_set_vfs(publish, vv);
             local_pid->thread_collecting |= 1<<EBPF_MODULE_VFS_IDX;

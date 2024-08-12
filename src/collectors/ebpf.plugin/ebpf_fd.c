@@ -702,7 +702,7 @@ static void ebpf_read_fd_apps_table(int maps_per_core, int max_period)
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, fv->tgid, fv->name);
         netdata_publish_fd_stat_t *publish_fd = pid_stat->fd;
         if (!publish_fd)
-            pid_stat->fd = ebpf_fd_allocate_publish();
+            pid_stat->fd = publish_fd = ebpf_fd_allocate_publish();
 
         if (!publish_fd->ct || publish_fd->ct != fv->ct) {
             publish_fd->ct = fv->ct;

@@ -731,7 +731,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name);
         netdata_publish_cachestat_t *publish = local_pid->cachestat;
         if (!publish)
-            local_pid->cachestat = ebpf_cachestat_allocate_publish();
+            local_pid->cachestat = publish = ebpf_cachestat_allocate_publish();
 
         if (!publish->ct || publish->ct != cv->ct){
             cachestat_save_pid_values(publish, cv);

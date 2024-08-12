@@ -76,20 +76,20 @@ typedef struct netdata_cachestat_pid {
     uint32_t gid;
     char name[TASK_COMM_LEN];
 
-    uint64_t add_to_page_cache_lru;
-    uint64_t mark_page_accessed;
-    uint64_t account_page_dirtied;
-    uint64_t mark_buffer_dirty;
+    uint32_t add_to_page_cache_lru;
+    uint32_t mark_page_accessed;
+    uint32_t account_page_dirtied;
+    uint32_t mark_buffer_dirty;
 } netdata_cachestat_pid_t;
 
-typedef struct netdata_cachestat {
-    uint64_t add_to_page_cache_lru;
-    uint64_t mark_page_accessed;
-    uint64_t account_page_dirtied;
-    uint64_t mark_buffer_dirty;
+typedef struct __attribute__((packed)) netdata_cachestat {
+    uint32_t add_to_page_cache_lru;
+    uint32_t mark_page_accessed;
+    uint32_t account_page_dirtied;
+    uint32_t mark_buffer_dirty;
 } netdata_cachestat_t;
 
-typedef struct netdata_publish_cachestat {
+typedef struct __attribute__((packed)) netdata_publish_cachestat {
     uint64_t ct;
 
     long long ratio;

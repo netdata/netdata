@@ -38,8 +38,8 @@ typedef struct netdata_ebpf_swap {
     uint32_t gid;
     char name[TASK_COMM_LEN];
 
-    uint64_t read;
-    uint64_t write;
+    uint32_t read;
+    uint32_t write;
 } netdata_ebpf_swap_t;
 
 enum swap_tables {

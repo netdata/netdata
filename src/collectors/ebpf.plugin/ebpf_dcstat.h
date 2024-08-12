@@ -82,9 +82,9 @@ typedef struct netdata_dcstat_pid {
     uint32_t gid;
     char name[TASK_COMM_LEN];
 
-    uint64_t cache_access;
-    uint64_t file_system;
-    uint64_t not_found;
+    uint32_t cache_access;
+    uint32_t file_system;
+    uint32_t not_found;
 } netdata_dcstat_pid_t;
 
 typedef struct __attribute__((packed)) netdata_publish_dcstat {

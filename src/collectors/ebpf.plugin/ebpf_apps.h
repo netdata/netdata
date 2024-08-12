@@ -63,8 +63,6 @@ typedef struct ebpf_process_stat {
 
     //Counter
     uint32_t task_err;
-
-    uint8_t removeme;
 } ebpf_process_stat_t;
 
 typedef struct __attribute__((packed)) ebpf_publish_process {

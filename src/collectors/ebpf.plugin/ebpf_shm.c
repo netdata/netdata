@@ -589,7 +589,7 @@ static void ebpf_read_shm_apps_table(int maps_per_core, int max_period)
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name);
         netdata_publish_shm_t *publish = local_pid->shm;
         if (!publish)
-            local_pid->shm = ebpf_shm_allocate_publish();
+            local_pid->shm = publish = ebpf_shm_allocate_publish();
 
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, &cv[0], sizeof(netdata_publish_shm_t));

@@ -564,7 +564,7 @@ static void ebpf_read_swap_apps_table(int maps_per_core, int max_period)
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name);
         netdata_publish_swap_t *publish = local_pid->swap;
         if (!publish)
-            local_pid->swap = ebpf_swap_allocate_publish_swap();
+            local_pid->swap = publish = ebpf_swap_allocate_publish_swap();
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, cv, sizeof(netdata_publish_swap_t));
             local_pid->thread_collecting |= 1<<EBPF_MODULE_SWAP_IDX;
