@@ -4030,7 +4030,7 @@ int main(int argc, char **argv)
             em->enabled = NETDATA_THREAD_EBPF_RUNNING;
             em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
 
-            if (em->apps_charts || em->cgroup_charts) {
+            if (em->functions.apps_routine && (em->apps_charts || em->cgroup_charts)) {
                 collect_pids |= 1<<i;
             }
             st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, em);
@@ -4069,7 +4069,7 @@ int main(int argc, char **argv)
                     collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
                 }
 
-//                ebpf_create_apps_charts(apps_groups_root_target);
+                ebpf_create_apps_charts(apps_groups_root_target);
                 pthread_mutex_unlock(&collect_data_mutex);
             }
             pthread_mutex_unlock(&lock);
