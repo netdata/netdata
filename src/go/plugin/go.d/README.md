@@ -71,6 +71,7 @@ see the appropriate collector readme.
 | [docker](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/docker)                         |         Docker Engine         |
 | [docker_engine](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/docker_engine)           |         Docker Engine         |
 | [dockerhub](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/dockerhub)                   |          Docker Hub           |
+| [dovecot](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/dovecot)                       |            Dovecot            |
 | [elasticsearch](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/elasticsearch)           |   Elasticsearch/OpenSearch    |
 | [envoy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/envoy)                           |             Envoy             |
 | [example](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/example)                       |               -               |
