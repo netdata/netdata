@@ -71,7 +71,7 @@ static inline void *ebpf_shm_allocate_publish()
     return callocz(1, sizeof(netdata_publish_shm_t));
 }
 
-static inline void *ebpf_shm_release_publish(netdata_publish_shm_t *ptr)
+static inline void ebpf_shm_release_publish(netdata_publish_shm_t *ptr)
 {
     freez(ptr);
 }

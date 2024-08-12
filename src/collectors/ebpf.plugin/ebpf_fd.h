@@ -100,12 +100,12 @@ enum fd_close_syscall {
     NETDATA_FD_CLOSE_END
 };
 
-static inline void *ebpf_fd_allocate_publish_fd()
+static inline void *ebpf_fd_allocate_publish()
 {
     return callocz(1, sizeof(netdata_publish_fd_stat_t));
 }
 
-static inline void *ebpf_fd_release_publish_fd(netdata_publish_fd_stat_t *ptr)
+static inline void ebpf_fd_release_publish(netdata_publish_fd_stat_t *ptr)
 {
     freez(ptr);
 }

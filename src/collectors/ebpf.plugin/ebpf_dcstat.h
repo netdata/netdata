@@ -102,7 +102,7 @@ static inline void *ebpf_dcallocate_publish()
     return callocz(1, sizeof(netdata_publish_dcstat_t));
 }
 
-static inline void *ebpf_dc_release_publish(netdata_publish_dcstat_t *ptr)
+static inline void ebpf_dc_release_publish(netdata_publish_dcstat_t *ptr)
 {
     freez(ptr);
 }
