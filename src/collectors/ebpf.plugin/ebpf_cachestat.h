@@ -48,14 +48,6 @@ enum cachestat_counters {
     NETDATA_CACHESTAT_END
 };
 
-enum cachestat_stats {
-    NETDATA_CACHESTAT_KEY_TOTAL,
-    NETDATA_CACHESTAT_KEY_MISSES,
-    NETDATA_CACHESTAT_KEY_DIRTY,
-
-    NETDATA_CACHESTAT_KEYS_END
-};
-
 enum cachestat_account_dirty_pages {
     NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY,
     NETDATA_CACHESTAT_SET_PAGE_DIRTY,
@@ -77,17 +69,25 @@ enum cachestat_tables {
     NETDATA_CACHESTAT_CTRL
 };
 
-typedef struct netdata_publish_cachestat_pid {
+typedef struct netdata_cachestat_pid {
     uint64_t ct;
     uint32_t tgid;
     uint32_t uid;
     uint32_t gid;
     char name[TASK_COMM_LEN];
 
-    int64_t total;
-    int64_t misses;
-    uint64_t dirty;
+    uint64_t add_to_page_cache_lru;
+    uint64_t mark_page_accessed;
+    uint64_t account_page_dirtied;
+    uint64_t mark_buffer_dirty;
 } netdata_cachestat_pid_t;
+
+typedef struct netdata_cachestat {
+    uint64_t add_to_page_cache_lru;
+    uint64_t mark_page_accessed;
+    uint64_t account_page_dirtied;
+    uint64_t mark_buffer_dirty;
+} netdata_cachestat_t;
 
 typedef struct netdata_publish_cachestat {
     uint64_t ct;
@@ -97,8 +97,19 @@ typedef struct netdata_publish_cachestat {
     long long hit;
     long long miss;
 
-    netdata_cachestat_pid_t current;
+    netdata_cachestat_t current;
+    netdata_cachestat_t prev;
 } netdata_publish_cachestat_t;
+
+static inline void *ebpf_cachestat_allocate_publish()
+{
+    return callocz(1, sizeof(netdata_publish_cachestat_t));
+}
+
+static inline void ebpf_cachestat_release_publish(netdata_publish_cachestat_t *ptr)
+{
+    freez(ptr);
+}
 
 void *ebpf_cachestat_thread(void *ptr);
 void ebpf_cachestat_release(netdata_publish_cachestat_t *stat);

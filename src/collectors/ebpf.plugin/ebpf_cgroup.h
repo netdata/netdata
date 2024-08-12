@@ -20,7 +20,7 @@ struct pid_on_target2 {
     netdata_dcstat_pid_t dc;
     netdata_publish_shm_t shm;
     netdata_socket_t socket;
-    netdata_cachestat_pid_t cachestat;
+    netdata_publish_cachestat_t cachestat;
 
     struct pid_on_target2 *next;
 };

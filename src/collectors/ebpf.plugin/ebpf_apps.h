@@ -134,8 +134,8 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
     netdata_publish_shm_t *shm; // this has a leak issue
     netdata_publish_dcstat_t *dc;
     netdata_publish_vfs_t *vfs;
-    /*
     netdata_publish_cachestat_t *cachestat;
+    /*
     ebpf_process_stat_t *process;
     ebpf_socket_publish_apps_t *socket;
      */
