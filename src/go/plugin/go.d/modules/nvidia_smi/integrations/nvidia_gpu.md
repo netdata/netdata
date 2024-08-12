@@ -24,8 +24,6 @@ Module: nvidia_smi
 This collector monitors GPUs performance metrics using
 the [nvidia-smi](https://developer.nvidia.com/nvidia-system-management-interface) CLI tool.
 
-> **Warning**: under development, [loop mode](https://github.com/netdata/netdata/issues/14522) not implemented yet.
-
 
 
 
@@ -119,11 +117,7 @@ There are no alerts configured by default for this integration.
 
 ### Prerequisites
 
-#### Enable in go.d.conf.
-
-This collector is disabled by default. You need to explicitly enable it in the `go.d.conf` file.
-
-
+No action required.
 
 ### Configuration
 
@@ -152,6 +146,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | binary_path | Path to nvidia_smi binary. The default is "nvidia_smi" and the executable is looked for in the directories specified in the PATH environment variable. | nvidia_smi | no |
 | timeout | nvidia_smi binary execution timeout. | 2 | no |
+| loop_mode | When enabled, `nvidia-smi` is executed continuously in a separate thread using the `-l` option. | yes | no |
 
 </details>
 
