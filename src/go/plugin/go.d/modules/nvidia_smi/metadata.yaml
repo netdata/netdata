@@ -73,6 +73,10 @@ modules:
               description: nvidia_smi binary execution timeout.
               default_value: 2
               required: false
+            - name: loop_mode
+              description: "When enabled, `nvidia-smi` is executed continuously in a separate thread using the `-l` option."
+              default_value: true
+              required: false
         examples:
           folding:
             title: Config

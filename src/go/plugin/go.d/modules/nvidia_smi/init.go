@@ -18,5 +18,5 @@ func (nv *NvidiaSmi) initNvidiaSmiExec() (nvidiaSmiBinary, error) {
 		binPath = path
 	}
 
-	return newNvidiaSmiExec(binPath, nv.Config, nv.Logger)
+	return newNvidiaSmiBinary(binPath, nv.Config, nv.Logger)
 }
