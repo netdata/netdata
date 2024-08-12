@@ -1115,65 +1115,41 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
  */
 void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
 {
-    if (unlikely(!ebpf_all_pids))
+    if (tbl_pid_stats_fd == -1)
         return;
 
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids; // global list of all processes running
-    while (pids) {
-        if (pids->updated_twice) {
-            pids->read = 0; // mark it as not read, so that collect_data_for_pid() will read it
-            pids->updated = 0;
-            pids->merged = 0;
-            pids->children_count = 0;
-            pids->parent = NULL;
-        } else {
-            if (pids->updated)
-                pids->updated_twice = 1;
-        }
-
-        pids = pids->next;
-    }
-
-    if (ebpf_read_proc_filesystem())
-        return;
-
-    pids = ebpf_root_of_pids; // global list of all processes running
+    size_t length =  sizeof(ebpf_process_stat_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
 
     if (tbl_pid_stats_fd != -1) {
-        size_t length =  sizeof(ebpf_process_stat_t);
-        if (maps_per_core)
-            length *= ebpf_nprocs;
 
         uint32_t key = 0, next_key = 0;
         while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, 0);
-            if (!local_pid)
-                goto end_process_loop;
-
-            ebpf_process_stat_t *w = &local_pid->process;
             if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
                 goto end_process_loop;
             }
 
             ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
 
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, 0, NULL);
+            ebpf_publish_process_t *w = local_pid->process;
+            if (!w)
+                local_pid->process = w = ebpf_process_allocate_publish();
+
             memcpy(w, process_stat_vector, sizeof(ebpf_process_stat_t));
+            w->create_thread = process_stat_vector[0].create_thread;
+            w->exit_call = process_stat_vector[0].exit_call;
+            w->create_thread = process_stat_vector[0].create_thread;
+            w->create_process = process_stat_vector[0].create_process;
+            w->release_call = process_stat_vector[0].release_call;
+            w->task_err = process_stat_vector[0].task_err;
 
 end_process_loop:
             memset(process_stat_vector, 0, length);
             key = next_key;
         }
     }
-
-    link_all_processes_to_their_parents();
-
-    apply_apps_groups_targets_inheritance();
-
-    apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
-
-    // this has to be done, before the cleanup
-    // // concentrate everything on the targets
-    post_aggregate_targets(apps_groups_root_target);
 
     struct ebpf_target *w;
     for (w = apps_groups_root_target; w; w = w->next) {
@@ -1182,6 +1158,7 @@ end_process_loop:
 
         ebpf_process_sum_values_for_pids(&w->process, w->root_pid);
     }
+
 }
 
 /**

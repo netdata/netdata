@@ -67,6 +67,29 @@ typedef struct ebpf_process_stat {
     uint8_t removeme;
 } ebpf_process_stat_t;
 
+typedef struct __attribute__((packed)) ebpf_publish_process {
+    uint64_t ct;
+
+    //Counter
+    uint32_t exit_call;
+    uint32_t release_call;
+    uint32_t create_process;
+    uint32_t create_thread;
+
+    //Counter
+    uint32_t task_err;
+} ebpf_publish_process_t;
+
+static inline void *ebpf_process_allocate_publish()
+{
+    return callocz(1, sizeof(ebpf_publish_process_t));
+}
+
+static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
+{
+    freez(ptr);
+}
+
 // ----------------------------------------------------------------------------
 // pid_stat
 //
@@ -135,8 +158,8 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
     netdata_publish_dcstat_t *dc;
     netdata_publish_vfs_t *vfs;
     netdata_publish_cachestat_t *cachestat;
+    ebpf_publish_process_t *process;
     /*
-    ebpf_process_stat_t *process;
     ebpf_socket_publish_apps_t *socket;
      */
 
