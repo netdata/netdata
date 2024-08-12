@@ -6,7 +6,14 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18308](https://github.com/netdata/netdata/pull/18308) ([netdatabot](https://github.com/netdatabot))
+- add go.d/exim [\#18306](https://github.com/netdata/netdata/pull/18306) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/exim [\#18305](https://github.com/netdata/netdata/pull/18305) ([ilyam8](https://github.com/ilyam8))
+- add exim to ndsudo [\#18304](https://github.com/netdata/netdata/pull/18304) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18303](https://github.com/netdata/netdata/pull/18303) ([netdatabot](https://github.com/netdatabot))
+- add go.d/nsd [\#18302](https://github.com/netdata/netdata/pull/18302) ([ilyam8](https://github.com/ilyam8))
 - add nsd-control to ndsudo [\#18301](https://github.com/netdata/netdata/pull/18301) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/nsd [\#18300](https://github.com/netdata/netdata/pull/18300) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18299](https://github.com/netdata/netdata/pull/18299) ([netdatabot](https://github.com/netdatabot))
 - go.d gearman fix meta [\#18298](https://github.com/netdata/netdata/pull/18298) ([ilyam8](https://github.com/ilyam8))
 - add go.d/gearman [\#18294](https://github.com/netdata/netdata/pull/18294) ([ilyam8](https://github.com/ilyam8))
@@ -408,13 +415,6 @@
 - go.d systemdunits add "skip\_transient" [\#17725](https://github.com/netdata/netdata/pull/17725) ([ilyam8](https://github.com/ilyam8))
 - minor fix on link [\#17722](https://github.com/netdata/netdata/pull/17722) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#17721](https://github.com/netdata/netdata/pull/17721) ([netdatabot](https://github.com/netdatabot))
-- PR to change absolute links to relative [\#17720](https://github.com/netdata/netdata/pull/17720) ([Ancairon](https://github.com/Ancairon))
-- Change links to relative links in one doc [\#17719](https://github.com/netdata/netdata/pull/17719) ([Ancairon](https://github.com/Ancairon))
-- fix proc plugin disk\_avgsz [\#17718](https://github.com/netdata/netdata/pull/17718) ([ilyam8](https://github.com/ilyam8))
-- go.d weblog ignore reqProcTime on HTTP 101 [\#17717](https://github.com/netdata/netdata/pull/17717) ([ilyam8](https://github.com/ilyam8))
-- Fix mongodb default config indentation [\#17715](https://github.com/netdata/netdata/pull/17715) ([louis-lau](https://github.com/louis-lau))
-- Fix compilation with disable-cloud [\#17714](https://github.com/netdata/netdata/pull/17714) ([stelfrag](https://github.com/stelfrag))
-- fix on link [\#17712](https://github.com/netdata/netdata/pull/17712) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
