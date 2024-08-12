@@ -2447,13 +2447,13 @@ install(FILES
         DESTINATION usr/lib/netdata/system/launchd)
 
 configure_file(system/freebsd/rc.d/netdata.in system/freebsd/rc.d/netdata @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/freebsd/rc.d/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/freebsd/rc.d)
 
 configure_file(system/initd/init.d/netdata.in system/initd/init.d/netdata @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/initd/init.d/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/initd/init.d)
@@ -2469,7 +2469,7 @@ install(FILES
         DESTINATION etc/logrotate.d)
 
 configure_file(system/lsb/init.d/netdata.in system/lsb/init.d/netdata @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/lsb/init.d/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/lsb/init.d)
@@ -2481,13 +2481,13 @@ install(FILES
         DESTINATION usr/lib/netdata/system/openrc/conf.d)
 
 configure_file(system/openrc/init.d/netdata.in system/openrc/init.d/netdata @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/openrc/init.d/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/openrc/init.d)
 
 configure_file(system/runit/run.in system/runit/run @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/runit/run
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/runit)
