@@ -43,10 +43,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - title: Enable in go.d.conf.
-            description: |
-              This collector is disabled by default. You need to explicitly enable it in the `go.d.conf` file.
+        list: []
       configuration:
         file:
           name: go.d/nvidia_smi.conf

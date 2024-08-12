@@ -18,7 +18,6 @@ func init() {
 	module.Register("nvidia_smi", module.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: module.Defaults{
-			Disabled:    true,
 			UpdateEvery: 10,
 		},
 		Create: func() module.Module { return New() },
