@@ -29,7 +29,8 @@ func init() {
 func New() *NvidiaSmi {
 	return &NvidiaSmi{
 		Config: Config{
-			Timeout: web.Duration(time.Second * 10),
+			Timeout:  web.Duration(time.Second * 10),
+			LoopMode: true,
 		},
 		binName: "nvidia-smi",
 		charts:  &module.Charts{},
@@ -43,6 +44,7 @@ type Config struct {
 	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
 	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	BinaryPath  string       `yaml:"binary_path" json:"binary_path"`
+	LoopMode    bool         `yaml:"loop_mode,omitempty" json:"loop_mode"`
 }
 
 type NvidiaSmi struct {
@@ -103,4 +105,11 @@ func (nv *NvidiaSmi) Collect() map[string]int64 {
 	return mx
 }
 
-func (nv *NvidiaSmi) Cleanup() {}
+func (nv *NvidiaSmi) Cleanup() {
+	if nv.exec != nil {
+		if err := nv.exec.stop(); err != nil {
+			nv.Errorf("cleanup: %v", err)
+		}
+		nv.exec = nil
+	}
+}
