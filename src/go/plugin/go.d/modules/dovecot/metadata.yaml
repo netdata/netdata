@@ -1,0 +1,194 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-dovecot
+      plugin_name: go.d.plugin
+      module_name: dovecot
+      monitored_instance:
+        name: Dovecot
+        link: 'https://www.dovecot.org/'
+        categories:
+          - data-collection.mail-servers
+        icon_filename: "dovecot.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - dovecot
+        - imap
+        - mail
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Dovecot metrics about sessions, logins, commands, page faults and more.
+        method_description: |
+          It reads the server's response to the `EXPORT\tglobal\n` command.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            Automatically discovers and collects Dovecot statistics from the following default locations:
+
+            - localhost:24242
+            - unix:///var/run/dovecot/old-stats
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable old_stats plugin
+            description: |
+              To enable `old_stats` plugin, see [Old Statistics](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics).
+      configuration:
+        file:
+          name: go.d/dovecot.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: "The Unix or TCP socket address where the Dovecot [old_stats](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics) plugin listens for connections."
+              default_value: 127.0.0.1:24242
+              required: true
+            - name: timeout
+              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic (TCP)
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:24242
+            - name: Basic (UNIX)
+              description: A basic example configuration using a UNIX socket.
+              config: |
+                jobs:
+                  - name: local
+                    address: unix:///var/run/dovecot/old-stats
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:24242
+
+                  - name: remote
+                    address: 203.0.113.0:24242
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: dovecot.session
+              description: Dovecot Active Sessions
+              unit: "sessions"
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: dovecot.logins
+              description: Dovecot Logins
+              unit: "logins"
+              chart_type: line
+              dimensions:
+                - name: logins
+            - name: dovecot.auth
+              description: Dovecot Authentications
+              unit: "attempts/s"
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: failed
+            - name: dovecot.commands
+              description: Dovecot Commands
+              unit: "commands"
+              chart_type: line
+              dimensions:
+                - name: commands
+            - name: dovecot.context_switches
+              description: Dovecot Context Switches
+              unit: "switches/s"
+              chart_type: line
+              dimensions:
+                - name: voluntary
+                - name: voluntary
+            - name: dovecot.io
+              description: Dovecot Disk I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: dovecot.net
+              description: Dovecot Network Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: dovecot.syscalls
+              description: Dovecot Number of SysCalls
+              unit: "syscalls/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: dovecot.lookup
+              description: Dovecot Lookups
+              unit: "lookups/s"
+              chart_type: stacked
+              dimensions:
+                - name: path
+                - name: attr
+            - name: dovecot.cache
+              description: Dovecot Cache Hits
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+            - name: dovecot.auth_cache
+              description: Dovecot Authentication Cache
+              unit: "requests/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses

@@ -25,6 +25,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/docker"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/docker_engine"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/dockerhub"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/dovecot"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/elasticsearch"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/envoy"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/example"
