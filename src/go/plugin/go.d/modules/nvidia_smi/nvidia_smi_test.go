@@ -418,6 +418,10 @@ func (m *mockNvidiaSmi) queryGPUInfo() ([]byte, error) {
 	return m.gpuInfo, nil
 }
 
+func (m *mockNvidiaSmi) stop() error {
+	return nil
+}
+
 func prepareCaseMIGA100(nv *NvidiaSmi) {
 	nv.exec = &mockNvidiaSmi{gpuInfo: dataXMLA100SXM4MIG}
 }
