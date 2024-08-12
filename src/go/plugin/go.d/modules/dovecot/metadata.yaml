@@ -35,9 +35,9 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            Automatically discovers and collects Dovecot statistics from the following default locations: 
+            Automatically discovers and collects Dovecot statistics from the following default locations:
 
-            - localhost:24242 
+            - localhost:24242
             - unix:///var/run/dovecot/old-stats
         limits:
           description: ""
