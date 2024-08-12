@@ -23,12 +23,6 @@
         "type": "number",
         "minimum": 0.5,
         "default": 10
-      },
-      "use_csv_format": {
-        "title": "Use CSV format",
-        "description": "Determines the format used for requesting GPU information. If set, CSV format is used, otherwise XML.",
-        "type": "boolean",
-        "default": false
       }
     },
     "required": [
