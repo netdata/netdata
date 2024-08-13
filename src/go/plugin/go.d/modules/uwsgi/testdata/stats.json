@@ -1,0 +1,117 @@
+{
+  "version": "2.1.21-debian",
+  "listen_queue": 1,
+  "listen_queue_errors": 1,
+  "signal_queue": 1,
+  "load": 1,
+  "pid": 859919,
+  "uid": 1111,
+  "gid": 1111,
+  "cwd": "/home/ilyam",
+  "locks": [
+    {
+      "user 1": 1
+    },
+    {
+      "signal": 1
+    },
+    {
+      "filemon": 1
+    },
+    {
+      "timer": 1
+    },
+    {
+      "rbtimer": 1
+    },
+    {
+      "cron": 1
+    },
+    {
+      "rpc": 1
+    },
+    {
+      "snmp": 1
+    }
+  ],
+  "sockets": [
+    {
+      "name": ":3131",
+      "proto": "uwsgi",
+      "queue": 1,
+      "max_queue": 111,
+      "shared": 1,
+      "can_offload": 1
+    }
+  ],
+  "workers": [
+    {
+      "id": 1,
+      "pid": 859911,
+      "accepting": 1,
+      "requests": 1,
+      "delta_requests": 1,
+      "exceptions": 1,
+      "harakiri_count": 1,
+      "signals": 1,
+      "signal_queue": 1,
+      "status": "idle",
+      "rss": 1,
+      "vsz": 1,
+      "running_time": 1,
+      "last_spawn": 1723542786,
+      "respawn_count": 1,
+      "tx": 1,
+      "avg_rt": 1,
+      "apps": [],
+      "cores": [
+        {
+          "id": 1,
+          "requests": 1,
+          "static_requests": 1,
+          "routed_requests": 1,
+          "offloaded_requests": 1,
+          "write_errors": 1,
+          "read_errors": 1,
+          "in_request": 1,
+          "vars": [],
+          "req_info": {}
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "pid": 859911,
+      "accepting": 1,
+      "requests": 1,
+      "delta_requests": 1,
+      "exceptions": 1,
+      "harakiri_count": 1,
+      "signals": 1,
+      "signal_queue": 1,
+      "status": "idle",
+      "rss": 1,
+      "vsz": 1,
+      "running_time": 1,
+      "last_spawn": 1723542786,
+      "respawn_count": 1,
+      "tx": 1,
+      "avg_rt": 1,
+      "apps": [],
+      "cores": [
+        {
+          "id": 1,
+          "requests": 1,
+          "static_requests": 1,
+          "routed_requests": 1,
+          "offloaded_requests": 1,
+          "write_errors": 1,
+          "read_errors": 1,
+          "in_request": 1,
+          "vars": [],
+          "req_info": {}
+        }
+      ]
+    }
+  ]
+}
