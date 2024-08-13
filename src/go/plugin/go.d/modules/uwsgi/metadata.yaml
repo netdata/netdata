@@ -213,4 +213,3 @@ modules:
               chart_type: area
               dimensions:
                 - name: vsz
-
