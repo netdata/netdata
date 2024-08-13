@@ -697,6 +697,8 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p)
     if (!p->target)
         assign_target_to_pid(p);
 
+    p->cmdline = NULL;
+
     if (unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
         debug_log_int(
             "READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s'",

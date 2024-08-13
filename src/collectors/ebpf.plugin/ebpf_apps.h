@@ -44,6 +44,35 @@
 
 #define EBPF_CLEANUP_FACTOR 2
 
+enum ebpf_main_index {
+    EBPF_MODULE_PROCESS_IDX,
+    EBPF_MODULE_SOCKET_IDX,
+    EBPF_MODULE_CACHESTAT_IDX,
+    EBPF_MODULE_SYNC_IDX,
+    EBPF_MODULE_DCSTAT_IDX,
+    EBPF_MODULE_SWAP_IDX,
+    EBPF_MODULE_VFS_IDX,
+    EBPF_MODULE_FILESYSTEM_IDX,
+    EBPF_MODULE_DISK_IDX,
+    EBPF_MODULE_MOUNT_IDX,
+    EBPF_MODULE_FD_IDX,
+    EBPF_MODULE_HARDIRQ_IDX,
+    EBPF_MODULE_SOFTIRQ_IDX,
+    EBPF_MODULE_OOMKILL_IDX,
+    EBPF_MODULE_SHM_IDX,
+    EBPF_MODULE_MDFLUSH_IDX,
+    EBPF_MODULE_FUNCTION_IDX,
+    /* THREADS MUST BE INCLUDED BEFORE THIS COMMENT */
+    EBPF_OPTION_ALL_CHARTS,
+    EBPF_OPTION_VERSION,
+    EBPF_OPTION_HELP,
+    EBPF_OPTION_GLOBAL_CHART,
+    EBPF_OPTION_RETURN_MODE,
+    EBPF_OPTION_LEGACY,
+    EBPF_OPTION_CORE,
+    EBPF_OPTION_UNITTEST
+};
+
 // ----------------------------------------------------------------------------
 // Structures used to read information from kernel ring
 typedef struct ebpf_process_stat {
@@ -254,9 +283,11 @@ static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
 }
 
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx) {
+    // To add pids to target here will do host very slow
+
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
     ptr->thread_collecting |= 1<<idx;
-    if (ptr->pid == pid) {
+    if (ptr->pid == pid && ptr->comm[0] && ptr->target) {
         return ptr;
     }
 
@@ -266,11 +297,14 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
     if (name)
         strncpyz(ptr->comm, name, EBPF_MAX_COMPARE_NAME);
 
-    if (likely(ebpf_pids_link_list))
-        ebpf_pids_link_list->prev = ptr;
+    if (idx == EBPF_OPTION_ALL_CHARTS) {
+        // We can only use this with /proc files, because data from hash table can use almost 100% of CPU
+        if (likely(ebpf_pids_link_list))
+            ebpf_pids_link_list->prev = ptr;
 
-    ptr->next = ebpf_pids_link_list;
-    ebpf_pids_link_list = ptr;
+        ptr->next = ebpf_pids_link_list;
+        ebpf_pids_link_list = ptr;
+    }
 
     ebpf_all_pids_count++;
 
