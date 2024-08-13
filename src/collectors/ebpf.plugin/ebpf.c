@@ -3413,6 +3413,11 @@ void ebpf_send_statistic_data()
     }
     ebpf_write_end_chart();
 
+    ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, "monitoring_pid", "");
+    write_chart_dimension("user", ebpf_all_pids_count);
+    write_chart_dimension("kernel", ebpf_hash_table_pids_count);
+    ebpf_write_end_chart();
+
     ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LIFE_TIME, "");
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
@@ -3485,6 +3490,37 @@ static void update_internal_metric_variable()
 }
 
 /**
+ * Create PIDS Chart
+ *
+ * Write to standard output current values for PIDSs charts.
+ *
+ * @param order        order to display chart
+ * @param update_every time used to update charts
+ */
+static void ebpf_create_pids_chart(int order, int update_every)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         "monitoring_pid",
+                         "",
+                         "Total pids monitored",
+                         "pids",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         "ebpf_pids",
+                         order,
+                         update_every,
+                         "main");
+
+    ebpf_write_global_dimension("user",
+                                "user",
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+
+    ebpf_write_global_dimension("kernel",
+                                "kernel",
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+}
+
+/**
  * Create Thread Chart
  *
  * Write to standard output current values for threads charts.
@@ -3533,7 +3569,7 @@ static void ebpf_create_thread_chart(char *name,
                                     (char *)em->info.thread_name,
                                     ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
     }
-}
+                                     }
 
 /**
  * Create chart for Load Thread
@@ -3735,6 +3771,8 @@ static void ebpf_create_statistic_charts(int update_every)
                              NETDATA_EBPF_ORDER_STAT_THREADS,
                              update_every,
                              NULL);
+
+    ebpf_create_pids_chart(NETDATA_EBPF_ORDER_PIDS, update_every);
 
     ebpf_create_thread_chart(NETDATA_EBPF_LIFE_TIME,
                              "Time remaining for thread.",
