@@ -1161,7 +1161,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Web server log files](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/weblog/integrations/web_server_log_files.md)
 
-- [uWSGI](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/uwsgi/integrations/uwsgi.md)
+- [uWSGI](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/uwsgi/integrations/uwsgi.md)
 
 ### Windows Systems
 
