@@ -558,7 +558,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
 
         ebpf_dcstat_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, cv->tgid, cv->name);
+        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, cv->tgid, cv->name, EBPF_MODULE_DCSTAT_IDX);
         netdata_publish_dcstat_t *publish = pid_stat->dc;
         if (!publish)
             pid_stat->dc = publish = ebpf_dcallocate_publish();
@@ -569,7 +569,6 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
             publish->curr.file_system = cv[0].file_system;
             publish->curr.cache_access = cv[0].cache_access;
 
-            pid_stat->thread_collecting |= 1<<EBPF_MODULE_DCSTAT_IDX;
             pid_stat->not_updated = 0;
         } else if (++pid_stat->not_updated >= max_period) {
             ebpf_release_pid_data(pid_stat, fd, key, EBPF_MODULE_DCSTAT_IDX);
@@ -597,7 +596,7 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
     memset(&publish->curr, 0, sizeof(netdata_publish_dcstat_pid_t));
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL);
+        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_DCSTAT_IDX);
         netdata_publish_dcstat_t *w = pid_stat->dc;
         if (!w)
             continue;
@@ -787,7 +786,7 @@ static void ebpf_update_dc_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_DCSTAT_IDX);
             if (!local_pid)
                 continue;
 

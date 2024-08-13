@@ -659,6 +659,7 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p)
     struct stat statbuf;
     if (stat(filename, &statbuf)) {
         p->has_proc_file = 0;
+        p->thread_collecting &= ~(1<<EBPF_OPTION_ALL_CHARTS);
         return 0;
     }
 
@@ -673,7 +674,12 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p)
         goto cleanup_pid_stat;
 
     char *comm = procfile_lineword(ff, 0, 1);
-    p->ppid = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
+    int32_t ppid = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
+
+    if (p->ppid == ppid && p->target)
+        goto without_cmdline_target;
+
+    p->ppid = ppid;
 
     char cmdline[MAX_CMDLINE + 1];
     p->cmdline = cmdline;
@@ -696,6 +702,7 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p)
             "READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s'",
             netdata_configured_host_prefix, p->pid, p->comm, (p->target) ? p->target->name : "UNSET");
 
+without_cmdline_target:
     p->has_proc_file = 1;
     p->not_updated = 0;
     ret = 1;
@@ -719,7 +726,7 @@ static inline int ebpf_collect_data_for_pid(pid_t pid)
         return 0;
     }
 
-    ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL);
+    ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL, EBPF_OPTION_ALL_CHARTS);
     read_proc_pid_stat(p);
 
     // check its parent pid
@@ -1133,7 +1140,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
 
             ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
 
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, 0, NULL);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, 0, NULL, EBPF_MODULE_PROCESS_IDX);
             ebpf_publish_process_t *w = local_pid->process;
             if (!w)
                 local_pid->process = w = ebpf_process_allocate_publish();

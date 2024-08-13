@@ -1753,7 +1753,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
 end_socket_loop:
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key.pid, 0, values[0].name);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key.pid, 0, values[0].name, EBPF_MODULE_SOCKET_IDX);
         ebpf_socket_publish_apps_t *curr = local_pid->socket;
         if (!curr)
             local_pid->socket = curr = ebpf_socket_allocate_publish();
@@ -1786,7 +1786,7 @@ void ebpf_socket_resume_apps_data()
         memset(&w->socket, 0, sizeof(ebpf_socket_publish_apps_t));
         while (move) {
             int32_t pid = move->pid;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SOCKET_IDX);
             ebpf_socket_publish_apps_t *ws = local_pid->socket;
             if (!ws)
                 continue;
@@ -2022,7 +2022,7 @@ static void ebpf_update_socket_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SOCKET_IDX);
             ebpf_socket_publish_apps_t *in = local_pid->socket;
             if (!in)
                 continue;

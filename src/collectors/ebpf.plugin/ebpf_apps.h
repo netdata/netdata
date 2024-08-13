@@ -253,8 +253,9 @@ static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
     freez(ptr);
 }
 
-static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name) {
+static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx) {
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
+    ptr->thread_collecting |= 1<<idx;
     if (ptr->pid == pid) {
         return ptr;
     }
