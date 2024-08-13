@@ -997,7 +997,7 @@ static inline void ebpf_create_apps_for_module(ebpf_module_t *em, struct ebpf_ta
  */
 static void ebpf_create_apps_charts(struct ebpf_target *root)
 {
-    if (unlikely(!ebpf_all_pids))
+    if (unlikely(!ebpf_pids))
         return;
 
     struct ebpf_target *w;
@@ -1029,21 +1029,15 @@ static void ebpf_create_apps_charts(struct ebpf_target *root)
         }
     }
 
-    int i;
-    if (!newly_added) {
+    if (newly_added) {
+        int i;
         for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
-            ebpf_module_t *current = &ebpf_modules[i];
-            if (current->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
+            if (!(collect_pids & (1<<i)))
                 continue;
 
+            ebpf_module_t *current = &ebpf_modules[i];
             ebpf_create_apps_for_module(current, root);
         }
-        return;
-    }
-
-    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
-        ebpf_module_t *current = &ebpf_modules[i];
-        ebpf_create_apps_for_module(current, root);
     }
 }
 
