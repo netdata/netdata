@@ -745,14 +745,13 @@ static inline int ebpf_collect_data_for_pid(pid_t pid)
  */
 static inline void link_all_processes_to_their_parents(void)
 {
-    struct ebpf_pid_stat *p, *pp;
+    ebpf_pid_data_t *p, *pp;
 
     // link all children to their parents
     // and update children count on parents
-    for (p = ebpf_root_of_pids; p; p = p->next) {
+    for (p = ebpf_pids_link_list; p; p = p->next) {
         // for each process found
 
-        p->sortlist = 0;
         p->parent = NULL;
 
         if (unlikely(!p->ppid)) {
@@ -760,16 +759,15 @@ static inline void link_all_processes_to_their_parents(void)
             continue;
         }
 
-        pp = ebpf_all_pids[p->ppid];
-        if (likely(pp)) {
+        pp = &ebpf_pids[p->ppid];
+        if (likely(pp->pid)) {
             p->parent = pp;
             pp->children_count++;
 
             if (unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
                 debug_log_int(
-                    "child %d (%s, %s) on target '%s' has parent %d (%s, %s).", p->pid, p->comm,
-                    p->updated ? "running" : "exited", (p->target) ? p->target->name : "UNSET", pp->pid, pp->comm,
-                    pp->updated ? "running" : "exited");
+                    "child %d (%s) on target '%s' has parent %d (%s).", p->pid, p->comm,
+                    (p->target) ? p->target->name : "UNSET", pp->pid, pp->comm);
         } else {
             p->parent = NULL;
             debug_log("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
@@ -782,7 +780,7 @@ static inline void link_all_processes_to_their_parents(void)
  */
 static void apply_apps_groups_targets_inheritance(void)
 {
-    struct ebpf_pid_stat *p = NULL;
+    struct ebpf_pid_data *p = NULL;
 
     // children that do not have a target
     // inherit their target from their parent
@@ -791,7 +789,7 @@ static void apply_apps_groups_targets_inheritance(void)
         if (unlikely(debug_enabled))
             loops++;
         found = 0;
-        for (p = ebpf_root_of_pids; p; p = p->next) {
+        for (p = ebpf_pids_link_list; p; p = p->next) {
             // if this process does not have a target
             // and it has a parent
             // and its parent has a target
@@ -817,7 +815,7 @@ static void apply_apps_groups_targets_inheritance(void)
             loops++;
         found = 0;
 
-        for (p = ebpf_root_of_pids; p; p = p->next) {
+        for (p = ebpf_pids_link_list; p; p = p->next) {
             if (unlikely(!p->sortlist && !p->children_count))
                 p->sortlist = sortlist++;
 
@@ -853,17 +851,15 @@ static void apply_apps_groups_targets_inheritance(void)
     }
 
     // init goes always to default target
-    if (ebpf_all_pids[INIT_PID])
-        ebpf_all_pids[INIT_PID]->target = apps_groups_default_target;
+    ebpf_pids[INIT_PID].target = apps_groups_default_target;
 
     // pid 0 goes always to default target
-    if (ebpf_all_pids[0])
-        ebpf_all_pids[0]->target = apps_groups_default_target;
+    ebpf_pids[0].target = apps_groups_default_target;
 
     // give a default target on all top level processes
     if (unlikely(debug_enabled))
         loops++;
-    for (p = ebpf_root_of_pids; p; p = p->next) {
+    for (p = ebpf_pids_link_list; p; p = p->next) {
         // if the process is not merged itself
         // then is is a top level process
         if (unlikely(!p->merged && !p->target))
@@ -874,8 +870,7 @@ static void apply_apps_groups_targets_inheritance(void)
             p->sortlist = sortlist++;
     }
 
-    if (ebpf_all_pids[1])
-        ebpf_all_pids[1]->sortlist = sortlist++;
+    ebpf_pids[1].sortlist = sortlist++;
 
     // give a target to all merged child processes
     found = 1;
@@ -883,7 +878,7 @@ static void apply_apps_groups_targets_inheritance(void)
         if (unlikely(debug_enabled))
             loops++;
         found = 0;
-        for (p = ebpf_root_of_pids; p; p = p->next) {
+        for (p = ebpf_pids_link_list; p; p = p->next) {
             if (unlikely(!p->target && p->merged && p->parent && p->parent->target)) {
                 p->target = p->parent->target;
                 found++;
@@ -1180,12 +1175,18 @@ void ebpf_parse_proc_files()
     ebpf_pid_data_t *pids = ebpf_pids_link_list;
     while (pids) {
         pids->not_updated = EBPF_CLEANUP_FACTOR;
+        pids->merged = 0;
+        pids->children_count = 0;
 
         pids = pids->next;
     }
 
     if (ebpf_read_proc_filesystem())
         return;
+
+    link_all_processes_to_their_parents();
+
+    apply_apps_groups_targets_inheritance();
 
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 

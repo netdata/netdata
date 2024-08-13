@@ -164,8 +164,12 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
 
     uint32_t has_proc_file;
     uint32_t not_updated;
+    int children_count;              // number of processes directly referencing this
+    int merged;
+    int sortlist; // higher numbers = top on the process tree
 
     struct ebpf_target *target; // the one that will be reported to netdata
+    struct ebpf_pid_data *parent;
     struct ebpf_pid_data *prev;
     struct ebpf_pid_data *next;
 
@@ -287,7 +291,7 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
 
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
     ptr->thread_collecting |= 1<<idx;
-    if (ptr->pid == pid && ptr->comm[0] && ptr->target) {
+    if (ptr->pid == pid) {
         return ptr;
     }
 
@@ -298,7 +302,7 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
         strncpyz(ptr->comm, name, EBPF_MAX_COMPARE_NAME);
 
     if (idx == EBPF_OPTION_ALL_CHARTS) {
-        // We can only use this with /proc files, because data from hash table can use almost 100% of CPU
+        // We are going to use only with pids listed in /proc, other PIDs are associated to it
         if (likely(ebpf_pids_link_list))
             ebpf_pids_link_list->prev = ptr;
 
