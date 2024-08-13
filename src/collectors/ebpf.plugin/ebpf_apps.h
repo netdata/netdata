@@ -391,7 +391,7 @@ int ebpf_read_hash_table(void *ep, int fd, uint32_t pid);
 
 int get_pid_comm(pid_t pid, size_t n, char *dest);
 
-void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core);
+void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core, int max_period);
 void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
 
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,

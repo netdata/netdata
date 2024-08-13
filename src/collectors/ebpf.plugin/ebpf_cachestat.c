@@ -841,7 +841,7 @@ void *ebpf_read_cachestat_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
-    int max_period = update_every * EBPF_CLEANUP_FACTOR;
+    int max_period = EBPF_CLEANUP_FACTOR;
 
     int counter = update_every - 1;
 

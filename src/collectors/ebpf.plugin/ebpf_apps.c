@@ -1120,8 +1120,9 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
  *
  * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
  * @param maps_per_core         do I have hash maps per core?
+ * @param max_period            max period to wait before remove from hash table.
  */
-void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
+void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core, int max_period)
 {
     if (tbl_pid_stats_fd == -1)
         return;
