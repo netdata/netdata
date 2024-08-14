@@ -1507,8 +1507,6 @@ set(ACLK_PROTO_DEFS
 )
 
 set(ACLK_FILES
-        src/aclk/aclk_stats.c
-        src/aclk/aclk_stats.h
         src/aclk/aclk_query.c
         src/aclk/aclk_query.h
         src/aclk/aclk_query_queue.c

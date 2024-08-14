@@ -3,6 +3,11 @@
 #include "sqlite_functions.h"
 #include "sqlite_aclk.h"
 
+void sanity_check(void) {
+    // make sure the compiler will stop on misconfigurations
+    BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < ACLK_MAX_ENUMERATIONS_DEFINED);
+}
+
 #include "sqlite_aclk_node.h"
 #include "../aclk_query_queue.h"
 #include "../aclk_query.h"
@@ -18,11 +23,6 @@ struct aclk_sync_config_s {
     SPINLOCK cmd_queue_lock;
     struct aclk_database_cmd *cmd_base;
 } aclk_sync_config = { 0 };
-
-void sanity_check(void) {
-    // make sure the compiler will stop on misconfigurations
-    BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < ACLK_MAX_ENUMERATIONS_DEFINED);
-}
 
 static struct aclk_database_cmd aclk_database_deq_cmd(void)
 {
