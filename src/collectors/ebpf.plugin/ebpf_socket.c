@@ -1752,7 +1752,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         rw_spinlock_write_unlock(&pid_ptr->socket_stats.rw_spinlock);
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-end_socket_loop:
+end_socket_loop: ; // the empty statement is here to allow code to be compiled by old compilers
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key.pid, 0, values[0].name, EBPF_MODULE_SOCKET_IDX);
         ebpf_socket_publish_apps_t *curr = local_pid->socket;
         if (!curr)
