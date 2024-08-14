@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18328](https://github.com/netdata/netdata/pull/18328) ([netdatabot](https://github.com/netdatabot))
+- add go.d/uwsgi [\#18326](https://github.com/netdata/netdata/pull/18326) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/uwsgi [\#18325](https://github.com/netdata/netdata/pull/18325) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18324](https://github.com/netdata/netdata/pull/18324) ([netdatabot](https://github.com/netdatabot))
 - remove python.d/dovecot [\#18322](https://github.com/netdata/netdata/pull/18322) ([ilyam8](https://github.com/ilyam8))
 - add go.d dovecot [\#18321](https://github.com/netdata/netdata/pull/18321) ([ilyam8](https://github.com/ilyam8))
@@ -412,9 +415,6 @@
 - remove unused go.d/prometheus meta file [\#17749](https://github.com/netdata/netdata/pull/17749) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17748](https://github.com/netdata/netdata/pull/17748) ([netdatabot](https://github.com/netdatabot))
 - Use semver releases with sentry. [\#17746](https://github.com/netdata/netdata/pull/17746) ([vkalintiris](https://github.com/vkalintiris))
-- add go.d clickhouse [\#17743](https://github.com/netdata/netdata/pull/17743) ([ilyam8](https://github.com/ilyam8))
-- fix clickhouse in apps groups [\#17742](https://github.com/netdata/netdata/pull/17742) ([ilyam8](https://github.com/ilyam8))
-- fix ebpf cgroup swap context [\#17740](https://github.com/netdata/netdata/pull/17740) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
