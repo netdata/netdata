@@ -1,3 +1,9 @@
+@PKG_NAME@ (3-3) unstable; urgency=medium
+
+  * Version bump to keep in sync with RPM repo packages
+
+ -- Netdata Builder <bot@netdata.cloud>  Fri, 9 Aug 2024 09:37:00 -0400
+
 @PKG_NAME@ (3-2) unstable; urgency=medium
 
   * Version bump to keep in sync with RPM repo packages

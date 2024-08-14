@@ -1,0 +1,215 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-uwsgi
+      plugin_name: go.d.plugin
+      module_name: uwsgi
+      monitored_instance:
+        name: uWSGI
+        link: https://uwsgi-docs.readthedocs.io/en/latest/
+        categories:
+          - data-collection.web-servers-and-web-proxies
+        icon_filename: "uwsgi.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - application server
+        - python
+        - web applications
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitors UWSGI worker health and performance by collecting metrics like requests, transmitted data, exceptions, and harakiris.
+        method_description: |
+          It fetches [Stats Server](https://uwsgi-docs.readthedocs.io/en/latest/StatsServer.html) statistics over TCP.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            Automatically discovers and collects UWSGI statistics from the following default locations:
+
+            - localhost:1717
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable the uWSGI Stats Server
+            description: |
+              See [Stats Server](https://uwsgi-docs.readthedocs.io/en/latest/StatsServer.html) for details.
+      configuration:
+        file:
+          name: go.d/uwsgi.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: "The IP address and port where the UWSGI [Stats Server](https://uwsgi-docs.readthedocs.io/en/latest/StatsServer.html) listens for connections."
+              default_value: 127.0.0.1:1717
+              required: true
+            - name: timeout
+              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:1717
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:1717
+
+                  - name: remote
+                    address: 203.0.113.0:1717
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: uwsgi.transmitted_data
+              description: UWSGI Transmitted Data
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: tx
+            - name: uwsgi.requests
+              description: UWSGI Requests
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: uwsgi.harakiris
+              description: UWSGI Dropped Requests
+              unit: "harakiris/s"
+              chart_type: line
+              dimensions:
+                - name: harakiris
+            - name: uwsgi.respawns
+              description: UWSGI Respawns
+              unit: "respawns/s"
+              chart_type: line
+              dimensions:
+                - name: respawns
+        - name: worker
+          description: "These metrics refer to the Worker process."
+          labels:
+            - name: "worker_id"
+              description: Worker ID.
+          metrics:
+            - name: uwsgi.worker_transmitted_data
+              description: UWSGI Worker Transmitted Data
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: tx
+            - name: uwsgi.worker_requests
+              description: UWSGI Worker Requests
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: uwsgi.worker_delta_requests
+              description: UWSGI Worker Delta Requests
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: delta_requests
+            - name: uwsgi.worker_average_request_time
+              description: UWSGI Worker Average Request Time
+              unit: "milliseconds"
+              chart_type: line
+              dimensions:
+                - name: avg
+            - name: uwsgi.worker_harakiris
+              description: UWSGI Worker Dropped Requests
+              unit: "harakiris/s"
+              chart_type: line
+              dimensions:
+                - name: harakiris
+            - name: uwsgi.worker_exceptions
+              description: UWSGI Worker Raised Exceptions
+              unit: "exceptions/s"
+              chart_type: line
+              dimensions:
+                - name: exceptions
+            - name: uwsgi.worker_status
+              description: UWSGI Worker Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: idle
+                - name: busy
+                - name: cheap
+                - name: pause
+                - name: sig
+            - name: uwsgi.worker_request_handling_status
+              description: UWSGI Worker Request Handling Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: accepting
+                - name: not_accepting
+            - name: uwsgi.worker_respawns
+              description: UWSGI Worker Respawns
+              unit: "respawns/s"
+              chart_type: line
+              dimensions:
+                - name: respawns
+            - name: uwsgi.worker_memory_rss
+              description: UWSGI Worker Memory RSS (Resident Set Size)
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: rss
+            - name: uwsgi.worker_memory_vsz
+              description: UWSGI Worker Memory VSZ (Virtual Memory Size)
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: vsz

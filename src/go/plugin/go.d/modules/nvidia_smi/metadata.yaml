@@ -25,8 +25,6 @@ modules:
         metrics_description: |
           This collector monitors GPUs performance metrics using
           the [nvidia-smi](https://developer.nvidia.com/nvidia-system-management-interface) CLI tool.
-          
-          > **Warning**: under development, [loop mode](https://github.com/netdata/netdata/issues/14522) not implemented yet.
         method_description: ""
       supported_platforms:
         include: []
@@ -43,10 +41,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - title: Enable in go.d.conf.
-            description: |
-              This collector is disabled by default. You need to explicitly enable it in the `go.d.conf` file.
+        list: []
       configuration:
         file:
           name: go.d/nvidia_smi.conf
@@ -73,26 +68,15 @@ modules:
               description: nvidia_smi binary execution timeout.
               default_value: 2
               required: false
-            - name: use_csv_format
-              description: Used format when requesting GPU information. XML is used if set to 'no'.
-              default_value: false
+            - name: loop_mode
+              description: "When enabled, `nvidia-smi` is executed continuously in a separate thread using the `-l` option."
+              default_value: true
               required: false
-              details: |
-                This module supports data collection in CSV and XML formats. The default is XML.
-                
-                - XML provides more metrics, but requesting GPU information consumes more CPU, especially if there are multiple GPUs in the system.
-                - CSV provides fewer metrics, but is much lighter than XML in terms of CPU usage.
         examples:
           folding:
             title: Config
             enabled: true
           list:
-            - name: CSV format
-              description: Use CSV format when requesting GPU information.
-              config: |
-                jobs:
-                  - name: nvidia_smi
-                    use_csv_format: yes
             - name: Custom binary path
               description: The executable is not in the directories specified in the PATH environment variable.
               config: |
@@ -108,9 +92,7 @@ modules:
         title: Metrics
         enabled: false
       description: ""
-      availability:
-        - XML
-        - CSV
+      availability: []
       scopes:
         - name: gpu
           description: These metrics refer to the GPU.
@@ -121,8 +103,6 @@ modules:
               description: GPU product name (e.g. NVIDIA A100-SXM4-40GB)
           metrics:
             - name: nvidia_smi.gpu_pcie_bandwidth_usage
-              availability:
-                - XML
               description: PCI Express Bandwidth Usage
               unit: B/s
               chart_type: line
@@ -130,8 +110,6 @@ modules:
                 - name: rx
                 - name: tx
             - name: nvidia_smi.gpu_pcie_bandwidth_utilization
-              availability:
-                - XML
               description: PCI Express Bandwidth Utilization
               unit: '%'
               chart_type: line
@@ -139,52 +117,36 @@ modules:
                 - name: rx
                 - name: tx
             - name: nvidia_smi.gpu_fan_speed_perc
-              availability:
-                - XML
-                - CSV
               description: Fan speed
               unit: '%'
               chart_type: line
               dimensions:
                 - name: fan_speed
             - name: nvidia_smi.gpu_utilization
-              availability:
-                - XML
-                - CSV
               description: GPU utilization
               unit: '%'
               chart_type: line
               dimensions:
                 - name: gpu
             - name: nvidia_smi.gpu_memory_utilization
-              availability:
-                - XML
-                - CSV
               description: Memory utilization
               unit: '%'
               chart_type: line
               dimensions:
                 - name: memory
             - name: nvidia_smi.gpu_decoder_utilization
-              availability:
-                - XML
               description: Decoder utilization
               unit: '%'
               chart_type: line
               dimensions:
                 - name: decoder
             - name: nvidia_smi.gpu_encoder_utilization
-              availability:
-                - XML
               description: Encoder utilization
               unit: '%'
               chart_type: line
               dimensions:
                 - name: encoder
             - name: nvidia_smi.gpu_frame_buffer_memory_usage
-              availability:
-                - XML
-                - CSV
               description: Frame buffer memory usage
               unit: B
               chart_type: stacked
@@ -193,8 +155,6 @@ modules:
                 - name: used
                 - name: reserved
             - name: nvidia_smi.gpu_bar1_memory_usage
-              availability:
-                - XML
               description: BAR1 memory usage
               unit: B
               chart_type: stacked
@@ -202,26 +162,18 @@ modules:
                 - name: free
                 - name: used
             - name: nvidia_smi.gpu_temperature
-              availability:
-                - XML
-                - CSV
               description: Temperature
               unit: Celsius
               chart_type: line
               dimensions:
                 - name: temperature
             - name: nvidia_smi.gpu_voltage
-              availability:
-                - XML
               description: Voltage
               unit: V
               chart_type: line
               dimensions:
                 - name: voltage
             - name: nvidia_smi.gpu_clock_freq
-              availability:
-                - XML
-                - CSV
               description: Clock current frequency
               unit: MHz
               chart_type: line
@@ -231,26 +183,18 @@ modules:
                 - name: sm
                 - name: mem
             - name: nvidia_smi.gpu_power_draw
-              availability:
-                - XML
-                - CSV
               description: Power draw
               unit: Watts
               chart_type: line
               dimensions:
                 - name: power_draw
             - name: nvidia_smi.gpu_performance_state
-              availability:
-                - XML
-                - CSV
               description: Performance state
               unit: state
               chart_type: line
               dimensions:
                 - name: P0-P15
             - name: nvidia_smi.gpu_mig_mode_current_status
-              availability:
-                - XML
               description: MIG current mode
               unit: status
               chart_type: line
@@ -258,8 +202,6 @@ modules:
                 - name: enabled
                 - name: disabled
             - name: nvidia_smi.gpu_mig_devices_count
-              availability:
-                - XML
               description: MIG devices
               unit: devices
               chart_type: line
@@ -276,8 +218,6 @@ modules:
               description: GPU instance id (e.g. 1)
           metrics:
             - name: nvidia_smi.gpu_mig_frame_buffer_memory_usage
-              availability:
-                - XML
               description: Frame buffer memory usage
               unit: B
               chart_type: stacked
@@ -286,8 +226,6 @@ modules:
                 - name: used
                 - name: reserved
             - name: nvidia_smi.gpu_mig_bar1_memory_usage
-              availability:
-                - XML
               description: BAR1 memory usage
               unit: B
               chart_type: stacked

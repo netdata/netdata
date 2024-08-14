@@ -28,6 +28,17 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
     "label_value text, date_created int, PRIMARY KEY (chart_id, label_key))",
 
+    "CREATE TRIGGER IF NOT EXISTS del_chart_label AFTER DELETE ON chart "
+    "BEGIN DELETE FROM chart_label WHERE chart_id = old.chart_id; END",
+
+    "CREATE TRIGGER IF NOT EXISTS del_chart "
+    "AFTER DELETE ON dimension "
+    "FOR EACH ROW "
+    "BEGIN"
+    "  DELETE FROM chart WHERE chart_id = OLD.chart_id "
+    "  AND NOT EXISTS (SELECT 1 FROM dimension WHERE chart_id = OLD.chart_id);"
+    "END",
+
     "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created)",
 
     "CREATE TABLE IF NOT EXISTS alert_hash(hash_id blob PRIMARY KEY, date_updated int, alarm text, template text, "
