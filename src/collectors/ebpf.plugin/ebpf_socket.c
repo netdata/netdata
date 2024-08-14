@@ -1784,7 +1784,7 @@ void ebpf_socket_resume_apps_data()
 
         ebpf_socket_publish_apps_t *values = &w->socket;
         memset(&w->socket, 0, sizeof(ebpf_socket_publish_apps_t));
-        while (move) {
+        for (; move; move = move->next) {
             int32_t pid = move->pid;
             ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SOCKET_IDX);
             ebpf_socket_publish_apps_t *ws = local_pid->socket;
@@ -1800,8 +1800,6 @@ void ebpf_socket_resume_apps_data()
             values->retransmit = ws->retransmit;
             values->call_udp_sent = ws->call_udp_sent;
             values->call_udp_received = ws->call_udp_received;
-
-            move = move->next;
         }
     }
 }

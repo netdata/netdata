@@ -681,6 +681,9 @@ static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_pe
         total->mark_page_accessed += w->mark_page_accessed;
         if (w->ct > ct)
             ct = w->ct;
+
+        if (!total->name[0] && w->name[0])
+            strncpyz(total->name, w->name, sizeof(total->name) - 1);
     }
     total->ct = ct;
 }
@@ -696,13 +699,14 @@ static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_pe
 static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, netdata_cachestat_pid_t *in)
 {
     out->ct = in->ct;
-    if (!out->current.mark_page_accessed) {
-        memcpy(&out->current, &in[0], sizeof(netdata_cachestat_pid_t));
-        return;
+    if (out->current.mark_page_accessed) {
+        memcpy(&out->prev, &out->current, sizeof(netdata_cachestat_t));
     }
 
-    memcpy(&out->prev, &out->current, sizeof(netdata_cachestat_pid_t));
-    memcpy(&out->current, &in[0], sizeof(netdata_cachestat_pid_t));
+    out->current.account_page_dirtied = in[0].account_page_dirtied;
+    out->current.add_to_page_cache_lru = in[0].add_to_page_cache_lru;
+    out->current.mark_buffer_dirty = in[0].mark_buffer_dirty;
+    out->current.mark_page_accessed = in[0].mark_page_accessed;
 }
 
 /**
@@ -791,7 +795,7 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
     memset(&publish->current, 0, sizeof(publish->current));
 
     netdata_cachestat_t *dst = &publish->current;
-    while (root) {
+    for (; root; root = root->next) {
         int32_t pid = root->pid;
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_CACHESTAT_IDX);
         netdata_publish_cachestat_t *w = local_pid->cachestat;
@@ -803,8 +807,6 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
         dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
         dst->mark_buffer_dirty += src->mark_buffer_dirty;
         dst->mark_page_accessed += src->mark_page_accessed;
-
-        root = root->next;
     }
 }
 
@@ -1075,15 +1077,13 @@ void ebpf_cachestat_sum_cgroup_pids(netdata_publish_cachestat_t *publish, struct
     memset(&publish->current, 0, sizeof(publish->current));
 
     netdata_cachestat_t *dst = &publish->current;
-    while (root) {
+    for (; root; root = root->next) {
         netdata_cachestat_t *src = &root->cachestat.current;
 
         dst->account_page_dirtied += src->account_page_dirtied;
         dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
         dst->mark_buffer_dirty += src->mark_buffer_dirty;
         dst->mark_page_accessed += src->mark_page_accessed;
-
-        root = root->next;
     }
 }
 

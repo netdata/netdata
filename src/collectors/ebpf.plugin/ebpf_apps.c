@@ -1093,19 +1093,18 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
 void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_pid_on_target *root)
 {
     memset(process, 0, sizeof(ebpf_process_stat_t));
-    while (root) {
+    for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
-        if (local_pid) {
-            ebpf_process_stat_t *in = &local_pid->process;
-            process->task_err += in->task_err;
-            process->release_call += in->release_call;
-            process->exit_call += in->exit_call;
-            process->create_thread += in->create_thread;
-            process->create_process += in->create_process;
-        }
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_PROCESS_IDX);
+        ebpf_publish_process_t *in = local_pid->process;
+        if (!in)
+            continue;
 
-        root = root->next;
+        process->task_err += in->task_err;
+        process->release_call += in->release_call;
+        process->exit_call += in->exit_call;
+        process->create_thread += in->create_thread;
+        process->create_process += in->create_process;
     }
 }
 

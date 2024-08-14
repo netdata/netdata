@@ -506,7 +506,7 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_
     uint64_t local_read = 0;
     uint64_t local_write = 0;
 
-    while (root) {
+    for (; root; root = root->next) {
         int32_t pid = root->pid;
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SWAP_IDX);
         netdata_publish_swap_t *w = local_pid->swap;
@@ -515,8 +515,6 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_
 
         local_write += w->write;
         local_read += w->read;
-
-        root = root->next;
     }
 
     // These conditions were added, because we are using incremental algorithm

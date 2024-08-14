@@ -594,7 +594,7 @@ end_dc_loop:
 void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_target *root)
 {
     memset(&publish->curr, 0, sizeof(netdata_publish_dcstat_pid_t));
-    while (root) {
+    for (; root; root = root->next) {
         int32_t pid = root->pid;
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_DCSTAT_IDX);
         netdata_publish_dcstat_t *w = pid_stat->dc;
@@ -604,8 +604,6 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
         publish->curr.cache_access += w->curr.cache_access;
         publish->curr.file_system += w->curr.file_system;
         publish->curr.not_found += w->curr.not_found;
-
-        root = root->next;
     }
 }
 
@@ -787,10 +785,9 @@ static void ebpf_update_dc_cgroup()
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
             ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_DCSTAT_IDX);
-            if (!local_pid)
-                continue;
-
             netdata_publish_dcstat_t *in = local_pid->dc;
+            if (!in)
+                continue;
 
             memcpy(out, &in->curr, sizeof(netdata_publish_dcstat_pid_t));
         }

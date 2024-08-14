@@ -1112,7 +1112,7 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_tar
 {
     memset(vfs, 0, sizeof(netdata_publish_vfs_t));
 
-    while (root) {
+    for (; root; root = root->next) {
         int32_t pid = root->pid;
         ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_VFS_IDX);
         netdata_publish_vfs_t *w = local_pid->vfs;
@@ -1120,8 +1120,6 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_tar
             continue;
 
         vfs_aggregate_publish_vfs(vfs, w);
-
-        root = root->next;
     }
 }
 

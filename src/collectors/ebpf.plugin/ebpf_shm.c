@@ -665,20 +665,17 @@ static void ebpf_shm_read_global_table(netdata_idx_t *stats, int maps_per_core)
 static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_target *root)
 {
     memset(shm, 0, sizeof(netdata_publish_shm_t));
-    while (root) {
+    for (; root; root = root->next) {
         int32_t pid = root->pid;
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SHM_IDX);
-        if (pid_stat) {
-            netdata_publish_shm_t *w = pid_stat->shm;
-            if (!w)
-                continue;
+        netdata_publish_shm_t *w = pid_stat->shm;
+        if (!w)
+            continue;
 
-            shm->get += w->get;
-            shm->at += w->at;
-            shm->dt += w->dt;
-            shm->ctl += w->ctl;
-        }
-        root = root->next;
+        shm->get += w->get;
+        shm->at += w->at;
+        shm->dt += w->dt;
+        shm->ctl += w->ctl;
     }
 }
 
