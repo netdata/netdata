@@ -4075,7 +4075,7 @@ int main(int argc, char **argv)
     heartbeat_t hb;
     heartbeat_init(&hb);
     int update_apps_every = (int) EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
-    int max_period = EBPF_CLEANUP_FACTOR;
+    uint32_t max_period = EBPF_CLEANUP_FACTOR;
     int update_apps_list = update_apps_every - 1;
     int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     //Plugin will be killed when it receives a signal

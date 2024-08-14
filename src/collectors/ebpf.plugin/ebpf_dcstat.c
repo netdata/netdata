@@ -541,8 +541,9 @@ static void ebpf_dcstat_apps_accumulator(netdata_dcstat_pid_t *out, int maps_per
  * Read the apps table and store data inside the structure.
  *
  * @param maps_per_core do I need to read all cores?
+ * @param max_period    limit of iterations without updates before remove data from hash table
  */
-static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
+static void ebpf_read_dc_apps_table(int maps_per_core, uint32_t max_period)
 {
     netdata_dcstat_pid_t *cv = dcstat_vector;
     int fd = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
@@ -654,7 +655,7 @@ void *ebpf_read_dcstat_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
-    int max_period = EBPF_CLEANUP_FACTOR;
+    uint32_t max_period = EBPF_CLEANUP_FACTOR;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
         if (ebpf_plugin_stop() || ++counter != update_every)

@@ -682,8 +682,9 @@ static void fd_apps_accumulator(netdata_fd_stat_t *out, int maps_per_core)
  * Read the apps table and store data inside the structure.
  *
  * @param maps_per_core do I need to read all cores?
+ * @param max_period    limit of iterations without updates before remove data from hash table
  */
-static void ebpf_read_fd_apps_table(int maps_per_core, int max_period)
+static void ebpf_read_fd_apps_table(int maps_per_core, uint32_t max_period)
 {
     netdata_fd_stat_t *fv = fd_vector;
     int fd = fd_maps[NETDATA_FD_PID_STATS].map_fd;
@@ -793,7 +794,7 @@ void *ebpf_read_fd_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     int period = USEC_PER_SEC;
-    int max_period = EBPF_CLEANUP_FACTOR;
+    uint32_t max_period = EBPF_CLEANUP_FACTOR;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
         if (ebpf_plugin_stop() || ++counter != update_every)

@@ -1245,7 +1245,7 @@ static void vfs_apps_accumulator(netdata_ebpf_vfs_t *out, int maps_per_core)
 /**
  * Read the hash table and store data to allocated vectors.
  */
-static void ebpf_vfs_read_apps(int maps_per_core, int max_period)
+static void ebpf_vfs_read_apps(int maps_per_core, uint32_t max_period)
 {
     netdata_ebpf_vfs_t *vv = vfs_vector;
     int fd = vfs_maps[NETDATA_VFS_PID].map_fd;
@@ -2075,7 +2075,7 @@ void *ebpf_read_vfs_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
-    int max_period = EBPF_CLEANUP_FACTOR;
+    uint32_t max_period = EBPF_CLEANUP_FACTOR;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
         if (ebpf_plugin_stop() || ++counter != update_every)

@@ -715,8 +715,9 @@ static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, n
  * Read the apps table and store data inside the structure.
  *
  * @param maps_per_core do I need to read all cores?
+ * @param max_period    limit of iterations without updates before remove data from hash table
  */
-static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
+static void ebpf_read_cachestat_apps_table(int maps_per_core, uint32_t max_period)
 {
     netdata_cachestat_pid_t *cv = cachestat_vector;
     int fd = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
@@ -843,7 +844,7 @@ void *ebpf_read_cachestat_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
-    int max_period = EBPF_CLEANUP_FACTOR;
+    uint32_t max_period = EBPF_CLEANUP_FACTOR;
 
     int counter = update_every - 1;
 

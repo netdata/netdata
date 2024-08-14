@@ -466,7 +466,7 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p)
 
     char filename[FILENAME_MAX + 1];
     int ret = 0;
-    snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", netdata_configured_host_prefix, p->pid);
+    snprintfz(filename, FILENAME_MAX, "%s/proc/%u/stat", netdata_configured_host_prefix, p->pid);
 
     struct stat statbuf;
     if (stat(filename, &statbuf)) {
@@ -544,8 +544,8 @@ static inline int ebpf_collect_data_for_pid(pid_t pid)
     read_proc_pid_stat(p);
 
     // check its parent pid
-    if (unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-        netdata_log_error("Pid %u (command '%s') states invalid parent pid %u. Using 0.", pid, p->comm, p->ppid);
+    if (unlikely( p->ppid > pid_max)) {
+        netdata_log_error("Pid %d (command '%s') states invalid parent pid %u. Using 0.", pid, p->comm, p->ppid);
         p->ppid = 0;
     }
 
@@ -612,7 +612,7 @@ static void apply_apps_groups_targets_inheritance(void)
 
                 if (debug_enabled || (p->target && p->target->debug_enabled))
                     debug_log_int(
-                        "TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s).", p->target->name,
+                        "TARGET INHERITANCE: %s is inherited by %u (%s) from its parent %d (%s).", p->target->name,
                         p->pid, p->comm, p->parent->pid, p->parent->comm);
             }
         }
@@ -901,7 +901,7 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
  * @param maps_per_core         do I have hash maps per core?
  * @param max_period            max period to wait before remove from hash table.
  */
-void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core, int max_period)
+void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core, uint32_t max_period)
 {
     if (tbl_pid_stats_fd == -1)
         return;
