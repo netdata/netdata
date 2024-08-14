@@ -21,35 +21,9 @@ void ebpf_aral_init(void)
         max_elements = NETDATA_EBPF_ALLOC_MIN_ELEMENTS;
     }
 
-    ebpf_aral_apps_pid_stat = ebpf_allocate_pid_aral("ebpf_pid_stat", sizeof(struct ebpf_pid_stat));
-
 #ifdef NETDATA_DEV_MODE
     netdata_log_info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
 #endif
-}
-
-/**
- * eBPF pid stat get
- *
- * Get a ebpf_pid_stat entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-struct ebpf_pid_stat *ebpf_pid_stat_get(void)
-{
-    struct ebpf_pid_stat *target = aral_mallocz(ebpf_aral_apps_pid_stat);
-    memset(target, 0, sizeof(struct ebpf_pid_stat));
-    return target;
-}
-
-/**
- * eBPF target release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_pid_stat_release(struct ebpf_pid_stat *stat)
-{
-    aral_freez(ebpf_aral_apps_pid_stat, stat);
 }
 
 // ----------------------------------------------------------------------------
@@ -332,9 +306,6 @@ int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **a
 
 #define MAX_CMDLINE 16384
 
-struct ebpf_pid_stat **ebpf_all_pids = NULL;    // to avoid allocations, we pre-allocate the entire pid space.
-struct ebpf_pid_stat *ebpf_root_of_pids = NULL; // global list of all processes running
-
 ebpf_pid_data_t *ebpf_pids = NULL;            // to avoid allocations, we pre-allocate the entire pid space.
 ebpf_pid_data_t *ebpf_pids_link_list = NULL;  // global list of all processes running
 
@@ -392,117 +363,6 @@ static inline void debug_log_dummy(void)
 #endif
 
 /**
- * Managed log
- *
- * Store log information if it is necessary.
- *
- * @param p         the pid stat structure
- * @param log       the log id
- * @param status    the return from a function.
- *
- * @return It returns the status value.
-static inline int managed_log(ebpf_pid_data_t *p, uint32_t log, int status)
-{
-    if (unlikely(!status)) {
-        // netdata_log_error("command failed log %u, errno %d", log, errno);
-
-        if (unlikely(debug_enabled || errno != ENOENT)) {
-            if (unlikely(debug_enabled || !(p->log_thrown & log))) {
-                p->log_thrown |= log;
-                switch (log) {
-                    case PID_LOG_IO:
-                        netdata_log_error(
-                            "Cannot process %s/proc/%u/io (command '%s')", netdata_configured_host_prefix, p->pid,
-                            p->comm);
-                        break;
-
-                    case PID_LOG_STATUS:
-                        netdata_log_error(
-                            "Cannot process %s/proc/%u/status (command '%s')", netdata_configured_host_prefix, p->pid,
-                            p->comm);
-                        break;
-
-                    case PID_LOG_CMDLINE:
-                        netdata_log_error(
-                            "Cannot process %s/proc/%u/cmdline (command '%s')", netdata_configured_host_prefix, p->pid,
-                            p->comm);
-                        break;
-
-                    case PID_LOG_FDS:
-                        netdata_log_error(
-                            "Cannot process entries in %s/proc/%u/fd (command '%s')", netdata_configured_host_prefix,
-                            p->pid, p->comm);
-                        break;
-
-                    case PID_LOG_STAT:
-                        break;
-
-                    default:
-                        netdata_log_error("unhandled error for pid %u, command '%s'", p->pid, p->comm);
-                        break;
-                }
-            }
-        }
-        errno_clear();
-    } else if (unlikely(p->log_thrown & log)) {
-        // netdata_log_error("unsetting log %u on pid %d", log, p->pid);
-        p->log_thrown &= ~log;
-    }
-
-    return status;
-}
- */
-
-/**
- * Get PID entry
- *
- * Get or allocate the PID entry for the specified pid.
- *
- * @param pid   the pid to search the data.
- * @param tgid  the task group id
- *
- * @return It returns the pid entry structure
- */
-ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid, pid_t tgid)
-{
-    /*
-    struct ebpf_pid_stat *p;
-    if (unlikely(!ebpf_vector_pids)) {
-        ebpf_pid_stat_t *ptr = ebpf_all_pids[pid];
-        if (unlikely(ptr)) {
-            if (!ptr->ppid && tgid)
-                ptr->ppid = tgid;
-            return ebpf_all_pids[pid];
-        }
-
-        p = ebpf_pid_stat_get();
-        ebpf_all_pids[pid] = p;
-    } else {
-        p = &ebpf_vector_pids[pid];
-
-        if (p->pid == pid && p->ppid == tgid)
-            return p;
-
-        memset(p, 0, sizeof(*p));
-    }
-
-    if (likely(ebpf_root_of_pids))
-        ebpf_root_of_pids->prev = p;
-
-    p->next = ebpf_root_of_pids;
-    ebpf_root_of_pids = p;
-
-    p->pid = pid;
-    p->ppid = tgid;
-
-    ebpf_all_pids_count++;
-
-    return p;
-     */
-    return NULL;
-}
-
-/**
  * Assign the PID to a target.
  *
  * @param p the pid_stat structure to assign for a target.
@@ -551,61 +411,13 @@ static inline void assign_target_to_pid(ebpf_pid_data_t *p)
     }
 }
 
-/**
- * Get PID and link
- *
- * @param pid  the current PID
- * @param tgid The parent PID
- * @param name The process name
- *
- * @return It returns the pid_stat already associated to a target.
- */
-ebpf_pid_stat_t *ebpf_get_pid_and_link(pid_t pid, pid_t tgid, char *name)
-{
-    ebpf_pid_stat_t *pe = ebpf_get_pid_entry(pid, tgid);
-
-    // mark it as updated
-    pe->updated = 1;
-    pe->keep = 0;
-    pe->keeploops = 0;
-
-    strncpyz(pe->comm, name, sizeof(pe->comm) -1);
-
-    /*
-    if (!pe->target)
-        assign_target_to_pid(pe);
-        */
-
-    return pe;
-}
-
-/**
- * Release and Ulink PID stat
- *
- * Release the PID stat pid and also remove from apps group.
- *
- * @param eps a structure with data to test and update.
- * @param fd  the file descriptor where data is stored inside kernel ring.
- * @param key the key (pid value) of the hash table.
- * @param idx the thread index.
- */
-void ebpf_release_and_unlink_pid_stat(ebpf_pid_stat_t *eps, int fd, uint32_t key, uint32_t idx)
-{
-    bpf_map_delete_elem(fd, &key);
-    eps->not_updated = 0;
-    eps->updated = 0;
-    eps->thread_collecting &= ~(1<<idx);
-    if (!eps->thread_collecting)
-        ebpf_del_pid_entry((pid_t)key);
-}
-
 // ----------------------------------------------------------------------------
 // update pids from proc
 
 /**
  * Read cmd line from /proc/PID/cmdline
  *
- * @param p  the ebpf_pid_stat_structure.
+ * @param p  the ebpf_pid_data structure.
  *
  * @return It returns 1 on success and 0 otherwise.
  */
@@ -934,7 +746,6 @@ void ebpf_del_pid_entry(pid_t pid)
 
     memset(p, 0, sizeof(ebpf_pid_data_t));
 
-    /*
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
     if (pid_ptr) {
@@ -952,36 +763,8 @@ void ebpf_del_pid_entry(pid_t pid)
         JudyLDel(&ebpf_judy_pid.index.JudyLArray, p->pid, PJE0);
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
-     */
 
     ebpf_all_pids_count--;
-}
-
-/**
- * Get command string associated with a PID.
- * This can only safely be used when holding the `collect_data_mutex` lock.
- *
- * @param pid the pid to search the data.
- * @param n the maximum amount of bytes to copy into dest.
- *          if this is greater than the size of the command, it is clipped.
- * @param dest the target memory buffer to write the command into.
- * @return -1 if the PID hasn't been scraped yet, 0 otherwise.
- */
-int get_pid_comm(pid_t pid, size_t n, char *dest)
-{
-    struct ebpf_pid_stat *stat;
-
-    stat = ebpf_all_pids[pid];
-    if (unlikely(stat == NULL)) {
-        return -1;
-    }
-
-    if (unlikely(n > sizeof(stat->comm))) {
-        n = sizeof(stat->comm);
-    }
-
-    strncpyz(dest, stat->comm, n);
-    return 0;
 }
 
 /**
