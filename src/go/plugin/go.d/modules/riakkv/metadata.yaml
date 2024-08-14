@@ -1,0 +1,390 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-riakkv
+      plugin_name: go.d.plugin
+      module_name: riakkv
+      monitored_instance:
+        name: Riak KV
+        link: https://riak.com/products/riak-kv/index.html
+        categories:
+          - data-collection.database-servers
+        icon_filename: "riak.svg"
+      related_resources:
+        integrations:
+          list: []
+      alternative_monitored_instances: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - database
+        - nosql
+        - big data
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors RiakKV metrics about throughput, latency, resources and more.
+        method_description: |
+          It sends HTTP requests to the Riak [/stats](https://docs.riak.com/riak/kv/2.2.3/developing/api/http/status.1.html) endpoint.
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects Riak instances running on localhost that are listening on port 8098.
+            On startup, it tries to collect metrics from:
+
+            - http://127.0.0.1:8098/stats
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Enable /stats endpoint
+            description: |
+              See the RiakKV [configuration reference](https://docs.riak.com/riak/kv/2.2.3/developing/api/http/status.1.html).
+      configuration:
+        file:
+          name: go.d/riakkv.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:8098/stats
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8098/stats
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8098/stats
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: With enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8098/stats
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8098/stats
+                
+                  - name: remote
+                    url: http://192.0.2.1:8098/stats
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: riak.kv.throughput
+              description: Reads & writes coordinated by this node
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: gets
+                - name: puts
+            - name: riak.dt.vnode_updates
+              description: Update operations coordinated by local vnodes by data type
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: counters
+                - name: sets
+                - name: maps
+            - name: riak.search
+              description: Search queries on the node
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: queries
+            - name: riak.search.documents
+              description: Documents indexed by search
+              unit: "documents/s"
+              chart_type: line
+              dimensions:
+                - name: indexed
+            - name: riak.consistent.operations
+              description: Consistent node operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: gets
+                - name: puts
+            - name: riak.kv.latency.get
+              description: Time between reception of a client GET request and subsequent response to client
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: mean
+                - name: median
+                - name: "95"
+                - name: "99"
+                - name: "100"
+            - name: riak.kv.latency.put
+              description: Time between reception of a client PUT request and subsequent response to client
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: mean
+                - name: median
+                - name: "95"
+                - name: "99"
+                - name: "100"
+            - name: riak.dt.latency.counter_merge
+              description: Time it takes to perform an Update Counter operation
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: mean
+                - name: median
+                - name: "95"
+                - name: "99"
+                - name: "100"
+            - name: riak.dt.latency.set_merge
+              description: Time it takes to perform an Update Set operation
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: mean
+                - name: median
+                - name: "95"
+                - name: "99"
+                - name: "100"
+            - name: riak.dt.latency.map_merge
+              description: Time it takes to perform an Update Map operation
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: mean
+                - name: median
+                - name: "95"
+                - name: "99"
+                - name: "100"
+            - name: riak.search.latency.query
+              description: Search query latency
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: median
+                - name: min
+                - name: "95"
+                - name: "99"
+                - name: "999"
+                - name: max
+            - name: riak.search.latency.index
+              description: Time it takes Search to index a new document
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: median
+                - name: min
+                - name: "95"
+                - name: "99"
+                - name: "999"
+                - name: max
+            - name: riak.consistent.latency.get
+              description: Strongly consistent read latency
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: mean
+                - name: median
+                - name: "95"
+                - name: "99"
+                - name: "100"
+            - name: riak.consistent.latency.put
+              description: Strongly consistent write latency
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: mean
+                - name: median
+                - name: "95"
+                - name: "99"
+                - name: "100"
+            - name: riak.vm
+              description: Total processes running in the Erlang VM
+              unit: "total"
+              chart_type: line
+              dimensions:
+                - name: processes
+            - name: riak.vm.memory.processes
+              description: Memory allocated & used by Erlang processes
+              unit: "MB"
+              chart_type: line
+              dimensions:
+                - name: allocated
+                - name: used
+            - name: riak.kv.siblings_encountered.get
+              description: Number of siblings encountered during GET operations by this node during the past minute
+              unit: "siblings"
+              chart_type: line
+              dimensions:
+                - name: mean
+                - name: median
+                - name: "95"
+                - name: "99"
+                - name: "100"
+            - name: riak.kv.objsize.get
+              description: Object size encountered by this node during the past minute
+              unit: "KB"
+              chart_type: line
+              dimensions:
+                - name: mean
+                - name: median
+                - name: "95"
+                - name: "99"
+                - name: "100"
+            - name: riak.search.vnodeq_size
+              description: Number of unprocessed messages in the vnode message queues of Search on this node in the past minute
+              unit: "messages"
+              chart_type: line
+              dimensions:
+                - name: mean
+                - name: median
+                - name: "95"
+                - name: "99"
+                - name: "100"
+            - name: riak.search.index
+              description: Errors encountered by Search
+              unit: "errors"
+              chart_type: line
+              dimensions:
+                - name: index_fail
+                - name: bad_entry
+                - name: extract_fail
+            - name: riak.core.protobuf_connections
+              description: Protocol buffer connections by status
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: riak.core.repairs
+              description: Number of repair operations this node has coordinated
+              unit: "repairs"
+              chart_type: line
+              dimensions:
+                - name: read
+            - name: riak.core.fsm_active
+              description: Active finite state machines by kind
+              unit: "fsms"
+              chart_type: line
+              dimensions:
+                - name: get
+                - name: put
+                - name: secondary index
+                - name: list keys
+            - name: riak.core.fsm_rejected
+              description: Finite state machines being rejected by Sidejobs overload protection
+              unit: "fsms"
+              chart_type: line
+              dimensions:
+                - name: get
+                - name: put
