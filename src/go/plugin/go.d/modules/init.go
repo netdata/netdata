@@ -84,6 +84,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/rabbitmq"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/redis"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/rethinkdb"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/riakkv"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/rspamd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/scaleio"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/sensors"
