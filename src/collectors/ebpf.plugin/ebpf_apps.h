@@ -290,6 +290,10 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
     // To add pids to target here will do host very slow
 
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
+    // The caller is getting data to work.
+    if (!name && idx != EBPF_OPTION_ALL_CHARTS)
+        return ptr;
+
     ptr->thread_collecting |= 1<<idx;
     if (ptr->pid == pid) {
         return ptr;

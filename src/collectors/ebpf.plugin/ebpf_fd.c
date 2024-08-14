@@ -737,18 +737,17 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
 {
     memset(fd, 0, sizeof(netdata_fd_stat_t));
 
-    while (root) {
+    for (; root; root = root->next) {
         int32_t pid = root->pid;
         ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_FD_IDX);
         netdata_publish_fd_stat_t *w = pid_stat->fd;
         if (!w)
             continue;
+
         fd->open_call += w->open_call;
         fd->close_call += w->close_call;
         fd->open_err += w->open_err;
         fd->close_err += w->close_err;
-
-        root = root->next;
     }
 }
 
