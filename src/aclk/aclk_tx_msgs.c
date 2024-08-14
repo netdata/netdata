@@ -38,9 +38,9 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
 
     mqtt_wss_publish5(client, (char*)topic, NULL, msg, &freez_aclk_publish5a, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    aclk_stats_msg_published(packet_id);
-#endif
+//#ifdef NETDATA_INTERNAL_CHECKS
+//    aclk_stats_msg_published(packet_id);
+//#endif
 
     if (aclklog_enabled) {
         char *json = protomsg_to_json(msg, msg_len, msgname);
@@ -87,10 +87,10 @@ static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_obj
 
     if (rc == MQTT_WSS_ERR_TOO_BIG_FOR_SERVER)
         return HTTP_RESP_CONTENT_TOO_LONG;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    aclk_stats_msg_published(packet_id);
-#endif
+//
+//#ifdef NETDATA_INTERNAL_CHECKS
+//    aclk_stats_msg_published(packet_id);
+//#endif
 
     return 0;
 }
