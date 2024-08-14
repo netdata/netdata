@@ -444,39 +444,39 @@ struct aclk_metrics aclk_metrics = {
 //    ACLK_STATS_UNLOCK;
 //}
 
-#ifdef NETDATA_INTERNAL_CHECKS
-static usec_t pub_time[UINT16_MAX + 1] = {0};
-void aclk_stats_msg_published(uint16_t id)
-{
-    ACLK_STATS_LOCK;
-    pub_time[id] = now_boottime_usec();
-    ACLK_STATS_UNLOCK;
-}
-
-void aclk_stats_msg_puback(uint16_t id)
-{
-    ACLK_STATS_LOCK;
-    usec_t t;
-
-    if (!aclk_stats_enabled) {
-        ACLK_STATS_UNLOCK;
-        return;
-    }
-
-    if (unlikely(!pub_time[id])) {
-        ACLK_STATS_UNLOCK;
-        netdata_log_error("Received PUBACK for unknown message?!");
-        return;
-    }
-
-    t = now_boottime_usec() - pub_time[id];
-    t /= USEC_PER_MS;
-    pub_time[id] = 0;
-    if (aclk_metrics_per_sample.latency_max < t)
-        aclk_metrics_per_sample.latency_max = t;
-
-    aclk_metrics_per_sample.latency_total += t;
-    aclk_metrics_per_sample.latency_count++;
-    ACLK_STATS_UNLOCK;
-}
-#endif /* NETDATA_INTERNAL_CHECKS */
+//#ifdef NETDATA_INTERNAL_CHECKS
+//static usec_t pub_time[UINT16_MAX + 1] = {0};
+//void aclk_stats_msg_published(uint16_t id)
+//{
+//    ACLK_STATS_LOCK;
+//    pub_time[id] = now_boottime_usec();
+//    ACLK_STATS_UNLOCK;
+//}
+//
+//void aclk_stats_msg_puback(uint16_t id)
+//{
+//    ACLK_STATS_LOCK;
+//    usec_t t;
+//
+//    if (!aclk_stats_enabled) {
+//        ACLK_STATS_UNLOCK;
+//        return;
+//    }
+//
+//    if (unlikely(!pub_time[id])) {
+//        ACLK_STATS_UNLOCK;
+//        netdata_log_error("Received PUBACK for unknown message?!");
+//        return;
+//    }
+//
+//    t = now_boottime_usec() - pub_time[id];
+//    t /= USEC_PER_MS;
+//    pub_time[id] = 0;
+//    if (aclk_metrics_per_sample.latency_max < t)
+//        aclk_metrics_per_sample.latency_max = t;
+//
+//    aclk_metrics_per_sample.latency_total += t;
+//    aclk_metrics_per_sample.latency_count++;
+//    ACLK_STATS_UNLOCK;
+//}
+//#endif /* NETDATA_INTERNAL_CHECKS */

@@ -297,9 +297,9 @@ static void puback_callback(uint16_t packet_id)
         aclk_tbeb_reset();
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    aclk_stats_msg_puback(packet_id);
-#endif
+//#ifdef NETDATA_INTERNAL_CHECKS
+//    aclk_stats_msg_puback(packet_id);
+//#endif
 
     if (aclk_shared_state.mqtt_shutdown_msg_id == (int)packet_id) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
