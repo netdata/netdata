@@ -1142,7 +1142,6 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core, int
             if (!w)
                 local_pid->process = w = ebpf_process_allocate_publish();
 
-            memcpy(w, process_stat_vector, sizeof(ebpf_process_stat_t));
             w->create_thread = process_stat_vector[0].create_thread;
             w->exit_call = process_stat_vector[0].exit_call;
             w->create_thread = process_stat_vector[0].create_thread;
