@@ -269,7 +269,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [RethinkDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/rethinkdb/integrations/rethinkdb.md)
 
-- [RiakKV](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/riakkv/integrations/riakkv.md)
+- [Riak KV](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/riakkv/integrations/riak_kv.md)
 
 - [SQL Database agnostic](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/sql_database_agnostic.md)
 
