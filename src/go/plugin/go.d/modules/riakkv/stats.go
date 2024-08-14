@@ -45,7 +45,7 @@ type riakStats struct {
 	ObjectMapMergeTimeMedian *int64 `json:"object_map_merge_time_median" stm:"object_map_merge_time_median"`
 	ObjectMapMergeTime95     *int64 `json:"object_map_merge_time_95" stm:"object_map_merge_time_95"`
 	ObjectMapMergeTime99     *int64 `json:"object_map_merge_time_99" stm:"object_map_merge_time_99"`
-	ObjectMapMergeTime100    *int64 `json:"object_map_merge_time_100" stm:"object_map_merge_time_100"¬`
+	ObjectMapMergeTime100    *int64 `json:"object_map_merge_time_100" stm:"object_map_merge_time_100"`
 
 	SearchQueryLatencyMin    *int64 `json:"search_query_latency_min" stm:"search_query_latency_min"`
 	SearchQueryLatencyMedian *int64 `json:"search_query_latency_median" stm:"search_query_latency_median"`
@@ -108,5 +108,5 @@ type riakStats struct {
 	NodePutFsmRejected *int64 `json:"node_put_fsm_rejected" stm:"node_put_fsm_rejected"`
 
 	SearchIndexBadEntryCount    *int64 `json:"search_index_bad_entry_count" stm:"search_index_bad_entry_count"`
-	SearchIndexExtractFailCount *int64 `json:"search_index_extract_fail_count" stm:"search_index_extract_fail_count"¬`
+	SearchIndexExtractFailCount *int64 `json:"search_index_extract_fail_count" stm:"search_index_extract_fail_count"`
 }
