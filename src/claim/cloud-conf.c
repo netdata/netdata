@@ -66,7 +66,7 @@ static void cloud_conf_load_defaults(void) {
 
 void cloud_conf_load(int silent) {
     errno_clear();
-    char *filename = strdupz_path_subpath(netdata_configured_cloud_dir, "cloud.conf");
+    char *filename = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "cloud.conf");
     int ret = appconfig_load(&cloud_config, filename, 1, NULL);
 
     if(!ret && !silent)

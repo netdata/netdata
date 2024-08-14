@@ -79,7 +79,7 @@ int call_function_bearer_get_token(RRDHOST *host, struct web_client *w, const ch
     buffer_json_member_add_string(payload, "node_id", node_id);
     buffer_json_member_add_string(payload, "user_role", http_id2user_role(w->user_role));
     http_access2buffer_json_array(payload, "access", w->access);
-    buffer_json_member_add_uuid(payload, "cloud_account_id", &w->auth.cloud_account_id);
+    buffer_json_member_add_uuid(payload, "cloud_account_id", w->auth.cloud_account_id);
     buffer_json_member_add_string(payload, "client_name", w->auth.client_name);
     buffer_json_finalize(payload);
 

@@ -14,8 +14,8 @@ static bool check_and_generate_certificates() {
     EVP_PKEY *pkey = NULL;
     EVP_PKEY_CTX *pctx = NULL;
 
-    CLEAN_CHAR_P *private_key_file = strdupz_path_subpath(netdata_configured_cloud_dir, "private.pem");
-    CLEAN_CHAR_P *public_key_file = strdupz_path_subpath(netdata_configured_cloud_dir, "public.pem");
+    CLEAN_CHAR_P *private_key_file = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "private.pem");
+    CLEAN_CHAR_P *public_key_file = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "public.pem");
 
     // Check if private key exists
     fp = fopen(public_key_file, "r");
@@ -144,7 +144,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     snprintf(target_url, sizeof(target_url), "%s/api/v1/spaces/nodes/%s", url, claimed_id_str);
 
     // Read the public key
-    CLEAN_CHAR_P *public_key_file = strdupz_path_subpath(netdata_configured_cloud_dir, "public.pem");
+    CLEAN_CHAR_P *public_key_file = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "public.pem");
     fp = fopen(public_key_file, "r");
     if (!fp || fread(public_key, 1, sizeof(public_key), fp) == 0) {
         claim_agent_failure_reason_set("cannot read public key file '%s'", public_key_file);
@@ -156,13 +156,13 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 
     // check if we have trusted.pem
     // or cloud_fullchain.pem, for backwards compatibility
-    CLEAN_CHAR_P *trusted_key_file = strdupz_path_subpath(netdata_configured_cloud_dir, "trusted.pem");
+    CLEAN_CHAR_P *trusted_key_file = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "trusted.pem");
     fp = fopen(trusted_key_file, "r");
     if(fp)
         fclose(fp);
     else {
         freez(trusted_key_file);
-        trusted_key_file = strdupz_path_subpath(netdata_configured_cloud_dir, "cloud_fullchain.pem");
+        trusted_key_file = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "cloud_fullchain.pem");
         fp = fopen(trusted_key_file, "r");
         if(fp)
             fclose(fp);
@@ -393,7 +393,7 @@ bool claim_agent_from_claim_conf(void) {
     spinlock_lock(&spinlock);
 
     errno_clear();
-    char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "claim.conf");
+    char *filename = filename_from_path_entry_strdupz(netdata_configured_user_config_dir, "claim.conf");
     bool loaded = appconfig_load(&claim_config, filename, 1, NULL);
     freez(filename);
 

@@ -207,14 +207,14 @@ struct engine *read_exporting_config()
     if (unlikely(engine))
         return engine;
 
-    char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, EXPORTING_CONF);
+    char *filename = filename_from_path_entry_strdupz(netdata_configured_user_config_dir, EXPORTING_CONF);
 
     exporting_config_exists = appconfig_load(&exporting_config, filename, 0, NULL);
     if (!exporting_config_exists) {
         netdata_log_info("CONFIG: cannot load user exporting config '%s'. Will try the stock version.", filename);
         freez(filename);
 
-        filename = strdupz_path_subpath(netdata_configured_stock_config_dir, EXPORTING_CONF);
+        filename = filename_from_path_entry_strdupz(netdata_configured_stock_config_dir, EXPORTING_CONF);
         exporting_config_exists = appconfig_load(&exporting_config, filename, 0, NULL);
         if (!exporting_config_exists)
             netdata_log_info("CONFIG: cannot load stock exporting config '%s'. Running with internal defaults.", filename);

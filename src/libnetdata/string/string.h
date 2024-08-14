@@ -36,4 +36,11 @@ int string_unittest(size_t entries);
 
 void string_init(void);
 
+static inline void cleanup_string_pp(STRING **stringpp) {
+    if(stringpp)
+        string_freez(*stringpp);
+}
+
+#define CLEAN_STRING _cleanup_(cleanup_string_pp) STRING
+
 #endif

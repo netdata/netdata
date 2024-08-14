@@ -753,6 +753,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/close_range.h
         src/libnetdata/os/setproctitle.c
         src/libnetdata/os/setproctitle.h
+        src/libnetdata/paths/paths.c
+        src/libnetdata/paths/paths.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

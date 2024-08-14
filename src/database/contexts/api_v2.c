@@ -708,7 +708,7 @@ void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t durati
     buffer_json_member_add_string(wb, "mg", host->machine_guid);
 
     if(!uuid_is_null(host->node_id))
-        buffer_json_member_add_uuid(wb, "nd", &host->node_id);
+        buffer_json_member_add_uuid(wb, "nd", host->node_id);
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
     buffer_json_member_add_uint64(wb, "ni", ni);
 
@@ -1160,7 +1160,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
         buffer_json_member_add_object(wb, "agent");
 
     buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
-    buffer_json_member_add_uuid(wb, "nd", &localhost->node_id);
+    buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
     buffer_json_member_add_time_t(wb, "now", now_s);
 
@@ -1404,7 +1404,7 @@ static void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct s
         
     {
         buffer_json_member_add_string(wb, "name", t->name);
-        buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
+        buffer_json_member_add_uuid_ptr(wb, "config_hash_id", t->config_hash_id);
 
         buffer_json_member_add_object(wb, "selectors");
         {
@@ -1550,10 +1550,10 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
             buffer_json_member_add_string(wb, "sum", string2str(t->summary));
             buffer_json_member_add_string(wb, "ctx", string2str(t->context));
             buffer_json_member_add_string(wb, "st", rrdcalc_status2string(t->status));
-            buffer_json_member_add_uuid(wb, "tr_i", &t->last_transition_id);
+            buffer_json_member_add_uuid(wb, "tr_i", t->last_transition_id);
             buffer_json_member_add_double(wb, "tr_v", t->last_status_change_value);
             buffer_json_member_add_time_t(wb, "tr_t", t->last_status_change);
-            buffer_json_member_add_uuid(wb, "cfg", &t->config_hash_id);
+            buffer_json_member_add_uuid(wb, "cfg", t->config_hash_id);
             buffer_json_member_add_string(wb, "src", string2str(t->source));
 
             buffer_json_member_add_string(wb, "to", string2str(t->recipient));
@@ -1993,15 +1993,15 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
             RRDHOST *host = rrdhost_find_by_guid(t->machine_guid);
 
             buffer_json_member_add_uint64(wb, "gi", t->global_id);
-            buffer_json_member_add_uuid(wb, "transition_id", &t->transition_id);
-            buffer_json_member_add_uuid(wb, "config_hash_id", &t->config_hash_id);
+            buffer_json_member_add_uuid(wb, "transition_id", t->transition_id);
+            buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
             buffer_json_member_add_string(wb, "machine_guid", t->machine_guid);
 
             if(host) {
                 buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
 
                 if(!uuid_is_null(host->node_id))
-                    buffer_json_member_add_uuid(wb, "node_id", &host->node_id);
+                    buffer_json_member_add_uuid(wb, "node_id", host->node_id);
             }
 
             buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);

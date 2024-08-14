@@ -270,7 +270,7 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
         buffer_json_member_add_object(wb, "config");
         {
             if(!for_hashing) {
-                buffer_json_member_add_uuid(wb, "hash", &ap->config.hash_id);
+                buffer_json_member_add_uuid(wb, "hash", ap->config.hash_id);
                 buffer_json_member_add_string(wb, "source_type", dyncfg_id2source_type(ap->config.source_type));
                 buffer_json_member_add_string(wb, "source", string2str(ap->config.source));
             }

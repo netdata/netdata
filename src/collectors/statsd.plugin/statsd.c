@@ -1283,7 +1283,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     // find the directory name from the file we already read
                     char *filename2 = strdupz(filename); // copy filename, since dirname() will change it
                     char *dir = dirname(filename2);      // find the directory part of the filename
-                    tmp = strdupz_path_subpath(dir, s);  // compose the new filename to read;
+                    tmp = filename_from_path_entry_strdupz(dir, s);  // compose the new filename to read;
                     freez(filename2);                    // free the filename we copied
                 }
                 statsd_readfile(tmp, app, chart, dict);

@@ -34,7 +34,7 @@ const char *claim_agent_failure_reason_get(void) {
 
 bool claimed_id_save_to_file(const char *claimed_id_str) {
     bool ret;
-    const char *filename = strdupz_path_subpath(netdata_configured_cloud_dir, "claimed_id");
+    const char *filename = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "claimed_id");
     FILE *fp = fopen(filename, "w");
     if(fp) {
         fprintf(fp, "%s", claimed_id_str);
@@ -68,7 +68,7 @@ static ND_UUID claimed_id_load_from_file(void) {
     ND_UUID uuid;
 
     long bytes_read;
-    const char *filename = strdupz_path_subpath(netdata_configured_cloud_dir, "claimed_id");
+    const char *filename = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "claimed_id");
     char *claimed_id = read_by_filename(filename, &bytes_read);
 
     if(!claimed_id)

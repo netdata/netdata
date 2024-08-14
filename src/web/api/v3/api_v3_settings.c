@@ -39,49 +39,20 @@
 // concurrently for settings files
 static RW_SPINLOCK settings_spinlock = NETDATA_RW_SPINLOCK_INITIALIZER;
 
-static inline void settings_path(char out[PATH_MAX]) {
-    snprintfz(out, PATH_MAX, "%s/settings", netdata_configured_varlib_dir);
+static inline void settings_path(char out[FILENAME_MAX]) {
+    filename_from_path_entry(out, netdata_configured_varlib_dir, "settings", NULL);
 }
 
 static inline void settings_filename(char out[FILENAME_MAX], const char *file, const char *extension) {
-    char path[PATH_MAX];
+    char path[FILENAME_MAX];
     settings_path(path);
-    snprintfz(out, FILENAME_MAX, "%s/%s%s", path, file, extension?extension:"");
+    filename_from_path_entry(out, path, file, extension);
 }
 
 static inline bool settings_ensure_path_exists(void) {
-    char path[PATH_MAX];
-    settings_path(path); // Assume this function fills 'path' with the directory path
-
-    struct stat st;
-
-    // Check if the directory exists
-    if (stat(path, &st) != 0) {
-        if (errno == ENOENT) {
-            // Directory does not exist, attempt to create it
-            if (mkdir(path, 0755) != 0) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "cannot create directory '%s'", path);
-                return false; // Failed to create the directory
-            }
-        }
-        else {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "cannot stat() directory '%s'", path);
-            return false;
-        }
-
-    }
-    else if (!S_ISDIR(st.st_mode)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "path '%s' exists but it is not a directory", path);
-        return false;
-    }
-
-    // Check if the directory is accessible
-    if (access(path, R_OK | W_OK | X_OK) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "directory '%s' exists but I don't have access to it", path);
-        return false;
-    }
-
-    return true;
+    char path[FILENAME_MAX];
+    settings_path(path);
+    return filename_is_dir(path, true);
 }
 
 static inline size_t settings_extract_json_version(const char *json) {
@@ -195,7 +166,7 @@ static inline int settings_put(struct web_client *w, char *file) {
     const char *updated_json_str = json_object_to_json_string(jobj);
 
     char tmp_filename[FILENAME_MAX];
-    settings_filename(tmp_filename, file, ".new");
+    settings_filename(tmp_filename, file, "new");
 
     // Save the updated JSON string to a file
     FILE *fp = fopen(tmp_filename, "w");

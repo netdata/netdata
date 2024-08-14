@@ -84,7 +84,7 @@ int bearer_get_token_json_response(BUFFER *wb, RRDHOST *host, const char *claim_
     buffer_json_member_add_int64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "mg", host->machine_guid);
     buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
-    buffer_json_member_add_uuid(wb, "token", &uuid);
+    buffer_json_member_add_uuid(wb, "token", uuid);
     buffer_json_member_add_time_t(wb, "expiration", expires_s);
     buffer_json_finalize(wb);
     return HTTP_RESP_OK;
