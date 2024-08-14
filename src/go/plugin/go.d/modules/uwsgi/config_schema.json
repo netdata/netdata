@@ -1,0 +1,44 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "UWSGI collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "address": {
+        "title": "Address",
+        "description": "The IP address and port where the UWSGI [Stats Server](https://uwsgi-docs.readthedocs.io/en/latest/StatsServer.html) listens for connections.",
+        "type": "string",
+        "default": "127.0.0.1:1717"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for establishing a connection and communication (reading and writing) in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 1
+      }
+    },
+    "required": [
+      "address"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    }
+  }
+}

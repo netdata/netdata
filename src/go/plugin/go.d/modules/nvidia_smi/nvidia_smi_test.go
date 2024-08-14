@@ -24,9 +24,6 @@ var (
 	dataXMLTeslaP100, _        = os.ReadFile("testdata/tesla-p100.xml")
 
 	dataXMLA100SXM4MIG, _ = os.ReadFile("testdata/a100-sxm4-mig.xml")
-
-	dataHelpQueryGPU, _ = os.ReadFile("testdata/help-query-gpu.txt")
-	dataCSVTeslaP100, _ = os.ReadFile("testdata/tesla-p100.csv")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -38,25 +35,23 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataXMLRTX3060":          dataXMLRTX3060,
 		"dataXMLTeslaP100":        dataXMLTeslaP100,
 		"dataXMLA100SXM4MIG":      dataXMLA100SXM4MIG,
-		"dataHelpQueryGPU":        dataHelpQueryGPU,
-		"dataCSVTeslaP100":        dataCSVTeslaP100,
 	} {
 		require.NotNil(t, data, name)
 	}
 }
 
-func TestNvidiaSMI_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &NvidiaSMI{}, dataConfigJSON, dataConfigYAML)
+func TestNvidiaSmi_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &NvidiaSmi{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestNvidiaSMI_Init(t *testing.T) {
+func TestNvidiaSmi_Init(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(nv *NvidiaSMI)
+		prepare  func(nv *NvidiaSmi)
 		wantFail bool
 	}{
 		"fails if can't local nvidia-smi": {
 			wantFail: true,
-			prepare: func(nv *NvidiaSMI) {
+			prepare: func(nv *NvidiaSmi) {
 				nv.binName += "!!!"
 			},
 		},
@@ -77,46 +72,34 @@ func TestNvidiaSMI_Init(t *testing.T) {
 	}
 }
 
-func TestNvidiaSMI_Charts(t *testing.T) {
+func TestNvidiaSmi_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestNvidiaSMI_Check(t *testing.T) {
+func TestNvidiaSmi_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(nv *NvidiaSMI)
+		prepare  func(nv *NvidiaSmi)
 		wantFail bool
 	}{
-		"success A100-SXM4 MIG [XML]": {
+		"success A100-SXM4 MIG": {
 			wantFail: false,
-			prepare:  prepareCaseMIGA100formatXML,
+			prepare:  prepareCaseMIGA100,
 		},
-		"success RTX 3060 [XML]": {
+		"success RTX 3060": {
 			wantFail: false,
-			prepare:  prepareCaseRTX3060formatXML,
+			prepare:  prepareCaseRTX3060,
 		},
-		"success Tesla P100 [XML]": {
+		"success Tesla P100": {
 			wantFail: false,
-			prepare:  prepareCaseTeslaP100formatXML,
+			prepare:  prepareCaseTeslaP100,
 		},
-		"success Tesla P100 [CSV]": {
+		"success RTX 2080 Win": {
 			wantFail: false,
-			prepare:  prepareCaseTeslaP100formatCSV,
+			prepare:  prepareCaseRTX2080Win,
 		},
-		"success RTX 2080 Win [XML]": {
-			wantFail: false,
-			prepare:  prepareCaseRTX2080WinFormatXML,
-		},
-		"fail on queryGPUInfoXML error": {
+		"fail on queryGPUInfo error": {
 			wantFail: true,
-			prepare:  prepareCaseErrOnQueryGPUInfoXML,
-		},
-		"fail on queryGPUInfoCSV error": {
-			wantFail: true,
-			prepare:  prepareCaseErrOnQueryGPUInfoCSV,
-		},
-		"fail on queryHelpQueryGPU error": {
-			wantFail: true,
-			prepare:  prepareCaseErrOnQueryHelpQueryGPU,
+			prepare:  prepareCaseErrOnQueryGPUInfo,
 		},
 	}
 
@@ -135,16 +118,16 @@ func TestNvidiaSMI_Check(t *testing.T) {
 	}
 }
 
-func TestNvidiaSMI_Collect(t *testing.T) {
+func TestNvidiaSmi_Collect(t *testing.T) {
 	type testCaseStep struct {
-		prepare func(nv *NvidiaSMI)
-		check   func(t *testing.T, nv *NvidiaSMI)
+		prepare func(nv *NvidiaSmi)
+		check   func(t *testing.T, nv *NvidiaSmi)
 	}
 	tests := map[string][]testCaseStep{
-		"success A100-SXM4 MIG [XML]": {
+		"success A100-SXM4 MIG": {
 			{
-				prepare: prepareCaseMIGA100formatXML,
-				check: func(t *testing.T, nv *NvidiaSMI) {
+				prepare: prepareCaseMIGA100,
+				check: func(t *testing.T, nv *NvidiaSmi) {
 					mx := nv.Collect()
 
 					expected := map[string]int64{
@@ -201,10 +184,10 @@ func TestNvidiaSMI_Collect(t *testing.T) {
 				},
 			},
 		},
-		"success RTX 4090 Driver 535 [XML]": {
+		"success RTX 4090 Driver 535": {
 			{
-				prepare: prepareCaseRTX4090Driver535formatXML,
-				check: func(t *testing.T, nv *NvidiaSMI) {
+				prepare: prepareCaseRTX4090Driver535,
+				check: func(t *testing.T, nv *NvidiaSmi) {
 					mx := nv.Collect()
 
 					expected := map[string]int64{
@@ -251,10 +234,10 @@ func TestNvidiaSMI_Collect(t *testing.T) {
 				},
 			},
 		},
-		"success RTX 3060 [XML]": {
+		"success RTX 3060": {
 			{
-				prepare: prepareCaseRTX3060formatXML,
-				check: func(t *testing.T, nv *NvidiaSMI) {
+				prepare: prepareCaseRTX3060,
+				check: func(t *testing.T, nv *NvidiaSmi) {
 					mx := nv.Collect()
 
 					expected := map[string]int64{
@@ -300,10 +283,10 @@ func TestNvidiaSMI_Collect(t *testing.T) {
 				},
 			},
 		},
-		"success Tesla P100 [XML]": {
+		"success Tesla P100": {
 			{
-				prepare: prepareCaseTeslaP100formatXML,
-				check: func(t *testing.T, nv *NvidiaSMI) {
+				prepare: prepareCaseTeslaP100,
+				check: func(t *testing.T, nv *NvidiaSmi) {
 					mx := nv.Collect()
 
 					expected := map[string]int64{
@@ -348,50 +331,10 @@ func TestNvidiaSMI_Collect(t *testing.T) {
 				},
 			},
 		},
-		"success Tesla P100 [CSV]": {
+		"success RTX 2080 Win": {
 			{
-				prepare: prepareCaseTeslaP100formatCSV,
-				check: func(t *testing.T, nv *NvidiaSMI) {
-					mx := nv.Collect()
-
-					expected := map[string]int64{
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_frame_buffer_memory_usage_free":     17070817280,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_frame_buffer_memory_usage_reserved": 108003328,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_frame_buffer_memory_usage_used":     0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_gpu_utilization":                    0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_graphics_clock":                     405,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_mem_clock":                          715,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_mem_utilization":                    0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P0":               1,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P1":               0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P10":              0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P11":              0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P12":              0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P13":              0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P14":              0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P15":              0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P2":               0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P3":               0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P4":               0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P5":               0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P6":               0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P7":               0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P8":               0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_performance_state_P9":               0,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_power_draw":                         28,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_sm_clock":                           405,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_temperature":                        37,
-						"gpu_GPU-ef1b2c9b-38d8-2090-2bd1-f567a3eb42a6_video_clock":                        835,
-					}
-
-					assert.Equal(t, expected, mx)
-				},
-			},
-		},
-		"success RTX 2080 Win [XML]": {
-			{
-				prepare: prepareCaseRTX2080WinFormatXML,
-				check: func(t *testing.T, nv *NvidiaSMI) {
+				prepare: prepareCaseRTX2080Win,
+				check: func(t *testing.T, nv *NvidiaSmi) {
 					mx := nv.Collect()
 
 					expected := map[string]int64{
@@ -437,30 +380,10 @@ func TestNvidiaSMI_Collect(t *testing.T) {
 				},
 			},
 		},
-		"fail on queryGPUInfoXML error [XML]": {
+		"fails on queryGPUInfo error": {
 			{
-				prepare: prepareCaseErrOnQueryGPUInfoXML,
-				check: func(t *testing.T, nv *NvidiaSMI) {
-					mx := nv.Collect()
-
-					assert.Equal(t, map[string]int64(nil), mx)
-				},
-			},
-		},
-		"fail on queryGPUInfoCSV error [CSV]": {
-			{
-				prepare: prepareCaseErrOnQueryGPUInfoCSV,
-				check: func(t *testing.T, nv *NvidiaSMI) {
-					mx := nv.Collect()
-
-					assert.Equal(t, map[string]int64(nil), mx)
-				},
-			},
-		},
-		"fail on queryHelpQueryGPU error": {
-			{
-				prepare: prepareCaseErrOnQueryHelpQueryGPU,
-				check: func(t *testing.T, nv *NvidiaSMI) {
+				prepare: prepareCaseErrOnQueryGPUInfo,
+				check: func(t *testing.T, nv *NvidiaSmi) {
 					mx := nv.Collect()
 
 					assert.Equal(t, map[string]int64(nil), mx)
@@ -483,79 +406,42 @@ func TestNvidiaSMI_Collect(t *testing.T) {
 	}
 }
 
-type mockNvidiaSMI struct {
-	gpuInfoXML           []byte
-	errOnQueryGPUInfoXML bool
-
-	gpuInfoCSV           []byte
-	errOnQueryGPUInfoCSV bool
-
-	helpQueryGPU           []byte
-	errOnQueryHelpQueryGPU bool
+type mockNvidiaSmi struct {
+	gpuInfo           []byte
+	errOnQueryGPUInfo bool
 }
 
-func (m *mockNvidiaSMI) queryGPUInfoXML() ([]byte, error) {
-	if m.errOnQueryGPUInfoXML {
-		return nil, errors.New("error on mock.queryGPUInfoXML()")
+func (m *mockNvidiaSmi) queryGPUInfo() ([]byte, error) {
+	if m.errOnQueryGPUInfo {
+		return nil, errors.New("error on mock.queryGPUInfo()")
 	}
-	return m.gpuInfoXML, nil
+	return m.gpuInfo, nil
 }
 
-func (m *mockNvidiaSMI) queryGPUInfoCSV(_ []string) ([]byte, error) {
-	if m.errOnQueryGPUInfoCSV {
-		return nil, errors.New("error on mock.queryGPUInfoCSV()")
-	}
-	return m.gpuInfoCSV, nil
+func (m *mockNvidiaSmi) stop() error {
+	return nil
 }
 
-func (m *mockNvidiaSMI) queryHelpQueryGPU() ([]byte, error) {
-	if m.errOnQueryHelpQueryGPU {
-		return nil, errors.New("error on mock.queryHelpQueryGPU()")
-	}
-	return m.helpQueryGPU, nil
+func prepareCaseMIGA100(nv *NvidiaSmi) {
+	nv.exec = &mockNvidiaSmi{gpuInfo: dataXMLA100SXM4MIG}
 }
 
-func prepareCaseMIGA100formatXML(nv *NvidiaSMI) {
-	nv.UseCSVFormat = false
-	nv.exec = &mockNvidiaSMI{gpuInfoXML: dataXMLA100SXM4MIG}
+func prepareCaseRTX3060(nv *NvidiaSmi) {
+	nv.exec = &mockNvidiaSmi{gpuInfo: dataXMLRTX3060}
 }
 
-func prepareCaseRTX3060formatXML(nv *NvidiaSMI) {
-	nv.UseCSVFormat = false
-	nv.exec = &mockNvidiaSMI{gpuInfoXML: dataXMLRTX3060}
+func prepareCaseRTX4090Driver535(nv *NvidiaSmi) {
+	nv.exec = &mockNvidiaSmi{gpuInfo: dataXMLRTX4090Driver535}
 }
 
-func prepareCaseRTX4090Driver535formatXML(nv *NvidiaSMI) {
-	nv.UseCSVFormat = false
-	nv.exec = &mockNvidiaSMI{gpuInfoXML: dataXMLRTX4090Driver535}
+func prepareCaseTeslaP100(nv *NvidiaSmi) {
+	nv.exec = &mockNvidiaSmi{gpuInfo: dataXMLTeslaP100}
 }
 
-func prepareCaseTeslaP100formatXML(nv *NvidiaSMI) {
-	nv.UseCSVFormat = false
-	nv.exec = &mockNvidiaSMI{gpuInfoXML: dataXMLTeslaP100}
+func prepareCaseRTX2080Win(nv *NvidiaSmi) {
+	nv.exec = &mockNvidiaSmi{gpuInfo: dataXMLRTX2080Win}
 }
 
-func prepareCaseRTX2080WinFormatXML(nv *NvidiaSMI) {
-	nv.UseCSVFormat = false
-	nv.exec = &mockNvidiaSMI{gpuInfoXML: dataXMLRTX2080Win}
-}
-
-func prepareCaseErrOnQueryGPUInfoXML(nv *NvidiaSMI) {
-	nv.UseCSVFormat = false
-	nv.exec = &mockNvidiaSMI{errOnQueryGPUInfoXML: true}
-}
-
-func prepareCaseTeslaP100formatCSV(nv *NvidiaSMI) {
-	nv.UseCSVFormat = true
-	nv.exec = &mockNvidiaSMI{helpQueryGPU: dataHelpQueryGPU, gpuInfoCSV: dataCSVTeslaP100}
-}
-
-func prepareCaseErrOnQueryHelpQueryGPU(nv *NvidiaSMI) {
-	nv.UseCSVFormat = true
-	nv.exec = &mockNvidiaSMI{errOnQueryHelpQueryGPU: true}
-}
-
-func prepareCaseErrOnQueryGPUInfoCSV(nv *NvidiaSMI) {
-	nv.UseCSVFormat = true
-	nv.exec = &mockNvidiaSMI{helpQueryGPU: dataHelpQueryGPU, errOnQueryGPUInfoCSV: true}
+func prepareCaseErrOnQueryGPUInfo(nv *NvidiaSmi) {
+	nv.exec = &mockNvidiaSmi{errOnQueryGPUInfo: true}
 }

@@ -53,16 +53,6 @@ var (
 		migDeviceFrameBufferMemoryUsageChartTmpl.Copy(),
 		migDeviceBAR1MemoryUsageChartTmpl.Copy(),
 	}
-	gpuCSVCharts = module.Charts{
-		gpuFanSpeedPercChartTmpl.Copy(),
-		gpuUtilizationChartTmpl.Copy(),
-		gpuMemUtilizationChartTmpl.Copy(),
-		gpuFrameBufferMemoryUsageChartTmpl.Copy(),
-		gpuTemperatureChartTmpl.Copy(),
-		gpuClockFreqChartTmpl.Copy(),
-		gpuPowerDrawChartTmpl.Copy(),
-		gpuPerformanceStateChartTmpl.Copy(),
-	}
 )
 
 var (
@@ -271,7 +261,7 @@ var (
 	}
 )
 
-func (nv *NvidiaSMI) addGPUXMLCharts(gpu xmlGPUInfo) {
+func (nv *NvidiaSmi) addGPUXMLCharts(gpu gpuInfo) {
 	charts := gpuXMLCharts.Copy()
 
 	if !isValidValue(gpu.Utilization.GpuUtil) {
@@ -318,37 +308,6 @@ func (nv *NvidiaSMI) addGPUXMLCharts(gpu xmlGPUInfo) {
 	}
 }
 
-func (nv *NvidiaSMI) addGPUCSVCharts(gpu csvGPUInfo) {
-	charts := gpuCSVCharts.Copy()
-
-	if !isValidValue(gpu.utilizationGPU) {
-		_ = charts.Remove(gpuUtilizationChartTmpl.ID)
-	}
-	if !isValidValue(gpu.utilizationMemory) {
-		_ = charts.Remove(gpuMemUtilizationChartTmpl.ID)
-	}
-	if !isValidValue(gpu.fanSpeed) {
-		_ = charts.Remove(gpuFanSpeedPercChartTmpl.ID)
-	}
-	if !isValidValue(gpu.powerDraw) {
-		_ = charts.Remove(gpuPowerDrawChartTmpl.ID)
-	}
-
-	for _, c := range *charts {
-		c.ID = fmt.Sprintf(c.ID, strings.ToLower(gpu.uuid))
-		c.Labels = []module.Label{
-			{Key: "product_name", Value: gpu.name},
-		}
-		for _, d := range c.Dims {
-			d.ID = fmt.Sprintf(d.ID, gpu.uuid)
-		}
-	}
-
-	if err := nv.Charts().Add(*charts...); err != nil {
-		nv.Warning(err)
-	}
-}
-
 var (
 	migDeviceFrameBufferMemoryUsageChartTmpl = module.Chart{
 		ID:       "mig_instance_%s_gpu_%s_frame_buffer_memory_usage",
@@ -379,7 +338,7 @@ var (
 	}
 )
 
-func (nv *NvidiaSMI) addMIGDeviceXMLCharts(gpu xmlGPUInfo, mig xmlMIGDeviceInfo) {
+func (nv *NvidiaSmi) addMIGDeviceCharts(gpu gpuInfo, mig gpuMIGDeviceInfo) {
 	charts := migDeviceXMLCharts.Copy()
 
 	for _, c := range *charts {
@@ -399,7 +358,7 @@ func (nv *NvidiaSMI) addMIGDeviceXMLCharts(gpu xmlGPUInfo, mig xmlMIGDeviceInfo)
 	}
 }
 
-func (nv *NvidiaSMI) removeCharts(prefix string) {
+func (nv *NvidiaSmi) removeCharts(prefix string) {
 	prefix = strings.ToLower(prefix)
 
 	for _, c := range *nv.Charts() {

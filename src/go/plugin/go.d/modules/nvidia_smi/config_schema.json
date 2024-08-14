@@ -24,11 +24,11 @@
         "minimum": 0.5,
         "default": 10
       },
-      "use_csv_format": {
-        "title": "Use CSV format",
-        "description": "Determines the format used for requesting GPU information. If set, CSV format is used, otherwise XML.",
+      "loop_mode": {
+        "title": "Loop Mode",
+        "description": "When enabled, `nvidia-smi` is executed continuously in a separate thread using the `-l` option.",
         "type": "boolean",
-        "default": false
+        "default": true
       }
     },
     "required": [
@@ -48,6 +48,9 @@
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "loop_mode": {
+      "ui:help": "In loop mode, `nvidia-smi` will repeatedly query GPU data at specified intervals, defined by the `-l SEC` or `--loop=SEC` parameter, rather than just running the query once. This enables ongoing performance tracking by putting the application to sleep between queries."
     }
   }
 }

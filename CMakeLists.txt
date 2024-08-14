@@ -2476,13 +2476,13 @@ install(FILES
         DESTINATION usr/lib/netdata/system/launchd)
 
 configure_file(system/freebsd/rc.d/netdata.in system/freebsd/rc.d/netdata @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/freebsd/rc.d/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/freebsd/rc.d)
 
 configure_file(system/initd/init.d/netdata.in system/initd/init.d/netdata @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/initd/init.d/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/initd/init.d)
@@ -2498,7 +2498,7 @@ install(FILES
         DESTINATION etc/logrotate.d)
 
 configure_file(system/lsb/init.d/netdata.in system/lsb/init.d/netdata @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/lsb/init.d/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/lsb/init.d)
@@ -2510,13 +2510,13 @@ install(FILES
         DESTINATION usr/lib/netdata/system/openrc/conf.d)
 
 configure_file(system/openrc/init.d/netdata.in system/openrc/init.d/netdata @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/openrc/init.d/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/openrc/init.d)
 
 configure_file(system/runit/run.in system/runit/run @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/runit/run
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/runit)
@@ -2809,24 +2809,18 @@ install(FILES
         src/collectors/python.d.plugin/boinc/boinc.conf
         src/collectors/python.d.plugin/ceph/ceph.conf
         src/collectors/python.d.plugin/changefinder/changefinder.conf
-        src/collectors/python.d.plugin/dovecot/dovecot.conf
         src/collectors/python.d.plugin/example/example.conf
-        src/collectors/python.d.plugin/exim/exim.conf
         src/collectors/python.d.plugin/go_expvar/go_expvar.conf
         src/collectors/python.d.plugin/haproxy/haproxy.conf
         src/collectors/python.d.plugin/monit/monit.conf
-        src/collectors/python.d.plugin/nsd/nsd.conf
-        src/collectors/python.d.plugin/nvidia_smi/nvidia_smi.conf
         src/collectors/python.d.plugin/openldap/openldap.conf
         src/collectors/python.d.plugin/oracledb/oracledb.conf
         src/collectors/python.d.plugin/pandas/pandas.conf
         src/collectors/python.d.plugin/retroshare/retroshare.conf
-        src/collectors/python.d.plugin/riakkv/riakkv.conf
         src/collectors/python.d.plugin/samba/samba.conf
         src/collectors/python.d.plugin/spigotmc/spigotmc.conf
         src/collectors/python.d.plugin/tor/tor.conf
         src/collectors/python.d.plugin/traefik/traefik.conf
-        src/collectors/python.d.plugin/uwsgi/uwsgi.conf
         src/collectors/python.d.plugin/varnish/varnish.conf
         src/collectors/python.d.plugin/w1sensor/w1sensor.conf
         src/collectors/python.d.plugin/zscores/zscores.conf
@@ -2839,24 +2833,18 @@ install(FILES
         src/collectors/python.d.plugin/boinc/boinc.chart.py
         src/collectors/python.d.plugin/ceph/ceph.chart.py
         src/collectors/python.d.plugin/changefinder/changefinder.chart.py
-        src/collectors/python.d.plugin/dovecot/dovecot.chart.py
         src/collectors/python.d.plugin/example/example.chart.py
-        src/collectors/python.d.plugin/exim/exim.chart.py
         src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
         src/collectors/python.d.plugin/haproxy/haproxy.chart.py
         src/collectors/python.d.plugin/monit/monit.chart.py
-        src/collectors/python.d.plugin/nsd/nsd.chart.py
-        src/collectors/python.d.plugin/nvidia_smi/nvidia_smi.chart.py
         src/collectors/python.d.plugin/openldap/openldap.chart.py
         src/collectors/python.d.plugin/oracledb/oracledb.chart.py
         src/collectors/python.d.plugin/pandas/pandas.chart.py
         src/collectors/python.d.plugin/retroshare/retroshare.chart.py
-        src/collectors/python.d.plugin/riakkv/riakkv.chart.py
         src/collectors/python.d.plugin/samba/samba.chart.py
         src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
         src/collectors/python.d.plugin/tor/tor.chart.py
         src/collectors/python.d.plugin/traefik/traefik.chart.py
-        src/collectors/python.d.plugin/uwsgi/uwsgi.chart.py
         src/collectors/python.d.plugin/varnish/varnish.chart.py
         src/collectors/python.d.plugin/w1sensor/w1sensor.chart.py
         src/collectors/python.d.plugin/zscores/zscores.chart.py

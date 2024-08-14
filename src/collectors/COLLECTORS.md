@@ -269,7 +269,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [RethinkDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/rethinkdb/integrations/rethinkdb.md)
 
-- [RiakKV](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/riakkv/integrations/riakkv.md)
+- [Riak KV](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/riakkv/integrations/riak_kv.md)
 
 - [SQL Database agnostic](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/sql_database_agnostic.md)
 
@@ -303,7 +303,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [ISC DHCP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/isc_dhcpd/integrations/isc_dhcp.md)
 
-- [Name Server Daemon](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/nsd/integrations/name_server_daemon.md)
+- [NSD](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/nsd/integrations/nsd.md)
 
 - [NextDNS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/nextdns.md)
 
@@ -745,9 +745,9 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [DMARC](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/dmarc.md)
 
-- [Dovecot](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/dovecot/integrations/dovecot.md)
+- [Dovecot](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/dovecot/integrations/dovecot.md)
 
-- [Exim](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/exim/integrations/exim.md)
+- [Exim](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/exim/integrations/exim.md)
 
 - [Halon](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/halon.md)
 
@@ -1161,7 +1161,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Web server log files](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/weblog/integrations/web_server_log_files.md)
 
-- [uWSGI](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/uwsgi/integrations/uwsgi.md)
+- [uWSGI](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/uwsgi/integrations/uwsgi.md)
 
 ### Windows Systems
 

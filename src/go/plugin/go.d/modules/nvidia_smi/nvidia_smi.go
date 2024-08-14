@@ -18,7 +18,6 @@ func init() {
 	module.Register("nvidia_smi", module.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: module.Defaults{
-			Disabled:    true,
 			UpdateEvery: 10,
 		},
 		Create: func() module.Module { return New() },
@@ -26,11 +25,11 @@ func init() {
 	})
 }
 
-func New() *NvidiaSMI {
-	return &NvidiaSMI{
+func New() *NvidiaSmi {
+	return &NvidiaSmi{
 		Config: Config{
-			Timeout:      web.Duration(time.Second * 10),
-			UseCSVFormat: false,
+			Timeout:  web.Duration(time.Second * 10),
+			LoopMode: true,
 		},
 		binName: "nvidia-smi",
 		charts:  &module.Charts{},
@@ -41,41 +40,32 @@ func New() *NvidiaSMI {
 }
 
 type Config struct {
-	UpdateEvery  int          `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout      web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	BinaryPath   string       `yaml:"binary_path" json:"binary_path"`
-	UseCSVFormat bool         `yaml:"use_csv_format" json:"use_csv_format"`
+	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	BinaryPath  string       `yaml:"binary_path" json:"binary_path"`
+	LoopMode    bool         `yaml:"loop_mode,omitempty" json:"loop_mode"`
 }
 
-type (
-	NvidiaSMI struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type NvidiaSmi struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec    nvidiaSMI
-		binName string
+	exec    nvidiaSmiBinary
+	binName string
 
-		gpuQueryProperties []string
+	gpus map[string]bool
+	migs map[string]bool
+}
 
-		gpus map[string]bool
-		migs map[string]bool
-	}
-	nvidiaSMI interface {
-		queryGPUInfoXML() ([]byte, error)
-		queryGPUInfoCSV(properties []string) ([]byte, error)
-		queryHelpQueryGPU() ([]byte, error)
-	}
-)
-
-func (nv *NvidiaSMI) Configuration() any {
+func (nv *NvidiaSmi) Configuration() any {
 	return nv.Config
 }
 
-func (nv *NvidiaSMI) Init() error {
+func (nv *NvidiaSmi) Init() error {
 	if nv.exec == nil {
-		smi, err := nv.initNvidiaSMIExec()
+		smi, err := nv.initNvidiaSmiExec()
 		if err != nil {
 			nv.Error(err)
 			return err
@@ -86,7 +76,7 @@ func (nv *NvidiaSMI) Init() error {
 	return nil
 }
 
-func (nv *NvidiaSMI) Check() error {
+func (nv *NvidiaSmi) Check() error {
 	mx, err := nv.collect()
 	if err != nil {
 		nv.Error(err)
@@ -98,11 +88,11 @@ func (nv *NvidiaSMI) Check() error {
 	return nil
 }
 
-func (nv *NvidiaSMI) Charts() *module.Charts {
+func (nv *NvidiaSmi) Charts() *module.Charts {
 	return nv.charts
 }
 
-func (nv *NvidiaSMI) Collect() map[string]int64 {
+func (nv *NvidiaSmi) Collect() map[string]int64 {
 	mx, err := nv.collect()
 	if err != nil {
 		nv.Error(err)
@@ -114,4 +104,11 @@ func (nv *NvidiaSMI) Collect() map[string]int64 {
 	return mx
 }
 
-func (nv *NvidiaSMI) Cleanup() {}
+func (nv *NvidiaSmi) Cleanup() {
+	if nv.exec != nil {
+		if err := nv.exec.stop(); err != nil {
+			nv.Errorf("cleanup: %v", err)
+		}
+		nv.exec = nil
+	}
+}

@@ -1,0 +1,272 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-nsd
+      plugin_name: go.d.plugin
+      module_name: nsd
+      monitored_instance:
+        name: NSD
+        link: "https://nsd.docs.nlnetlabs.nl/en/latest"
+        icon_filename: 'nsd.svg'
+        categories:
+          - data-collection.dns-and-dhcp-servers
+      keywords:
+        - nsd
+        - dns
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: >
+          This collector monitors NSD statistics like queries, zones, protocols, query types and more.
+          It relies on the [`nsd-control`](https://nsd.docs.nlnetlabs.nl/en/latest/manpages/nsd-control.html) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+          
+          Executed commands:
+          
+          - `nsd-control stats_noreset`
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/nsd.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: timeout
+              description: nsd-control binary execution timeout.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
+              config: |
+                jobs:
+                  - name: nsd
+                    update_every: 5  # Collect logical volume statistics every 5 seconds
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the the entire monitored application.
+          labels: []
+          metrics:
+            - name: nsd.queries
+              description: Queries
+              unit: 'queries/s'
+              chart_type: line
+              dimensions:
+                - name: queries
+            - name: nsd.queries_by_type
+              description: Queries Type
+              unit: 'queries/s'
+              chart_type: stacked
+              dimensions:
+                - name: "A"
+                - name: "NS"
+                - name: "MD"
+                - name: "MF"
+                - name: "CNAME"
+                - name: "SOA"
+                - name: "MB"
+                - name: "MG"
+                - name: "MR"
+                - name: "NULL"
+                - name: "WKS"
+                - name: "PTR"
+                - name: "HINFO"
+                - name: "MINFO"
+                - name: "MX"
+                - name: "TXT"
+                - name: "RP"
+                - name: "AFSDB"
+                - name: "X25"
+                - name: "ISDN"
+                - name: "RT"
+                - name: "NSAP"
+                - name: "SIG"
+                - name: "KEY"
+                - name: "PX"
+                - name: "AAAA"
+                - name: "LOC"
+                - name: "NXT"
+                - name: "SRV"
+                - name: "NAPTR"
+                - name: "KX"
+                - name: "CERT"
+                - name: "DNAME"
+                - name: "OPT"
+                - name: "APL"
+                - name: "DS"
+                - name: "SSHFP"
+                - name: "IPSECKEY"
+                - name: "RRSIG"
+                - name: "NSEC"
+                - name: "DNSKEY"
+                - name: "DHCID"
+                - name: "NSEC3"
+                - name: "NSEC3PARAM"
+                - name: "TLSA"
+                - name: "SMIMEA"
+                - name: "CDS"
+                - name: "CDNSKEY"
+                - name: "OPENPGPKEY"
+                - name: "CSYNC"
+                - name: "ZONEMD"
+                - name: "SVCB"
+                - name: "HTTPS"
+                - name: "SPF"
+                - name: "NID"
+                - name: "L32"
+                - name: "L64"
+                - name: "LP"
+                - name: "EUI48"
+                - name: "EUI64"
+                - name: "URI"
+                - name: "CAA"
+                - name: "AVC"
+                - name: "DLV"
+                - name: "IXFR"
+                - name: "AXFR"
+                - name: "MAILB"
+                - name: "MAILA"
+                - name: "ANY"
+            - name: nsd.queries_by_opcode
+              description: Queries Opcode
+              unit: 'queries/s'
+              chart_type: stacked
+              dimensions:
+                - name: "QUERY"
+                - name: "IQUERY"
+                - name: "STATUS"
+                - name: "NOTIFY"
+                - name: "UPDATE"
+                - name: "OTHER"
+            - name: nsd.queries_by_class
+              description: Queries Class
+              unit: 'queries/s'
+              chart_type: stacked
+              dimensions:
+                - name: "IN"
+                - name: "CS"
+                - name: "CH"
+                - name: "HS"
+            - name: nsd.queries_by_protocol
+              description: Queries Protocol
+              unit: 'queries/s'
+              chart_type: stacked
+              dimensions:
+                - name: "udp"
+                - name: "udp6"
+                - name: "tcp"
+                - name: "tcp6"
+                - name: "tls"
+                - name: "tls6"
+            - name: nsd.answers_by_rcode
+              description: Answers Rcode
+              unit: 'answers/s'
+              chart_type: stacked
+              dimensions:
+                - name: "NOERROR"
+                - name: "FORMERR"
+                - name: "SERVFAIL"
+                - name: "NXDOMAIN"
+                - name: "NOTIMP"
+                - name: "REFUSED"
+                - name: "YXDOMAIN"
+                - name: "YXRRSET"
+                - name: "NXRRSET"
+                - name: "NOTAUTH"
+                - name: "NOTZONE"
+                - name: "RCODE11"
+                - name: "RCODE12"
+                - name: "RCODE13"
+                - name: "RCODE14"
+                - name: "RCODE15"
+                - name: "BADVERS"
+            - name: nsd.errors
+              description: Errors
+              unit: 'errors/s'
+              chart_type: line
+              dimensions:
+                - name: "query"
+                - name: "answer"
+            - name: nsd.drops
+              description: Drops
+              unit: 'drops/s'
+              chart_type: line
+              dimensions:
+                - name: "query"
+            - name: nsd.zones
+              description: Zones
+              unit: 'zones'
+              chart_type: line
+              dimensions:
+                - name: "master"
+                - name: "slave"
+            - name: nsd.zone_transfers_requests
+              description: Zone Transfers
+              unit: 'requests/s'
+              chart_type: line
+              dimensions:
+                - name: "AXFR"
+                - name: "IXFR"
+            - name: nsd.zone_transfer_memory
+              description: Zone Transfer Memory
+              unit: 'bytes'
+              chart_type: line
+              dimensions:
+                - name: "used"
+            - name: nsd.database_size
+              description: Database Size
+              unit: 'bytes'
+              chart_type: line
+              dimensions:
+                - name: "disk"
+                - name: "mem"
+            - name: nsd.uptime
+              description: Uptime
+              unit: 'seconds'
+              chart_type: line
+              dimensions:
+                - name: "uptime"
