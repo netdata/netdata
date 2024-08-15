@@ -309,6 +309,7 @@ static cmd_status_t cmd_aclk_state(char *args, char **message)
 {
 #ifdef ENABLE_ACLK
     netdata_log_info("COMMAND: Reopening aclk/cloud state.");
+#endif
 #ifdef ENABLE_ACLK
     if (strstr(args, "json"))
         *message = aclk_state_json();
