@@ -199,7 +199,9 @@ fi
 
 progress "changing plugins ownership and permissions"
 
-./bin/bash /opt/netdata/system/apply-filecaps.sh "${NETDATA_GROUP}"
+if ! ./bin/bash /opt/netdata/system/apply-filecaps.sh "${NETDATA_GROUP}"; then
+  run_failed "Failed to apply file ownership and permissions. Some collectors may not work correctly."
+fi
 
 # -----------------------------------------------------------------------------
 
