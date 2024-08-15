@@ -101,6 +101,7 @@ see the appropriate collector readme.
 | [megacli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/megacli)                       |     MegaCli Hardware Raid     |
 | [memcached](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/memcached)                   |           Memcached           |
 | [mongoDB](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/mongodb)                       |            MongoDB            |
+| [monit](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/monit)                           |             Monit             |
 | [mysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/mysql)                           |             MySQL             |
 | [nginx](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginx)                           |             NGINX             |
 | [nginxplus](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginxplus)                   |          NGINX Plus           |

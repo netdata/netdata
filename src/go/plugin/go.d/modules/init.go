@@ -56,6 +56,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/megacli"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/memcached"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/mongodb"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/monit"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/mysql"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nginx"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nginxplus"
