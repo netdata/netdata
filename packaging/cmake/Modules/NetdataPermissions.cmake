@@ -182,7 +182,7 @@ endfunction()
 # Add shell script to the specified variable to handle restricting
 # the permissions of the specified path to the Netdata user
 function(_nd_perms_mark_path_restricted var path)
-  set(tmp_var "${${var}}chown -f 'root:${NETDATA_GROUP}' '${path}'\n")
+  set(tmp_var "${${var}}chown -f 'root:$NETDATA_GROUP' '${path}'\n")
   set(tmp_var "${tmp_var}chmod -f 0750 '${path}'\n")
   set(${var} "${tmp_var}" PARENT_SCOPE)
 endfunction()
@@ -190,7 +190,7 @@ endfunction()
 # Add shell script to the specified variable to handle marking the
 # specified path SUID.
 function(_nd_perms_mark_path_suid var path)
-  set(tmp_var "${${var}}chown -f 'root:${NETDATA_GROUP}' '${path}'\n")
+  set(tmp_var "${${var}}chown -f 'root:$NETDATA_GROUP' '${path}'\n")
   set(tmp_var "${tmp_var}chmod -f 4750 '${path}'\n")
   set(${var} "${tmp_var}" PARENT_SCOPE)
 endfunction()
@@ -198,8 +198,8 @@ endfunction()
 # Add shell script to the specified variable to handle marking the
 # specified path with the specified filecaps.
 function(_nd_perms_mark_path_filecaps var path capset)
-  set(tmp_var "${${var}}chown -f 'root:${NETDATA_GROUP}' '${path}'\n")
-  set(tmp_var "${tmpvar}chmod -f 0750 '${path}'\n")
+  set(tmp_var "${${var}}chown -f 'root:$NETDATA_GROUP' '${path}'\n")
+  set(tmp_var "${tmp_var}chmod -f 0750 '${path}'\n")
   set(tmp_var "${tmp_var}if ! capset '${capset}' '${path}' 2>/dev/null; then\n")
 
   if(capset MATCHES "perfmon")
@@ -258,7 +258,7 @@ endfunction()
 # Handle generation of postinstall scripts for DEB packages.
 function(nd_perms_prepare_deb_postinst_scripts entries)
   foreach(component IN LISTS CPACK_COMPONENTS_ALL)
-    set(ND_APPLY_PERMISSIONS "\n")
+    set(ND_APPLY_PERMISSIONS "NETDATA_GROUP='${NETDATA_GROUP}'\n")
     file(MAKE_DIRECTORY "${_nd_perms_hooks_dir}/deb/${component}")
     set(postinst "${_nd_perms_hooks_dir}/deb/${component}/postinst")
     set(postinst_src "${PKG_FILES_PATH}/deb/${component}/postinst")
@@ -280,18 +280,14 @@ endfunction()
 function(nd_perms_prepare_static_postinstall_hook entries)
   file(MAKE_DIRECTORY "${_nd_perms_hooks_dir}/static")
   set(hook_path "${_nd_perms_hooks_dir}/static/apply-filecaps.sh")
-  # This next variable is needed to work around CMake’s inability to
-  # escape `$` in arguments.
-  #
-  # Syntax highlighting for this line does not work correctly in at
-  # least some editors.
-  set(euid_check [=[[ "${EUID}" -ne 0 ] || exit 0]=])
 
   message(STATUS "Generating ${hook_path}")
 
   set(hook_script "#!/bin/bash\n")
   set(hook_script "${hook_script}set -e\n")
-  set(hook_script "${hook_script}${euid_check}\n")
+  set(hook_script "${hook_script}[ \"$EUID\" -ne 0 ] || exit 0\n")
+  set(hook_script "${hook_script}NETDATA_GROUP=\"$1\"\n")
+  set(hook_script "${hook_script}[ -z \"$NETDATA_GROUP\" ] && NETDATA_GROUP='${NETDATA_GROUP}'\n")
 
   foreach(entry IN LISTS entries)
     _nd_perms_generate_entry_script(hook_script "${entry}")

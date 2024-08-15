@@ -199,7 +199,7 @@ fi
 
 progress "changing plugins ownership and permissions"
 
-./bin/bash /opt/netdata/system/apply-filecaps.sh
+./bin/bash /opt/netdata/system/apply-filecaps.sh "${NETDATA_GROUP}"
 
 # -----------------------------------------------------------------------------
 
