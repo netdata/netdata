@@ -285,7 +285,7 @@ function(nd_perms_prepare_static_postinstall_hook entries)
 
   set(hook_script "#!/bin/bash\n")
   set(hook_script "${hook_script}set -e\n")
-  set(hook_script "${hook_script}[ \"$EUID\" -ne 0 ] || exit 0\n")
+  set(hook_script "${hook_script}[ \"$EUID\" -eq 0 ] || exit 0\n")
   set(hook_script "${hook_script}NETDATA_GROUP=\"$1\"\n")
   set(hook_script "${hook_script}[ -z \"$NETDATA_GROUP\" ] && NETDATA_GROUP='${NETDATA_GROUP}'\n")
 
