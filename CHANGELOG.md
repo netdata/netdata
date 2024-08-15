@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- Bump github.com/docker/docker from 27.1.1+incompatible to 27.1.2+incompatible in /src/go [\#18340](https://github.com/netdata/netdata/pull/18340) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/vmware/govmomi from 0.39.0 to 0.40.0 in /src/go [\#18338](https://github.com/netdata/netdata/pull/18338) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/miekg/dns from 1.1.61 to 1.1.62 in /src/go [\#18337](https://github.com/netdata/netdata/pull/18337) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump k8s.io/client-go from 0.30.3 to 0.31.0 in /src/go [\#18336](https://github.com/netdata/netdata/pull/18336) ([dependabot[bot]](https://github.com/apps/dependabot))
+- add i2pd to apps\_groups.conf [\#18335](https://github.com/netdata/netdata/pull/18335) ([ilyam8](https://github.com/ilyam8))
+- add dashboard v2 license to readme [\#18334](https://github.com/netdata/netdata/pull/18334) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18333](https://github.com/netdata/netdata/pull/18333) ([netdatabot](https://github.com/netdatabot))
+- go.d riakkv [\#18330](https://github.com/netdata/netdata/pull/18330) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/riakkv [\#18329](https://github.com/netdata/netdata/pull/18329) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18328](https://github.com/netdata/netdata/pull/18328) ([netdatabot](https://github.com/netdatabot))
 - add go.d/uwsgi [\#18326](https://github.com/netdata/netdata/pull/18326) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/uwsgi [\#18325](https://github.com/netdata/netdata/pull/18325) ([ilyam8](https://github.com/ilyam8))
@@ -13,6 +22,7 @@
 - remove python.d/dovecot [\#18322](https://github.com/netdata/netdata/pull/18322) ([ilyam8](https://github.com/ilyam8))
 - add go.d dovecot [\#18321](https://github.com/netdata/netdata/pull/18321) ([ilyam8](https://github.com/ilyam8))
 - go.d redis: fix default "address" in config\_schema.json [\#18320](https://github.com/netdata/netdata/pull/18320) ([ilyam8](https://github.com/ilyam8))
+- Ensure files in /usr/lib/netdata/system are not executable. [\#18318](https://github.com/netdata/netdata/pull/18318) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#18317](https://github.com/netdata/netdata/pull/18317) ([netdatabot](https://github.com/netdatabot))
 - remove python.d/nvidia\_smi [\#18316](https://github.com/netdata/netdata/pull/18316) ([ilyam8](https://github.com/ilyam8))
 - go.d nvidia\_smi: enable by default [\#18315](https://github.com/netdata/netdata/pull/18315) ([ilyam8](https://github.com/ilyam8))
@@ -63,6 +73,7 @@
 - docs: add a note that the min dbengine tier size is 256 MB [\#18256](https://github.com/netdata/netdata/pull/18256) ([ilyam8](https://github.com/ilyam8))
 - Update Installer Code \(Services\) [\#18253](https://github.com/netdata/netdata/pull/18253) ([thiagoftsm](https://github.com/thiagoftsm))
 - Don’t install netdata-updater code on Windows. [\#18251](https://github.com/netdata/netdata/pull/18251) ([Ferroin](https://github.com/Ferroin))
+- Add trigger to clean up chart labels and charts [\#18248](https://github.com/netdata/netdata/pull/18248) ([stelfrag](https://github.com/stelfrag))
 - Update README.md [\#18246](https://github.com/netdata/netdata/pull/18246) ([Steve8291](https://github.com/Steve8291))
 - Bump github.com/tidwall/gjson from 1.17.1 to 1.17.3 in /src/go [\#18244](https://github.com/netdata/netdata/pull/18244) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Fix OS detection messages in CMake. [\#18243](https://github.com/netdata/netdata/pull/18243) ([Ferroin](https://github.com/Ferroin))
@@ -249,7 +260,6 @@
 - spawn server \(Windows support for external plugins\) [\#17866](https://github.com/netdata/netdata/pull/17866) ([ktsaou](https://github.com/ktsaou))
 - sysinfo \(WinAPI\) [\#17857](https://github.com/netdata/netdata/pull/17857) ([thiagoftsm](https://github.com/thiagoftsm))
 - Run the agent as a Windows service. [\#17766](https://github.com/netdata/netdata/pull/17766) ([vkalintiris](https://github.com/vkalintiris))
-- add Win CPU interrupts [\#17753](https://github.com/netdata/netdata/pull/17753) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
@@ -401,20 +411,6 @@
 - Netdata Cloud docs section edits [\#17768](https://github.com/netdata/netdata/pull/17768) ([Ancairon](https://github.com/Ancairon))
 - Fix DEB package builds. [\#17765](https://github.com/netdata/netdata/pull/17765) ([Ferroin](https://github.com/Ferroin))
 - Fix version for go.d plugin [\#17764](https://github.com/netdata/netdata/pull/17764) ([vkalintiris](https://github.com/vkalintiris))
-- go.d sd local-listeners fix extractComm [\#17763](https://github.com/netdata/netdata/pull/17763) ([ilyam8](https://github.com/ilyam8))
-- Schedule a node info on label reload [\#17762](https://github.com/netdata/netdata/pull/17762) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#17761](https://github.com/netdata/netdata/pull/17761) ([netdatabot](https://github.com/netdatabot))
-- add clickhouse alerts [\#17760](https://github.com/netdata/netdata/pull/17760) ([ilyam8](https://github.com/ilyam8))
-- simplify installation page [\#17759](https://github.com/netdata/netdata/pull/17759) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations.js [\#17758](https://github.com/netdata/netdata/pull/17758) ([netdatabot](https://github.com/netdatabot))
-- Collecting metrics docs section simplification [\#17757](https://github.com/netdata/netdata/pull/17757) ([Ancairon](https://github.com/Ancairon))
-- go.d clickhouse add more metrics [\#17756](https://github.com/netdata/netdata/pull/17756) ([ilyam8](https://github.com/ilyam8))
-- mention how to remove highlight in documentation [\#17755](https://github.com/netdata/netdata/pull/17755) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations.js [\#17752](https://github.com/netdata/netdata/pull/17752) ([netdatabot](https://github.com/netdatabot))
-- go.d clickhouse add running queries [\#17751](https://github.com/netdata/netdata/pull/17751) ([ilyam8](https://github.com/ilyam8))
-- remove unused go.d/prometheus meta file [\#17749](https://github.com/netdata/netdata/pull/17749) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17748](https://github.com/netdata/netdata/pull/17748) ([netdatabot](https://github.com/netdatabot))
-- Use semver releases with sentry. [\#17746](https://github.com/netdata/netdata/pull/17746) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
