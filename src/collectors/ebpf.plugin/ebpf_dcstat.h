@@ -3,6 +3,8 @@
 #ifndef NETDATA_EBPF_DCSTAT_H
 #define NETDATA_EBPF_DCSTAT_H 1
 
+#include "ebpf.h"
+
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_DCSTAT "dcstat"
 #define NETDATA_EBPF_DC_MODULE_DESC "Monitor file access using directory cache. This thread is integrated with apps and cgroup."
@@ -69,26 +71,32 @@ enum directory_cache_targets {
     NETDATA_DC_TARGET_D_LOOKUP
 };
 
-typedef struct netdata_publish_dcstat_pid {
+typedef struct __attribute__((packed)) netdata_publish_dcstat_pid {
+    uint64_t cache_access;
+    uint32_t file_system;
+    uint32_t not_found;
+} netdata_publish_dcstat_pid_t;
+
+typedef struct netdata_dcstat_pid {
     uint64_t ct;
     uint32_t tgid;
     uint32_t uid;
     uint32_t gid;
     char name[TASK_COMM_LEN];
 
-    uint64_t cache_access;
-    uint64_t file_system;
-    uint64_t not_found;
+    uint32_t cache_access;
+    uint32_t file_system;
+    uint32_t not_found;
 } netdata_dcstat_pid_t;
 
-typedef struct netdata_publish_dcstat {
+typedef struct __attribute__((packed)) netdata_publish_dcstat {
     uint64_t ct;
 
     long long ratio;
     long long cache_access;
 
-    netdata_dcstat_pid_t curr;
-    netdata_dcstat_pid_t prev;
+    netdata_publish_dcstat_pid_t curr;
+    netdata_publish_dcstat_pid_t prev;
 } netdata_publish_dcstat_t;
 
 void *ebpf_dcstat_thread(void *ptr);

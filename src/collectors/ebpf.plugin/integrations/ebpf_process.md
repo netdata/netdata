@@ -68,6 +68,7 @@ Metrics:
 | netdata.ebpf_aral_stat_size | memory | bytes |
 | netdata.ebpf_aral_stat_alloc | aral | calls |
 | netdata.ebpf_threads | total, running | threads |
+| netdata.ebpf_pids | user, kernel | pids |
 | netdata.ebpf_load_methods | legacy, co-re | methods |
 | netdata.ebpf_kernel_memory | memory_locked | bytes |
 | netdata.ebpf_hash_tables_count | hash_table | hash tables |
