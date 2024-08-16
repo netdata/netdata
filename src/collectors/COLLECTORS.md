@@ -1041,8 +1041,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Idle OS Jitter](https://github.com/netdata/netdata/blob/master/src/collectors/idlejitter.plugin/integrations/idle_os_jitter.md)
 
-- [Monit](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/monit/integrations/monit.md)
-
 - [Ping](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/ping/integrations/ping.md)
 
 - [Pingdom](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/pingdom.md)
