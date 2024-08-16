@@ -21,7 +21,19 @@ Module: httpcheck
 
 ## Overview
 
-This collector monitors HTTP servers availability and response time.
+This collector monitors HTTP servers availability status and response time.
+
+Possible statuses:
+
+| Status        | Description                                                                                                                                                                                  |
+|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| success       | HTTP request completed successfully with a status code matching the configured `status_accepted` range (default: 200), and the response body and headers (if configured) match expectations. |
+| timeout       | HTTP request timed out before receiving a response (default: 1 second).                                                                                                                      |
+| no_connection | Failed to establish a connection to the target.                                                                                                                                              |
+| redirect      | Received a redirect response (3xx status code) while `not_follow_redirects` is configured.                                                                                                   |
+| bad_status    | HTTP request completed with a status code outside the configured `status_accepted` range (default: non-200).                                                                                 |
+| bad_content   | HTTP request completed successfully but the response body does not match the expected content (when using `response_match`).                                                                 |
+| bad_header    | HTTP request completed successfully but response headers do not match the expected values (when using `headers_match`).                                                                      |
 
 
 
