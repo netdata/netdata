@@ -21,35 +21,9 @@ void ebpf_aral_init(void)
         max_elements = NETDATA_EBPF_ALLOC_MIN_ELEMENTS;
     }
 
-    ebpf_aral_apps_pid_stat = ebpf_allocate_pid_aral("ebpf_pid_stat", sizeof(struct ebpf_pid_stat));
-
 #ifdef NETDATA_DEV_MODE
     netdata_log_info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
 #endif
-}
-
-/**
- * eBPF pid stat get
- *
- * Get a ebpf_pid_stat entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-struct ebpf_pid_stat *ebpf_pid_stat_get(void)
-{
-    struct ebpf_pid_stat *target = aral_mallocz(ebpf_aral_apps_pid_stat);
-    memset(target, 0, sizeof(struct ebpf_pid_stat));
-    return target;
-}
-
-/**
- * eBPF target release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_pid_stat_release(struct ebpf_pid_stat *stat)
-{
-    aral_freez(ebpf_aral_apps_pid_stat, stat);
 }
 
 // ----------------------------------------------------------------------------
@@ -332,11 +306,11 @@ int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **a
 
 #define MAX_CMDLINE 16384
 
-struct ebpf_pid_stat **ebpf_all_pids = NULL;    // to avoid allocations, we pre-allocate the
-                                      // the entire pid space.
-struct ebpf_pid_stat *ebpf_root_of_pids = NULL; // global list of all processes running
+ebpf_pid_data_t *ebpf_pids = NULL;            // to avoid allocations, we pre-allocate the entire pid space.
+ebpf_pid_data_t *ebpf_pids_link_list = NULL;  // global list of all processes running
 
-size_t ebpf_all_pids_count = 0; // the number of processes running
+size_t ebpf_all_pids_count = 0; // the number of processes running read from /proc
+size_t ebpf_hash_table_pids_count = 0; // the number of tasks in our hash tables
 
 struct ebpf_target
     *apps_groups_default_target = NULL, // the default target
@@ -389,109 +363,11 @@ static inline void debug_log_dummy(void)
 #endif
 
 /**
- * Managed log
- *
- * Store log information if it is necessary.
- *
- * @param p         the pid stat structure
- * @param log       the log id
- * @param status    the return from a function.
- *
- * @return It returns the status value.
- */
-static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
-{
-    if (unlikely(!status)) {
-        // netdata_log_error("command failed log %u, errno %d", log, errno);
-
-        if (unlikely(debug_enabled || errno != ENOENT)) {
-            if (unlikely(debug_enabled || !(p->log_thrown & log))) {
-                p->log_thrown |= log;
-                switch (log) {
-                    case PID_LOG_IO:
-                        netdata_log_error(
-                            "Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid,
-                            p->comm);
-                        break;
-
-                    case PID_LOG_STATUS:
-                        netdata_log_error(
-                            "Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid,
-                            p->comm);
-                        break;
-
-                    case PID_LOG_CMDLINE:
-                        netdata_log_error(
-                            "Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid,
-                            p->comm);
-                        break;
-
-                    case PID_LOG_FDS:
-                        netdata_log_error(
-                            "Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix,
-                            p->pid, p->comm);
-                        break;
-
-                    case PID_LOG_STAT:
-                        break;
-
-                    default:
-                        netdata_log_error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
-                        break;
-                }
-            }
-        }
-        errno_clear();
-    } else if (unlikely(p->log_thrown & log)) {
-        // netdata_log_error("unsetting log %u on pid %d", log, p->pid);
-        p->log_thrown &= ~log;
-    }
-
-    return status;
-}
-
-/**
- * Get PID entry
- *
- * Get or allocate the PID entry for the specified pid.
- *
- * @param pid   the pid to search the data.
- * @param tgid  the task group id
- *
- * @return It returns the pid entry structure
- */
-ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid, pid_t tgid)
-{
-    ebpf_pid_stat_t *ptr = ebpf_all_pids[pid];
-    if (unlikely(ptr)) {
-        if (!ptr->ppid && tgid)
-            ptr->ppid = tgid;
-        return ebpf_all_pids[pid];
-    }
-
-    struct ebpf_pid_stat *p = ebpf_pid_stat_get();
-
-    if (likely(ebpf_root_of_pids))
-        ebpf_root_of_pids->prev = p;
-
-    p->next = ebpf_root_of_pids;
-    ebpf_root_of_pids = p;
-
-    p->pid = pid;
-    p->ppid = tgid;
-
-    ebpf_all_pids[pid] = p;
-    ebpf_all_pids_count++;
-
-    return p;
-}
-
-/**
  * Assign the PID to a target.
  *
  * @param p the pid_stat structure to assign for a target.
  */
-static inline void assign_target_to_pid(struct ebpf_pid_stat *p)
+static inline void assign_target_to_pid(ebpf_pid_data_t *p)
 {
     targets_assignment_counter++;
 
@@ -499,6 +375,7 @@ static inline void assign_target_to_pid(struct ebpf_pid_stat *p)
     size_t pclen = strlen(p->comm);
 
     struct ebpf_target *w;
+    bool assigned = false;
     for (w = apps_groups_root_target; w; w = w->next) {
         // if(debug_enabled || (p->target && p->target->debug_enabled)) debug_log_int("\t\tcomparing '%s' with '%s'", w->compare, p->comm);
 
@@ -521,8 +398,16 @@ static inline void assign_target_to_pid(struct ebpf_pid_stat *p)
             if (debug_enabled || (p->target && p->target->debug_enabled))
                 debug_log_int("%s linked to target %s", p->comm, p->target->name);
 
+            w->processes++;
+            assigned = true;
+
             break;
         }
+    }
+
+    if (!assigned) {
+        apps_groups_default_target->processes++;
+        p->target = apps_groups_default_target;
     }
 }
 
@@ -532,22 +417,18 @@ static inline void assign_target_to_pid(struct ebpf_pid_stat *p)
 /**
  * Read cmd line from /proc/PID/cmdline
  *
- * @param p  the ebpf_pid_stat_structure.
+ * @param p  the ebpf_pid_data structure.
  *
  * @return It returns 1 on success and 0 otherwise.
  */
-static inline int read_proc_pid_cmdline(struct ebpf_pid_stat *p)
+static inline int read_proc_pid_cmdline(ebpf_pid_data_t *p, char *cmdline)
 {
-    static char cmdline[MAX_CMDLINE + 1];
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
 
     int ret = 0;
-    if (unlikely(!p->cmdline_filename)) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
-        p->cmdline_filename = strdupz(filename);
-    }
 
-    int fd = open(p->cmdline_filename, procfile_open_flags, 0666);
+    int fd = open(filename, procfile_open_flags, 0666);
     if (unlikely(fd == -1))
         goto cleanup;
 
@@ -563,21 +444,12 @@ static inline int read_proc_pid_cmdline(struct ebpf_pid_stat *p)
             cmdline[i] = ' ';
     }
 
-    debug_log("Read file '%s' contents: %s", p->cmdline_filename, p->cmdline);
+    debug_log("Read file '%s' contents: %s", filename, p->cmdline);
 
     ret = 1;
 
 cleanup:
-    // copy the command to the command line
-    if (p->cmdline)
-        freez(p->cmdline);
-    p->cmdline = strdupz(p->comm);
-
-    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
-    if (pid_ptr)
-        pid_ptr->cmdline = p->cmdline;
-    rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+    p->cmdline[0] = '\0';
 
     return ret;
 }
@@ -587,44 +459,43 @@ cleanup:
  * Assign target to pid
  *
  * @param p the pid stat structure to store the data.
- * @param ptr an useless argument.
  */
-static inline int read_proc_pid_stat(struct ebpf_pid_stat *p, void *ptr)
+static inline int read_proc_pid_stat(ebpf_pid_data_t *p)
 {
-    UNUSED(ptr);
+    procfile *ff;
 
-    static procfile *ff = NULL;
-
-    if (unlikely(!p->stat_filename)) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", netdata_configured_host_prefix, p->pid);
-        p->stat_filename = strdupz(filename);
-    }
-
-    int set_quotes = (!ff) ? 1 : 0;
+    char filename[FILENAME_MAX + 1];
+    int ret = 0;
+    snprintfz(filename, FILENAME_MAX, "%s/proc/%u/stat", netdata_configured_host_prefix, p->pid);
 
     struct stat statbuf;
-    if (stat(p->stat_filename, &statbuf))
+    if (stat(filename, &statbuf)) {
+        p->has_proc_file = 0;
+        p->thread_collecting &= ~(1<<EBPF_OPTION_ALL_CHARTS);
         return 0;
+    }
 
-    ff = procfile_reopen(ff, p->stat_filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+    ff = procfile_open(filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
     if (unlikely(!ff))
-        return 0;
+        goto cleanup_pid_stat;
 
-    if (unlikely(set_quotes))
-        procfile_set_open_close(ff, "(", ")");
+    procfile_set_open_close(ff, "(", ")");
 
     ff = procfile_readall(ff);
     if (unlikely(!ff))
-        return 0;
-
-    p->last_stat_collected_usec = p->stat_collected_usec;
-    p->stat_collected_usec = now_monotonic_usec();
-    calls_counter++;
+        goto cleanup_pid_stat;
 
     char *comm = procfile_lineword(ff, 0, 1);
-    p->ppid = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
+    int32_t ppid = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
 
+    if (p->ppid == ppid && p->target)
+        goto without_cmdline_target;
+
+    p->ppid = ppid;
+
+    char cmdline[MAX_CMDLINE + 1];
+    p->cmdline = cmdline;
+    read_proc_pid_cmdline(p, cmdline);
     if (strcmp(p->comm, comm) != 0) {
         if (unlikely(debug_enabled)) {
             if (p->comm[0])
@@ -634,57 +505,49 @@ static inline int read_proc_pid_stat(struct ebpf_pid_stat *p, void *ptr)
         }
 
         strncpyz(p->comm, comm, EBPF_MAX_COMPARE_NAME);
-
-        // /proc/<pid>/cmdline
-        if (likely(proc_pid_cmdline_is_needed))
-            managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
-
-        assign_target_to_pid(p);
     }
+    if (!p->target)
+        assign_target_to_pid(p);
+
+    p->cmdline = NULL;
 
     if (unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
         debug_log_int(
-            "READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu)",
-            netdata_configured_host_prefix, p->pid, p->comm, (p->target) ? p->target->name : "UNSET",
-            p->stat_collected_usec - p->last_stat_collected_usec);
+            "READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s'",
+            netdata_configured_host_prefix, p->pid, p->comm, (p->target) ? p->target->name : "UNSET");
 
-    return 1;
+without_cmdline_target:
+    p->has_proc_file = 1;
+    p->not_updated = 0;
+    ret = 1;
+cleanup_pid_stat:
+    procfile_close(ff);
+
+    return ret;
 }
 
 /**
  * Collect data for PID
  *
  * @param pid the current pid that we are working
- * @param ptr a NULL value
  *
  * @return It returns 1 on success and 0 otherwise
  */
-static inline int ebpf_collect_data_for_pid(pid_t pid, void *ptr)
+static inline int ebpf_collect_data_for_pid(pid_t pid)
 {
     if (unlikely(pid < 0 || pid > pid_max)) {
         netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
         return 0;
     }
 
-    ebpf_pid_stat_t *p = ebpf_get_pid_entry(pid, 0);
-    if (unlikely(!p || p->read))
-        return 0;
-    p->read = 1;
-
-    if (unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr))))
-        // there is no reason to proceed if we cannot get its status
-        return 0;
+    ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL, EBPF_OPTION_ALL_CHARTS);
+    read_proc_pid_stat(p);
 
     // check its parent pid
-    if (unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-        netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
+    if (unlikely( p->ppid > pid_max)) {
+        netdata_log_error("Pid %d (command '%s') states invalid parent pid %u. Using 0.", pid, p->comm, p->ppid);
         p->ppid = 0;
     }
-
-    // mark it as updated
-    p->updated = 1;
-    p->keep = 0;
-    p->keeploops = 0;
 
     return 1;
 }
@@ -694,14 +557,13 @@ static inline int ebpf_collect_data_for_pid(pid_t pid, void *ptr)
  */
 static inline void link_all_processes_to_their_parents(void)
 {
-    struct ebpf_pid_stat *p, *pp;
+    ebpf_pid_data_t *p, *pp;
 
     // link all children to their parents
     // and update children count on parents
-    for (p = ebpf_root_of_pids; p; p = p->next) {
+    for (p = ebpf_pids_link_list; p; p = p->next) {
         // for each process found
 
-        p->sortlist = 0;
         p->parent = NULL;
 
         if (unlikely(!p->ppid)) {
@@ -709,16 +571,15 @@ static inline void link_all_processes_to_their_parents(void)
             continue;
         }
 
-        pp = ebpf_all_pids[p->ppid];
-        if (likely(pp)) {
+        pp = &ebpf_pids[p->ppid];
+        if (likely(pp->pid)) {
             p->parent = pp;
             pp->children_count++;
 
             if (unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
                 debug_log_int(
-                    "child %d (%s, %s) on target '%s' has parent %d (%s, %s).", p->pid, p->comm,
-                    p->updated ? "running" : "exited", (p->target) ? p->target->name : "UNSET", pp->pid, pp->comm,
-                    pp->updated ? "running" : "exited");
+                    "child %d (%s) on target '%s' has parent %d (%s).", p->pid, p->comm,
+                    (p->target) ? p->target->name : "UNSET", pp->pid, pp->comm);
         } else {
             p->parent = NULL;
             debug_log("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
@@ -731,7 +592,7 @@ static inline void link_all_processes_to_their_parents(void)
  */
 static void apply_apps_groups_targets_inheritance(void)
 {
-    struct ebpf_pid_stat *p = NULL;
+    struct ebpf_pid_data *p = NULL;
 
     // children that do not have a target
     // inherit their target from their parent
@@ -740,7 +601,7 @@ static void apply_apps_groups_targets_inheritance(void)
         if (unlikely(debug_enabled))
             loops++;
         found = 0;
-        for (p = ebpf_root_of_pids; p; p = p->next) {
+        for (p = ebpf_pids_link_list; p; p = p->next) {
             // if this process does not have a target
             // and it has a parent
             // and its parent has a target
@@ -751,7 +612,7 @@ static void apply_apps_groups_targets_inheritance(void)
 
                 if (debug_enabled || (p->target && p->target->debug_enabled))
                     debug_log_int(
-                        "TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s).", p->target->name,
+                        "TARGET INHERITANCE: %s is inherited by %u (%s) from its parent %d (%s).", p->target->name,
                         p->pid, p->comm, p->parent->pid, p->parent->comm);
             }
         }
@@ -766,7 +627,7 @@ static void apply_apps_groups_targets_inheritance(void)
             loops++;
         found = 0;
 
-        for (p = ebpf_root_of_pids; p; p = p->next) {
+        for (p = ebpf_pids_link_list; p; p = p->next) {
             if (unlikely(!p->sortlist && !p->children_count))
                 p->sortlist = sortlist++;
 
@@ -802,17 +663,15 @@ static void apply_apps_groups_targets_inheritance(void)
     }
 
     // init goes always to default target
-    if (ebpf_all_pids[INIT_PID])
-        ebpf_all_pids[INIT_PID]->target = apps_groups_default_target;
+    ebpf_pids[INIT_PID].target = apps_groups_default_target;
 
     // pid 0 goes always to default target
-    if (ebpf_all_pids[0])
-        ebpf_all_pids[0]->target = apps_groups_default_target;
+    ebpf_pids[0].target = apps_groups_default_target;
 
     // give a default target on all top level processes
     if (unlikely(debug_enabled))
         loops++;
-    for (p = ebpf_root_of_pids; p; p = p->next) {
+    for (p = ebpf_pids_link_list; p; p = p->next) {
         // if the process is not merged itself
         // then is is a top level process
         if (unlikely(!p->merged && !p->target))
@@ -823,8 +682,7 @@ static void apply_apps_groups_targets_inheritance(void)
             p->sortlist = sortlist++;
     }
 
-    if (ebpf_all_pids[1])
-        ebpf_all_pids[1]->sortlist = sortlist++;
+    ebpf_pids[1].sortlist = sortlist++;
 
     // give a target to all merged child processes
     found = 1;
@@ -832,7 +690,7 @@ static void apply_apps_groups_targets_inheritance(void)
         if (unlikely(debug_enabled))
             loops++;
         found = 0;
-        for (p = ebpf_root_of_pids; p; p = p->next) {
+        for (p = ebpf_pids_link_list; p; p = p->next) {
             if (unlikely(!p->target && p->merged && p->parent && p->parent->target)) {
                 p->target = p->parent->target;
                 found++;
@@ -872,29 +730,21 @@ static inline void post_aggregate_targets(struct ebpf_target *root)
  *
  * @param pid the PID that will be removed.
  */
-static inline void ebpf_del_pid_entry(pid_t pid)
+void ebpf_del_pid_entry(pid_t pid)
 {
-    struct ebpf_pid_stat *p = ebpf_all_pids[pid];
-
-    if (unlikely(!p)) {
-        netdata_log_error("attempted to free pid %d that is not allocated.", pid);
-        return;
-    }
+    ebpf_pid_data_t *p = &ebpf_pids[pid];
 
     debug_log("process %d %s exited, deleting it.", pid, p->comm);
 
-    if (ebpf_root_of_pids == p)
-        ebpf_root_of_pids = p->next;
+    if (ebpf_pids_link_list == p)
+        ebpf_pids_link_list = p->next;
 
     if (p->next)
         p->next->prev = p->prev;
     if (p->prev)
         p->prev->next = p->next;
 
-    freez(p->stat_filename);
-    freez(p->status_filename);
-    freez(p->io_filename);
-    freez(p->cmdline_filename);
+    memset(p, 0, sizeof(ebpf_pid_data_t));
 
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
@@ -914,57 +764,20 @@ static inline void ebpf_del_pid_entry(pid_t pid)
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-    freez(p->cmdline);
-    ebpf_pid_stat_release(p);
-
-    ebpf_all_pids[pid] = NULL;
     ebpf_all_pids_count--;
-}
-
-/**
- * Get command string associated with a PID.
- * This can only safely be used when holding the `collect_data_mutex` lock.
- *
- * @param pid the pid to search the data.
- * @param n the maximum amount of bytes to copy into dest.
- *          if this is greater than the size of the command, it is clipped.
- * @param dest the target memory buffer to write the command into.
- * @return -1 if the PID hasn't been scraped yet, 0 otherwise.
- */
-int get_pid_comm(pid_t pid, size_t n, char *dest)
-{
-    struct ebpf_pid_stat *stat;
-
-    stat = ebpf_all_pids[pid];
-    if (unlikely(stat == NULL)) {
-        return -1;
-    }
-
-    if (unlikely(n > sizeof(stat->comm))) {
-        n = sizeof(stat->comm);
-    }
-
-    strncpyz(dest, stat->comm, n);
-    return 0;
 }
 
 /**
  * Remove PIDs when they are not running more.
  */
-void ebpf_cleanup_exited_pids(int max)
+static void ebpf_cleanup_exited_pids()
 {
-    struct ebpf_pid_stat *p = NULL;
-
-    for (p = ebpf_root_of_pids; p;) {
-        if (p->not_updated > max) {
-            if (unlikely(debug_enabled && (p->keep || p->keeploops)))
-                debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, p->comm);
-
-            pid_t r = p->pid;
-            p = p->next;
-
-            ebpf_del_pid_entry(r);
+    ebpf_pid_data_t *p = NULL;
+    for (p = ebpf_pids_link_list; p;) {
+        if (!p->has_proc_file) {
+            ebpf_release_pid_data(p, 0, p->pid, EBPF_OPTION_ALL_CHARTS);
         }
+
         p = p->next;
     }
 }
@@ -974,14 +787,14 @@ void ebpf_cleanup_exited_pids(int max)
  *
  * @return It returns 0 on success and -1 otherwise.
  */
-static inline void read_proc_filesystem()
+static int ebpf_read_proc_filesystem()
 {
     char dirname[FILENAME_MAX + 1];
 
     snprintfz(dirname, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
     DIR *dir = opendir(dirname);
     if (!dir)
-        return;
+        return -1;
 
     struct dirent *de = NULL;
 
@@ -997,9 +810,11 @@ static inline void read_proc_filesystem()
         if (unlikely(endptr == de->d_name || *endptr != '\0'))
             continue;
 
-        ebpf_collect_data_for_pid(pid, NULL);
+        ebpf_collect_data_for_pid(pid);
     }
     closedir(dir);
+
+    return 0;
 }
 
 /**
@@ -1009,17 +824,17 @@ static inline void read_proc_filesystem()
  * @param p the pid with information to update
  * @param o never used
  */
-static inline void aggregate_pid_on_target(struct ebpf_target *w, struct ebpf_pid_stat *p, struct ebpf_target *o)
+static inline void aggregate_pid_on_target(struct ebpf_target *w, ebpf_pid_data_t *p, struct ebpf_target *o)
 {
     UNUSED(o);
 
-    if (unlikely(!p->updated)) {
+    if (unlikely(!p->has_proc_file)) {
         // the process is not running
         return;
     }
 
     if (unlikely(!w)) {
-        netdata_log_error("pid %d %s was left without a target!", p->pid, p->comm);
+        netdata_log_error("pid %u %s was left without a target!", p->pid, p->comm);
         return;
     }
 
@@ -1061,19 +876,18 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
 void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_pid_on_target *root)
 {
     memset(process, 0, sizeof(ebpf_process_stat_t));
-    while (root) {
+    for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
-        if (local_pid) {
-            ebpf_process_stat_t *in = &local_pid->process;
-            process->task_err += in->task_err;
-            process->release_call += in->release_call;
-            process->exit_call += in->exit_call;
-            process->create_thread += in->create_thread;
-            process->create_process += in->create_process;
-        }
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_PROCESS_IDX);
+        ebpf_publish_process_t *in = local_pid->process;
+        if (!in)
+            continue;
 
-        root = root->next;
+        process->task_err += in->task_err;
+        process->release_call += in->release_call;
+        process->exit_call += in->exit_call;
+        process->create_thread += in->create_thread;
+        process->create_process += in->create_process;
     }
 }
 
@@ -1085,70 +899,44 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
  *
  * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
  * @param maps_per_core         do I have hash maps per core?
+ * @param max_period            max period to wait before remove from hash table.
  */
-void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
+void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core, uint32_t max_period)
 {
-    if (unlikely(!ebpf_all_pids))
+    if (tbl_pid_stats_fd == -1)
         return;
 
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids; // global list of all processes running
-    while (pids) {
-        if (pids->updated_twice) {
-            pids->read = 0; // mark it as not read, so that collect_data_for_pid() will read it
-            pids->updated = 0;
-            pids->merged = 0;
-            pids->children_count = 0;
-            pids->parent = NULL;
-        } else {
-            if (pids->updated)
-                pids->updated_twice = 1;
-        }
-
-        pids = pids->next;
-    }
-
-    read_proc_filesystem();
-
-    pids = ebpf_root_of_pids; // global list of all processes running
+    size_t length =  sizeof(ebpf_process_stat_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
 
     if (tbl_pid_stats_fd != -1) {
-        size_t length =  sizeof(ebpf_process_stat_t);
-        if (maps_per_core)
-            length *= ebpf_nprocs;
 
         uint32_t key = 0, next_key = 0;
         while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, 0);
-            if (!local_pid)
-                goto end_process_loop;
-
-            ebpf_process_stat_t *w = &local_pid->process;
             if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
                 goto end_process_loop;
             }
 
             ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
 
-            memcpy(w, process_stat_vector, sizeof(ebpf_process_stat_t));
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, 0, NULL, EBPF_MODULE_PROCESS_IDX);
+            ebpf_publish_process_t *w = local_pid->process;
+            if (!w)
+                local_pid->process = w = ebpf_process_allocate_publish();
+
+            w->create_thread = process_stat_vector[0].create_thread;
+            w->exit_call = process_stat_vector[0].exit_call;
+            w->create_thread = process_stat_vector[0].create_thread;
+            w->create_process = process_stat_vector[0].create_process;
+            w->release_call = process_stat_vector[0].release_call;
+            w->task_err = process_stat_vector[0].task_err;
 
 end_process_loop:
             memset(process_stat_vector, 0, length);
             key = next_key;
         }
     }
-
-    link_all_processes_to_their_parents();
-
-    apply_apps_groups_targets_inheritance();
-
-    apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
-
-    // this has to be done, before the cleanup
-    // // concentrate everything on the targets
-    for (pids = ebpf_root_of_pids; pids; pids = pids->next)
-        aggregate_pid_on_target(pids->target, pids, NULL);
-
-    post_aggregate_targets(apps_groups_root_target);
 
     struct ebpf_target *w;
     for (w = apps_groups_root_target; w; w = w->next) {
@@ -1157,4 +945,34 @@ end_process_loop:
 
         ebpf_process_sum_values_for_pids(&w->process, w->root_pid);
     }
+
+}
+
+/**
+ *
+ */
+void ebpf_parse_proc_files()
+{
+    ebpf_pid_data_t *pids = ebpf_pids_link_list;
+    while (pids) {
+        pids->not_updated = EBPF_CLEANUP_FACTOR;
+        pids->merged = 0;
+        pids->children_count = 0;
+
+        pids = pids->next;
+    }
+
+    if (ebpf_read_proc_filesystem())
+        return;
+
+    link_all_processes_to_their_parents();
+
+    apply_apps_groups_targets_inheritance();
+
+    apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
+
+    for (pids = ebpf_pids_link_list; pids; pids = pids->next)
+        aggregate_pid_on_target(pids->target, pids, NULL);
+
+    ebpf_cleanup_exited_pids();
 }

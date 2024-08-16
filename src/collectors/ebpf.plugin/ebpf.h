@@ -37,6 +37,7 @@
 #define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
 #define NETDATA_EBPF_CONFIG_FILE "ebpf.d.conf"
 
+extern size_t ebpf_hash_table_pids_count;
 #ifdef LIBBPF_MAJOR_VERSION // BTF code
 #include "cachestat.skel.h"
 #include "dc.skel.h"
@@ -122,34 +123,6 @@ typedef struct netdata_ebpf_judy_pid_stats {
 } netdata_ebpf_judy_pid_stats_t;
 
 extern ebpf_module_t ebpf_modules[];
-enum ebpf_main_index {
-    EBPF_MODULE_PROCESS_IDX,
-    EBPF_MODULE_SOCKET_IDX,
-    EBPF_MODULE_CACHESTAT_IDX,
-    EBPF_MODULE_SYNC_IDX,
-    EBPF_MODULE_DCSTAT_IDX,
-    EBPF_MODULE_SWAP_IDX,
-    EBPF_MODULE_VFS_IDX,
-    EBPF_MODULE_FILESYSTEM_IDX,
-    EBPF_MODULE_DISK_IDX,
-    EBPF_MODULE_MOUNT_IDX,
-    EBPF_MODULE_FD_IDX,
-    EBPF_MODULE_HARDIRQ_IDX,
-    EBPF_MODULE_SOFTIRQ_IDX,
-    EBPF_MODULE_OOMKILL_IDX,
-    EBPF_MODULE_SHM_IDX,
-    EBPF_MODULE_MDFLUSH_IDX,
-    EBPF_MODULE_FUNCTION_IDX,
-    /* THREADS MUST BE INCLUDED BEFORE THIS COMMENT */
-    EBPF_OPTION_ALL_CHARTS,
-    EBPF_OPTION_VERSION,
-    EBPF_OPTION_HELP,
-    EBPF_OPTION_GLOBAL_CHART,
-    EBPF_OPTION_RETURN_MODE,
-    EBPF_OPTION_LEGACY,
-    EBPF_OPTION_CORE,
-    EBPF_OPTION_UNITTEST
-};
 
 typedef struct ebpf_tracepoint {
     bool enabled;
@@ -380,6 +353,7 @@ void ebpf_read_local_addresses_unsafe();
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
 extern bool ebpf_plugin_exit;
+extern uint64_t collect_pids;
 
 static inline bool ebpf_plugin_stop(void) {
     return ebpf_plugin_exit || nd_thread_signaled_to_cancel();

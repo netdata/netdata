@@ -229,13 +229,13 @@ static void ebpf_update_process_cgroup()
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            ebpf_process_stat_t *out = &pids->ps;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
-            if (local_pid) {
-                ebpf_process_stat_t *in = &local_pid->process;
+            ebpf_publish_process_t *out = &pids->ps;
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_PROCESS_IDX);
+            ebpf_publish_process_t *in = local_pid->process;
+            if (!in)
+                continue;
 
-                memcpy(out, in, sizeof(ebpf_process_stat_t));
-            }
+            memcpy(out, in, sizeof(ebpf_publish_process_t));
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -694,6 +694,10 @@ static void ebpf_process_exit(void *pptr)
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!em) return;
 
+    pthread_mutex_lock(&lock);
+    collect_pids &= ~(1<<EBPF_MODULE_PROCESS_IDX);
+    pthread_mutex_unlock(&lock);
+
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
         if (em->cgroup_charts) {
@@ -746,13 +750,13 @@ static void ebpf_process_exit(void *pptr)
  * @param ps  structure used to store data
  * @param pids input data
  */
-static void ebpf_process_sum_cgroup_pids(ebpf_process_stat_t *ps, struct pid_on_target2 *pids)
+static void ebpf_process_sum_cgroup_pids(ebpf_publish_process_t *ps, struct pid_on_target2 *pids)
 {
-    ebpf_process_stat_t accumulator;
+    ebpf_publish_process_t accumulator;
     memset(&accumulator, 0, sizeof(accumulator));
 
     while (pids) {
-        ebpf_process_stat_t *pps = &pids->ps;
+        ebpf_publish_process_t *pps = &pids->ps;
 
         accumulator.exit_call += pps->exit_call;
         accumulator.release_call += pps->release_call;
@@ -781,7 +785,7 @@ static void ebpf_process_sum_cgroup_pids(ebpf_process_stat_t *ps, struct pid_on_
  * @param values structure with values that will be sent to netdata
  * @param em   the structure with thread information
  */
-static void ebpf_send_specific_process_data(char *type, ebpf_process_stat_t *values, ebpf_module_t *em)
+static void ebpf_send_specific_process_data(char *type, ebpf_publish_process_t *values, ebpf_module_t *em)
 {
     ebpf_write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_PROCESS, "");
     write_chart_dimension(process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK].name,

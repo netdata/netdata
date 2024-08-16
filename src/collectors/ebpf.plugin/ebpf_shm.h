@@ -28,15 +28,27 @@
 #define NETDATA_SYSTEMD_SHM_DT_CONTEXT "systemd.service.shmdt"
 #define NETDATA_SYSTEMD_SHM_CTL_CONTEXT "systemd.service.shmctl"
 
-typedef struct netdata_publish_shm {
+typedef struct __attribute__((packed)) netdata_publish_shm {
     uint64_t ct;
+
+    uint32_t get;
+    uint32_t at;
+    uint32_t dt;
+    uint32_t ctl;
+} netdata_publish_shm_t;
+
+typedef struct netdata_ebpf_shm {
+    uint64_t ct;
+    uint32_t tgid;
+    uint32_t uid;
+    uint32_t gid;
     char name[TASK_COMM_LEN];
 
-    uint64_t get;
-    uint64_t at;
-    uint64_t dt;
-    uint64_t ctl;
-} netdata_publish_shm_t;
+    uint32_t get;
+    uint32_t at;
+    uint32_t dt;
+    uint32_t ctl;
+} netdata_ebpf_shm_t;
 
 enum shm_tables {
     NETDATA_PID_SHM_TABLE,
