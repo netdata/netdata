@@ -1,0 +1,193 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-monit
+      plugin_name: go.d.plugin
+      module_name: monit
+      monitored_instance:
+        name: Monit
+        link: https://mmonit.com/monit/
+        categories:
+          - data-collection.synthetic-checks
+        icon_filename: monit.png
+      related_resources:
+        integrations:
+          list: []
+      alternative_monitored_instances: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - monit
+        - mmonit
+        - supervision tool
+        - monitrc
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors status of Monit's service checks.
+        method_description: |
+          It sends HTTP requests to the Monit `/_status?format=xml&level=full` endpoint.
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects Monit instances running on localhost that are listening on port 2812.
+            On startup, it tries to collect metrics from:
+
+            - http://127.0.0.1:2812
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Enable TCP PORT
+            description:
+              See [Syntax for TCP port](https://mmonit.com/monit/documentation/monit.html#TCP-PORT) for details.
+      configuration:
+        file:
+          name: go.d/monit.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:2812
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: "admin"
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: "monit"
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:2812
+                    username: admin
+                    password: monit
+            - name: HTTPS with self-signed certificate
+              description: With enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:2812
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:2812
+                
+                  - name: remote
+                    url: http://192.0.2.1:2812
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: service
+          description: These metrics refer to the monitored Service.
+          labels:
+            - name: server_hostname
+              description: Hostname of the Monit server.
+            - name: service_check_name
+              description: Service check name.
+            - name: service_check_type
+              description: Service check type.
+          metrics:
+            - name: monit.service_check_status
+              description: Service Check Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: error
+                - name: initializing
+                - name: not_monitored
