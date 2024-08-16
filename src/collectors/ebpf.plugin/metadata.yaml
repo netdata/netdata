@@ -3254,6 +3254,13 @@ modules:
               dimensions:
                 - name: total
                 - name: running
+            - name: netdata.ebpf_pids
+              description: Total number of monitored PIDs
+              unit: "pids"
+              chart_type: line
+              dimensions:
+                - name: user
+                - name: kernel
             - name: netdata.ebpf_load_methods
               description: Load info
               unit: "methods"

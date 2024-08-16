@@ -3502,11 +3502,11 @@ static void ebpf_create_pids_chart(int order, int update_every)
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          "monitoring_pid",
                          "",
-                         "Total pids monitored",
+                         "Total number of monitored PIDs",
                          "pids",
                          NETDATA_EBPF_FAMILY,
                          NETDATA_EBPF_CHART_TYPE_LINE,
-                         "ebpf_pids",
+                         "netdata.ebpf_pids",
                          order,
                          update_every,
                          "main");
