@@ -44,6 +44,21 @@
 
 #define EBPF_CLEANUP_FACTOR 2
 
+enum ebpf_pids_index {
+    EBPF_PIDS_PROCESS_IDX,
+    EBPF_PIDS_SOCKET_IDX,
+    EBPF_PIDS_CACHESTAT_IDX,
+    EBPF_PIDS_DCSTAT_IDX,
+    EBPF_PIDS_SWAP_IDX,
+    EBPF_PIDS_VFS_IDX,
+    EBPF_PIDS_FD_IDX,
+    EBPF_PIDS_SHM_IDX,
+
+    EBPF_PIDS_END_IDX
+};
+
+extern int pids_fd[EBPF_PIDS_END_IDX];
+
 enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
     EBPF_MODULE_SOCKET_IDX,

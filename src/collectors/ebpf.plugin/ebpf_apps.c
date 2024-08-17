@@ -320,6 +320,8 @@ struct ebpf_target
 
 size_t apps_groups_targets_count = 0; // # of apps_groups.conf targets
 
+int pids_fd[EBPF_PIDS_END_IDX];
+
 // ----------------------------------------------------------------------------
 // internal counters
 
