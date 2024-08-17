@@ -2786,7 +2786,6 @@ install(FILES
         src/collectors/python.d.plugin/openldap/openldap.conf
         src/collectors/python.d.plugin/oracledb/oracledb.conf
         src/collectors/python.d.plugin/pandas/pandas.conf
-        src/collectors/python.d.plugin/retroshare/retroshare.conf
         src/collectors/python.d.plugin/samba/samba.conf
         src/collectors/python.d.plugin/spigotmc/spigotmc.conf
         src/collectors/python.d.plugin/tor/tor.conf
@@ -2809,7 +2808,6 @@ install(FILES
         src/collectors/python.d.plugin/openldap/openldap.chart.py
         src/collectors/python.d.plugin/oracledb/oracledb.chart.py
         src/collectors/python.d.plugin/pandas/pandas.chart.py
-        src/collectors/python.d.plugin/retroshare/retroshare.chart.py
         src/collectors/python.d.plugin/samba/samba.chart.py
         src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
         src/collectors/python.d.plugin/tor/tor.chart.py
