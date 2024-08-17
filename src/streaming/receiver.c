@@ -327,6 +327,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 #endif
 
     pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
+    rpt->parser = parser;
 
     rrd_collector_started();
 
@@ -358,6 +359,8 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
+
+    rrdpush_receiver_send_node_and_claim_id_to_child(rpt->host);
 
     while(!receiver_should_stop(rpt)) {
 

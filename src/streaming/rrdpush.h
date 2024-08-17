@@ -392,7 +392,7 @@ struct receiver_state {
         STREAM_NODE_INSTANCE *array;
     } instances;
 */
-
+    void *parser;
 #ifdef ENABLE_H2O
     void *h2o_ctx;
 #endif
