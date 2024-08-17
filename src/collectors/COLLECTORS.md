@@ -763,8 +763,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [OBS Studio](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/obs_studio.md)
 
-- [RetroShare](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/retroshare/integrations/retroshare.md)
-
 - [SABnzbd](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/sabnzbd.md)
 
 - [Stream](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/stream.md)
