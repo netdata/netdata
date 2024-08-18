@@ -170,6 +170,7 @@ extern struct ebpf_target *users_root_target;
 extern struct ebpf_target *groups_root_target;
 extern uint64_t collect_pids;
 
+// ebpf_pid_data
 typedef struct __attribute__((packed)) ebpf_pid_data {
     uint32_t pid;
     uint32_t ppid;
@@ -345,6 +346,58 @@ static inline void ebpf_release_pid_data(ebpf_pid_data_t *eps, int fd, uint32_t 
         ebpf_del_pid_entry((pid_t)key);
     }
 }
+
+static inline void ebpf_reset_specific_pid_data(ebpf_pid_data_t *ptr)
+{
+    ptr->has_proc_file = 0;
+    int idx;
+    uint32_t pid = ptr->pid;
+    for (idx = EBPF_PIDS_PROCESS_IDX; idx < EBPF_PIDS_PROC_FILE; idx++) {
+        if (!(ptr->thread_collecting & (1<<idx)))  {
+            continue;
+        }
+        // Check if we still have the map loaded
+        int fd = pids_fd[idx];
+        if (fd <= STDERR_FILENO)
+            continue;
+
+        bpf_map_delete_elem(fd, &pid);
+        ebpf_hash_table_pids_count--;
+        void *clean;
+        switch (idx) {
+            case EBPF_PIDS_PROCESS_IDX:
+                clean = ptr->process;
+                break;
+            case EBPF_PIDS_SOCKET_IDX:
+                clean = ptr->socket;
+                break;
+            case EBPF_PIDS_CACHESTAT_IDX:
+                clean = ptr->cachestat;
+                break;
+            case EBPF_PIDS_DCSTAT_IDX:
+                clean = ptr->dc;
+                break;
+            case EBPF_PIDS_SWAP_IDX:
+                clean = ptr->swap;
+                break;
+            case EBPF_PIDS_VFS_IDX:
+                clean = ptr->vfs;
+                break;
+            case EBPF_PIDS_FD_IDX:
+                clean = ptr->fd;
+                break;
+            case EBPF_PIDS_SHM_IDX:
+                clean = ptr->shm;
+                break;
+            default:
+                clean = NULL;
+        }
+        freez(clean);
+    }
+
+    ebpf_del_pid_entry(pid);
+}
+
 
 typedef struct ebpf_pid_stat {
     uint32_t pid;

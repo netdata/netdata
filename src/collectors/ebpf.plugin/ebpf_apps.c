@@ -746,6 +746,10 @@ void ebpf_del_pid_entry(pid_t pid)
     if (p->prev)
         p->prev->next = p->next;
 
+
+    if (p->thread_collecting & EBPF_PIDS_PROC_FILE)
+        ebpf_all_pids_count--;
+
     memset(p, 0, sizeof(ebpf_pid_data_t));
 
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
@@ -765,8 +769,6 @@ void ebpf_del_pid_entry(pid_t pid)
         JudyLDel(&ebpf_judy_pid.index.JudyLArray, p->pid, PJE0);
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
-
-    ebpf_all_pids_count--;
 }
 
 /**
