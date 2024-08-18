@@ -1107,8 +1107,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Speedify CLI](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/speedify_cli.md)
 
-- [Tor](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/tor/integrations/tor.md)
-
 - [WireGuard](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/wireguard/integrations/wireguard.md)
 
 - [strongSwan](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/strongswan.md)
