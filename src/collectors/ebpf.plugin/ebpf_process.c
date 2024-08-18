@@ -691,6 +691,7 @@ static void ebpf_process_disable_tracepoints()
  */
 static void ebpf_process_exit(void *pptr)
 {
+    pids_fd[EBPF_PIDS_PROCESS_IDX] = -1;
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!em) return;
 

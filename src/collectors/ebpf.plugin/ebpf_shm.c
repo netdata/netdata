@@ -1335,6 +1335,7 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_shm_thread(void *ptr)
 {
+    pids_fd[EBPF_PIDS_SHM_IDX] = -1;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_shm_exit) cleanup_ptr = em;

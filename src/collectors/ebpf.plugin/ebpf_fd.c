@@ -548,6 +548,7 @@ static void ebpf_obsolete_fd_global(ebpf_module_t *em)
  */
 static void ebpf_fd_exit(void *pptr)
 {
+    pids_fd[EBPF_PIDS_FD_IDX] = -1;
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!em) return;
 

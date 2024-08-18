@@ -525,6 +525,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
  */
 static void ebpf_cachestat_exit(void *pptr)
 {
+    pids_fd[EBPF_PIDS_CACHESTAT_IDX] = -1;
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!em) return;
 
