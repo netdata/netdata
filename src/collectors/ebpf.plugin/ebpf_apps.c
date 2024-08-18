@@ -880,7 +880,7 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
     memset(process, 0, sizeof(ebpf_process_stat_t));
     for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_PROCESS_IDX);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_PROCESS_IDX);
         ebpf_publish_process_t *in = local_pid->process;
         if (!in)
             continue;
@@ -908,6 +908,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core, uin
     if (tbl_pid_stats_fd == -1)
         return;
 
+    pids_fd[EBPF_PIDS_PROCESS_IDX] = tbl_pid_stats_fd;
     size_t length =  sizeof(ebpf_process_stat_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
@@ -922,7 +923,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core, uin
 
             ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
 
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, 0, NULL, EBPF_MODULE_PROCESS_IDX);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, 0, NULL, EBPF_PIDS_PROCESS_IDX);
             ebpf_publish_process_t *w = local_pid->process;
             if (!w)
                 local_pid->process = w = ebpf_process_allocate_publish();
