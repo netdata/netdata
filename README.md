@@ -33,7 +33,7 @@
 
 **Netdata** is a high-performance, cloud-native, and on-premises observability platform designed to monitor metrics and logs with unparalleled efficiency. It delivers a simpler, faster, and significantly easier approach to real-time, low-latency monitoring for systems, containers, and applications.
 
-What sets Netdata apart is its **cost-efficient, distributed design**. Unlike traditional monitoring solutions that centralize data, **Netdata distributes the code**. Instead of funneling all data into a few central databases, Netdata processes data at the edge, keeping it close to the source. The smart Netdata Agent acts as a distributed database, enabling the construction of complex observability pipelines with modular, Lego-like simplicity.
+What sets Netdata apart is its **cost-efficient, distributed design**. Unlike traditional monitoring solutions that centralize data, **Netdata distributes the code**. Instead of funneling all data into a few central databases, Netdata processes data at the edge, keeping it close to the source. The smart open-source Netdata Agent acts as a distributed database, enabling the construction of complex observability pipelines with modular, Lego-like simplicity.
 
 Netdata also incorporates **A.I. insights** for all monitored data, training machine learning models directly at the edge. This allows for fully automated and unsupervised anomaly detection, and with comprehensive APIs and UIs, users can quickly spot correlations and gain deeper insights.
 
