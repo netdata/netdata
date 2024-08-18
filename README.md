@@ -26,7 +26,7 @@
 
 <hr class="solid">
 
-MENU: **[WHAT IS NEW](#whats-new-and-coming)** | **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)** | **[FAQ](#faq)** | **[DOCS](#book-documentation)** | **[COMMUNITY](#tada-community)** | **[CONTRIBUTE](#pray-contribute)** | **[LICENSE](#license)**
+MENU: **[WHAT IS NEW](#whats-new-and-coming)**|**[GETTING STARTED](#getting-started)**|**[HOW IT WORKS](#how-it-works)**|**[FAQ](#faq)**|**[DOCS](#book-documentation)**|**[COMMUNITY](#tada-community)**|**[CONTRIBUTE](#pray-contribute)**|**[LICENSE](#license)**
 
 > **Important** :bulb:<br/>
 > People get addicted to Netdata. Once you use it on your systems, **there's no going back!**<br/>
