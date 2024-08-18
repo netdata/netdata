@@ -98,6 +98,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/systemdunits"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/tengine"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/tomcat"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/tor"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/traefik"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/unbound"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/upsd"
