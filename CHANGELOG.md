@@ -6,6 +6,17 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18357](https://github.com/netdata/netdata/pull/18357) ([netdatabot](https://github.com/netdatabot))
+- remove python.d lm\_sensors.py [\#18356](https://github.com/netdata/netdata/pull/18356) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/retroshare [\#18355](https://github.com/netdata/netdata/pull/18355) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18353](https://github.com/netdata/netdata/pull/18353) ([netdatabot](https://github.com/netdatabot))
+- go.d httpcheck: add status description to docs [\#18351](https://github.com/netdata/netdata/pull/18351) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18350](https://github.com/netdata/netdata/pull/18350) ([netdatabot](https://github.com/netdatabot))
+- Add missing initial slashes for internal documation links [\#18348](https://github.com/netdata/netdata/pull/18348) ([ralphm](https://github.com/ralphm))
+- fix sending CLEAR notifications with critical severity modifier [\#18347](https://github.com/netdata/netdata/pull/18347) ([ilyam8](https://github.com/ilyam8))
+- add license to readmes menu [\#18345](https://github.com/netdata/netdata/pull/18345) ([ilyam8](https://github.com/ilyam8))
+- add go.d/monit [\#18344](https://github.com/netdata/netdata/pull/18344) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/monit [\#18343](https://github.com/netdata/netdata/pull/18343) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/docker/docker from 27.1.1+incompatible to 27.1.2+incompatible in /src/go [\#18340](https://github.com/netdata/netdata/pull/18340) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/vmware/govmomi from 0.39.0 to 0.40.0 in /src/go [\#18338](https://github.com/netdata/netdata/pull/18338) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/miekg/dns from 1.1.61 to 1.1.62 in /src/go [\#18337](https://github.com/netdata/netdata/pull/18337) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -83,6 +94,7 @@
 - Bump github.com/vmware/govmomi from 0.38.0 to 0.39.0 in /src/go [\#18236](https://github.com/netdata/netdata/pull/18236) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/gofrs/flock from 0.12.0 to 0.12.1 in /src/go [\#18235](https://github.com/netdata/netdata/pull/18235) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/docker/docker from 27.0.3+incompatible to 27.1.1+incompatible in /src/go [\#18234](https://github.com/netdata/netdata/pull/18234) ([dependabot[bot]](https://github.com/apps/dependabot))
+- eBPF memory [\#18232](https://github.com/netdata/netdata/pull/18232) ([thiagoftsm](https://github.com/thiagoftsm))
 - Windows build fix [\#18231](https://github.com/netdata/netdata/pull/18231) ([Ferroin](https://github.com/Ferroin))
 - Default to release with debug symbols for Windows builds. [\#18230](https://github.com/netdata/netdata/pull/18230) ([Ferroin](https://github.com/Ferroin))
 - Fix up CMake feature handling for Windows. [\#18229](https://github.com/netdata/netdata/pull/18229) ([Ferroin](https://github.com/Ferroin))
@@ -259,7 +271,6 @@
 - Fix small typo [\#17875](https://github.com/netdata/netdata/pull/17875) ([stelfrag](https://github.com/stelfrag))
 - spawn server \(Windows support for external plugins\) [\#17866](https://github.com/netdata/netdata/pull/17866) ([ktsaou](https://github.com/ktsaou))
 - sysinfo \(WinAPI\) [\#17857](https://github.com/netdata/netdata/pull/17857) ([thiagoftsm](https://github.com/thiagoftsm))
-- Run the agent as a Windows service. [\#17766](https://github.com/netdata/netdata/pull/17766) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
@@ -401,16 +412,6 @@
 - docs fix statsd conf dir [\#17785](https://github.com/netdata/netdata/pull/17785) ([ilyam8](https://github.com/ilyam8))
 - go.d phpfpm switch to github.com/kanocz/fcgi\_client [\#17784](https://github.com/netdata/netdata/pull/17784) ([ilyam8](https://github.com/ilyam8))
 - Change "War Room" to "Room" and other docs changes [\#17783](https://github.com/netdata/netdata/pull/17783) ([Ancairon](https://github.com/Ancairon))
-- rm "ignore zero metrics" proc meminfo [\#17781](https://github.com/netdata/netdata/pull/17781) ([ilyam8](https://github.com/ilyam8))
-- fix links [\#17779](https://github.com/netdata/netdata/pull/17779) ([Ancairon](https://github.com/Ancairon))
-- remove "ignore zero metrics" from proc network modules [\#17776](https://github.com/netdata/netdata/pull/17776) ([ilyam8](https://github.com/ilyam8))
-- proc/diskstats and diskspace: remove "ignore zero metrics" [\#17775](https://github.com/netdata/netdata/pull/17775) ([ilyam8](https://github.com/ilyam8))
-- docs fix "Prevent the double access.log" [\#17773](https://github.com/netdata/netdata/pull/17773) ([ilyam8](https://github.com/ilyam8))
-- docs: simplify claiming readme part1 [\#17771](https://github.com/netdata/netdata/pull/17771) ([ilyam8](https://github.com/ilyam8))
-- Upgrade sqlite version to 3.45.3 [\#17769](https://github.com/netdata/netdata/pull/17769) ([stelfrag](https://github.com/stelfrag))
-- Netdata Cloud docs section edits [\#17768](https://github.com/netdata/netdata/pull/17768) ([Ancairon](https://github.com/Ancairon))
-- Fix DEB package builds. [\#17765](https://github.com/netdata/netdata/pull/17765) ([Ferroin](https://github.com/Ferroin))
-- Fix version for go.d plugin [\#17764](https://github.com/netdata/netdata/pull/17764) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
