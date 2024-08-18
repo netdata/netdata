@@ -956,7 +956,7 @@ end_process_loop:
  */
 void ebpf_parse_proc_files()
 {
-    ebpf_pid_data_t *pids = ebpf_pids_link_list;
+    ebpf_pid_data_t *pids;
     for (pids = ebpf_pids_link_list; pids;) {
         if (kill(pids->pid, 0)) { // No PID found
             ebpf_pid_data_t *next = pids->next;

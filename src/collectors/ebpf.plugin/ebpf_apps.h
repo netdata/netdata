@@ -304,8 +304,6 @@ static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
 }
 
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx) {
-    // To add pids to target here will do host very slow
-
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
     ptr->thread_collecting |= 1<<idx;
     // The caller is getting data to work.
@@ -322,14 +320,12 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
     if (name)
         strncpyz(ptr->comm, name, EBPF_MAX_COMPARE_NAME);
 
+    if (likely(ebpf_pids_link_list))
+        ebpf_pids_link_list->prev = ptr;
+
+    ptr->next = ebpf_pids_link_list;
+    ebpf_pids_link_list = ptr;
     if (idx == EBPF_PIDS_PROC_FILE) {
-        // We are going to use only with pids listed in /proc, other PIDs are associated to it
-        if (likely(ebpf_pids_link_list))
-            ebpf_pids_link_list->prev = ptr;
-
-        ptr->next = ebpf_pids_link_list;
-        ebpf_pids_link_list = ptr;
-
         ebpf_all_pids_count++;
     }
 

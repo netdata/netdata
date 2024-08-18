@@ -714,10 +714,14 @@ static void ebpf_read_fd_apps_table(int maps_per_core, uint32_t max_period)
             publish_fd->close_err = fv->close_err;
 
             pid_stat->not_updated = 0;
-        } else if (++pid_stat->not_updated >= max_period) {
-            ebpf_release_pid_data(pid_stat, fd, key, EBPF_MODULE_FD_IDX);
-            ebpf_fd_release_publish(publish_fd);
-            pid_stat->fd = NULL;
+        } else {
+            if (kill(key, 0)) { // No PID found
+                ebpf_reset_specific_pid_data(pid_stat);
+            } else { // There is PID, but there is not data anymore
+                ebpf_release_pid_data(pid_stat, fd, key, EBPF_MODULE_FD_IDX);
+                ebpf_fd_release_publish(publish_fd);
+                pid_stat->fd = NULL;
+            }
         }
 
 end_fd_loop:
