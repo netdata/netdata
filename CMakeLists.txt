@@ -2788,7 +2788,6 @@ install(FILES
         src/collectors/python.d.plugin/pandas/pandas.conf
         src/collectors/python.d.plugin/samba/samba.conf
         src/collectors/python.d.plugin/spigotmc/spigotmc.conf
-        src/collectors/python.d.plugin/tor/tor.conf
         src/collectors/python.d.plugin/traefik/traefik.conf
         src/collectors/python.d.plugin/varnish/varnish.conf
         src/collectors/python.d.plugin/w1sensor/w1sensor.conf
@@ -2810,7 +2809,6 @@ install(FILES
         src/collectors/python.d.plugin/pandas/pandas.chart.py
         src/collectors/python.d.plugin/samba/samba.chart.py
         src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
-        src/collectors/python.d.plugin/tor/tor.chart.py
         src/collectors/python.d.plugin/traefik/traefik.chart.py
         src/collectors/python.d.plugin/varnish/varnish.chart.py
         src/collectors/python.d.plugin/w1sensor/w1sensor.chart.py
