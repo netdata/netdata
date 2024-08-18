@@ -93,7 +93,7 @@ typedef struct parser_user_object {
     } v2;
 } PARSER_USER_OBJECT;
 
-typedef struct parser {
+struct parser {
     uint8_t version;                // Parser version
     PARSER_REPERTOIRE repertoire;
     uint32_t flags;
@@ -128,7 +128,9 @@ typedef struct parser {
         SPINLOCK spinlock;
     } writer;
 
-} PARSER;
+};
+
+typedef struct parser PARSER;
 
 PARSER *parser_init(struct parser_user_object *user, int fd_input, int fd_output, PARSER_INPUT_TYPE flags, void *ssl);
 void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire);

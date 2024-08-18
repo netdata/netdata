@@ -2,10 +2,8 @@
 
 #include "pluginsd_internals.h"
 
-ssize_t send_to_plugin(const char *txt, void *data) {
-    PARSER *parser = data;
-
-    if(!txt || !*txt)
+ssize_t send_to_plugin(const char *txt, PARSER *parser) {
+    if(!txt || !*txt || !parser)
         return 0;
 
 #ifdef ENABLE_H2O

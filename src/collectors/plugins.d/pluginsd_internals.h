@@ -13,7 +13,7 @@
 
 PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const char *msg);
 
-ssize_t send_to_plugin(const char *txt, void *data);
+ssize_t send_to_plugin(const char *txt, PARSER *parser);
 
 static inline RRDHOST *pluginsd_require_scope_host(PARSER *parser, const char *cmd) {
     RRDHOST *host = parser->user.host;

@@ -333,6 +333,9 @@ typedef struct stream_node_instance {
 } STREAM_NODE_INSTANCE;
 */
 
+struct parser;
+typedef struct parser PARSER;
+
 struct receiver_state {
     RRDHOST *host;
     pid_t tid;
@@ -392,7 +395,8 @@ struct receiver_state {
         STREAM_NODE_INSTANCE *array;
     } instances;
 */
-    void *parser;
+    PARSER *parser;
+
 #ifdef ENABLE_H2O
     void *h2o_ctx;
 #endif
