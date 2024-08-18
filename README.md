@@ -1,4 +1,5 @@
 
+
 <p align="center">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_light.png" alt="Netdata" width="300"/>
@@ -16,12 +17,7 @@
   <a href="https://app.netdata.cloud/spaces/netdata-demo?utm_campaign=github_readme_demo_badge"><img src="https://img.shields.io/badge/Live%20Demo-green" alt="Live Demo"></a>
   <a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata.svg" alt="Latest release"></a>
   <a href="https://github.com/netdata/netdata-nightlies/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata-nightlies.svg" alt="Latest nightly build"></a>
-  <br />
-  <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a>
-  <a href="https://scan.coverity.com/projects/netdata-netdata?tab=overview"><img alt="Coverity Scan" src="https://img.shields.io/coverity/scan/netdata"></a>
-  <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg" alt="License: GPL v3+"></a>
-  <a href="https://github.com/netdata/netdata/blob/master/src/web/gui/v2/LICENSE.md"><img src="https://img.shields.io/badge/License%20%28Dashboard%20v2%29-NCUL1-blue.svg" alt="License (Dashboard v2): NCUL1"></a>
-  <br />
+  <br/>
   <a href="https://community.netdata.cloud"><img alt="Discourse topics" src="https://img.shields.io/discourse/topics?server=https%3A%2F%2Fcommunity.netdata.cloud%2F&logo=discourse&label=discourse%20forum"></a>
   <a href="https://github.com/netdata/netdata/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/github/discussions/netdata/netdata?logo=github&label=github%20discussions"></a>
 </p>
@@ -32,9 +28,56 @@
 
 MENU: **[WHAT IS NEW](#whats-new-and-coming)** | **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)** | **[FAQ](#faq)** | **[DOCS](#book-documentation)** | **[COMMUNITY](#tada-community)** | **[CONTRIBUTE](#pray-contribute)** | **[LICENSE](#license)**
 
-Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor your systems, containers, and applications.
+> **Important** :bulb:<br/>
+> People get addicted to Netdata. Once you use it on your systems, **there's no going back!**<br/>
 
-It scales nicely from just a single server to thousands of servers, even in complex multi/mixed/hybrid cloud environments, and given enough disk space it can keep your metrics for years.
+**Netdata** is a high-performance, cloud-native, and on-premises observability platform designed to monitor metrics and logs with unparalleled efficiency. It delivers a simpler, faster, and significantly easier approach to real-time, low-latency monitoring for systems, containers, and applications.
+
+What sets Netdata apart is its **cost-efficient, distributed design**. Unlike traditional monitoring solutions that centralize data, **Netdata distributes the code**. Instead of funneling all data into a few central databases, Netdata processes data at the edge, keeping it close to the source. The smart Netdata Agent acts as a distributed database, enabling the construction of complex observability pipelines with modular, Lego-like simplicity.
+
+Netdata also incorporates **A.I. insights** for all monitored data, training machine learning models directly at the edge. This allows for fully automated and unsupervised anomaly detection, and with comprehensive APIs and UIs, users can quickly spot correlations and gain deeper insights.
+
+**Netdata is built on three core components:**
+
+1.  **Netdata Agent**: The heart of Netdata, this component handles the collection, storage, querying, machine learning, exporting, and alerting of observability data. It runs in physical and virtual servers, cloud environments, Kubernetes clusters, and edge/IoT devices and is optimized to be a "polite citizen" for production systems and applications.
+    
+    <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/Netdata%20Agent%20License-GPL%20v3%2B-blue.svg" alt="Netdata Agent License: GPL v3+"></a> <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a> <a href="https://scan.coverity.com/projects/netdata-netdata?tab=overview"><img alt="Coverity Scan" src="https://img.shields.io/coverity/scan/netdata"></a>
+    
+2.  **Netdata Cloud**: Enhancing the Netdata Agent, Netdata Cloud offers enterprise features such as user management, role-based access control, horizontal scalability, alert and notification management, and more. Importantly, Netdata Cloud does **not** centralize observability data.
+    
+    _Netdata Cloud is available as a SaaS solution or an on-premises installation, with a free community tier._
+    
+3.  **Netdata UI**: The user interface that powers all dashboards, data visualization, and configuration.
+    
+    _While closed-source, it is free to use with both Netdata Agents and Netdata Cloud._
+
+    <a href="https://github.com/netdata/netdata/blob/master/src/web/gui/v2/LICENSE.md"><img src="https://img.shields.io/badge/Netdata%20UI%20License%20-NCUL1-blue.svg" alt="Netdata UI License: NCUL1"></a>
+    
+Netdata scales effortlessly from a single server to thousands, even in complex, multi-cloud or hybrid environments, with the ability to retain data for years.
+
+**KEY CHARACTERISTICS**:<br/>
+
+- :boom: **Collects data from 800+ integrations**<br/>
+  Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD, and logs.
+  
+- :muscle: **Real-Time, Low-Latency, High-Resolution**<br/>
+  All data are collected per second and are on the dashboard immediately after data collection.
+
+- :face_in_clouds: **Unsupervised Anomaly Detection**<br/>
+  Trains multiple Machine-Learning (ML) models for each metric and uses AI to detect anomalies based on the past behavior of each metric.
+
+- :fire: **Powerful Visualization**<br/>
+  Fully automated dashboard providing corellated visualization of all metrics, allowing you to understand any dataset at first sight, but also to filter, slice and dice the data directly on the dashboards, without the need to learn a query language.
+
+- :bell: **Out of box Alerts**<br/>
+  Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
+
+- :sunglasses: **Low Maintenance**<br/>
+  Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, zero-touch machine-learning, easy scalability and high availability, and CI/CD friendly.
+
+- :star: **Open and Extensible**<br/>
+  Netdata is a modular platform that can be extended in all possible ways, and it also integrates nicely with other monitoring solutions.
+
 
 **WHAT CAN BE MONITORED WITH NETDATA**:<br/>
 
@@ -61,29 +104,6 @@ When Netdata runs on Linux, it monitors every kernel feature available, providin
 Netdata provides full **enterprise hardware** coverage, monitoring all components that provide hardware error reporting, like PCI AER, RAM EDAC, IPMI, S.M.A.R.T., NVMe, Fans, Power, Voltages, and more.
 
 <small> * Netdata runs on Linux, FreeBSD and macOS. For Windows, we rely on Windows Exporter (so a Netdata running on Linux, FreeBSD or macOS is required, next to the monitored Windows servers).</small>
-
-**KEY CHARACTERISTICS**:<br/>
-
-- :boom: **Collects data from 800+ integrations**<br/>
-  Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD, and logs.
-  
-- :muscle: **Real-Time, Low-Latency, High-Resolution**<br/>
-  All data are collected per second and are on the dashboard immediately after data collection.
-
-- :face_in_clouds: **Unsupervised Anomaly Detection**<br/>
-  Trains multiple Machine-Learning (ML) models for each metric and uses AI to detect anomalies based on the past behavior of each metric.
-
-- :fire: **Powerful Visualization**<br/>
-  Fully automated dashboard providing corellated visualization of all metrics, allowing you to understand any dataset at first sight, but also to filter, slice and dice the data directly on the dashboards, without the need to learn a query language.
-
-- :bell: **Out of box Alerts**<br/>
-  Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
-
-- :sunglasses: **Low Maintenance**<br/>
-  Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, zero-touch machine-learning, easy scalability and high availability, and CI/CD friendly.
-
-- :star: **Open and Extensible**<br/>
-  Netdata is a modular platform that can be extended in all possible ways, and it also integrates nicely with other monitoring solutions.
 
 ---
 
@@ -181,10 +201,6 @@ Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata
 
 ![Netdata Agent](https://github.com/netdata/netdata/assets/2662304/af4caa23-19be-46ef-9779-8fdad8d99d2a)
 
-<hr class="solid">
-
-> **Important** :bulb:<br/>
-> People get addicted to Netdata. Once you use it on your systems, **there's no going back!**<br/>
 
 <hr class="solid">
 
@@ -748,7 +764,7 @@ The Netdata Agent is shipped with multiple UI versions:
 - `http://agent.ip:19999/v1/`, the latest open-source single-node UI, GPLv3+.
 - `http://agent.ip:19999/v2/`, a snapshot of the latest Netdata Cloud UI as it was at the time the agent was released, licensed to be distributed with Netdata Agents under [NCUL1](/src/web/gui/v2/LICENSE.md).
 
-When you access a Netdata Agent via `http://agent.ip:19999/` a splash screen attempts to use the latest live version of Netdata Cloud UI (downloaded from Cloudflare). This only happens when the web browser has internet connectivity and Netdata Cloud is not disabled at the agent configuration. Otherwise, it falls back to `http://agent.ip:19999/v2/`.
+When you access a Netdata Agent via `http://agent.ip:19999/` a splash screen attempts to use the latest live version of Netdata Cloud UI (downloaded from Cloudflare). This only happens when the web browser has internet connectivity. Otherwise, it falls back to `http://agent.ip:19999/v2/`.
 
 The Netdata Cloud UI is not open-source. But we thought that it is to the benefit of the community to allow everyone to use it directly with Netdata Agents, for free, even if Netdata Cloud is not used.
 
@@ -850,7 +866,14 @@ instructions on building each Netdata component from the source and preparing a 
 
 ## License
 
-Netdata is released under [GPLv3+](https://github.com/netdata/netdata/blob/master/LICENSE). Netdata re-distributes other open-source tools and libraries. Please check the
-[third party licenses](/REDISTRIBUTED.md).
+The Netdata ecosystem is comprised of three key components:
 
-The Latest Netdata UI, is distributed under [NCUL1](/src/web/gui/v2/LICENSE.md). It also uses third party open source components. Check the [UI third party licenses](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/3D_PARTY_LICENSES.txt)
+-   **Netdata Agent**: The heart of the Netdata ecosystem, the Netdata Agent is an open-source tool that must be installed on all systems monitored by Netdata. It offers a wide range of essential features, including data collection via various plugins, an embedded high-performance time-series database (dbengine), unsupervised anomaly detection powered by edge-trained machine learning, alerting and notifications, as well as query and scoring engines with associated APIs. Additionally, it supports exporting data to third-party monitoring systems, among other capabilities.
+    
+    The Netdata Agent is released under the [GPLv3+ license](https://github.com/netdata/netdata/blob/master/LICENSE) and redistributes several other open-source tools and libraries, which are listed in the [Netdata Agent third-party licenses](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md).
+    
+-   **Netdata Cloud**: A commercial, closed-source component, Netdata Cloud enhances the capabilities of the open-source Netdata Agent by providing horizontal scalability, centralized alert notification dispatch (including a mobile app), user management, role-based access control, and other enterprise-grade features. It is available both as a SaaS solution and for on-premises deployment, with a free-to-use community tier also offered.
+    
+-   **Netdata UI**: The Netdata UI is closed-source, and handles all visualization and dashboard functionalities related to metrics, logs and other collected data, as well as the central configuration and management of the Netdata ecosystem. It serves both the Netdata Agent and Netdata Cloud. The Netdata UI is distributed in binary form with the Netdata Agent and is publicly accessible via a CDN, licensed under the [Netdata Cloud UI License 1 (NCUL1)](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/LICENSE.md). It integrates third-party open-source components, detailed in the [Netdata UI third-party licenses](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/3D_PARTY_LICENSES.txt).
+
+The binary installation packages provided by Netdata include the Netdata Agent and the Netdata UI in a single package. Since the Netdata Agent is open-source, it is frequently packaged by third parties (e.g. Linux Distributions) excluding the closed-source components (Netdata UI is not included). While their packages can still be useful in providing the necessary back-ends and the APIs of a fully functional monitoring solution, we recommend using the installation packages we provide to experience the full feature set of Netdata.
