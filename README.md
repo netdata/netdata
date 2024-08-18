@@ -49,7 +49,7 @@ Netdata also incorporates **A.I. insights** for all monitored data, training mac
     
 3.  **Netdata UI**: The user interface that powers all dashboards, data visualization, and configuration.
     
-    _While closed-source, it is free to use with both Netdata Agents and Netdata Cloud._
+    _While closed-source, it is free to use with both Netdata Agents and Netdata Cloud, via their public APIs._
 
     <a href="https://github.com/netdata/netdata/blob/master/src/web/gui/v2/LICENSE.md"><img src="https://img.shields.io/badge/Netdata%20UI%20License%20-NCUL1-blue.svg" alt="Netdata UI License: NCUL1"></a>
     
