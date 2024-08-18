@@ -3037,6 +3037,7 @@ static void ebpf_set_global_variables()
     isrh = get_redhat_release();
     pid_max = os_get_system_pid_max();
     running_on_kernel = ebpf_get_kernel_version();
+    memset(pids_fd, -1, sizeof(pids_fd));
 }
 
 /**
