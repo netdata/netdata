@@ -307,11 +307,11 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
     // To add pids to target here will do host very slow
 
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
+    ptr->thread_collecting |= 1<<idx;
     // The caller is getting data to work.
     if (!name && idx != EBPF_PIDS_PROC_FILE)
         return ptr;
 
-    ptr->thread_collecting |= 1<<idx;
     if (ptr->pid == pid) {
         return ptr;
     }
@@ -322,16 +322,16 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
     if (name)
         strncpyz(ptr->comm, name, EBPF_MAX_COMPARE_NAME);
 
-    if (idx == EBPF_OPTION_ALL_CHARTS) {
+    if (idx == EBPF_PIDS_PROC_FILE) {
         // We are going to use only with pids listed in /proc, other PIDs are associated to it
         if (likely(ebpf_pids_link_list))
             ebpf_pids_link_list->prev = ptr;
 
         ptr->next = ebpf_pids_link_list;
         ebpf_pids_link_list = ptr;
-    }
 
-    ebpf_all_pids_count++;
+        ebpf_all_pids_count++;
+    }
 
     return ptr;
 }
@@ -349,7 +349,6 @@ static inline void ebpf_release_pid_data(ebpf_pid_data_t *eps, int fd, uint32_t 
 
 static inline void ebpf_reset_specific_pid_data(ebpf_pid_data_t *ptr)
 {
-    ptr->has_proc_file = 0;
     int idx;
     uint32_t pid = ptr->pid;
     for (idx = EBPF_PIDS_PROCESS_IDX; idx < EBPF_PIDS_PROC_FILE; idx++) {

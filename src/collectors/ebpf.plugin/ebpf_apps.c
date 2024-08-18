@@ -472,8 +472,8 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p)
 
     struct stat statbuf;
     if (stat(filename, &statbuf)) {
+        // PID ended before we stat the file
         p->has_proc_file = 0;
-        p->thread_collecting &= ~(1<<EBPF_OPTION_ALL_CHARTS);
         return 0;
     }
 
@@ -747,10 +747,8 @@ void ebpf_del_pid_entry(pid_t pid)
         p->prev->next = p->next;
 
 
-    if (p->thread_collecting & EBPF_PIDS_PROC_FILE)
+    if ((p->thread_collecting & EBPF_PIDS_PROC_FILE) || p->has_proc_file)
         ebpf_all_pids_count--;
-
-    memset(p, 0, sizeof(ebpf_pid_data_t));
 
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
@@ -769,6 +767,8 @@ void ebpf_del_pid_entry(pid_t pid)
         JudyLDel(&ebpf_judy_pid.index.JudyLArray, p->pid, PJE0);
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
+    memset(p, 0, sizeof(ebpf_pid_data_t));
 }
 
 /**
@@ -777,12 +777,10 @@ void ebpf_del_pid_entry(pid_t pid)
 static void ebpf_cleanup_exited_pids()
 {
     ebpf_pid_data_t *p = NULL;
-    for (p = ebpf_pids_link_list; p;) {
+    for (p = ebpf_pids_link_list; p; p = p->next) {
         if (!p->has_proc_file) {
-            ebpf_release_pid_data(p, 0, p->pid, EBPF_OPTION_ALL_CHARTS);
+            ebpf_reset_specific_pid_data(p);
         }
-
-        p = p->next;
     }
 }
 
@@ -959,11 +957,17 @@ end_process_loop:
 void ebpf_parse_proc_files()
 {
     ebpf_pid_data_t *pids = ebpf_pids_link_list;
-    while (pids) {
+    for (pids = ebpf_pids_link_list; pids;) {
+        if (kill(pids->pid, 0)) { // No PID found
+            ebpf_pid_data_t *next = pids->next;
+            ebpf_reset_specific_pid_data(pids);
+            pids = next;
+            continue;
+        }
+
         pids->not_updated = EBPF_CLEANUP_FACTOR;
         pids->merged = 0;
         pids->children_count = 0;
-
         pids = pids->next;
     }
 
