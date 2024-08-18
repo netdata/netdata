@@ -54,6 +54,7 @@ enum ebpf_pids_index {
     EBPF_PIDS_FD_IDX,
     EBPF_PIDS_SHM_IDX,
 
+    EBPF_PIDS_PROC_FILE,
     EBPF_PIDS_END_IDX
 };
 
@@ -306,7 +307,7 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
 
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
     // The caller is getting data to work.
-    if (!name && idx != EBPF_OPTION_ALL_CHARTS)
+    if (!name && idx != EBPF_PIDS_PROC_FILE)
         return ptr;
 
     ptr->thread_collecting |= 1<<idx;

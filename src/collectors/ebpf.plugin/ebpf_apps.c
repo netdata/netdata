@@ -542,7 +542,7 @@ static inline int ebpf_collect_data_for_pid(pid_t pid)
         return 0;
     }
 
-    ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL, EBPF_OPTION_ALL_CHARTS);
+    ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL, EBPF_PIDS_PROC_FILE);
     read_proc_pid_stat(p);
 
     // check its parent pid
