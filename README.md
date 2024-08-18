@@ -39,7 +39,7 @@ Netdata also incorporates **A.I. insights** for all monitored data, training mac
 
 **Netdata is built on three core components:**
 
-1.  **Netdata Agent**: The heart of Netdata, this component handles the collection, storage, querying, machine learning, exporting, and alerting of observability data. It runs in physical and virtual servers, cloud environments, Kubernetes clusters, and edge/IoT devices and is optimized to be a "polite citizen" for production systems and applications.
+1.  **Netdata Agent**: The heart of Netdata, this open-source component handles the collection, storage, querying, machine learning, exporting, and alerting of observability data. It runs in physical and virtual servers, cloud environments, Kubernetes clusters, and edge/IoT devices and is optimized to be a "polite citizen" for production systems and applications.
     
     <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/Netdata%20Agent%20License-GPL%20v3%2B-blue.svg" alt="Netdata Agent License: GPL v3+"></a> <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a> <a href="https://scan.coverity.com/projects/netdata-netdata?tab=overview"><img alt="Coverity Scan" src="https://img.shields.io/coverity/scan/netdata"></a>
     
