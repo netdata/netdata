@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18357](https://github.com/netdata/netdata/pull/18357) ([netdatabot](https://github.com/netdatabot))
+- remove python.d lm\_sensors.py [\#18356](https://github.com/netdata/netdata/pull/18356) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/retroshare [\#18355](https://github.com/netdata/netdata/pull/18355) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18353](https://github.com/netdata/netdata/pull/18353) ([netdatabot](https://github.com/netdatabot))
 - go.d httpcheck: add status description to docs [\#18351](https://github.com/netdata/netdata/pull/18351) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18350](https://github.com/netdata/netdata/pull/18350) ([netdatabot](https://github.com/netdatabot))
@@ -409,7 +412,6 @@
 - docs fix statsd conf dir [\#17785](https://github.com/netdata/netdata/pull/17785) ([ilyam8](https://github.com/ilyam8))
 - go.d phpfpm switch to github.com/kanocz/fcgi\_client [\#17784](https://github.com/netdata/netdata/pull/17784) ([ilyam8](https://github.com/ilyam8))
 - Change "War Room" to "Room" and other docs changes [\#17783](https://github.com/netdata/netdata/pull/17783) ([Ancairon](https://github.com/Ancairon))
-- rm "ignore zero metrics" proc meminfo [\#17781](https://github.com/netdata/netdata/pull/17781) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
