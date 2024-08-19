@@ -780,7 +780,7 @@ You can also find Netdata on:<br/>
 ## :pray: Contribute
 
 <p align="center">
-  <a href="https://github.com/netdata/netdata/graphs/contributors"><img alt="Open Source Contributors" src="https://img.shields.io/github/contributors/netdata/netdata"></a>
+  <a href="https://github.com/netdata/netdata/graphs/contributors"><img alt="Open Source Contributors" src="[https://img.shields.io/github/contributors/netdata/netdata](https://img.shields.io/github/contributors/netdata/netdata?label=open-source%20contributors)"></a>
 </p>
 
 Contributions are essential to the success of open-source projects. In other words, we need your help to keep Netdata great!
