@@ -859,6 +859,7 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     ebpf_process_stat_t *total = &out[0];
+    uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
         ebpf_process_stat_t *w = &out[i];
         total->exit_call += w->exit_call;
@@ -866,7 +867,11 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
         total->create_thread += w->create_thread;
         total->create_process += w->create_process;
         total->release_call += w->release_call;
+
+        if (w->ct > ct)
+            ct = w->ct;
     }
+    total->ct = ct;
 }
 
 /**
@@ -928,12 +933,23 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core, uin
             if (!w)
                 local_pid->process = w = ebpf_process_allocate_publish();
 
-            w->create_thread = process_stat_vector[0].create_thread;
-            w->exit_call = process_stat_vector[0].exit_call;
-            w->create_thread = process_stat_vector[0].create_thread;
-            w->create_process = process_stat_vector[0].create_process;
-            w->release_call = process_stat_vector[0].release_call;
-            w->task_err = process_stat_vector[0].task_err;
+            if (!w->ct || w->ct != process_stat_vector[0].ct) {
+                w->ct = process_stat_vector[0].ct;
+                w->create_thread = process_stat_vector[0].create_thread;
+                w->exit_call = process_stat_vector[0].exit_call;
+                w->create_thread = process_stat_vector[0].create_thread;
+                w->create_process = process_stat_vector[0].create_process;
+                w->release_call = process_stat_vector[0].release_call;
+                w->task_err = process_stat_vector[0].task_err;
+            } else {
+                if (kill(key, 0)) { // No PID found
+                    ebpf_reset_specific_pid_data(local_pid);
+                } else { // There is PID, but there is not data anymore
+                    ebpf_release_pid_data(local_pid, tbl_pid_stats_fd, key, EBPF_PIDS_PROCESS_IDX);
+                    ebpf_process_release_publish(w);
+                    local_pid->process = NULL;
+                }
+            }
 
 end_process_loop:
             memset(process_stat_vector, 0, length);

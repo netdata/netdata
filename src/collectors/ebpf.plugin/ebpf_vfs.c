@@ -1265,13 +1265,18 @@ static void ebpf_vfs_read_apps(int maps_per_core, uint32_t max_period)
         netdata_publish_vfs_t *publish = local_pid->vfs;
         if (!publish)
             local_pid->vfs = publish = ebpf_vfs_allocate_publish();
+
         if (!publish->ct || publish->ct != vv->ct) {
             vfs_aggregate_set_vfs(publish, vv);
             local_pid->not_updated = 0;
         } else if (++local_pid->not_updated >= max_period){
-            ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_VFS_IDX);
-            ebpf_vfs_release_publish(publish);
-            local_pid->vfs = NULL;
+            if (kill(key, 0)) { // No PID found
+                ebpf_reset_specific_pid_data(local_pid);
+            } else { // There is PID, but there is not data anymore
+                ebpf_release_pid_data(local_pid, fd, key, EBPF_PIDS_VFS_IDX);
+                ebpf_vfs_release_publish(publish);
+                local_pid->vfs = NULL;
+            }
         }
 
 end_vfs_loop:

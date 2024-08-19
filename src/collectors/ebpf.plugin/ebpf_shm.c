@@ -595,10 +595,14 @@ static void ebpf_read_shm_apps_table(int maps_per_core, uint32_t max_period)
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, &cv[0], sizeof(netdata_publish_shm_t));
             local_pid->not_updated = 0;
-        } else if (++local_pid->not_updated >= max_period){
-            ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_SHM_IDX);
-            ebpf_shm_release_publish(publish);
-            local_pid->shm = NULL;
+        } else {
+            if (kill(key, 0)) { // No PID found
+                ebpf_reset_specific_pid_data(local_pid);
+            } else { // There is PID, but there is not data anymore
+                ebpf_release_pid_data(local_pid, fd, key, EBPF_PIDS_SHM_IDX);
+                ebpf_shm_release_publish(publish);
+                local_pid->shm = NULL;
+            }
         }
 
 end_shm_loop:

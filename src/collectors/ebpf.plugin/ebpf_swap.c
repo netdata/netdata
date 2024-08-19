@@ -565,13 +565,18 @@ static void ebpf_read_swap_apps_table(int maps_per_core, uint32_t max_period)
         netdata_publish_swap_t *publish = local_pid->swap;
         if (!publish)
             local_pid->swap = publish = ebpf_swap_allocate_publish_swap();
+
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, cv, sizeof(netdata_publish_swap_t));
             local_pid->not_updated = 0;
-        } else if (++local_pid->not_updated >= max_period && !local_pid->has_proc_file) {
-            ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_SWAP_IDX);
-            ebpf_release_publish_swap(publish);
-            local_pid->swap = NULL;
+        } else {
+            if (kill(key, 0)) { // No PID found
+                ebpf_reset_specific_pid_data(local_pid);
+            } else { // There is PID, but there is not data anymore
+                ebpf_release_pid_data(local_pid, fd, key, EBPF_PIDS_SWAP_IDX);
+                ebpf_swap_release_publish(publish);
+                local_pid->swap = NULL;
+            }
         }
 
         // We are cleaning to avoid passing data read from one process to other.

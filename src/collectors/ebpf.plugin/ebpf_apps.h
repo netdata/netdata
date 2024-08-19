@@ -273,7 +273,7 @@ static inline void *ebpf_swap_allocate_publish_swap()
     return callocz(1, sizeof(netdata_publish_swap_t));
 }
 
-static inline void ebpf_release_publish_swap(netdata_publish_swap_t *ptr)
+static inline void ebpf_swap_release_publish(netdata_publish_swap_t *ptr)
 {
     ebpf_hash_table_pids_count--;
     freez(ptr);
