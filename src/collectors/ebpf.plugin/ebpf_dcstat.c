@@ -572,10 +572,14 @@ static void ebpf_read_dc_apps_table(int maps_per_core, uint32_t max_period)
             publish->curr.cache_access = cv[0].cache_access;
 
             pid_stat->not_updated = 0;
-        } else if (++pid_stat->not_updated >= max_period) {
-            ebpf_release_pid_data(pid_stat, fd, key, EBPF_MODULE_DCSTAT_IDX);
-            ebpf_dc_release_publish(publish);
-            pid_stat->dc = NULL;
+        } else {
+            if (kill(key, 0)) { // No PID found
+                ebpf_reset_specific_pid_data(pid_stat);
+            } else { // There is PID, but there is not data anymore
+                ebpf_release_pid_data(pid_stat, fd, key, EBPF_MODULE_DCSTAT_IDX);
+                ebpf_dc_release_publish(publish);
+                pid_stat->dc = NULL;
+            }
         }
 
 end_dc_loop:

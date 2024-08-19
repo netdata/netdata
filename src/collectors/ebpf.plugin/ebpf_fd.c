@@ -718,7 +718,7 @@ static void ebpf_read_fd_apps_table(int maps_per_core, uint32_t max_period)
             if (kill(key, 0)) { // No PID found
                 ebpf_reset_specific_pid_data(pid_stat);
             } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(pid_stat, fd, key, EBPF_MODULE_FD_IDX);
+                ebpf_release_pid_data(pid_stat, fd, key, EBPF_PIDS_FD_IDX);
                 ebpf_fd_release_publish(publish_fd);
                 pid_stat->fd = NULL;
             }
