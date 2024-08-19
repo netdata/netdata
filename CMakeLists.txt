@@ -2780,7 +2780,6 @@ install(FILES
         src/collectors/python.d.plugin/boinc/boinc.conf
         src/collectors/python.d.plugin/ceph/ceph.conf
         src/collectors/python.d.plugin/changefinder/changefinder.conf
-        src/collectors/python.d.plugin/example/example.conf
         src/collectors/python.d.plugin/go_expvar/go_expvar.conf
         src/collectors/python.d.plugin/haproxy/haproxy.conf
         src/collectors/python.d.plugin/openldap/openldap.conf
@@ -2801,7 +2800,6 @@ install(FILES
         src/collectors/python.d.plugin/boinc/boinc.chart.py
         src/collectors/python.d.plugin/ceph/ceph.chart.py
         src/collectors/python.d.plugin/changefinder/changefinder.chart.py
-        src/collectors/python.d.plugin/example/example.chart.py
         src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
         src/collectors/python.d.plugin/haproxy/haproxy.chart.py
         src/collectors/python.d.plugin/openldap/openldap.chart.py
