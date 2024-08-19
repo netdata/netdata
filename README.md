@@ -1,5 +1,3 @@
-
-
 <p align="center">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_light.png" alt="Netdata" width="300"/>
@@ -37,9 +35,11 @@ What sets Netdata apart is its **cost-efficient, distributed design**. Unlike tr
 
 Netdata also incorporates **A.I. insights** for all monitored data, training machine learning models directly at the edge. This allows for fully automated and unsupervised anomaly detection, and with the provided APIs and UIs, users can quickly spot correlations and gain deeper insights.
 
-**Netdata is built on three core components:**
+**THE NETDATA ECOSYSTEM**:<br/>
 
-1.  **Netdata Agent**: The heart of Netdata, this open-source component handles the collection, storage, querying, machine learning, exporting, and alerting of observability data. It runs in physical and virtual servers, cloud environments, Kubernetes clusters, and edge/IoT devices and is optimized to be a "polite citizen" for production systems and applications.
+Netdata is built on three core components:
+
+1.  **Netdata Agent** (usually just "Netdata"): This open-source component is the heart of the Netdata ecosystem, handling data collection, storage (embedded database), querying, machine learning, exporting, and alerting of observability data. All observability data and features a Netdata ecosystem offers, are managed by the Netdata Agent. It runs in physical and virtual servers, cloud environments, Kubernetes clusters, and edge/IoT devices and is carefully optimized to be a _**polite citizen**_ for production systems and applications.
     
     <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/Netdata%20Agent%20License-GPL%20v3%2B-blue.svg" alt="Netdata Agent License: GPL v3+"></a> <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a> <a href="https://scan.coverity.com/projects/netdata-netdata?tab=overview"><img alt="Coverity Scan" src="https://img.shields.io/coverity/scan/netdata"></a>
     
