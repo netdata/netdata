@@ -345,7 +345,7 @@ func isRespTimeValid(time int) bool {
 // isCacheCodeValid does not guarantee cache result code is valid, but it is very likely.
 func isCacheCodeValid(code string) bool {
 	// https://wiki.squid-cache.org/SquidFaq/SquidLogs#Squid_result_codes
-	if code == "NONE" {
+	if code == "NONE" || code == "NONE_NONE" {
 		return true
 	}
 	return len(code) > 5 && (code[:4] == "TCP_" || code[:4] == "UDP_")
