@@ -169,6 +169,7 @@ libreswan_sudo=0
 
 ### Debug Mode
 
+
 To troubleshoot issues with the `libreswan` collector, run the `charts.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.
 
