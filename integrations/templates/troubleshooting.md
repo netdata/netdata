@@ -4,6 +4,10 @@
 
 ### Debug Mode
 
+[% if entry.meta.plugin_name == 'go.d.plugin' %]
+**Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
+[% endif %]
+
 To troubleshoot issues with the `[[ entry.meta.module_name ]]` collector, run the `[[ entry.meta.plugin_name ]]` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.
 
