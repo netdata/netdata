@@ -10,7 +10,7 @@ require (
 	github.com/Wing924/ltsv v0.3.1
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
-	github.com/axiomhq/hyperloglog v0.0.0-20240507144631-af9851f82b27
+	github.com/axiomhq/hyperloglog v0.1.0
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
@@ -43,7 +43,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/tidwall/gjson v1.17.3
 	github.com/valyala/fastjson v1.6.4
-	github.com/vmware/govmomi v0.40.0
+	github.com/vmware/govmomi v0.42.0
 	go.mongodb.org/mongo-driver v1.16.1
 	golang.org/x/net v0.28.0
 	golang.org/x/text v0.17.0
