@@ -230,7 +230,7 @@ static void ebpf_update_process_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             ebpf_publish_process_t *out = &pids->ps;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_PROCESS_IDX);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_PROCESS_IDX);
             ebpf_publish_process_t *in = local_pid->process;
             if (!in)
                 continue;
@@ -691,6 +691,7 @@ static void ebpf_process_disable_tracepoints()
  */
 static void ebpf_process_exit(void *pptr)
 {
+    pids_fd[EBPF_PIDS_PROCESS_IDX] = -1;
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!em) return;
 

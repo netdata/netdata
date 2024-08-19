@@ -3,7 +3,6 @@
 package squidlog
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 
@@ -26,28 +25,48 @@ func (s *SquidLog) createLogReader() error {
 
 func (s *SquidLog) createParser() error {
 	s.Debug("starting parser creating")
-	lastLine, err := logs.ReadLastLine(s.file.CurrentFilename(), 0)
+
+	const readLastLinesNum = 100
+
+	lines, err := logs.ReadLastLines(s.file.CurrentFilename(), readLastLinesNum)
 	if err != nil {
-		return fmt.Errorf("read last line: %v", err)
+		return fmt.Errorf("failed to read last lines: %v", err)
 	}
 
-	lastLine = bytes.TrimRight(lastLine, "\n")
-	s.Debugf("last line: '%s'", string(lastLine))
+	var found bool
+	for _, line := range lines {
+		if line = strings.TrimSpace(line); line == "" {
+			continue
+		}
 
-	s.parser, err = logs.NewParser(s.ParserConfig, s.file)
-	if err != nil {
-		return fmt.Errorf("create parser: %v", err)
-	}
-	s.Debugf("created parser: %s", s.parser.Info())
+		s.Debugf("last line: '%s'", line)
 
-	err = s.parser.Parse(lastLine, s.line)
-	if err != nil {
-		return fmt.Errorf("parse last line: %v (%s)", err, string(lastLine))
+		s.parser, err = logs.NewParser(s.ParserConfig, s.file)
+		if err != nil {
+			s.Debugf("failed to create parser from line: %v", err)
+			continue
+		}
+
+		s.line.reset()
+
+		if err = s.parser.Parse([]byte(line), s.line); err != nil {
+			s.Debugf("failed to parse line: %v", err)
+			continue
+		}
+
+		if err = s.line.verify(); err != nil {
+			s.Debugf("failed to verify line: %v", err)
+			continue
+		}
+
+		found = true
+		break
 	}
 
-	if err = s.line.verify(); err != nil {
-		return fmt.Errorf("verify last line: %v (%s)", err, string(lastLine))
+	if !found {
+		return fmt.Errorf("failed to create log parser (file '%s')", s.file.CurrentFilename())
 	}
+
 	return nil
 }
 

@@ -525,6 +525,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
  */
 static void ebpf_cachestat_exit(void *pptr)
 {
+    pids_fd[EBPF_PIDS_CACHESTAT_IDX] = -1;
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!em) return;
 
@@ -733,7 +734,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint32_t max_perio
 
         cachestat_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, EBPF_MODULE_CACHESTAT_IDX);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, EBPF_PIDS_CACHESTAT_IDX);
         netdata_publish_cachestat_t *publish = local_pid->cachestat;
         if (!publish)
             local_pid->cachestat = publish = ebpf_cachestat_allocate_publish();
@@ -741,10 +742,14 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint32_t max_perio
         if (!publish->ct || publish->ct != cv->ct){
             cachestat_save_pid_values(publish, cv);
             local_pid->not_updated = 0;
-        } else if (++local_pid->not_updated >= max_period) {
-            ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_CACHESTAT_IDX);
-            ebpf_cachestat_release_publish(publish);
-            local_pid->cachestat = NULL;
+        } else {
+            if (kill(key, 0)) { // No PID found
+                ebpf_reset_specific_pid_data(local_pid);
+            } else { // There is PID, but there is not data anymore
+                ebpf_release_pid_data(local_pid, fd, key, EBPF_PIDS_CACHESTAT_IDX);
+                ebpf_cachestat_release_publish(publish);
+                local_pid->cachestat = NULL;
+            }
         }
 
 end_cachestat_loop:
@@ -771,7 +776,7 @@ static void ebpf_update_cachestat_cgroup()
             int pid = pids->pid;
             netdata_publish_cachestat_t *out = &pids->cachestat;
 
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_CACHESTAT_IDX);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_CACHESTAT_IDX);
             netdata_publish_cachestat_t *in = local_pid->cachestat;
             if (!in)
                 continue;
@@ -798,7 +803,7 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
     netdata_cachestat_t *dst = &publish->current;
     for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_CACHESTAT_IDX);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_CACHESTAT_IDX);
         netdata_publish_cachestat_t *w = local_pid->cachestat;
         if (!w)
             continue;
@@ -851,6 +856,7 @@ void *ebpf_read_cachestat_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
+    pids_fd[EBPF_PIDS_CACHESTAT_IDX] = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
         if (ebpf_plugin_stop() || ++counter != update_every)

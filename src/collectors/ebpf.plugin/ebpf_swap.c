@@ -391,6 +391,7 @@ static void ebpf_obsolete_swap_global(ebpf_module_t *em)
  */
 static void ebpf_swap_exit(void *ptr)
 {
+    pids_fd[EBPF_PIDS_SWAP_IDX] = -1;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     pthread_mutex_lock(&lock);
@@ -483,7 +484,7 @@ static void ebpf_update_swap_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_swap_t *out = &pids->swap;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SWAP_IDX);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_SWAP_IDX);
             netdata_publish_swap_t *in = local_pid->swap;
             if (!in)
                 continue;
@@ -508,7 +509,7 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_
 
     for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SWAP_IDX);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_SWAP_IDX);
         netdata_publish_swap_t *w = local_pid->swap;
         if (!w)
             continue;
@@ -560,17 +561,22 @@ static void ebpf_read_swap_apps_table(int maps_per_core, uint32_t max_period)
 
         swap_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, EBPF_MODULE_SWAP_IDX);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, EBPF_PIDS_SWAP_IDX);
         netdata_publish_swap_t *publish = local_pid->swap;
         if (!publish)
             local_pid->swap = publish = ebpf_swap_allocate_publish_swap();
+
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, cv, sizeof(netdata_publish_swap_t));
             local_pid->not_updated = 0;
-        } else if (++local_pid->not_updated >= max_period && !local_pid->has_proc_file) {
-            ebpf_release_pid_data(local_pid, fd, key, EBPF_MODULE_SWAP_IDX);
-            ebpf_release_publish_swap(publish);
-            local_pid->swap = NULL;
+        } else {
+            if (kill(key, 0)) { // No PID found
+                ebpf_reset_specific_pid_data(local_pid);
+            } else { // There is PID, but there is not data anymore
+                ebpf_release_pid_data(local_pid, fd, key, EBPF_PIDS_SWAP_IDX);
+                ebpf_swap_release_publish(publish);
+                local_pid->swap = NULL;
+            }
         }
 
         // We are cleaning to avoid passing data read from one process to other.
@@ -608,6 +614,7 @@ void *ebpf_read_swap_thread(void *ptr)
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
     uint32_t max_period = EBPF_CLEANUP_FACTOR;
+    pids_fd[EBPF_PIDS_SWAP_IDX] = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
 
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);

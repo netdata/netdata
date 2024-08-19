@@ -44,6 +44,22 @@
 
 #define EBPF_CLEANUP_FACTOR 2
 
+enum ebpf_pids_index {
+    EBPF_PIDS_PROCESS_IDX,
+    EBPF_PIDS_SOCKET_IDX,
+    EBPF_PIDS_CACHESTAT_IDX,
+    EBPF_PIDS_DCSTAT_IDX,
+    EBPF_PIDS_SWAP_IDX,
+    EBPF_PIDS_VFS_IDX,
+    EBPF_PIDS_FD_IDX,
+    EBPF_PIDS_SHM_IDX,
+
+    EBPF_PIDS_PROC_FILE,
+    EBPF_PIDS_END_IDX
+};
+
+extern int pids_fd[EBPF_PIDS_END_IDX];
+
 enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
     EBPF_MODULE_SOCKET_IDX,
@@ -154,6 +170,7 @@ extern struct ebpf_target *users_root_target;
 extern struct ebpf_target *groups_root_target;
 extern uint64_t collect_pids;
 
+// ebpf_pid_data
 typedef struct __attribute__((packed)) ebpf_pid_data {
     uint32_t pid;
     uint32_t ppid;
@@ -256,7 +273,7 @@ static inline void *ebpf_swap_allocate_publish_swap()
     return callocz(1, sizeof(netdata_publish_swap_t));
 }
 
-static inline void ebpf_release_publish_swap(netdata_publish_swap_t *ptr)
+static inline void ebpf_swap_release_publish(netdata_publish_swap_t *ptr)
 {
     ebpf_hash_table_pids_count--;
     freez(ptr);
@@ -287,14 +304,12 @@ static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
 }
 
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx) {
-    // To add pids to target here will do host very slow
-
     ebpf_pid_data_t *ptr = &ebpf_pids[pid];
+    ptr->thread_collecting |= 1<<idx;
     // The caller is getting data to work.
-    if (!name && idx != EBPF_OPTION_ALL_CHARTS)
+    if (!name && idx != EBPF_PIDS_PROC_FILE)
         return ptr;
 
-    ptr->thread_collecting |= 1<<idx;
     if (ptr->pid == pid) {
         return ptr;
     }
@@ -305,16 +320,14 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
     if (name)
         strncpyz(ptr->comm, name, EBPF_MAX_COMPARE_NAME);
 
-    if (idx == EBPF_OPTION_ALL_CHARTS) {
-        // We are going to use only with pids listed in /proc, other PIDs are associated to it
-        if (likely(ebpf_pids_link_list))
-            ebpf_pids_link_list->prev = ptr;
+    if (likely(ebpf_pids_link_list))
+        ebpf_pids_link_list->prev = ptr;
 
-        ptr->next = ebpf_pids_link_list;
-        ebpf_pids_link_list = ptr;
+    ptr->next = ebpf_pids_link_list;
+    ebpf_pids_link_list = ptr;
+    if (idx == EBPF_PIDS_PROC_FILE) {
+        ebpf_all_pids_count++;
     }
-
-    ebpf_all_pids_count++;
 
     return ptr;
 }
@@ -329,6 +342,57 @@ static inline void ebpf_release_pid_data(ebpf_pid_data_t *eps, int fd, uint32_t 
         ebpf_del_pid_entry((pid_t)key);
     }
 }
+
+static inline void ebpf_reset_specific_pid_data(ebpf_pid_data_t *ptr)
+{
+    int idx;
+    uint32_t pid = ptr->pid;
+    for (idx = EBPF_PIDS_PROCESS_IDX; idx < EBPF_PIDS_PROC_FILE; idx++) {
+        if (!(ptr->thread_collecting & (1<<idx)))  {
+            continue;
+        }
+        // Check if we still have the map loaded
+        int fd = pids_fd[idx];
+        if (fd <= STDERR_FILENO)
+            continue;
+
+        bpf_map_delete_elem(fd, &pid);
+        ebpf_hash_table_pids_count--;
+        void *clean;
+        switch (idx) {
+            case EBPF_PIDS_PROCESS_IDX:
+                clean = ptr->process;
+                break;
+            case EBPF_PIDS_SOCKET_IDX:
+                clean = ptr->socket;
+                break;
+            case EBPF_PIDS_CACHESTAT_IDX:
+                clean = ptr->cachestat;
+                break;
+            case EBPF_PIDS_DCSTAT_IDX:
+                clean = ptr->dc;
+                break;
+            case EBPF_PIDS_SWAP_IDX:
+                clean = ptr->swap;
+                break;
+            case EBPF_PIDS_VFS_IDX:
+                clean = ptr->vfs;
+                break;
+            case EBPF_PIDS_FD_IDX:
+                clean = ptr->fd;
+                break;
+            case EBPF_PIDS_SHM_IDX:
+                clean = ptr->shm;
+                break;
+            default:
+                clean = NULL;
+        }
+        freez(clean);
+    }
+
+    ebpf_del_pid_entry(pid);
+}
+
 
 typedef struct ebpf_pid_stat {
     uint32_t pid;
