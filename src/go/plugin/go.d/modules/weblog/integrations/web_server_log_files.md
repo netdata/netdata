@@ -345,6 +345,8 @@ There are no configuration examples.
 
 ### Debug Mode
 
+**Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
+
 To troubleshoot issues with the `web_log` collector, run the `go.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.
 
