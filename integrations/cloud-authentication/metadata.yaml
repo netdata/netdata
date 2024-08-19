@@ -131,7 +131,7 @@
       3. In the SCIM card, click on **Activate**.
       4. Depending on your situation:
          - If OIDC/SSO integration is already enabled in your Space, click **Activate**.
-         - If you have an existing SCIM integration in another Space and want to create a new one in this space linked to it, provide the SCIM token you received when enabling the first SCIM integration, and click **Activate**.
+         - If you already have a SCIM integration in another Space and want to create a linked integration here, enter the SCIM token from the original integration and click **Activate**.
       5. If the setup is successful, you will receive two parameters:
          - **Base URL**: Use this URL as the base URL for your SCIM client.
          - **Token**: Use this token for Bearer Authentication with your SCIM client.
@@ -166,7 +166,7 @@
       This mapping ensures that the identity of users remains consistent and secure across both systems.
 
       **Important**: Ensure that your OIDC and SCIM systems follow this mapping strictly.
-      The externalID in SCIM must correspond to the sub field in OIDC. Any deviation from this mapping may result
+      The externalID in SCIM must correspond to the subfield in OIDC. Any deviation from this mapping may result
       in incorrect user identification and authentication failures.
 
       ### Reference
