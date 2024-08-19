@@ -43,7 +43,7 @@ Netdata is built on three core components:
     
     <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/Netdata%20Agent%20License-GPL%20v3%2B-blue.svg" alt="Netdata Agent License: GPL v3+"></a> <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a> <a href="https://scan.coverity.com/projects/netdata-netdata?tab=overview"><img alt="Coverity Scan" src="https://img.shields.io/coverity/scan/netdata"></a>
     
-2.  **Netdata Cloud**: Enhancing the Netdata Agent, Netdata Cloud offers enterprise features such as user management, role-based access control, horizontal scalability, alert and notification management, access from anywhere, and more. Importantly, Netdata Cloud does **not** centralize observability data.
+2.  **Netdata Cloud**: Enhancing the Netdata Agent, Netdata Cloud offers enterprise features such as user management, role-based access control, horizontal scalability, alert and notification management, access from anywhere, and more.  Netdata Cloud does **not** centralize or store observability data.
     
     _Netdata Cloud is available as a SaaS solution or an on-premises installation, with a free community tier._
     
