@@ -47,6 +47,12 @@ EOF
 run chmod 755 "${NETDATA_INSTALL_PATH}/bin/netdata"
 
 # -----------------------------------------------------------------------------
+# the claiming script must be in the same directory as the netdata binary for web-based claiming to work
+
+run ln -s "${NETDATA_INSTALL_PATH}/bin/netdata-claim.sh" \
+  "${NETDATA_INSTALL_PATH}/bin/srv/netdata-claim.sh" || exit 1
+
+# -----------------------------------------------------------------------------
 # copy the SSL/TLS configuration and certificates from the build system
 
 run cp -a /etc/ssl "${NETDATA_INSTALL_PATH}/share/ssl"

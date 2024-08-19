@@ -2415,6 +2415,12 @@ set(registrydir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata/registry")
 set(varlibdir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(netdata_user_POST "${NETDATA_USER}")
 
+configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
+install(PROGRAMS
+        ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh
+        COMPONENT netdata
+        DESTINATION "${BINDIR}")
+
 #
 # We don't check ENABLE_PLUGIN_CGROUP_NETWORK because rpm builds assume
 # the files exists unconditionally.

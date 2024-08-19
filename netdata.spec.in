@@ -511,6 +511,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_sbindir}/log2journal
 %endif
 %{_sbindir}/systemd-cat-native
+%{_sbindir}/%{name}-claim.sh
 
 %{_unitdir}/%{name}.service
 %{_unitdir}/%{name}-updater.timer
