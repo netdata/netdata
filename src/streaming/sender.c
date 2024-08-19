@@ -350,6 +350,7 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
 
     // clear the parent's claim id
     rrdpush_sender_clear_child_claim_id(host);
+    rrdpush_receiver_send_node_and_claim_id_to_child(host);
 }
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host) {

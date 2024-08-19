@@ -19,14 +19,14 @@ void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
 
         CLAIM_ID claim_id = claim_id_get();
 
-        if((!claim_id_is_set(claim_id) || !aclk_online()) && !UUIDiszero(host->aclk.claim_id_of_parent)) {
-            // the agent is not claimed or not connected, and it has a parent claim id
-            // we use it, to allow the connection flow
+        if((!claim_id_is_set(claim_id) || !aclk_online())) {
+            // the agent is not claimed or not connected, just use parent claim id
+            // to allow the connection flow.
             claim_id.uuid = host->aclk.claim_id_of_parent;
             uuid_unparse_lower(claim_id.uuid.uuid, claim_id.str);
         }
 
-        if(claim_id_is_set(claim_id) && claim_id.str[0] && node_id_str[0]) {
+        if(claim_id.str[0] && node_id_str[0]) {
             char buf[2048];
             snprintfz(buf, sizeof(buf),
                       PLUGINSD_KEYWORD_NODE_ID " '%s' '%s' '%s'\n",
