@@ -334,7 +334,6 @@ typedef struct stream_node_instance {
 */
 
 struct parser;
-typedef struct parser PARSER;
 
 struct receiver_state {
     RRDHOST *host;
@@ -395,7 +394,12 @@ struct receiver_state {
         STREAM_NODE_INSTANCE *array;
     } instances;
 */
-    PARSER *parser;
+
+    // The parser pointer is safe to read and use, only when having the host receiver lock.
+    // Without this lock, the data pointed by the pointer may vanish randomly.
+    // Also, since the receiver sets it when it starts, it should be read with
+    // an atomic read.
+    struct parser *parser;
 
 #ifdef ENABLE_H2O
     void *h2o_ctx;

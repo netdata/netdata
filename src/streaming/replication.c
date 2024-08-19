@@ -718,7 +718,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
 struct replication_request_details {
     struct {
         send_command callback;
-        PARSER *parser;
+        struct parser *parser;
     } caller;
 
     RRDHOST *host;
@@ -836,7 +836,7 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
     return true;
 }
 
-bool replicate_chart_request(send_command callback, PARSER *parser, RRDHOST *host, RRDSET *st,
+bool replicate_chart_request(send_command callback, struct parser *parser, RRDHOST *host, RRDSET *st,
                              time_t child_first_entry, time_t child_last_entry, time_t child_wall_clock_time,
                              time_t prev_first_entry_wanted, time_t prev_last_entry_wanted)
 {

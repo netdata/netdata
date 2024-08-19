@@ -127,7 +127,6 @@ struct parser {
     struct {
         SPINLOCK spinlock;
     } writer;
-
 };
 
 typedef struct parser PARSER;

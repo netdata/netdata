@@ -1090,8 +1090,7 @@ void pluginsd_cleanup_v2(PARSER *parser) {
     pluginsd_clear_scope_chart(parser, "THREAD CLEANUP");
 }
 
-void pluginsd_process_thread_cleanup(void *pptr) {
-    PARSER *parser = CLEANUP_FUNCTION_GET_PTR(pptr);
+void pluginsd_process_cleanup(PARSER *parser) {
     if(!parser) return;
 
     pluginsd_cleanup_v2(parser);
@@ -1107,6 +1106,11 @@ void pluginsd_process_thread_cleanup(void *pptr) {
 #endif
 
     parser_destroy(parser);
+}
+
+void pluginsd_process_thread_cleanup(void *pptr) {
+    PARSER *parser = CLEANUP_FUNCTION_GET_PTR(pptr);
+    pluginsd_process_cleanup(parser);
 }
 
 bool parser_reconstruct_node(BUFFER *wb, void *ptr) {

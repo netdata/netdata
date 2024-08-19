@@ -327,13 +327,8 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 #endif
 
     pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
-    rpt->parser = parser;
 
     rrd_collector_started();
-
-    // this keeps the parser with its current value
-    // so, parser needs to be allocated before pushing it
-    CLEANUP_FUNCTION_REGISTER(pluginsd_process_thread_cleanup) parser_ptr = parser;
 
     bool compressed_connection = rrdpush_decompression_initialize(rpt);
     buffered_reader_init(&rpt->reader);
@@ -360,6 +355,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     };
     ND_LOG_STACK_PUSH(lgs);
 
+    __atomic_store_n(&rpt->parser, parser, __ATOMIC_RELAXED);
     rrdpush_receiver_send_node_and_claim_id_to_child(rpt->host);
 
     while(!receiver_should_stop(rpt)) {
@@ -386,6 +382,13 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         buffer->len = 0;
         buffer->buffer[0] = '\0';
     }
+
+    // make sure send_to_plugin() will not write any data to the socket
+    spinlock_lock(&parser->writer.spinlock);
+    parser->fd_output = -1;
+    parser->ssl_output = NULL;
+    spinlock_unlock(&parser->writer.spinlock);
+
     result = parser->user.data_collections_count;
     return result;
 }
@@ -465,6 +468,9 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
         if(host->receiver == rpt) {
             __atomic_sub_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
             rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+
+            pluginsd_process_cleanup(rpt->parser);
+            __atomic_store_n(&rpt->parser, NULL, __ATOMIC_RELAXED);
 
             host->trigger_chart_obsoletion_check = 0;
             host->child_connect_time = 0;
