@@ -594,7 +594,9 @@ Remember, it's not necessary to understand every single metric or chart right aw
 
 ### :cloud: Do I have to subscribe to Netdata Cloud?
 
-Yes, Netdata Cloud is required to use Netdata UI. There is a free community tier available.
+Netdata Cloud delivers the full suite of features and functionality that Netdata offers, including a free community tier.
+
+While our default onboarding process encourages users to take advantage of Netdata Cloud, including a complimentary one-month trial of our full business product, it is not mandatory. Users have the option to bypass this process entirely and still utilize the Netdata Agents along with the Netdata UI, without the need to sign up for Netdata Cloud.
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
@@ -604,11 +606,11 @@ The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still,
   1. Access your infrastructure from anywhere.
   2. Have SSO to protect sensitive features. 
   3. Customizable (custom dashboards and other settings are persisted when you are signed in to Netdata Cloud)
-  4. Configuration of Alerts and Data Collection from the UI (coming soon)
+  4. Configuration of Alerts and Data Collection from the UI
   5. Security (role-based access control - RBAC).
   6. Horizontal Scalability ("blend" multiple independent parents in one uniform infrastructure)
   7. Central Dispatch of Alert Notifications (even when multiple independent parents are involved)
-  8. Mobile App for Alert Notifications (coming soon)
+  8. Mobile App for Alert Notifications
 
 We encourage you to support Netdata by buying a Netdata Cloud subscription. A successful Netdata is a Netdata that evolves and gets improved to provide a simpler, faster and easier monitoring for all of us.
 
