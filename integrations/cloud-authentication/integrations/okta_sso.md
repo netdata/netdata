@@ -37,7 +37,7 @@ Steps needed to be done on Okta Admin Portal:
 
 ### Netdata Configuration Steps
 1. Click on the Space settings cog (located above your profile icon)
-2. Click on the **Authentication** tab
+2. Click on the **User Management** section and access **Authentication and Authorization** tab.
 3. On the Okta SSO card, click on **Configure**
 4. Fill in the [required credentials](https://developer.okta.com/docs/guides/find-your-app-credentials/main/), you get them from **Okta Admin Portal**:
     - **Issuer URL** you can get it from your profile icon on top, e.g. `https://company-name.okta.com`

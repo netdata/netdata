@@ -39,7 +39,7 @@ The access settings for your client are the following:
 
 ### Netdata Configuration Steps
 1. Click on the Space settings cog (located above your profile icon)
-2. Click on the **Authentication** tab
+2. Click on the **User Management** section and access **Authentication and Authorization** tab.
 3. On the OIDC card, click on **Configure**
 4. Fill in the required credentials:
     - **Issuer URL** the Authorization Server Issuer URL, e.g. `https://my-auth-server.com/`
