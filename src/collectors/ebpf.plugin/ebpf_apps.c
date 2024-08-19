@@ -320,6 +320,8 @@ struct ebpf_target
 
 size_t apps_groups_targets_count = 0; // # of apps_groups.conf targets
 
+int pids_fd[EBPF_PIDS_END_IDX];
+
 // ----------------------------------------------------------------------------
 // internal counters
 
@@ -470,8 +472,8 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p)
 
     struct stat statbuf;
     if (stat(filename, &statbuf)) {
+        // PID ended before we stat the file
         p->has_proc_file = 0;
-        p->thread_collecting &= ~(1<<EBPF_OPTION_ALL_CHARTS);
         return 0;
     }
 
@@ -540,7 +542,7 @@ static inline int ebpf_collect_data_for_pid(pid_t pid)
         return 0;
     }
 
-    ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL, EBPF_OPTION_ALL_CHARTS);
+    ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL, EBPF_PIDS_PROC_FILE);
     read_proc_pid_stat(p);
 
     // check its parent pid
@@ -744,7 +746,9 @@ void ebpf_del_pid_entry(pid_t pid)
     if (p->prev)
         p->prev->next = p->next;
 
-    memset(p, 0, sizeof(ebpf_pid_data_t));
+
+    if ((p->thread_collecting & EBPF_PIDS_PROC_FILE) || p->has_proc_file)
+        ebpf_all_pids_count--;
 
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
@@ -764,7 +768,7 @@ void ebpf_del_pid_entry(pid_t pid)
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-    ebpf_all_pids_count--;
+    memset(p, 0, sizeof(ebpf_pid_data_t));
 }
 
 /**
@@ -773,12 +777,10 @@ void ebpf_del_pid_entry(pid_t pid)
 static void ebpf_cleanup_exited_pids()
 {
     ebpf_pid_data_t *p = NULL;
-    for (p = ebpf_pids_link_list; p;) {
+    for (p = ebpf_pids_link_list; p; p = p->next) {
         if (!p->has_proc_file) {
-            ebpf_release_pid_data(p, 0, p->pid, EBPF_OPTION_ALL_CHARTS);
+            ebpf_reset_specific_pid_data(p);
         }
-
-        p = p->next;
     }
 }
 
@@ -857,6 +859,7 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     ebpf_process_stat_t *total = &out[0];
+    uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
         ebpf_process_stat_t *w = &out[i];
         total->exit_call += w->exit_call;
@@ -864,7 +867,11 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
         total->create_thread += w->create_thread;
         total->create_process += w->create_process;
         total->release_call += w->release_call;
+
+        if (w->ct > ct)
+            ct = w->ct;
     }
+    total->ct = ct;
 }
 
 /**
@@ -878,7 +885,7 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
     memset(process, 0, sizeof(ebpf_process_stat_t));
     for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_PROCESS_IDX);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_PROCESS_IDX);
         ebpf_publish_process_t *in = local_pid->process;
         if (!in)
             continue;
@@ -906,6 +913,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core, uin
     if (tbl_pid_stats_fd == -1)
         return;
 
+    pids_fd[EBPF_PIDS_PROCESS_IDX] = tbl_pid_stats_fd;
     size_t length =  sizeof(ebpf_process_stat_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
@@ -920,17 +928,28 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core, uin
 
             ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
 
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, 0, NULL, EBPF_MODULE_PROCESS_IDX);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, 0, NULL, EBPF_PIDS_PROCESS_IDX);
             ebpf_publish_process_t *w = local_pid->process;
             if (!w)
                 local_pid->process = w = ebpf_process_allocate_publish();
 
-            w->create_thread = process_stat_vector[0].create_thread;
-            w->exit_call = process_stat_vector[0].exit_call;
-            w->create_thread = process_stat_vector[0].create_thread;
-            w->create_process = process_stat_vector[0].create_process;
-            w->release_call = process_stat_vector[0].release_call;
-            w->task_err = process_stat_vector[0].task_err;
+            if (!w->ct || w->ct != process_stat_vector[0].ct) {
+                w->ct = process_stat_vector[0].ct;
+                w->create_thread = process_stat_vector[0].create_thread;
+                w->exit_call = process_stat_vector[0].exit_call;
+                w->create_thread = process_stat_vector[0].create_thread;
+                w->create_process = process_stat_vector[0].create_process;
+                w->release_call = process_stat_vector[0].release_call;
+                w->task_err = process_stat_vector[0].task_err;
+            } else {
+                if (kill(key, 0)) { // No PID found
+                    ebpf_reset_specific_pid_data(local_pid);
+                } else { // There is PID, but there is not data anymore
+                    ebpf_release_pid_data(local_pid, tbl_pid_stats_fd, key, EBPF_PIDS_PROCESS_IDX);
+                    ebpf_process_release_publish(w);
+                    local_pid->process = NULL;
+                }
+            }
 
 end_process_loop:
             memset(process_stat_vector, 0, length);
@@ -953,12 +972,18 @@ end_process_loop:
  */
 void ebpf_parse_proc_files()
 {
-    ebpf_pid_data_t *pids = ebpf_pids_link_list;
-    while (pids) {
+    ebpf_pid_data_t *pids;
+    for (pids = ebpf_pids_link_list; pids;) {
+        if (kill(pids->pid, 0)) { // No PID found
+            ebpf_pid_data_t *next = pids->next;
+            ebpf_reset_specific_pid_data(pids);
+            pids = next;
+            continue;
+        }
+
         pids->not_updated = EBPF_CLEANUP_FACTOR;
         pids->merged = 0;
         pids->children_count = 0;
-
         pids = pids->next;
     }
 
