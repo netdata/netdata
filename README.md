@@ -68,7 +68,7 @@ Netdata scales effortlessly from a single server to thousands, even in complex, 
   Trains multiple Machine-Learning (ML) models at the edge, for each metric collected and uses AI to detect anomalies based on the past behavior of each metric.
 
 - :scroll:  **systemd-journald Logs**<br/>
-  Includes tools to efficiently convert plain text log (text, csv, logfmt, json) files to structured systemd-journald entries (`log2journal`, `systemd-cat-native`) and queries systemd-journal files directly enabling powerful logs visualization dashboards. The Netdata Agents eliminates the need to centralize logs and provides all the functions to work with logs directly at the edge.
+  Includes tools to efficiently convert plain text log (text, csv, logfmt, json) files to structured systemd-journald entries (`log2journal`, `systemd-cat-native`) and queries systemd-journal files directly enabling powerful logs visualization dashboards. The Netdata Agents eliminate the need to centralize logs and provide all the functions to work with logs directly at the edge.
 
 - :star: **Lego like, Observability Pipelines**<br/>
   Netdata Agents can be linked to together (in parent-child relationships), to build observability centralization points within your infrastructure, allowing you to control data replication and retention at multiple levels.
