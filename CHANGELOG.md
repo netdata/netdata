@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18363](https://github.com/netdata/netdata/pull/18363) ([netdatabot](https://github.com/netdatabot))
+- add go.d/tor [\#18361](https://github.com/netdata/netdata/pull/18361) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/tor [\#18358](https://github.com/netdata/netdata/pull/18358) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18357](https://github.com/netdata/netdata/pull/18357) ([netdatabot](https://github.com/netdatabot))
 - remove python.d lm\_sensors.py [\#18356](https://github.com/netdata/netdata/pull/18356) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/retroshare [\#18355](https://github.com/netdata/netdata/pull/18355) ([ilyam8](https://github.com/ilyam8))
@@ -408,10 +411,6 @@
 - Use correct path for package files. [\#17793](https://github.com/netdata/netdata/pull/17793) ([vkalintiris](https://github.com/vkalintiris))
 - proc/net\_dev: remove "ignore zero metrics" [\#17789](https://github.com/netdata/netdata/pull/17789) ([ilyam8](https://github.com/ilyam8))
 - Add Alpine 3.20 to CI checks. [\#17788](https://github.com/netdata/netdata/pull/17788) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#17786](https://github.com/netdata/netdata/pull/17786) ([netdatabot](https://github.com/netdatabot))
-- docs fix statsd conf dir [\#17785](https://github.com/netdata/netdata/pull/17785) ([ilyam8](https://github.com/ilyam8))
-- go.d phpfpm switch to github.com/kanocz/fcgi\_client [\#17784](https://github.com/netdata/netdata/pull/17784) ([ilyam8](https://github.com/ilyam8))
-- Change "War Room" to "Room" and other docs changes [\#17783](https://github.com/netdata/netdata/pull/17783) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
