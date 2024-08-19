@@ -682,9 +682,14 @@ In a nutshell, Netdata proves invaluable for:
 
 ### :globe_with_meridians: Is Netdata open-source?
 
+The **Netdata Agent** is open-source, but the **overall Netdata ecosystem** is a hybrid solution, combining open-source and closed-source components.
+
+<details><summary>Click to see detailed answer ...</summary>
+&nbsp;<br/>&nbsp;<br/>
+
 Open-source is about sharing intellectual property with the world, and at Netdata, we embrace this philosophy wholeheartedly.
 
-The Netdata Agent, the core of our ecosystem and the engine behind all our observability features, is fully open-source. Licensed under GPLv3+, the Netdata Agent represents our commitment to open-sourcing innovation in a wide array of observability technologies, including data collection, database design, query engines, observability data modeling, machine learning, and unsupervised anomaly detection, high-performance edge computing, real-time monitoring, and more.
+The **Netdata Agent**, the core of our ecosystem and the engine behind all our observability features, is fully open-source. Licensed under GPLv3+, the Netdata Agent represents our commitment to open-sourcing innovation in a wide array of observability technologies, including data collection, database design, query engines, observability data modeling, machine learning and unsupervised anomaly detection, high-performance edge computing, real-time monitoring, and more.
 
 **The Netdata Agent is our gift to the world**, ensuring that the cutting-edge advancements we've developed are freely accessible to everyone.
 
@@ -692,18 +697,19 @@ However, as a privately funded company, we also need to monetize our open-source
 
 Traditionally, open-source projects have often used the open-core model, where a basic version of the software is open-source, and additional features are reserved for a commercial, closed-source version. This approach can limit access to advanced innovations, as most of these remain closed-source.
 
-At Netdata, we take a different path. We don't create a separate enterprise version of our product. Instead, all users—whether commercial or not—utilize the same Netdata Agent, ensuring that our observability innovations are always open-source.
+At Netdata, we take a slightly different path. We don't create a separate enterprise version of our product. Instead, all users—whether commercial or not—utilize the same Netdata Agent, ensuring that all our observability innovations are always open-source.
 
-However, to experience the full capabilities of the Netdata ecosystem, users need to use the open-source components with our closed-source offerings. The complete product still remains free to use.
+To experience the full capabilities of the Netdata ecosystem, users need to combine the open-source components with our closed-source offerings. The complete product still remains free to use.
 
 The closed-source components include:
 
--   **Netdata UI**: This is closed-source but free to use with the Netdata Agents and Netdata Cloud. It’s also available publicly via a CDN.
+-   **Netdata UI**: This is closed-source but free to use with the Netdata Agents and Netdata Cloud. It’s also publicly available via a CDN.
 -   **Netdata Cloud**: A commercial product available both as an on-premises installation and as a SaaS solution, with a free community tier.
 
-To summarize, the **Netdata Agent** is legally open-source, but the **overall Netdata ecosystem** is a hybrid solution, combining open-source and closed-source components.
-
 By balancing open-source and closed-source components, we ensure that all users have access to our innovations while sustaining our ability to grow and innovate as a company.
+
+&nbsp;<br/>&nbsp;<br/>
+</details>
 
 ### :moneybag: What is your monetization strategy?
 
