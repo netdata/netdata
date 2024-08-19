@@ -245,10 +245,16 @@ func (l *logLine) assignMimeType(mime string) error {
 	}
 	// format: type/subtype, type/subtype;parameter=value
 	i := strings.IndexByte(mime, '/')
-	if i <= 0 || !isMimeTypeValid(mime[:i]) {
+	if i <= 0 {
 		return fmt.Errorf("assign '%s': %w", mime, errBadMimeType)
 	}
+
+	if !isMimeTypeValid(mime[:i]) {
+		return nil
+	}
+
 	l.mimeType = mime[:i] // drop subtype
+
 	return nil
 }
 
