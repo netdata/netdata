@@ -43,7 +43,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/tidwall/gjson v1.17.3
 	github.com/valyala/fastjson v1.6.4
-	github.com/vmware/govmomi v0.40.0
+	github.com/vmware/govmomi v0.42.0
 	go.mongodb.org/mongo-driver v1.16.1
 	golang.org/x/net v0.28.0
 	golang.org/x/text v0.17.0
