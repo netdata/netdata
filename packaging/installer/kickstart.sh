@@ -1235,26 +1235,92 @@ is_netdata_running() {
 }
 
 claim() {
-  local etc_netdata="${INSTALL_PREFIX}/etc/netdata"
-  [ ! -d "${etc_netdata}" -a -d "${INSTALL_PREFIX}/netdata/etc/netdata" ] && etc_netdata="${INSTALL_PREFIX}/netdata/etc/netdata"
-
-  if [ ! -d "${etc_netdata}" ];
-  then
-    fatal "Cannot find ${etc_netdata} of this installation." F0520
-    return 1
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would attempt to claim agent to ${NETDATA_CLAIM_URL}"
+  else
+    progress "Attempting to claim agent to ${NETDATA_CLAIM_URL}"
   fi
 
-  cat >"${etc_netdata}/claim.conf" <<CLAIM_HERE
-[global]
-  url = ${NETDATA_CLAIM_URL}
-  token = ${NETDATA_CLAIM_TOKEN}
-  rooms = ${NETDATA_CLAIM_ROOMS}
-  # proxy = env
-  # insecure = no
-CLAIM_HERE
+  if command -v netdata-claim.sh > /dev/null 2>&1; then
+    NETDATA_CLAIM_PATH="$(command -v netdata-claim.sh)"
+  elif [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
+    NETDATA_CLAIM_PATH=/usr/sbin/netdata-claim.sh
+  elif [ "${INSTALL_PREFIX}" = "/opt/netdata" ]; then
+    NETDATA_CLAIM_PATH="/opt/netdata/bin/netdata-claim.sh"
+  elif [ ! -d "${INSTALL_PREFIX}/netdata" ]; then
+    if [ -d "${INSTALL_PREFIX}/usr" ]; then
+        NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/usr/sbin/netdata-claim.sh"
+    else
+        NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/sbin/netdata-claim.sh"
+    fi
+  else
+    NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
+  fi
 
-  chown root:netdata "${etc_netdata}/claim.conf"
-  chmod 0640 "${etc_netdata}/claim.conf"
+  err_msg=
+  err_code=
+  if [ -z "${NETDATA_CLAIM_PATH}" ]; then
+    err_msg="Unable to claim node: could not find usable claiming script. Reinstalling Netdata may resolve this."
+    err_code=F050B
+  elif [ ! -e "${NETDATA_CLAIM_PATH}" ]; then
+    err_msg="Unable to claim node: ${NETDATA_CLAIM_PATH} does not exist."
+    err_code=F0512
+  elif [ ! -f "${NETDATA_CLAIM_PATH}" ]; then
+    err_msg="Unable to claim node: ${NETDATA_CLAIM_PATH} is not a file."
+    err_code=F0513
+  elif [ ! -x "${NETDATA_CLAIM_PATH}" ]; then
+    err_msg="Unable to claim node: claiming script at ${NETDATA_CLAIM_PATH} is not executable. Reinstalling Netdata may resolve this."
+    err_code=F0514
+  fi
+
+  if [ -n "$err_msg" ]; then
+    if [ "${ACTION}" = "claim" ]; then
+      fatal "$err_msg" "$err_code"
+    else
+      warning "$err_msg"
+      return 1
+    fi
+  fi
+
+  if ! is_netdata_running; then
+    NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -daemon-not-running"
+  fi
+
+  # shellcheck disable=SC2086
+  run_as_root "${NETDATA_CLAIM_PATH}" -token="${NETDATA_CLAIM_TOKEN}" -rooms="${NETDATA_CLAIM_ROOMS}" -url="${NETDATA_CLAIM_URL}" ${NETDATA_CLAIM_EXTRA}
+  case $? in
+    0)
+      progress "Successfully claimed node"
+      return 0
+      ;;
+    1) warning "Unable to claim node due to invalid claiming options. If you are seeing this message, you’ve probably found a bug and should open a bug report at ${AGENT_BUG_REPORT_URL}" ;;
+    2) warning "Unable to claim node due to issues creating the claiming directory or preparing the local claiming key. Make sure you have a working openssl command and that ${INSTALL_PREFIX}/var/lib/netdata/cloud.d exists, then try again." ;;
+    3) warning "Unable to claim node due to missing dependencies. Usually this means that the Netdata Agent was built without support for Netdata Cloud. If you built the agent from source, please install all needed dependencies for Cloud support. If you used the regular installation script and see this error, please file a bug report at ${AGENT_BUG_REPORT_URL}." ;;
+    4) warning "Failed to claim node due to inability to connect to ${NETDATA_CLAIM_URL}. Usually this either means that the specified claiming URL is wrong, or that you are having networking problems." ;;
+    5)
+      progress "Successfully claimed node, but was not able to notify the Netdata Agent. You will need to restart the Netdata service on this node before it will show up in the Cloud."
+      return 0
+      ;;
+    8) warning "Failed to claim node due to an invalid agent ID. You can usually resolve this by removing ${INSTALL_PREFIX}/var/lib/netdata/registry/netdata.public.unique.id and restarting the agent. Then try to claim it again using the same options." ;;
+    9) warning "Failed to claim node due to an invalid node name. This probably means you tried to specify a custom name for this node (for example, using the --claim-hostname option), but the hostname itself was either empty or consisted solely of whitespace. You can resolve this by specifying a valid host name and trying again." ;;
+    10) warning "Failed to claim node due to an invalid room ID. This issue is most likely caused by a typo.  Please check if the room(s) you are trying to add appear on the list of rooms provided to the --claim-rooms option ('${NETDATA_CLAIM_ROOMS}'). Then verify if the rooms are visible in Netdata Cloud and try again." ;;
+    11) warning "Failed to claim node due to an issue with the generated RSA key pair. You can usually resolve this by removing all files in ${INSTALL_PREFIX}/var/lib/netdata/cloud.d and then trying again." ;;
+    12) warning "Failed to claim node due to an invalid or expired claiming token. Please check that the token specified with the --claim-token option ('${NETDATA_CLAIM_TOKEN}') matches what you see in the Cloud and try again." ;;
+    13) warning "Failed to claim node because the Cloud thinks it is already claimed. If this node was created by cloning a VM or as a container from a template, please remove the file ${INSTALL_PREFIX}/var/lib/netdata/registry/netdata.public.unique.id and restart the agent. Then try to claim it again with the same options. Otherwise, if you are certain this node has never been claimed before, you can use the --claim-id option to specify a new node ID to use for claiming, for example by using the uuidgen command like so: --claim-id \"\$(uuidgen)\"" ;;
+    14) warning "Failed to claim node because the node is already in the process of being claimed. You should not need to do anything to resolve this, the node should show up properly in the Cloud soon. If it does not, please report a bug at ${AGENT_BUG_REPORT_URL}." ;;
+    15|16|17) warning "Failed to claim node due to an internal server error in the Cloud. Please retry claiming this node later, and if you still see this message file a bug report at ${CLOUD_BUG_REPORT_URL}." ;;
+    18) warning "Unable to claim node because this Netdata installation does not have a unique ID yet. Make sure the agent is running and started up correctly, and then try again." ;;
+    *) warning "Failed to claim node for an unknown reason. This usually means either networking problems or a bug. Please retry claiming later, and if you still see this message file a bug report at ${AGENT_BUG_REPORT_URL}" ;;
+  esac
+
+  if [ "${ACTION}" = "claim" ]; then
+    deferred_warnings
+    printf >&2 "%s\n" "For community support, you can connect with us on:"
+    support_list
+    cleanup
+    trap - EXIT
+    exit 1
+  fi
 }
 
 # ======================================================================
