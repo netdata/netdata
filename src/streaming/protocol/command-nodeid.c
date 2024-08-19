@@ -29,7 +29,7 @@ void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
         if(claim_id_is_set(claim_id) && claim_id.str[0] && node_id_str[0]) {
             char buf[2048];
             snprintfz(buf, sizeof(buf),
-                      PLUGINSD_KEYWORD_NODE_ID " '%s' '%s' '%s'",
+                      PLUGINSD_KEYWORD_NODE_ID " '%s' '%s' '%s'\n",
                       claim_id.str, node_id_str, cloud_config_url_get());
 
             send_to_plugin(buf, __atomic_load_n(&host->receiver->parser, __ATOMIC_RELAXED));
