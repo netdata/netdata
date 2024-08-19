@@ -68,7 +68,7 @@ Netdata scales effortlessly from a single server to thousands, even in complex, 
   Trains multiple Machine-Learning (ML) models at the edge, for each metric collected and uses AI to detect anomalies based on the past behavior of each metric.
 
 - :scroll:  **systemd-journald Logs**<br/>
-  Includes tools to efficiently convert plain text log (text, csv, logfmt, json) files to structured systemd-journald entries (`log2journal`, `systemd-cat-native`) and queries systemd-journal files directly enabling powerful logs visualization dashboards. The Netdata Agents eliminates the need to centralize logs and provides all the functions to work with logs directly at the edge.
+  Includes tools to efficiently convert plain text log (text, csv, logfmt, json) files to structured systemd-journald entries (`log2journal`, `systemd-cat-native`) and queries systemd-journal files directly enabling powerful logs visualization dashboards. The Netdata Agents eliminate the need to centralize logs and provide all the functions to work with logs directly at the edge.
 
 - :star: **Lego like, Observability Pipelines**<br/>
   Netdata Agents can be linked to together (in parent-child relationships), to build observability centralization points within your infrastructure, allowing you to control data replication and retention at multiple levels.
@@ -594,7 +594,9 @@ Remember, it's not necessary to understand every single metric or chart right aw
 
 ### :cloud: Do I have to subscribe to Netdata Cloud?
 
-Yes, Netdata Cloud is required to use Netdata UI. There is a free community tier available.
+Netdata Cloud delivers the full suite of features and functionality that Netdata offers, including a free community tier.
+
+While our default onboarding process encourages users to take advantage of Netdata Cloud, including a complimentary one-month trial of our full business product, it is not mandatory. Users have the option to bypass this process entirely and still utilize the Netdata Agents along with the Netdata UI, without the need to sign up for Netdata Cloud.
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
@@ -604,11 +606,11 @@ The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still,
   1. Access your infrastructure from anywhere.
   2. Have SSO to protect sensitive features. 
   3. Customizable (custom dashboards and other settings are persisted when you are signed in to Netdata Cloud)
-  4. Configuration of Alerts and Data Collection from the UI (coming soon)
+  4. Configuration of Alerts and Data Collection from the UI
   5. Security (role-based access control - RBAC).
   6. Horizontal Scalability ("blend" multiple independent parents in one uniform infrastructure)
   7. Central Dispatch of Alert Notifications (even when multiple independent parents are involved)
-  8. Mobile App for Alert Notifications (coming soon)
+  8. Mobile App for Alert Notifications
 
 We encourage you to support Netdata by buying a Netdata Cloud subscription. A successful Netdata is a Netdata that evolves and gets improved to provide a simpler, faster and easier monitoring for all of us.
 
@@ -776,6 +778,10 @@ You can also find Netdata on:<br/>
 [Twitter](https://twitter.com/netdatahq) | [YouTube](https://www.youtube.com/c/Netdata) | [Reddit](https://www.reddit.com/r/netdata/) | [LinkedIn](https://www.linkedin.com/company/netdata-cloud/) | [StackShare](https://stackshare.io/netdata) | [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/) | [Repology](https://repology.org/metapackage/netdata/versions) | [Facebook](https://www.facebook.com/linuxnetdata/)
 
 ## :pray: Contribute
+
+<p align="center">
+  <a href="https://github.com/netdata/netdata/graphs/contributors"><img alt="Open Source Contributors" src="https://img.shields.io/github/contributors/netdata/netdata?label=open-source%20contributors"></a>
+</p>
 
 Contributions are essential to the success of open-source projects. In other words, we need your help to keep Netdata great!
 
