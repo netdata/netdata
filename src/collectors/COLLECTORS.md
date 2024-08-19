@@ -887,8 +887,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 ### Other
 
-- [Example collector](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/example/integrations/example_collector.md)
-
 - [Files and directories](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/filecheck/integrations/files_and_directories.md)
 
 - [GitHub API rate limit](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/github_api_rate_limit.md)
