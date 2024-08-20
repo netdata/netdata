@@ -299,17 +299,6 @@ jobs:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
           known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
-      - name: Upload to packages.netdata.cloud
-        id: package-upload
-        continue-on-error: true
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
-        run: |
-          .github/scripts/package-upload.sh \
-          packages.netdata.cloud \
-          ${{ matrix.repo_distro }} \
-          ${{ matrix.arch }} \
-          ${{ matrix.format }} \
-          ${{ needs.version-check.outputs.repo }}
       - name: Import GPG Keys
         id: import-keys
         if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
@@ -321,6 +310,17 @@ jobs:
         if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
         shell: bash
         run: .github/scripts/deb-sign.sh artifacts ${{ steps.import-keys.outputs.fingerprint }}
+      - name: Upload to packages.netdata.cloud
+        id: package-upload
+        continue-on-error: true
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
+        run: |
+          .github/scripts/package-upload.sh \
+          packages.netdata.cloud \
+          ${{ matrix.repo_distro }} \
+          ${{ matrix.arch }} \
+          ${{ matrix.format }} \
+          ${{ needs.version-check.outputs.repo }}
       - name: Upload to packages2.netdata.cloud
         id: package2-upload
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'

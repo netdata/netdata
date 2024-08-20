@@ -297,10 +297,8 @@ static void health_event_loop(void) {
             worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
             {
                 struct aclk_sync_cfg_t *wc = host->aclk_config;
-                if (wc && wc->send_snapshot == 2) {
-                    netdata_log_info("DEBUG: %s SKIPPING HEALTH BECAUSE WE WILL SEND SNAPSHOT", rrdhost_hostname(host));
+                if (wc && wc->send_snapshot == 2)
                     continue;
-                }
             }
 
             // the first loop is to lookup values from the db
