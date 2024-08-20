@@ -22,9 +22,9 @@ ${GITHUB_ACTIONS+echo "::group::Installing"}
 cmake --install "${build}"
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
-if [ ! -f "/msys2-installer.exe" ]; then
+if [ ! -f "/msys2-x86_64-latest.sfx.exe" ]; then
     ${GITHUB_ACTIONS+echo "::group::Fetching MSYS2 installer"}
-    "${repo_root}/packaging/windows/fetch-msys2-installer.py" /msys2-installer.exe
+    "${repo_root}/packaging/windows/fetch-msys2-installer.py" /msys2-x86_64-latest.sfx.exe
     ${GITHUB_ACTIONS+echo "::endgroup::"}
 fi
 
@@ -39,6 +39,7 @@ fi
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Packaging"}
+cp /msys2-x86_64-latest.sfx.exe /opt/netdata/ || exit 1
 NDVERSION=$"$(grep 'CMAKE_PROJECT_VERSION:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 NDMAJORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MAJOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 NDMINORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MINOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
