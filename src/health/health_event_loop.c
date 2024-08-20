@@ -298,10 +298,8 @@ static void health_event_loop(void) {
 #ifdef ENABLE_ACLK
             if (netdata_cloud_enabled) {
                 struct aclk_sync_cfg_t *wc = host->aclk_config;
-                if (wc && wc->send_snapshot == 2) {
-                    netdata_log_info("DEBUG: %s SKIPPING HEALTH BECAUSE WE WILL SEND SNAPSHOT", rrdhost_hostname(host));
+                if (wc && wc->send_snapshot == 2)
                     continue;
-                }
             }
 #endif
 
