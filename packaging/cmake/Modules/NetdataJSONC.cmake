@@ -71,7 +71,7 @@ endfunction()
 # NETDATA_JSONC_* variables for later use.
 macro(netdata_detect_jsonc)
         if(NOT ENABLE_BUNDLED_JSONC)
-                pkg_check_modules(JSONC json-c)
+                pkg_check_modules(JSONC json-c>=0.14)
         endif()
 
         if(NOT JSONC_FOUND)
