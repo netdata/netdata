@@ -5,6 +5,7 @@ package zfspool
 import (
 	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -17,7 +18,9 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataZpoolList, _ = os.ReadFile("testdata/zpool-list.txt")
+	dataZpoolList, _                  = os.ReadFile("testdata/zpool-list.txt")
+	dataZpoolListWithVdev, _          = os.ReadFile("testdata/zpool-list-vdev.txt")
+	dataZpoolListWithVdevLogsCache, _ = os.ReadFile("testdata/zpool-list-vdev-logs-cache.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -25,7 +28,9 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataConfigJSON": dataConfigJSON,
 		"dataConfigYAML": dataConfigYAML,
 
-		"dataZpoolList": dataZpoolList,
+		"dataZpoolList":                  dataZpoolList,
+		"dataZpoolListWithVdev":          dataZpoolListWithVdev,
+		"dataZpoolListWithVdevLogsCache": dataZpoolListWithVdevLogsCache,
 	} {
 		require.NotNil(t, data, name)
 
@@ -81,7 +86,7 @@ func TestZFSPool_Cleanup(t *testing.T) {
 		"after check": {
 			prepare: func() *ZFSPool {
 				zp := New()
-				zp.exec = prepareMockOK()
+				zp.exec = prepareMockOk()
 				_ = zp.Check()
 				return zp
 			},
@@ -89,7 +94,7 @@ func TestZFSPool_Cleanup(t *testing.T) {
 		"after collect": {
 			prepare: func() *ZFSPool {
 				zp := New()
-				zp.exec = prepareMockOK()
+				zp.exec = prepareMockOk()
 				_ = zp.Collect()
 				return zp
 			},
@@ -115,7 +120,7 @@ func TestZFSPool_Check(t *testing.T) {
 		wantFail    bool
 	}{
 		"success case": {
-			prepareMock: prepareMockOK,
+			prepareMock: prepareMockOk,
 			wantFail:    false,
 		},
 		"error on list call": {
@@ -153,8 +158,186 @@ func TestZFSPool_Collect(t *testing.T) {
 		wantMetrics map[string]int64
 	}{
 		"success case": {
-			prepareMock: prepareMockOK,
+			prepareMock: prepareMockOk,
 			wantMetrics: map[string]int64{
+				"vdev_rpool/mirror-0/nvme0n1p3_health_state_degraded":  0,
+				"vdev_rpool/mirror-0/nvme0n1p3_health_state_faulted":   0,
+				"vdev_rpool/mirror-0/nvme0n1p3_health_state_offline":   0,
+				"vdev_rpool/mirror-0/nvme0n1p3_health_state_online":    1,
+				"vdev_rpool/mirror-0/nvme0n1p3_health_state_removed":   0,
+				"vdev_rpool/mirror-0/nvme0n1p3_health_state_suspended": 0,
+				"vdev_rpool/mirror-0/nvme0n1p3_health_state_unavail":   0,
+				"vdev_rpool/mirror-0/nvme2n1p3_health_state_degraded":  0,
+				"vdev_rpool/mirror-0/nvme2n1p3_health_state_faulted":   0,
+				"vdev_rpool/mirror-0/nvme2n1p3_health_state_offline":   0,
+				"vdev_rpool/mirror-0/nvme2n1p3_health_state_online":    1,
+				"vdev_rpool/mirror-0/nvme2n1p3_health_state_removed":   0,
+				"vdev_rpool/mirror-0/nvme2n1p3_health_state_suspended": 0,
+				"vdev_rpool/mirror-0/nvme2n1p3_health_state_unavail":   0,
+				"vdev_rpool/mirror-0_health_state_degraded":            0,
+				"vdev_rpool/mirror-0_health_state_faulted":             0,
+				"vdev_rpool/mirror-0_health_state_offline":             0,
+				"vdev_rpool/mirror-0_health_state_online":              1,
+				"vdev_rpool/mirror-0_health_state_removed":             0,
+				"vdev_rpool/mirror-0_health_state_suspended":           0,
+				"vdev_rpool/mirror-0_health_state_unavail":             0,
+				"vdev_zion/mirror-0/nvme0n1p3_health_state_degraded":   0,
+				"vdev_zion/mirror-0/nvme0n1p3_health_state_faulted":    0,
+				"vdev_zion/mirror-0/nvme0n1p3_health_state_offline":    0,
+				"vdev_zion/mirror-0/nvme0n1p3_health_state_online":     1,
+				"vdev_zion/mirror-0/nvme0n1p3_health_state_removed":    0,
+				"vdev_zion/mirror-0/nvme0n1p3_health_state_suspended":  0,
+				"vdev_zion/mirror-0/nvme0n1p3_health_state_unavail":    0,
+				"vdev_zion/mirror-0/nvme2n1p3_health_state_degraded":   0,
+				"vdev_zion/mirror-0/nvme2n1p3_health_state_faulted":    0,
+				"vdev_zion/mirror-0/nvme2n1p3_health_state_offline":    0,
+				"vdev_zion/mirror-0/nvme2n1p3_health_state_online":     1,
+				"vdev_zion/mirror-0/nvme2n1p3_health_state_removed":    0,
+				"vdev_zion/mirror-0/nvme2n1p3_health_state_suspended":  0,
+				"vdev_zion/mirror-0/nvme2n1p3_health_state_unavail":    0,
+				"vdev_zion/mirror-0_health_state_degraded":             0,
+				"vdev_zion/mirror-0_health_state_faulted":              0,
+				"vdev_zion/mirror-0_health_state_offline":              0,
+				"vdev_zion/mirror-0_health_state_online":               1,
+				"vdev_zion/mirror-0_health_state_removed":              0,
+				"vdev_zion/mirror-0_health_state_suspended":            0,
+				"vdev_zion/mirror-0_health_state_unavail":              0,
+				"zpool_rpool_alloc":                  9051643576,
+				"zpool_rpool_cap":                    42,
+				"zpool_rpool_frag":                   33,
+				"zpool_rpool_free":                   12240656794,
+				"zpool_rpool_health_state_degraded":  0,
+				"zpool_rpool_health_state_faulted":   0,
+				"zpool_rpool_health_state_offline":   0,
+				"zpool_rpool_health_state_online":    1,
+				"zpool_rpool_health_state_removed":   0,
+				"zpool_rpool_health_state_suspended": 0,
+				"zpool_rpool_health_state_unavail":   0,
+				"zpool_rpool_size":                   21367462298,
+				"zpool_zion_health_state_degraded":   0,
+				"zpool_zion_health_state_faulted":    1,
+				"zpool_zion_health_state_offline":    0,
+				"zpool_zion_health_state_online":     0,
+				"zpool_zion_health_state_removed":    0,
+				"zpool_zion_health_state_suspended":  0,
+				"zpool_zion_health_state_unavail":    0,
+			},
+		},
+		"success case vdev logs and cache": {
+			prepareMock: prepareMockOkVdevLogsCache,
+			wantMetrics: map[string]int64{
+				"vdev_rpool/cache/sdb2_health_state_degraded":                          0,
+				"vdev_rpool/cache/sdb2_health_state_faulted":                           0,
+				"vdev_rpool/cache/sdb2_health_state_offline":                           0,
+				"vdev_rpool/cache/sdb2_health_state_online":                            1,
+				"vdev_rpool/cache/sdb2_health_state_removed":                           0,
+				"vdev_rpool/cache/sdb2_health_state_suspended":                         0,
+				"vdev_rpool/cache/sdb2_health_state_unavail":                           0,
+				"vdev_rpool/cache/wwn-0x500151795954c095-part2_health_state_degraded":  0,
+				"vdev_rpool/cache/wwn-0x500151795954c095-part2_health_state_faulted":   0,
+				"vdev_rpool/cache/wwn-0x500151795954c095-part2_health_state_offline":   0,
+				"vdev_rpool/cache/wwn-0x500151795954c095-part2_health_state_online":    0,
+				"vdev_rpool/cache/wwn-0x500151795954c095-part2_health_state_removed":   0,
+				"vdev_rpool/cache/wwn-0x500151795954c095-part2_health_state_suspended": 0,
+				"vdev_rpool/cache/wwn-0x500151795954c095-part2_health_state_unavail":   1,
+				"vdev_rpool/logs/mirror-1/14807975228228307538_health_state_degraded":  0,
+				"vdev_rpool/logs/mirror-1/14807975228228307538_health_state_faulted":   0,
+				"vdev_rpool/logs/mirror-1/14807975228228307538_health_state_offline":   0,
+				"vdev_rpool/logs/mirror-1/14807975228228307538_health_state_online":    0,
+				"vdev_rpool/logs/mirror-1/14807975228228307538_health_state_removed":   0,
+				"vdev_rpool/logs/mirror-1/14807975228228307538_health_state_suspended": 0,
+				"vdev_rpool/logs/mirror-1/14807975228228307538_health_state_unavail":   1,
+				"vdev_rpool/logs/mirror-1/sdb1_health_state_degraded":                  0,
+				"vdev_rpool/logs/mirror-1/sdb1_health_state_faulted":                   0,
+				"vdev_rpool/logs/mirror-1/sdb1_health_state_offline":                   0,
+				"vdev_rpool/logs/mirror-1/sdb1_health_state_online":                    1,
+				"vdev_rpool/logs/mirror-1/sdb1_health_state_removed":                   0,
+				"vdev_rpool/logs/mirror-1/sdb1_health_state_suspended":                 0,
+				"vdev_rpool/logs/mirror-1/sdb1_health_state_unavail":                   0,
+				"vdev_rpool/logs/mirror-1_health_state_degraded":                       1,
+				"vdev_rpool/logs/mirror-1_health_state_faulted":                        0,
+				"vdev_rpool/logs/mirror-1_health_state_offline":                        0,
+				"vdev_rpool/logs/mirror-1_health_state_online":                         0,
+				"vdev_rpool/logs/mirror-1_health_state_removed":                        0,
+				"vdev_rpool/logs/mirror-1_health_state_suspended":                      0,
+				"vdev_rpool/logs/mirror-1_health_state_unavail":                        0,
+				"vdev_rpool/mirror-0/sdc2_health_state_degraded":                       0,
+				"vdev_rpool/mirror-0/sdc2_health_state_faulted":                        0,
+				"vdev_rpool/mirror-0/sdc2_health_state_offline":                        0,
+				"vdev_rpool/mirror-0/sdc2_health_state_online":                         1,
+				"vdev_rpool/mirror-0/sdc2_health_state_removed":                        0,
+				"vdev_rpool/mirror-0/sdc2_health_state_suspended":                      0,
+				"vdev_rpool/mirror-0/sdc2_health_state_unavail":                        0,
+				"vdev_rpool/mirror-0/sdd2_health_state_degraded":                       0,
+				"vdev_rpool/mirror-0/sdd2_health_state_faulted":                        0,
+				"vdev_rpool/mirror-0/sdd2_health_state_offline":                        0,
+				"vdev_rpool/mirror-0/sdd2_health_state_online":                         1,
+				"vdev_rpool/mirror-0/sdd2_health_state_removed":                        0,
+				"vdev_rpool/mirror-0/sdd2_health_state_suspended":                      0,
+				"vdev_rpool/mirror-0/sdd2_health_state_unavail":                        0,
+				"vdev_rpool/mirror-0_health_state_degraded":                            0,
+				"vdev_rpool/mirror-0_health_state_faulted":                             0,
+				"vdev_rpool/mirror-0_health_state_offline":                             0,
+				"vdev_rpool/mirror-0_health_state_online":                              1,
+				"vdev_rpool/mirror-0_health_state_removed":                             0,
+				"vdev_rpool/mirror-0_health_state_suspended":                           0,
+				"vdev_rpool/mirror-0_health_state_unavail":                             0,
+				"vdev_zion/cache/sdb2_health_state_degraded":                           0,
+				"vdev_zion/cache/sdb2_health_state_faulted":                            0,
+				"vdev_zion/cache/sdb2_health_state_offline":                            0,
+				"vdev_zion/cache/sdb2_health_state_online":                             1,
+				"vdev_zion/cache/sdb2_health_state_removed":                            0,
+				"vdev_zion/cache/sdb2_health_state_suspended":                          0,
+				"vdev_zion/cache/sdb2_health_state_unavail":                            0,
+				"vdev_zion/cache/wwn-0x500151795954c095-part2_health_state_degraded":   0,
+				"vdev_zion/cache/wwn-0x500151795954c095-part2_health_state_faulted":    0,
+				"vdev_zion/cache/wwn-0x500151795954c095-part2_health_state_offline":    0,
+				"vdev_zion/cache/wwn-0x500151795954c095-part2_health_state_online":     0,
+				"vdev_zion/cache/wwn-0x500151795954c095-part2_health_state_removed":    0,
+				"vdev_zion/cache/wwn-0x500151795954c095-part2_health_state_suspended":  0,
+				"vdev_zion/cache/wwn-0x500151795954c095-part2_health_state_unavail":    1,
+				"vdev_zion/logs/mirror-1/14807975228228307538_health_state_degraded":   0,
+				"vdev_zion/logs/mirror-1/14807975228228307538_health_state_faulted":    0,
+				"vdev_zion/logs/mirror-1/14807975228228307538_health_state_offline":    0,
+				"vdev_zion/logs/mirror-1/14807975228228307538_health_state_online":     0,
+				"vdev_zion/logs/mirror-1/14807975228228307538_health_state_removed":    0,
+				"vdev_zion/logs/mirror-1/14807975228228307538_health_state_suspended":  0,
+				"vdev_zion/logs/mirror-1/14807975228228307538_health_state_unavail":    1,
+				"vdev_zion/logs/mirror-1/sdb1_health_state_degraded":                   0,
+				"vdev_zion/logs/mirror-1/sdb1_health_state_faulted":                    0,
+				"vdev_zion/logs/mirror-1/sdb1_health_state_offline":                    0,
+				"vdev_zion/logs/mirror-1/sdb1_health_state_online":                     1,
+				"vdev_zion/logs/mirror-1/sdb1_health_state_removed":                    0,
+				"vdev_zion/logs/mirror-1/sdb1_health_state_suspended":                  0,
+				"vdev_zion/logs/mirror-1/sdb1_health_state_unavail":                    0,
+				"vdev_zion/logs/mirror-1_health_state_degraded":                        1,
+				"vdev_zion/logs/mirror-1_health_state_faulted":                         0,
+				"vdev_zion/logs/mirror-1_health_state_offline":                         0,
+				"vdev_zion/logs/mirror-1_health_state_online":                          0,
+				"vdev_zion/logs/mirror-1_health_state_removed":                         0,
+				"vdev_zion/logs/mirror-1_health_state_suspended":                       0,
+				"vdev_zion/logs/mirror-1_health_state_unavail":                         0,
+				"vdev_zion/mirror-0/sdc2_health_state_degraded":                        0,
+				"vdev_zion/mirror-0/sdc2_health_state_faulted":                         0,
+				"vdev_zion/mirror-0/sdc2_health_state_offline":                         0,
+				"vdev_zion/mirror-0/sdc2_health_state_online":                          1,
+				"vdev_zion/mirror-0/sdc2_health_state_removed":                         0,
+				"vdev_zion/mirror-0/sdc2_health_state_suspended":                       0,
+				"vdev_zion/mirror-0/sdc2_health_state_unavail":                         0,
+				"vdev_zion/mirror-0/sdd2_health_state_degraded":                        0,
+				"vdev_zion/mirror-0/sdd2_health_state_faulted":                         0,
+				"vdev_zion/mirror-0/sdd2_health_state_offline":                         0,
+				"vdev_zion/mirror-0/sdd2_health_state_online":                          1,
+				"vdev_zion/mirror-0/sdd2_health_state_removed":                         0,
+				"vdev_zion/mirror-0/sdd2_health_state_suspended":                       0,
+				"vdev_zion/mirror-0/sdd2_health_state_unavail":                         0,
+				"vdev_zion/mirror-0_health_state_degraded":                             0,
+				"vdev_zion/mirror-0_health_state_faulted":                              0,
+				"vdev_zion/mirror-0_health_state_offline":                              0,
+				"vdev_zion/mirror-0_health_state_online":                               1,
+				"vdev_zion/mirror-0_health_state_removed":                              0,
+				"vdev_zion/mirror-0_health_state_suspended":                            0,
+				"vdev_zion/mirror-0_health_state_unavail":                              0,
 				"zpool_rpool_alloc":                  9051643576,
 				"zpool_rpool_cap":                    42,
 				"zpool_rpool_frag":                   33,
@@ -199,16 +382,125 @@ func TestZFSPool_Collect(t *testing.T) {
 			mx := zp.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
+
 			if len(test.wantMetrics) > 0 {
-				assert.Len(t, *zp.Charts(), len(zpoolChartsTmpl)*len(zp.zpools))
+				want := len(zpoolChartsTmpl)*len(zp.seenZpools) + len(vdevChartsTmpl)*len(zp.seenVdevs)
+
+				assert.Len(t, *zp.Charts(), want, "want charts")
+
+				module.TestMetricsHasAllChartsDimsSkip(t, zp.Charts(), mx, func(chart *module.Chart) bool {
+					return strings.HasPrefix(chart.ID, "zfspool_zion") && !strings.HasSuffix(chart.ID, "health_state")
+				})
 			}
 		})
 	}
 }
 
-func prepareMockOK() *mockZpoolCLIExec {
+func TestZFSPool_parseZpoolListDevOutput(t *testing.T) {
+	tests := map[string]struct {
+		input string
+		want  []vdevEntry
+	}{
+		"": {
+			input: `
+NAME                                     SIZE          ALLOC           FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
+store                           9981503995904  3046188658688  6935315337216        -         -      9     30   1.00  DEGRADED  -
+  mirror-0                      9981503995904  3046188658688  6935315337216        -         -      9     30      -    ONLINE
+    sdc2                        9998683602944      -      -        -         -      -      -      -    ONLINE
+    sdd2                        9998683602944      -      -        -         -      -      -      -    ONLINE
+logs                                -      -      -        -         -      -      -      -         -
+  mirror-1                      17716740096  393216  17716346880        -         -      0      0      -  DEGRADED
+    sdb1                        17951621120      -      -        -         -      -      -      -    ONLINE
+    14807975228228307538            -      -      -        -         -      -      -      -   UNAVAIL
+cache                               -      -      -        -         -      -      -      -         -
+  sdb2                          99000254464  98755866624  239665152        -         -      0     99      -    ONLINE
+  wwn-0x500151795954c095-part2      -      -      -        -         -      -      -      -   UNAVAIL
+`,
+			want: []vdevEntry{
+				{
+					name:   "mirror-0",
+					health: "online",
+					vdev:   "store/mirror-0",
+					level:  2,
+				},
+				{
+					name:   "sdc2",
+					health: "online",
+					vdev:   "store/mirror-0/sdc2",
+					level:  4,
+				},
+				{
+					name:   "sdd2",
+					health: "online",
+					vdev:   "store/mirror-0/sdd2",
+					level:  4,
+				},
+				{
+					name:   "logs",
+					health: "-",
+					vdev:   "store/logs",
+					level:  0,
+				},
+				{
+					name:   "mirror-1",
+					health: "degraded",
+					vdev:   "store/logs/mirror-1",
+					level:  2,
+				},
+				{
+					name:   "sdb1",
+					health: "online",
+					vdev:   "store/logs/mirror-1/sdb1",
+					level:  4,
+				},
+				{
+					name:   "14807975228228307538",
+					health: "unavail",
+					vdev:   "store/logs/mirror-1/14807975228228307538",
+					level:  4,
+				},
+				{
+					name:   "cache",
+					health: "-",
+					vdev:   "store/cache",
+					level:  0,
+				},
+				{
+					name:   "sdb2",
+					health: "online",
+					vdev:   "store/cache/sdb2",
+					level:  2,
+				},
+				{
+					name:   "wwn-0x500151795954c095-part2",
+					health: "unavail",
+					vdev:   "store/cache/wwn-0x500151795954c095-part2",
+					level:  2,
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			v, err := parseZpoolListVdevOutput([]byte(test.input))
+			require.NoError(t, err)
+			assert.Equal(t, test.want, v)
+		})
+	}
+}
+
+func prepareMockOk() *mockZpoolCLIExec {
 	return &mockZpoolCLIExec{
-		listData: dataZpoolList,
+		listData:         dataZpoolList,
+		listWithVdevData: dataZpoolListWithVdev,
+	}
+}
+
+func prepareMockOkVdevLogsCache() *mockZpoolCLIExec {
+	return &mockZpoolCLIExec{
+		listData:         dataZpoolList,
+		listWithVdevData: dataZpoolListWithVdevLogsCache,
 	}
 }
 
@@ -233,8 +525,9 @@ Fusce et felis pulvinar, posuere sem non, porttitor eros.
 }
 
 type mockZpoolCLIExec struct {
-	errOnList bool
-	listData  []byte
+	errOnList        bool
+	listData         []byte
+	listWithVdevData []byte
 }
 
 func (m *mockZpoolCLIExec) list() ([]byte, error) {
@@ -243,4 +536,11 @@ func (m *mockZpoolCLIExec) list() ([]byte, error) {
 	}
 
 	return m.listData, nil
+}
+
+func (m *mockZpoolCLIExec) listWithVdev(pool string) ([]byte, error) {
+	s := string(m.listWithVdevData)
+	s = strings.Replace(s, "rpool", pool, 1)
+
+	return []byte(s), nil
 }

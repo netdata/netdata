@@ -31,8 +31,9 @@ func New() *ZFSPool {
 			BinaryPath: "/usr/bin/zpool",
 			Timeout:    web.Duration(time.Second * 2),
 		},
-		charts: &module.Charts{},
-		zpools: make(map[string]bool),
+		charts:     &module.Charts{},
+		seenZpools: make(map[string]bool),
+		seenVdevs:  make(map[string]bool),
 	}
 }
 
@@ -51,10 +52,12 @@ type (
 
 		exec zpoolCLI
 
-		zpools map[string]bool
+		seenZpools map[string]bool
+		seenVdevs  map[string]bool
 	}
 	zpoolCLI interface {
 		list() ([]byte, error)
+		listWithVdev(pool string) ([]byte, error)
 	}
 )
 
