@@ -220,6 +220,14 @@ static struct web_api_command api_commands_v3[] = {
         .callback = api_v2_bearer_get_token,
         .allow_subpaths = 0
     },
+    {
+        .api = "me",
+        .hash = 0,
+        .acl = HTTP_ACL_NOCHECK,
+        .access = HTTP_ACCESS_NONE,
+        .callback = api_v3_me,
+        .allow_subpaths = 0
+    },
 
     // Netdata branding APIs
     {

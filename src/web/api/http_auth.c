@@ -9,7 +9,7 @@ static DICTIONARY *netdata_authorized_bearers = NULL;
 
 struct bearer_token {
     nd_uuid_t cloud_account_id;
-    char cloud_user_name[CLOUD_USER_NAME_LENGTH];
+    char client_name[CLOUD_CLIENT_NAME_LENGTH];
     HTTP_ACCESS access;
     HTTP_USER_ROLE user_role;
     time_t created_s;
@@ -65,17 +65,42 @@ static void bearer_token_cleanup(bool force) {
     dictionary_garbage_collect(netdata_authorized_bearers);
 }
 
+static uint64_t bearer_token_signature(nd_uuid_t token, struct bearer_token *bt) {
+    // we use a custom structure to make sure that changes in the other code will not affect the signature
+
+    struct {
+        nd_uuid_t token;
+        nd_uuid_t cloud_account_id;
+        char client_name[CLOUD_CLIENT_NAME_LENGTH];
+        HTTP_ACCESS access;
+        HTTP_USER_ROLE user_role;
+        time_t created_s;
+        time_t expires_s;
+    } signature_payload = {
+        .access = bt->access,
+        .user_role = bt->user_role,
+        .created_s = bt->created_s,
+        .expires_s = bt->expires_s,
+    };
+    uuid_copy(signature_payload.token, token);
+    uuid_copy(signature_payload.cloud_account_id, bt->cloud_account_id);
+    strncpyz(signature_payload.client_name, bt->client_name, sizeof(signature_payload.client_name) - 1);
+
+    return XXH3_64bits(&signature_payload, sizeof(signature_payload));
+}
+
 static bool bearer_token_save_to_file(nd_uuid_t token, struct bearer_token *bt) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_uint64(wb, "version", 1);
     buffer_json_member_add_uuid(wb, "token", token);
     buffer_json_member_add_uuid(wb, "cloud_account_id", bt->cloud_account_id);
-    buffer_json_member_add_string(wb, "cloud_user_name", bt->cloud_user_name);
+    buffer_json_member_add_string(wb, "client_name", bt->client_name);
     http_access2buffer_json_array(wb, "access", bt->access);
     buffer_json_member_add_string(wb, "user_role", http_id2user_role(bt->user_role));
     buffer_json_member_add_uint64(wb, "created_s", bt->created_s);
     buffer_json_member_add_uint64(wb, "expires_s", bt->expires_s);
+    buffer_json_member_add_uint64(wb, "signature", bearer_token_signature(token, bt));
     buffer_json_finalize(wb);
 
     char filename[FILENAME_MAX];
@@ -113,7 +138,7 @@ static time_t bearer_create_token_internal(nd_uuid_t token, HTTP_USER_ROLE user_
         bt->access = access;
 
         uuid_copy(bt->cloud_account_id, cloud_account_id);
-        strncpyz(bt->cloud_user_name, client_name, sizeof(bt->cloud_account_id) - 1);
+        strncpyz(bt->client_name, client_name, sizeof(bt->cloud_account_id) - 1);
 
         if(save)
             bearer_token_save_to_file(token, bt);
@@ -142,18 +167,20 @@ time_t bearer_create_token(nd_uuid_t *uuid, HTTP_USER_ROLE user_role, HTTP_ACCES
 static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, BUFFER *error) {
     int64_t version;
     nd_uuid_t token_in_file, cloud_account_id;
-    CLEAN_STRING *cloud_user_name = NULL;
+    CLEAN_STRING *client_name = NULL;
     HTTP_USER_ROLE user_role = HTTP_USER_ROLE_NONE;
     HTTP_ACCESS access = HTTP_ACCESS_NONE;
     time_t created_s = 0, expires_s = 0;
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, ".", "version", version, error, true);
+    uint64_t signature = 0;
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, ".", "version", version, error, true);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, ".", "token", token_in_file, error, true);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, ".", "cloud_account_id", cloud_account_id, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, ".", "cloud_user_name", cloud_user_name, error, true);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, ".", "client_name", client_name, error, true);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, ".", "access", http_access2id_one, access, error, true);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, ".", "user_role", http_user_role2id, user_role, error, true);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, ".", "created_s", created_s, error, true);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, ".", "expires_s", expires_s, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, ".", "created_s", created_s, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, ".", "expires_s", expires_s, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, ".", "signature", signature, error, true);
 
     if(uuid_compare(token, token_in_file) != 0) {
         buffer_flush(error);
@@ -167,8 +194,22 @@ static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, B
         return false;
     }
 
+    struct bearer_token bt = {
+        .access = access,
+        .user_role = user_role,
+        .created_s = created_s,
+        .expires_s = expires_s,
+    };
+    uuid_copy(bt.cloud_account_id, cloud_account_id);
+    strncpyz(bt.client_name, string2str(client_name), sizeof(bt.client_name) - 1);
+    if(signature != bearer_token_signature(token_in_file, &bt)) {
+        buffer_flush(error);
+        buffer_strcat(error, "bearer token has invalid signature");
+        return false;
+    }
+
     bearer_create_token_internal(token, user_role, access,
-                                 cloud_account_id, string2str(cloud_user_name),
+                                 cloud_account_id, string2str(client_name),
                                  created_s, expires_s, false);
 
     return true;
@@ -192,6 +233,7 @@ static bool bearer_token_load_token(nd_uuid_t token) {
     bool rc = bearer_token_parse_json(token, jobj, error);
     if(!rc) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to parse bearer token file '%s': %s", filename, buffer_tostring(error));
+        unlink(filename);
         return false;
     }
 
@@ -245,7 +287,7 @@ bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
         if(item) {
             struct bearer_token *bt = dictionary_acquired_item_value(item);
             if (bt->expires_s > now_realtime_sec()) {
-                strncpyz(w->auth.client_name, bt->cloud_user_name, sizeof(w->auth.client_name) - 1);
+                strncpyz(w->auth.client_name, bt->client_name, sizeof(w->auth.client_name) - 1);
                 uuid_copy(w->auth.cloud_account_id, bt->cloud_account_id);
                 web_client_set_permissions(w, bt->access, bt->user_role, WEB_CLIENT_FLAG_AUTH_BEARER);
                 rc = true;

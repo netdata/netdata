@@ -6,5 +6,6 @@
 #include "../web_api_v3.h"
 
 int api_v3_settings(RRDHOST *host, struct web_client *w, char *url);
+int api_v3_me(RRDHOST *host, struct web_client *w, char *url);
 
 #endif //NETDATA_API_V3_CALLS_H

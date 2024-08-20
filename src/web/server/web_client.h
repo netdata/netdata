@@ -134,7 +134,7 @@ void web_client_set_conn_webrtc(struct web_client *w);
 #define NETDATA_WEB_REQUEST_MAX_SIZE 65536
 #define NETDATA_WEB_DECODED_URL_INITIAL_SIZE 512
 
-#define CLOUD_USER_NAME_LENGTH 64
+#define CLOUD_CLIENT_NAME_LENGTH 64
 
 struct response {
     BUFFER *header;         // our response header
@@ -205,7 +205,7 @@ struct web_client {
     struct {
         nd_uuid_t bearer_token;
         nd_uuid_t cloud_account_id;
-        char client_name[CLOUD_USER_NAME_LENGTH];
+        char client_name[CLOUD_CLIENT_NAME_LENGTH];
     } auth;
 
     struct {                            // A callback to check if the query should be interrupted / stopped

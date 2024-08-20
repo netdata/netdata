@@ -68,8 +68,8 @@ static bool parse_match(json_object *jobj, const char *path, struct rrd_alert_ma
 }
 
 static bool parse_config_value_database_lookup(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, bool strict) {
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "after", config->after, error, strict);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "before", config->before, error, strict);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "after", config->after, error, strict);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "before", config->before, error, strict);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group", time_grouping_txt2id, config->time_group, error, strict);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "dims_group", alerts_dims_grouping2id, config->dims_group, error, strict);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "data_source", alerts_data_sources2id, config->data_source, error, strict);
@@ -98,7 +98,7 @@ static bool parse_config_value(json_object *jobj, const char *path, struct rrd_a
     JSONC_PARSE_SUBOBJECT(jobj, path, "database_lookup", config, parse_config_value_database_lookup, error, strict);
     JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "calculation", config->calculation, error, false);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "units", config->units, error, false);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "update_every", config->update_every, error, strict);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "update_every", config->update_every, error, strict);
     return true;
 }
 
@@ -109,17 +109,17 @@ static bool parse_config_conditions(json_object *jobj, const char *path, struct 
 }
 
 static bool parse_config_action_delay(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, bool strict) {
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "up", config->delay_up_duration, error, strict);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "down", config->delay_down_duration, error, strict);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "max", config->delay_max_duration, error, strict);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "up", config->delay_up_duration, error, strict);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "down", config->delay_down_duration, error, strict);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "max", config->delay_max_duration, error, strict);
     JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "multiplier", config->delay_multiplier, error, strict);
     return true;
 }
 
 static bool parse_config_action_repeat(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, bool strict) {
     JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "enabled", config->has_custom_repeat_config, error, strict);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "warning", config->warn_repeat_every, error, strict);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "critical", config->crit_repeat_every, error, strict);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "warning", config->warn_repeat_every, error, strict);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "critical", config->crit_repeat_every, error, strict);
     return true;
 }
 
@@ -153,7 +153,7 @@ static bool parse_config(json_object *jobj, const char *path, RRD_ALERT_PROTOTYP
 
 static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTOTYPE *base, BUFFER *error, const char *name, bool strict) {
     int64_t version = 0;
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "format_version", version, error, strict);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "format_version", version, error, strict);
 
     if(version != 1) {
         buffer_sprintf(error, "unsupported document version");

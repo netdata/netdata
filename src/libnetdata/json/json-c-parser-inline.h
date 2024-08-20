@@ -136,11 +136,11 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                      \
+#define JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                    \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         if (_j != NULL && json_object_is_type(_j, json_type_int))                                               \
-            dst = json_object_get_int(_j);                                                                      \
+            dst = json_object_get_int64(_j);                                                                    \
         else if (_j != NULL && json_object_is_type(_j, json_type_double))                                       \
             dst = (typeof(dst))json_object_get_double(_j);                                                      \
         else if (_j == NULL)                                                                                    \
@@ -150,7 +150,26 @@
             return false;                                                                                       \
         }                                                                                                       \
     } else if(required) {                                                                                       \
-        buffer_sprintf(error, "missing or invalid type (expected int value or null) for '%s.%s'", path, member); \
+        buffer_sprintf(error, "missing or invalid type (expected int value or null) for '%s.%s'", path, member);\
+        return false;                                                                                           \
+    }                                                                                                           \
+} while(0)
+
+#define JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                   \
+    json_object *_j;                                                                                            \
+    if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
+        if (_j != NULL && json_object_is_type(_j, json_type_int))                                               \
+            dst = json_object_get_uint64(_j);                                                                   \
+        else if (_j != NULL && json_object_is_type(_j, json_type_double))                                       \
+            dst = (typeof(dst))json_object_get_double(_j);                                                      \
+        else if (_j == NULL)                                                                                    \
+            dst = 0;                                                                                            \
+        else {                                                                                                  \
+            buffer_sprintf(error, "not supported type (expected int) for '%s.%s'", path, member);               \
+            return false;                                                                                       \
+        }                                                                                                       \
+    } else if(required) {                                                                                       \
+        buffer_sprintf(error, "missing or invalid type (expected int value or null) for '%s.%s'", path, member);\
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
