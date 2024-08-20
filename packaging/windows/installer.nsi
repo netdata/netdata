@@ -16,6 +16,7 @@ RequestExecutionLevel admin
 !define MUI_UNABORTWARNING
 
 !insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_LICENSE "C:\msys64\cloud.txt"
 !insertmacro MUI_PAGE_LICENSE "C:\msys64\gpl-3.0.txt"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -42,25 +43,28 @@ Function .onInit
 FunctionEnd
 
 Function NetdataStartMsys
+        !insertmacro MUI_HEADER_TEXT "Netdata configuration" "Claim your agent on Netdata Cloud"
+
         nsDialogs::Create 1018
         Pop $0
         ${If} $0 == error
             Abort
         ${EndIf}
 
-        ${NSD_CreateLabel} 0 0 100% 12u "Configuration options. Enter your token and ID to claim your agent. Additionaly, you can also open a terminal to execute optional commands:"
+        ${NSD_CreateLabel} 0 0 100% 12u "Enter your token and Cloud ID."
+        ${NSD_CreateLabel} 0 15% 100% 12u "Optionally, you can open a terminal to execute additional commands."
 
-        ${NSD_CreateLabel} 0 20% 20% 10% "Token"
+        ${NSD_CreateLabel} 0 35% 20% 10% "Token"
         Pop $0
-        ${NSD_CreateText} 0 20% 80% 10% ""
+        ${NSD_CreateText} 21% 35% 79% 10% ""
         Pop $cloudToken
 
-        ${NSD_CreateLabel} 0 40% 20% 10% "ID"
+        ${NSD_CreateLabel} 0 55% 20% 10% "ID"
         Pop $0
-        ${NSD_CreateText} 0 40% 80% 10% ""
+        ${NSD_CreateText} 21% 55% 79% 10% ""
         Pop $cloudID
 
-        ${NSD_CreateCheckbox} 0 60% 100% 10u "Open terminal"
+        ${NSD_CreateCheckbox} 0 70% 100% 10u "Open terminal"
         Pop $StartMsys
         nsDialogs::Show
 FunctionEnd

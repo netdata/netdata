@@ -33,9 +33,15 @@ NDVERSION=$"$(grep 'CMAKE_PROJECT_VERSION:STATIC' "${build}/CMakeCache.txt"| cut
 NDMAJORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MAJOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 NDMINORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MINOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 
-if [ -f "/gpl-3.0.txt" ]; then
+if [ ! -f "/gpl-3.0.txt" ]; then
     ${GITHUB_ACTIONS+echo "::group::Fetching GPL3 License"}
     curl -o /gpl-3.0.txt "https://www.gnu.org/licenses/gpl-3.0.txt"
+    ${GITHUB_ACTIONS+echo "::endgroup::"}
+fi
+
+if [ ! -f "/cloud.txt" ]; then
+    ${GITHUB_ACTIONS+echo "::group::Fetching Cloud License"}
+    curl -o /cloud.txt "https://raw.githubusercontent.com/netdata/netdata/master/src/web/gui/v2/LICENSE.md"
     ${GITHUB_ACTIONS+echo "::endgroup::"}
 fi
 
