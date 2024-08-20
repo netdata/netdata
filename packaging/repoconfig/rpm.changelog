@@ -1,3 +1,5 @@
+* Mon Aug 19 2024 Austin Hemmelgarn <austin@netdata.cloud
+- Version bump to stay in sync with DEB packages.
 * Fri Aug 9 2024 Austin Hemmelgarn <austin@netdata.cloud> 3-3
 - Use system certificate config for Yum/DNF repos.
 * Mon Jun 24 2024 Austin Hemmelgarn <austin@netdata.cloud> 3-2

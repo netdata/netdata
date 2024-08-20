@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-cmake_minimum_required(VERSION 3.13.0...3.28)
+cmake_minimum_required(VERSION 3.16.0...3.30)
 
 list(APPEND RHEL_DISTROS centos centos-stream rocky almalinux cloudlinux)
 list(APPEND SUSE_DISTROS opensuse-leap opensuse-tumbleweed)
@@ -10,7 +10,7 @@ list(APPEND DEB_DISTROS debian ubuntu)
 set(DEB_GPG_KEY_SOURCE "https://repo.netdata.cloud/netdatabot.gpg.key")
 
 set(PACKAGE_VERSION 3)
-set(PACKAGE_RELEASE 2)
+set(PACKAGE_RELEASE 4)
 
 set(CPACK_THREADS 0)
 set(CPACK_STRIP_FILES NO)
@@ -117,10 +117,10 @@ if(${DISTRO} IN_LIST DEB_DISTROS)
   set(DIST_NAME ${DISTRO})
   message(STATUS "Generating stable repository configuration for ${DISTRO} ${SUITE}")
   set(VARIANT stable)
-  configure_file(netdata.list.in netdata.list @ONLY)
+  configure_file(netdata.sources.in netdata.sources @ONLY)
   message(STATUS "Generating edge repository configuration for ${DISTRO} ${SUITE}")
   set(VARIANT edge)
-  configure_file(netdata.list.in netdata-edge.list @ONLY)
+  configure_file(netdata.sources.in netdata-edge.sources @ONLY)
   message(STATUS "Preparing changelogs")
   set(PKG_NAME netdata-repo)
   file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/netdata-repo)
@@ -129,10 +129,10 @@ if(${DISTRO} IN_LIST DEB_DISTROS)
   file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/netdata-repo-edge)
   configure_file(deb.changelog netdata-repo-edge/changelog @ONLY)
 
-  install(FILES ${CMAKE_BINARY_DIR}/netdata.list
+  install(FILES ${CMAKE_BINARY_DIR}/netdata.sources
           DESTINATION etc/apt/sources.list.d
           COMPONENT netdata-repo)
-  install(FILES ${CMAKE_BINARY_DIR}/netdata-edge.list
+  install(FILES ${CMAKE_BINARY_DIR}/netdata-edge.sources
           DESTINATION etc/apt/sources.list.d
           COMPONENT netdata-repo-edge)
 
@@ -150,24 +150,14 @@ if(${DISTRO} IN_LIST DEB_DISTROS)
                     DEPENDS ${CMAKE_BINARY_DIR}/netdata.gpg)
 
   install(FILES ${CMAKE_BINARY_DIR}/netdata.gpg
-          DESTINATION etc/apt/trusted.gpg.d
+          DESTINATION usr/share/keyrings
           RENAME netdata-archive-keyring.gpg
-          PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
-          COMPONENT netdata-repo)
-  install(FILES ${CMAKE_BINARY_DIR}/netdata.gpg
-          DESTINATION etc/apt/trusted.gpg.d
-          RENAME netdata-repoconfig-archive-keyring.gpg
           PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
           COMPONENT netdata-repo)
 
   install(FILES ${CMAKE_BINARY_DIR}/netdata.gpg
-          DESTINATION etc/apt/trusted.gpg.d
-          RENAME netdata-edge-archive-keyring.gpg
-          PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
-          COMPONENT netdata-repo-edge)
-  install(FILES ${CMAKE_BINARY_DIR}/netdata.gpg
-          DESTINATION etc/apt/trusted.gpg.d
-          RENAME netdata-repoconfig-archive-keyring.gpg
+          DESTINATION usr/share/keyrings
+          RENAME netdata-archive-keyring.gpg
           PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
           COMPONENT netdata-repo-edge)
 

@@ -1,2 +1,0 @@
-deb http://repo.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/ @SUITE@/
-deb http://repo.netdata.cloud/repos/repoconfig/@DIST_NAME@/ @SUITE@/
