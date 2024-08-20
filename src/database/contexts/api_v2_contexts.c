@@ -331,7 +331,7 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
     buffer_json_object_close(wb); // streaming
 }
 
-static void agent_capabilities_to_json(BUFFER *wb, RRDHOST *host, const char *key) {
+void agent_capabilities_to_json(BUFFER *wb, RRDHOST *host, const char *key) {
     buffer_json_member_add_array(wb, key);
 
     struct capability *capas = aclk_get_node_instance_capas(host);

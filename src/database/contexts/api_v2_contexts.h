@@ -91,6 +91,8 @@ struct rrdcontext_to_json_v2_data {
     struct query_timings timings;
 };
 
+void agent_capabilities_to_json(BUFFER *wb, RRDHOST *host, const char *key);
+
 #include "api_v2_contexts_alerts.h"
 
 #endif //NETDATA_API_V2_CONTEXTS_H

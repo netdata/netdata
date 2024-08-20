@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "internal.h"
+#include "api_v2_contexts.h"
+#include "aclk/aclk_capas.h"
 
 void build_info_to_json_object(BUFFER *b);
 
@@ -50,9 +51,45 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
     if(info) {
         buffer_json_member_add_object(wb, "application");
         build_info_to_json_object(wb);
-        buffer_json_object_close(wb); // netdata
+        buffer_json_object_close(wb); // application
 
         buffer_json_cloud_status(wb, now_s);
+
+        buffer_json_member_add_object(wb, "nodes");
+        {
+            size_t receiving = 0, archived = 0, sending = 0, total = 0;
+            RRDHOST *host;
+            dfe_start_read(rrdhost_root_index, host) {
+                total++;
+
+                if(host == localhost)
+                    continue;
+
+                if(rrdhost_state_cloud_emulation(host))
+                    receiving++;
+                else
+                    archived++;
+
+                if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED))
+                    sending++;
+            }
+            dfe_done(host);
+
+            buffer_json_member_add_uint64(wb, "total", total);
+            buffer_json_member_add_uint64(wb, "receiving", receiving);
+            buffer_json_member_add_uint64(wb, "sending", sending);
+            buffer_json_member_add_uint64(wb, "archived", archived);
+        }
+        buffer_json_object_close(wb); // nodes
+
+        agent_capabilities_to_json(wb, localhost, "capabilities");
+
+        buffer_json_member_add_object(wb, "api");
+        {
+            buffer_json_member_add_uint64(wb, "version", aclk_get_http_api_version());
+            buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
+        }
+        buffer_json_object_close(wb); // api
 
         buffer_json_member_add_array(wb, "db_size");
         size_t group_seconds = localhost->rrd_update_every;

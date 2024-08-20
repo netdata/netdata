@@ -74,7 +74,7 @@ static struct web_api_command api_commands_v2[] = {
     {
         .api = "info",
         .hash = 0,
-        .acl = HTTP_ACL_NODES,
+        .acl = HTTP_ACL_NOCHECK,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v2_info,
         .allow_subpaths = 0
