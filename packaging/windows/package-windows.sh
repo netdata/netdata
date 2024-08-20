@@ -38,6 +38,12 @@ if [ ! -f "/cloud.txt" ]; then
 fi
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
+${GITHUB_ACTIONS+echo "::group::Prompt"}
+cp /msys2.exe /msys2.ini /msys2_shell.cmd /opt/netdata
+cd /usr/bin && cp ls.exe nano.exe msys-magic-1.dll msys-bz2-1.dll msys-lzma-5.dll /opt/netdata/usr/bin
+echo "export PATH=\"/usr/bin:/bin:/\"" > /opt/netdata/etc/profile
+${GITHUB_ACTIONS+echo "::endgroup::"}
+
 ${GITHUB_ACTIONS+echo "::group::Packaging"}
 NDVERSION=$"$(grep 'CMAKE_PROJECT_VERSION:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 NDMAJORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MAJOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
