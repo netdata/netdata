@@ -382,6 +382,9 @@ static cmd_status_t cmd_remove_node(char *args, char **message)
             freez(host->node_id);
             host->node_id = NULL;
             buffer_sprintf(wb, "Unregistering node with machine guid %s, hostname = %s", host->machine_guid, rrdhost_hostname(host));
+            rrd_wrlock();
+            rrdhost_free___while_having_rrd_wrlock(host, true);
+            rrd_wrunlock();
         }
         else
             buffer_sprintf(wb, "Node with machine guid %s, hostname = %s is already unregistered", host->machine_guid, rrdhost_hostname(host));
