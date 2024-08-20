@@ -194,6 +194,8 @@ jobs:
 
 ### Debug Mode
 
+**Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
+
 To troubleshoot issues with the `k8s_kubelet` collector, run the `go.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.
 
