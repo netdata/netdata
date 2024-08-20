@@ -1205,7 +1205,7 @@ check_claim_opts() {
 # shellcheck disable=SC2235,SC2030
   if [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
     fatal "Invalid claiming options, claim rooms may only be specified when a token is specified." F0204
-  elif [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_EXTRA}${NETDATA_CLAIM_URL}${NETDATA_CLAIM_PROXY}${NETDATA_CLAIM_NORELOAD}${NETDATA_CLAIM_INSECURE}" ]; then
+  elif [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_EXTRA}${NETDATA_CLAIM_PROXY}${NETDATA_CLAIM_NORELOAD}${NETDATA_CLAIM_INSECURE}" ]; then
     # The above condition checks if _any_ claiming options other than the rooms have been set when the token is unset.
     fatal "Invalid claiming options, a claiming token must be specified." F0204
   fi
