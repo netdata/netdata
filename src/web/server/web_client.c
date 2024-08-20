@@ -33,6 +33,7 @@ void web_client_set_conn_webrtc(struct web_client *w) {
 void web_client_reset_permissions(struct web_client *w) {
     web_client_flags_clear_auth(w);
     w->access = HTTP_ACCESS_NONE;
+    w->user_role = HTTP_USER_ROLE_NONE;
 }
 
 void web_client_set_permissions(struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, WEB_CLIENT_FLAGS auth) {
@@ -209,6 +210,8 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     }
 
     memset(w->transaction, 0, sizeof(w->transaction));
+    memset(&w->auth, 0, sizeof(w->auth));
+
     web_client_reset_permissions(w);
     web_client_flag_clear(w, WEB_CLIENT_ENCODING_GZIP|WEB_CLIENT_ENCODING_DEFLATE);
     web_client_reset_path_flags(w);

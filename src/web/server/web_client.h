@@ -110,9 +110,9 @@ typedef enum __attribute__((packed)) {
 #define web_client_check_conn_tcp(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_TCP)
 #define web_client_check_conn_cloud(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD)
 #define web_client_check_conn_webrtc(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_WEBRTC)
-
-#define WEB_CLIENT_FLAG_ALL_AUTHS (WEB_CLIENT_FLAG_AUTH_CLOUD | WEB_CLIENT_FLAG_AUTH_BEARER)
 #define web_client_flags_clear_conn(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_CONN_TCP | WEB_CLIENT_FLAG_CONN_UNIX | WEB_CLIENT_FLAG_CONN_CLOUD | WEB_CLIENT_FLAG_CONN_WEBRTC)
+
+#define WEB_CLIENT_FLAG_ALL_AUTHS (WEB_CLIENT_FLAG_AUTH_CLOUD | WEB_CLIENT_FLAG_AUTH_BEARER | WEB_CLIENT_FLAG_AUTH_GOD)
 #define web_client_flags_check_auth(w) web_client_flag_check(w, WEB_CLIENT_FLAG_ALL_AUTHS)
 #define web_client_flags_clear_auth(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_ALL_AUTHS)
 

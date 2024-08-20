@@ -119,6 +119,7 @@ struct web_client *web_client_get_from_cache(void) {
     w->mode = HTTP_REQUEST_MODE_GET;
     web_client_reset_permissions(w);
     memset(w->transaction, 0, sizeof(w->transaction));
+    memset(&w->auth, 0, sizeof(w->auth));
 
     return w;
 }
