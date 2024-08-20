@@ -2,6 +2,8 @@
 #
 # Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
+#
+# %%NEW_CLAIMING_METHOD%%
 
 set -e
 
@@ -35,16 +37,16 @@ error() {
 
 write_config() {
     config="[global]"
-    config="${config}\nurl = ${NETDATA_CLAIM_URL}"
-    config="${config}\ntoken = ${NETDATA_CLAIM_TOKEN}"
+    config="${config}\n    url = ${NETDATA_CLAIM_URL}"
+    config="${config}\n    token = ${NETDATA_CLAIM_TOKEN}"
     if [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
-        config="${config}\nrooms = ${NETDATA_CLAIM_ROOMS}"
+        config="${config}\n    rooms = ${NETDATA_CLAIM_ROOMS}"
     fi
     if [ -n "${NETDATA_CLAIM_PROXY}" ]; then
-        config="${config}\nproxy = ${NETDATA_CLAIM_PROXY}"
+        config="${config}\n    proxy = ${NETDATA_CLAIM_PROXY}"
     fi
     if [ -n "${NETDATA_CLAIM_INSECURE}" ]; then
-        config="${config}\ninsecure = ${NETDATA_CLAIM_INSECURE}"
+        config="${config}\n    insecure = ${NETDATA_CLAIM_INSECURE}"
     fi
 
     touch "${claim_config}.tmp"
@@ -98,9 +100,10 @@ parse_args() {
 
 [ -z "$EUID" ] && EUID="$(id -u)"
 if [ "${EUID}" != "0" ] && [ ! -w "${config_dir}" ]; then
-    error "Script must be run by a user with write access to ${config_dir}." 2
+    error "Script must be run by a user with write access to ${config_dir}." 32
 fi
 
+warning "This script is deprecated and will be officially unsupported in the near future. Please either use the kickstart script with the appropriate '--claim-*' options, or directly write out the claiming configuration instead."
 parse_args "${@}"
 write_config
 reload_claiming
