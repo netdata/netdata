@@ -10,7 +10,7 @@ void rrdpush_sender_clear_child_claim_id(RRDHOST *host) {
 
 // the parent sends to the child its claim id, node id and cloud url
 void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
-    if(host == localhost) return;
+    if(host == localhost || uuid_is_null(host->node_id)) return;
 
     spinlock_lock(&host->receiver_lock);
     if(host->receiver && stream_has_capability(host->receiver, STREAM_CAP_NODE_ID)) {
@@ -22,18 +22,17 @@ void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
         if((!claim_id_is_set(claim_id) || !aclk_online())) {
             // the agent is not claimed or not connected, just use parent claim id
             // to allow the connection flow.
+            // this may be zero and it is ok.
             claim_id.uuid = host->aclk.claim_id_of_parent;
             uuid_unparse_lower(claim_id.uuid.uuid, claim_id.str);
         }
 
-        if(claim_id.str[0] && node_id_str[0]) {
-            char buf[2048];
-            snprintfz(buf, sizeof(buf),
-                      PLUGINSD_KEYWORD_NODE_ID " '%s' '%s' '%s'\n",
-                      claim_id.str, node_id_str, cloud_config_url_get());
+        char buf[4096];
+        snprintfz(buf, sizeof(buf),
+                  PLUGINSD_KEYWORD_NODE_ID " '%s' '%s' '%s'\n",
+                  claim_id.str, node_id_str, cloud_config_url_get());
 
-            send_to_plugin(buf, __atomic_load_n(&host->receiver->parser, __ATOMIC_RELAXED));
-        }
+        send_to_plugin(buf, __atomic_load_n(&host->receiver->parser, __ATOMIC_RELAXED));
     }
     spinlock_unlock(&host->receiver_lock);
 }
