@@ -20,7 +20,7 @@ RequestExecutionLevel admin
 !insertmacro MUI_PAGE_LICENSE "C:\msys64\gpl-3.0.txt"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-Page Custom NetdataStartMsys
+Page Custom NetdataConfigPage
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -42,7 +42,7 @@ Function .onInit
         ${EndIf}
 FunctionEnd
 
-Function NetdataStartMsys
+Function NetdataConfigPage
         !insertmacro MUI_HEADER_TEXT "Netdata configuration" "Claim your agent on Netdata Cloud"
 
         nsDialogs::Create 1018
