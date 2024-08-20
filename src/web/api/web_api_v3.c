@@ -110,7 +110,7 @@ static struct web_api_command api_commands_v3[] = {
         .api = "info",
         .hash = 0,
         .acl = HTTP_ACL_NOCHECK,
-        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .access = HTTP_ACCESS_NONE,
         .callback = api_v2_info,
         .allow_subpaths = 0
     },
@@ -234,7 +234,7 @@ static struct web_api_command api_commands_v3[] = {
         .api = "ilove.svg",
         .hash = 0,
         .acl = HTTP_ACL_NOCHECK,
-        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .access = HTTP_ACCESS_NONE,
         .callback = api_v2_ilove,
         .allow_subpaths = 0
     },
