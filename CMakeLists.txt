@@ -943,6 +943,14 @@ set(API_PLUGIN_FILES
         src/web/api/v1/api_v1_context.c
         src/web/api/v1/api_v1_alarms.c
         src/web/api/v1/api_v1_charts.c
+        src/web/api/v2/api_v2_info.c
+        src/web/api/v2/api_v2_nodes.c
+        src/web/api/v2/api_v2_node_instances.c
+        src/web/api/v2/api_v2_q.c
+        src/web/api/v2/api_v2_versions.c
+        src/web/api/v2/api_v2_functions.c
+        src/web/api/v2/api_v2_alerts.c
+        src/web/api/v2/api_v2_alert_transitions.c
         src/web/api/v2/api_v2_ilove/ilove.c
         src/web/api/v2/api_v2_bearer.c
         src/web/api/v2/api_v2_calls.h
@@ -953,6 +961,8 @@ set(API_PLUGIN_FILES
         src/web/api/v2/api_v2_contexts.c
         src/web/api/v2/api_v2_claim.c
         src/web/api/v2/api_v2_webrtc.c
+        src/web/api/v3/api_v3_calls.h
+        src/web/api/v3/api_v3_settings.c
         src/web/api/functions/functions.c
         src/web/api/functions/functions.h
         src/web/api/functions/function-progress.c
@@ -1009,8 +1019,6 @@ set(API_PLUGIN_FILES
         src/web/rtc/webrtc.h
         src/web/api/functions/function-bearer_get_token.c
         src/web/api/functions/function-bearer_get_token.h
-        src/web/api/v3/api_v3_calls.h
-        src/web/api/v3/api_v3_settings.c
 )
 
 set(EXPORTING_ENGINE_FILES
@@ -1101,8 +1109,14 @@ set(PLUGINSD_PLUGIN_FILES
 )
 
 set(RRD_PLUGIN_FILES
-        src/database/contexts/api_v1.c
-        src/database/contexts/api_v2.c
+        src/database/contexts/api_v1_contexts.c
+        src/database/contexts/api_v2_contexts.c
+        src/database/contexts/api_v2_contexts.h
+        src/database/contexts/api_v2_contexts_agents.c
+        src/database/contexts/api_v2_contexts_alerts.c
+        src/database/contexts/api_v2_contexts_alerts.h
+        src/database/contexts/api_v2_contexts_alert_transitions.c
+        src/database/contexts/api_v2_contexts_alert_config.c
         src/database/contexts/context.c
         src/database/contexts/instance.c
         src/database/contexts/internal.h

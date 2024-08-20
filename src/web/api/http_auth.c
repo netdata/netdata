@@ -2,9 +2,9 @@
 
 #include "http_auth.h"
 
-#define BEARER_TOKEN_EXPIRATION 86400
+#define BEARER_TOKEN_EXPIRATION (86400 * 1)
 
-bool netdata_is_protected_by_bearer = false; // this is controlled by cloud, at the point the agent logs in - this should also be saved to /var/lib/netdata
+bool netdata_is_protected_by_bearer = false;
 static DICTIONARY *netdata_authorized_bearers = NULL;
 
 struct bearer_token {
@@ -261,6 +261,9 @@ bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
 }
 
 void bearer_tokens_init(void) {
+    netdata_is_protected_by_bearer =
+        config_get_boolean(CONFIG_SECTION_WEB, "bearer token protection", netdata_is_protected_by_bearer);
+
     netdata_authorized_bearers = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
         NULL, sizeof(struct bearer_token));
