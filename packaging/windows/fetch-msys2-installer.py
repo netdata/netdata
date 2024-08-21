@@ -78,8 +78,8 @@ def main() -> None:
     with TemporaryDirectory() as tmpdir:
         tmppath = Path(tmpdir)
 
-        installer = fetch_release_asset(tmppath, name, f'msys2-base-x86_64-{version}.sfx.exe')
-        checksums = fetch_release_asset(tmppath, name, f'msys2-base-x86_64-{version}.sfx.exe.sha256')
+        installer = fetch_release_asset(tmppath, name, f'msys2-base-x86_64-{version}.tar.zst')
+        checksums = fetch_release_asset(tmppath, name, f'msys2-base-x86_64-{version}.tar.zst.sha256')
 
         print('>>> Verifying SHA256 checksum')
         expected_checksum = checksums.read_text().partition(' ')[0].casefold()
