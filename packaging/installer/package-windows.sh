@@ -22,30 +22,22 @@ ${GITHUB_ACTIONS+echo "::group::Installing"}
 cmake --install "${build}"
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
-if [ ! -f "/msys2-latest.tar.zst" ]; then
-    ${GITHUB_ACTIONS+echo "::group::Fetching MSYS2 files"}
-    "${repo_root}/packaging/windows/fetch-msys2-installer.py" /msys2-latest.tar.zst
+if [ ! -f "/msys2-installer.exe" ]; then
+    ${GITHUB_ACTIONS+echo "::group::Fetching MSYS2 installer"}
+    "${repo_root}/packaging/windows/fetch-msys2-installer.py" /msys2-installer.exe
     ${GITHUB_ACTIONS+echo "::endgroup::"}
 fi
 
-${GITHUB_ACTIONS+echo "::group::Licenses"}
-if [ ! -f "/gpl-3.0.txt" ]; then
-    curl -o /gpl-3.0.txt "https://www.gnu.org/licenses/gpl-3.0.txt"
-fi
-
-if [ ! -f "/cloud.txt" ]; then
-    curl -o /cloud.txt "https://raw.githubusercontent.com/netdata/netdata/master/src/web/gui/v2/LICENSE.md"
-fi
-${GITHUB_ACTIONS+echo "::endgroup::"}
-
 ${GITHUB_ACTIONS+echo "::group::Packaging"}
-tar -xf /msys2-latest.tar.zst -C /opt/netdata/ || exit 1
-cp -R /opt/netdata/msys64/* /opt/netdata/ || exit 1
-rm -rf /opt/netdata/msys64/
 NDVERSION=$"$(grep 'CMAKE_PROJECT_VERSION:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 NDMAJORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MAJOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 NDMINORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MINOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 
+if [ -f "/gpl-3.0.txt" ]; then
+    ${GITHUB_ACTIONS+echo "::group::Fetching GPL3 License"}
+    curl -o /gpl-3.0.txt "https://www.gnu.org/licenses/gpl-3.0.txt"
+    ${GITHUB_ACTIONS+echo "::endgroup::"}
+fi
+
 /mingw64/bin/makensis.exe -DCURRVERSION="${NDVERSION}" -DMAJORVERSION="${NDMAJORVERSION}" -DMINORVERSION="${NDMINORVERSION}" "${repo_root}/packaging/windows/installer.nsi"
 ${GITHUB_ACTIONS+echo "::endgroup::"}
-
