@@ -1,0 +1,5 @@
+NAME                    SIZE          ALLOC           FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
+rpool          3985729650688  1647130456064  2338599194624        -         -     55     41   1.00    ONLINE  -
+  mirror-0     3985729650688  1647130456064  2338599194624        -         -     55     41      -    ONLINE
+    nvme2n1p3  4000249020416      -      -        -         -      -      -      -    ONLINE
+    nvme0n1p3  4000249020416      -      -        -         -      -      -      -    ONLINE

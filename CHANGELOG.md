@@ -6,12 +6,16 @@
 
 **Merged pull requests:**
 
+- Remove debug message [\#18382](https://github.com/netdata/netdata/pull/18382) ([stelfrag](https://github.com/stelfrag))
+- Remove host immediately on stale node removal [\#18381](https://github.com/netdata/netdata/pull/18381) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18380](https://github.com/netdata/netdata/pull/18380) ([netdatabot](https://github.com/netdatabot))
 - go.d docs: add a note that debug mode not supported for Dyncfg jobs [\#18379](https://github.com/netdata/netdata/pull/18379) ([ilyam8](https://github.com/ilyam8))
 - ci gen integrations: add cloud-authentication dir [\#18378](https://github.com/netdata/netdata/pull/18378) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18377](https://github.com/netdata/netdata/pull/18377) ([netdatabot](https://github.com/netdatabot))
 - go.d dnsmasq: query metrics individually to handle v2.90+ SERVFAIL [\#18376](https://github.com/netdata/netdata/pull/18376) ([ilyam8](https://github.com/ilyam8))
+- Switch to DEB822 format for APT repository configuration. [\#18374](https://github.com/netdata/netdata/pull/18374) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#18373](https://github.com/netdata/netdata/pull/18373) ([netdatabot](https://github.com/netdatabot))
+- Origin-sign all DEB packages regardless of upload target. [\#18372](https://github.com/netdata/netdata/pull/18372) ([Ferroin](https://github.com/Ferroin))
 - remove python.d/changefinder [\#18370](https://github.com/netdata/netdata/pull/18370) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/example [\#18369](https://github.com/netdata/netdata/pull/18369) ([ilyam8](https://github.com/ilyam8))
 - go.d squidlog: improve parser init and parsing [\#18368](https://github.com/netdata/netdata/pull/18368) ([ilyam8](https://github.com/ilyam8))
@@ -407,11 +411,6 @@
 - remove "ignore 0 metrics" leftovers [\#17817](https://github.com/netdata/netdata/pull/17817) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17815](https://github.com/netdata/netdata/pull/17815) ([netdatabot](https://github.com/netdatabot))
 - fix typo: `round tripe` → `round trip` [\#17814](https://github.com/netdata/netdata/pull/17814) ([luckman212](https://github.com/luckman212))
-- Change classification to "cls" since "cl" is clear count [\#17811](https://github.com/netdata/netdata/pull/17811) ([stelfrag](https://github.com/stelfrag))
-- remove "ignore 0 metrics" from tc/btrfs/ksm [\#17810](https://github.com/netdata/netdata/pull/17810) ([ilyam8](https://github.com/ilyam8))
-- fix ebpf units [\#17809](https://github.com/netdata/netdata/pull/17809) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17808](https://github.com/netdata/netdata/pull/17808) ([netdatabot](https://github.com/netdatabot))
-- health: add go.d/lvm alerts [\#17807](https://github.com/netdata/netdata/pull/17807) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
