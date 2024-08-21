@@ -1296,6 +1296,10 @@ set(CLAIM_PLUGIN_FILES
         src/claim/cloud-status.h
 )
 
+set(CLAIM_WINDOWS_FILES
+        src/claim/netdata_claim.c
+)
+
 set(ACLK_ALWAYS_BUILD
         src/aclk/aclk_rrdhost_state.h
         src/aclk/aclk_proxy.c
@@ -2237,6 +2241,10 @@ add_executable(netdata
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGODB_EXPORTING_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES}>"
 )
+
+if(OS_WINDOWS)
+        add_executable(netdata_claim ${CLAIM_WINDOWS_FILES})
+endif()
 
 target_compile_definitions(netdata PRIVATE
         "$<$<BOOL:${ENABLE_ML}>:DLIB_NO_GUI_SUPPORT>"
