@@ -163,16 +163,9 @@ time_t bearer_create_token(nd_uuid_t *uuid, HTTP_USER_ROLE user_role, HTTP_ACCES
             uuid_eq(cloud_account_id, bt->cloud_account_id) &&                          // the cloud_account_id matches
             strncmp(client_name, bt->client_name, sizeof(bt->client_name) - 1) == 0 &&  // the client_name matches
             uuid_parse_flexi(bt_dfe.name, *uuid) == 0)                               // the token can be parsed
-        {
-            expires_s = bt->expires_s;
-            break;
-        }
+            return expires_s; /* dfe will cleanup automatically */
     }
     dfe_done(bt);
-
-    if(expires_s)
-        // we found an existing token with exactly the same characteristics
-        return expires_s;
 
     uuid_generate_random(*uuid);
     expires_s = bearer_create_token_internal(
