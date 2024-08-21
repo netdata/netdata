@@ -136,7 +136,7 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "dumpconfig\n"
              "    Returns the current netdata.conf on stdout.\n"
 #ifdef ENABLE_ACLK
-             "remove-stale-node node_id|machine_guid|hostname|ALL\n"
+             "remove-stale-node node_id|machine_guid|hostname|ALL_NODES\n"
              "    Unregisters and removes a node from the cloud.\n"
 #endif
              "version\n"
@@ -374,7 +374,7 @@ static void remove_ephemeral_host(BUFFER *wb, RRDHOST *host)
         buffer_sprintf(wb, "Node with machine guid %s, hostname = %s is already unregistered", host->machine_guid, rrdhost_hostname(host));
 }
 
-#define SQL_HOSTNAME_TO_REMOVE "SELECT host_id FROM host WHERE (hostname = @hostname OR @hostname = 'ALL')"
+#define SQL_HOSTNAME_TO_REMOVE "SELECT host_id FROM host WHERE (hostname = @hostname OR @hostname = 'ALL_NODES')"
 
 static cmd_status_t cmd_remove_node(char *args, char **message)
 {
