@@ -422,7 +422,7 @@ static cmd_status_t cmd_remove_node(char *args, char **message)
         }
         if (!cnt && buffer_strlen(wb) == 0) {
             if (report_error)
-                buffer_sprintf(wb, "No match for hostname \"%s\"", args);
+                buffer_sprintf(wb, "No match for \"%s\"", args);
             else
                 buffer_sprintf(wb, "No stale nodes found");
         }
