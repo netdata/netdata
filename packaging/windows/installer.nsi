@@ -20,7 +20,7 @@ RequestExecutionLevel admin
 !insertmacro MUI_PAGE_LICENSE "C:\msys64\gpl-3.0.txt"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-Page Custom NetdataConfigPage
+Page Custom NetdataConfigPage NetdataConfigLeave
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -29,9 +29,13 @@ Page Custom NetdataConfigPage
 
 !insertmacro MUI_LANGUAGE "English"
 
-var StartMsys
+var hStartMsys
+var startMsys
+
+var hCloudToken
 var cloudToken
-var cloudID
+var hCloudRoom
+var cloudRoom
 
 Function .onInit
         nsExec::ExecToLog '$SYSDIR\sc.exe stop Netdata'
@@ -40,6 +44,8 @@ Function .onInit
             nsExec::ExecToLog '$SYSDIR\sc.exe delete Netdata'
             pop $0
         ${EndIf}
+
+        StrCpy $startMsys ${BST_UNCHECKED}
 FunctionEnd
 
 Function NetdataConfigPage
@@ -51,22 +57,41 @@ Function NetdataConfigPage
             Abort
         ${EndIf}
 
-        ${NSD_CreateLabel} 0 0 100% 12u "Enter your token and Cloud ID."
+        ${NSD_CreateLabel} 0 0 100% 12u "Enter your Token and Cloud Room."
         ${NSD_CreateLabel} 0 15% 100% 12u "Optionally, you can open a terminal to execute additional commands."
 
         ${NSD_CreateLabel} 0 35% 20% 10% "Token"
         Pop $0
         ${NSD_CreateText} 21% 35% 79% 10% ""
-        Pop $cloudToken
+        Pop $hCloudToken
 
-        ${NSD_CreateLabel} 0 55% 20% 10% "ID"
+        ${NSD_CreateLabel} 0 55% 20% 10% "Room"
         Pop $0
         ${NSD_CreateText} 21% 55% 79% 10% ""
-        Pop $cloudID
+        Pop $hCloudRoom
 
         ${NSD_CreateCheckbox} 0 70% 100% 10u "Open terminal"
-        Pop $StartMsys
+        Pop $hStartMsys
         nsDialogs::Show
+FunctionEnd
+
+Function NetdataConfigLeave
+        ${NSD_GetText} $hCloudToken $cloudToken
+        ${NSD_GetText} $hCloudRoom $cloudRoom
+        ${NSD_GetState} $hStartMsys $startMsys
+
+        StrLen $0 $cloudToken
+        StrLen $1 $cloudRoom
+        ${If} $0 == 125
+        ${AndIf} $0 == 36
+                # We should start our new claiming software here
+                MessageBox MB_OK "$cloudToken | $cloudRoom | $startMsys"
+        ${EndIf}
+
+        ${If} $startMsys == 1
+            nsExec::ExecToLog '$INSTDIR\msys2.exe'
+            pop $0
+        ${EndIf}
 FunctionEnd
 
 Function NetdataUninstallRegistry
