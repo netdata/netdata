@@ -150,6 +150,12 @@ install_go_toolchain() {
 
     touch /usr/local/go/.installed-by-netdata
 
+    if [ "$(uname -m)" = "aarch64" ]; then
+        GO_TELEMETRY_DIR="$HOME/.config/go/telemetry"
+        [ ! -d "$GO_TELEMETRY_DIR" ] && mkdir -p "$GO_TELEMETRY_DIR"
+        echo "off" >"$GO_TELEMETRY_DIR/mode"
+    fi
+
     rm -rf "${GOLANG_TEMP_PATH}"
 }
 
