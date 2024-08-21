@@ -152,10 +152,30 @@ static time_t bearer_create_token_internal(nd_uuid_t token, HTTP_USER_ROLE user_
 }
 
 time_t bearer_create_token(nd_uuid_t *uuid, HTTP_USER_ROLE user_role, HTTP_ACCESS access, nd_uuid_t cloud_account_id, const char *client_name) {
-    uuid_generate_random(*uuid);
     time_t now_s = now_realtime_sec();
+    time_t expires_s = 0;
 
-    time_t expires_s = bearer_create_token_internal(
+    struct bearer_token *bt;
+    dfe_start_read(netdata_authorized_bearers, bt) {
+        if(bt->expires_s > now_s + 3600 * 2 &&                                          // expires in more than 2 hours
+            user_role == bt->user_role &&                                               // the user_role matches
+            access == bt->access &&                                                     // the access matches
+            uuid_eq(cloud_account_id, bt->cloud_account_id) &&                          // the cloud_account_id matches
+            strncmp(client_name, bt->client_name, sizeof(bt->client_name) - 1) == 0 &&  // the client_name matches
+            uuid_parse_flexi(bt_dfe.name, *uuid) == 0)                               // the token can be parsed
+        {
+            expires_s = bt->expires_s;
+            break;
+        }
+    }
+    dfe_done(bt);
+
+    if(expires_s)
+        // we found an existing token with exactly the same characteristics
+        return expires_s;
+
+    uuid_generate_random(*uuid);
+    expires_s = bearer_create_token_internal(
         *uuid, user_role, access, cloud_account_id, client_name,
         now_s, now_s + BEARER_TOKEN_EXPIRATION, true);
 
