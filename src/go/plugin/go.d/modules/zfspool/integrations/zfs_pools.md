@@ -73,6 +73,23 @@ Metrics:
 | zfspool.pool_fragmentation | fragmentation | % |
 | zfspool.pool_health_state | online, degraded, faulted, offline, unavail, removed, suspended | state |
 
+### Per zfs pool vdev
+
+These metrics refer to the ZFS pool virtual device.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| pool | Zpool name |
+| vdev | Unique identifier for a virtual device (vdev) within a ZFS pool. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| zfspool.vdev_health_state | online, degraded, faulted, offline, unavail, removed, suspended | state |
+
 
 
 ## Alerts
@@ -85,6 +102,7 @@ The following alerts are available:
 | [ zfs_pool_space_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfspool.pool_space_utilization | ZFS pool ${label:pool} is nearing capacity. Current space usage is above the threshold. |
 | [ zfs_pool_health_state_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfspool.pool_health_state | ZFS pool ${label:pool} state is degraded |
 | [ zfs_pool_health_state_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfspool.pool_health_state | ZFS pool ${label:pool} state is faulted or unavail |
+| [ zfs_vdev_health_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfspool.vdev_health_state | ZFS vdev ${label:vdev} state is faulted or degraded |
 
 
 ## Setup
