@@ -69,6 +69,7 @@ static uint64_t bearer_token_signature(nd_uuid_t token, struct bearer_token *bt)
     // we use a custom structure to make sure that changes in the other code will not affect the signature
 
     struct {
+        nd_uuid_t host_uuid;
         nd_uuid_t token;
         nd_uuid_t cloud_account_id;
         char client_name[CLOUD_CLIENT_NAME_LENGTH];
@@ -82,8 +83,10 @@ static uint64_t bearer_token_signature(nd_uuid_t token, struct bearer_token *bt)
         .created_s = bt->created_s,
         .expires_s = bt->expires_s,
     };
+    uuid_copy(signature_payload.host_uuid, localhost->host_uuid);
     uuid_copy(signature_payload.token, token);
     uuid_copy(signature_payload.cloud_account_id, bt->cloud_account_id);
+    memset(signature_payload.client_name, 0, sizeof(signature_payload.client_name));
     strncpyz(signature_payload.client_name, bt->client_name, sizeof(signature_payload.client_name) - 1);
 
     return XXH3_64bits(&signature_payload, sizeof(signature_payload));
@@ -93,6 +96,7 @@ static bool bearer_token_save_to_file(nd_uuid_t token, struct bearer_token *bt) 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_uint64(wb, "version", 1);
+    buffer_json_member_add_uuid(wb, "host_uuid", localhost->host_uuid);
     buffer_json_member_add_uuid(wb, "token", token);
     buffer_json_member_add_uuid(wb, "cloud_account_id", bt->cloud_account_id);
     buffer_json_member_add_string(wb, "client_name", bt->client_name);
@@ -179,13 +183,15 @@ time_t bearer_create_token(nd_uuid_t *uuid, HTTP_USER_ROLE user_role, HTTP_ACCES
 
 static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, BUFFER *error) {
     int64_t version;
-    nd_uuid_t token_in_file, cloud_account_id;
+    nd_uuid_t token_in_file, cloud_account_id, host_uuid;
     CLEAN_STRING *client_name = NULL;
     HTTP_USER_ROLE user_role = HTTP_USER_ROLE_NONE;
     HTTP_ACCESS access = HTTP_ACCESS_NONE;
     time_t created_s = 0, expires_s = 0;
     uint64_t signature = 0;
+
     JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, ".", "version", version, error, true);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, ".", "host_uuid", host_uuid, error, true);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, ".", "token", token_in_file, error, true);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, ".", "cloud_account_id", cloud_account_id, error, true);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, ".", "client_name", client_name, error, true);
@@ -198,6 +204,12 @@ static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, B
     if(uuid_compare(token, token_in_file) != 0) {
         buffer_flush(error);
         buffer_strcat(error, "token in JSON file does not match the filename");
+        return false;
+    }
+
+    if(uuid_compare(host_uuid, localhost->host_uuid) != 0) {
+        buffer_flush(error);
+        buffer_strcat(error, "Host UUID in JSON file does not match our host UUID");
         return false;
     }
 
@@ -215,6 +227,7 @@ static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, B
     };
     uuid_copy(bt.cloud_account_id, cloud_account_id);
     strncpyz(bt.client_name, string2str(client_name), sizeof(bt.client_name) - 1);
+
     if(signature != bearer_token_signature(token_in_file, &bt)) {
         buffer_flush(error);
         buffer_strcat(error, "bearer token has invalid signature");

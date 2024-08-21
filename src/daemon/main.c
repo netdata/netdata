@@ -2137,8 +2137,6 @@ int netdata_main(int argc, char **argv) {
     (void)dont_fork;
 #endif
 
-    bearer_tokens_init();
-
     netdata_main_spawn_server_init("plugins", argc, (const char **)argv);
     watcher_thread_start();
 
@@ -2210,7 +2208,6 @@ int netdata_main(int argc, char **argv) {
     if (fd >= 0)
         close(fd);
 
-
     // ------------------------------------------------------------------------
     // Claim netdata agent to a cloud endpoint
 
@@ -2228,6 +2225,8 @@ int netdata_main(int argc, char **argv) {
 
     // ------------------------------------------------------------------------
     // spawn the threads
+
+    bearer_tokens_init();
 
     delta_startup_time("start the static threads");
 
