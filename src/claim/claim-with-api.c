@@ -126,6 +126,22 @@ void curl_add_rooms_json_array(BUFFER *wb, const char *rooms) {
     buffer_json_array_close(wb);
 }
 
+static int debug_callback(CURL *handle, curl_infotype type, char *data, size_t size, void *userptr) {
+    (void)handle; // Unused
+    (void)userptr; // Unused
+
+    if(type == CURLINFO_TEXT)
+        nd_log(NDLS_DAEMON, NDLP_INFO, "CLAIM: Send info: %s", data);
+    else if(type == CURLINFO_HEADER_OUT)
+        nd_log(NDLS_DAEMON, NDLP_INFO, "CLAIM: Send header: %.*s", (int)size, data);
+    else if(type == CURLINFO_DATA_OUT)
+        nd_log(NDLS_DAEMON, NDLP_INFO, "CLAIM: Send data: %.*s", (int)size, data);
+    else if(type == CURLINFO_SSL_DATA_OUT)
+        nd_log(NDLS_DAEMON, NDLP_INFO, "CLAIM: Send SSL data: %.*s", (int)size, data);
+
+    return 0;
+}
+
 static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure, bool *can_retry) {
     CURL *curl;
     CURLcode res;
@@ -196,6 +212,9 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
         *can_retry = true;
         return false;
     }
+
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, debug_callback);
 
     // we will receive the response in this
     CLEAN_BUFFER *response = buffer_create(0, NULL);
