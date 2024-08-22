@@ -375,8 +375,7 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error)
         sql_set_host_label(&host->host_uuid, "_is_ephemeral", "true");
         aclk_host_state_update(host, 0, 0);
         unregister_node(host->machine_guid);
-        freez(host->node_id);
-        host->node_id = NULL;
+        uuid_clear(host->node_id);
         buffer_sprintf(wb, "Unregistering node with machine guid %s, hostname = %s", host->machine_guid, rrdhost_hostname(host));
         rrd_wrlock();
         rrdhost_free___while_having_rrd_wrlock(host, true);
@@ -415,16 +414,20 @@ static cmd_status_t cmd_remove_node(char *args, char **message)
             goto done;
         }
 
-        if (!rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST)) {
-            rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
-            sql_set_host_label(&host->host_uuid, "_is_ephemeral", "true");
-            aclk_host_state_update(host, 0, 0);
-            unregister_node(host->machine_guid);
-            uuid_clear(host->node_id);
-            buffer_sprintf(wb, "Unregistering node with machine guid %s, hostname = %s", host->machine_guid, rrdhost_hostname(host));
-            rrd_wrlock();
-            rrdhost_free___while_having_rrd_wrlock(host, true);
-            rrd_wrunlock();
+        int param = 0;
+        SQLITE_BIND_FAIL(done0, sqlite3_bind_text(res, ++param, args, -1, SQLITE_STATIC));
+
+        param = 0;
+        int cnt = 0;
+        while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+            char guid[UUID_STR_LEN];
+            uuid_unparse_lower(*(nd_uuid_t *)sqlite3_column_blob(res, 0), guid);
+            host = rrdhost_find_by_guid(guid);
+            if (host) {
+                if (cnt)
+                    buffer_fast_strcat(wb, "\n", 1);
+                cnt += remove_ephemeral_host(wb, host, report_error);
+            }
         }
         if (!cnt && buffer_strlen(wb) == 0) {
             if (report_error)
