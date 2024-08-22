@@ -633,14 +633,14 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
     SIMPLE_PATTERN *chart_dimensions_pattern = NULL;
 
     if(chart_label_key)
-        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT, true);
+        chart_label_key_pattern = simple_pattern_create(chart_label_key, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true);
 
     if(chart_labels_filter)
-        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT,
+        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT,
                                                             true);
 
     if(dimensions) {
-        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v",
+        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS,
                                                          SIMPLE_PATTERN_EXACT, true);
         buffer_free(dimensions);
     }
@@ -691,14 +691,14 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
     SIMPLE_PATTERN *chart_dimensions_pattern = NULL;
 
     if(chart_label_key)
-        chart_label_key_pattern = simple_pattern_create(chart_label_key, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT, true);
+        chart_label_key_pattern = simple_pattern_create(chart_label_key, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true);
 
     if(chart_labels_filter)
-        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT,
+        chart_labels_filter_pattern = simple_pattern_create(chart_labels_filter, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT,
                                                             true);
 
     if(dimensions) {
-        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), ",|\t\r\n\f\v",
+        chart_dimensions_pattern = simple_pattern_create(buffer_tostring(dimensions), SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS,
                                                          SIMPLE_PATTERN_EXACT, true);
         buffer_free(dimensions);
     }
