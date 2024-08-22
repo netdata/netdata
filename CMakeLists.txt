@@ -155,6 +155,8 @@ mark_as_advanced(DEFAULT_FEATURE_STATE)
 # High-level features
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
+option(DASHBOARD "Enable local dashboard" True)
+mark_as_advanced(DASHBOARD)
 
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
@@ -3019,8 +3021,12 @@ endif()
 #
 
 include(src/web/gui/v1/dashboard_v1.cmake)
-include(src/web/gui/v2/dashboard_v2.cmake)
 include(src/web/gui/gui.cmake)
+
+if(DASHBOARD)
+  include(NetdataDashboard)
+  bundle_dashboard()
+endif()
 
 function(cat IN_FILE OUT_FILE)
         file(READ ${IN_FILE} CONTENTS)
@@ -3042,12 +3048,8 @@ install(FILES
 install(FILES
         src/web/gui/dashboard_info_custom_example.js
         src/web/gui/dashboard_info.js
-        src/web/gui/index.html
         src/web/gui/main.css
         src/web/gui/main.js
-        src/web/gui/registry-access.html
-        src/web/gui/registry-alert-redirect.html
-        src/web/gui/registry-hello.html
         src/web/gui/switch.html
         src/web/gui/ilove.html
         COMPONENT netdata

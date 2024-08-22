@@ -144,3 +144,48 @@ function(netdata_identify_libc _libc_name)
         set(${_libc_name} ${_ND_DETECTED_LIBC} PARENT_SCOPE)
     endif()
 endfunction()
+
+# Extract a tar archive.
+#
+# This will use CMake’s native support if available, but will still
+# fall back cleanly if CMake is too old.
+function(extract_tarball tarball target)
+  if(CMAKE_VERSION VERSION_LESS 3.18)
+    find_program(TAR NAMES tar bsdtar DOC "TAR archive program")
+
+    if(TAR STREQUAL "TAR-NOTFOUND")
+      message(FATAL_ERROR "Unable to find tar command")
+    endif()
+
+    file(MAKE_DIRECTORY "${target}")
+    execute_process(COMMAND tar -x -f "${tarball}" -C "${target}"
+                    RESULT_VARIABLE result)
+
+    if(result)
+      message(FATAL_ERROR "Failed to extract ${tarball}")
+    endif()
+  else()
+    file(ARCHIVE_EXTRACT
+         INPUT "${tarball}"
+         DESTINATION "${target}")
+  endif()
+endfunction()
+
+# Get a recursive list of all sub-directories of the specified directory,
+# relative to that directory.
+function(subdirlist result curdir)
+  file(GLOB_RECURSE children
+       LIST_DIRECTORIES TRUE
+       RELATIVE ${curdir}
+       ${curdir}/*)
+
+  set(dirlist "")
+
+  foreach(child ${children})
+    if(IS_DIRECTORY ${curdir}/${child})
+      list(APPEND dirlist ${child})
+    endif()
+  endforeach()
+
+  set(${result} ${dirlist} PARENT_SCOPE)
+endfunction()
