@@ -7,6 +7,15 @@
 
 set -e
 
+warning() {
+    printf "WARNING: %s\n" "${1}" 1>&2
+}
+
+error() {
+    printf "ERROR: %s\n" "${1}" 1>&2
+    exit "${2}"
+}
+
 get_templated_value() {
     value="$1"
     default="$2"
@@ -14,6 +23,8 @@ get_templated_value() {
 
     if [ -n "${override}" ]; then
         echo "${override}"
+    elif [ -z "${value}" ]; then
+        error "Expected templated value not present"
     elif (echo "${value}" | grep -q '@'); then
         echo "${default}"
     else
@@ -25,15 +36,6 @@ config_dir="$(get_templated_value "@configdir_POST@" "/etc/netdata" "${NETDATA_C
 claim_config="${config_dir}/claim.conf"
 netdatacli="$(get_templated_value "@sbindir_POST@/netdatacli" "$(command -v netdatacli 2>/dev/null)" "${NETDATA_CLAIM_NETDATACLI_PATH}")"
 netdata_group="$(get_templated_value "@netdata_group_POST@" "netdata" "${NETDATA_CLAIM_CONFIG_GROUP}")"
-
-warning() {
-    printf "WARNING: %s\n" "${1}" 1>&2
-}
-
-error() {
-    printf "ERROR: %s\n" "${1}" 1>&2
-    exit "${2}"
-}
 
 write_config() {
     config="[global]"
