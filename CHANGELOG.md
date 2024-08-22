@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18391](https://github.com/netdata/netdata/pull/18391) ([netdatabot](https://github.com/netdatabot))
+- remove proc zfspools [\#18389](https://github.com/netdata/netdata/pull/18389) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18387](https://github.com/netdata/netdata/pull/18387) ([netdatabot](https://github.com/netdatabot))
+- Modify CLI command remove-stale-node to accept hostname [\#18386](https://github.com/netdata/netdata/pull/18386) ([stelfrag](https://github.com/stelfrag))
+- Update windows installer [\#18385](https://github.com/netdata/netdata/pull/18385) ([thiagoftsm](https://github.com/thiagoftsm))
+- go.d zfspool: collect vdev health state [\#18383](https://github.com/netdata/netdata/pull/18383) ([ilyam8](https://github.com/ilyam8))
 - Remove debug message [\#18382](https://github.com/netdata/netdata/pull/18382) ([stelfrag](https://github.com/stelfrag))
 - Remove host immediately on stale node removal [\#18381](https://github.com/netdata/netdata/pull/18381) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18380](https://github.com/netdata/netdata/pull/18380) ([netdatabot](https://github.com/netdatabot))
@@ -403,14 +409,6 @@
 - Disable updater jitter when run from anacron. [\#17826](https://github.com/netdata/netdata/pull/17826) ([Ferroin](https://github.com/Ferroin))
 - Make our LSB init script \_actually\_ LSB compliant. [\#17824](https://github.com/netdata/netdata/pull/17824) ([Ferroin](https://github.com/Ferroin))
 - fix health alert load15 info [\#17823](https://github.com/netdata/netdata/pull/17823) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17822](https://github.com/netdata/netdata/pull/17822) ([netdatabot](https://github.com/netdatabot))
-- Proper check for static\_thread being NULL [\#17821](https://github.com/netdata/netdata/pull/17821) ([stelfrag](https://github.com/stelfrag))
-- Fix coverity report [\#17820](https://github.com/netdata/netdata/pull/17820) ([thiagoftsm](https://github.com/thiagoftsm))
-- Update contexts - eBPF.plugin \(part II\) [\#17819](https://github.com/netdata/netdata/pull/17819) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add alert meta info \(node index\) [\#17818](https://github.com/netdata/netdata/pull/17818) ([stelfrag](https://github.com/stelfrag))
-- remove "ignore 0 metrics" leftovers [\#17817](https://github.com/netdata/netdata/pull/17817) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17815](https://github.com/netdata/netdata/pull/17815) ([netdatabot](https://github.com/netdatabot))
-- fix typo: `round tripe` → `round trip` [\#17814](https://github.com/netdata/netdata/pull/17814) ([luckman212](https://github.com/luckman212))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
