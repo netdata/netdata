@@ -163,7 +163,8 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     uuid_unparse_lower(claimed_id, claimed_id_str);
 
     // generate the URL to post
-    snprintf(target_url, sizeof(target_url), "%s/api/v1/spaces/nodes/%s", url, claimed_id_str);
+    snprintf(target_url, sizeof(target_url), "%s%sapi/v1/spaces/nodes/%s",
+             url, strendswith(url, "/") ? "" : "/", claimed_id_str);
 
     // Read the public key
     CLEAN_CHAR_P *public_key_file = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "public.pem");
