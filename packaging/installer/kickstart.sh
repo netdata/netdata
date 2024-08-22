@@ -1377,7 +1377,7 @@ claim() {
 
   case ${method} in
     script) run_claim_script ;;
-    internal)
+    config)
       if ! write_claim_config; then
         warning "Failed to write claiming configuration. This usually means you do not have permissions to access the configuration directory."
       fi
