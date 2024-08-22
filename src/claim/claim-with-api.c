@@ -130,14 +130,20 @@ static int debug_callback(CURL *handle, curl_infotype type, char *data, size_t s
     (void)handle; // Unused
     (void)userptr; // Unused
 
-    if(type == CURLINFO_TEXT)
-        nd_log(NDLS_DAEMON, NDLP_INFO, "CLAIM: Send info: %s", data);
-    else if(type == CURLINFO_HEADER_OUT)
+    if (type == CURLINFO_TEXT)
+        nd_log(NDLS_DAEMON, NDLP_INFO, "CLAIM: Info: %s", data);
+    else if (type == CURLINFO_HEADER_OUT)
         nd_log(NDLS_DAEMON, NDLP_INFO, "CLAIM: Send header: %.*s", (int)size, data);
-    else if(type == CURLINFO_DATA_OUT)
+    else if (type == CURLINFO_DATA_OUT)
         nd_log(NDLS_DAEMON, NDLP_INFO, "CLAIM: Send data: %.*s", (int)size, data);
-    else if(type == CURLINFO_SSL_DATA_OUT)
+    else if (type == CURLINFO_SSL_DATA_OUT)
         nd_log(NDLS_DAEMON, NDLP_INFO, "CLAIM: Send SSL data: %.*s", (int)size, data);
+    else if (type == CURLINFO_HEADER_IN)
+        nd_log(NDLS_DAEMON, NDLP_INFO, "CLAIM: Receive header: %.*s", (int)size, data);
+    else if (type == CURLINFO_DATA_IN)
+        nd_log(NDLS_DAEMON, NDLP_INFO, "CLAIM: Receive data: %.*s", (int)size, data);
+    else if (type == CURLINFO_SSL_DATA_IN)
+        nd_log(NDLS_DAEMON, NDLP_INFO, "CLAIM: Receive SSL data: %.*s", (int)size, data);
 
     return 0;
 }
