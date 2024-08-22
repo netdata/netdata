@@ -1274,7 +1274,7 @@ write_claim_config() {
 
   run_as_root touch "${claim_config}.tmp" || return 1
   run_as_root chmod 0640 "${claim_config}.tmp" || return 1
-  run_as_root chown ":${NETDATA_CLAIM_GROUP}" "${claim_config}.tmp" || return 1
+  run_as_root chown ":${NETDATA_CLAIM_GROUP:-netdata}" "${claim_config}.tmp" || return 1
   run_as_root echo "${config}" > "${claim_config}.tmp" || return 1
   run_as_root mv -f "${claim_config}.tmp" "${claim_config}" || return 1
 
