@@ -635,8 +635,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [ZFS Adaptive Replacement Cache](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/zfs_adaptive_replacement_cache.md)
 
-- [ZFS Pools](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/zfs_pools.md)
-
 #### Firewall
 
 - [Conntrack](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/conntrack.md)
