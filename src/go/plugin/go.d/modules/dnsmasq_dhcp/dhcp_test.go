@@ -147,3 +147,63 @@ func TestDnsmasqDHCP_CollectFailedToOpenLeasesPath(t *testing.T) {
 	job.LeasesPath = ""
 	assert.Nil(t, job.Collect())
 }
+
+func TestDnsmasqDHCP_parseDHCPRangeValue(t *testing.T) {
+	tests := map[string]struct {
+		input    string
+		wantFail bool
+	}{
+		"ipv4": {
+			input: "192.168.0.50,192.168.0.150,12h",
+		},
+		"ipv4 with netmask": {
+			input: "192.168.0.50,192.168.0.150,255.255.255.0,12h",
+		},
+		"ipv4 with netmask and tag": {
+			input: "set:red,1.1.1.50,1.1.2.150, 255.255.252.0",
+		},
+		"ipv4 with iface": {
+			input: "enp3s0, 172.16.1.2, 172.16.1.254, 1h",
+		},
+		"ipv4 with iface 2": {
+			input: "enp2s0.100, 192.168.100.2, 192.168.100.254, 1h",
+		},
+		"ipv4 static": {
+			wantFail: true,
+			input:    "192.168.0.0,static",
+		},
+		"ipv6": {
+			input: "1234::2,1234::500",
+		},
+		"ipv6 slacc": {
+			input: "1234::2,1234::500, slaac",
+		},
+		"ipv6 with with prefix length and lease time": {
+			input: "1234::2,1234::500, 64, 12h",
+		},
+		"ipv6 ra-only": {
+			wantFail: true,
+			input:    "1234::,ra-only",
+		},
+		"ipv6 ra-names": {
+			wantFail: true,
+			input:    "1234::,ra-names",
+		},
+		"ipv6 ra-stateless": {
+			wantFail: true,
+			input:    "1234::,ra-stateless",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			v := parseDHCPRangeValue(test.input)
+
+			if test.wantFail {
+				assert.Emptyf(t, v, "parsing '%s' must fail", test.input)
+			} else {
+				assert.NotEmptyf(t, v, "parsing '%s' must not fail", test.input)
+			}
+		})
+	}
+}
