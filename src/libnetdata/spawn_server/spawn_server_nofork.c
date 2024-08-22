@@ -338,7 +338,7 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
     close(rq->fds[1]); rq->fds[1] = -1;
     close(rq->fds[2]); rq->fds[2] = -1;
 
-    nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: process created with pid %d: %s", rq->pid, rq->cmdline);
+    nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "SPAWN SERVER: process created with pid %d: %s", rq->pid, rq->cmdline);
     return true;
 }
 
