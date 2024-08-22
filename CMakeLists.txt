@@ -2414,7 +2414,7 @@ set(cachedir_POST "${NETDATA_RUNTIME_PREFIX}/var/cache/netdata")
 set(registrydir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata/registry")
 set(varlibdir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(netdata_user_POST "${NETDATA_USER}")
-set(netdata_group_POST "${NETDATA_GROUP}")
+set(netdata_group_POST "${NETDATA_USER}")
 
 configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
 install(PROGRAMS
