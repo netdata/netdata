@@ -1,11 +1,12 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.47.0](https://github.com/netdata/netdata/tree/v1.47.0) (2024-08-22)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.46.3...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.46.3...v1.47.0)
 
 **Merged pull requests:**
 
+- go.d dnsmsasq\_dhcp: improve parsing of dhcp ranges [\#18394](https://github.com/netdata/netdata/pull/18394) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18391](https://github.com/netdata/netdata/pull/18391) ([netdatabot](https://github.com/netdatabot))
 - remove proc zfspools [\#18389](https://github.com/netdata/netdata/pull/18389) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18387](https://github.com/netdata/netdata/pull/18387) ([netdatabot](https://github.com/netdatabot))
@@ -406,9 +407,6 @@
 - fix order of loading schema files in dyncfg\_get\_schema\_from [\#17829](https://github.com/netdata/netdata/pull/17829) ([ilyam8](https://github.com/ilyam8))
 - claiming: add proxy to cloud.conf if set [\#17828](https://github.com/netdata/netdata/pull/17828) ([ilyam8](https://github.com/ilyam8))
 - Use bundled protobuf for openSUSE packages. [\#17827](https://github.com/netdata/netdata/pull/17827) ([Ferroin](https://github.com/Ferroin))
-- Disable updater jitter when run from anacron. [\#17826](https://github.com/netdata/netdata/pull/17826) ([Ferroin](https://github.com/Ferroin))
-- Make our LSB init script \_actually\_ LSB compliant. [\#17824](https://github.com/netdata/netdata/pull/17824) ([Ferroin](https://github.com/Ferroin))
-- fix health alert load15 info [\#17823](https://github.com/netdata/netdata/pull/17823) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
