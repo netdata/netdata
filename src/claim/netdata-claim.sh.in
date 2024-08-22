@@ -69,13 +69,13 @@ parse_args() {
     while [ -n "${1}" ]; do
         case "${1}" in
             --claim-token) NETDATA_CLAIM_TOKEN="${2}"; shift 1 ;;
-            -token=*) NETDATA_CLAIM_TOKEN="$(echo "${1}" | tail -c +9)" ;;
+            -token=*) NETDATA_CLAIM_TOKEN="$(echo "${1}" | sed 's/^-token=//')" ;;
             --claim-rooms) NETDATA_CLAIM_ROOMS="${2}"; shift 1 ;;
-            -rooms=*) NETDATA_CLAIM_ROOMS="$(echo "${1}" | tail -c +9)" ;;
+            -rooms=*) NETDATA_CLAIM_ROOMS="$(echo "${1}" | sed 's/^-rooms=//')" ;;
             --claim-url) NETDATA_CLAIM_URL="${2}"; shift 1 ;;
-            -url=*) NETDATA_CLAIM_URL="$(echo "${1}" | tail -c +6)" ;;
+            -url=*) NETDATA_CLAIM_URL="$(echo "${1}" | sed 's/^-url=/')" ;;
             --claim-proxy) NETDATA_CLAIM_PROXY="${2}"; shift 1 ;;
-            -proxy=*) NETDATA_CLAIM_PROXY="$(echo "${1}" | tail -c +6)" ;;
+            -proxy=*) NETDATA_CLAIM_PROXY="$(echo "${1}" | sed 's/-proxy=//')" ;;
             -noproxy|--noproxy) NETDATA_CLAIM_PROXY="none" ;;
             -noreload|--noreload) NORELOAD=1 ;;
             -insecure|--insecure) NETDATA_CLAIM_INSECURE=yes ;;
