@@ -324,9 +324,7 @@ while [ -n "${1}" ]; do
     "--disable-cloud")
       warning "Cloud cannot be disabled."
       ;;
-    "--require-cloud")
-      warning "Cloud is always required."
-      ;;
+    "--require-cloud") ;;
     "--build-json-c")
       NETDATA_BUILD_JSON_C=1
       ;;
