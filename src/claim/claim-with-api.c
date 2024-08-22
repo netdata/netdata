@@ -220,7 +220,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
         return false;
     }
 
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+    // curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
     curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, debug_callback);
 
     // we will receive the response in this
