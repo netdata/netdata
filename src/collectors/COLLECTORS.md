@@ -215,6 +215,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [AWS RDS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/aws_rds.md)
 
+- [BOINC](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/boinc/integrations/boinc.md)
+
 - [Cassandra](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/cassandra/integrations/cassandra.md)
 
 - [ClickHouse](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/clickhouse/integrations/clickhouse.md)
@@ -280,8 +282,6 @@ If you don't see the app/service you'd like to monitor in this list:
 - [pgBackRest](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/pgbackrest.md)
 
 ### Distributed Computing Systems
-
-- [BOINC](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/boinc/integrations/boinc.md)
 
 - [Gearman](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/gearman/integrations/gearman.md)
 
