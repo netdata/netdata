@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "aclk_tx_msgs.h"
-#include "daemon/common.h"
 #include "aclk_util.h"
 #include "aclk.h"
 #include "aclk_capas.h"
@@ -18,6 +17,8 @@ static void freez_aclk_publish5a(void *ptr) {
 static void freez_aclk_publish5b(void *ptr) {
     freez(ptr);
 }
+
+#define ACLK_HEADER_VERSION (2)
 
 uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
@@ -43,7 +44,6 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
     return packet_id;
 }
 
-#define TOPIC_MAX_LEN 512
 #define V2_BIN_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
 static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_object *msg, const char *topic, const void *payload, size_t payload_len)
 {
@@ -87,12 +87,14 @@ static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_obj
  * Creates universal header common for all ACLK messages. User gets ownership of json object created.
  * Usually this is freed by send function after message has been sent.
  */
-static struct json_object *create_hdr(const char *type, const char *msg_id, time_t ts_secs, usec_t ts_us, int version)
+static struct json_object *create_hdr(const char *type, const char *msg_id)
 {
     nd_uuid_t uuid;
-    char uuid_str[36 + 1];
+    char uuid_str[UUID_STR_LEN];
     json_object *tmp;
     json_object *obj = json_object_new_object();
+    time_t ts_secs;
+    usec_t ts_us;
 
     tmp = json_object_new_string(type);
     json_object_object_add(obj, "type", tmp);
@@ -103,11 +105,9 @@ static struct json_object *create_hdr(const char *type, const char *msg_id, time
         msg_id = uuid_str;
     }
 
-    if (ts_secs == 0) {
-        ts_us = now_realtime_usec();
-        ts_secs = ts_us / USEC_PER_SEC;
-        ts_us = ts_us % USEC_PER_SEC;
-    }
+    ts_us = now_realtime_usec();
+    ts_secs = ts_us / USEC_PER_SEC;
+    ts_us = ts_us % USEC_PER_SEC;
 
     tmp = json_object_new_string(msg_id);
     json_object_object_add(obj, "msg-id", tmp);
@@ -132,7 +132,7 @@ static struct json_object *create_hdr(const char *type, const char *msg_id, time
     tmp = json_object_new_int64(aclk_session_us);
     json_object_object_add(obj, "connect-offset-usec", tmp);
 
-    tmp = json_object_new_int(version);
+    tmp = json_object_new_int(ACLK_HEADER_VERSION);
     json_object_object_add(obj, "version", tmp);
 
     return obj;
@@ -149,7 +149,7 @@ static struct json_object *create_hdr(const char *type, const char *msg_id, time
 void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char *msg_id, int http_code, int ec, const char* emsg, const char *payload, size_t payload_len)
 {
     json_object *tmp, *msg;
-    msg = create_hdr("http", msg_id, 0, 0, 2);
+    msg = create_hdr("http", msg_id);
     tmp = json_object_new_int(http_code);
     json_object_object_add(msg, "http-code", tmp);
 
@@ -169,7 +169,7 @@ short aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *ms
 {
     json_object *tmp, *msg;
 
-    msg = create_hdr("http", msg_id, 0, 0, 2);
+    msg = create_hdr("http", msg_id);
 
     tmp = json_object_new_int64(t_exec);
     json_object_object_add(msg, "t-exec", tmp);

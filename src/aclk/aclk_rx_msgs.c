@@ -501,7 +501,7 @@ new_cloud_rx_msg_t *find_rx_handler_by_hash(simple_hash_t hash)
     return NULL;
 }
 
-unsigned int aclk_init_rx_msg_handlers(void)
+void aclk_init_rx_msg_handlers(void)
 {
     int i;
     for (i = 0; rx_msgs[i].fnc; i++) {
@@ -514,7 +514,6 @@ unsigned int aclk_init_rx_msg_handlers(void)
         }
         rx_msgs[i].name_hash = hash;
     }
-    return i;
 }
 
 void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len, const char *topic __maybe_unused)

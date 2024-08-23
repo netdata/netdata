@@ -20,8 +20,6 @@
 #include <fcntl.h>
 #endif
 
-#define ACLK_STABLE_TIMEOUT 3 // Minimum delay to mark AGENT as stable
-
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 int aclk_rcvd_cloud_msgs = 0;
 int aclk_connection_counter = 0;
@@ -778,7 +776,7 @@ void *aclk_main(void *ptr)
         return NULL;
     }
 
-    unsigned int proto_hdl_cnt = aclk_init_rx_msg_handlers();
+    aclk_init_rx_msg_handlers();
 
     if (wait_till_agent_claim_ready())
         goto exit;
@@ -842,7 +840,6 @@ exit:
 void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 {
     nd_uuid_t node_id;
-    int ret = 0;
 
     if (!aclk_online())
         return;
@@ -851,7 +848,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
         uuid_copy(node_id, host->node_id);
     }
     else {
-        ret = get_node_id(&host->host_uuid, &node_id);
+        int ret = get_node_id(&host->host_uuid, &node_id);
         if (ret > 0) {
             // this means we were not able to check if node_id already present
             netdata_log_error("Unable to check for node_id. Ignoring the host state update.");

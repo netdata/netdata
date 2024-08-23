@@ -279,6 +279,7 @@ struct aclk_query_payload {
 
 static void after_aclk_run_query_job(uv_work_t *req, int status __maybe_unused)
 {
+    worker_is_busy(ACLK_QUERY_EXECUTE);
     struct aclk_query_payload *payload = req->data;
     struct aclk_sync_config_s *config = payload->config;
     config->aclk_queries_running--;
@@ -321,6 +322,7 @@ static void aclk_synchronization(void *arg)
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
     worker_register_job_name(ACLK_QUERY_EXECUTE,                 "query execute");
+    worker_register_job_name(ACLK_QUERY_EXECUTE_SYNC,            "query execute sync");
     worker_register_job_name(ACLK_DATABASE_TIMER,                "timer");
 
     uv_loop_t *loop = &config->loop;
@@ -337,8 +339,9 @@ static void aclk_synchronization(void *arg)
 
     sql_delete_aclk_table_list();
 
-    int query_thread_count = MIN(get_netdata_cpus()/2, 6);
+    int query_thread_count = MIN(libuv_worker_threads / 10, 16);
     query_thread_count = MAX(query_thread_count, 2);
+    netdata_log_info("Starting ACLK synchronization thread with %d parallel query threads", query_thread_count);
 
     while (likely(service_running(SERVICE_ACLK))) {
         enum aclk_database_opcode opcode;
@@ -354,7 +357,7 @@ static void aclk_synchronization(void *arg)
 
             opcode = cmd.opcode;
 
-            if(likely(opcode != ACLK_DATABASE_NOOP))
+            if(likely(opcode != ACLK_DATABASE_NOOP && opcode != ACLK_QUERY_EXECUTE))
                 worker_is_busy(opcode);
 
             switch (opcode) {
@@ -401,6 +404,7 @@ static void aclk_synchronization(void *arg)
                     }
 
                     if (execute_now) {
+                        worker_is_busy(ACLK_QUERY_EXECUTE_SYNC);
                         aclk_run_query(config, query);
                         freez(payload);
                         config->aclk_queries_running--;

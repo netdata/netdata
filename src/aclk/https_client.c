@@ -105,7 +105,8 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     int idx, idx_end;
     char buf_key[HTTP_HDR_BUFFER_SIZE];
     char buf_val[HTTP_HDR_BUFFER_SIZE];
-    char *ptr = buf_key;
+    char *ptr;
+
     if (!rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx_end)) {
         netdata_log_error("CRLF expected");
         return 1;
