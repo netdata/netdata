@@ -207,14 +207,14 @@ struct engine *read_exporting_config()
     if (unlikely(engine))
         return engine;
 
-    char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, EXPORTING_CONF);
+    char *filename = filename_from_path_entry_strdupz(netdata_configured_user_config_dir, EXPORTING_CONF);
 
     exporting_config_exists = appconfig_load(&exporting_config, filename, 0, NULL);
     if (!exporting_config_exists) {
         netdata_log_info("CONFIG: cannot load user exporting config '%s'. Will try the stock version.", filename);
         freez(filename);
 
-        filename = strdupz_path_subpath(netdata_configured_stock_config_dir, EXPORTING_CONF);
+        filename = filename_from_path_entry_strdupz(netdata_configured_stock_config_dir, EXPORTING_CONF);
         exporting_config_exists = appconfig_load(&exporting_config, filename, 0, NULL);
         if (!exporting_config_exists)
             netdata_log_info("CONFIG: cannot load stock exporting config '%s'. Running with internal defaults.", filename);
@@ -468,8 +468,6 @@ struct engine *read_exporting_config()
 
         tmp_instance->config.hostname = strdupz(exporter_get(instance_name, "hostname", engine->config.hostname));
 
-#ifdef ENABLE_HTTPS
-
 #define STR_GRAPHITE_HTTPS "graphite:https"
 #define STR_JSON_HTTPS "json:https"
 #define STR_OPENTSDB_HTTPS "opentsdb:https"
@@ -487,7 +485,6 @@ struct engine *read_exporting_config()
                  strlen(STR_PROMETHEUS_REMOTE_WRITE_HTTPS)))) {
             tmp_instance->config.options |= EXPORTING_OPTION_USE_TLS;
         }
-#endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
         netdata_log_info(

@@ -203,7 +203,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
         if (host == localhost)
             continue;
 
-        netdata_mutex_lock(&host->receiver_lock);
+        spinlock_lock(&host->receiver_lock);
 
         time_t now = now_realtime_sec();
 
@@ -215,7 +215,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
             host->trigger_chart_obsoletion_check = 0;
         }
 
-        netdata_mutex_unlock(&host->receiver_lock);
+        spinlock_unlock(&host->receiver_lock);
     }
 
     rrd_rdunlock();
@@ -247,14 +247,12 @@ restart_after_removal:
         }
 
         worker_is_busy(WORKER_JOB_FREE_HOST);
-#ifdef ENABLE_ACLK
         // in case we have cloud connection we inform cloud
         // a child disconnected
-        if (netdata_cloud_enabled && force) {
+        if (force) {
             aclk_host_state_update(host, 0, 0);
             unregister_node(host->machine_guid);
         }
-#endif
         rrdhost_free___while_having_rrd_wrlock(host, force);
         goto restart_after_removal;
     }

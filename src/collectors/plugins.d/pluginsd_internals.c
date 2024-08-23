@@ -2,10 +2,8 @@
 
 #include "pluginsd_internals.h"
 
-ssize_t send_to_plugin(const char *txt, void *data) {
-    PARSER *parser = data;
-
-    if(!txt || !*txt)
+ssize_t send_to_plugin(const char *txt, PARSER *parser) {
+    if(!txt || !*txt || !parser)
         return 0;
 
 #ifdef ENABLE_H2O
@@ -17,7 +15,6 @@ ssize_t send_to_plugin(const char *txt, void *data) {
     spinlock_lock(&parser->writer.spinlock);
     ssize_t bytes = -1;
 
-#ifdef ENABLE_HTTPS
     NETDATA_SSL *ssl = parser->ssl_output;
     if(ssl) {
 
@@ -30,29 +27,14 @@ ssize_t send_to_plugin(const char *txt, void *data) {
         spinlock_unlock(&parser->writer.spinlock);
         return bytes;
     }
-#endif
 
-    if(parser->fp_output) {
-
-        bytes = fprintf(parser->fp_output, "%s", txt);
-        if(bytes <= 0) {
-            netdata_log_error("PLUGINSD: cannot send command (FILE)");
-            bytes = -2;
-        }
-        else
-            fflush(parser->fp_output);
-
-        spinlock_unlock(&parser->writer.spinlock);
-        return bytes;
-    }
-
-    if(parser->fd != -1) {
+    if(parser->fd_output != -1) {
         bytes = 0;
         ssize_t total = (ssize_t)strlen(txt);
         ssize_t sent;
 
         do {
-            sent = write(parser->fd, &txt[bytes], total - bytes);
+            sent = write(parser->fd_output, &txt[bytes], total - bytes);
             if(sent <= 0) {
                 netdata_log_error("PLUGINSD: cannot send command (fd)");
                 spinlock_unlock(&parser->writer.spinlock);
@@ -100,19 +82,16 @@ void parser_destroy(PARSER *parser) {
 }
 
 
-PARSER *parser_init(struct parser_user_object *user, FILE *fp_input, FILE *fp_output, int fd,
+PARSER *parser_init(struct parser_user_object *user, int fd_input, int fd_output,
                     PARSER_INPUT_TYPE flags, void *ssl __maybe_unused) {
     PARSER *parser;
 
     parser = callocz(1, sizeof(*parser));
     if(user)
         parser->user = *user;
-    parser->fd = fd;
-    parser->fp_input = fp_input;
-    parser->fp_output = fp_output;
-#ifdef ENABLE_HTTPS
+    parser->fd_input = fd_input;
+    parser->fd_output = fd_output;
     parser->ssl_output = ssl;
-#endif
     parser->flags = flags;
 
     spinlock_init(&parser->writer.spinlock);

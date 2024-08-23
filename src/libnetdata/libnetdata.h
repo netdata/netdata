@@ -9,10 +9,6 @@ extern "C" {
 
 #include "config.h"
 
-#ifdef ENABLE_OPENSSL
-#define ENABLE_HTTPS 1
-#endif
-
 #ifdef HAVE_LIBDATACHANNEL
 #define ENABLE_WEBRTC 1
 #endif
@@ -331,6 +327,7 @@ size_t judy_aral_structures(void);
 
 #include "linked-lists.h"
 #include "storage-point.h"
+#include "paths/paths.h"
 
 void netdata_fix_chart_id(char *s);
 void netdata_fix_chart_name(char *s);
@@ -394,17 +391,6 @@ int verify_netdata_host_prefix(bool log_msg);
 
 extern volatile sig_atomic_t netdata_exit;
 
-char *strdupz_path_subpath(const char *path, const char *subpath);
-int path_is_dir(const char *path, const char *subpath);
-int path_is_file(const char *path, const char *subpath);
-void recursive_config_double_dir_load(
-        const char *user_path
-        , const char *stock_path
-        , const char *subpath
-        , int (*callback)(const char *filename, void *data, bool stock_config)
-        , void *data
-        , size_t depth
-);
 char *read_by_filename(const char *filename, long *file_size);
 char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
 
@@ -479,9 +465,7 @@ extern char *netdata_configured_host_prefix;
 #include "spawn_server/spawn_server.h"
 #include "spawn_server/spawn_popen.h"
 #include "simple_pattern/simple_pattern.h"
-#ifdef ENABLE_HTTPS
-# include "socket/security.h"
-#endif
+#include "socket/security.h"
 #include "socket/socket.h"
 #include "config/appconfig.h"
 #include "log/journal.h"

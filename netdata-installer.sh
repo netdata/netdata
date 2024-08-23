@@ -202,12 +202,9 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly updates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-ebpf             Disable eBPF Kernel plugin. Default: enabled.
-  --disable-cloud            Disable all Netdata Cloud functionality.
-  --require-cloud            Fail the install if it can't build Netdata Cloud support.
   --force-legacy-cxx         Force usage of an older C++ standard to allow building on older systems. This will usually be autodetected.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi  Explicitly disable the FreeIPMI plugin.
-  --disable-https            Explicitly disable TLS support.
   --disable-dbengine         Explicitly disable DB engine support.
   --enable-plugin-go         Enable the Go plugin. Default: Enabled when possible.
   --disable-plugin-go        Disable the Go plugin.
@@ -257,7 +254,6 @@ NETDATA_ENABLE_ML=""
 ENABLE_DBENGINE=1
 ENABLE_GO=1
 ENABLE_H2O=1
-ENABLE_CLOUD=1
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 
@@ -279,9 +275,7 @@ while [ -n "${1}" ]; do
     "--enable-plugin-freeipmi") ENABLE_FREEIPMI=1 ;;
     "--disable-plugin-freeipmi") ENABLE_FREEIPMI=0 ;;
     "--disable-https")
-      ENABLE_DBENGINE=0
-      ENABLE_H2O=0
-      ENABLE_CLOUD=0
+      warning "HTTPS cannot be disabled."
       ;;
     "--disable-dbengine") ENABLE_DBENGINE=0 ;;
     "--enable-plugin-go") ENABLE_GO=1 ;;
@@ -328,21 +322,9 @@ while [ -n "${1}" ]; do
       # XXX: No longer supported
       ;;
     "--disable-cloud")
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-        warning "Cloud explicitly enabled, ignoring --disable-cloud."
-      else
-        ENABLE_CLOUD=0
-        NETDATA_DISABLE_CLOUD=1
-      fi
+      warning "Cloud cannot be disabled."
       ;;
-    "--require-cloud")
-      if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
-        warning "Cloud explicitly disabled, ignoring --require-cloud."
-      else
-        ENABLE_CLOUD=1
-        NETDATA_REQUIRE_CLOUD=1
-      fi
-      ;;
+    "--require-cloud") ;;
     "--build-json-c")
       NETDATA_BUILD_JSON_C=1
       ;;

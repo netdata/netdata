@@ -54,6 +54,7 @@ typedef enum {
     STREAM_CAP_BROTLI           = (1 << 21), // BROTLI compression supported
     STREAM_CAP_PROGRESS         = (1 << 22), // Functions PROGRESS support
     STREAM_CAP_DYNCFG           = (1 << 23), // support for DYNCFG
+    STREAM_CAP_NODE_ID          = (1 << 24), // support for sending NODE_ID back to the child
 
     STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit
@@ -238,9 +239,7 @@ struct sender_state {
     FILE *stream_log_fp;
 #endif
 
-#ifdef ENABLE_HTTPS
     NETDATA_SSL ssl;                     // structure used to encrypt the connection
-#endif
 
     struct {
         bool shutdown;
@@ -334,6 +333,8 @@ typedef struct stream_node_instance {
 } STREAM_NODE_INSTANCE;
 */
 
+struct parser;
+
 struct receiver_state {
     RRDHOST *host;
     pid_t tid;
@@ -382,9 +383,7 @@ struct receiver_state {
         STREAM_CAPABILITIES compression_priorities[COMPRESSION_ALGORITHM_MAX];
     } config;
 
-#ifdef ENABLE_HTTPS
     NETDATA_SSL ssl;
-#endif
 
     time_t replication_first_time_t;
 
@@ -395,6 +394,12 @@ struct receiver_state {
         STREAM_NODE_INSTANCE *array;
     } instances;
 */
+
+    // The parser pointer is safe to read and use, only when having the host receiver lock.
+    // Without this lock, the data pointed by the pointer may vanish randomly.
+    // Also, since the receiver sets it when it starts, it should be read with
+    // an atomic read.
+    struct parser *parser;
 
 #ifdef ENABLE_H2O
     void *h2o_ctx;
@@ -455,7 +460,6 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
 bool rrdset_push_chart_definition_now(RRDSET *st);
 void *rrdpush_sender_thread(void *ptr);
 void rrdpush_send_host_labels(RRDHOST *host);
-void rrdpush_send_claimed_id(RRDHOST *host);
 void rrdpush_send_global_functions(RRDHOST *host);
 
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string, void *h2o_ctx);
@@ -757,5 +761,7 @@ bool rrdpush_decompression_initialize(struct receiver_state *rpt);
 void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *order);
 void rrdpush_select_receiver_compression_algorithm(struct receiver_state *rpt);
 void rrdpush_compression_deactivate(struct sender_state *s);
+
+#include "protocol/commands.h"
 
 #endif //NETDATA_RRDPUSH_H

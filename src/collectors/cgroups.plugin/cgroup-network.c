@@ -518,7 +518,7 @@ void call_the_helper(pid_t pid, const char *cgroup) {
     if(pi) {
         char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
         char *s;
-        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, pi->child_stdout_fp))) {
+        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, spawn_popen_stdout(pi)))) {
             trim(s);
 
             if(*s && *s != '\n') {

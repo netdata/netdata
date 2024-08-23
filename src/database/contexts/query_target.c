@@ -897,9 +897,9 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     QUERY_TARGET *qt = qtl->qt;
     QUERY_NODE *qn = query_node_allocate(qt, host);
 
-    if(host->node_id) {
+    if(!uuid_is_null(host->node_id)) {
         if(!qtl->host_node_id_str[0])
-            uuid_unparse_lower(*host->node_id, qn->node_id);
+            uuid_unparse_lower(host->node_id, qn->node_id);
         else
             memcpy(qn->node_id, qtl->host_node_id_str, sizeof(qn->node_id));
     }
@@ -958,7 +958,7 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
 
 void query_target_generate_name(QUERY_TARGET *qt) {
     char options_buffer[100 + 1];
-    web_client_api_request_v1_data_options_to_string(options_buffer, 100, qt->request.options);
+    web_client_api_request_data_vX_options_to_string(options_buffer, 100, qt->request.options);
 
     char resampling_buffer[20 + 1] = "";
     if(qt->request.resampling_time > 1)
@@ -1120,8 +1120,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     }
 
     if(host) {
-        if(host->node_id)
-            uuid_unparse_lower(*host->node_id, qtl.host_node_id_str);
+        if(!uuid_is_null(host->node_id))
+            uuid_unparse_lower(host->node_id, qtl.host_node_id_str);
         else
             qtl.host_node_id_str[0] = '\0';
 

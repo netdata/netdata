@@ -67,9 +67,7 @@ void simple_connector_cleanup(struct instance *instance)
         freez(current_buffer);
     }
 
-#ifdef ENABLE_HTTPS
     netdata_ssl_close(&simple_connector_data->ssl);
-#endif
 
     freez(simple_connector_data);
 

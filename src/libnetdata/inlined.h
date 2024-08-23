@@ -506,6 +506,43 @@ static inline int read_txt_file(const char *filename, char *buffer, size_t size)
     return 0;
 }
 
+static inline bool read_txt_file_to_buffer(const char *filename, BUFFER *wb, size_t max_size) {
+    // Open the file
+    int fd = open(filename, O_RDONLY | O_CLOEXEC);
+    if (fd == -1)
+        return false;
+
+    // Get the file size
+    struct stat st;
+    if (fstat(fd, &st) == -1) {
+        close(fd);
+        return false;
+    }
+
+    size_t file_size = st.st_size;
+
+    // Check if the file size exceeds the maximum allowed size
+    if (file_size > max_size) {
+        close(fd);
+        return false; // File size too large
+    }
+
+    buffer_need_bytes(wb, file_size + 1);
+
+    // Read the file contents into the buffer
+    ssize_t r = read(fd, &wb->buffer[wb->len], file_size);
+    if (r != (ssize_t)file_size) {
+        close(fd);
+        return false; // Read error
+    }
+    wb->len = r;
+
+    // Close the file descriptor
+    close(fd);
+
+    return true; // Success
+}
+
 static inline int read_proc_cmdline(const char *filename, char *buffer, size_t size) {
     if (unlikely(!size)) return 3;
 

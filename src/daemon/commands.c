@@ -47,9 +47,7 @@ static cmd_status_t cmd_ping_execute(char *args, char **message);
 static cmd_status_t cmd_aclk_state(char *args, char **message);
 static cmd_status_t cmd_version(char *args, char **message);
 static cmd_status_t cmd_dumpconfig(char *args, char **message);
-#ifdef ENABLE_ACLK
 static cmd_status_t cmd_remove_node(char *args, char **message);
-#endif
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -65,9 +63,7 @@ static command_info_t command_info_array[] = {
         {"aclk-state", cmd_aclk_state, CMD_TYPE_ORTHOGONAL},
         {"version", cmd_version, CMD_TYPE_ORTHOGONAL},
         {"dumpconfig", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL},
-#ifdef ENABLE_ACLK
         {"remove-stale-node", cmd_remove_node, CMD_TYPE_ORTHOGONAL}
-#endif
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -135,10 +131,8 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "    Returns current state of ACLK and Cloud connection. (optionally in json).\n"
              "dumpconfig\n"
              "    Returns the current netdata.conf on stdout.\n"
-#ifdef ENABLE_ACLK
              "remove-stale-node node_id|machine_guid|hostname|ALL_NODES\n"
              "    Unregisters and removes a node from the cloud.\n"
-#endif
              "version\n"
              "    Returns the netdata version.\n",
              MAX_COMMAND_LENGTH - 1);
@@ -193,17 +187,42 @@ static cmd_status_t cmd_fatal_execute(char *args, char **message)
     return CMD_STATUS_SUCCESS;
 }
 
-static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message)
-{
-    (void)args;
-    (void)message;
-#if defined(DISABLE_CLOUD) || !defined(ENABLE_ACLK)
-    netdata_log_info("The claiming feature has been explicitly disabled");
-    *message = strdupz("This agent cannot be claimed, it was built without support for Cloud");
-    return CMD_STATUS_FAILURE;
-#endif
-    netdata_log_info("COMMAND: Reloading Agent Claiming configuration.");
-    claim_reload_all();
+static cmd_status_t cmd_reload_claiming_state_execute(char *args __maybe_unused, char **message) {
+    char msg[1024];
+
+    CLOUD_STATUS status = claim_reload_and_wait_online();
+    switch(status) {
+        case CLOUD_STATUS_ONLINE:
+            snprintfz(msg, sizeof(msg),
+                      "Netdata Agent is claimed to Netdata Cloud and is currently online.");
+            break;
+
+        case CLOUD_STATUS_BANNED:
+            snprintfz(msg, sizeof(msg),
+                      "Netdata Agent is claimed to Netdata Cloud, but it is banned.");
+            break;
+
+        default:
+        case CLOUD_STATUS_AVAILABLE:
+            snprintfz(msg, sizeof(msg),
+                      "Netdata Agent is not claimed to Netdata Cloud: %s",
+                      claim_agent_failure_reason_get());
+            break;
+
+        case CLOUD_STATUS_OFFLINE:
+            snprintfz(msg, sizeof(msg),
+                      "Netdata Agent is claimed to Netdata Cloud, but it is currently offline: %s",
+                      cloud_status_aclk_offline_reason());
+            break;
+
+        case CLOUD_STATUS_INDIRECT:
+            snprintfz(msg, sizeof(msg),
+                      "Netdata Agent is not claimed to Netdata Cloud, but it is currently online via parent.");
+            break;
+    }
+
+    *message = strdupz(msg);
+
     return CMD_STATUS_SUCCESS;
 }
 
@@ -306,17 +325,10 @@ static cmd_status_t cmd_ping_execute(char *args, char **message)
 static cmd_status_t cmd_aclk_state(char *args, char **message)
 {
     netdata_log_info("COMMAND: Reopening aclk/cloud state.");
-#ifdef ENABLE_ACLK
     if (strstr(args, "json"))
         *message = aclk_state_json();
     else
         *message = aclk_state();
-#else
-    if (strstr(args, "json"))
-        *message = strdupz("{\"aclk-available\":false}");
-    else
-        *message = strdupz("ACLK Available: No");
-#endif
 
     return CMD_STATUS_SUCCESS;
 }
@@ -338,13 +350,11 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message)
     (void)args;
 
     BUFFER *wb = buffer_create(1024, NULL);
-    config_generate(wb, 0);
+    netdata_conf_generate(wb, 0);
     *message = strdupz(buffer_tostring(wb));
     buffer_free(wb);
     return CMD_STATUS_SUCCESS;
 }
-
-#ifdef ENABLE_ACLK
 
 static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error)
 {
@@ -365,8 +375,7 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error)
         sql_set_host_label(&host->host_uuid, "_is_ephemeral", "true");
         aclk_host_state_update(host, 0, 0);
         unregister_node(host->machine_guid);
-        freez(host->node_id);
-        host->node_id = NULL;
+        uuid_clear(host->node_id);
         buffer_sprintf(wb, "Unregistering node with machine guid %s, hostname = %s", host->machine_guid, rrdhost_hostname(host));
         rrd_wrlock();
         rrdhost_free___while_having_rrd_wrlock(host, true);
@@ -438,7 +447,6 @@ done:
     buffer_free(wb);
     return CMD_STATUS_SUCCESS;
 }
-#endif
 
 static void cmd_lock_exclusive(unsigned index)
 {

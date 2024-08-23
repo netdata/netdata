@@ -16,7 +16,7 @@ typedef enum  __attribute__((__packed__)) {
     NDLS_UNSET = 0,   // internal use only
     NDLS_ACCESS,      // access.log
     NDLS_ACLK,        // aclk.log
-    NDLS_COLLECTORS,  // collectors.log
+    NDLS_COLLECTORS,  // collector.log
     NDLS_DAEMON,      // error.log
     NDLS_HEALTH,      // health.log
     NDLS_DEBUG,       // debug.log
@@ -238,12 +238,8 @@ void log_stack_push(struct log_stack_entry *lgs);
 #define D_SYSTEM            0x8000000000000000
 
 extern uint64_t debug_flags;
-
 extern const char *program_name;
-
-#ifdef ENABLE_ACLK
 extern int aclklog_enabled;
-#endif
 
 #define LOG_DATE_LENGTH 26
 void log_date(char *buffer, size_t len, time_t now);

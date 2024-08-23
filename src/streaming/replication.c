@@ -718,7 +718,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
 struct replication_request_details {
     struct {
         send_command callback;
-        void *data;
+        struct parser *parser;
     } caller;
 
     RRDHOST *host;
@@ -826,7 +826,7 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
               rrdset_id(st), r->wanted.start_streaming ? "true" : "false",
               (unsigned long long)r->wanted.after, (unsigned long long)r->wanted.before);
 
-    ssize_t ret = r->caller.callback(buffer, r->caller.data);
+    ssize_t ret = r->caller.callback(buffer, r->caller.parser);
     if (ret < 0) {
         netdata_log_error("REPLAY ERROR: 'host:%s/chart:%s' failed to send replication request to child (error %zd)",
               rrdhost_hostname(r->host), rrdset_id(r->st), ret);
@@ -836,14 +836,14 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
     return true;
 }
 
-bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST *host, RRDSET *st,
+bool replicate_chart_request(send_command callback, struct parser *parser, RRDHOST *host, RRDSET *st,
                              time_t child_first_entry, time_t child_last_entry, time_t child_wall_clock_time,
                              time_t prev_first_entry_wanted, time_t prev_last_entry_wanted)
 {
     struct replication_request_details r = {
             .caller = {
                     .callback = callback,
-                    .data = callback_data,
+                    .parser = parser,
             },
 
             .host = host,

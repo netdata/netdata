@@ -6,6 +6,10 @@
 
 #define HTTP_API_V2_VERSION 6
 
+size_t aclk_get_http_api_version(void) {
+    return HTTP_API_V2_VERSION;
+}
+
 const struct capability *aclk_get_agent_capas()
 {
     static struct capability agent_capabilities[] = {

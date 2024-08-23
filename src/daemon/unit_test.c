@@ -1437,8 +1437,8 @@ int check_strdupz_path_subpath() {
 
     size_t i;
     for(i = 0; checks[i].result ; i++) {
-        char *s = strdupz_path_subpath(checks[i].path, checks[i].subpath);
-        fprintf(stderr, "strdupz_path_subpath(\"%s\", \"%s\") = \"%s\": ", checks[i].path, checks[i].subpath, s);
+        char *s = filename_from_path_entry_strdupz(checks[i].path, checks[i].subpath);
+        fprintf(stderr, "filename_from_path_entry_strdupz(\"%s\", \"%s\") = \"%s\": ", checks[i].path, checks[i].subpath, s);
         if(!s || strcmp(s, checks[i].result) != 0) {
             freez(s);
             fprintf(stderr, "FAILED\n");

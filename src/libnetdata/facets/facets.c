@@ -222,6 +222,7 @@ struct facets {
     SIMPLE_PATTERN *visible_keys;
     SIMPLE_PATTERN *excluded_keys;
     SIMPLE_PATTERN *included_keys;
+    bool all_keys_included_by_default;
 
     FACETS_OPTIONS options;
 
@@ -570,11 +571,11 @@ static inline void FACET_VALUE_ADD_CURRENT_VALUE_TO_INDEX(FACET_KEY *k) {
     k->facets->operations.values.indexed++;
 }
 
-static inline void FACET_VALUE_ADD_OR_UPDATE_SELECTED(FACET_KEY *k, FACETS_HASH hash) {
+static inline void FACET_VALUE_ADD_OR_UPDATE_SELECTED(FACET_KEY *k, const char *name, FACETS_HASH hash) {
     FACET_VALUE tv = {
             .hash = hash,
             .selected = true,
-            .name = NULL,
+            .name = name,
             .name_len = 0,
     };
     FACET_VALUE_ADD_TO_INDEX(k, &tv);
@@ -1547,7 +1548,7 @@ static inline void facet_value_is_used(FACET_KEY *k, FACET_VALUE *v) {
 }
 
 static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k) {
-    bool included = true, excluded = false, never = false;
+    bool included = facets->all_keys_included_by_default, excluded = false, never = false;
 
     if(k->options & (FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_NO_FACET | FACET_KEY_OPTION_NEVER_FACET)) {
         if(k->options & FACET_KEY_OPTION_FACET) {
@@ -1594,6 +1595,7 @@ static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k) {
 
 FACETS *facets_create(uint32_t items_to_return, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys) {
     FACETS *facets = callocz(1, sizeof(FACETS));
+    facets->all_keys_included_by_default = true;
     facets->options = options;
     FACETS_KEYS_INDEX_CREATE(facets);
 
@@ -1691,6 +1693,40 @@ void facets_enable_slice_mode(FACETS *facets) {
     facets->options |= FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS | FACETS_OPTION_SORT_FACETS_ALPHABETICALLY;
 }
 
+void facets_reset_and_disable_all_facets(FACETS *facets) {
+    facets->all_keys_included_by_default = false;
+
+    simple_pattern_free(facets->included_keys);
+    facets->included_keys = NULL;
+
+//  We need this, because the exclusions are good for controlling which key can become a facet.
+//  The excluded ones are not offered for facets at all.
+//    simple_pattern_free(facets->excluded_keys);
+//    facets->excluded_keys = NULL;
+
+    simple_pattern_free(facets->visible_keys);
+    facets->visible_keys = NULL;
+
+    FACET_KEY *k;
+    foreach_key_in_facets(facets, k) {
+        k->options |= FACET_KEY_OPTION_NO_FACET;
+        k->options &= ~FACET_KEY_OPTION_FACET;
+    }
+    foreach_key_in_facets_done(k);
+}
+
+inline FACET_KEY *facets_register_facet(FACETS *facets, const char *name, FACET_KEY_OPTIONS options) {
+    size_t name_length = strlen(name);
+    FACETS_HASH hash = FACETS_HASH_FUNCTION(name, name_length);
+
+    FACET_KEY *k = FACETS_KEY_ADD_TO_INDEX(facets, hash, name, name_length, options);
+    k->options |= FACET_KEY_OPTION_FACET;
+    k->options &= ~FACET_KEY_OPTION_NO_FACET;
+    facet_key_late_init(facets, k);
+
+    return k;
+}
+
 inline FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options) {
     if(!is_valid_string_hash(key_id))
         return NULL;
@@ -1708,13 +1744,22 @@ inline FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, F
     return k;
 }
 
-void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *value_id, FACET_KEY_OPTIONS options) {
+void facets_register_facet_filter_id(FACETS *facets, const char *key_id, const char *value_id, FACET_KEY_OPTIONS options) {
     FACET_KEY *k = facets_register_facet_id(facets, key_id, options);
     if(k) {
         if(is_valid_string_hash(value_id)) {
             k->default_selected_for_values = false;
-            FACET_VALUE_ADD_OR_UPDATE_SELECTED(k, str_to_facets_hash(value_id));
+            FACET_VALUE_ADD_OR_UPDATE_SELECTED(k, NULL, str_to_facets_hash(value_id));
         }
+    }
+}
+
+void facets_register_facet_filter(FACETS *facets, const char *key, const char *value, FACET_KEY_OPTIONS options) {
+    FACET_KEY *k = facets_register_facet(facets, key, options);
+    if(k) {
+        FACETS_HASH hash = FACETS_HASH_FUNCTION(value, strlen(value));
+        k->default_selected_for_values = false;
+        FACET_VALUE_ADD_OR_UPDATE_SELECTED(k, value, hash);
     }
 }
 
@@ -2437,16 +2482,18 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                 if(!k->values.enabled)
                     continue;
 
-                if(!facets_sort_and_reorder_values(k))
-                    // no values for this key
-                    continue;
+                facets_sort_and_reorder_values(k);
 
                 buffer_json_add_array_item_object(wb); // key
                 {
-                    buffer_json_member_add_string(wb, "id", hash_to_static_string(k->hash));
-                    buffer_json_member_add_string(wb, "name", facets_key_name_cached(k
-                                                                                     , facets->report.used_hashes_registry
-                                                                                    ));
+                    buffer_json_member_add_string(
+                        wb, "id", hash_to_static_string(k->hash));
+
+                    buffer_json_member_add_string(
+                        wb, "name",
+                        facets_key_name_cached(k, facets->report.used_hashes_registry));
+
+                    buffer_json_member_add_string(wb, "raw", k->name);
 
                     if(!k->order) k->order = facets->order++;
                     buffer_json_member_add_uint64(wb, "order", k->order);
@@ -2467,6 +2514,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
 
                                 facets_key_value_transformed(facets, k, v, tb, FACETS_TRANSFORM_FACET);
                                 buffer_json_member_add_string(wb, "name", buffer_tostring(tb));
+                                buffer_json_member_add_string(wb, "raw", v->name);
                                 buffer_json_member_add_uint64(wb, "count", v->final_facet_value_counter);
                                 buffer_json_member_add_uint64(wb, "order", v->order);
                             }

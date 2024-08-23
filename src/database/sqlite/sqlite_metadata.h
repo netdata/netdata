@@ -41,7 +41,7 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
 int sql_metadata_cache_stats(int op);
 
 int get_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
-int update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
+int sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
 struct node_instance_list *get_node_list(void);
 void sql_load_node_id(RRDHOST *host);
 

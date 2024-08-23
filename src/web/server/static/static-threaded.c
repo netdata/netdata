@@ -211,7 +211,6 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
         web_client_set_conn_tcp(w);
     }
 
-#ifdef ENABLE_HTTPS
     if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
         sock_delnonblock(w->ifd);
 
@@ -239,13 +238,10 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
 
         sock_setnonblock(w->ifd);
     }
-#endif
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
 
-#ifdef ENABLE_HTTPS
 cleanup:
-#endif
     worker_is_idle();
     return w;
 }
@@ -503,14 +499,12 @@ void *socket_listen_main_static_threaded(void *ptr) {
     if(!api_sockets.opened)
         fatal("LISTENER: no listen sockets available.");
 
-#ifdef ENABLE_HTTPS
     netdata_ssl_validate_certificate = !config_get_boolean(CONFIG_SECTION_WEB, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
 
     if(!netdata_ssl_validate_certificate_sender)
         netdata_log_info("SSL: web server will skip SSL certificates verification.");
 
     netdata_ssl_initialize_ctx(NETDATA_SSL_WEB_SERVER_CTX);
-#endif
 
     // 6 threads is the optimal value
     // since 6 are the parallel connections browsers will do
@@ -526,13 +520,11 @@ void *socket_listen_main_static_threaded(void *ptr) {
 
     if (static_threaded_workers_count < 1) static_threaded_workers_count = 1;
 
-#ifdef ENABLE_HTTPS
     // See https://github.com/netdata/netdata/issues/11081#issuecomment-831998240 for more details
     if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) {
         static_threaded_workers_count = 1;
         netdata_log_info("You are running an OpenSSL older than 1.1.0, web server will not enable multithreading.");
     }
-#endif
 
     size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets",
                                                    (long long int)(rlimit_nofile.rlim_cur / 4));

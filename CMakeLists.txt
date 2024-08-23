@@ -147,8 +147,6 @@ option(DEFAULT_FEATURE_STATE "Specify the default state for most optional featur
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
 # High-level features
-option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
@@ -198,11 +196,7 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
-if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
-        set(NEED_PROTOBUF True)
-else()
-        set(NEED_PROTOBUF False)
-endif()
+set(NEED_PROTOBUF True)
 
 if(ENABLE_PLUGIN_GO)
     include(NetdataGoTools)
@@ -260,6 +254,9 @@ if(ENABLE_PLUGIN_EBPF)
         netdata_bundle_libbpf()
         netdata_fetch_ebpf_co_re()
 endif()
+
+pkg_check_modules(CURL libcurl>=7.21 REQUIRED IMPORTED_TARGET)
+set(HAVE_LIBCURL TRUE)
 
 #
 # Libm
@@ -524,7 +521,6 @@ if(OS_FREEBSD OR OS_MACOS)
 endif()
 
 # openssl/crypto
-set(ENABLE_OPENSSL True)
 pkg_check_modules(TLS IMPORTED_TARGET openssl)
 
 if(NOT TARGET PkgConfig::TLS)
@@ -743,14 +739,23 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setenv.h
         src/libnetdata/os/strndup.c
         src/libnetdata/os/strndup.h
-        src/libnetdata/spawn_server/spawn_server.c
+        src/libnetdata/spawn_server/spawn_server_nofork.c
         src/libnetdata/spawn_server/spawn_server.h
         src/libnetdata/spawn_server/spawn_popen.c
         src/libnetdata/spawn_server/spawn_popen.h
+        src/libnetdata/spawn_server/spawn_server_windows.c
+        src/libnetdata/spawn_server/spawn_server_internals.h
+        src/libnetdata/spawn_server/spawn_server_libuv.c
+        src/libnetdata/spawn_server/spawn_server_posix.c
+        src/libnetdata/spawn_server/spawn_library.c
+        src/libnetdata/spawn_server/spawn_library.h
         src/libnetdata/os/close_range.c
         src/libnetdata/os/close_range.h
         src/libnetdata/os/setproctitle.c
         src/libnetdata/os/setproctitle.h
+        src/libnetdata/paths/paths.c
+        src/libnetdata/paths/paths.h
+        src/libnetdata/json/json-c-parser-inline.c
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -849,14 +854,15 @@ set(DAEMON_FILES
         src/daemon/common.h
         src/daemon/daemon.c
         src/daemon/daemon.h
-        src/daemon/event_loop.c
-        src/daemon/event_loop.h
+        src/daemon/libuv_workers.c
+        src/daemon/libuv_workers.h
         src/daemon/global_statistics.c
         src/daemon/global_statistics.h
         src/daemon/analytics.c
         src/daemon/analytics.h
         src/daemon/main.c
         src/daemon/main.h
+        src/daemon/environment.c
         src/daemon/win_system-info.c
         src/daemon/win_system-info.h
         src/daemon/signals.c
@@ -905,16 +911,65 @@ set(API_PLUGIN_FILES
         src/web/api/web_api_v1.h
         src/web/api/web_api_v2.c
         src/web/api/web_api_v2.h
+        src/web/api/web_api_v3.c
+        src/web/api/web_api_v3.h
         src/web/api/http_auth.c
         src/web/api/http_auth.h
         src/web/api/http_header.c
         src/web/api/http_header.h
-        src/web/api/badges/web_buffer_svg.c
-        src/web/api/badges/web_buffer_svg.h
-        src/web/api/exporters/allmetrics.c
-        src/web/api/exporters/allmetrics.h
-        src/web/api/exporters/shell/allmetrics_shell.c
-        src/web/api/exporters/shell/allmetrics_shell.h
+        src/web/api/maps/rrdr_options.c
+        src/web/api/maps/rrdr_options.h
+        src/web/api/maps/contexts_options.c
+        src/web/api/maps/contexts_options.h
+        src/web/api/maps/datasource_formats.c
+        src/web/api/maps/datasource_formats.h
+        src/web/api/maps/maps.h
+        src/web/api/maps/contexts_alert_statuses.c
+        src/web/api/maps/contexts_alert_statuses.h
+        src/web/api/v1/api_v1_allmetrics.c
+        src/web/api/v1/api_v1_badge/web_buffer_svg.c
+        src/web/api/v1/api_v1_function.c
+        src/web/api/v1/api_v1_manage.c
+        src/web/api/v1/api_v1_calls.h
+        src/web/api/v1/api_v1_dbengine.c
+        src/web/api/v1/api_v1_config.c
+        src/web/api/v1/api_v1_functions.c
+        src/web/api/v1/api_v1_weights.c
+        src/web/api/v1/api_v1_info.c
+        src/web/api/v1/api_v1_registry.c
+        src/web/api/v1/api_v1_data.c
+        src/web/api/v1/api_v1_contexts.c
+        src/web/api/v1/api_v1_ml_info.c
+        src/web/api/v1/api_v1_aclk.c
+        src/web/api/v1/api_v1_context.c
+        src/web/api/v1/api_v1_alarms.c
+        src/web/api/v1/api_v1_charts.c
+        src/web/api/v2/api_v2_info.c
+        src/web/api/v2/api_v2_nodes.c
+        src/web/api/v2/api_v2_node_instances.c
+        src/web/api/v2/api_v2_q.c
+        src/web/api/v2/api_v2_versions.c
+        src/web/api/v2/api_v2_functions.c
+        src/web/api/v2/api_v2_alerts.c
+        src/web/api/v2/api_v2_alert_transitions.c
+        src/web/api/v2/api_v2_ilove/ilove.c
+        src/web/api/v2/api_v2_bearer.c
+        src/web/api/v2/api_v2_calls.h
+        src/web/api/v2/api_v2_data.c
+        src/web/api/v2/api_v2_progress.c
+        src/web/api/v2/api_v2_weights.c
+        src/web/api/v2/api_v2_alert_config.c
+        src/web/api/v2/api_v2_contexts.c
+        src/web/api/v2/api_v2_claim.c
+        src/web/api/v2/api_v2_webrtc.c
+        src/web/api/v3/api_v3_calls.h
+        src/web/api/v3/api_v3_settings.c
+        src/web/api/functions/functions.c
+        src/web/api/functions/functions.h
+        src/web/api/functions/function-progress.c
+        src/web/api/functions/function-progress.h
+        src/web/api/functions/function-streaming.c
+        src/web/api/functions/function-streaming.h
         src/web/api/queries/rrdr.c
         src/web/api/queries/rrdr.h
         src/web/api/queries/query.c
@@ -961,10 +1016,11 @@ set(API_PLUGIN_FILES
         src/web/api/formatters/charts2json.h
         src/web/api/formatters/rrdset2json.c
         src/web/api/formatters/rrdset2json.h
-        src/web/api/ilove/ilove.c
-        src/web/api/ilove/ilove.h
         src/web/rtc/webrtc.c
         src/web/rtc/webrtc.h
+        src/web/api/functions/function-bearer_get_token.c
+        src/web/api/functions/function-bearer_get_token.h
+        src/web/api/v3/api_v3_me.c
 )
 
 set(EXPORTING_ENGINE_FILES
@@ -1055,8 +1111,14 @@ set(PLUGINSD_PLUGIN_FILES
 )
 
 set(RRD_PLUGIN_FILES
-        src/database/contexts/api_v1.c
-        src/database/contexts/api_v2.c
+        src/database/contexts/api_v1_contexts.c
+        src/database/contexts/api_v2_contexts.c
+        src/database/contexts/api_v2_contexts.h
+        src/database/contexts/api_v2_contexts_agents.c
+        src/database/contexts/api_v2_contexts_alerts.c
+        src/database/contexts/api_v2_contexts_alerts.h
+        src/database/contexts/api_v2_contexts_alert_transitions.c
+        src/database/contexts/api_v2_contexts_alert_config.c
         src/database/contexts/context.c
         src/database/contexts/instance.c
         src/database/contexts/internal.h
@@ -1073,10 +1135,6 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions.h
         src/database/rrdfunctions-inline.c
         src/database/rrdfunctions-inline.h
-        src/database/rrdfunctions-progress.c
-        src/database/rrdfunctions-progress.h
-        src/database/rrdfunctions-streaming.c
-        src/database/rrdfunctions-streaming.h
         src/database/rrdhost.c
         src/database/rrdlabels.c
         src/database/rrd.c
@@ -1200,6 +1258,10 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/replication.c
         src/streaming/replication.h
         src/streaming/common.h
+        src/streaming/protocol/command-nodeid.c
+        src/streaming/protocol/commands.c
+        src/streaming/protocol/commands.h
+        src/streaming/protocol/command-claimed_id.c
 )
 
 set(WEB_PLUGIN_FILES
@@ -1216,6 +1278,12 @@ set(WEB_PLUGIN_FILES
 set(CLAIM_PLUGIN_FILES
         src/claim/claim.c
         src/claim/claim.h
+        src/claim/claim_id.c
+        src/claim/claim_id.h
+        src/claim/cloud-conf.c
+        src/claim/claim-with-api.c
+        src/claim/cloud-status.c
+        src/claim/cloud-status.h
 )
 
 set(ACLK_ALWAYS_BUILD
@@ -1677,10 +1745,7 @@ endif()
 #
 # mqtt library
 #
-if (ENABLE_H2O OR ENABLE_ACLK)
-        set(ENABLE_MQTTWEBSOCKETS True)
-endif()
-
+set(ENABLE_MQTTWEBSOCKETS True)
 if(ENABLE_MQTTWEBSOCKETS)
         add_library(mqttwebsockets STATIC ${MQTT_WEBSOCKETS_FILES})
 
@@ -1695,20 +1760,17 @@ if(ENABLE_MQTTWEBSOCKETS)
 
 endif()
 
-if(ENABLE_ACLK)
-        #
-        # proto definitions
-        #
-        netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
-                                    "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
-                                    ACLK_PROTO_BUILT_SRCS
-                                    ACLK_PROTO_BUILT_HDRS
-                                    ${ACLK_PROTO_DEFS})
+#
+# proto definitions
+#
+netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+                            "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+                            ACLK_PROTO_BUILT_SRCS
+                            ACLK_PROTO_BUILT_HDRS
+                            ${ACLK_PROTO_DEFS})
 
-        list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
-                               ${ACLK_PROTO_BUILT_HDRS})
-
-endif()
+list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
+                       ${ACLK_PROTO_BUILT_HDRS})
 
 #
 # build plugins
@@ -1739,6 +1801,9 @@ if(ENABLE_PLUGIN_DEBUGFS)
                 DESTINATION usr/share/doc/netdata-plugin-debugfs)
     endif()
 endif()
+
+add_executable(spawn-tester src/libnetdata/spawn_server/spawn-tester.c)
+target_link_libraries(spawn-tester libnetdata)
 
 if(ENABLE_PLUGIN_APPS)
     pkg_check_modules(CAP QUIET libcap)
@@ -2164,7 +2229,7 @@ endif()
 
 add_executable(netdata
         ${NETDATA_FILES}
-        "$<$<BOOL:${ENABLE_ACLK}>:${ACLK_FILES}>"
+        "${ACLK_FILES}"
         "$<$<BOOL:${ENABLE_H2O}>:${H2O_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGODB_EXPORTING_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES}>"
@@ -2180,7 +2245,7 @@ target_compile_options(netdata PRIVATE
 )
 
 target_include_directories(netdata PRIVATE
-        "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas>"
+        "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
 )
@@ -2196,6 +2261,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
+        "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
 )
 
 if(NEED_PROTOBUF)
@@ -2349,19 +2415,7 @@ set(cachedir_POST "${NETDATA_RUNTIME_PREFIX}/var/cache/netdata")
 set(registrydir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata/registry")
 set(varlibdir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(netdata_user_POST "${NETDATA_USER}")
-
-# netdata-claim.sh
-if(ENABLE_CLOUD)
-        set(enable_cloud_POST "yes")
-else()
-        set(enable_cloud_POST "no")
-endif()
-
-if(ENABLE_ACLK)
-        set(enable_aclk_POST "yes")
-else()
-        set(enable_aclk_POST "no")
-endif()
+set(netdata_group_POST "${NETDATA_USER}")
 
 configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
 install(PROGRAMS

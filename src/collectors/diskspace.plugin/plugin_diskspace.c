@@ -629,7 +629,7 @@ static void diskspace_main_cleanup(void *pptr) {
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
 #endif
 
-int diskspace_function_mount_points(BUFFER *wb, const char *function __maybe_unused) {
+static int diskspace_function_mount_points(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload __maybe_unused, const char *source __maybe_unused) {
     netdata_mutex_lock(&slow_mountinfo_mutex);
 
     buffer_flush(wb);

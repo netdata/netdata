@@ -44,23 +44,21 @@ STREAM_CAPABILITIES globally_disabled_capabilities = STREAM_CAP_NONE;
 unsigned int default_rrdpush_compression_enabled = 1;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
-char *default_rrdpush_send_charts_matching = NULL;
+char *default_rrdpush_send_charts_matching = "*";
 bool default_rrdpush_enable_replication = true;
 time_t default_rrdpush_seconds_to_replicate = 86400;
 time_t default_rrdpush_replication_step = 600;
-#ifdef ENABLE_HTTPS
 char *netdata_ssl_ca_path = NULL;
 char *netdata_ssl_ca_file = NULL;
-#endif
 
 static void load_stream_conf() {
     errno_clear();
-    char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
+    char *filename = filename_from_path_entry_strdupz(netdata_configured_user_config_dir, "stream.conf");
     if(!appconfig_load(&stream_config, filename, 0, NULL)) {
         nd_log_daemon(NDLP_NOTICE, "CONFIG: cannot load user config '%s'. Will try stock config.", filename);
         freez(filename);
 
-        filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
+        filename = filename_from_path_entry_strdupz(netdata_configured_stock_config_dir, "stream.conf");
         if(!appconfig_load(&stream_config, filename, 0, NULL))
             nd_log_daemon(NDLP_NOTICE, "CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
@@ -100,7 +98,7 @@ int rrdpush_init() {
     default_rrdpush_enabled     = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
-    default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
+    default_rrdpush_send_charts_matching = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", default_rrdpush_send_charts_matching);
 
     default_rrdpush_enable_replication = config_get_boolean(CONFIG_SECTION_DB, "enable replication", default_rrdpush_enable_replication);
     default_rrdpush_seconds_to_replicate = config_get_number(CONFIG_SECTION_DB, "seconds to replicate", default_rrdpush_seconds_to_replicate);
@@ -132,7 +130,6 @@ int rrdpush_init() {
         default_rrdpush_enabled = 0;
     }
 
-#ifdef ENABLE_HTTPS
     netdata_ssl_validate_certificate_sender = !appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
 
     if(!netdata_ssl_validate_certificate_sender)
@@ -140,7 +137,6 @@ int rrdpush_init() {
 
     netdata_ssl_ca_path = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", NULL);
     netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", NULL);
-#endif
 
     return default_rrdpush_enabled;
 }
@@ -172,12 +168,31 @@ static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
             else
                 rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
         }
-        else if(simple_pattern_matches_string(host->rrdpush_send_charts_matching, st->id) ||
-            simple_pattern_matches_string(host->rrdpush_send_charts_matching, st->name))
+        else {
+            int negative = 0, positive = 0;
+            SIMPLE_PATTERN_RESULT r;
 
-            rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
-        else
-            rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
+            r = simple_pattern_matches_string_extract(host->rrdpush.send.charts_matching, st->context, NULL, 0);
+            if(r == SP_MATCHED_POSITIVE) positive++;
+            else if(r == SP_MATCHED_NEGATIVE) negative++;
+
+            if(!negative) {
+                r = simple_pattern_matches_string_extract(host->rrdpush.send.charts_matching, st->name, NULL, 0);
+                if (r == SP_MATCHED_POSITIVE) positive++;
+                else if (r == SP_MATCHED_NEGATIVE) negative++;
+            }
+
+            if(!negative) {
+                r = simple_pattern_matches_string_extract(host->rrdpush.send.charts_matching, st->id, NULL, 0);
+                if (r == SP_MATCHED_POSITIVE) positive++;
+                else if (r == SP_MATCHED_NEGATIVE) negative++;
+            }
+
+            if(!negative && positive)
+                rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
+            else
+                rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
+        }
 
         // get the flags again, to know how to respond
         flags = rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND|RRDSET_FLAG_UPSTREAM_IGNORE);
@@ -578,24 +593,6 @@ void rrdpush_send_global_functions(RRDHOST *host) {
     sender_thread_buffer_free();
 }
 
-void rrdpush_send_claimed_id(RRDHOST *host) {
-    if(!stream_has_capability(host->sender, STREAM_CAP_CLAIM))
-        return;
-
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)))
-        return;
-    
-    BUFFER *wb = sender_start(host->sender);
-    rrdhost_aclk_state_lock(host);
-
-    buffer_sprintf(wb, "CLAIMED_ID %s %s\n", host->machine_guid, (host->aclk_state.claimed_id ? host->aclk_state.claimed_id : "NULL") );
-
-    rrdhost_aclk_state_unlock(host);
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-
-    sender_thread_buffer_free();
-}
-
 int connect_to_one_of_destinations(
     RRDHOST *host,
     int default_port,
@@ -677,7 +674,7 @@ bool destinations_init_add_one(char *entry, void *data) {
 }
 
 void rrdpush_destinations_init(RRDHOST *host) {
-    if(!host->rrdpush_send_destination) return;
+    if(!host->rrdpush.send.destination) return;
 
     rrdpush_destinations_free(host);
 
@@ -687,7 +684,7 @@ void rrdpush_destinations_init(RRDHOST *host) {
         .count = 0,
     };
 
-    foreach_entry_in_connection_string(host->rrdpush_send_destination, destinations_init_add_one, &t);
+    foreach_entry_in_connection_string(host->rrdpush.send.destination, destinations_init_add_one, &t);
 
     host->destinations = t.list;
 }
@@ -777,12 +774,10 @@ int rrdpush_receiver_too_busy_now(struct web_client *w) {
 static void rrdpush_receiver_takeover_web_connection(struct web_client *w, struct receiver_state *rpt) {
     rpt->fd                = w->ifd;
 
-#ifdef ENABLE_HTTPS
     rpt->ssl.conn          = w->ssl.conn;
     rpt->ssl.state         = w->ssl.state;
 
     w->ssl = NETDATA_SSL_UNSET_CONNECTION;
-#endif
 
     WEB_CLIENT_IS_DEAD(w);
 
@@ -825,9 +820,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
 
-#ifdef ENABLE_HTTPS
     rpt->ssl = NETDATA_SSL_UNSET_CONNECTION;
-#endif
 
     rpt->config.update_every = default_rrd_update_every;
 
@@ -1083,9 +1076,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
 
         if(send_timeout(
-#ifdef ENABLE_HTTPS
                 &rpt->ssl,
-#endif
                 rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 
             nd_log_daemon(NDLP_ERR, "STREAM '%s' [receive from [%s]:%s]: "
@@ -1149,7 +1140,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             host = NULL;
 
         if (host) {
-            netdata_mutex_lock(&host->receiver_lock);
+            spinlock_lock(&host->receiver_lock);
             if (host->receiver) {
                 age = now_monotonic_sec() - host->receiver->last_msg_t;
 
@@ -1158,7 +1149,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
                 else
                     receiver_stale = true;
             }
-            netdata_mutex_unlock(&host->receiver_lock);
+            spinlock_unlock(&host->receiver_lock);
         }
         rrd_rdunlock();
 
@@ -1294,6 +1285,7 @@ static struct {
     {STREAM_CAP_IEEE754,      "IEEE754" },
     {STREAM_CAP_DATA_WITH_ML, "ML" },
     {STREAM_CAP_DYNCFG,       "DYNCFG" },
+    {STREAM_CAP_NODE_ID,       "NODEID" },
     {STREAM_CAP_SLOTS,        "SLOTS" },
     {STREAM_CAP_ZSTD,         "ZSTD" },
     {STREAM_CAP_GZIP,         "GZIP" },
@@ -1352,12 +1344,12 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
         // we have DATA_WITH_ML capability
         // we should remove the DATA_WITH_ML capability if our database does not have anomaly info
         // this can happen under these conditions: 1. we don't run ML, and 2. we don't receive ML
-        netdata_mutex_lock(&host->receiver_lock);
+        spinlock_lock(&host->receiver_lock);
 
         if(!ml_host_running(host) && !stream_has_capability(host->receiver, STREAM_CAP_DATA_WITH_ML))
             disabled_capabilities |= STREAM_CAP_DATA_WITH_ML;
 
-        netdata_mutex_unlock(&host->receiver_lock);
+        spinlock_unlock(&host->receiver_lock);
 
         if(host->sender)
             disabled_capabilities |= host->sender->disabled_capabilities;
@@ -1378,6 +1370,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_PROGRESS |
             STREAM_CAP_COMPRESSIONS_AVAILABLE |
             STREAM_CAP_DYNCFG |
+            STREAM_CAP_NODE_ID |
             STREAM_CAP_IEEE754 |
             STREAM_CAP_DATA_WITH_ML |
             0) & ~disabled_capabilities;

@@ -1188,7 +1188,7 @@ struct rrdhost {
     struct rrdhost_system_info *system_info;        // information collected from the host environment
 
     // ------------------------------------------------------------------------
-    // streaming of data to remote hosts - rrdpush sender
+    // streaming of data to remote hosts - rrdpush
 
     struct {
         struct {
@@ -1204,6 +1204,10 @@ struct rrdhost {
 
                 uint32_t last_used;                 // the last slot we used for a chart (increments only)
             } pluginsd_chart_slots;
+
+            char *destination;                      // where to send metrics to
+            char *api_key;                          // the api key at the receiving netdata
+            SIMPLE_PATTERN *charts_matching;        // pattern to match the charts to be sent
         } send;
 
         struct {
@@ -1215,11 +1219,8 @@ struct rrdhost {
         } receive;
     } rrdpush;
 
-    char *rrdpush_send_destination;                 // where to send metrics to
-    char *rrdpush_send_api_key;                     // the api key at the receiving netdata
     struct rrdpush_destinations *destinations;      // a linked list of possible destinations
     struct rrdpush_destinations *destination;       // the current destination from the above list
-    SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
     int32_t rrdpush_last_receiver_exit_reason;
     time_t rrdpush_seconds_to_replicate;            // max time we want to replicate from the child
@@ -1247,7 +1248,7 @@ struct rrdhost {
     int connected_children_count;                   // number of senders currently streaming
 
     struct receiver_state *receiver;
-    netdata_mutex_t receiver_lock;
+    SPINLOCK receiver_lock;
     int trigger_chart_obsoletion_check;             // set when child connects, will instruct parent to
                                                     // trigger a check for obsoleted charts since previous connect
 
@@ -1307,10 +1308,12 @@ struct rrdhost {
     } retention;
 
     nd_uuid_t  host_uuid;                              // Global GUID for this host
-    nd_uuid_t  *node_id;                               // Cloud node_id
+    nd_uuid_t  node_id;                                // Cloud node_id
 
-    netdata_mutex_t aclk_state_lock;
-    aclk_rrdhost_state aclk_state;
+    struct {
+        ND_UUID claim_id_of_origin;
+        ND_UUID claim_id_of_parent;
+    } aclk;
 
     struct rrdhost *next;
     struct rrdhost *prev;
@@ -1324,9 +1327,6 @@ extern RRDHOST *localhost;
 #define rrdhost_abbrev_timezone(host) string2str((host)->abbrev_timezone)
 #define rrdhost_program_name(host) string2str((host)->program_name)
 #define rrdhost_program_version(host) string2str((host)->program_version)
-
-#define rrdhost_aclk_state_lock(host) netdata_mutex_lock(&((host)->aclk_state_lock))
-#define rrdhost_aclk_state_unlock(host) netdata_mutex_unlock(&((host)->aclk_state_lock))
 
 #define rrdhost_receiver_replicating_charts(host) (__atomic_load_n(&((host)->rrdpush_receiver_replicating_charts), __ATOMIC_RELAXED))
 #define rrdhost_receiver_replicating_charts_plus_one(host) (__atomic_add_fetch(&((host)->rrdpush_receiver_replicating_charts), 1, __ATOMIC_RELAXED))

@@ -930,24 +930,18 @@ jobs:
         id: load
         if: needs.file-check.outputs.run == 'true'
         run: docker load --input image.tar
-      - name: netdata-installer on ${{ matrix.distro }}, disable cloud
-        id: build-no-cloud
-        if: needs.file-check.outputs.run == 'true'
-        run: |
-          docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
-              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud --one-time-build ${{ needs.file-check.outputs.skip-go }}'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud
         id: build-cloud
         if: needs.file-check.outputs.run == 'true'
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
-              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build ${{ needs.file-check.outputs.skip-go }}'
+              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --one-time-build ${{ needs.file-check.outputs.skip-go }}'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
         id: build-no-jsonc
         if: matrix.jsonc_removal != '' && needs.file-check.outputs.run == 'true'
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
-              /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build ${{ needs.file-check.outputs.skip-go }}'
+              /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --one-time-build ${{ needs.file-check.outputs.skip-go }}'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -1015,7 +1009,7 @@ jobs:
         id: build-source
         if: needs.file-check.outputs.run == 'true'
         run: |
-          sudo bash ./netdata-installer.sh --install-no-prefix /usr/local/netdata --dont-wait --dont-start-it --require-cloud --one-time-build
+          sudo bash ./netdata-installer.sh --install-no-prefix /usr/local/netdata --dont-wait --dont-start-it --one-time-build
       - name: Test Agent start up
         id: test-agent
         if: needs.file-check.outputs.run == 'true'

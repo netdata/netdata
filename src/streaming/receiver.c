@@ -19,9 +19,7 @@ void receiver_state_free(struct receiver_state *rpt) {
     freez(rpt->program_name);
     freez(rpt->program_version);
 
-#ifdef ENABLE_HTTPS
     netdata_ssl_close(&rpt->ssl);
-#endif
 
     if(rpt->fd != -1) {
         internal_error(true, "closing socket...");
@@ -73,9 +71,7 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
         errno_clear();
 
         switch(wait_on_socket_or_cancel_with_timeout(
-#ifdef ENABLE_HTTPS
         &r->ssl,
-#endif
         r->fd, 0, POLLIN, NULL))
         {
             case 0: // data are waiting
@@ -95,14 +91,10 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
                 return -2;
         }
 
-#ifdef ENABLE_HTTPS
         if (SSL_connection(&r->ssl))
             bytes_read = netdata_ssl_read(&r->ssl, buffer, size);
         else
             bytes_read = read(r->fd, buffer, size);
-#else
-        bytes_read = read(r->fd, buffer, size);
-#endif
 
     } while(bytes_read < 0 && errno == EINTR && tries--);
 
@@ -327,7 +319,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
                 .capabilities = rpt->capabilities,
         };
 
-        parser = parser_init(&user, NULL, NULL, fd, PARSER_INPUT_SPLIT, ssl);
+        parser = parser_init(&user, fd, fd, PARSER_INPUT_SPLIT, ssl);
     }
 
 #ifdef ENABLE_H2O
@@ -337,10 +329,6 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
 
     rrd_collector_started();
-
-    // this keeps the parser with its current value
-    // so, parser needs to be allocated before pushing it
-    CLEANUP_FUNCTION_REGISTER(pluginsd_process_thread_cleanup) parser_ptr = parser;
 
     bool compressed_connection = rrdpush_decompression_initialize(rpt);
     buffered_reader_init(&rpt->reader);
@@ -367,6 +355,9 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     };
     ND_LOG_STACK_PUSH(lgs);
 
+    __atomic_store_n(&rpt->parser, parser, __ATOMIC_RELAXED);
+    rrdpush_receiver_send_node_and_claim_id_to_child(rpt->host);
+
     while(!receiver_should_stop(rpt)) {
 
         if(!buffered_reader_next_line(&rpt->reader, buffer)) {
@@ -391,6 +382,13 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         buffer->len = 0;
         buffer->buffer[0] = '\0';
     }
+
+    // make sure send_to_plugin() will not write any data to the socket
+    spinlock_lock(&parser->writer.spinlock);
+    parser->fd_output = -1;
+    parser->ssl_output = NULL;
+    spinlock_unlock(&parser->writer.spinlock);
+
     result = parser->user.data_collections_count;
     return result;
 }
@@ -409,7 +407,7 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     bool signal_rrdcontext = false;
     bool set_this = false;
 
-    netdata_mutex_lock(&host->receiver_lock);
+    spinlock_lock(&host->receiver_lock);
 
     if (!host->receiver) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
@@ -452,7 +450,7 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         set_this = true;
     }
 
-    netdata_mutex_unlock(&host->receiver_lock);
+    spinlock_unlock(&host->receiver_lock);
 
     if(signal_rrdcontext)
         rrdcontext_host_child_connected(host);
@@ -464,12 +462,15 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
     RRDHOST *host = rpt->host;
     if(host) {
         bool signal_rrdcontext = false;
-        netdata_mutex_lock(&host->receiver_lock);
+        spinlock_lock(&host->receiver_lock);
 
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
         if(host->receiver == rpt) {
             __atomic_sub_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
             rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+
+            pluginsd_process_cleanup(rpt->parser);
+            __atomic_store_n(&rpt->parser, NULL, __ATOMIC_RELAXED);
 
             host->trigger_chart_obsoletion_check = 0;
             host->child_connect_time = 0;
@@ -490,7 +491,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
                 rrdcalc_child_disconnected(host);
         }
 
-        netdata_mutex_unlock(&host->receiver_lock);
+        spinlock_unlock(&host->receiver_lock);
 
         if(signal_rrdcontext)
             rrdcontext_host_child_disconnected(host);
@@ -502,7 +503,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
     bool ret = false;
 
-    netdata_mutex_lock(&host->receiver_lock);
+    spinlock_lock(&host->receiver_lock);
 
     if(host->receiver) {
         if(!host->receiver->exit.shutdown) {
@@ -516,12 +517,12 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
 
     int count = 2000;
     while (host->receiver && count-- > 0) {
-        netdata_mutex_unlock(&host->receiver_lock);
+        spinlock_unlock(&host->receiver_lock);
 
         // let the lock for the receiver thread to exit
         sleep_usec(1 * USEC_PER_MS);
 
-        netdata_mutex_lock(&host->receiver_lock);
+        spinlock_lock(&host->receiver_lock);
     }
 
     if(host->receiver)
@@ -533,16 +534,14 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
     else
         ret = true;
 
-    netdata_mutex_unlock(&host->receiver_lock);
+    spinlock_unlock(&host->receiver_lock);
 
     return ret;
 }
 
 static void rrdpush_send_error_on_taken_over_connection(struct receiver_state *rpt, const char *msg) {
     (void) send_timeout(
-#ifdef ENABLE_HTTPS
             &rpt->ssl,
-#endif
             rpt->fd,
             (char *)msg,
             strlen(msg),
@@ -732,11 +731,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
          , rpt->host->rrd_history_entries
          , rrd_memory_mode_name(rpt->host->rrd_memory_mode)
          , (rpt->config.health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((rpt->config.health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
-#ifdef ENABLE_HTTPS
          , (rpt->ssl.conn != NULL) ? " SSL," : ""
-#else
-         , ""
-#endif
     );
 #endif // NETDATA_INTERNAL_CHECKS
 
@@ -786,9 +781,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
         } else {
 #endif
             ssize_t bytes_sent = send_timeout(
-#ifdef ENABLE_HTTPS
                     &rpt->ssl,
-#endif
                     rpt->fd, initial_response, strlen(initial_response), 0, 60);
 
             if(bytes_sent != (ssize_t)strlen(initial_response)) {
@@ -830,12 +823,9 @@ static void rrdpush_receive(struct receiver_state *rpt)
             rpt, "connected and ready to receive data",
             RRDPUSH_STATUS_CONNECTED, NDLP_INFO);
 
-#ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
     // new child connected
-    if (netdata_cloud_enabled)
-        aclk_host_state_update(rpt->host, 1, 1);
-#endif
+    aclk_host_state_update(rpt->host, 1, 1);
 
     rrdhost_set_is_parent_label();
 
@@ -845,14 +835,10 @@ static void rrdpush_receive(struct receiver_state *rpt)
     // let it reconnect to parent immediately
     rrdpush_reset_destinations_postpone_time(rpt->host);
 
-    size_t count = streaming_parser(rpt, &cd, rpt->fd,
-#ifdef ENABLE_HTTPS
-                                    (rpt->ssl.conn) ? &rpt->ssl : NULL
-#else
-                                    NULL
-#endif
-                                    );
+    // receive data
+    size_t count = streaming_parser(rpt, &cd, rpt->fd, (rpt->ssl.conn) ? &rpt->ssl : NULL);
 
+    // the parser stopped
     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
 
     {
@@ -863,12 +849,9 @@ static void rrdpush_receive(struct receiver_state *rpt)
                 RRDPUSH_STATUS_DISCONNECTED, NDLP_WARNING);
     }
 
-#ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
     // a child disconnected
-    if (netdata_cloud_enabled)
-        aclk_host_state_update(rpt->host, 0, 1);
-#endif
+    aclk_host_state_update(rpt->host, 0, 1);
 
 cleanup:
     ;
@@ -903,11 +886,7 @@ static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
     if(!rpt)
         return false;
 
-#ifdef ENABLE_HTTPS
     buffer_strcat(wb, SSL_connection(&rpt->ssl) ? "https" : "http");
-#else
-    buffer_strcat(wb, "http");
-#endif
     return true;
 }
 

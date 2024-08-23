@@ -88,7 +88,6 @@ system/systemd/netdata-updater.service
 !system/systemd/netdata.service.*.in
 
 src/health/notifications/alarm-notify.sh
-claim/netdata-claim.sh
 src/collectors/cgroups.plugin/cgroup-name.sh
 src/collectors/cgroups.plugin/cgroup-network-helper.sh
 src/collectors/tc.plugin/tc-qos-helper.sh

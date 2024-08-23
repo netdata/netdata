@@ -388,8 +388,6 @@ happened, on your systems and applications.
 	%else
 	-DENABLE_EXPORTER_MONGODB=Off \
 	%endif
-	-DENABLE_ACLK=On \
-	-DENABLE_CLOUD=On \
 	-DENABLE_DBENGINE=On \
 	-DENABLE_H2O=On \
 	-DENABLE_PLUGIN_APPS=On \

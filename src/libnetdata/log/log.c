@@ -27,12 +27,8 @@
 #endif
 
 const char *program_name = "";
-
 uint64_t debug_flags = 0;
-
-#ifdef ENABLE_ACLK
 int aclklog_enabled = 0;
-#endif
 
 // ----------------------------------------------------------------------------
 
@@ -467,7 +463,7 @@ static struct {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                         .method = NDLM_DEFAULT,
                         .format = NDLF_LOGFMT,
-                        .filename = LOG_DIR "/collectors.log",
+                        .filename = LOG_DIR "/collector.log",
                         .fd = STDERR_FILENO,
                         .fp = NULL,
                         .min_priority = NDLP_INFO,
@@ -518,7 +514,7 @@ __attribute__((constructor)) void initialize_invocation_id(void) {
 
     char uuid[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(nd_log.invocation_id, uuid);
-    setenv("NETDATA_INVOCATION_ID", uuid, 1);
+    nd_setenv("NETDATA_INVOCATION_ID", uuid, 1);
 }
 
 int nd_log_health_fd(void) {
@@ -658,9 +654,9 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
         else
             method = NDLM_STDERR;
 
-        setenv("NETDATA_LOG_METHOD", nd_log_id2method(method), 1);
-        setenv("NETDATA_LOG_FORMAT", nd_log_id2format(format), 1);
-        setenv("NETDATA_LOG_LEVEL", nd_log_id2priority(priority), 1);
+        nd_setenv("NETDATA_LOG_METHOD", nd_log_id2method(method), 1);
+        nd_setenv("NETDATA_LOG_FORMAT", nd_log_id2format(format), 1);
+        nd_setenv("NETDATA_LOG_LEVEL", nd_log_id2priority(priority), 1);
     }
 }
 
@@ -680,7 +676,7 @@ void nd_log_set_priority_level(const char *setting) {
     }
 
     // the right one
-    setenv("NETDATA_LOG_LEVEL", nd_log_id2priority(priority), 1);
+    nd_setenv("NETDATA_LOG_LEVEL", nd_log_id2priority(priority), 1);
 }
 
 void nd_log_set_facility(const char *facility) {
@@ -688,7 +684,7 @@ void nd_log_set_facility(const char *facility) {
         facility = "daemon";
 
     nd_log.syslog.facility = nd_log_facility2id(facility);
-    setenv("NETDATA_SYSLOG_FACILITY", nd_log_id2facility(nd_log.syslog.facility), 1);
+    nd_setenv("NETDATA_SYSLOG_FACILITY", nd_log_id2facility(nd_log.syslog.facility), 1);
 }
 
 void nd_log_set_flood_protection(size_t logs, time_t period) {
@@ -702,9 +698,9 @@ void nd_log_set_flood_protection(size_t logs, time_t period) {
 
     char buf[100];
     snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t )period);
-    setenv("NETDATA_ERRORS_THROTTLE_PERIOD", buf, 1);
+    nd_setenv("NETDATA_ERRORS_THROTTLE_PERIOD", buf, 1);
     snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t )logs);
-    setenv("NETDATA_ERRORS_PER_PERIOD", buf, 1);
+    nd_setenv("NETDATA_ERRORS_PER_PERIOD", buf, 1);
 }
 
 static bool nd_log_journal_systemd_init(void) {
@@ -719,7 +715,7 @@ static bool nd_log_journal_systemd_init(void) {
 
 static void nd_log_journal_direct_set_env(void) {
     if(nd_log.sources[NDLS_COLLECTORS].method == NDLM_JOURNAL)
-        setenv("NETDATA_SYSTEMD_JOURNAL_PATH", nd_log.journal_direct.filename, 1);
+        nd_setenv("NETDATA_SYSTEMD_JOURNAL_PATH", nd_log.journal_direct.filename, 1);
 }
 
 static bool nd_log_journal_direct_init(const char *path) {
@@ -776,8 +772,8 @@ static void nd_log_syslog_init() {
 void nd_log_initialize_for_external_plugins(const char *name) {
     // if we don't run under Netdata, log to stderr,
     // otherwise, use the logging method Netdata wants us to use.
-    setenv("NETDATA_LOG_METHOD", "stderr", 0);
-    setenv("NETDATA_LOG_FORMAT", "logfmt", 0);
+    nd_setenv("NETDATA_LOG_METHOD", "stderr", 0);
+    nd_setenv("NETDATA_LOG_FORMAT", "logfmt", 0);
 
     nd_log.overwrite_process_source = NDLS_COLLECTORS;
     program_name = name;

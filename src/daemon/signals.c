@@ -2,12 +2,6 @@
 
 #include "common.h"
 
-/*
- * IMPORTANT: Libuv uv_spawn() uses SIGCHLD internally:
- * https://github.com/libuv/libuv/blob/cc51217a317e96510fbb284721d5e6bc2af31e33/src/unix/process.c#L485
- * Extreme care is needed when mixing and matching POSIX and libuv.
- */
-
 typedef enum signal_action {
     NETDATA_SIGNAL_END_OF_LIST,
     NETDATA_SIGNAL_IGNORE,
@@ -56,24 +50,33 @@ static void signal_handler(int signo) {
     }
 }
 
-void signals_block(void) {
+// Mask all signals, to ensure they will only be unmasked at the threads that can handle them.
+// This means that all third party libraries (including libuv) cannot use signals anymore.
+// The signals they are interested must be unblocked at their corresponding event loops.
+static void posix_mask_all_signals(void) {
     sigset_t sigset;
     sigfillset(&sigset);
 
-    if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) == -1)
-        netdata_log_error("SIGNAL: Could not block signals for threads");
+    if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) != 0)
+        netdata_log_error("SIGNAL: cannot mask all signals");
 }
 
-void signals_unblock(void) {
+// Unmask all signals the netdata main signal handler uses.
+// All other signals remain masked.
+static void posix_unmask_my_signals(void) {
     sigset_t sigset;
-    sigfillset(&sigset);
+    sigemptyset(&sigset);
 
-    if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) == -1) {
-        netdata_log_error("SIGNAL: Could not unblock signals for threads");
-    }
+    for (int i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST; i++)
+        sigaddset(&sigset, signals_waiting[i].signo);
+
+    if (pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) != 0)
+        netdata_log_error("SIGNAL: cannot unmask netdata signals");
 }
 
-void signals_init(void) {
+void nd_initialize_signals(void) {
+    posix_mask_all_signals(); // block all signals for all threads
+
     // Catch signals which we want to use
     struct sigaction sa;
     sa.sa_flags = 0;
@@ -97,22 +100,10 @@ void signals_init(void) {
     }
 }
 
-void signals_reset(void) {
-    struct sigaction sa;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_handler = SIG_DFL;
-    sa.sa_flags = 0;
+void nd_process_signals(void) {
+    posix_unmask_my_signals();
 
-    int i;
-    for (i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST; i++) {
-        if(sigaction(signals_waiting[i].signo, &sa, NULL) == -1)
-            netdata_log_error("SIGNAL: Failed to reset signal handler for: %s", signals_waiting[i].name);
-    }
-}
-
-void signals_handle(void) {
     while(1) {
-
         // pause()  causes  the calling process (or thread) to sleep until a signal
         // is delivered that either terminates the process or causes the invocation
         // of a signal-catching function.

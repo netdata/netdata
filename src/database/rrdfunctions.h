@@ -7,6 +7,7 @@
 #include "libnetdata/libnetdata.h"
 
 #define RRDFUNCTIONS_PRIORITY_DEFAULT 100
+#define RRDFUNCTIONS_TAG_HIDDEN "hidden"
 
 #define RRDFUNCTIONS_TIMEOUT_EXTENSION_UT (1 * USEC_PER_SEC)
 
@@ -79,9 +80,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                      rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                     BUFFER *payload, const char *source);
-
-int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
+                     BUFFER *payload, const char *source, bool hidden);
 
 bool rrd_function_available(RRDHOST *host, const char *function);
 
@@ -90,7 +89,5 @@ bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, rrd_
 #include "rrdfunctions-inline.h"
 #include "rrdfunctions-inflight.h"
 #include "rrdfunctions-exporters.h"
-#include "rrdfunctions-streaming.h"
-#include "rrdfunctions-progress.h"
 
 #endif // NETDATA_RRDFUNCTIONS_H

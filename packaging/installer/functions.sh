@@ -341,8 +341,6 @@ prepare_cmake_options() {
   enable_feature PLUGIN_NETWORK_VIEWER "${IS_LINUX}"
   enable_feature PLUGIN_EBPF "${ENABLE_EBPF:-0}"
 
-  enable_feature ACLK "${ENABLE_CLOUD:-1}"
-  enable_feature CLOUD "${ENABLE_CLOUD:-1}"
   enable_feature BUNDLED_JSONC "${NETDATA_BUILD_JSON_C:-0}"
   enable_feature DBENGINE "${ENABLE_DBENGINE:-1}"
   enable_feature H2O "${ENABLE_H2O:-1}"

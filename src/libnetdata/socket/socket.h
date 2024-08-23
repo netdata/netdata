@@ -39,15 +39,9 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
 int connect_to_one_of_urls(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
 
 
-#ifdef ENABLE_HTTPS
 ssize_t recv_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
 ssize_t send_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
 int wait_on_socket_or_cancel_with_timeout(NETDATA_SSL *ssl, int fd, int timeout_ms, short int poll_events, short int *revents);
-#else
-ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
-ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
-int wait_on_socket_or_cancel_with_timeout(int fd, int timeout_ms, short int poll_events, short int *revents);
-#endif
 
 bool fd_is_socket(int fd);
 bool sock_has_output_error(int fd);

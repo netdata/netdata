@@ -24,6 +24,7 @@ static h2o_accept_ctx_t accept_ctx;
 #define NBUF_INITIAL_SIZE_RESP (4096)
 #define API_V1_PREFIX "/api/v1/"
 #define API_V2_PREFIX "/api/v2/"
+#define API_V3_PREFIX "/api/v3/"
 #define HOST_SELECT_PREFIX "/host/"
 
 #define HTTPD_CONFIG_SECTION "httpd"
@@ -182,13 +183,17 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
             norm_path.len--;
     }
 
-    unsigned int api_version = 2;
-    size_t api_loc = h2o_strstr(norm_path.base, norm_path.len, H2O_STRLIT(API_V2_PREFIX));
+    unsigned int api_version = 3;
+    size_t api_loc = h2o_strstr(norm_path.base, norm_path.len, H2O_STRLIT(API_V3_PREFIX));
     if (api_loc == SIZE_MAX) {
-        api_version = 1;
-        api_loc = h2o_strstr(norm_path.base, norm_path.len, H2O_STRLIT(API_V1_PREFIX));
-        if (api_loc == SIZE_MAX)
-            return 1;
+        api_version = 2;
+        api_loc = h2o_strstr(norm_path.base, norm_path.len, H2O_STRLIT(API_V2_PREFIX));
+        if (api_loc == SIZE_MAX) {
+            api_version = 1;
+            api_loc = h2o_strstr(norm_path.base, norm_path.len, H2O_STRLIT(API_V1_PREFIX));
+            if (api_loc == SIZE_MAX)
+                return 1;
+        }
     }
 
     // API_V1_PREFIX and API_V2_PREFIX are the same length
@@ -235,7 +240,9 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
     }
 
 //inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
-    if (api_version == 2)
+    if (api_version == 3)
+        web_client_api_request_v3(*host, &w, path_unescaped);
+    else if (api_version == 2)
         web_client_api_request_v2(*host, &w, path_unescaped);
     else
         web_client_api_request_v1(*host, &w, path_unescaped);
@@ -314,7 +321,7 @@ static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
         return -1;
 
     BUFFER *buf = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
-    config_generate(buf, 0);
+    netdata_conf_generate(buf, 0);
 
     void *managed = h2o_mem_alloc_shared(&req->pool, buf->len, NULL);
     memcpy(managed, buf->buffer, buf->len);

@@ -78,7 +78,6 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
 
-#ifdef ENABLE_ACLK
     "CREATE TABLE IF NOT EXISTS alert_queue "
     " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, status INT, date_scheduled INT, "
     " UNIQUE(host_id, health_log_id, alarm_id))",
@@ -88,7 +87,6 @@ const char *database_config[] = {
 
     "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, "
     "unique_id INT, date_created INT,  UNIQUE(host_id, health_log_id))",
-#endif
 
     NULL
 };
@@ -257,26 +255,20 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
         return;
 
     if (unlikely(!node_id)) {
-        freez(host->node_id);
-        __atomic_store_n(&host->node_id, NULL, __ATOMIC_RELAXED);
+        uuid_clear(host->node_id);
         return;
     }
 
     struct aclk_sync_cfg_t  *wc = host->aclk_config;
 
-    if (unlikely(!host->node_id)) {
-        nd_uuid_t *t = mallocz(sizeof(*host->node_id));
-        uuid_copy(*t, *node_id);
-        __atomic_store_n(&host->node_id, t, __ATOMIC_RELAXED);
-    }
-    else {
-        uuid_copy(*(host->node_id), *node_id);
-    }
+    uuid_copy(host->node_id, *node_id);
 
     if (unlikely(!wc))
         create_aclk_config(host, &host->host_uuid, node_id);
     else
         uuid_unparse_lower(*node_id, wc->node_id);
+
+    rrdpush_receiver_send_node_and_claim_id_to_child(host);
 }
 
 #define SQL_SET_HOST_LABEL                                                                                             \
@@ -315,7 +307,7 @@ done:
 
 #define SQL_UPDATE_NODE_ID  "UPDATE node_instance SET node_id = @node_id WHERE host_id = @host_id"
 
-int update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
+int sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
 {
     sqlite3_stmt *res = NULL;
     RRDHOST *host = NULL;
@@ -1479,9 +1471,7 @@ static void cleanup_health_log(struct metadata_wc *wc)
 
     (void) db_execute(db_meta,"DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)");
     (void) db_execute(db_meta,"DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
-#ifdef ENABLE_ACLK
     (void) db_execute(db_meta,"DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
-#endif
 }
 
 //
@@ -1631,9 +1621,7 @@ static void restore_host_context(void *arg)
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
 
-#ifdef ENABLE_ACLK
     aclk_queue_node_info(host, false);
-#endif
 
     nd_log(
         NDLS_DAEMON,
@@ -1952,10 +1940,10 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_CLAIMID))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_CLAIMID);
-            nd_uuid_t uuid;
             int rc;
-            if (likely(host->aclk_state.claimed_id && !uuid_parse(host->aclk_state.claimed_id, uuid)))
-                rc = store_claim_id(&host->host_uuid, &uuid);
+            ND_UUID uuid = claim_id_get_uuid();
+            if(!UUIDiszero(uuid))
+                rc = store_claim_id(&host->host_uuid, &uuid.uuid);
             else
                 rc = store_claim_id(&host->host_uuid, NULL);
 

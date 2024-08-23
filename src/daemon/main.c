@@ -6,6 +6,7 @@
 #include "static_threads.h"
 
 #include "database/engine/page_test.h"
+#include <curl/curl.h>
 
 #ifdef OS_WINDOWS
 #include "win_system-info.h"
@@ -480,15 +481,13 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
 
     // unlink the pid
-    if(pidfile[0]) {
+    if(pidfile && *pidfile) {
         if(unlink(pidfile) != 0)
             netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
     }
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);
 
-#ifdef ENABLE_HTTPS
     netdata_ssl_cleanup();
-#endif
     watcher_step_complete(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
 
     (void) unlink(agent_incomplete_shutdown_file);
@@ -496,6 +495,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
     watcher_shutdown_end();
     watcher_thread_stop();
+    curl_global_cleanup();
 
 #ifdef OS_WINDOWS
     return;
@@ -807,8 +807,6 @@ int help(int exitcode) {
             "                           are enabled or not, in JSON format.\n\n"
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
-            "  -W \"claim -token=TOKEN -rooms=ROOM1,ROOM2\"\n"
-            "                           Claim the agent to the workspace rooms pointed to by TOKEN and ROOM*.\n\n"
 #ifdef OS_WINDOWS
             "  -W perflibdump [key]\n"
             "                           Dump the Windows Performance Counters Registry in JSON.\n\n"
@@ -825,7 +823,6 @@ int help(int exitcode) {
     return exitcode;
 }
 
-#ifdef ENABLE_HTTPS
 static void security_init(){
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
@@ -839,7 +836,6 @@ static void security_init(){
 
     netdata_ssl_initialize_openssl();
 }
-#endif
 
 static void log_init(void) {
     nd_log_set_facility(config_get(CONFIG_SECTION_LOGS, "facility", "daemon"));
@@ -881,21 +877,19 @@ static void log_init(void) {
         snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
     nd_log_set_user_settings(NDLS_HEALTH, config_get(CONFIG_SECTION_LOGS, "health", filename));
 
-#ifdef ENABLE_ACLK
     aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
         nd_log_set_user_settings(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
     }
-#endif
+
+    aclk_config_get_query_scope();
 }
 
-char *initialize_lock_directory_path(char *prefix)
-{
+static char *get_varlib_subdir_from_config(const char *prefix, const char *dir) {
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/lock", prefix);
-
-    return config_get(CONFIG_SECTION_DIRECTORIES, "lock", filename);
+    snprintfz(filename, FILENAME_MAX, "%s/%s", prefix, dir);
+    return config_get(CONFIG_SECTION_DIRECTORIES, dir, filename);
 }
 
 static void backwards_compatible_config() {
@@ -1175,7 +1169,8 @@ static void get_netdata_configured_variables()
     netdata_configured_cache_dir        = config_get(CONFIG_SECTION_DIRECTORIES, "cache",        netdata_configured_cache_dir);
     netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_DIRECTORIES, "lib",          netdata_configured_varlib_dir);
 
-    netdata_configured_lock_dir = initialize_lock_directory_path(netdata_configured_varlib_dir);
+    netdata_configured_lock_dir = get_varlib_subdir_from_config(netdata_configured_varlib_dir, "lock");
+    netdata_configured_cloud_dir = get_varlib_subdir_from_config(netdata_configured_varlib_dir, "cloud.d");
 
     {
         pluginsd_initialize_plugin_directories();
@@ -1309,14 +1304,14 @@ static bool load_netdata_conf(char *filename, char overwrite_used, char **user) 
             netdata_log_error("CONFIG: cannot load config file '%s'.", filename);
     }
     else {
-        filename = strdupz_path_subpath(netdata_configured_user_config_dir, "netdata.conf");
+        filename = filename_from_path_entry_strdupz(netdata_configured_user_config_dir, "netdata.conf");
 
         ret = config_load(filename, overwrite_used, NULL);
         if(!ret) {
             netdata_log_info("CONFIG: cannot load user config '%s'. Will try the stock version.", filename);
             freez(filename);
 
-            filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "netdata.conf");
+            filename = filename_from_path_entry_strdupz(netdata_configured_stock_config_dir, "netdata.conf");
             ret = config_load(filename, overwrite_used, NULL);
             if(!ret)
                 netdata_log_info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
@@ -1351,7 +1346,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
         char line[200 + 1];
         // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
         // One time init code, but I'm curious about the warning...
-        while (fgets(line, 200, instance->child_stdout_fp) != NULL) {
+        while (fgets(line, 200, spawn_popen_stdout(instance)) != NULL) {
             char *value=line;
             while (*value && *value != '=') value++;
             if (*value=='=') {
@@ -1366,7 +1361,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
                     netdata_log_error("Unexpected environment variable %s=%s", line, value);
                 } else {
-                    setenv(line, value, 1);
+                    nd_setenv(line, value, 1);
                 }
             }
         }
@@ -1405,6 +1400,7 @@ int unittest_rrdpush_compressions(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
+bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
 int windows_perflib_dump(const char *key);
@@ -1455,6 +1451,8 @@ int netdata_main(int argc, char **argv) {
     // set the name for logging
     program_name = "netdata";
 
+    curl_global_init(CURL_GLOBAL_ALL);
+
     // parse options
     {
         int num_opts = sizeof(option_definitions) / sizeof(struct option_def);
@@ -1483,7 +1481,7 @@ int netdata_main(int argc, char **argv) {
                     }
                     else {
                         netdata_log_debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
-                        load_cloud_conf(1);
+                        cloud_conf_load(1);
                         config_loaded = 1;
                     }
                     break;
@@ -1499,8 +1497,7 @@ int netdata_main(int argc, char **argv) {
                     config_set(CONFIG_SECTION_WEB, "bind to", optarg);
                     break;
                 case 'P':
-                    strncpy(pidfile, optarg, FILENAME_MAX);
-                    pidfile[FILENAME_MAX] = '\0';
+                    pidfile = strdupz(optarg);
                     break;
                 case 'p':
                     config_set(CONFIG_SECTION_GLOBAL, "default port", optarg);
@@ -1522,7 +1519,6 @@ int netdata_main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
-                        char* claim_string = "claim";
 #ifdef ENABLE_DBENGINE
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
@@ -1870,7 +1866,7 @@ int netdata_main(int argc, char **argv) {
                             if(!config_loaded) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
                                 load_netdata_conf(NULL, 0, &user);
-                                load_cloud_conf(1);
+                                cloud_conf_load(1);
                             }
 
                             get_netdata_configured_variables();
@@ -1883,10 +1879,6 @@ int netdata_main(int argc, char **argv) {
                             const char *value = appconfig_get(tmp_config, section, key, def);
                             printf("%s\n", value);
                             return 0;
-                        }
-                        else if(strncmp(optarg, claim_string, strlen(claim_string)) == 0) {
-                            /* will trigger a claiming attempt when the agent is initialized */
-                            claiming_pending_arguments = optarg + strlen(claim_string);
                         }
                         else if(strcmp(optarg, "buildinfo") == 0) {
                             print_build_info();
@@ -1919,12 +1911,12 @@ int netdata_main(int argc, char **argv) {
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
         // the caller may have left open files (lxc-attach has this issue)
-        os_close_all_non_std_open_fds_except(NULL, 0);
+        os_close_all_non_std_open_fds_except(NULL, 0, 0);
     }
 
     if(!config_loaded) {
         load_netdata_conf(NULL, 0, &user);
-        load_cloud_conf(0);
+        cloud_conf_load(0);
     }
 
     // ------------------------------------------------------------------------
@@ -1970,7 +1962,8 @@ int netdata_main(int argc, char **argv) {
 
         // prepare configuration environment variables for the plugins
         get_netdata_configured_variables();
-        set_global_environment();
+        set_environment_for_plugins_and_scripts();
+        analytics_reset();
 
         // work while we are cd into config_dir
         // to allow the plugins refer to their config
@@ -1987,7 +1980,7 @@ int netdata_main(int argc, char **argv) {
         // get the debugging flags from the configuration file
 
         char *flags = config_get(CONFIG_SECTION_LOGS, "debug flags",  "0x0000000000000000");
-        setenv("NETDATA_DEBUG_FLAGS", flags, 1);
+        nd_setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
         debug_flags = strtoull(flags, NULL, 0);
         netdata_log_debug(D_OPTIONS, "Debug flags set to '0x%" PRIX64 "'.", debug_flags);
@@ -2021,8 +2014,6 @@ int netdata_main(int argc, char **argv) {
 
         get_system_timezone();
 
-        bearer_tokens_init();
-
         replication_initialize();
 
         rrd_functions_inflight_init();
@@ -2030,9 +2021,7 @@ int netdata_main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // get the certificate and start security
 
-#ifdef ENABLE_HTTPS
         security_init();
-#endif
 
         // --------------------------------------------------------------------
         // This is the safest place to start the SILENCERS structure
@@ -2053,8 +2042,7 @@ int netdata_main(int argc, char **argv) {
         // this causes the threads to block signals.
 
         delta_startup_time("initialize signals");
-        signals_block();
-        signals_init(); // setup the signals we want to use
+        nd_initialize_signals(); // setup the signals we want to use
 
         // --------------------------------------------------------------------
         // check which threads are enabled and initialize them
@@ -2086,7 +2074,7 @@ int netdata_main(int argc, char **argv) {
                 st->init_routine();
 
             if(st->env_name)
-                setenv(st->env_name, st->enabled?"YES":"NO", 1);
+                nd_setenv(st->env_name, st->enabled?"YES":"NO", 1);
 
             if(st->global_variable)
                 *st->global_variable = (st->enabled) ? true : false;
@@ -2097,7 +2085,7 @@ int netdata_main(int argc, char **argv) {
 
         delta_startup_time("initialize web server");
 
-        web_client_api_v1_init();
+        nd_web_api_init();
         web_server_threading_selection();
 
         if(web_server_mode != WEB_SERVER_MODE_NONE) {
@@ -2165,7 +2153,7 @@ int netdata_main(int argc, char **argv) {
         netdata_configured_home_dir = config_get(CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
     }
 
-    setenv("HOME", netdata_configured_home_dir, 1);
+    nd_setenv("HOME", netdata_configured_home_dir, 1);
 
     dyncfg_init(true);
 
@@ -2178,6 +2166,7 @@ int netdata_main(int argc, char **argv) {
     // initialize internal registry
     delta_startup_time("initialize registry");
     registry_init();
+    cloud_conf_init_after_registry();
     netdata_random_session_id_generate();
 
     // ------------------------------------------------------------------------
@@ -2203,7 +2192,7 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("initialize RRD structures");
 
     if(rrd_init(netdata_configured_hostname, system_info, false)) {
-        set_late_global_environment(system_info);
+        set_late_analytics_variables(system_info);
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
     }
 
@@ -2219,15 +2208,10 @@ int netdata_main(int argc, char **argv) {
     if (fd >= 0)
         close(fd);
 
-
     // ------------------------------------------------------------------------
     // Claim netdata agent to a cloud endpoint
 
     delta_startup_time("collect claiming info");
-
-    if (claiming_pending_arguments)
-         claim_agent(claiming_pending_arguments, false, NULL);
-
     load_claiming_state();
 
     // ------------------------------------------------------------------------
@@ -2242,11 +2226,13 @@ int netdata_main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // spawn the threads
 
+    bearer_tokens_init();
+
     delta_startup_time("start the static threads");
 
     web_server_config_options();
 
-    set_late_global_environment(system_info);
+    set_late_analytics_variables(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
@@ -2295,28 +2281,7 @@ int netdata_main(int argc, char **argv) {
         }
     }
 
-    // ------------------------------------------------------------------------
-    // Report ACLK build failure
-#ifndef ENABLE_ACLK
-    netdata_log_error("This agent doesn't have ACLK.");
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/.aclk_report_sent", netdata_configured_varlib_dir);
-    if (netdata_anonymous_statistics_enabled > 0 && access(filename, F_OK)) { // -1 -> not initialized
-        analytics_statistic_t statistic = { "ACLK_DISABLED", "-", "-" };
-        analytics_statistic_send(&statistic);
-
-        int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 444);
-        if (fd == -1)
-            netdata_log_error("Cannot create file '%s'. Please fix this.", filename);
-        else
-            close(fd);
-    }
-#endif
-
     webrtc_initialize();
-
-    signals_unblock();
-
     return 10;
 }
 
@@ -2327,7 +2292,7 @@ int main(int argc, char *argv[])
     if (rc != 10)
         return rc;
 
-    signals_handle();
+    nd_process_signals();
     return 1;
 }
 #endif

@@ -93,17 +93,15 @@ typedef struct parser_user_object {
     } v2;
 } PARSER_USER_OBJECT;
 
-typedef struct parser {
+struct parser {
     uint8_t version;                // Parser version
     PARSER_REPERTOIRE repertoire;
     uint32_t flags;
-    int fd;                         // Socket
-    FILE *fp_input;                 // Input source e.g. stream
-    FILE *fp_output;                // Stream to send commands to plugin
+    int fd_input;
+    int fd_output;
 
-#ifdef ENABLE_HTTPS
     NETDATA_SSL *ssl_output;
-#endif
+
 #ifdef ENABLE_H2O
     void *h2o_ctx;                  // if set we use h2o_stream functions to send data
 #endif
@@ -129,10 +127,11 @@ typedef struct parser {
     struct {
         SPINLOCK spinlock;
     } writer;
+};
 
-} PARSER;
+typedef struct parser PARSER;
 
-PARSER *parser_init(struct parser_user_object *user, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
+PARSER *parser_init(struct parser_user_object *user, int fd_input, int fd_output, PARSER_INPUT_TYPE flags, void *ssl);
 void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire);
 void parser_destroy(PARSER *working_parser);
 void pluginsd_cleanup_v2(PARSER *parser);

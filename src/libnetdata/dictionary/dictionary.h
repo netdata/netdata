@@ -299,7 +299,8 @@ typedef DICTFE_CONST struct dictionary_foreach {
 
 #define dfe_start_rw(dict, value, mode)                                                             \
         do {                                                                                        \
-            DICTFE value ## _dfe = {};                                                              \
+            /* automatically cleanup DFE, to allow using return from within the loop */             \
+            DICTFE _cleanup_(dictionary_foreach_done) value ## _dfe = {};                           \
             (void)(value); /* needed to avoid warning when looping without using this */            \
             for((value) = dictionary_foreach_start_rw(&value ## _dfe, (dict), (mode));              \
                 (value ## _dfe.item) || (value) ;                                                   \
@@ -308,7 +309,6 @@ typedef DICTFE_CONST struct dictionary_foreach {
 
 #define dfe_done(value)                                                                             \
             }                                                                                       \
-            dictionary_foreach_done(&value ## _dfe);                                                \
         } while(0)
 
 #define dfe_unlock(value) dictionary_foreach_unlock(&value ## _dfe)

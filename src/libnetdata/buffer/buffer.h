@@ -775,7 +775,7 @@ static inline void buffer_json_member_add_quoted_string(BUFFER *wb, const char *
     wb->json.stack[wb->json.depth].count++;
 }
 
-static inline void buffer_json_member_add_uuid(BUFFER *wb, const char *key, nd_uuid_t *value) {
+static inline void buffer_json_member_add_uuid_ptr(BUFFER *wb, const char *key, nd_uuid_t *value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
     buffer_fast_strcat(wb, ":", 1);
@@ -783,6 +783,22 @@ static inline void buffer_json_member_add_uuid(BUFFER *wb, const char *key, nd_u
     if(value && !uuid_is_null(*value)) {
         char uuid[GUID_LEN + 1];
         uuid_unparse_lower(*value, uuid);
+        buffer_json_add_string_value(wb, uuid);
+    }
+    else
+        buffer_json_add_string_value(wb, NULL);
+
+    wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_member_add_uuid(BUFFER *wb, const char *key, nd_uuid_t value) {
+    buffer_print_json_comma_newline_spacing(wb);
+    buffer_print_json_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+
+    if(!uuid_is_null(value)) {
+        char uuid[GUID_LEN + 1];
+        uuid_unparse_lower(value, uuid);
         buffer_json_add_string_value(wb, uuid);
     }
     else

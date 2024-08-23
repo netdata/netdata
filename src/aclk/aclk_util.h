@@ -3,8 +3,6 @@
 #define ACLK_UTIL_H
 
 #include "libnetdata/libnetdata.h"
-
-#ifdef ENABLE_ACLK
 #include "mqtt_websockets/mqtt_wss_client.h"
 
 #define CLOUD_EC_MALFORMED_NODE_ID   1
@@ -114,7 +112,6 @@ unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min, un
 #define aclk_tbeb_reset(x) aclk_tbeb_delay(1, 0, 0, 0)
 
 void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd, enum mqtt_wss_proxy_type *type);
-#endif /* ENABLE_ACLK */
 
 int base64_encode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len);
 

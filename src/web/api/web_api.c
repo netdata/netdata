@@ -2,6 +2,12 @@
 
 #include "web_api.h"
 
+void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key) {
+    buffer_json_member_add_object(wb, key);
+    rrdlabels_to_buffer_json_members(host->rrdlabels, wb);
+    buffer_json_object_close(wb);
+}
+
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
     buffer_no_cacheable(w->response.data);
 
@@ -11,15 +17,16 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
     internal_fatal(!web_client_flags_check_auth(w) && (w->access & HTTP_ACCESS_SIGNED_ID),
                    "signed-in permission is set, but it shouldn't");
 
-    if(!web_client_flags_check_auth(w)) {
-        w->user_role = (netdata_is_protected_by_bearer) ? HTTP_USER_ROLE_NONE : HTTP_USER_ROLE_ANY;
-        w->access = (netdata_is_protected_by_bearer) ? HTTP_ACCESS_NONE : HTTP_ACCESS_ANONYMOUS_DATA;
-    }
-
 #ifdef NETDATA_GOD_MODE
-    web_client_flag_set(w, WEB_CLIENT_FLAG_AUTH_GOD);
-    w->user_role = HTTP_USER_ROLE_ADMIN;
-    w->access = HTTP_ACCESS_ALL;
+    web_client_set_permissions(w, HTTP_ACCESS_ALL, HTTP_USER_ROLE_ADMIN, WEB_CLIENT_FLAG_AUTH_GOD);
+#else
+    if(!web_client_flags_check_auth(w)) {
+        web_client_set_permissions(
+            w,
+            (netdata_is_protected_by_bearer) ? HTTP_ACCESS_NONE : HTTP_ACCESS_ANONYMOUS_DATA,
+            (netdata_is_protected_by_bearer) ? HTTP_USER_ROLE_NONE : HTTP_USER_ROLE_ANY,
+            0);
+    }
 #endif
 
     if(unlikely(!url_path_endpoint || !*url_path_endpoint)) {
@@ -110,150 +117,6 @@ RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
     return options;
 }
 
-int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *url, WEIGHTS_METHOD method, WEIGHTS_FORMAT format, size_t api_version) {
-    if (!netdata_ready)
-        return HTTP_RESP_SERVICE_UNAVAILABLE;
-
-    time_t baseline_after = 0, baseline_before = 0, after = 0, before = 0;
-    size_t points = 0;
-    RRDR_OPTIONS options = 0;
-    RRDR_TIME_GROUPING time_group_method = RRDR_GROUPING_AVERAGE;
-    time_t timeout_ms = 0;
-    size_t tier = 0;
-    const char *time_group_options = NULL, *scope_contexts = NULL, *scope_nodes = NULL, *contexts = NULL, *nodes = NULL,
-        *instances = NULL, *dimensions = NULL, *labels = NULL, *alerts = NULL;
-
-    struct group_by_pass group_by = {
-            .group_by = RRDR_GROUP_BY_NONE,
-            .group_by_label = NULL,
-            .aggregation = RRDR_GROUP_BY_FUNCTION_AVERAGE,
-    };
-
-    while (url) {
-        char *value = strsep_skip_consecutive_separators(&url, "&");
-        if (!value || !*value)
-            continue;
-
-        char *name = strsep_skip_consecutive_separators(&value, "=");
-        if (!name || !*name)
-            continue;
-        if (!value || !*value)
-            continue;
-
-        if (!strcmp(name, "baseline_after"))
-            baseline_after = str2l(value);
-
-        else if (!strcmp(name, "baseline_before"))
-            baseline_before = str2l(value);
-
-        else if (!strcmp(name, "after") || !strcmp(name, "highlight_after"))
-            after = str2l(value);
-
-        else if (!strcmp(name, "before") || !strcmp(name, "highlight_before"))
-            before = str2l(value);
-
-        else if (!strcmp(name, "points") || !strcmp(name, "max_points"))
-            points = str2ul(value);
-
-        else if (!strcmp(name, "timeout"))
-            timeout_ms = str2l(value);
-
-        else if((api_version == 1 && !strcmp(name, "group")) || (api_version >= 2 && !strcmp(name, "time_group")))
-            time_group_method = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
-
-        else if((api_version == 1 && !strcmp(name, "group_options")) || (api_version >= 2 && !strcmp(name, "time_group_options")))
-            time_group_options = value;
-
-        else if(!strcmp(name, "options"))
-            options |= rrdr_options_parse(value);
-
-        else if(!strcmp(name, "method"))
-            method = weights_string_to_method(value);
-
-        else if(api_version == 1 && (!strcmp(name, "context") || !strcmp(name, "contexts")))
-            scope_contexts = value;
-
-        else if(api_version >= 2 && !strcmp(name, "scope_nodes")) scope_nodes = value;
-        else if(api_version >= 2 && !strcmp(name, "scope_contexts")) scope_contexts = value;
-        else if(api_version >= 2 && !strcmp(name, "nodes")) nodes = value;
-        else if(api_version >= 2 && !strcmp(name, "contexts")) contexts = value;
-        else if(api_version >= 2 && !strcmp(name, "instances")) instances = value;
-        else if(api_version >= 2 && !strcmp(name, "dimensions")) dimensions = value;
-        else if(api_version >= 2 && !strcmp(name, "labels")) labels = value;
-        else if(api_version >= 2 && !strcmp(name, "alerts")) alerts = value;
-        else if(api_version >= 2 && (!strcmp(name, "group_by") || !strcmp(name, "group_by[0]"))) {
-            group_by.group_by = group_by_parse(value);
-        }
-        else if(api_version >= 2 && (!strcmp(name, "group_by_label") || !strcmp(name, "group_by_label[0]"))) {
-            group_by.group_by_label = value;
-        }
-        else if(api_version >= 2 && (!strcmp(name, "aggregation") || !strcmp(name, "aggregation[0]"))) {
-            group_by.aggregation = group_by_aggregate_function_parse(value);
-        }
-
-        else if(!strcmp(name, "tier")) {
-            tier = str2ul(value);
-            if(tier < storage_tiers)
-                options |= RRDR_OPTION_SELECTED_TIER;
-            else
-                tier = 0;
-        }
-    }
-
-    if(options == 0)
-        // the user did not set any options
-        options  = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO | RRDR_OPTION_NONZERO;
-    else
-        // the user set some options, add also these
-        options |= RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;
-
-    if(options & RRDR_OPTION_PERCENTAGE)
-        options |= RRDR_OPTION_ABSOLUTE;
-
-    if(options & RRDR_OPTION_DEBUG)
-        options &= ~RRDR_OPTION_MINIFY;
-
-    BUFFER *wb = w->response.data;
-    buffer_flush(wb);
-    wb->content_type = CT_APPLICATION_JSON;
-
-    QUERY_WEIGHTS_REQUEST qwr = {
-            .version = api_version,
-            .host = (api_version == 1) ? NULL : host,
-            .scope_nodes = scope_nodes,
-            .scope_contexts = scope_contexts,
-            .nodes = nodes,
-            .contexts = contexts,
-            .instances = instances,
-            .dimensions = dimensions,
-            .labels = labels,
-            .alerts = alerts,
-            .group_by = {
-                .group_by = group_by.group_by,
-                .group_by_label = group_by.group_by_label,
-                .aggregation = group_by.aggregation,
-            },
-            .method = method,
-            .format = format,
-            .time_group_method = time_group_method,
-            .time_group_options = time_group_options,
-            .baseline_after = baseline_after,
-            .baseline_before = baseline_before,
-            .after = after,
-            .before = before,
-            .points = points,
-            .options = options,
-            .tier = tier,
-            .timeout_ms = timeout_ms,
-
-            .interrupt_callback = web_client_interrupt_callback,
-            .interrupt_callback_data = w,
-
-            .transaction = &w->transaction,
-    };
-
-    return web_api_v12_weights(wb, &qwr);
-}
 
 bool web_client_interrupt_callback(void *data) {
     struct web_client *w = data;
@@ -263,3 +126,54 @@ bool web_client_interrupt_callback(void *data) {
 
     return sock_has_output_error(w->ofd);
 }
+
+void nd_web_api_init(void) {
+    contexts_alert_statuses_init();
+    rrdr_options_init();
+    contexts_options_init();
+    datasource_formats_init();
+    time_grouping_init();
+}
+
+
+bool request_source_is_cloud(const char *source) {
+    return source && *source && strstartswith(source, "method=NC,");
+}
+
+void web_client_api_request_vX_source_to_buffer(struct web_client *w, BUFFER *source) {
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_CLOUD))
+        buffer_sprintf(source, "method=NC");
+    else if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_BEARER))
+        buffer_sprintf(source, "method=api-bearer");
+    else
+        buffer_sprintf(source, "method=api");
+
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_GOD))
+        buffer_strcat(source, ",role=god");
+    else
+        buffer_sprintf(source, ",role=%s", http_id2user_role(w->user_role));
+
+    buffer_sprintf(source, ",permissions="HTTP_ACCESS_FORMAT, (HTTP_ACCESS_FORMAT_CAST)w->access);
+
+    if(w->auth.client_name[0])
+        buffer_sprintf(source, ",user=%s", w->auth.client_name);
+
+    if(!uuid_is_null(w->auth.cloud_account_id)) {
+        char uuid_str[UUID_COMPACT_STR_LEN];
+        uuid_unparse_lower_compact(w->auth.cloud_account_id, uuid_str);
+        buffer_sprintf(source, ",account=%s", uuid_str);
+    }
+
+    if(w->client_ip[0])
+        buffer_sprintf(source, ",ip=%s", w->client_ip);
+
+    if(w->forwarded_for)
+        buffer_sprintf(source, ",forwarded_for=%s", w->forwarded_for);
+}
+
+void web_client_progress_functions_update(void *data, size_t done, size_t all) {
+    // handle progress updates from the plugin
+    struct web_client *w = data;
+    query_progress_functions_update(&w->transaction, done, all);
+}
+

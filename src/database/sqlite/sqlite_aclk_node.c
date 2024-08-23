@@ -6,8 +6,6 @@
 #include "../../aclk/aclk_contexts_api.h"
 #include "../../aclk/aclk_capas.h"
 
-#ifdef ENABLE_ACLK
-
 DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
     RRDSET *st;
     char name[500];
@@ -32,16 +30,18 @@ static void build_node_collectors(RRDHOST *host)
     struct update_node_collectors upd_node_collectors;
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
+    CLAIM_ID claim_id = claim_id_get();
     upd_node_collectors.node_id = wc->node_id;
-    upd_node_collectors.claim_id = get_agent_claimid();
+    upd_node_collectors.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
 
     upd_node_collectors.node_collectors = collectors_from_charts(host, dict);
     aclk_update_node_collectors(&upd_node_collectors);
 
     dictionary_destroy(dict);
-    freez(upd_node_collectors.claim_id);
 
-    nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK RES [%s (%s)]: NODE COLLECTORS SENT", wc->node_id, rrdhost_hostname(host));
+    nd_log(NDLS_ACCESS, NDLP_DEBUG,
+           "ACLK RES [%s (%s)]: NODE COLLECTORS SENT",
+           wc->node_id, rrdhost_hostname(host));
 }
 
 static void build_node_info(RRDHOST *host)
@@ -50,9 +50,11 @@ static void build_node_info(RRDHOST *host)
 
     struct aclk_sync_cfg_t *wc = host->aclk_config;
 
+    CLAIM_ID claim_id = claim_id_get();
+
     rrd_rdlock();
     node_info.node_id = wc->node_id;
-    node_info.claim_id = get_agent_claimid();
+    node_info.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
     node_info.machine_guid = host->machine_guid;
     node_info.child = (host != localhost);
     node_info.ml_info.ml_capable = ml_capable();
@@ -64,11 +66,11 @@ static void build_node_info(RRDHOST *host)
 
     char *host_version = NULL;
     if (host != localhost) {
-        netdata_mutex_lock(&host->receiver_lock);
+        spinlock_lock(&host->receiver_lock);
         host_version = strdupz(
             host->receiver && host->receiver->program_version ? host->receiver->program_version :
                                                                 rrdhost_program_version(host));
-        netdata_mutex_unlock(&host->receiver_lock);
+        spinlock_unlock(&host->receiver_lock);
     }
 
     node_info.data.name = rrdhost_hostname(host);
@@ -108,7 +110,6 @@ static void build_node_info(RRDHOST *host)
         host == localhost ? "parent" : "child");
 
     rrd_rdunlock();
-    freez(node_info.claim_id);
     freez(node_info.node_instance_capabilities);
     freez(host_version);
 
@@ -133,7 +134,7 @@ void aclk_check_node_info_and_collectors(void)
 {
     RRDHOST *host;
 
-    if (unlikely(!aclk_connected))
+    if (unlikely(!aclk_online_for_nodes()))
         return;
 
     size_t context_loading = 0;
@@ -190,5 +191,3 @@ void aclk_check_node_info_and_collectors(void)
             context_pp);
     }
 }
-
-#endif

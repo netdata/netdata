@@ -223,7 +223,7 @@ typedef struct local_socket {
 #endif
 } LOCAL_SOCKET;
 
-static inline void local_sockets_spawn_server_callback(SPAWN_REQUEST *request);
+static inline int local_sockets_spawn_server_callback(SPAWN_REQUEST *request);
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -1145,7 +1145,7 @@ static inline void local_sockets_send_to_parent(struct local_socket_state *ls __
             local_sockets_log(ls, "failed to write cmdline to pipe");
 }
 
-static inline void local_sockets_spawn_server_callback(SPAWN_REQUEST *request) {
+static inline int local_sockets_spawn_server_callback(SPAWN_REQUEST *request) {
     LS_STATE ls = { 0 };
     ls.config = *((struct local_sockets_config *)request->data);
 
@@ -1172,7 +1172,7 @@ static inline void local_sockets_spawn_server_callback(SPAWN_REQUEST *request) {
     // switch namespace using the custom fd passed via the spawn server
     if (setns(request->fds[3], CLONE_NEWNET) == -1) {
         local_sockets_log(&ls, "failed to switch network namespace at child process using fd %d", request->fds[3]);
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     // read all sockets from /proc
@@ -1187,7 +1187,9 @@ static inline void local_sockets_spawn_server_callback(SPAWN_REQUEST *request) {
     };
     local_sockets_send_to_parent(&ls, &zero, &cw);
 
-    exit(EXIT_SUCCESS);
+    local_sockets_cleanup(&ls);
+
+    return EXIT_SUCCESS;
 }
 
 static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, struct pid_socket *ps) {
