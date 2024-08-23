@@ -641,8 +641,12 @@ filter_recipient_by_criticality() {
       ;;
 
     CLEAR)
-      # remove tracking file
-      [ -f "${tracking_file}" ] && rm "${tracking_file}"
+      if [ -f "${tracking_file}" ]; then
+        tracking_file_existed="yes"
+        rm "${tracking_file}"
+      else
+        tracking_file_existed=""
+      fi
 
       # "noclear" modifier set, block notification
       if [ "${mod_noclear}" == "1" ]; then
@@ -657,7 +661,7 @@ filter_recipient_by_criticality() {
       fi
 
       # "critical" modifier set, send notification if tracking file exists
-      if [ "${mod_critical}" == "1" ] && [ -f "${tracking_file}" ]; then
+      if [ "${mod_critical}" == "1" ] && [ -n "${tracking_file_existed}" ]; then
         debug "SEVERITY FILTERING for ${recipient_arg} VIA ${method}: ALLOW: recipient has been notified for this alarm in the past (no status change will be sent from now)"
         return 0
       fi
@@ -1515,13 +1519,20 @@ send_telegram() {
       notify_telegram=1
       notify_retries=${TELEGRAM_RETRIES_ON_LIMIT:-0}
 
+      IFS=":" read -r chatID threadID <<< "${chatid}"
+
+      # https://core.telegram.org/bots/api#sendmessage
+      api_url="https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatID}"
+      if [ -n "${threadID}" ]; then
+        api_url+="&message_thread_id=${threadID}"
+      fi
+
       while [ ${notify_telegram} -eq 1 ]; do
-        # https://core.telegram.org/bots/api#sendmessage
         httpcode=$(docurl ${disableNotification} \
           --data-urlencode "parse_mode=HTML" \
           --data-urlencode "disable_web_page_preview=true" \
           --data-urlencode "text=${emoji} ${message}" \
-          "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
+          "${api_url}")
 
         notify_telegram=0
 

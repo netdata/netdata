@@ -331,7 +331,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
         "Filters can be combined. Each filter can be given only one time. Default all ports\n"
     };
 
-for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
+    for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
             break;
@@ -428,6 +428,7 @@ for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         ebpf_socket_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
+        collect_pids |= 1<<EBPF_MODULE_SOCKET_IDX;
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction,

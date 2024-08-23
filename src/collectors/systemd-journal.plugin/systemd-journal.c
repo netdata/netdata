@@ -1037,7 +1037,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
         struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
 
     sd_journal *j = NULL;
-    errno = 0;
+    errno_clear();
 
     fstat_cache_enable_on_thread();
 

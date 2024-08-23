@@ -92,6 +92,10 @@ modules:
         metric: zfspool.pool_health_state
         info: "ZFS pool ${label:pool} state is faulted or unavail"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf
+      - name: zfs_vdev_health_state
+        metric: zfspool.vdev_health_state
+        info: "ZFS vdev ${label:vdev} state is faulted or degraded"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf
     metrics:
       folding:
         title: Metrics
@@ -126,6 +130,26 @@ modules:
                 - name: fragmentation
             - name: zfspool.pool_health_state
               description: Zpool health state
+              unit: 'state'
+              chart_type: line
+              dimensions:
+                - name: online
+                - name: degraded
+                - name: faulted
+                - name: offline
+                - name: unavail
+                - name: removed
+                - name: suspended
+        - name: zfs pool vdev
+          description: These metrics refer to the ZFS pool virtual device.
+          labels:
+            - name: pool
+              description: Zpool name
+            - name: vdev
+              description: Unique identifier for a virtual device (vdev) within a ZFS pool.
+          metrics:
+            - name: zfspool.vdev_health_state
+              description: Zpool Vdev health state
               unit: 'state'
               chart_type: line
               dimensions:

@@ -1,0 +1,4 @@
+{"id":["cluster"],"query_engine":{"client_connections":1,"clients_active":1,"queries_per_sec":1,"read_docs_per_sec":0,"written_docs_per_sec":0}}
+{"id":["server","b7730db2-4303-4719-aef8-2a3c339c672b"],"query_engine":{"client_connections":1,"clients_active":1,"queries_per_sec":1,"queries_total":13,"read_docs_per_sec":0,"read_docs_total":1,"written_docs_per_sec":0,"written_docs_total":1},"server":"some_hostname_182"}
+{"id":["server","f325e3c3-22d9-4005-b4b2-1f561d384edc"],"query_engine":{"client_connections":2,"clients_active":2,"queries_per_sec":1,"queries_total":14,"read_docs_per_sec":0,"read_docs_total":2,"written_docs_per_sec":0,"written_docs_total":2},"server":"pve_deb_work_183"}
+{"id":["server","0f74c641-af5f-48d6-a005-35b8983c576a"],"server":"pve_deb_work_184","error":"Timed out. Unable to retrieve stats."}

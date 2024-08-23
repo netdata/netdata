@@ -245,10 +245,16 @@ func (l *logLine) assignMimeType(mime string) error {
 	}
 	// format: type/subtype, type/subtype;parameter=value
 	i := strings.IndexByte(mime, '/')
-	if i <= 0 || !isMimeTypeValid(mime[:i]) {
+	if i <= 0 {
 		return fmt.Errorf("assign '%s': %w", mime, errBadMimeType)
 	}
+
+	if !isMimeTypeValid(mime[:i]) {
+		return nil
+	}
+
 	l.mimeType = mime[:i] // drop subtype
+
 	return nil
 }
 
@@ -345,7 +351,7 @@ func isRespTimeValid(time int) bool {
 // isCacheCodeValid does not guarantee cache result code is valid, but it is very likely.
 func isCacheCodeValid(code string) bool {
 	// https://wiki.squid-cache.org/SquidFaq/SquidLogs#Squid_result_codes
-	if code == "NONE" {
+	if code == "NONE" || code == "NONE_NONE" {
 		return true
 	}
 	return len(code) > 5 && (code[:4] == "TCP_" || code[:4] == "UDP_")

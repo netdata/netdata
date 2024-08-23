@@ -3,8 +3,8 @@
 package functions
 
 import (
-	"bufio"
 	"bytes"
+	"context"
 	"encoding/csv"
 	"fmt"
 	"strconv"
@@ -67,22 +67,30 @@ func parseFunction(s string) (*Function, error) {
 	return fn, nil
 }
 
-func parseFunctionWithPayload(s string, sc *bufio.Scanner) (*Function, error) {
+func parseFunctionWithPayload(ctx context.Context, s string, in input) (*Function, error) {
 	fn, err := parseFunction(s)
 	if err != nil {
 		return nil, err
 	}
 
-	var n int
 	var buf bytes.Buffer
-	for sc.Scan() && sc.Text() != "FUNCTION_PAYLOAD_END" {
-		if n++; n > 1 {
-			buf.WriteString("\n")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, nil
+		case line, ok := <-in.lines():
+			if !ok {
+				return nil, nil
+			}
+			if line == "FUNCTION_PAYLOAD_END" {
+				fn.Payload = append(fn.Payload, buf.Bytes()...)
+				return fn, nil
+			}
+			if buf.Len() > 0 {
+				buf.WriteString("\n")
+			}
+			buf.WriteString(line)
 		}
-		buf.WriteString(sc.Text())
 	}
-
-	fn.Payload = append(fn.Payload, buf.Bytes()...)
-
-	return fn, nil
 }

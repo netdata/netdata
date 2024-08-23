@@ -12,6 +12,7 @@ type scanDevice struct {
 	name     string
 	infoName string
 	typ      string
+	extra    bool // added via config "extra_devices"
 }
 
 func (s *scanDevice) key() string {
@@ -23,7 +24,15 @@ func (s *scanDevice) shortName() string {
 }
 
 func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
-	resp, err := s.exec.scan()
+	// Issue on Discord: https://discord.com/channels/847502280503590932/1261747175361347644/1261747175361347644
+	// "sat" devices being identified as "scsi" with --scan, and then later
+	// code attempts to validate the type by calling `smartctl` with the "scsi" type.
+	// This validation can trigger unintended "Enabling discard_zeroes_data" messages in system logs (dmesg).
+	// To address this specific issue we use `smartctl --scan-open` as a workaround.
+	// This method reliably identifies device types.
+	scanOpen := s.NoCheckPowerMode == "never"
+
+	resp, err := s.exec.scan(scanOpen)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan devices: %v", err)
 	}
@@ -34,7 +43,7 @@ func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
 		dev := &scanDevice{
 			name:     d.Get("name").String(),
 			infoName: d.Get("info_name").String(),
-			typ:      d.Get("type").String(), // guessed type (we do '--scan' not '--scan-open')
+			typ:      d.Get("type").String(),
 		}
 
 		if dev.name == "" || dev.typ == "" {
@@ -47,17 +56,13 @@ func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
 			continue
 		}
 
-		if dev.typ == "scsi" {
+		if !scanOpen && dev.typ == "scsi" {
 			// `smartctl --scan` attempts to guess the device type based on the path, but this can be unreliable.
 			// Accurate device type information is crucial because we use the `--device` option to gather data.
 			// Using the wrong type can lead to issues.
 			// For example, using 'scsi' for 'sat' devices prevents `smartctl` from issuing the necessary ATA commands.
-			resp, _ := s.exec.deviceInfo(dev.name, dev.typ, s.NoCheckPowerMode)
-			if resp != nil && isExitStatusHasBit(resp, 2) {
-				correctType := "sat"
-				s.Debugf("changing device '%s' type '%s' -> '%s'", dev.name, dev.typ, correctType)
-				dev.typ = correctType
-			}
+
+			s.handleGuessedScsiScannedDevice(dev)
 		}
 
 		s.Debugf("smartctl scan found device '%s' type '%s' info_name '%s'", dev.name, dev.typ, dev.infoName)
@@ -65,11 +70,50 @@ func (s *Smartctl) scanDevices() (map[string]*scanDevice, error) {
 		devices[dev.key()] = dev
 	}
 
+	s.Debugf("smartctl scan found %d devices", len(devices))
+
+	for _, v := range s.ExtraDevices {
+		dev := &scanDevice{name: v.Name, typ: v.Type, extra: true}
+
+		if _, ok := devices[dev.key()]; !ok {
+			devices[dev.key()] = dev
+		}
+	}
+
 	if len(devices) == 0 {
 		return nil, errors.New("no devices found during scan")
 	}
 
-	s.Debugf("smartctl scan found %d devices", len(devices))
-
 	return devices, nil
+}
+
+func (s *Smartctl) handleGuessedScsiScannedDevice(dev *scanDevice) {
+	if dev.typ != "scsi" || s.hasScannedDevice(dev) {
+		return
+	}
+
+	d := &scanDevice{name: dev.name, typ: "sat"}
+
+	if s.hasScannedDevice(d) {
+		dev.typ = d.typ
+		return
+	}
+
+	resp, _ := s.exec.deviceInfo(dev.name, "sat", s.NoCheckPowerMode)
+	if resp == nil || resp.Get("smartctl.exit_status").Int() != 0 {
+		return
+	}
+
+	atts, ok := newSmartDevice(resp).ataSmartAttributeTable()
+	if !ok || len(atts) == 0 {
+		return
+	}
+
+	s.Debugf("changing device '%s' type 'scsi' -> 'sat'", dev.name)
+	dev.typ = "sat"
+}
+
+func (s *Smartctl) hasScannedDevice(d *scanDevice) bool {
+	_, ok := s.scannedDevices[d.key()]
+	return ok
 }

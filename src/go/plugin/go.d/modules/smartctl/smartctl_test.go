@@ -26,6 +26,10 @@ var (
 
 	dataTypeNvmeScan, _        = os.ReadFile("testdata/type-nvme/scan.json")
 	dataTypeNvmeDeviceNvme0, _ = os.ReadFile("testdata/type-nvme/device-nvme0.json")
+	dataTypeNvmeDeviceNvme1, _ = os.ReadFile("testdata/type-nvme/device-nvme1.json")
+
+	dataTypeScsiScan, _      = os.ReadFile("testdata/type-scsi/scan.json")
+	dataTypeScsiDeviceSda, _ = os.ReadFile("testdata/type-scsi/device-sda.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -39,6 +43,10 @@ func Test_testDataIsValid(t *testing.T) {
 
 		"dataTypeNvmeScan":        dataTypeNvmeScan,
 		"dataTypeNvmeDeviceNvme0": dataTypeNvmeDeviceNvme0,
+		"dataTypeNvmeDeviceNvme1": dataTypeNvmeDeviceNvme1,
+
+		"dataTypeScsiScan":      dataTypeScsiScan,
+		"dataTypeScsiDeviceSda": dataTypeScsiDeviceSda,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -160,9 +168,10 @@ func TestSmartctl_Check(t *testing.T) {
 
 func TestSmartctl_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepareMock func() *mockSmartctlCliExec
-		wantMetrics map[string]int64
-		wantCharts  int
+		prepareMock   func() *mockSmartctlCliExec
+		prepareConfig func() Config
+		wantMetrics   map[string]int64
+		wantCharts    int
 	}{
 		"success type sata devices": {
 			prepareMock: prepareMockOkTypeSata,
@@ -289,6 +298,46 @@ func TestSmartctl_Collect(t *testing.T) {
 				"device_nvme0_type_nvme_temperature":         39,
 			},
 		},
+		"success type nvme devices with extra": {
+			prepareMock: prepareMockOkTypeNvme,
+			prepareConfig: func() Config {
+				cfg := New().Config
+				cfg.ExtraDevices = []ConfigExtraDevice{
+					{Name: "/dev/nvme1", Type: "nvme"},
+				}
+				return cfg
+			},
+			wantCharts: 8,
+			wantMetrics: map[string]int64{
+				"device_nvme0_type_nvme_power_cycle_count":   2,
+				"device_nvme0_type_nvme_power_on_time":       11206800,
+				"device_nvme0_type_nvme_smart_status_failed": 0,
+				"device_nvme0_type_nvme_smart_status_passed": 1,
+				"device_nvme0_type_nvme_temperature":         39,
+				"device_nvme1_type_nvme_power_cycle_count":   5,
+				"device_nvme1_type_nvme_power_on_time":       17038800,
+				"device_nvme1_type_nvme_smart_status_failed": 0,
+				"device_nvme1_type_nvme_smart_status_passed": 1,
+				"device_nvme1_type_nvme_temperature":         36,
+			},
+		},
+		"success type scsi devices": {
+			prepareMock: prepareMockOkTypeScsi,
+			wantCharts:  7,
+			wantMetrics: map[string]int64{
+				"device_sda_type_scsi_power_cycle_count":                              4,
+				"device_sda_type_scsi_power_on_time":                                  5908920,
+				"device_sda_type_scsi_scsi_error_log_read_total_errors_corrected":     647736,
+				"device_sda_type_scsi_scsi_error_log_read_total_uncorrected_errors":   0,
+				"device_sda_type_scsi_scsi_error_log_verify_total_errors_corrected":   0,
+				"device_sda_type_scsi_scsi_error_log_verify_total_uncorrected_errors": 0,
+				"device_sda_type_scsi_scsi_error_log_write_total_errors_corrected":    0,
+				"device_sda_type_scsi_scsi_error_log_write_total_uncorrected_errors":  0,
+				"device_sda_type_scsi_smart_status_failed":                            0,
+				"device_sda_type_scsi_smart_status_passed":                            1,
+				"device_sda_type_scsi_temperature":                                    34,
+			},
+		},
 		"error on scan": {
 			prepareMock: prepareMockErrOnScan,
 		},
@@ -303,6 +352,9 @@ func TestSmartctl_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			smart := New()
+			if test.prepareConfig != nil {
+				smart.Config = test.prepareConfig()
+			}
 			mock := test.prepareMock()
 			smart.exec = mock
 			smart.ScanEvery = web.Duration(time.Microsecond * 1)
@@ -367,6 +419,26 @@ func prepareMockOkTypeNvme() *mockSmartctlCliExec {
 			switch deviceName {
 			case "/dev/nvme0":
 				return dataTypeNvmeDeviceNvme0, nil
+			case "/dev/nvme1":
+				return dataTypeNvmeDeviceNvme1, nil
+			default:
+				return nil, fmt.Errorf("unexpected device name %s", deviceName)
+			}
+		},
+	}
+}
+
+func prepareMockOkTypeScsi() *mockSmartctlCliExec {
+	return &mockSmartctlCliExec{
+		errOnScan: false,
+		scanData:  dataTypeScsiScan,
+		deviceDataFunc: func(deviceName, deviceType, powerMode string) ([]byte, error) {
+			if deviceType != "scsi" {
+				return nil, fmt.Errorf("unexpected device type %s", deviceType)
+			}
+			switch deviceName {
+			case "/dev/sda":
+				return dataTypeScsiDeviceSda, nil
 			default:
 				return nil, fmt.Errorf("unexpected device name %s", deviceName)
 			}
@@ -397,7 +469,7 @@ type mockSmartctlCliExec struct {
 	deviceDataFunc func(deviceName, deviceType, powerMode string) ([]byte, error)
 }
 
-func (m *mockSmartctlCliExec) scan() (*gjson.Result, error) {
+func (m *mockSmartctlCliExec) scan(_ bool) (*gjson.Result, error) {
 	if m.errOnScan {
 		return nil, fmt.Errorf("mock.scan() error")
 	}

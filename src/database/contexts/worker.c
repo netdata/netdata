@@ -753,30 +753,26 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function __maybe_unused, RRD_FLAGS flags __maybe_unused) {
     if(unlikely(!rc->rrdhost->rrdctx.pp_queue)) return;
 
-    if(!rrd_flag_check(rc, RRD_FLAG_QUEUED_FOR_PP)) {
-        dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx.pp_queue,
-                       string2str(rc->id),
-                       rc,
-                       sizeof(*rc));
-
-#if(defined(NETDATA_INTERNAL_CHECKS) && defined(LOG_POST_PROCESSING_QUEUE_INSERTIONS))
-        {
-            BUFFER *wb_flags = buffer_create(1000);
-            rrd_flags_to_buffer(flags, wb_flags);
-
-            BUFFER *wb_reasons = buffer_create(1000);
-            rrd_reasons_to_buffer(flags, wb_reasons);
-
-            internal_error(true, "RRDCONTEXT: '%s' update triggered by function %s(), due to flags: %s, reasons: %s",
-                           string2str(rc->id), function,
-                           buffer_tostring(wb_flags),
-                           buffer_tostring(wb_reasons));
-
-            buffer_free(wb_reasons);
-            buffer_free(wb_flags);
-        }
-#endif
+#if 0
+    if(string_strcmp(rc->id, "system.cpu") == 0) {
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+        buffer_json_member_add_array(wb, "flags");
+        rrd_flags_to_buffer_json_array_items(rc->flags, wb);
+        buffer_json_array_close(wb);
+        buffer_json_member_add_array(wb, "reasons");
+        rrd_reasons_to_buffer_json_array_items(rc->flags, wb);
+        buffer_json_array_close(wb);
+        buffer_json_finalize(wb);
+        nd_log(NDLS_DAEMON, NDLP_EMERG, "%s() context '%s', triggered: %s",
+               function, string2str(rc->id), buffer_tostring(wb));
     }
+#endif
+
+    dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx.pp_queue,
+                   string2str(rc->id),
+                   rc,
+                   sizeof(*rc));
 }
 
 static void rrdcontext_dequeue_from_post_processing(RRDCONTEXT *rc) {
@@ -960,14 +956,11 @@ static void rrdcontext_dequeue_from_hub_queue(RRDCONTEXT *rc) {
 static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
 
     // check if we have received a streaming command for this host
-    if(!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS) || !aclk_connected || !host->rrdctx.hub_queue)
+    if(!host->node_id || !rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS) || !aclk_connected || !host->rrdctx.hub_queue)
         return;
 
     // check if there are queued items to send
     if(!dictionary_entries(host->rrdctx.hub_queue))
-        return;
-
-    if(!host->node_id)
         return;
 
     size_t messages_added = 0;

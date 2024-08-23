@@ -312,7 +312,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
             d->collected_metadata = true;
         }
 
-        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->traffic.received) ||
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->traffic.received) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->traffic.sent)) {
 
             if(d->traffic.received.current.Data == 0 && d->traffic.sent.current.Data == 0)
@@ -350,7 +350,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
             rrdset_done(d->traffic.st);
         }
 
-        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->packets.received) ||
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->packets.received) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->packets.sent)) {
 
             if (unlikely(!d->packets.st)) {

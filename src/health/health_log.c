@@ -4,7 +4,8 @@
 
 // ----------------------------------------------------------------------------
 
-inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
+inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
+{
     sql_health_alarm_log_save(host, ae);
 }
 
@@ -43,7 +44,7 @@ void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int 
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    errno = 0;
+    errno_clear();
 
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
 

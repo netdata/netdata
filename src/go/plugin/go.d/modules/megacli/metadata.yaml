@@ -157,7 +157,7 @@ modules:
             - name: battery_type
               description: Battery type (e.g. BBU)
           metrics:
-            - name: megacli.bbu_relative_charge
+            - name: megacli.bbu_charge
               description: BBU relative charge
               unit: percentage
               chart_type: area
@@ -169,6 +169,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: recharge
+            - name: megacli.bbu_capacity_degradation
+              description: BBU capacity degradation
+              unit: percent
+              chart_type: area
+              dimensions:
+                - name: cap_degradation
             - name: megacli.bbu_temperature
               description: BBU bbu_temperature
               unit: Celsius

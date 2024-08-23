@@ -49,7 +49,7 @@
         "properties": {
           "allow": {
             "title": "Allow",
-            "description": "Allow time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/prometheus/selector#readme).",
+            "description": "Allow time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
             "type": [
               "array",
               "null"
@@ -62,7 +62,7 @@
           },
           "deny": {
             "title": "Deny",
-            "description": "Deny time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/prometheus/selector#readme).",
+            "description": "Deny time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
             "type": [
               "array",
               "null"
@@ -288,6 +288,12 @@
     },
     "selector": {
       "ui:help": "The logic is as follows: `(allow1 OR allow2) AND !(deny1 OR deny2)`."
+    },
+    "username": {
+      "ui:widget": "password"
+    },
+    "proxy_username": {
+      "ui:widget": "password"
     },
     "password": {
       "ui:widget": "password"

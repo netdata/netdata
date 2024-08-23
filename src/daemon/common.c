@@ -44,7 +44,7 @@ long get_netdata_cpus(void) {
 
     long cores_user_configured = config_get_number(CONFIG_SECTION_GLOBAL, "cpu cores", processors);
 
-    errno = 0;
+    errno_clear();
     internal_error(true,
          "System CPUs: %ld, ("
          "system: %ld, cgroups cpuset v1: %ld, cgroups cpuset v2: %ld, netdata.conf: %ld"

@@ -7,12 +7,13 @@
 #include <sys/syscall.h>
 #endif
 
+#include "setproctitle.h"
+#include "close_range.h"
 #include "setresuid.h"
 #include "setresgid.h"
 #include "getgrouplist.h"
 #include "adjtimex.h"
 #include "gettid.h"
-#include "waitid.h"
 #include "get_pid_max.h"
 #include "get_system_cpus.h"
 #include "tinysleep.h"

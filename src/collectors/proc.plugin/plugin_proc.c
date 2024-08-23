@@ -62,7 +62,6 @@ static struct proc_module {
 
     // ZFS metrics
     {.name = "/proc/spl/kstat/zfs/arcstats", .dim = "zfs_arcstats", .func = do_proc_spl_kstat_zfs_arcstats},
-    {.name = "/proc/spl/kstat/zfs/pool/state",.dim = "zfs_pool_state",.func = do_proc_spl_kstat_zfs_pool_state},
 
     // BTRFS metrics
     {.name = "/sys/fs/btrfs",                .dim = "btrfs",        .func = do_sys_fs_btrfs},
@@ -102,6 +101,9 @@ static void proc_main_cleanup(void *pptr)
 }
 
 bool inside_lxc_container = false;
+bool is_mem_swap_enabled = false;
+bool is_mem_zswap_enabled = false;
+bool is_mem_ksm_enabled = false;
 
 static bool is_lxcfs_proc_mounted() {
     procfile *ff = NULL;
@@ -134,6 +136,61 @@ static bool is_lxcfs_proc_mounted() {
     procfile_close(ff);
 
     return false;
+}
+
+static bool is_ksm_enabled() {
+    unsigned long long ksm_run = 0;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/sys/kernel/mm/ksm/run", netdata_configured_host_prefix);
+
+    return !read_single_number_file(filename, &ksm_run) && ksm_run == 1;
+}
+
+static bool is_zswap_enabled() {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "/sys/module/zswap/parameters/enabled"); // host prefix is not needed here
+    char state[1 + 1];                                                         // Y or N
+
+    int ret = read_txt_file(filename, state, sizeof(state));
+
+    return !ret && !strcmp(state, "Y");
+}
+
+static bool is_swap_enabled() {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/proc/meminfo", netdata_configured_host_prefix);
+
+    procfile *ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
+    if (!ff) {
+        return false;
+    }
+
+    ff = procfile_readall(ff);
+    if (!ff) {
+        procfile_close(ff);
+        return false;
+    }
+
+    unsigned long long swap_total = 0;
+
+    size_t lines = procfile_lines(ff), l;
+
+    for (l = 0; l < lines; l++) {
+        size_t words = procfile_linewords(ff, l);
+        if (words < 2)
+            continue;
+
+        const char *key = procfile_lineword(ff, l, 0);
+        if (strcmp(key, "SwapTotal") == 0) {
+            swap_total = str2ull(procfile_lineword(ff, l, 1), NULL);
+            break;
+        }
+    }
+
+    procfile_close(ff);
+
+    return swap_total > 0;
 }
 
 static bool log_proc_module(BUFFER *wb, void *data) {
@@ -174,6 +231,9 @@ void *proc_main(void *ptr)
     heartbeat_init(&hb);
 
     inside_lxc_container = is_lxcfs_proc_mounted();
+    is_mem_swap_enabled = is_swap_enabled();
+    is_mem_zswap_enabled = is_zswap_enabled();
+    is_mem_ksm_enabled = is_ksm_enabled();
 
 #define LGS_MODULE_ID 0
 

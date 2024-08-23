@@ -3,13 +3,10 @@
 package functions
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,20 +15,15 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/safewriter"
-
-	"github.com/mattn/go-isatty"
-	"github.com/muesli/cancelreader"
 )
-
-var isTerminal = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsTerminal(os.Stdin.Fd())
 
 func NewManager() *Manager {
 	return &Manager{
 		Logger: logger.New().With(
 			slog.String("component", "functions manager"),
 		),
-		Input:            os.Stdin,
 		api:              netdataapi.New(safewriter.Stdout),
+		input:            stdinInput,
 		mux:              &sync.Mutex{},
 		FunctionRegistry: make(map[string]func(Function)),
 	}
@@ -40,8 +32,10 @@ func NewManager() *Manager {
 type Manager struct {
 	*logger.Logger
 
-	Input            io.Reader
-	api              *netdataapi.API
+	api *netdataapi.API
+
+	input input
+
 	mux              *sync.Mutex
 	FunctionRegistry map[string]func(Function)
 }
@@ -50,68 +44,65 @@ func (m *Manager) Run(ctx context.Context) {
 	m.Info("instance is started")
 	defer func() { m.Info("instance is stopped") }()
 
-	if !isTerminal {
-		r, err := cancelreader.NewReader(m.Input)
-		if err != nil {
-			m.Errorf("fail to create cancel reader: %v", err)
-			return
-		}
+	var wg sync.WaitGroup
 
-		go func() { <-ctx.Done(); r.Cancel() }()
+	wg.Add(1)
+	go func() { defer wg.Done(); m.run(ctx) }()
 
-		var wg sync.WaitGroup
-
-		wg.Add(1)
-		go func() { defer wg.Done(); m.run(r) }()
-
-		wg.Wait()
-		_ = r.Close()
-	}
+	wg.Wait()
 
 	<-ctx.Done()
 }
 
-func (m *Manager) run(r io.Reader) {
-	sc := bufio.NewScanner(r)
+func (m *Manager) run(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case line, ok := <-m.input.lines():
+			if !ok {
+				return
+			}
 
-	for sc.Scan() {
-		text := sc.Text()
+			var fn *Function
+			var err error
 
-		var fn *Function
-		var err error
+			// FIXME:  if we are waiting for FUNCTION_PAYLOAD_END and a new FUNCTION* appears,
+			// we need to discard the current one and switch to the new one
+			switch {
+			case strings.HasPrefix(line, "FUNCTION "):
+				fn, err = parseFunction(line)
+			case strings.HasPrefix(line, "FUNCTION_PAYLOAD "):
+				fn, err = parseFunctionWithPayload(ctx, line, m.input)
+			case line == "":
+				continue
+			default:
+				m.Warningf("unexpected line: '%s'", line)
+				continue
+			}
 
-		// FIXME:  if we are waiting for FUNCTION_PAYLOAD_END and a new FUNCTION* appears,
-		// we need to discard the current one and switch to the new one
-		switch {
-		case strings.HasPrefix(text, "FUNCTION "):
-			fn, err = parseFunction(text)
-		case strings.HasPrefix(text, "FUNCTION_PAYLOAD "):
-			fn, err = parseFunctionWithPayload(text, sc)
-		case text == "":
-			continue
-		default:
-			m.Warningf("unexpected line: '%s'", text)
-			continue
+			if err != nil {
+				m.Warningf("parse function: %v ('%s')", err, line)
+				continue
+			}
+			if fn == nil {
+				continue
+			}
+
+			function, ok := m.lookupFunction(fn.Name)
+			if !ok {
+				m.Infof("skipping execution of '%s': unregistered function", fn.Name)
+				m.respf(fn, 501, "unregistered function: %s", fn.Name)
+				continue
+			}
+			if function == nil {
+				m.Warningf("skipping execution of '%s': nil function registered", fn.Name)
+				m.respf(fn, 501, "nil function: %s", fn.Name)
+				continue
+			}
+
+			function(*fn)
 		}
-
-		if err != nil {
-			m.Warningf("parse function: %v ('%s')", err, text)
-			continue
-		}
-
-		function, ok := m.lookupFunction(fn.Name)
-		if !ok {
-			m.Infof("skipping execution of '%s': unregistered function", fn.Name)
-			m.respf(fn, 501, "unregistered function: %s", fn.Name)
-			continue
-		}
-		if function == nil {
-			m.Warningf("skipping execution of '%s': nil function registered", fn.Name)
-			m.respf(fn, 501, "nil function: %s", fn.Name)
-			continue
-		}
-
-		function(*fn)
 	}
 }
 

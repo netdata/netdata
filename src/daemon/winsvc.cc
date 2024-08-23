@@ -219,7 +219,7 @@ static bool update_path() {
 
 int main(int argc, char *argv[])
 {
-    bool tty = isatty(fileno(stdout)) == 1;
+    bool tty = isatty(fileno(stdin)) == 1;
 
     if (!update_path()) {
         return 1;

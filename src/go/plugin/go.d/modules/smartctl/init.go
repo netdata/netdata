@@ -17,6 +17,13 @@ func (s *Smartctl) validateConfig() error {
 	default:
 		return fmt.Errorf("invalid power mode '%s'", s.NoCheckPowerMode)
 	}
+
+	for _, v := range s.ExtraDevices {
+		if v.Name == "" || v.Type == "" {
+			return fmt.Errorf("invalid extra device: name and type must both be provided, got name='%s' type='%s'", v.Name, v.Type)
+		}
+	}
+
 	return nil
 }
 

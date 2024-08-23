@@ -82,6 +82,26 @@ func (s *SNMP) collectSysUptime(mx map[string]int64) error {
 }
 
 func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
+	if s.checkMaxReps {
+		ok, err := s.adjustMaxRepetitions()
+		if err != nil {
+			return err
+		}
+
+		s.checkMaxReps = false
+
+		if !ok {
+			s.collectIfMib = false
+
+			if len(s.oids) == 0 {
+				return errors.New("no IF-MIB data returned")
+			}
+
+			s.Warning("no IF-MIB data returned")
+			return nil
+		}
+	}
+
 	ifMibTable, err := s.walkAll(rootOidIfMibIfTable)
 	if err != nil {
 		return err
@@ -93,11 +113,7 @@ func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
 	}
 
 	if len(ifMibTable) == 0 && len(ifMibXTable) == 0 {
-		if len(s.oids) == 0 {
-			return errors.New("no IF-MIB data returned, try decreasing 'max_repetitions'")
-		}
-
-		s.Warningf("no IF-MIB data returned, try decreasing 'max_repetitions' (current: %d)", s.snmpClient.MaxRepetitions())
+		s.Warning("no IF-MIB data returned")
 		s.collectIfMib = false
 		return nil
 	}
@@ -262,6 +278,38 @@ func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
 	}
 
 	return nil
+}
+
+func (s *SNMP) adjustMaxRepetitions() (bool, error) {
+	orig := s.Config.Options.MaxRepetitions
+	maxReps := s.Config.Options.MaxRepetitions
+
+	for {
+		v, err := s.walkAll(oidIfIndex)
+		if err != nil {
+			return false, err
+		}
+
+		if len(v) > 0 {
+			if orig != maxReps {
+				s.Infof("changed 'max_repetitions' %d => %d", orig, maxReps)
+			}
+			return true, nil
+		}
+
+		if maxReps > 5 {
+			maxReps = max(5, maxReps-5)
+		} else {
+			maxReps--
+		}
+
+		if maxReps <= 0 {
+			return false, nil
+		}
+
+		s.Debugf("no IF-MIB data returned, trying to decrese 'max_repetitions' to %d", maxReps)
+		s.snmpClient.SetMaxRepetitions(uint32(maxReps))
+	}
 }
 
 func (s *SNMP) walkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {

@@ -153,7 +153,7 @@ func (f *Filecheck) updateDirCharts(infos []*statInfo) {
 
 		if !sd.hasExistenceCharts {
 			sd.hasExistenceCharts = true
-			f.addFileCharts(info.path,
+			f.addDirCharts(info.path,
 				dirExistenceStatusChartTmpl.Copy(),
 			)
 		}

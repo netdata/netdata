@@ -986,7 +986,7 @@ int main(int argc, char **argv) {
         netdata_log_error("xenstat.plugin: ignoring parameter '%s'", argv[i]);
     }
 
-    errno = 0;
+    errno_clear();
 
     if(freq >= netdata_update_every)
         netdata_update_every = freq;

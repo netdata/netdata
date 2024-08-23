@@ -88,7 +88,16 @@ No action required.
 
 #### File
 
-There is no configuration file.
+The configuration file name for this integration is `go.d/postfix.conf`.
+
+
+You can edit the configuration file using the `edit-config` script from the
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/postfix.conf
+```
 #### Options
 
 The following options can be defined globally: update_every.
@@ -105,13 +114,28 @@ The following options can be defined globally: update_every.
 </details>
 
 #### Examples
-There are no configuration examples.
+
+##### Custom binary path
+
+The executable is not in the directories specified in the PATH environment variable.
+
+<details open><summary></summary>
+
+```yaml
+jobs:
+  - name: custom_path
+    binary_path: /usr/local/sbin/postqueue
+
+```
+</details>
 
 
 
 ## Troubleshooting
 
 ### Debug Mode
+
+**Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
 To troubleshoot issues with the `postfix` collector, run the `go.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.

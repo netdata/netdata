@@ -14,6 +14,23 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "exim-bpc",
+        .params = "-bpc",
+        .search =
+            {
+                [0] = "exim",
+                [1] = NULL,
+            },
+    },
+    {
+        .name = "nsd-control-stats",
+        .params = "stats_noreset",
+        .search = {
+            [0] = "nsd-control",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "chronyc-serverstats",
         .params = "serverstats",
         .search = {
@@ -54,6 +71,14 @@ struct command {
         },
     },
     {
+        .name = "smartctl-json-scan-open",
+        .params = "--json --scan-open",
+        .search = {
+            [0] = "smartctl",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "smartctl-json-device-info",
         .params = "--json --all {{deviceName}} --device {{deviceType}} --nocheck {{powerMode}}",
         .search = {
@@ -70,8 +95,24 @@ struct command {
         },
     },
     {
+        .name = "fail2ban-client-status-socket",
+        .params = "-s {{socket_path}} status",
+        .search = {
+            [0] = "fail2ban-client",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "fail2ban-client-status-jail",
         .params = "status {{jail}}",
+        .search = {
+            [0] = "fail2ban-client",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "fail2ban-client-status-jail-socket",
+        .params = "-s {{socket_path}} status {{jail}}",
         .search = {
             [0] = "fail2ban-client",
             [1] = NULL,
@@ -375,6 +416,10 @@ int main(int argc, char *argv[]) {
 
     char new_path[] = "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
     putenv(new_path);
+
+    setuid(0);
+    setgid(0);
+    setegid(0);
 
     bool found = false;
     char filename[FILENAME_MAX];

@@ -88,7 +88,7 @@ jobs:
 View filter syntax: [simple patterns](https://docs.netdata.cloud/libnetdata/simple_pattern/).
 
 For all available options please see
-module [configuration file](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d/bind.conf).
+module [configuration file](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/bind.conf).
 
 ## Troubleshooting
 

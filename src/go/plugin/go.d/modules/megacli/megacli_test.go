@@ -160,6 +160,7 @@ func TestMegaCli_Collect(t *testing.T) {
 				"adapter_0_health_state_optimal":                       1,
 				"adapter_0_health_state_partially_degraded":            0,
 				"bbu_adapter_0_absolute_state_of_charge":               63,
+				"bbu_adapter_0_capacity_degradation_perc":              10,
 				"bbu_adapter_0_cycle_count":                            4,
 				"bbu_adapter_0_relative_state_of_charge":               71,
 				"bbu_adapter_0_temperature":                            33,
@@ -190,6 +191,7 @@ func TestMegaCli_Collect(t *testing.T) {
 				"adapter_0_health_state_optimal":                       1,
 				"adapter_0_health_state_partially_degraded":            0,
 				"bbu_adapter_0_absolute_state_of_charge":               83,
+				"bbu_adapter_0_capacity_degradation_perc":              17,
 				"bbu_adapter_0_cycle_count":                            61,
 				"bbu_adapter_0_relative_state_of_charge":               100,
 				"bbu_adapter_0_temperature":                            31,
@@ -235,6 +237,9 @@ func TestMegaCli_Collect(t *testing.T) {
 
 			assert.Equal(t, test.wantMetrics, mx)
 			assert.Len(t, *mega.Charts(), test.wantCharts)
+			if len(test.wantMetrics) > 0 {
+				module.TestMetricsHasAllChartsDims(t, mega.Charts(), mx)
+			}
 		})
 	}
 }

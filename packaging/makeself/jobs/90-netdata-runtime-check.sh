@@ -11,7 +11,7 @@ dump_log() {
 trap dump_log EXIT
 
 export NETDATA_LIBEXEC_PREFIX="${NETDATA_INSTALL_PATH}/usr/libexec/netdata"
-export NETDATA_SKIP_LIBEXEC_PARTS="logs-management|freeipmi|xenstat|cups"
+export NETDATA_SKIP_LIBEXEC_PARTS="freeipmi|xenstat|cups"
 
 if [ "$(uname -m)" != "x86_64" ]; then
     export NETDATA_SKIP_LIBEXEC_PARTS="${NETDATA_SKIP_LIBEXEC_PARTS}|ebpf"

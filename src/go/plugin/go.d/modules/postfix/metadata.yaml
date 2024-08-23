@@ -45,8 +45,7 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "go.d/postfix.conf"
         options:
           description: |
             The following options can be defined globally: update_every.
@@ -70,7 +69,13 @@ modules:
           folding:
             enabled: true
             title: ""
-          list: []
+          list:
+            - name: Custom binary path
+              description: The executable is not in the directories specified in the PATH environment variable.
+              config: |
+                jobs:
+                  - name: custom_path
+                    binary_path: /usr/local/sbin/postqueue
     troubleshooting:
       problems:
         list: []

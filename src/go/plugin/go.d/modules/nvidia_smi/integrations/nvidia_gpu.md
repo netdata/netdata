@@ -24,8 +24,6 @@ Module: nvidia_smi
 This collector monitors GPUs performance metrics using
 the [nvidia-smi](https://developer.nvidia.com/nvidia-system-management-interface) CLI tool.
 
-> **Warning**: under development, [loop mode](https://github.com/netdata/netdata/issues/14522) not implemented yet.
-
 
 
 
@@ -70,24 +68,24 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | XML | CSV |
-|:------|:----------|:----|:---:|:---:|
-| nvidia_smi.gpu_pcie_bandwidth_usage | rx, tx | B/s | • |   |
-| nvidia_smi.gpu_pcie_bandwidth_utilization | rx, tx | % | • |   |
-| nvidia_smi.gpu_fan_speed_perc | fan_speed | % | • | • |
-| nvidia_smi.gpu_utilization | gpu | % | • | • |
-| nvidia_smi.gpu_memory_utilization | memory | % | • | • |
-| nvidia_smi.gpu_decoder_utilization | decoder | % | • |   |
-| nvidia_smi.gpu_encoder_utilization | encoder | % | • |   |
-| nvidia_smi.gpu_frame_buffer_memory_usage | free, used, reserved | B | • | • |
-| nvidia_smi.gpu_bar1_memory_usage | free, used | B | • |   |
-| nvidia_smi.gpu_temperature | temperature | Celsius | • | • |
-| nvidia_smi.gpu_voltage | voltage | V | • |   |
-| nvidia_smi.gpu_clock_freq | graphics, video, sm, mem | MHz | • | • |
-| nvidia_smi.gpu_power_draw | power_draw | Watts | • | • |
-| nvidia_smi.gpu_performance_state | P0-P15 | state | • | • |
-| nvidia_smi.gpu_mig_mode_current_status | enabled, disabled | status | • |   |
-| nvidia_smi.gpu_mig_devices_count | mig | devices | • |   |
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nvidia_smi.gpu_pcie_bandwidth_usage | rx, tx | B/s |
+| nvidia_smi.gpu_pcie_bandwidth_utilization | rx, tx | % |
+| nvidia_smi.gpu_fan_speed_perc | fan_speed | % |
+| nvidia_smi.gpu_utilization | gpu | % |
+| nvidia_smi.gpu_memory_utilization | memory | % |
+| nvidia_smi.gpu_decoder_utilization | decoder | % |
+| nvidia_smi.gpu_encoder_utilization | encoder | % |
+| nvidia_smi.gpu_frame_buffer_memory_usage | free, used, reserved | B |
+| nvidia_smi.gpu_bar1_memory_usage | free, used | B |
+| nvidia_smi.gpu_temperature | temperature | Celsius |
+| nvidia_smi.gpu_voltage | voltage | V |
+| nvidia_smi.gpu_clock_freq | graphics, video, sm, mem | MHz |
+| nvidia_smi.gpu_power_draw | power_draw | Watts |
+| nvidia_smi.gpu_performance_state | P0-P15 | state |
+| nvidia_smi.gpu_mig_mode_current_status | enabled, disabled | status |
+| nvidia_smi.gpu_mig_devices_count | mig | devices |
 
 ### Per mig
 
@@ -103,10 +101,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | XML | CSV |
-|:------|:----------|:----|:---:|:---:|
-| nvidia_smi.gpu_mig_frame_buffer_memory_usage | free, used, reserved | B | • |   |
-| nvidia_smi.gpu_mig_bar1_memory_usage | free, used | B | • |   |
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nvidia_smi.gpu_mig_frame_buffer_memory_usage | free, used, reserved | B |
+| nvidia_smi.gpu_mig_bar1_memory_usage | free, used | B |
 
 
 
@@ -119,11 +117,7 @@ There are no alerts configured by default for this integration.
 
 ### Prerequisites
 
-#### Enable in go.d.conf.
-
-This collector is disabled by default. You need to explicitly enable it in the `go.d.conf` file.
-
-
+No action required.
 
 ### Configuration
 
@@ -152,25 +146,11 @@ The following options can be defined globally: update_every, autodetection_retry
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | binary_path | Path to nvidia_smi binary. The default is "nvidia_smi" and the executable is looked for in the directories specified in the PATH environment variable. | nvidia_smi | no |
 | timeout | nvidia_smi binary execution timeout. | 2 | no |
-| use_csv_format | Used format when requesting GPU information. XML is used if set to 'no'. | no | no |
+| loop_mode | When enabled, `nvidia-smi` is executed continuously in a separate thread using the `-l` option. | yes | no |
 
 </details>
 
 #### Examples
-
-##### CSV format
-
-Use CSV format when requesting GPU information.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: nvidia_smi
-    use_csv_format: yes
-
-```
-</details>
 
 ##### Custom binary path
 
@@ -191,6 +171,8 @@ jobs:
 ## Troubleshooting
 
 ### Debug Mode
+
+**Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
 To troubleshoot issues with the `nvidia_smi` collector, run the `go.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.

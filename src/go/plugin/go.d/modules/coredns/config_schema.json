@@ -40,7 +40,7 @@
         "properties": {
           "includes": {
             "title": "Include",
-            "description": "Include servers whose names match any of the specified inclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
+            "description": "Include servers whose names match any of the specified inclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#readme).",
             "type": [
               "array",
               "null"
@@ -53,7 +53,7 @@
           },
           "excludes": {
             "title": "Exclude",
-            "description": "Exclude servers whose names match any of the specified exclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
+            "description": "Exclude servers whose names match any of the specified exclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#readme).",
             "type": [
               "array",
               "null"
@@ -76,7 +76,7 @@
         "properties": {
           "includes": {
             "title": "Include",
-            "description": "Include zones whose names match any of the specified inclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
+            "description": "Include zones whose names match any of the specified inclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#readme).",
             "type": [
               "array",
               "null"
@@ -89,7 +89,7 @@
           },
           "excludes": {
             "title": "Exclude",
-            "description": "Exclude zones whose names match any of the specified exclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
+            "description": "Exclude zones whose names match any of the specified exclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#readme).",
             "type": [
               "array",
               "null"
@@ -253,6 +253,12 @@
     "per_zone_stats": {
       "ui:help": "The logic for inclusion and exclusion is as follows: `(include1 OR include2) AND !(exclude1 OR exclude2)`.",
       "ui:collapsible": true
+    },
+    "username": {
+      "ui:widget": "password"
+    },
+    "proxy_username": {
+      "ui:widget": "password"
     },
     "password": {
       "ui:widget": "password"

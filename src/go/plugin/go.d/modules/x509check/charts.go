@@ -36,6 +36,7 @@ var (
 		Ctx:   "x509check.revocation_status",
 		Opts:  module.Opts{StoreFirst: true},
 		Dims: module.Dims{
+			{ID: "not_revoked"},
 			{ID: "revoked"},
 		},
 	}

@@ -71,7 +71,7 @@
             },
             "match": {
               "title": "Pattern",
-              "description": "The [pattern string](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme) used to match against the full original request URI.",
+              "description": "The [pattern string](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#readme) used to match against the full original request URI.",
               "type": "string"
             }
           },
@@ -123,7 +123,7 @@
                   },
                   "match": {
                     "title": "Pattern",
-                    "description": "The [pattern string](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme) used to match against the field value.",
+                    "description": "The [pattern string](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#readme) used to match against the field value.",
                     "type": "string"
                   }
                 },

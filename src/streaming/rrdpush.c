@@ -54,7 +54,7 @@ char *netdata_ssl_ca_file = NULL;
 #endif
 
 static void load_stream_conf() {
-    errno = 0;
+    errno_clear();
     char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
     if(!appconfig_load(&stream_config, filename, 0, NULL)) {
         nd_log_daemon(NDLP_NOTICE, "CONFIG: cannot load user config '%s'. Will try stock config.", filename);

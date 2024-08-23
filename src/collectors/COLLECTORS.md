@@ -109,7 +109,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Jenkins](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/jenkins.md)
 
-- [Puppet](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/puppet/integrations/puppet.md)
+- [Puppet](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/puppet/integrations/puppet.md)
 
 ### Cloud Provider Managed
 
@@ -239,7 +239,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Memcached (community)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/memcached_community.md)
 
-- [Memcached](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/memcached/integrations/memcached.md)
+- [Memcached](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/memcached/integrations/memcached.md)
 
 - [MongoDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/mongodb/integrations/mongodb.md)
 
@@ -267,9 +267,9 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Redis](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/redis/integrations/redis.md)
 
-- [RethinkDB](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/rethinkdbs/integrations/rethinkdb.md)
+- [RethinkDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/rethinkdb/integrations/rethinkdb.md)
 
-- [RiakKV](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/riakkv/integrations/riakkv.md)
+- [Riak KV](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/riakkv/integrations/riak_kv.md)
 
 - [SQL Database agnostic](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/sql_database_agnostic.md)
 
@@ -283,7 +283,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [BOINC](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/boinc/integrations/boinc.md)
 
-- [Gearman](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/gearman/integrations/gearman.md)
+- [Gearman](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/gearman/integrations/gearman.md)
 
 ### DNS and DHCP Servers
 
@@ -303,7 +303,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [ISC DHCP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/isc_dhcpd/integrations/isc_dhcp.md)
 
-- [Name Server Daemon](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/nsd/integrations/name_server_daemon.md)
+- [NSD](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/nsd/integrations/nsd.md)
 
 - [NextDNS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/nextdns.md)
 
@@ -635,8 +635,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [ZFS Adaptive Replacement Cache](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/zfs_adaptive_replacement_cache.md)
 
-- [ZFS Pools](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/zfs_pools.md)
-
 #### Firewall
 
 - [Conntrack](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/conntrack.md)
@@ -679,7 +677,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 #### Network
 
-- [Access Points](https://github.com/netdata/netdata/blob/master/src/collectors/charts.d.plugin/ap/integrations/access_points.md)
+- [Access Points](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/ap/integrations/access_points.md)
 
 - [IP Virtual Server](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/ip_virtual_server.md)
 
@@ -745,9 +743,9 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [DMARC](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/dmarc.md)
 
-- [Dovecot](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/dovecot/integrations/dovecot.md)
+- [Dovecot](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/dovecot/integrations/dovecot.md)
 
-- [Exim](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/exim/integrations/exim.md)
+- [Exim](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/exim/integrations/exim.md)
 
 - [Halon](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/halon.md)
 
@@ -759,11 +757,9 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Discourse](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/discourse.md)
 
-- [Icecast](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/icecast/integrations/icecast.md)
+- [Icecast](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/icecast/integrations/icecast.md)
 
 - [OBS Studio](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/obs_studio.md)
-
-- [RetroShare](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/retroshare/integrations/retroshare.md)
 
 - [SABnzbd](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/sabnzbd.md)
 
@@ -779,7 +775,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Apache Pulsar](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/pulsar/integrations/apache_pulsar.md)
 
-- [Beanstalk](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/beanstalk/integrations/beanstalk.md)
+- [Beanstalk](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/beanstalk/integrations/beanstalk.md)
 
 - [IBM MQ](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/ibm_mq.md)
 
@@ -889,17 +885,11 @@ If you don't see the app/service you'd like to monitor in this list:
 
 ### Other
 
-- [Example collector](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/example/integrations/example_collector.md)
-
 - [Files and directories](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/filecheck/integrations/files_and_directories.md)
 
 - [GitHub API rate limit](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/github_api_rate_limit.md)
 
 - [GitHub repository](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/github_repository.md)
-
-- [Netdata Agent alarms](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/alarms/integrations/netdata_agent_alarms.md)
-
-- [python.d changefinder](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/changefinder/integrations/python.d_changefinder.md)
 
 - [python.d zscores](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/zscores/integrations/python.d_zscores.md)
 
@@ -1003,7 +993,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [IBM Spectrum](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/ibm_spectrum.md)
 
-- [IPFS](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/ipfs/integrations/ipfs.md)
+- [IPFS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/ipfs/integrations/ipfs.md)
 
 - [LVM logical volumes](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/lvm/integrations/lvm_logical_volumes.md)
 
@@ -1043,7 +1033,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Idle OS Jitter](https://github.com/netdata/netdata/blob/master/src/collectors/idlejitter.plugin/integrations/idle_os_jitter.md)
 
-- [Monit](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/monit/integrations/monit.md)
+- [Monit](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/monit/integrations/monit.md)
 
 - [Ping](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/ping/integrations/ping.md)
 
@@ -1111,7 +1101,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Speedify CLI](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/speedify_cli.md)
 
-- [Tor](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/tor/integrations/tor.md)
+- [Tor](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/tor/integrations/tor.md)
 
 - [WireGuard](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/wireguard/integrations/wireguard.md)
 
@@ -1151,11 +1141,11 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Squid log files](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/squidlog/integrations/squid_log_files.md)
 
-- [Squid](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/squid/integrations/squid.md)
+- [Squid](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/squid/integrations/squid.md)
 
 - [Tengine](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/tengine/integrations/tengine.md)
 
-- [Tomcat](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/tomcat/integrations/tomcat.md)
+- [Tomcat](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/tomcat/integrations/tomcat.md)
 
 - [Traefik](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/traefik/integrations/traefik.md)
 
@@ -1163,7 +1153,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Web server log files](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/weblog/integrations/web_server_log_files.md)
 
-- [uWSGI](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/uwsgi/integrations/uwsgi.md)
+- [uWSGI](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/uwsgi/integrations/uwsgi.md)
 
 ### Windows Systems
 

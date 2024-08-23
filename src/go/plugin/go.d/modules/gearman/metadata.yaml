@@ -1,0 +1,152 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-gearman
+      plugin_name: go.d.plugin
+      module_name: gearman
+      monitored_instance:
+        name: Gearman
+        link: https://gearman.org/
+        categories:
+          - data-collection.distributed-computing-systems
+        icon_filename: "gearman.png"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - gearman
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitors jobs activity, priority and available workers. It collects summary and function-specific statistics.
+        method_description: |
+          This collector connects to a Gearman instance via TCP socket and executes the following commands:
+
+          - status
+          - priority-status
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects Gearman instances running on localhost that are listening on port 4730.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/gearman.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: The IP address and port where the Gearman service listens for connections.
+              default_value: 127.0.0.1:11211
+              required: true
+            - name: timeout
+              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:4730
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:4730
+
+                  - name: remote
+                    address: 203.0.113.0:4730
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: gearman.queued_jobs_activity
+              description: Jobs Activity
+              unit: "jobs"
+              chart_type: stacked
+              dimensions:
+                - name: running
+                - name: waiting
+            - name: gearman.queued_jobs_priority
+              description: Jobs Priority
+              unit: "jobs"
+              chart_type: stacked
+              dimensions:
+                - name: high
+                - name: normal
+                - name: low
+        - name: global
+          description: "These metrics refer to the Function (task)."
+          labels:
+            - name: function_name
+              description: Function name.
+          metrics:
+            - name: gearman.function_queued_jobs_activity
+              description: Function Jobs Activity
+              unit: "jobs"
+              chart_type: stacked
+              dimensions:
+                - name: running
+                - name: waiting
+            - name: gearman.function_queued_jobs_priority
+              description: Function Jobs Priority
+              unit: "jobs"
+              chart_type: stacked
+              dimensions:
+                - name: high
+                - name: normal
+                - name: low
+            - name: gearman.function_workers
+              description: Function Workers
+              unit: "workers"
+              chart_type: line
+              dimensions:
+                - name: available

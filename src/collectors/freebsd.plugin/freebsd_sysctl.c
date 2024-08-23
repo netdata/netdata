@@ -1142,30 +1142,10 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
                 }
             }
 
-            static RRDSET *st_semaphores = NULL, *st_semaphore_arrays = NULL;
-            static RRDDIM *rd_semaphores = NULL, *rd_semaphore_arrays = NULL;
+            static RRDSET *st_semaphore_arrays = NULL;
+            static RRDDIM *rd_semaphore_arrays = NULL;
 
-            if (unlikely(!st_semaphores)) {
-                st_semaphores = rrdset_create_localhost(
-                        "system",
-                        "ipc_semaphores",
-                        NULL,
-                        "ipc semaphores",
-                        NULL,
-                        "IPC Semaphores",
-                        "semaphores",
-                        "freebsd.plugin",
-                        "kern.ipc.sem",
-                        NETDATA_CHART_PRIO_SYSTEM_IPC_SEMAPHORES,
-                        update_every,
-                        RRDSET_TYPE_AREA
-                );
-
-                rd_semaphores = rrddim_add(st_semaphores, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            }
-
-            rrddim_set_by_pointer(st_semaphores, rd_semaphores, ipc_sem.semaphores);
-            rrdset_done(st_semaphores);
+            common_semaphore_ipc(ipc_sem.semaphores, 0.0, "kern.ipc.sem", update_every);
 
             if (unlikely(!st_semaphore_arrays)) {
                 st_semaphore_arrays = rrdset_create_localhost(

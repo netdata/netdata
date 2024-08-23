@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-cmake_minimum_required(VERSION 3.13.0...3.28)
+cmake_minimum_required(VERSION 3.16.0...3.30)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/Modules")
 
@@ -90,7 +90,6 @@ set(OS_FREEBSD     False)
 set(OS_LINUX       False)
 set(OS_MACOS       False)
 set(OS_WINDOWS     False)
-set(ALLOW_PLATFORM_SENSITIVE_OPTIONS True)
 
 set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
 set(BINDIR usr/sbin)
@@ -99,19 +98,14 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
         set(OS_MACOS True)
         find_library(IOKIT IOKit)
         find_library(FOUNDATION Foundation)
-        message(INFO " Compiling for MacOS... ")
+        message(STATUS " Compiling for MacOS... ")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
         set(OS_FREEBSD True)
-        message(INFO " Compiling for FreeBSD... ")
+        message(STATUS " Compiling for FreeBSD... ")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
         set(OS_LINUX True)
         add_definitions(-D_GNU_SOURCE)
-        message(INFO " Compiling for Linux... ")
-        include(NetdataUtil)
-        netdata_identify_libc(LIBC_IMPLEMENTATION)
-        if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND LIBC_IMPLEMENTATION STREQUAL "musl")
-            set(ALLOW_PLATFORM_SENSITIVE_OPTIONS False)
-        endif()
+        message(STATUS " Compiling for Linux... ")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
         set(OS_WINDOWS True)
 
@@ -140,13 +134,15 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
                 endif()
         endif()
 
-        message(INFO " Compiling for Windows (${CMAKE_SYSTEM_NAME}, MSYSTEM=$ENV{MSYSTEM})... ")
+        message(STATUS " Compiling for Windows (${CMAKE_SYSTEM_NAME}, MSYSTEM=$ENV{MSYSTEM})... ")
 else()
         message(FATAL_ERROR "Unknown/unsupported platform: ${CMAKE_SYSTEM_NAME} (Supported platforms: FreeBSD, Linux, macOS, Windows)")
 endif()
 
 # This is intended to make life easier for developers who are working on one
 # specific feature.
+#
+# NOTE: DO NOT USE THIS OPTION FOR PRODUCTION BUILDS.
 option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" True)
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
@@ -157,10 +153,10 @@ option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
 # Data collection plugins
-option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 
-cmake_dependent_option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD OR OS_MACOS" False)
+cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
+cmake_dependent_option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 
 cmake_dependent_option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD" False)
 
@@ -170,7 +166,6 @@ cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" 
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
-cmake_dependent_option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" False "OS_LINUX AND ALLOW_PLATFORM_SENSITIVE_OPTIONS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
@@ -186,10 +181,6 @@ option(ENABLE_EXPORTER_MONGODB "Enable exporting to MongoDB" ${DEFAULT_FEATURE_S
 option(ENABLE_BUNDLED_JSONC "Force use of a vendored copy of JSON-C" False)
 option(ENABLE_BUNDLED_YAML "Force use of a vendored copy of libyaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
-
-# Optional test code
-cmake_dependent_option(ENABLE_LOGS_MANAGEMENT_TESTS "Enable test code for logs-management plugin." True "ENABLE_PLUGIN_LOGS_MANAGEMENT" False)
-mark_as_advanced(ENABLE_LOGS_MANAGEMENT_TESTS)
 
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
@@ -219,6 +210,12 @@ if(ENABLE_PLUGIN_GO)
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
 
     find_package(Go "${MIN_GO_VERSION}" REQUIRED)
+endif()
+
+if(ENABLE_PLUGIN_GO)
+    set(NEED_NDSUDO TRUE)
+else()
+    set(NEED_NDSUDO FALSE)
 endif()
 
 if(ENABLE_WEBRTC)
@@ -668,8 +665,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/byteorder.h
         src/libnetdata/onewayalloc/onewayalloc.c
         src/libnetdata/onewayalloc/onewayalloc.h
-        src/libnetdata/popen/popen.c
-        src/libnetdata/popen/popen.h
         src/libnetdata/procfile/procfile.c
         src/libnetdata/procfile/procfile.h
         src/libnetdata/query_progress/progress.c
@@ -720,8 +715,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/linked-lists.h
         src/libnetdata/storage-point.h
         src/libnetdata/bitmap64.h
-        src/libnetdata/os/waitid.c
-        src/libnetdata/os/waitid.h
         src/libnetdata/os/gettid.c
         src/libnetdata/os/gettid.h
         src/libnetdata/os/adjtimex.c
@@ -750,6 +743,14 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setenv.h
         src/libnetdata/os/strndup.c
         src/libnetdata/os/strndup.h
+        src/libnetdata/spawn_server/spawn_server.c
+        src/libnetdata/spawn_server/spawn_server.h
+        src/libnetdata/spawn_server/spawn_popen.c
+        src/libnetdata/spawn_server/spawn_popen.h
+        src/libnetdata/os/close_range.c
+        src/libnetdata/os/close_range.h
+        src/libnetdata/os/setproctitle.c
+        src/libnetdata/os/setproctitle.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1178,6 +1179,7 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
         src/libnetdata/maps/system-users.h
         src/libnetdata/maps/system-groups.h
+        src/libnetdata/maps/system-services.h
 )
 
 set(STREAMING_PLUGIN_FILES
@@ -1214,13 +1216,6 @@ set(WEB_PLUGIN_FILES
 set(CLAIM_PLUGIN_FILES
         src/claim/claim.c
         src/claim/claim.h
-)
-
-set(SPAWN_PLUGIN_FILES
-        src/spawn/spawn.c
-        src/spawn/spawn_server.c
-        src/spawn/spawn_client.c
-        src/spawn/spawn.h
 )
 
 set(ACLK_ALWAYS_BUILD
@@ -1299,6 +1294,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-dump.c
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
+        src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
@@ -1356,44 +1352,6 @@ set(TC_PLUGIN_FILES
         src/collectors/tc.plugin/plugin_tc.c
 )
 
-set(LOGS_MANAGEMENT_PLUGIN_FILES
-        src/logsmanagement/circular_buffer.c
-        src/logsmanagement/circular_buffer.h
-        src/logsmanagement/db_api.c
-        src/logsmanagement/db_api.h
-        src/logsmanagement/defaults.h
-        src/logsmanagement/file_info.h
-        src/logsmanagement/flb_plugin.c
-        src/logsmanagement/flb_plugin.h
-        src/logsmanagement/functions.c
-        src/logsmanagement/functions.h
-        src/logsmanagement/helper.h
-        src/logsmanagement/logsmanag_config.c
-        src/logsmanagement/logsmanag_config.h
-        src/logsmanagement/logsmanagement.c
-        src/logsmanagement/parser.c
-        src/logsmanagement/parser.h
-        src/logsmanagement/query.c
-        src/logsmanagement/query.h
-        src/logsmanagement/rrd_api/rrd_api_docker_ev.c
-        src/logsmanagement/rrd_api/rrd_api_docker_ev.h
-        src/logsmanagement/rrd_api/rrd_api_generic.c
-        src/logsmanagement/rrd_api/rrd_api_generic.h
-        src/logsmanagement/rrd_api/rrd_api_kernel.c
-        src/logsmanagement/rrd_api/rrd_api_kernel.h
-        src/logsmanagement/rrd_api/rrd_api_mqtt.c
-        src/logsmanagement/rrd_api/rrd_api_mqtt.h
-        src/logsmanagement/rrd_api/rrd_api_stats.c
-        src/logsmanagement/rrd_api/rrd_api_stats.h
-        src/logsmanagement/rrd_api/rrd_api_systemd.c
-        src/logsmanagement/rrd_api/rrd_api_systemd.h
-        src/logsmanagement/rrd_api/rrd_api_web_log.c
-        src/logsmanagement/rrd_api/rrd_api_web_log.h
-        src/logsmanagement/rrd_api/rrd_api.h
-        src/database/sqlite/sqlite3.c
-        src/database/sqlite/sqlite3.h
-)
-
 set(NETDATA_FILES
         src/collectors/all.h
         ${DAEMON_FILES}
@@ -1409,7 +1367,6 @@ set(NETDATA_FILES
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
-        ${SPAWN_PLUGIN_FILES}
         ${ACLK_ALWAYS_BUILD}
         ${PROFILE_PLUGIN_FILES}
 )
@@ -1936,45 +1893,6 @@ if(ENABLE_PLUGIN_SLABINFO)
     endif()
 endif()
 
-if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
-    set(ENABLE_LOGSMANAGEMENT True)
-
-    if(ENABLE_LOGS_MANAGEMENT_TESTS)
-        list(APPEND LOGS_MANAGEMENT_PLUGIN_FILES src/logsmanagement/unit_test/unit_test.c
-                                                 src/logsmanagement/unit_test/unit_test.h)
-        set(ENABLE_LOGSMANAGEMENT_TESTS True)
-    endif()
-
-    add_executable(logs-management.plugin ${LOGS_MANAGEMENT_PLUGIN_FILES})
-    target_link_libraries(logs-management.plugin libnetdata)
-
-    install(TARGETS logs-management.plugin
-            COMPONENT plugin-logs-management
-            DESTINATION usr/libexec/netdata/plugins.d)
-
-    install(DIRECTORY src/logsmanagement/stock_conf/logsmanagement.d
-            COMPONENT plugin-logs-management
-            DESTINATION usr/lib/netdata/conf.d)
-
-    install(DIRECTORY
-            COMPONENT plugin-logs-management
-            DESTINATION etc/netdata/logsmanagement.d)
-
-    configure_file(src/logsmanagement/stock_conf/logsmanagement.d.conf.in
-                   src/logsmanagement/stock_conf/logsmanagement.d.conf
-                   @ONLY)
-
-    install(FILES ${CMAKE_BINARY_DIR}/src/logsmanagement/stock_conf/logsmanagement.d.conf
-            COMPONENT plugin-logs-management
-            DESTINATION usr/lib/netdata/conf.d)
-
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-logs-management
-                DESTINATION usr/share/doc/netdata-plugin-logs-management)
-    endif()
-endif()
 
 if(ENABLE_PLUGIN_CUPS)
     pkg_check_modules(CUPS libcups)
@@ -2016,13 +1934,15 @@ if(ENABLE_PLUGIN_CUPS)
     endif()
 endif()
 
-set(NDSUDO_FILES src/collectors/plugins.d/ndsudo.c)
+if(NEED_NDSUDO)
+    set(NDSUDO_FILES src/collectors/plugins.d/ndsudo.c)
 
-add_executable(ndsudo ${NDSUDO_FILES})
+    add_executable(ndsudo ${NDSUDO_FILES})
 
-install(TARGETS ndsudo
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata/plugins.d)
+    install(TARGETS ndsudo
+            COMPONENT netdata
+            DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 
 if(ENABLE_PLUGIN_CGROUP_NETWORK)
     set(CGROUP_NETWORK_FILES src/collectors/cgroups.plugin/cgroup-network.c)
@@ -2520,12 +2440,6 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION usr/libexec/netdata)
 
-configure_file(system/cron/netdata-updater-daily.in system/cron/netdata-updater-daily @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/cron/netdata-updater-daily
-        COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/cron)
-
 configure_file(system/launchd/netdata.plist.in system/launchd/netdata.plist @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/launchd/netdata.plist
@@ -2533,13 +2447,13 @@ install(FILES
         DESTINATION usr/lib/netdata/system/launchd)
 
 configure_file(system/freebsd/rc.d/netdata.in system/freebsd/rc.d/netdata @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/freebsd/rc.d/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/freebsd/rc.d)
 
 configure_file(system/initd/init.d/netdata.in system/initd/init.d/netdata @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/initd/init.d/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/initd/init.d)
@@ -2555,7 +2469,7 @@ install(FILES
         DESTINATION etc/logrotate.d)
 
 configure_file(system/lsb/init.d/netdata.in system/lsb/init.d/netdata @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/lsb/init.d/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/lsb/init.d)
@@ -2567,13 +2481,13 @@ install(FILES
         DESTINATION usr/lib/netdata/system/openrc/conf.d)
 
 configure_file(system/openrc/init.d/netdata.in system/openrc/init.d/netdata @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/openrc/init.d/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/openrc/init.d)
 
 configure_file(system/runit/run.in system/runit/run @ONLY)
-install(PROGRAMS
+install(FILES
         ${CMAKE_BINARY_DIR}/system/runit/run
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/runit)
@@ -2601,28 +2515,10 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
-configure_file(system/systemd/netdata-updater.service.in system/systemd/netdata-updater.service @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
-        COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/systemd)
-
-install(FILES
-        system/systemd/netdata-updater.timer
-        COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/systemd)
 
 if(BUILD_FOR_PACKAGING)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
-                COMPONENT netdata
-                DESTINATION lib/systemd/system)
-        install(FILES
-                ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
-                COMPONENT netdata
-                DESTINATION lib/systemd/system)
-        install(FILES
-                system/systemd/netdata-updater.timer
                 COMPONENT netdata
                 DESTINATION lib/systemd/system)
         install(DIRECTORY
@@ -2661,12 +2557,6 @@ else()
         set(NETDATA_CONF_DEST "usr/lib/netdata/conf.d")
 endif()
 
-install(FILES
-        system/netdata.conf
-        system/netdata-updater.conf
-        COMPONENT netdata
-        DESTINATION ${NETDATA_CONF_DEST})
-
 #
 # misc files
 #
@@ -2682,10 +2572,50 @@ if(BUILD_FOR_PACKAGING)
                 DESTINATION etc/init.d)
 endif()
 
-install(PROGRAMS
-        packaging/installer/netdata-updater.sh
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata)
+if(NOT OS_WINDOWS)
+  install(PROGRAMS
+          packaging/installer/netdata-updater.sh
+          COMPONENT netdata
+          DESTINATION usr/libexec/netdata)
+
+  install(FILES
+          system/netdata.conf
+          system/netdata-updater.conf
+          COMPONENT netdata
+          DESTINATION ${NETDATA_CONF_DEST})
+
+  configure_file(system/cron/netdata-updater-daily.in
+                 system/cron/netdata-updater-daily
+                 @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/cron/netdata-updater-daily
+          COMPONENT netdata
+          DESTINATION usr/lib/netdata/system/cron)
+
+  configure_file(system/systemd/netdata-updater.service.in
+                 system/systemd/netdata-updater.service
+                 @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
+          COMPONENT netdata
+          DESTINATION usr/lib/netdata/system/systemd)
+
+  install(FILES
+          system/systemd/netdata-updater.timer
+          COMPONENT netdata
+          DESTINATION usr/lib/netdata/system/systemd)
+
+  if(BUILD_FOR_PACKAGING)
+    install(FILES
+            ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
+            COMPONENT netdata
+            DESTINATION lib/systemd/system)
+    install(FILES
+            system/systemd/netdata-updater.timer
+            COMPONENT netdata
+            DESTINATION lib/systemd/system)
+  endif()
+endif()
 
 #
 # TODO: check the following files for correct substitutions
@@ -2723,11 +2653,13 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
-install(PROGRAMS
-        src/health/notifications/alarm-email.sh
-        src/health/notifications/alarm-test.sh
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata/plugins.d)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        install(PROGRAMS
+                src/health/notifications/alarm-email.sh
+                src/health/notifications/alarm-test.sh
+                COMPONENT netdata
+                DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 
 install(FILES
         src/health/notifications/health_alarm_notify.conf
@@ -2738,22 +2670,23 @@ install(FILES
 # test/ files
 #
 
-configure_file(tests/health_mgmtapi/health-cmdapi-test.sh.in tests/health_mgmtapi/health-cmdapi-test.sh @ONLY)
-configure_file(tests/acls/acl.sh.in tests/acls/acl.sh @ONLY)
-configure_file(tests/urls/request.sh.in tests/urls/request.sh @ONLY)
-configure_file(tests/alarm_repetition/alarm.sh.in tests/alarm_repetition/alarm.sh @ONLY)
-configure_file(tests/template_dimension/template_dim.sh.in tests/template_dimension/template_dim.sh @ONLY)
-configure_file(tests/ebpf/ebpf_thread_function.sh.in tests/ebpf/ebpf_thread_function.sh @ONLY)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        configure_file(tests/health_mgmtapi/health-cmdapi-test.sh.in tests/health_mgmtapi/health-cmdapi-test.sh @ONLY)
+        configure_file(tests/acls/acl.sh.in tests/acls/acl.sh @ONLY)
+        configure_file(tests/urls/request.sh.in tests/urls/request.sh @ONLY)
+        configure_file(tests/alarm_repetition/alarm.sh.in tests/alarm_repetition/alarm.sh @ONLY)
+        configure_file(tests/template_dimension/template_dim.sh.in tests/template_dimension/template_dim.sh @ONLY)
+        configure_file(tests/ebpf/ebpf_thread_function.sh.in tests/ebpf/ebpf_thread_function.sh @ONLY)
 
-install(FILES
-        ${CMAKE_BINARY_DIR}/tests/health_mgmtapi/health-cmdapi-test.sh
-        ${CMAKE_BINARY_DIR}/tests/acls/acl.sh
-        ${CMAKE_BINARY_DIR}/tests/urls/request.sh
-        ${CMAKE_BINARY_DIR}/tests/alarm_repetition/alarm.sh
-        ${CMAKE_BINARY_DIR}/tests/template_dimension/template_dim.sh
-        ${CMAKE_BINARY_DIR}/tests/ebpf/ebpf_thread_function.sh
-        DESTINATION usr/libexec/netdata/plugins.d)
-
+        install(FILES
+                ${CMAKE_BINARY_DIR}/tests/health_mgmtapi/health-cmdapi-test.sh
+                ${CMAKE_BINARY_DIR}/tests/acls/acl.sh
+                ${CMAKE_BINARY_DIR}/tests/urls/request.sh
+                ${CMAKE_BINARY_DIR}/tests/alarm_repetition/alarm.sh
+                ${CMAKE_BINARY_DIR}/tests/template_dimension/template_dim.sh
+                ${CMAKE_BINARY_DIR}/tests/ebpf/ebpf_thread_function.sh
+                DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 #
 # charts.d plugin
 #
@@ -2783,7 +2716,6 @@ install(FILES
         DESTINATION usr/lib/netdata/conf.d)
 
 install(PROGRAMS
-        src/collectors/charts.d.plugin/ap/ap.chart.sh
         src/collectors/charts.d.plugin/apcupsd/apcupsd.chart.sh
         src/collectors/charts.d.plugin/example/example.chart.sh
         src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
@@ -2793,7 +2725,6 @@ install(PROGRAMS
         DESTINATION usr/libexec/netdata/charts.d)
 
 install(FILES
-        src/collectors/charts.d.plugin/ap/ap.conf
         src/collectors/charts.d.plugin/apcupsd/apcupsd.conf
         src/collectors/charts.d.plugin/example/example.conf
         src/collectors/charts.d.plugin/libreswan/libreswan.conf
@@ -2844,39 +2775,18 @@ install(FILES src/collectors/python.d.plugin/python.d.conf
         DESTINATION usr/lib/netdata/conf.d)
 
 install(FILES
-        src/collectors/python.d.plugin/alarms/alarms.conf
         src/collectors/python.d.plugin/am2320/am2320.conf
         src/collectors/python.d.plugin/anomalies/anomalies.conf
-        src/collectors/python.d.plugin/beanstalk/beanstalk.conf
         src/collectors/python.d.plugin/boinc/boinc.conf
         src/collectors/python.d.plugin/ceph/ceph.conf
-        src/collectors/python.d.plugin/changefinder/changefinder.conf
-        src/collectors/python.d.plugin/dovecot/dovecot.conf
-        src/collectors/python.d.plugin/example/example.conf
-        src/collectors/python.d.plugin/exim/exim.conf
-        src/collectors/python.d.plugin/gearman/gearman.conf
         src/collectors/python.d.plugin/go_expvar/go_expvar.conf
         src/collectors/python.d.plugin/haproxy/haproxy.conf
-        src/collectors/python.d.plugin/icecast/icecast.conf
-        src/collectors/python.d.plugin/ipfs/ipfs.conf
-        src/collectors/python.d.plugin/memcached/memcached.conf
-        src/collectors/python.d.plugin/monit/monit.conf
-        src/collectors/python.d.plugin/nsd/nsd.conf
-        src/collectors/python.d.plugin/nvidia_smi/nvidia_smi.conf
         src/collectors/python.d.plugin/openldap/openldap.conf
         src/collectors/python.d.plugin/oracledb/oracledb.conf
         src/collectors/python.d.plugin/pandas/pandas.conf
-        src/collectors/python.d.plugin/puppet/puppet.conf
-        src/collectors/python.d.plugin/rethinkdbs/rethinkdbs.conf
-        src/collectors/python.d.plugin/retroshare/retroshare.conf
-        src/collectors/python.d.plugin/riakkv/riakkv.conf
         src/collectors/python.d.plugin/samba/samba.conf
         src/collectors/python.d.plugin/spigotmc/spigotmc.conf
-        src/collectors/python.d.plugin/squid/squid.conf
-        src/collectors/python.d.plugin/tomcat/tomcat.conf
-        src/collectors/python.d.plugin/tor/tor.conf
         src/collectors/python.d.plugin/traefik/traefik.conf
-        src/collectors/python.d.plugin/uwsgi/uwsgi.conf
         src/collectors/python.d.plugin/varnish/varnish.conf
         src/collectors/python.d.plugin/w1sensor/w1sensor.conf
         src/collectors/python.d.plugin/zscores/zscores.conf
@@ -2884,39 +2794,18 @@ install(FILES
         DESTINATION usr/lib/netdata/conf.d/python.d)
 
 install(FILES
-        src/collectors/python.d.plugin/alarms/alarms.chart.py
         src/collectors/python.d.plugin/am2320/am2320.chart.py
         src/collectors/python.d.plugin/anomalies/anomalies.chart.py
-        src/collectors/python.d.plugin/beanstalk/beanstalk.chart.py
         src/collectors/python.d.plugin/boinc/boinc.chart.py
         src/collectors/python.d.plugin/ceph/ceph.chart.py
-        src/collectors/python.d.plugin/changefinder/changefinder.chart.py
-        src/collectors/python.d.plugin/dovecot/dovecot.chart.py
-        src/collectors/python.d.plugin/example/example.chart.py
-        src/collectors/python.d.plugin/exim/exim.chart.py
-        src/collectors/python.d.plugin/gearman/gearman.chart.py
         src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
         src/collectors/python.d.plugin/haproxy/haproxy.chart.py
-        src/collectors/python.d.plugin/icecast/icecast.chart.py
-        src/collectors/python.d.plugin/ipfs/ipfs.chart.py
-        src/collectors/python.d.plugin/memcached/memcached.chart.py
-        src/collectors/python.d.plugin/monit/monit.chart.py
-        src/collectors/python.d.plugin/nsd/nsd.chart.py
-        src/collectors/python.d.plugin/nvidia_smi/nvidia_smi.chart.py
         src/collectors/python.d.plugin/openldap/openldap.chart.py
         src/collectors/python.d.plugin/oracledb/oracledb.chart.py
         src/collectors/python.d.plugin/pandas/pandas.chart.py
-        src/collectors/python.d.plugin/puppet/puppet.chart.py
-        src/collectors/python.d.plugin/rethinkdbs/rethinkdbs.chart.py
-        src/collectors/python.d.plugin/retroshare/retroshare.chart.py
-        src/collectors/python.d.plugin/riakkv/riakkv.chart.py
         src/collectors/python.d.plugin/samba/samba.chart.py
         src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
-        src/collectors/python.d.plugin/squid/squid.chart.py
-        src/collectors/python.d.plugin/tomcat/tomcat.chart.py
-        src/collectors/python.d.plugin/tor/tor.chart.py
         src/collectors/python.d.plugin/traefik/traefik.chart.py
-        src/collectors/python.d.plugin/uwsgi/uwsgi.chart.py
         src/collectors/python.d.plugin/varnish/varnish.chart.py
         src/collectors/python.d.plugin/w1sensor/w1sensor.chart.py
         src/collectors/python.d.plugin/zscores/zscores.chart.py

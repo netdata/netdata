@@ -45,12 +45,8 @@ This collector supports collecting metrics from multiple instances of this integ
 
 #### Auto-Detection
 
-By default, it detects instances running on localhost by trying to connect as root and netdata using known MySQL TCP and UNIX sockets:
+By default, it detects instances running on localhost by trying to connect as root and netdata using known MySQL TCP sockets:
 
-- /var/run/mysqld/mysqld.sock
-- /var/run/mysqld/mysql.sock
-- /var/lib/mysql/mysql.sock
-- /tmp/mysql.sock
 - 127.0.0.1:3306
 - "[::1]:3306"
 
@@ -344,6 +340,8 @@ jobs:
 ## Troubleshooting
 
 ### Debug Mode
+
+**Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
 To troubleshoot issues with the `mysql` collector, run the `go.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.

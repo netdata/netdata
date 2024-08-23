@@ -3,6 +3,7 @@
 package functions
 
 import (
+	"bufio"
 	"context"
 	"sort"
 	"strings"
@@ -15,7 +16,7 @@ import (
 func TestNewManager(t *testing.T) {
 	mgr := NewManager()
 
-	assert.NotNilf(t, mgr.Input, "Input")
+	assert.NotNilf(t, mgr.input, "Input")
 	assert.NotNilf(t, mgr.FunctionRegistry, "FunctionRegistry")
 }
 
@@ -261,7 +262,7 @@ FUNCTION_PAYLOAD_END
 		t.Run(name, func(t *testing.T) {
 			mgr := NewManager()
 
-			mgr.Input = strings.NewReader(test.input)
+			mgr.input = newMockInput(test.input)
 
 			mock := &mockFunctionExecutor{}
 			for _, v := range test.register {
@@ -296,4 +297,24 @@ type mockFunctionExecutor struct {
 
 func (m *mockFunctionExecutor) execute(fn Function) {
 	m.executed = append(m.executed, fn)
+}
+
+func newMockInput(data string) *mockInput {
+	m := &mockInput{chLines: make(chan string)}
+	sc := bufio.NewScanner(strings.NewReader(data))
+	go func() {
+		for sc.Scan() {
+			m.chLines <- sc.Text()
+		}
+		close(m.chLines)
+	}()
+	return m
+}
+
+type mockInput struct {
+	chLines chan string
+}
+
+func (m *mockInput) lines() chan string {
+	return m.chLines
 }

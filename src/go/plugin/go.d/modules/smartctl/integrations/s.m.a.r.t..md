@@ -83,6 +83,9 @@ Metrics:
 | smartctl.device_power_on_time | power_on_time | seconds |
 | smartctl.device_temperature | temperature | Celsius |
 | smartctl.device_power_cycles_count | power | cycles |
+| smartctl.device_read_errors_rate | corrected, uncorrected | errors/s |
+| smartctl.device_write_errors_rate | corrected, uncorrected | errors/s |
+| smartctl.device_verify_errors_rate | corrected, uncorrected | errors/s |
 | smartctl.device_smart_attr_{attribute_name} | {attribute_name} | {attribute_unit} |
 | smartctl.device_smart_attr_{attribute_name}_normalized | {attribute_name} | value |
 
@@ -104,30 +107,36 @@ Install `smartmontools` version 7.0 or later using your distribution's package m
 
 #### For Netdata running in a Docker container
 
-Netdata requires the `SYS_RAWIO` capability and access to the storage devices to run the `smartctl` collector inside a Docker container. Here's how you can achieve this:
+1. **Install smartmontools**.
 
-- `docker run`
+    Ensure `smartctl` is available in the container by setting the environment variable `NETDATA_EXTRA_DEB_PACKAGES=smartmontools` when starting the container.
 
-  ```bash
-  docker run --cap-add SYS_RAWIO --device /dev/sda:/dev/sda ...
-  ```
+2. **Provide access to storage devices**.
 
-- `docker-compose.yml`
+    Netdata requires the `SYS_RAWIO` capability and access to the storage devices to run the `smartctl` collector inside a Docker container. Here's how you can achieve this:
 
-  ```yaml
-  services:
-    netdata:
-      cap_add:
-        - SYS_PTRACE
-        - SYS_ADMIN
-        - SYS_RAWIO # smartctl
-      devices:
-        - "/dev/sda:/dev/sda"
-  ```
+    - `docker run`
 
-> **Multiple Devices**: These examples only show mapping of one device (/dev/sda). You'll need to add additional `--device` options (in docker run) or entries in the `devices` list (in docker-compose.yml) for each storage device you want Netdata's smartctl collector to monitor.
+      ```bash
+      docker run --cap-add SYS_RAWIO --device /dev/sda:/dev/sda ...
+      ```
 
-> **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nvme#readme) to monitor NVMe devices.
+    - `docker-compose.yml`
+
+      ```yaml
+      services:
+        netdata:
+          cap_add:
+            - SYS_PTRACE
+            - SYS_ADMIN
+            - SYS_RAWIO # smartctl
+          devices:
+            - "/dev/sda:/dev/sda"
+      ```
+
+    > **Multiple Devices**: These examples only show mapping of one device (/dev/sda). You'll need to add additional `--device` options (in docker run) or entries in the `devices` list (in docker-compose.yml) for each storage device you want Netdata's smartctl collector to monitor.
+
+    > **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nvme#readme) to monitor NVMe devices.
 
 
 
@@ -156,9 +165,10 @@ The following options can be defined globally: update_every.
 |:----|:-----------|:-------|:--------:|
 | update_every | interval for updating Netdata charts, measured in seconds. Collector might use cached data if less than **Devices poll interval**. | 10 | no |
 | timeout | smartctl binary execution timeout. | 5 | no |
-| scan_every | interval for discovering new devices using `smartctl --scan`, measured in seconds. | 900 | no |
+| scan_every | interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup. | 900 | no |
 | poll_devices_every | interval for gathering data for every device, measured in seconds. Data is cached for this interval. | 300 | no |
 | device_selector | Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
+| extra_devices | Allows manual specification of devices not automatically detected by `smartctl --scan`. Each device entry must include both a name and a type. See "Configuration Examples" for details. | [] | no |
 | no_check_power_mode | Skip data collection when the device is in a low-power mode. Prevents unnecessary disk spin-up. | standby | no |
 
 ##### no_check_power_mode
@@ -191,11 +201,30 @@ jobs:
 ```
 </details>
 
+##### Extra devices
+
+This example demonstrates using `extra_devices` to manually add a storage device (`/dev/sdc`) not automatically detected by `smartctl --scan`.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: smartctl
+    extra_devices:
+      - name: /dev/sdc
+        type: jmb39x-q,3
+
+```
+</details>
+
 
 
 ## Troubleshooting
 
 ### Debug Mode
+
+**Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
 To troubleshoot issues with the `smartctl` collector, run the `go.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.

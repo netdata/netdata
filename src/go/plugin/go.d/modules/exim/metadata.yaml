@@ -1,0 +1,100 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-exim
+      plugin_name: go.d.plugin
+      module_name: exim
+      monitored_instance:
+        name: Exim
+        link: "https://www.exim.org/"
+        icon_filename: 'exim.jpg'
+        categories:
+          - data-collection.mail-servers
+      keywords:
+        - exim
+        - mail
+        - email
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: >
+          This collector monitors Exim mail queue.
+          It relies on the [`exim`](https://www.exim.org/exim-html-3.20/doc/html/spec_5.html) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+          
+          Executed commands:
+          
+          - `exim -bpc`
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/exim.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: timeout
+              description: exim binary execution timeout.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
+              config: |
+                jobs:
+                  - name: exim
+                    update_every: 5  # Collect logical volume statistics every 5 seconds
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the the entire monitored application.
+          labels: []
+          metrics:
+            - name: exim.qemails
+              description: Exim Queue Emails
+              unit: 'emails'
+              chart_type: line
+              dimensions:
+                - name: emails

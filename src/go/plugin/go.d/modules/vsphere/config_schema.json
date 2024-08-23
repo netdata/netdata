@@ -236,7 +236,11 @@
       "ui:listFlavour": "list"
     },
     "username": {
-      "ui:placeholder": "admin@vsphere.local"
+      "ui:placeholder": "admin@vsphere.local",
+      "ui:widget": "password"
+    },
+    "proxy_username": {
+      "ui:widget": "password"
     },
     "password": {
       "ui:widget": "password"

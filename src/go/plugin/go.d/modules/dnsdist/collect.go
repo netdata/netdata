@@ -36,8 +36,10 @@ func (d *DNSdist) collectStatistic(collected map[string]int64, statistics *stati
 }
 
 func (d *DNSdist) scrapeStatistics() (*statisticMetrics, error) {
-	req, _ := web.NewHTTPRequest(d.Request)
-	req.URL.Path = urlPathJSONStat
+	req, err := web.NewHTTPRequestWithPath(d.Request, urlPathJSONStat)
+	if err != nil {
+		return nil, err
+	}
 	req.URL.RawQuery = url.Values{"command": []string{"stats"}}.Encode()
 
 	var statistics statisticMetrics

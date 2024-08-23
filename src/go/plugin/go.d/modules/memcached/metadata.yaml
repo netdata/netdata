@@ -1,0 +1,217 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-memcached
+      plugin_name: go.d.plugin
+      module_name: memcached
+      monitored_instance:
+        name: Memcached
+        link: https://memcached.org/
+        categories:
+          - data-collection.database-servers
+        icon_filename: "memcached.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - memcached
+        - memcache
+        - cache
+        - database
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Monitor Memcached metrics for proficient in-memory key-value store operations. Track cache hits, misses, and memory usage for efficient data caching."
+        method_description: "It reads the server's response to the `stats` command."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            If no configuration is given, collector will attempt to connect to memcached instance on `127.0.0.1:11211` address.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/memcached.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: The IP address and port where the memcached service listens for connections.
+              default_value: 127.0.0.1:11211
+              required: true
+            - name: timeout
+              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:11211
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:11211
+
+                  - name: remote
+                    address: 203.0.113.0:11211
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: memcached_cache_memory_usage
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf
+        metric: memcached.cache
+        info: cache memory utilization
+      - name: memcached_cache_fill_rate
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf
+        metric: memcached.cache
+        info: average rate the cache fills up (positive), or frees up (negative) space over the last hour
+      - name: memcached_out_of_cache_space_time
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf
+        metric: memcached.cache
+        info: estimated time the cache will run out of space if the system continues to add data at the same rate as the past hour
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: memcached.cache
+              description: Cache Size
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: used
+            - name: memcached.net
+              description: Network
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: memcached.connections
+              description: Connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: rejected
+                - name: total
+            - name: memcached.items
+              description: Items
+              unit: "items"
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: total
+            - name: memcached.evicted_reclaimed
+              description: Evicted and Reclaimed Items
+              unit: "items"
+              chart_type: line
+              dimensions:
+                - name: reclaimed
+                - name: evicted
+            - name: memcached.get
+              description: Get Requests
+              unit: "requests"
+              chart_type: stacked
+              dimensions:
+                - name: hints
+                - name: misses
+            - name: memcached.get_rate
+              description: Get Request Rate
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: rate
+            - name: memcached.set_rate
+              description: Set Request Rate
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: rate
+            - name: memcached.delete
+              description: Delete Requests
+              unit: "requests"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: memcached.cas
+              description: Check and Set Requests
+              unit: "requests"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+                - name: bad value
+            - name: memcached.increment
+              description: Increment Requests
+              unit: "requests"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: memcached.decrement
+              description: Decrement Requests
+              unit: "requests"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: memcached.touch
+              description: Touch Requests
+              unit: "requests"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: memcached.touch_rate
+              description: Touch Request Rate
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: rate

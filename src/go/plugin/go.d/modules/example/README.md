@@ -27,7 +27,7 @@ sudo ./edit-config go.d/example.conf
 ```
 
 Disabled by default. Should be explicitly enabled
-in [go.d.conf](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d.conf).
+in [go.d.conf](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d.conf).
 
 ```yaml
 # go.d.conf
@@ -53,7 +53,7 @@ jobs:
 ---
 
 For all available options, see the Example
-collector's [configuration file](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d/example.conf).
+collector's [configuration file](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/example.conf).
 
 ## Troubleshooting
 

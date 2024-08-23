@@ -28,6 +28,17 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
     "label_value text, date_created int, PRIMARY KEY (chart_id, label_key))",
 
+    "CREATE TRIGGER IF NOT EXISTS del_chart_label AFTER DELETE ON chart "
+    "BEGIN DELETE FROM chart_label WHERE chart_id = old.chart_id; END",
+
+    "CREATE TRIGGER IF NOT EXISTS del_chart "
+    "AFTER DELETE ON dimension "
+    "FOR EACH ROW "
+    "BEGIN"
+    "  DELETE FROM chart WHERE chart_id = OLD.chart_id "
+    "  AND NOT EXISTS (SELECT 1 FROM dimension WHERE chart_id = OLD.chart_id);"
+    "END",
+
     "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created)",
 
     "CREATE TABLE IF NOT EXISTS alert_hash(hash_id blob PRIMARY KEY, date_updated int, alarm text, template text, "
@@ -66,6 +77,18 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_6 on health_log_detail (health_log_id, when_key)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
+
+#ifdef ENABLE_ACLK
+    "CREATE TABLE IF NOT EXISTS alert_queue "
+    " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, status INT, date_scheduled INT, "
+    " UNIQUE(host_id, health_log_id, alarm_id))",
+
+    "CREATE TABLE IF NOT EXISTS alert_version (health_log_id INTEGER PRIMARY KEY, unique_id INT, status INT, "
+    "version INT, date_submitted INT)",
+
+    "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, "
+    "unique_id INT, date_created INT,  UNIQUE(host_id, health_log_id))",
+#endif
 
     NULL
 };
@@ -251,7 +274,7 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
     }
 
     if (unlikely(!wc))
-        sql_create_aclk_table(host, &host->host_uuid, node_id);
+        create_aclk_config(host, &host->host_uuid, node_id);
     else
         uuid_unparse_lower(*node_id, wc->node_id);
 }
@@ -711,7 +734,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     }
 
     if (rebuild & DB_CHECK_ANALYZE) {
-        errno = 0;
+        errno_clear();
         netdata_log_info("Running ANALYZE on %s", sqlite_database);
         rc = sqlite3_exec_monitored(db_meta, "ANALYZE", 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
@@ -725,7 +748,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         return 1;
     }
 
-    errno = 0;
+    errno_clear();
     netdata_log_info("SQLite database %s initialization", sqlite_database);
 
     rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
@@ -1442,11 +1465,10 @@ static void cleanup_health_log(struct metadata_wc *wc)
 
     RRDHOST *host;
 
-    bool is_claimed = claimed();
     dfe_start_reentrant(rrdhost_root_index, host){
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
-        sql_health_alarm_log_cleanup(host, is_claimed);
+        sql_health_alarm_log_cleanup(host);
         if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
             break;
     }
@@ -1457,6 +1479,9 @@ static void cleanup_health_log(struct metadata_wc *wc)
 
     (void) db_execute(db_meta,"DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)");
     (void) db_execute(db_meta,"DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
+#ifdef ENABLE_ACLK
+    (void) db_execute(db_meta,"DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
+#endif
 }
 
 //

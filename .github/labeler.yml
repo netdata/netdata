@@ -289,9 +289,3 @@ area/web:
       - changed-files:
           - any-glob-to-any-file:
               - src/web/**
-
-area/logs-management:
-  - any:
-      - changed-files:
-          - any-glob-to-any-file:
-              - src/logsmanagement/**

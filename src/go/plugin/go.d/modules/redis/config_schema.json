@@ -15,7 +15,7 @@
         "title": "URI",
         "description": "The URI specifying the connection details for the Redis server.",
         "type": "string",
-        "default": "redis://@localhost:9221"
+        "default": "redis://@localhost:6379"
       },
       "timeout": {
         "title": "Timeout",
@@ -82,6 +82,9 @@
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "username": {
+      "ui:widget": "password"
     },
     "password": {
       "ui:widget": "password"

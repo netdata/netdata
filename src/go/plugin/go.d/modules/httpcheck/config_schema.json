@@ -95,7 +95,7 @@
             },
             "value": {
               "title": "Header value pattern",
-              "description": "Specifies the [matcher pattern](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme) to match against the value of the specified header.",
+              "description": "Specifies the [matcher pattern](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#readme) to match against the value of the specified header.",
               "type": "string"
             }
           },
@@ -253,6 +253,18 @@
     },
     "body": {
       "ui:widget": "textarea"
+    },
+    "username": {
+      "ui:widget": "password"
+    },
+    "proxy_username": {
+      "ui:widget": "password"
+    },
+    "password": {
+      "ui:widget": "password"
+    },
+    "proxy_password": {
+      "ui:widget": "password"
     }
   }
 }

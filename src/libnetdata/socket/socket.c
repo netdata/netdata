@@ -194,11 +194,9 @@ int sock_setreuse(int fd, int reuse) {
 void sock_setcloexec(int fd)
 {
     UNUSED(fd);
-#ifndef SOCK_CLOEXEC
     int flags = fcntl(fd, F_GETFD);
     if (flags != -1)
         (void) fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
-#endif
 }
 
 int sock_setreuse_port(int fd __maybe_unused, int reuse __maybe_unused) {
@@ -290,7 +288,7 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
     name.sun_family = AF_UNIX;
     strncpy(name.sun_path, path, sizeof(name.sun_path)-1);
 
-    errno = 0;
+    errno_clear();
     if (unlink(path) == -1 && errno != ENOENT)
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "LISTENER: failed to remove existing (probably obsolete or left-over) file on UNIX socket path '%s'.",
@@ -918,7 +916,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
             }
             sock_setcloexec(fd);
 
-            errno = 0;
+            errno_clear();
             if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
                 if(errno == EALREADY || errno == EINPROGRESS) {
                     nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -1200,7 +1198,7 @@ inline int wait_on_socket_or_cancel_with_timeout(
         const int wait_ms = (timeout_ms >= ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS || forever) ?
                                             ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS : timeout_ms;
 
-        errno = 0;
+        errno_clear();
 
         // check every wait_ms
         const int ret = poll(&pfd, 1, wait_ms);
@@ -1482,7 +1480,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 break;
         }
         if (!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection", allow_dns)) {
-            errno = 0;
+            errno_clear();
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "Permission denied for client '%s', port '%s'",
                    client_ip, client_port);

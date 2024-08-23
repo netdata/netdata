@@ -381,14 +381,14 @@ static void sched_setscheduler_set(void) {
                     priority = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process scheduling priority", priority);
 
 #ifdef HAVE_SCHED_GET_PRIORITY_MIN
-                errno = 0;
+                errno_clear();
                 if(priority < sched_get_priority_min(policy)) {
                     netdata_log_error("scheduler %s (%d) priority %d is below the minimum %d. Using the minimum.", name, policy, priority, sched_get_priority_min(policy));
                     priority = sched_get_priority_min(policy);
                 }
 #endif
 #ifdef HAVE_SCHED_GET_PRIORITY_MAX
-                errno = 0;
+                errno_clear();
                 if(priority > sched_get_priority_max(policy)) {
                     netdata_log_error("scheduler %s (%d) priority %d is above the maximum %d. Using the maximum.", name, policy, priority, sched_get_priority_max(policy));
                     priority = sched_get_priority_max(policy);
@@ -407,7 +407,7 @@ static void sched_setscheduler_set(void) {
                 .sched_priority = priority
         };
 
-        errno = 0;
+        errno_clear();
         i = sched_setscheduler(0, policy, &param);
         if(i != 0) {
             netdata_log_error("Cannot adjust netdata scheduling policy to %s (%d), with priority %d. Falling back to nice.",

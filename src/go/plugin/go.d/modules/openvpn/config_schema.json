@@ -15,7 +15,7 @@
         "title": "Address",
         "description": "The IP address and port where the OpenVPN [Management Interface](https://openvpn.net/community-resources/management-interface/) listens for connections.",
         "type": "string",
-        "default": "127.0.0.1:123"
+        "default": "127.0.0.1:7505"
       },
       "timeout": {
         "title": "Timeout",
@@ -34,7 +34,7 @@
         "properties": {
           "includes": {
             "title": "Include",
-            "description": "Include users whose usernames match any of the specified inclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
+            "description": "Include users whose usernames match any of the specified inclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#readme).",
             "type": [
               "array",
               "null"
@@ -47,7 +47,7 @@
           },
           "excludes": {
             "title": "Exclude",
-            "description": "Exclude users whose usernames match any of the specified exclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
+            "description": "Exclude users whose usernames match any of the specified exclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#readme).",
             "type": [
               "array",
               "null"

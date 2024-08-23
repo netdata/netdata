@@ -120,8 +120,7 @@ func (cdb *CouchDB) scrapeCouchDB() *cdbMetrics {
 }
 
 func (cdb *CouchDB) scrapeNodeStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequest(cdb.Request)
-	req.URL.Path = fmt.Sprintf(urlPathOverviewStats, cdb.Config.Node)
+	req, _ := web.NewHTTPRequestWithPath(cdb.Request, fmt.Sprintf(urlPathOverviewStats, cdb.Config.Node))
 
 	var stats cdbNodeStats
 	if err := cdb.doOKDecode(req, &stats); err != nil {
@@ -132,8 +131,7 @@ func (cdb *CouchDB) scrapeNodeStats(ms *cdbMetrics) {
 }
 
 func (cdb *CouchDB) scrapeSystemStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequest(cdb.Request)
-	req.URL.Path = fmt.Sprintf(urlPathSystemStats, cdb.Config.Node)
+	req, _ := web.NewHTTPRequestWithPath(cdb.Request, fmt.Sprintf(urlPathSystemStats, cdb.Config.Node))
 
 	var stats cdbNodeSystem
 	if err := cdb.doOKDecode(req, &stats); err != nil {
@@ -144,8 +142,7 @@ func (cdb *CouchDB) scrapeSystemStats(ms *cdbMetrics) {
 }
 
 func (cdb *CouchDB) scrapeActiveTasks(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequest(cdb.Request)
-	req.URL.Path = urlPathActiveTasks
+	req, _ := web.NewHTTPRequestWithPath(cdb.Request, urlPathActiveTasks)
 
 	var stats []cdbActiveTask
 	if err := cdb.doOKDecode(req, &stats); err != nil {
@@ -156,8 +153,7 @@ func (cdb *CouchDB) scrapeActiveTasks(ms *cdbMetrics) {
 }
 
 func (cdb *CouchDB) scrapeDBStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequest(cdb.Request)
-	req.URL.Path = urlPathDatabases
+	req, _ := web.NewHTTPRequestWithPath(cdb.Request, urlPathDatabases)
 	req.Method = http.MethodPost
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
@@ -182,18 +178,18 @@ func (cdb *CouchDB) scrapeDBStats(ms *cdbMetrics) {
 }
 
 func findMaxMQSize(MessageQueues map[string]interface{}) int64 {
-	var max float64
+	var maxSize float64
 	for _, mq := range MessageQueues {
 		switch mqSize := mq.(type) {
 		case float64:
-			max = math.Max(max, mqSize)
+			maxSize = math.Max(maxSize, mqSize)
 		case map[string]interface{}:
 			if v, ok := mqSize["count"].(float64); ok {
-				max = math.Max(max, v)
+				maxSize = math.Max(maxSize, v)
 			}
 		}
 	}
-	return int64(max)
+	return int64(maxSize)
 }
 
 func (cdb *CouchDB) pingCouchDB() error {

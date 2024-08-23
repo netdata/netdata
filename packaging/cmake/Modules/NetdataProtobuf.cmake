@@ -29,13 +29,23 @@ function(netdata_bundle_protobuf)
                 set(ABSL_PROPAGATE_CXX_STD On)
                 set(ABSL_ENABLE_INSTALL Off)
                 set(BUILD_SHARED_LIBS Off)
+                set(absl_repo https://github.com/abseil/abseil-cpp)
 
                 message(STATUS "Preparing bundled Abseil (required by bundled Protobuf)")
-                FetchContent_Declare(absl
-                        GIT_REPOSITORY https://github.com/abseil/abseil-cpp
-                        GIT_TAG ${ABSL_TAG}
-                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
-                )
+                if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+                        FetchContent_Declare(absl
+                                GIT_REPOSITORY ${absl_repo}
+                                GIT_TAG ${ABSL_TAG}
+                                CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
+                                EXCLUDE_FROM_ALL
+                        )
+                else()
+                        FetchContent_Declare(absl
+                                GIT_REPOSITORY ${absl_repo}
+                                GIT_TAG ${ABSL_TAG}
+                                CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
+                        )
+                endif()
                 FetchContent_MakeAvailable_NoInstall(absl)
                 message(STATUS "Finished preparing bundled Abseil")
         endif()
@@ -44,13 +54,23 @@ function(netdata_bundle_protobuf)
         set(protobuf_BUILD_LIBPROTOC Off)
         set(protobuf_BUILD_TESTS Off)
         set(protobuf_BUILD_SHARED_LIBS Off)
+        set(protobuf_repo https://github.com/protocolbuffers/protobuf)
 
         message(STATUS "Preparing bundled Protobuf")
-        FetchContent_Declare(protobuf
-                GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
-                GIT_TAG ${PROTOBUF_TAG}
-                CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
-        )
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+                FetchContent_Declare(protobuf
+                        GIT_REPOSITORY ${protobuf_repo}
+                        GIT_TAG ${PROTOBUF_TAG}
+                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
+                        EXCLUDE_FROM_ALL
+                )
+        else()
+                FetchContent_Declare(protobuf
+                        GIT_REPOSITORY ${protobuf_repo}
+                        GIT_TAG ${PROTOBUF_TAG}
+                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
+                )
+        endif()
         FetchContent_MakeAvailable_NoInstall(protobuf)
         message(STATUS "Finished preparing bundled Protobuf.")
 

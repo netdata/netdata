@@ -7,13 +7,14 @@ on:
       - master
     paths: # If any of these files change, we need to regenerate integrations.js.
       - 'src/collectors/**/metadata.yaml'
-      - 'src/go/collectors/**/metadata.yaml'
+      - 'src/go/plugin/**/metadata.yaml'
       - 'src/exporting/**/metadata.yaml'
       - 'src/health/notifications/**/metadata.yaml'
       - 'integrations/templates/**'
       - 'integrations/categories.yaml'
       - 'integrations/deploy.yaml'
       - 'integrations/cloud-notifications/metadata.yaml'
+      - 'integrations/cloud-authentication/metadata.yaml'
       - 'integrations/gen_integrations.py'
   workflow_dispatch: null
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref.

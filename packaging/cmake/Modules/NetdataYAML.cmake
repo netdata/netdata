@@ -19,12 +19,23 @@ function(netdata_bundle_libyaml)
         endif()
 
         set(FETCHCONTENT_FULLY_DISCONNECTED Off)
+        set(repo https://github.com/yaml/libyaml)
+        set(tag 2c891fc7a770e8ba2fec34fc6b545c672beb37e6) # v0.2.5
 
-        FetchContent_Declare(yaml
-                GIT_REPOSITORY https://github.com/yaml/libyaml
-                GIT_TAG 2c891fc7a770e8ba2fec34fc6b545c672beb37e6 # v0.2.5
-                CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
-        )
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+                FetchContent_Declare(yaml
+                        GIT_REPOSITORY ${repo}
+                        GIT_TAG ${tag}
+                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
+                        EXCLUDE_FROM_ALL
+                )
+        else()
+                FetchContent_Declare(yaml
+                        GIT_REPOSITORY ${repo}
+                        GIT_TAG ${tag}
+                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
+                )
+        endif()
 
         FetchContent_MakeAvailable_NoInstall(yaml)
 endfunction()

@@ -23,7 +23,13 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
     if (!(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS))
         return;
 
-    spawn_wait_cmd(ae->exec_spawn_serial, &ae->exec_code, &ae->exec_run_timestamp);
+    if(!ae->popen_instance) {
+        // nd_log(NDLS_DAEMON, NDLP_ERR, "attempted to wait for the execution of alert that has not spawn a notification");
+        return;
+    }
+
+    ae->exec_code = spawn_popen_wait(ae->popen_instance);
+
     netdata_log_debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
     ae->flags &= ~HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
 
@@ -75,7 +81,6 @@ static inline void enqueue_alarm_notify_in_progress(ALARM_ENTRY *ae)
         alarm_notifications_in_progress.head = ae;
     }
     alarm_notifications_in_progress.tail = ae;
-
 }
 
 static bool prepare_command(BUFFER *wb,
@@ -462,7 +467,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
 
         netdata_log_debug(D_HEALTH, "executing command '%s'", command_to_run);
         ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
-        ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
+        ae->popen_instance = spawn_popen_run(command_to_run);
         enqueue_alarm_notify_in_progress(ae);
         health_alarm_log_save(host, ae);
     } else {

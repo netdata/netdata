@@ -10,6 +10,7 @@
 #define _COMMON_PLUGIN_MODULE_NAME PLUGIN_PROC_MODULE_VMSTAT_NAME
 #include "../common-contexts/common-contexts.h"
 
+
 int do_proc_vmstat(int update_every, usec_t dt) {
     (void)dt;
 
@@ -262,7 +263,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if (do_swapio == CONFIG_BOOLEAN_YES || do_swapio == CONFIG_BOOLEAN_AUTO) {
+    if (is_mem_swap_enabled && (do_swapio == CONFIG_BOOLEAN_YES || do_swapio == CONFIG_BOOLEAN_AUTO)) {
         do_swapio = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_swapio = NULL;
@@ -465,7 +466,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if (do_zswapio == CONFIG_BOOLEAN_YES || do_zswapio == CONFIG_BOOLEAN_AUTO) {
+    if (is_mem_zswap_enabled && (do_zswapio == CONFIG_BOOLEAN_YES || do_zswapio == CONFIG_BOOLEAN_AUTO)) {
         do_zswapio = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_zswapio = NULL;
@@ -498,7 +499,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if (do_ksm == CONFIG_BOOLEAN_YES || do_ksm == CONFIG_BOOLEAN_AUTO) {
+    if (is_mem_ksm_enabled && (do_ksm == CONFIG_BOOLEAN_YES || do_ksm == CONFIG_BOOLEAN_AUTO)) {
         do_ksm = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_ksm_cow = NULL;

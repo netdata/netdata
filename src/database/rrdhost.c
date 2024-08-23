@@ -1494,18 +1494,16 @@ static void rrdhost_load_kubernetes_labels(void) {
         return;
     }
 
-    pid_t pid;
-    FILE *fp_child_input;
-    FILE *fp_child_output = netdata_popen(label_script, &pid, &fp_child_input);
-    if(!fp_child_output) return;
+    POPEN_INSTANCE *instance = spawn_popen_run(label_script);
+    if(!instance) return;
 
     char buffer[1000 + 1];
-    while (fgets(buffer, 1000, fp_child_output) != NULL)
+    while (fgets(buffer, 1000, instance->child_stdout_fp) != NULL)
         rrdlabels_add_pair(localhost->rrdlabels, buffer, RRDLABEL_SRC_AUTO|RRDLABEL_SRC_K8S);
 
     // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
     // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
-    int rc = netdata_pclose(fp_child_input, fp_child_output, pid);
+    int rc = spawn_popen_wait(instance);
     if(rc)
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "%s exited abnormally. Failed to get kubernetes labels.",

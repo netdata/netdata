@@ -77,7 +77,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
         ERR_clear_error();
 #endif
 
-    errno = 0;
+    errno_clear();
 
     // loop through to collect all data
     while (*sock != -1 && errno != EWOULDBLOCK) {

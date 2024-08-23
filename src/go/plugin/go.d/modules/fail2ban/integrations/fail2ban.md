@@ -82,7 +82,17 @@ There are no alerts configured by default for this integration.
 
 ### Prerequisites
 
-No action required.
+#### For Netdata running in a Docker container
+
+1. **Install Fail2ban client**.
+
+    Ensure `fail2ban-client` is available in the container by setting the environment variable `NETDATA_EXTRA_DEB_PACKAGES=fail2ban` when starting the container.
+
+2. **Mount host's `/var/run` directory**.
+
+    Mount the host machine's `/var/run` directory to `/host/var/run` inside your Netdata container. This grants Netdata access to the Fail2ban socket file, typically located at `/var/run/fail2ban/fail2ban.sock`.
+
+
 
 ### Configuration
 
@@ -133,6 +143,8 @@ jobs:
 ## Troubleshooting
 
 ### Debug Mode
+
+**Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
 To troubleshoot issues with the `fail2ban` collector, run the `go.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.

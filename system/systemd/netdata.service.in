@@ -63,8 +63,6 @@ CapabilityBoundingSet=CAP_NET_ADMIN
 CapabilityBoundingSet=CAP_SETGID CAP_SETUID
 # is required to change file ownership
 CapabilityBoundingSet=CAP_CHOWN
-# is required for logs-management.plugin
-CapabilityBoundingSet=CAP_SYSLOG
 
 # Sandboxing
 ProtectSystem=full

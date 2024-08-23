@@ -326,6 +326,9 @@ size_t judy_aral_structures(void);
 
 #define GUID_LEN 36
 
+#define PIPE_READ 0
+#define PIPE_WRITE 1
+
 #include "linked-lists.h"
 #include "storage-point.h"
 
@@ -425,7 +428,7 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 #define UNUSED_FUNCTION(x) UNUSED_##x
 #endif
 
-#define error_report(x, args...) do { errno = 0; netdata_log_error(x, ##args); } while(0)
+#define error_report(x, args...) do { errno_clear(); netdata_log_error(x, ##args); } while(0)
 
 // Taken from linux kernel
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
@@ -439,17 +442,6 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int max_line_length);
-
-typedef enum {
-    OPEN_FD_ACTION_CLOSE,
-    OPEN_FD_ACTION_FD_CLOEXEC
-} OPEN_FD_ACTION;
-typedef enum {
-    OPEN_FD_EXCLUDE_STDIN   = 0x01,
-    OPEN_FD_EXCLUDE_STDOUT  = 0x02,
-    OPEN_FD_EXCLUDE_STDERR  = 0x04
-} OPEN_FD_EXCLUDE;
-void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds);
 
 #ifdef OS_WINDOWS
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data);
@@ -483,7 +475,9 @@ extern char *netdata_configured_host_prefix;
 #include "datetime/rfc3339.h"
 #include "datetime/rfc7231.h"
 #include "completion/completion.h"
-#include "popen/popen.h"
+#include "log/log.h"
+#include "spawn_server/spawn_server.h"
+#include "spawn_server/spawn_popen.h"
 #include "simple_pattern/simple_pattern.h"
 #ifdef ENABLE_HTTPS
 # include "socket/security.h"
@@ -491,7 +485,6 @@ extern char *netdata_configured_host_prefix;
 #include "socket/socket.h"
 #include "config/appconfig.h"
 #include "log/journal.h"
-#include "log/log.h"
 #include "buffered_reader/buffered_reader.h"
 #include "procfile/procfile.h"
 #include "string/string.h"

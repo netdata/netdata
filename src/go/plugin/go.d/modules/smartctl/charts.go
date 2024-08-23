@@ -16,6 +16,10 @@ const (
 	prioDeviceTemperature
 	prioDevicePowerCycleCount
 
+	prioDeviceScsiReadErrors
+	prioDeviceScsiWriteErrors
+	prioDeviceScsiVerifyErrors
+
 	prioDeviceSmartAttributeDecoded
 	prioDeviceSmartAttributeNormalized
 )
@@ -92,6 +96,54 @@ var (
 	}
 )
 
+var deviceScsiErrorLogChartsTmpl = module.Charts{
+	deviceScsiReadErrorsChartTmpl.Copy(),
+	deviceScsiWriteErrorsChartTmpl.Copy(),
+	deviceScsiVerifyErrorsChartTmpl.Copy(),
+}
+
+var (
+	deviceScsiReadErrorsChartTmpl = module.Chart{
+		ID:       "device_%s_type_%s_read_errors_rate",
+		Title:    "Device read errors",
+		Units:    "errors/s",
+		Fam:      "scsi errors",
+		Ctx:      "smartctl.device_read_errors_rate",
+		Type:     module.Line,
+		Priority: prioDeviceScsiReadErrors,
+		Dims: module.Dims{
+			{ID: "device_%s_type_%s_scsi_error_log_read_total_errors_corrected", Name: "corrected", Algo: module.Incremental},
+			{ID: "device_%s_type_%s_scsi_error_log_read_total_uncorrected_errors", Name: "uncorrected", Algo: module.Incremental},
+		},
+	}
+	deviceScsiWriteErrorsChartTmpl = module.Chart{
+		ID:       "device_%s_type_%s_write_errors_rate",
+		Title:    "Device write errors",
+		Units:    "errors/s",
+		Fam:      "scsi errors",
+		Ctx:      "smartctl.device_write_errors_rate",
+		Type:     module.Line,
+		Priority: prioDeviceScsiWriteErrors,
+		Dims: module.Dims{
+			{ID: "device_%s_type_%s_scsi_error_log_write_total_errors_corrected", Name: "corrected", Algo: module.Incremental},
+			{ID: "device_%s_type_%s_scsi_error_log_read_total_uncorrected_errors", Name: "uncorrected", Algo: module.Incremental},
+		},
+	}
+	deviceScsiVerifyErrorsChartTmpl = module.Chart{
+		ID:       "device_%s_type_%s_verify_errors_rate",
+		Title:    "Device verify errors",
+		Units:    "errors/s",
+		Fam:      "scsi errors",
+		Ctx:      "smartctl.device_verify_errors_rate",
+		Type:     module.Line,
+		Priority: prioDeviceScsiVerifyErrors,
+		Dims: module.Dims{
+			{ID: "device_%s_type_%s_scsi_error_log_verify_total_errors_corrected", Name: "corrected", Algo: module.Incremental},
+			{ID: "device_%s_type_%s_scsi_error_log_verify_total_uncorrected_errors", Name: "uncorrected", Algo: module.Incremental},
+		},
+	}
+)
+
 var (
 	deviceSmartAttributeDecodedChartTmpl = module.Chart{
 		ID:       "device_%s_type_%s_smart_attr_%s",
@@ -128,6 +180,11 @@ func (s *Smartctl) addDeviceCharts(dev *smartDevice) {
 		}
 	}
 	if cs := s.newDeviceSmartAttrCharts(dev); cs != nil && len(*cs) > 0 {
+		if err := charts.Add(*cs...); err != nil {
+			s.Warning(err)
+		}
+	}
+	if cs := s.newDeviceScsiErrorLogCharts(dev); cs != nil && len(*cs) > 0 {
 		if err := charts.Add(*cs...); err != nil {
 			s.Warning(err)
 		}
@@ -233,6 +290,29 @@ func (s *Smartctl) newDeviceSmartAttrCharts(dev *smartDevice) *module.Charts {
 	}
 
 	return &charts
+}
+
+func (s *Smartctl) newDeviceScsiErrorLogCharts(dev *smartDevice) *module.Charts {
+	if dev.deviceType() != "scsi" || !dev.data.Get("scsi_error_counter_log").Exists() {
+		return nil
+	}
+
+	charts := deviceScsiErrorLogChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, dev.deviceName(), dev.deviceType())
+		chart.Labels = []module.Label{
+			{Key: "device_name", Value: dev.deviceName()},
+			{Key: "device_type", Value: dev.deviceType()},
+			{Key: "model_name", Value: dev.modelName()},
+			{Key: "serial_number", Value: dev.serialNumber()},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, dev.deviceName(), dev.deviceType())
+		}
+	}
+
+	return charts
 }
 
 var attrNameReplacer = strings.NewReplacer(" ", "_", "/", "_")

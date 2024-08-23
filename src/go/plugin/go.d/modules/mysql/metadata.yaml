@@ -47,12 +47,8 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            By default, it detects instances running on localhost by trying to connect as root and netdata using known MySQL TCP and UNIX sockets:
-            
-            - /var/run/mysqld/mysqld.sock
-            - /var/run/mysqld/mysql.sock
-            - /var/lib/mysql/mysql.sock
-            - /tmp/mysql.sock
+            By default, it detects instances running on localhost by trying to connect as root and netdata using known MySQL TCP sockets:
+
             - 127.0.0.1:3306
             - "[::1]:3306"
         limits:

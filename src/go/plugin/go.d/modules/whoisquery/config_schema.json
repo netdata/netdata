@@ -28,14 +28,14 @@
         "description": "Number of days before the alarm status is set to warning.",
         "type": "integer",
         "minimum": 1,
-        "default": 90
+        "default": 30
       },
       "days_until_expiration_critical": {
         "title": "Days until critical",
         "description": "Number of days before the alarm status is set to critical.",
         "type": "integer",
         "minimum": 1,
-        "default": 30
+        "default": 15
       }
     },
     "required": [

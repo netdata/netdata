@@ -258,9 +258,6 @@ class NetdataInstaller:
         if FeatureFlags.ExtendedBPF not in self.features:
             args.append("--disable-ebpf")
 
-        if FeatureFlags.LogsManagement not in self.features:
-            args.append("--disable-logsmanagement")
-
         if FeatureFlags.MachineLearning not in self.features:
             args.append("--disable-ml")
 

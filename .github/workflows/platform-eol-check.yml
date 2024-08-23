@@ -73,7 +73,7 @@ jobs:
         id: check
         shell: sh {0}
         run: |
-          d="$(.github/scripts/platform-impending-eol.py ${{ matrix.distro }} ${{ matrix.release }})"
+          d="$(.github/scripts/platform-impending-eol.py ${{ matrix.distro }} ${{ matrix.release }} ${{ matrix.lts }})"
           case $? in
             0) echo "pending=false" >> "${GITHUB_OUTPUT}" ;;
             1)

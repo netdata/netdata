@@ -106,13 +106,13 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
     else if(strncmp(payload, "DELETE /", 8) == 0)
         start = payload + 7;
     else {
-        errno = 0;
+        errno_clear();
         netdata_log_error("Only accepting requests that start with GET, POST, PUT, DELETE from CLOUD.");
         return 1;
     }
 
     if(!(end = strstr(payload, HTTP_1_1 HTTP_ENDL))) {
-        errno = 0;
+        errno_clear();
         netdata_log_error("Doesn't look like HTTP GET request.");
         return 1;
     }
@@ -127,7 +127,7 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
 {
     aclk_query_t query;
 
-    errno = 0;
+    errno_clear();
     if (cloud_to_agent->version < ACLK_V_COMPRESSION) {
         netdata_log_error(
             "This handler cannot reply to request with version older than %d, received %d.",
@@ -347,7 +347,7 @@ int start_alarm_streaming(const char *msg, size_t msg_len)
         netdata_log_error("Error parsing StartAlarmStreaming");
         return 1;
     }
-    aclk_start_alert_streaming(res.node_id, res.resets);
+    aclk_start_alert_streaming(res.node_id, res.version);
     freez(res.node_id);
     return 0;
 }
@@ -361,7 +361,7 @@ int send_alarm_checkpoint(const char *msg, size_t msg_len)
         freez(sac.claim_id);
         return 1;
     }
-    aclk_send_alarm_checkpoint(sac.node_id, sac.claim_id);
+    aclk_alert_version_check(sac.node_id, sac.claim_id, sac.version);
     freez(sac.node_id);
     freez(sac.claim_id);
     return 0;
@@ -375,7 +375,7 @@ int send_alarm_configuration(const char *msg, size_t msg_len)
         freez(config_hash);
         return 1;
     }
-    aclk_send_alarm_configuration(config_hash);
+    aclk_send_alert_configuration(config_hash);
     freez(config_hash);
     return 0;
 }

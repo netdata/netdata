@@ -5,6 +5,7 @@ package megacli
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -45,6 +46,11 @@ func (m *MegaCli) collectPhysDrives(mx map[string]int64) error {
 	if err != nil {
 		return err
 	}
+	if len(adapters) == 0 {
+		return errors.New("no adapters found")
+	}
+
+	var drives int
 
 	for _, ad := range adapters {
 		if !m.adapters[ad.number] {
@@ -64,6 +70,7 @@ func (m *MegaCli) collectPhysDrives(mx map[string]int64) error {
 				m.adapters[pd.wwn] = true
 				m.addPhysDriveCharts(pd)
 			}
+			drives++
 
 			px := fmt.Sprintf("phys_drive_%s_", pd.wwn)
 
@@ -71,6 +78,8 @@ func (m *MegaCli) collectPhysDrives(mx map[string]int64) error {
 			writeInt(mx, px+"predictive_failure_count", pd.predictiveFailureCount)
 		}
 	}
+
+	m.Debugf("found %d adapters, %d physical drives", len(m.adapters), drives)
 
 	return nil
 }

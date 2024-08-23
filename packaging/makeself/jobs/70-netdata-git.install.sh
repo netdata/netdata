@@ -36,7 +36,6 @@ run ./netdata-installer.sh \
   --use-system-protobuf \
   --dont-scrub-cflags-even-though-it-may-break-things \
   --one-time-build \
-  --disable-logsmanagement \
   --enable-lto \
   ${EXTRA_INSTALL_FLAGS:+${EXTRA_INSTALL_FLAGS}} \
 

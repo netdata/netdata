@@ -37,11 +37,23 @@ function(netdata_bundle_jsonc)
         set(BUILD_STATIC_LIBS ON)
         set(BUILD_APPS OFF)
 
-        FetchContent_Declare(json-c
-                GIT_REPOSITORY https://github.com/json-c/json-c
-                GIT_TAG b4c371fa0cbc4dcbaccc359ce9e957a22988fb34 # json-c-0.17-20230812
-                CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
-        )
+        set(repo https://github.com/json-c/json-c)
+        set(tag b4c371fa0cbc4dcbaccc359ce9e957a22988fb34) # json-c-0.17-20230812
+
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+                FetchContent_Declare(json-c
+                        GIT_REPOSITORY ${repo}
+                        GIT_TAG ${tag}
+                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
+                        EXCLUDE_FROM_ALL
+                )
+        else()
+                FetchContent_Declare(json-c
+                        GIT_REPOSITORY ${repo}
+                        GIT_TAG ${tag}
+                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
+                )
+        endif()
 
         FetchContent_MakeAvailable_NoInstall(json-c)
 
@@ -63,7 +75,7 @@ macro(netdata_detect_jsonc)
         endif()
 
         if(NOT JSONC_FOUND)
-                set(ENABLE_BUNDLED_JSONC True PARENT_SCOPE)
+                set(ENABLE_BUNDLED_JSONC True)
                 netdata_bundle_jsonc()
                 set(NETDATA_JSONC_LDFLAGS json-c)
                 set(NETDATA_JSONC_INCLUDE_DIRS ${PROJECT_BINARY_DIR}/include)

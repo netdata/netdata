@@ -68,23 +68,15 @@ static void pluginsd_worker_thread_cleanup(void *pptr) {
     cd->unsafe.running = false;
     cd->unsafe.thread = 0;
 
-    pid_t pid = cd->unsafe.pid;
     cd->unsafe.pid = 0;
+
+    POPEN_INSTANCE *pi = cd->unsafe.pi;
+    cd->unsafe.pi = NULL;
 
     spinlock_unlock(&cd->unsafe.spinlock);
 
-    if (pid) {
-        siginfo_t info;
-        netdata_log_info("PLUGINSD: 'host:%s', killing data collection child process with pid %d",
-             rrdhost_hostname(cd->host), pid);
-
-        if (killpid(pid) != -1) {
-            netdata_log_info("PLUGINSD: 'host:%s', waiting for data collection child process pid %d to exit...",
-                 rrdhost_hostname(cd->host), pid);
-
-            netdata_waitid(P_PID, (id_t)pid, &info, WEXITED);
-        }
-    }
+    if (pi)
+        spawn_popen_kill(pi);
 }
 
 #define SERIAL_FAILURES_THRESHOLD 10
@@ -160,14 +152,13 @@ static void *pluginsd_worker_thread(void *arg) {
     size_t count = 0;
 
     while(service_running(SERVICE_COLLECTORS)) {
-        FILE *fp_child_input = NULL;
-        FILE *fp_child_output = netdata_popen(cd->cmd, &cd->unsafe.pid, &fp_child_input);
-
-        if(unlikely(!fp_child_input || !fp_child_output)) {
+        cd->unsafe.pi = spawn_popen_run(cd->cmd);
+        if(!cd->unsafe.pi) {
             netdata_log_error("PLUGINSD: 'host:%s', cannot popen(\"%s\", \"r\").",
                               rrdhost_hostname(cd->host), cd->cmd);
             break;
         }
+        cd->unsafe.pid = spawn_server_instance_pid(cd->unsafe.pi->si);
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: 'host:%s' connected to '%s' running on pid %d",
@@ -190,15 +181,14 @@ static void *pluginsd_worker_thread(void *arg) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        count = pluginsd_process(cd->host, cd, fp_child_input, fp_child_output, 0);
+        count = pluginsd_process(cd->host, cd, cd->unsafe.pi->child_stdin_fp, cd->unsafe.pi->child_stdout_fp, 0);
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",
                rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, count);
 
-        killpid(cd->unsafe.pid);
-
-        int worker_ret_code = netdata_pclose(fp_child_input, fp_child_output, cd->unsafe.pid);
+        int worker_ret_code = spawn_popen_kill(cd->unsafe.pi);
+        cd->unsafe.pi = NULL;
 
         if(likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);
@@ -248,13 +238,6 @@ void *pluginsd_main(void *ptr) {
 
     // disable some plugins by default
     config_get_boolean(CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
-    config_get_boolean(CONFIG_SECTION_PLUGINS, "logs-management", 
-#if defined(LOGS_MANAGEMENT_DEV_MODE)
-        CONFIG_BOOLEAN_YES
-#else 
-        CONFIG_BOOLEAN_NO
-#endif
-    );
     // it crashes (both threads) on Alpine after we made it multi-threaded
     // works with "--device /dev/ipmi0", but this is not default
     // see https://github.com/netdata/netdata/pull/15564 for details
@@ -273,7 +256,7 @@ void *pluginsd_main(void *ptr) {
             if (unlikely(!service_running(SERVICE_COLLECTORS)))
                 break;
 
-            errno = 0;
+            errno_clear();
             DIR *dir = opendir(directory_name);
             if (unlikely(!dir)) {
                 if (directory_errors[idx] != errno) {

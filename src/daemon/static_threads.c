@@ -30,7 +30,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .name = "HEALTH",
         .config_section = NULL,
         .config_name = NULL,
-        .enabled = 0,
+        .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = health_main
@@ -70,11 +70,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .name = "PLUGINSD",
         .config_section = NULL,
         .config_name = NULL,
-#ifdef OS_WINDOWS
-        .enabled = 0,
-#else
         .enabled = 1,
-#endif
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = pluginsd_main
@@ -97,8 +93,6 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = statsd_main
     },
-#ifndef OS_WINDOWS
-    // this crashes the debugger under windows
     {
         .name = "EXPORTING",
         .config_section = NULL,
@@ -108,7 +102,6 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = exporting_main
     },
-#endif
     {
         .name = "SNDR[localhost]",
         .config_section = NULL,

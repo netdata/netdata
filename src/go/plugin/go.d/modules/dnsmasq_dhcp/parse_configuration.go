@@ -97,24 +97,31 @@ Examples:
   - 1234::,ra-names
   - 1234::,ra-stateless
 */
-var reDHCPRange = regexp.MustCompile(`([0-9a-f.:]+),([0-9a-f.:]+)`)
 
 func parseDHCPRangeValue(s string) (r string) {
 	if strings.Contains(s, "ra-stateless") {
-		return
+		return ""
 	}
 
-	match := reDHCPRange.FindStringSubmatch(s)
-	if match == nil {
-		return
+	s = strings.ReplaceAll(s, " ", "")
+
+	var start, end net.IP
+	parts := strings.Split(s, ",")
+
+	for i, v := range parts {
+		if start = net.ParseIP(strings.TrimSpace(v)); start == nil {
+			continue
+		}
+		if len(parts) < i+1 {
+			return ""
+		}
+		if end = net.ParseIP(parts[i+1]); end == nil || iprange.New(start, end) == nil {
+			return ""
+		}
+		return fmt.Sprintf("%s-%s", start, end)
 	}
 
-	start, end := net.ParseIP(match[1]), net.ParseIP(match[2])
-	if start == nil || end == nil {
-		return
-	}
-
-	return fmt.Sprintf("%s-%s", start, end)
+	return ""
 }
 
 /*
@@ -134,6 +141,8 @@ var (
 )
 
 func parseDHCPHostValue(s string) (r string) {
+	s = strings.ReplaceAll(s, " ", "")
+
 	if strings.Contains(s, "[") {
 		return strings.Trim(reDHCPHostV6.FindString(s), "[]")
 	}

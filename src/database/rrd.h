@@ -1043,7 +1043,6 @@ struct alarm_entry {
     STRING *recipient;
     time_t exec_run_timestamp;
     int exec_code;
-    uint64_t exec_spawn_serial;
 
     STRING *source;
     STRING *units;
@@ -1068,6 +1067,8 @@ struct alarm_entry {
     uint32_t updates_id;
 
     time_t last_repeat;
+
+    POPEN_INSTANCE *popen_instance;
 
     struct alarm_entry *next;
     struct alarm_entry *next_in_progress;

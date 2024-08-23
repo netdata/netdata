@@ -136,7 +136,7 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "dumpconfig\n"
              "    Returns the current netdata.conf on stdout.\n"
 #ifdef ENABLE_ACLK
-             "remove-stale-node node_id|machine_guid\n"
+             "remove-stale-node node_id|machine_guid|hostname|ALL_NODES\n"
              "    Unregisters and removes a node from the cloud.\n"
 #endif
              "version\n"
@@ -164,7 +164,7 @@ static cmd_status_t cmd_reopen_logs_execute(char *args, char **message)
     (void)message;
 
     nd_log_limits_unlimited();
-    nd_log_reopen_log_files();
+    nd_log_reopen_log_files(true);
     nd_log_limits_reset();
 
     return CMD_STATUS_SUCCESS;
@@ -306,10 +306,17 @@ static cmd_status_t cmd_ping_execute(char *args, char **message)
 static cmd_status_t cmd_aclk_state(char *args, char **message)
 {
     netdata_log_info("COMMAND: Reopening aclk/cloud state.");
+#ifdef ENABLE_ACLK
     if (strstr(args, "json"))
         *message = aclk_state_json();
     else
         *message = aclk_state();
+#else
+    if (strstr(args, "json"))
+        *message = strdupz("{\"aclk-available\":false}");
+    else
+        *message = strdupz("ACLK Available: No");
+#endif
 
     return CMD_STATUS_SUCCESS;
 }
@@ -338,13 +345,48 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message)
 }
 
 #ifdef ENABLE_ACLK
+
+static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error)
+{
+    if (host == localhost) {
+        if (report_error)
+            buffer_sprintf(wb, "You cannot unregister the parent node (%s)", rrdhost_hostname(host));
+        return 0;
+    }
+
+    if (rrdhost_is_online(host)) {
+        if (report_error)
+            buffer_sprintf(wb, "Cannot unregister a live node (%s)", rrdhost_hostname(host));
+        return 0;
+    }
+
+    if (!rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST)) {
+        rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+        sql_set_host_label(&host->host_uuid, "_is_ephemeral", "true");
+        aclk_host_state_update(host, 0, 0);
+        unregister_node(host->machine_guid);
+        freez(host->node_id);
+        host->node_id = NULL;
+        buffer_sprintf(wb, "Unregistering node with machine guid %s, hostname = %s", host->machine_guid, rrdhost_hostname(host));
+        rrd_wrlock();
+        rrdhost_free___while_having_rrd_wrlock(host, true);
+        rrd_wrunlock();
+        return 1;
+    }
+    if (report_error)
+       buffer_sprintf(wb, "Node with machine guid %s, hostname = %s is already unregistered", host->machine_guid, rrdhost_hostname(host));
+    return 0;
+}
+
+#define SQL_HOSTNAME_TO_REMOVE "SELECT host_id FROM host WHERE (hostname = @hostname OR @hostname = 'ALL_NODES')"
+
 static cmd_status_t cmd_remove_node(char *args, char **message)
 {
     (void)args;
 
     BUFFER *wb = buffer_create(1024, NULL);
     if (strlen(args) == 0) {
-        buffer_sprintf(wb, "Please specify a machine or node UUID");
+        buffer_sprintf(wb, "Please specify a machine or node UUID or hostname");
         goto done;
     }
 
@@ -353,32 +395,43 @@ static cmd_status_t cmd_remove_node(char *args, char **message)
     if (!host)
         host = find_host_by_node_id(args);
 
-    if (!host)
-        buffer_sprintf(wb, "Node with machine or node UUID \"%s\" not found", args);
-    else {
+    if (!host) {
+        sqlite3_stmt *res = NULL;
 
-        if (host == localhost) {
-            buffer_sprintf(wb, "You cannot unregister the parent node");
+        bool report_error = strcmp(args, "ALL_NODES");
+
+        if (!PREPARE_STATEMENT(db_meta, SQL_HOSTNAME_TO_REMOVE, &res)) {
+            buffer_sprintf(wb, "Failed to prepare database statement to check for stale nodes");
             goto done;
         }
 
-        if (rrdhost_is_online(host)) {
-            buffer_sprintf(wb, "Cannot unregister a live node");
-            goto done;
-        }
+        int param = 0;
+        SQLITE_BIND_FAIL(done0, sqlite3_bind_text(res, ++param, args, -1, SQLITE_STATIC));
 
-        if (!rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST)) {
-            rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
-            sql_set_host_label(&host->host_uuid, "_is_ephemeral", "true");
-            aclk_host_state_update(host, 0, 0);
-            unregister_node(host->machine_guid);
-            freez(host->node_id);
-            host->node_id = NULL;
-            buffer_sprintf(wb, "Unregistering node with machine guid %s, hostname = %s", host->machine_guid, rrdhost_hostname(host));
+        param = 0;
+        int cnt = 0;
+        while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+            char guid[UUID_STR_LEN];
+            uuid_unparse_lower(*(nd_uuid_t *)sqlite3_column_blob(res, 0), guid);
+            host = rrdhost_find_by_guid(guid);
+            if (host) {
+                if (cnt)
+                    buffer_fast_strcat(wb, "\n", 1);
+                cnt += remove_ephemeral_host(wb, host, report_error);
+            }
         }
-        else
-            buffer_sprintf(wb, "Node with machine guid %s, hostname = %s is already unregistered", host->machine_guid, rrdhost_hostname(host));
+        if (!cnt && buffer_strlen(wb) == 0) {
+            if (report_error)
+                buffer_sprintf(wb, "No match for \"%s\"", args);
+            else
+                buffer_sprintf(wb, "No stale nodes found");
+        }
+    done0:
+        REPORT_BIND_FAIL(res, param);
+        SQLITE_FINALIZE(res);
     }
+    else
+        (void) remove_ephemeral_host(wb, host, true);
 
 done:
     *message = strdupz(buffer_tostring(wb));

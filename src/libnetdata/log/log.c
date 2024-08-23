@@ -6,6 +6,10 @@
 
 #include "../libnetdata.h"
 
+#if defined(OS_WINDOWS)
+#include <windows.h>
+#endif
+
 #ifdef __FreeBSD__
 #include <sys/endian.h>
 #endif
@@ -34,6 +38,16 @@ int aclklog_enabled = 0;
 
 struct nd_log_source;
 static bool nd_log_limit_reached(struct nd_log_source *source);
+
+// ----------------------------------------------------------------------------
+
+void errno_clear(void) {
+    errno = 0;
+
+#if defined(OS_WINDOWS)
+    SetLastError(ERROR_SUCCESS);
+#endif
+}
 
 // ----------------------------------------------------------------------------
 // logging method
@@ -514,6 +528,13 @@ int nd_log_health_fd(void) {
     return STDERR_FILENO;
 }
 
+int nd_log_collectors_fd(void) {
+    if(nd_log.sources[NDLS_COLLECTORS].method == NDLM_FILE && nd_log.sources[NDLS_COLLECTORS].fd != -1)
+        return nd_log.sources[NDLS_COLLECTORS].fd;
+
+    return STDERR_FILENO;
+}
+
 void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
     char buf[FILENAME_MAX + 100];
     if(setting && *setting)
@@ -971,14 +992,38 @@ void nd_log_initialize(void) {
         nd_log_open(&nd_log.sources[i], i);
 }
 
-void nd_log_reopen_log_files(void) {
-    netdata_log_info("Reopening all log files.");
+void nd_log_reopen_log_files(bool log) {
+    if(log)
+        netdata_log_info("Reopening all log files.");
 
     nd_log.std_output.initialized = false;
     nd_log.std_error.initialized = false;
     nd_log_initialize();
 
-    netdata_log_info("Log files re-opened.");
+    if(log)
+        netdata_log_info("Log files re-opened.");
+}
+
+void nd_log_reopen_log_files_for_spawn_server(void) {
+    if(nd_log.syslog.initialized) {
+        closelog();
+        nd_log.syslog.initialized = false;
+        nd_log_syslog_init();
+    }
+
+    if(nd_log.journal_direct.initialized) {
+        close(nd_log.journal_direct.fd);
+        nd_log.journal_direct.fd = -1;
+        nd_log.journal_direct.initialized = false;
+        nd_log_journal_direct_init(NULL);
+    }
+
+    nd_log.sources[NDLS_UNSET].method = NDLM_DISABLED;
+    nd_log.sources[NDLS_ACCESS].method = NDLM_DISABLED;
+    nd_log.sources[NDLS_ACLK].method = NDLM_DISABLED;
+    nd_log.sources[NDLS_DEBUG].method = NDLM_DISABLED;
+    nd_log.sources[NDLS_HEALTH].method = NDLM_DISABLED;
+    nd_log_reopen_log_files(false);
 }
 
 void chown_open_file(int fd, uid_t uid, gid_t gid) {
@@ -1010,6 +1055,10 @@ struct log_field;
 static void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf);
 static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf);
 static void timestamp_usec_annotator(BUFFER *wb, const char *key, struct log_field *lf);
+
+#if defined(OS_WINDOWS)
+static void winerror_annotator(BUFFER *wb, const char *key, struct log_field *lf);
+#endif
 
 // ----------------------------------------------------------------------------
 
@@ -1058,6 +1107,13 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
                 .logfmt = "errno",
                 .logfmt_annotator = errno_annotator,
         },
+#if defined(OS_WINDOWS)
+        [NDF_WINERROR] = {
+                .journal = "WINERROR",
+                .logfmt = "winerror",
+                .logfmt_annotator = winerror_annotator,
+        },
+#endif
         [NDF_INVOCATION_ID] = {
                 .journal = "INVOCATION_ID", // standard journald field
                 .logfmt = NULL,
@@ -1562,6 +1618,45 @@ static void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
     buffer_json_strcat(wb, s);
     buffer_fast_strcat(wb, "\"", 1);
 }
+
+#if defined(OS_WINDOWS)
+static void winerror_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
+    DWORD errnum = log_field_to_uint64(lf);
+
+    if(errnum == 0)
+        return;
+
+    char buf[1024];
+    DWORD size = FormatMessageA(
+            FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL,
+            errnum,
+            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            buf,
+            (DWORD)(sizeof(buf) - 1),
+            NULL
+    );
+    if(size > 0) {
+        // remove \r\n at the end
+        while(size > 0 && (buf[size - 1] == '\r' || buf[size - 1] == '\n'))
+            buf[--size] = '\0';
+    }
+    else
+        size = snprintf(buf, sizeof(buf) - 1, "unknown error code");
+
+    buf[size] = '\0';
+
+    if(buffer_strlen(wb))
+        buffer_fast_strcat(wb, " ", 1);
+
+    buffer_strcat(wb, key);
+    buffer_fast_strcat(wb, "=\"", 2);
+    buffer_print_int64(wb, errnum);
+    buffer_fast_strcat(wb, ", ", 2);
+    buffer_json_strcat(wb, buf);
+    buffer_fast_strcat(wb, "\"", 1);
+}
+#endif
 
 static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
     uint64_t pri = log_field_to_uint64(lf);
@@ -2099,8 +2194,8 @@ static void nd_logger_merge_log_stack_to_thread_fields(void) {
 }
 
 static void nd_logger(const char *file, const char *function, const unsigned long line,
-               ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, bool limit, int saved_errno,
-               const char *fmt, va_list ap) {
+               ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, bool limit,
+               int saved_errno, size_t saved_winerror __maybe_unused, const char *fmt, va_list ap) {
 
     SPINLOCK *spinlock;
     FILE *fp;
@@ -2168,6 +2263,11 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     if(saved_errno != 0 && !thread_log_fields[NDF_ERRNO].entry.set)
         thread_log_fields[NDF_ERRNO].entry = ND_LOG_FIELD_I64(NDF_ERRNO, saved_errno);
 
+#if defined(OS_WINDOWS)
+    if(saved_winerror != 0 && !thread_log_fields[NDF_WINERROR].entry.set)
+        thread_log_fields[NDF_WINERROR].entry = ND_LOG_FIELD_U64(NDF_WINERROR, saved_winerror);
+#endif
+
     CLEAN_BUFFER *wb = NULL;
     if(fmt && !thread_log_fields[NDF_MESSAGE].entry.set) {
         wb = buffer_create(1024, NULL);
@@ -2215,7 +2315,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         nd_log.sources[source].pending_msg = NULL;
     }
 
-    errno = 0;
+    errno_clear();
 }
 
 static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
@@ -2234,6 +2334,12 @@ static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... )
 {
     int saved_errno = errno;
+
+    size_t saved_winerror = 0;
+#if defined(OS_WINDOWS)
+    saved_winerror = GetLastError();
+#endif
+
     source = nd_log_validate_source(source);
 
     if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
@@ -2243,12 +2349,18 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
     va_start(args, fmt);
     nd_logger(file, function, line, source, priority,
               source == NDLS_DAEMON || source == NDLS_COLLECTORS,
-              saved_errno, fmt, args);
+              saved_errno, saved_winerror, fmt, args);
     va_end(args);
 }
 
 void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     int saved_errno = errno;
+
+    size_t saved_winerror = 0;
+#if defined(OS_WINDOWS)
+    saved_winerror = GetLastError();
+#endif
+
     source = nd_log_validate_source(source);
 
     if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
@@ -2272,7 +2384,7 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
     va_start(args, fmt);
     nd_logger(file, function, line, source, priority,
             source == NDLS_DAEMON || source == NDLS_COLLECTORS,
-            saved_errno, fmt, args);
+            saved_errno, saved_winerror, fmt, args);
     va_end(args);
     erl->last_logged = now;
     erl->count = 0;
@@ -2280,12 +2392,18 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 
 void netdata_logger_fatal( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     int saved_errno = errno;
+
+    size_t saved_winerror = 0;
+#if defined(OS_WINDOWS)
+    saved_winerror = GetLastError();
+#endif
+
     ND_LOG_SOURCES source = NDLS_DAEMON;
     source = nd_log_validate_source(source);
 
     va_list args;
     va_start(args, fmt);
-    nd_logger(file, function, line, source, NDLP_ALERT, true, saved_errno, fmt, args);
+    nd_logger(file, function, line, source, NDLP_ALERT, true, saved_errno, saved_winerror, fmt, args);
     va_end(args);
 
     char date[LOG_DATE_LENGTH];

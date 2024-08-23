@@ -73,30 +73,19 @@ struct discovery_thread discovery_thread;
 #define MAXSIZE_PROC_CMDLINE 4096
 static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
 {
-    pid_t command_pid;
     enum cgroups_systemd_setting retval = SYSTEMD_CGROUP_ERR;
     char buf[MAXSIZE_PROC_CMDLINE];
     char *begin, *end;
 
-    FILE *fp_child_input;
-    FILE *fp_child_output = netdata_popen(exec, &command_pid, &fp_child_input);
-
-    if (!fp_child_output)
+    POPEN_INSTANCE *pi = spawn_popen_run(exec);
+    if(!pi)
         return retval;
-
-    int fd = fileno(fp_child_output);
-    if (fd == -1 ) {
-        collector_error("Cannot get the output of \"%s\": failed to get file descriptor", exec);
-        netdata_pclose(fp_child_input, fp_child_output, command_pid);
-        return retval;
-    }
 
     struct pollfd pfd;
-    pfd.fd = fd;
+    pfd.fd = spawn_server_instance_read_fd(pi->si);
     pfd.events = POLLIN;
 
     int timeout = 3000; // milliseconds
-
     int ret = poll(&pfd, 1, timeout);
 
     if (ret == -1) {
@@ -104,7 +93,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     } else if (ret == 0) {
         collector_info("Cannot get the output of \"%s\" within timeout (%d ms)", exec, timeout);
     } else {
-        while (fgets(buf, MAXSIZE_PROC_CMDLINE, fp_child_output) != NULL) {
+        while (fgets(buf, MAXSIZE_PROC_CMDLINE, pi->child_stdout_fp) != NULL) {
             if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
                 end = begin = begin + strlen(SYSTEMD_HIERARCHY_STRING);
                 if (!*begin)
@@ -123,7 +112,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
         }
     }
 
-    if (netdata_pclose(fp_child_input, fp_child_output, command_pid))
+    if(spawn_popen_wait(pi) != 0)
         return SYSTEMD_CGROUP_ERR;
 
     return retval;
@@ -159,25 +148,23 @@ static enum cgroups_type cgroups_try_detect_version()
 
     collector_info("cgroups version: can't detect using statfs (fs type), falling back to heuristics.");
 
-    pid_t command_pid;
     char buf[MAXSIZE_PROC_CMDLINE];
     enum cgroups_systemd_setting systemd_setting;
     int cgroups2_available = 0;
 
     // 1. check if cgroups2 available on system at all
-    FILE *fp_child_input;
-    FILE *fp_child_output = netdata_popen("grep cgroup /proc/filesystems", &command_pid, &fp_child_input);
-    if (!fp_child_output) {
-        collector_error("popen failed");
+    POPEN_INSTANCE *instance = spawn_popen_run("grep cgroup /proc/filesystems");
+    if(!instance) {
+        collector_error("cannot run 'grep cgroup /proc/filesystems'");
         return CGROUPS_AUTODETECT_FAIL;
     }
-    while (fgets(buf, MAXSIZE_PROC_CMDLINE, fp_child_output) != NULL) {
+    while (fgets(buf, MAXSIZE_PROC_CMDLINE, instance->child_stdout_fp) != NULL) {
         if (strstr(buf, "cgroup2")) {
             cgroups2_available = 1;
             break;
         }
     }
-    if(netdata_pclose(fp_child_input, fp_child_output, command_pid))
+    if(spawn_popen_wait(instance) != 0)
         return CGROUPS_AUTODETECT_FAIL;
 
     if(!cgroups2_available)

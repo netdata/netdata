@@ -69,7 +69,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | x509check.time_until_expiration | expiry | seconds |
-| x509check.revocation_status | revoked | boolean |
+| x509check.revocation_status | not_revoked, revoked | boolean |
 
 
 
@@ -80,8 +80,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ x509check_days_until_expiration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf) | x509check.time_until_expiration | time until x509 certificate expires |
-| [ x509check_revocation_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf) | x509check.revocation_status | x509 certificate revocation status (0: revoked, 1: valid) |
+| [ x509check_days_until_expiration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf) | x509check.time_until_expiration | Time until x509 certificate expires for ${label:source} |
+| [ x509check_revocation_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf) | x509check.revocation_status | x509 certificate revocation status for ${label:source} |
 
 
 ## Setup
@@ -199,6 +199,8 @@ jobs:
 ## Troubleshooting
 
 ### Debug Mode
+
+**Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
 To troubleshoot issues with the `x509check` collector, run the `go.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.

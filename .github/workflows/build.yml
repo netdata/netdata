@@ -70,6 +70,7 @@ jobs:
             packaging/cmake/
             packaging/makeself/
             packaging/installer/
+            packaging/windows/
             packaging/*.sh
             packaging/*.version
             packaging/*.checksums
@@ -78,6 +79,7 @@ jobs:
             packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
+        if: github.event_name != 'workflow_dispatch'
         env:
           CHANGED_SOURCE_FILES: ${{ steps.check-source-files.outputs.all_changed_files }}
           CHANGED_BUILD_FILES: ${{ steps.check-build-files.outputs.all_changed_files }}
@@ -95,11 +97,9 @@ jobs:
           fi
       - name: Check Go
         id: check-go
-        env:
-          OTHER_CHANGED_FILES: ${{ steps.check-source-files.outputs.other_changed_files }}
         run: |
           if [ '${{ github.event_name }}' == 'pull_request' ]; then
-            if echo "${OTHER_CHANGED_FILES}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
+            if echo "${{ steps.check-source-files.outputs.other_changed_files }}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
               echo 'skip-go=' >> "${GITHUB_OUTPUT}"
             else
               echo 'skip-go=--disable-go' >> "${GITHUB_OUTPUT}"
@@ -396,7 +396,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         env:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/
-        run: packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
+        run: sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -465,7 +465,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         env:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/
-        run: packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
+        run: sh -x packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -515,10 +515,10 @@ jobs:
           credentials_json: ${{ secrets.GCS_STORAGE_SERVICE_KEY_JSON }}
       - name: Setup GCS
         id: gcs-setup
-        uses: google-github-actions/setup-gcloud@v2.1.0
+        uses: google-github-actions/setup-gcloud@v2.1.1
       - name: Upload Artifacts
         id: upload
-        uses: google-github-actions/upload-cloud-storage@v2.1.0
+        uses: google-github-actions/upload-cloud-storage@v2.1.2
         with:
           destination: ${{ secrets.GCP_NIGHTLY_STORAGE_BUCKET }}
           gzip: false
@@ -975,6 +975,7 @@ jobs:
           }}
 
   macos-build: # Test building on macOS
+    name: Test building on macOS
     runs-on: ${{ matrix.runner }}
     if: github.event_name != 'workflow_dispatch'
     needs:
@@ -1043,6 +1044,112 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
+          }}
+
+  windows-build: # Test building on Windows
+    name: Test building on Windows
+    runs-on: windows-latest
+    if: github.event_name != 'workflow_dispatch'
+    needs:
+      - file-check
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: Write-Output "SKIPPED"
+      - name: Checkout
+        uses: actions/checkout@v4
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        with:
+          submodules: recursive
+          lfs: true
+      - name: Set Up Go
+        id: golang
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "^1.22"
+      - name: Set Up Dependencies
+        id: deps
+        if: needs.file-check.outputs.run == 'true'
+        run: ./packaging/windows/install-dependencies.ps1
+      - name: Build Netdata
+        id: build
+        if: needs.file-check.outputs.run == 'true'
+        env:
+          BUILD_DIR: ${{ github.workspace }}\build
+        run: ./packaging/windows/build.ps1
+      - name: Sign Agent Code
+        id: sign-agent
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
+        uses: azure/trusted-signing-action@v0.4.0
+        with:
+          azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
+          azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
+          endpoint: "https://eus.codesigning.azure.net/"
+          trusted-signing-account-name: Netdata
+          certificate-profile-name: Netdata
+          files-folder: ${{ github.workspace }}\build
+          files-folder-filter: exe,dll
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
+          timestamp-digest: SHA256
+      - name: Package Netdata
+        id: package
+        if: needs.file-check.outputs.run == 'true'
+        env:
+          BUILD_DIR: ${{ github.workspace }}\build
+        run: ./packaging/windows/package.ps1
+      - name: Sign Installer
+        id: sign-installer
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
+        uses: azure/trusted-signing-action@v0.4.0
+        with:
+          azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
+          azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
+          endpoint: "https://eus.codesigning.azure.net/"
+          trusted-signing-account-name: Netdata
+          certificate-profile-name: Netdata
+          files: ${{ github.workspace }}\packaging\windows\netdata-installer.exe
+          file-digest: SHA256
+          timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
+          timestamp-digest: SHA256
+      - name: Upload Installer
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64-installer
+          path: packaging\windows\netdata-installer.exe
+          retention-days: 30
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Windows build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Updater checks for ${{ matrix.distro }} failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Set Up Dependencies: ${{ steps.deps.outcome }}
+              Build Netdata: ${{ steps.build.outcome }}
+              Sign Agent Code: ${{ steps.sign-agent.outcome }}
+              Package Netdata: ${{ steps.package.outcome }}
+              Sign Installer: ${{ steps.sign-installer.outcome }}
+              Upload Installer: ${{ steps.upload.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
           }}
 
   updater-check: # Test the generated dist archive using the updater code.

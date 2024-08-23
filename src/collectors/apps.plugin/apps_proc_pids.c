@@ -2,18 +2,44 @@
 
 #include "apps_plugin.h"
 
-static inline struct pid_stat *get_pid_entry(pid_t pid) {
-    if(likely(all_pids[pid]))
-        return all_pids[pid];
+static struct pid_stat **all_pids = NULL;
+size_t all_pids_count = 0; // the number of processes running
 
-    struct pid_stat *p = callocz(sizeof(struct pid_stat), 1);
+struct pid_stat *root_of_pids = NULL;   // global linked list of all processes running
+
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
+// Another pre-allocated list of all possible pids.
+// We need it to assign them a unique sortlist id, so that we
+// read parents before children. This is needed to prevent a situation where
+// a child is found running, but until we read its parent, it has exited and
+// its parent has accumulated its resources.
+pid_t *all_pids_sortlist = NULL;
+#endif
+
+void pids_init(void) {
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
+    all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max + 1);
+#endif
+
+    all_pids = callocz(sizeof(struct pid_stat *), (size_t) pid_max + 1);
+}
+
+inline struct pid_stat *find_pid_entry(pid_t pid) {
+    return all_pids[pid];
+}
+
+static inline struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
+    struct pid_stat *p = find_pid_entry(pid);
+    if(likely(p))
+        return p;
+
+    p = callocz(sizeof(struct pid_stat), 1);
     p->fds = mallocz(sizeof(struct pid_fd) * MAX_SPARE_FDS);
     p->fds_size = MAX_SPARE_FDS;
     init_pid_fds(p, 0, p->fds_size);
     p->pid = pid;
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(root_of_pids, p, prev, next);
-
     all_pids[pid] = p;
     all_pids_count++;
 
@@ -21,7 +47,7 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
 }
 
 static inline void del_pid_entry(pid_t pid) {
-    struct pid_stat *p = all_pids[pid];
+    struct pid_stat *p = find_pid_entry(pid);
 
     if(unlikely(!p)) {
         netdata_log_error("attempted to free pid %d that is not allocated.", pid);
@@ -62,7 +88,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
         return 0;
     }
 
-    struct pid_stat *p = get_pid_entry(pid);
+    struct pid_stat *p = get_or_allocate_pid_entry(pid);
     if(unlikely(!p || p->read)) return 0;
     p->read = true;
 

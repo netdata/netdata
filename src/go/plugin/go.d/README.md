@@ -1,7 +1,7 @@
 <!--
 title: go.d.plugin
 description: "go.d.plugin is an external plugin for Netdata, responsible for running individual data collectors written in Go."
-custom_edit_url: "/src/go/collectors/go.d.plugin/README.md"
+custom_edit_url: "/src/go/plugin/go.d/README.md"
 sidebar_label: "go.d.plugin"
 learn_status: "Published"
 learn_topic_type: "Tasks"
@@ -51,7 +51,9 @@ see the appropriate collector readme.
 |:-------------------------------------------------------------------------------------------------------------------|:-----------------------------:|
 | [adaptec_raid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/adaptecraid)              |     Adaptec Hardware RAID     |
 | [activemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/activemq)                     |           ActiveMQ            |
+| [ap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ap)                                 |          Wireless AP          |
 | [apache](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/apache)                         |            Apache             |
+| [beanstalk](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/beanstalk)                   |           Beanstalk           |
 | [bind](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/bind)                             |           ISC Bind            |
 | [cassandra](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/cassandra)                   |           Cassandra           |
 | [chrony](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/chrony)                         |            Chrony             |
@@ -69,19 +71,24 @@ see the appropriate collector readme.
 | [docker](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/docker)                         |         Docker Engine         |
 | [docker_engine](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/docker_engine)           |         Docker Engine         |
 | [dockerhub](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/dockerhub)                   |          Docker Hub           |
+| [dovecot](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/dovecot)                       |            Dovecot            |
 | [elasticsearch](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/elasticsearch)           |   Elasticsearch/OpenSearch    |
 | [envoy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/envoy)                           |             Envoy             |
 | [example](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/example)                       |               -               |
+| [exim](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/exim)                             |             Exim              |
 | [fail2ban](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/fail2ban)                     |        Fail2Ban Jails         |
 | [filecheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/filecheck)                   |     Files and Directories     |
 | [fluentd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/fluentd)                       |            Fluentd            |
 | [freeradius](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/freeradius)                 |          FreeRADIUS           |
+| [gearman](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/gearman)                       |            Gearman            |
 | [haproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/haproxy)                       |            HAProxy            |
 | [hddtemp](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hddtemp)                       |       Disks temperature       |
 | [hdfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hdfs)                             |             HDFS              |
 | [hpssa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hpssa)                           |        HPE Smart Array        |
 | [httpcheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/httpcheck)                   |       Any HTTP Endpoint       |
+| [icecast](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/icecast)                       |            Icecast            |
 | [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/intelgpu)                     |     Intel integrated GPU      |
+| [ipfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ipfs)                             |             IPFS              |
 | [isc_dhcpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/isc_dhcpd)                   |           ISC DHCP            |
 | [k8s_kubelet](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/k8s_kubelet)               |            Kubelet            |
 | [k8s_kubeproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/k8s_kubeproxy)           |          Kube-proxy           |
@@ -92,11 +99,14 @@ see the appropriate collector readme.
 | [logstash](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/logstash)                     |           Logstash            |
 | [lvm](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/lvm)                               |      LVM logical volumes      |
 | [megacli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/megacli)                       |     MegaCli Hardware Raid     |
+| [memcached](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/memcached)                   |           Memcached           |
 | [mongoDB](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/mongodb)                       |            MongoDB            |
+| [monit](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/monit)                           |             Monit             |
 | [mysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/mysql)                           |             MySQL             |
 | [nginx](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginx)                           |             NGINX             |
 | [nginxplus](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginxplus)                   |          NGINX Plus           |
 | [nginxvts](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginxvts)                     |           NGINX VTS           |
+| [nsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nsd)                               |       NSD (NLnet Labs)        |
 | [ntpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ntpd)                             |          NTP daemon           |
 | [nvme](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nvme)                             |         NVMe devices          |
 | [openvpn](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/openvpn)                       |            OpenVPN            |
@@ -110,23 +120,30 @@ see the appropriate collector readme.
 | [prometheus](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/prometheus)                 |    Any Prometheus Endpoint    |
 | [portcheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/portcheck)                   |       Any TCP Endpoint        |
 | [postgres](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/postgres)                     |          PostgreSQL           |
+| [postfix](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/postfix)                       |            Postfix            |
 | [powerdns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/powerdns)                     | PowerDNS Authoritative Server |
 | [powerdns_recursor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/powerdns_recursor)   |       PowerDNS Recursor       |
 | [proxysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/proxysql)                     |           ProxySQL            |
-| [pulsar](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/portcheck)                      |         Apache Pulsar         |
+| [pulsar](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/pulsar)                         |         Apache Pulsar         |
+| [puppet](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/puppet)                         |            Puppet             |
 | [rabbitmq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/rabbitmq)                     |           RabbitMQ            |
 | [redis](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/redis)                           |             Redis             |
+| [rethinkdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/rethinkdb)                   |           RethinkDB           |
+| [riakkv](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/riakkv)                         |            Riak KV            |
 | [rspamd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/rspamd)                         |            Rspamd             |
 | [runit](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/runit)                           |             Runit             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/scaleio)                       |       Dell EMC ScaleIO        |
-| [sensors](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules)                    |       Hardware Sensors        |
-| [SNMP](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/snmp)                  |             SNMP              |
+| [sensors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/sensors)                       |       Hardware Sensors        |
+| [SNMP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/snmp)                             |             SNMP              |
+| [squid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/squid)                           |             Squid             |
 | [squidlog](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/squidlog)                     |             Squid             |
 | [smartctl](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/smartctl)                     |   S.M.A.R.T Storage Devices   |
 | [storcli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/storcli)                       |    Broadcom Hardware RAID     |
 | [supervisord](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/supervisord)               |          Supervisor           |
 | [systemdunits](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/systemdunits)             |      Systemd unit state       |
 | [tengine](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/tengine)                       |            Tengine            |
+| [tomcat](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/tomcat)                         |            Tomcat             |
+| [tor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/tor)                               |              Tor              |
 | [traefik](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/traefik)                       |            Traefik            |
 | [upsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/upsd)                             |          UPSd (Nut)           |
 | [unbound](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/unbound)                       |            Unbound            |
@@ -154,8 +171,8 @@ sudo ./edit-config go.d.conf
 
 Configurations are written in [YAML](http://yaml.org/).
 
-- [plugin configuration](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d.conf)
-- [specific module configuration](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/config/go.d)
+- [plugin configuration](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d.conf)
+- [specific module configuration](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d)
 
 ### Enable a collector
 

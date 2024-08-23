@@ -29,7 +29,10 @@ type smartctlCliExec struct {
 	timeout    time.Duration
 }
 
-func (e *smartctlCliExec) scan() (*gjson.Result, error) {
+func (e *smartctlCliExec) scan(open bool) (*gjson.Result, error) {
+	if open {
+		return e.execute("smartctl-json-scan-open")
+	}
 	return e.execute("smartctl-json-scan")
 }
 

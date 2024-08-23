@@ -99,6 +99,7 @@ include:
 
   - distro: centos
     version: "7"
+    base_image: "netdata/legacy:centos7"
     support_type: Core
     notes: ''
     eol_check: false
@@ -143,6 +144,7 @@ include:
     notes: ''
     base_image: debian:bookworm
     eol_check: true
+    eol_lts: true
     bundle_sentry:
       <<: *default_sentry
       amd64: true
@@ -167,15 +169,6 @@ include:
     packages:
       <<: *debian_packages
       repo_distro: debian/bullseye
-    test:
-      ebpf-core: false
-  - <<: *debian
-    version: "10"
-    base_image: debian:buster
-    bundle_sentry: *default_sentry
-    packages:
-      <<: *debian_packages
-      repo_distro: debian/buster
     test:
       ebpf-core: false
 
@@ -311,11 +304,6 @@ include:
     test:
       ebpf-core: true
   - <<: *ubuntu
-    version: "23.10"
-    packages:
-      <<: *ubuntu_packages
-      repo_distro: ubuntu/mantic
-  - <<: *ubuntu
     version: "22.04"
     packages:
       <<: *ubuntu_packages
@@ -326,6 +314,11 @@ include:
       <<: *ubuntu_packages
       repo_distro: ubuntu/focal
 legacy: # Info for platforms we used to support and still need to handle packages for
+  - <<: *debian
+    version: "10"
+    packages:
+      <<: *debian_packages
+      repo_distro: debian/buster
   - <<: *fedora
     version: "37"
     packages:
@@ -347,6 +340,11 @@ legacy: # Info for platforms we used to support and still need to handle package
     packages:
       <<: *cs_packages
       repo_distro: el/c8s
+  - <<: *ubuntu
+    version: "23.10"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/mantic
 no_include: # Info for platforms not covered in CI
   - distro: docker
     version: "19.03 or newer"

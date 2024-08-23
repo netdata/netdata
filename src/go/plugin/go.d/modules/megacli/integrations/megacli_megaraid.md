@@ -113,8 +113,9 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| megacli.bbu_relative_charge | charge | percentage |
+| megacli.bbu_charge | charge | percentage |
 | megacli.bbu_recharge_cycles | recharge | cycles |
+| megacli.bbu_capacity_degradation | cap_degradation | percent |
 | megacli.bbu_temperature | temperature | Celsius |
 
 
@@ -188,6 +189,8 @@ jobs:
 ## Troubleshooting
 
 ### Debug Mode
+
+**Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
 To troubleshoot issues with the `megacli` collector, run the `go.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.

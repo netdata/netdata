@@ -231,7 +231,7 @@ int main(int argc, char **argv) {
 
     parse_command_line(argc, argv);
 
-    errno = 0;
+    errno_clear();
 
     dict_dest_job_metrics = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 

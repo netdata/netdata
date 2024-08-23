@@ -39,3 +39,18 @@ func (e *zpoolCLIExec) list() ([]byte, error) {
 
 	return bs, nil
 }
+
+func (e *zpoolCLIExec) listWithVdev(pool string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, e.binPath, "list", "-p", "-v", "-L", pool)
+	e.Debugf("executing '%s'", cmd)
+
+	bs, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
+	}
+
+	return bs, nil
+}

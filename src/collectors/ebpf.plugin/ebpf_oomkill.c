@@ -55,9 +55,9 @@ static void ebpf_obsolete_specific_oomkill_charts(char *type, int update_every);
  */
 static void ebpf_obsolete_oomkill_services(ebpf_module_t *em, char *id)
 {
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_OOMKILL_CHART,
+                              "",
                               "Systemd service OOM kills.",
                               EBPF_OOMKILL_UNIT_KILLS,
                               NETDATA_EBPF_MEMORY_GROUP,
@@ -132,6 +132,10 @@ static void oomkill_cleanup(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!em) return;
+
+    pthread_mutex_lock(&lock);
+    collect_pids &= ~(1<<EBPF_MODULE_OOMKILL_IDX);
+    pthread_mutex_unlock(&lock);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -242,7 +246,7 @@ static void ebpf_create_systemd_oomkill_charts(int update_every)
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20191,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
-        .context = NETDATA_CGROUP_OOMKILLS_CONTEXT,
+        .context = NETDATA_SYSTEMD_OOMKILLS_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_OOMKILL,
         .update_every = 0,
         .suffix = NETDATA_OOMKILL_CHART,
@@ -276,7 +280,7 @@ static void ebpf_send_systemd_oomkill_charts()
         if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_OOMKILL_CHART)) ) {
             continue;
         }
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name,  NETDATA_OOMKILL_CHART);
+        ebpf_write_begin_chart(ect->name,  NETDATA_OOMKILL_CHART, "");
         write_chart_dimension(oomkill_publish_aggregated.dimension, (long long) ect->oomkill);
         ect->oomkill = 0;
         ebpf_write_end_chart();
@@ -549,7 +553,7 @@ void *ebpf_oomkill_thread(void *ptr)
     em->maps = oomkill_maps;
 
 #define NETDATA_DEFAULT_OOM_DISABLED_MSG "Disabling OOMKILL thread, because"
-    if (unlikely(!ebpf_all_pids || !em->apps_charts)) {
+    if (unlikely(!em->apps_charts)) {
         // When we are not running integration with apps, we won't fill necessary variables for this thread to run, so
         // we need to disable it.
         pthread_mutex_lock(&ebpf_exit_cleanup);

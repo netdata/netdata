@@ -1,0 +1,135 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-tor
+      plugin_name: go.d.plugin
+      module_name: tor
+      monitored_instance:
+        name: Tor
+        link: https://www.torproject.org/
+        categories:
+          - data-collection.vpns
+        icon_filename: "tor.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - tor
+        - traffic
+        - vpn
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Tracks Tor's download and upload traffic, as well as its uptime.
+        method_description: |
+          It reads the server's response to the [GETINFO](https://spec.torproject.org/control-spec/commands.html#getinfo) command.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects Tor instances running on localhost that are listening on port 9051.
+            On startup, it tries to collect metrics from:
+
+            - 127.0.0.1:9051
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable Control Port
+            description: |
+              Enable `ControlPort` in `/etc/tor/torrc`.
+      configuration:
+        file:
+          name: go.d/tor.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: The IP address and port where the Tor's Control Port listens for connections.
+              default_value: 127.0.0.1:9051
+              required: true
+            - name: timeout
+              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              default_value: 1
+              required: false
+            - name: password
+              description: Password for authentication.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:9051
+                    password: somePassword
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:9051
+                    password: somePassword
+
+                  - name: remote
+                    address: 203.0.113.0:9051
+                    password: somePassword
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: tor.traffic
+              description: Tor Traffic
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: tor.uptime
+              description: Tor Uptime
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: uptime

@@ -1,0 +1,12 @@
+NAME                                     SIZE          ALLOC           FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
+rpool                           9981503995904  3046188658688  6935315337216        -         -      9     30   1.00  DEGRADED  -
+  mirror-0                      9981503995904  3046188658688  6935315337216        -         -      9     30      -    ONLINE
+    sdc2                        9998683602944      -      -        -         -      -      -      -    ONLINE
+    sdd2                        9998683602944      -      -        -         -      -      -      -    ONLINE
+logs                                -      -      -        -         -      -      -      -         -
+  mirror-1                      17716740096  393216  17716346880        -         -      0      0      -  DEGRADED
+    sdb1                        17951621120      -      -        -         -      -      -      -    ONLINE
+    14807975228228307538            -      -      -        -         -      -      -      -   UNAVAIL
+cache                               -      -      -        -         -      -      -      -         -
+  sdb2                          99000254464  98755866624  239665152        -         -      0     99      -    ONLINE
+  wwn-0x500151795954c095-part2      -      -      -        -         -      -      -      -   UNAVAIL

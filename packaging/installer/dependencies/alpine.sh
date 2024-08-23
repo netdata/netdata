@@ -9,33 +9,27 @@ DONT_WAIT=0
 
 package_tree="
   alpine-sdk
-  coreutils
-  git
-  gcc
-  g++
-  automake
-  autoconf
   cmake
-  make
-  libatomic
-  libtool
-  pkgconfig
-  tar
+  coreutils
   curl
+  elfutils-dev
+  g++
+  gcc
+  git
   gzip
+  json-c-dev
+  libatomic
+  libmnl-dev
   libuv-dev
   lz4-dev
+  make
   openssl-dev
-  elfutils-dev
+  pkgconfig
   python3
-  zlib-dev
+  tar
   util-linux-dev
-  libmnl-dev
-  json-c-dev
-  musl-fts-dev
-  bison
-  flex
   yaml-dev
+  zlib-dev
   "
 
 usage() {

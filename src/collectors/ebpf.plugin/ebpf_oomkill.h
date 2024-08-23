@@ -28,6 +28,7 @@ typedef uint8_t oomkill_ebpf_val_t;
 
 // Contexts
 #define NETDATA_CGROUP_OOMKILLS_CONTEXT "cgroup.oomkills"
+#define NETDATA_SYSTEMD_OOMKILLS_CONTEXT "systemd.oomkills"
 
 extern struct config oomkill_config;
 void *ebpf_oomkill_thread(void *ptr);

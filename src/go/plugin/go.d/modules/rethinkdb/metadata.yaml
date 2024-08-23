@@ -1,0 +1,198 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-rethinkdb
+      plugin_name: go.d.plugin
+      module_name: rethinkdb
+      monitored_instance:
+        name: RethinkDB
+        link: https://rethinkdb.com
+        categories:
+          - data-collection.database-servers
+        icon_filename: "rethinkdb.png"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - rethinkdb
+        - database
+        - db
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          It collects cluster-wide metrics such as server status, client connections, active clients, query rate, and document read/write rates.
+          For each server, it offers similar metrics.
+        method_description: |
+          The data is gathered by querying the stats table in RethinkDB, which stores real-time statistics related to the cluster and its individual servers.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            If no configuration is given, collector will attempt to connect to RethinkDB instance on `127.0.0.1:28015` address.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/rethinkdb.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: The IP address and port where the RethinkDB service listens for connections.
+              default_value: 127.0.0.1:28015
+              required: true
+            - name: timeout
+              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username used for authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password used for authentication.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:28015
+            - name: With authentication
+              description: An example configuration with authentication.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:28015
+                    username: name
+                    password: pass
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:28015
+
+                  - name: remote
+                    address: 203.0.113.0:28015
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: rethinkdb.cluster_servers_stats_request
+              description: Cluster Servers Stats Request
+              unit: "servers"
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: timeout
+            - name: rethinkdb.cluster_client_connections
+              description: Cluster Client Connections
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: rethinkdb.cluster_active_clients
+              description: Cluster Active Clients
+              unit: "clients"
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: rethinkdb.cluster_queries
+              description: Cluster Queries
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: queries
+            - name: rethinkdb.cluster_documents
+              description: Cluster Documents
+              unit: "documents/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+        - name: server
+          description: "These metrics refer to the server (cluster member)."
+          labels:
+            - name: server_uuid
+              description: Server UUID.
+            - name: server_name
+              description: Server name.
+          metrics:
+            - name: rethinkdb.server_stats_request_status
+              description: Server Stats Request Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: timeout
+            - name: rethinkdb.server_client_connections
+              description: Server Client Connections
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: rethinkdb.server_active_clients
+              description: Server Active Clients
+              unit: "clients"
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: rethinkdb.server_queries
+              description: Server Queries
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: queries
+            - name: rethinkdb.server_documents
+              description: Server Documents
+              unit: "documents/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written

@@ -33,7 +33,7 @@ static inline bool read_proc_pid_limits_per_os(struct pid_stat *p, void *ptr __m
     bool ret = false;
     bool read_limits = false;
 
-    errno = 0;
+    errno_clear();
     proc_pid_limits_buffer[0] = '\0';
 
     kernel_uint_t all_fds = pid_openfds_sum(p);

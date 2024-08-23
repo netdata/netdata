@@ -3,8 +3,6 @@
 package chrony
 
 import (
-	"errors"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
@@ -22,10 +20,10 @@ const (
 	prioRefMeasurementTime
 	prioLeapStatus
 	prioActivity
-	prioNTPPackets
-	prioCommandPackets
-	prioNKEConnections
-	prioClientLogRecords
+	//prioNTPPackets
+	//prioCommandPackets
+	//prioNKEConnections
+	//prioClientLogRecords
 )
 
 var charts = module.Charts{
@@ -218,105 +216,105 @@ var (
 	}
 )
 
-var serverStatsVer1Charts = module.Charts{
-	ntpPacketsChart.Copy(),
-	commandPacketsChart.Copy(),
-	clientLogRecordsChart.Copy(),
-}
-
-var serverStatsVer2Charts = module.Charts{
-	ntpPacketsChart.Copy(),
-	commandPacketsChart.Copy(),
-	clientLogRecordsChart.Copy(),
-	nkeConnectionChart.Copy(),
-}
-
-var serverStatsVer3Charts = module.Charts{
-	ntpPacketsChart.Copy(),
-	commandPacketsChart.Copy(),
-	clientLogRecordsChart.Copy(),
-	nkeConnectionChart.Copy(),
-}
-
-var serverStatsVer4Charts = module.Charts{
-	ntpPacketsChart.Copy(),
-	commandPacketsChart.Copy(),
-	clientLogRecordsChart.Copy(),
-	nkeConnectionChart.Copy(),
-}
+//var serverStatsVer1Charts = module.Charts{
+//	ntpPacketsChart.Copy(),
+//	commandPacketsChart.Copy(),
+//	clientLogRecordsChart.Copy(),
+//}
+//
+//var serverStatsVer2Charts = module.Charts{
+//	ntpPacketsChart.Copy(),
+//	commandPacketsChart.Copy(),
+//	clientLogRecordsChart.Copy(),
+//	nkeConnectionChart.Copy(),
+//}
+//
+//var serverStatsVer3Charts = module.Charts{
+//	ntpPacketsChart.Copy(),
+//	commandPacketsChart.Copy(),
+//	clientLogRecordsChart.Copy(),
+//	nkeConnectionChart.Copy(),
+//}
+//
+//var serverStatsVer4Charts = module.Charts{
+//	ntpPacketsChart.Copy(),
+//	commandPacketsChart.Copy(),
+//	clientLogRecordsChart.Copy(),
+//	nkeConnectionChart.Copy(),
+//}
 
 // ServerStats charts
-var (
-	ntpPacketsChart = module.Chart{
-		ID:       "ntp_packets",
-		Title:    "NTP packets",
-		Units:    "packets/s",
-		Fam:      "client requests",
-		Ctx:      "chrony.ntp_packets",
-		Type:     module.Stacked,
-		Priority: prioNTPPackets,
-		Dims: module.Dims{
-			{ID: "ntp_packets_received", Name: "received", Algo: module.Incremental},
-			{ID: "ntp_packets_dropped", Name: "dropped", Algo: module.Incremental},
-		},
-	}
-	commandPacketsChart = module.Chart{
-		ID:       "command_packets",
-		Title:    "Command packets",
-		Units:    "packets/s",
-		Fam:      "client requests",
-		Ctx:      "chrony.command_packets",
-		Type:     module.Stacked,
-		Priority: prioCommandPackets,
-		Dims: module.Dims{
-			{ID: "command_packets_received", Name: "received", Algo: module.Incremental},
-			{ID: "command_packets_dropped", Name: "dropped", Algo: module.Incremental},
-		},
-	}
-	nkeConnectionChart = module.Chart{
-		ID:       "nke_connections",
-		Title:    "NTS-KE connections",
-		Units:    "connections/s",
-		Fam:      "client requests",
-		Ctx:      "chrony.nke_connections",
-		Type:     module.Stacked,
-		Priority: prioNKEConnections,
-		Dims: module.Dims{
-			{ID: "nke_connections_accepted", Name: "accepted", Algo: module.Incremental},
-			{ID: "nke_connections_dropped", Name: "dropped", Algo: module.Incremental},
-		},
-	}
-	clientLogRecordsChart = module.Chart{
-		ID:       "client_log_records",
-		Title:    "Client log records",
-		Units:    "records/s",
-		Fam:      "client requests",
-		Ctx:      "chrony.client_log_records",
-		Type:     module.Stacked,
-		Priority: prioClientLogRecords,
-		Dims: module.Dims{
-			{ID: "client_log_records_dropped", Name: "dropped", Algo: module.Incremental},
-		},
-	}
-)
+//var (
+//	ntpPacketsChart = module.Chart{
+//		ID:       "ntp_packets",
+//		Title:    "NTP packets",
+//		Units:    "packets/s",
+//		Fam:      "client requests",
+//		Ctx:      "chrony.ntp_packets",
+//		Type:     module.Stacked,
+//		Priority: prioNTPPackets,
+//		Dims: module.Dims{
+//			{ID: "ntp_packets_received", Name: "received", Algo: module.Incremental},
+//			{ID: "ntp_packets_dropped", Name: "dropped", Algo: module.Incremental},
+//		},
+//	}
+//	commandPacketsChart = module.Chart{
+//		ID:       "command_packets",
+//		Title:    "Command packets",
+//		Units:    "packets/s",
+//		Fam:      "client requests",
+//		Ctx:      "chrony.command_packets",
+//		Type:     module.Stacked,
+//		Priority: prioCommandPackets,
+//		Dims: module.Dims{
+//			{ID: "command_packets_received", Name: "received", Algo: module.Incremental},
+//			{ID: "command_packets_dropped", Name: "dropped", Algo: module.Incremental},
+//		},
+//	}
+//	nkeConnectionChart = module.Chart{
+//		ID:       "nke_connections",
+//		Title:    "NTS-KE connections",
+//		Units:    "connections/s",
+//		Fam:      "client requests",
+//		Ctx:      "chrony.nke_connections",
+//		Type:     module.Stacked,
+//		Priority: prioNKEConnections,
+//		Dims: module.Dims{
+//			{ID: "nke_connections_accepted", Name: "accepted", Algo: module.Incremental},
+//			{ID: "nke_connections_dropped", Name: "dropped", Algo: module.Incremental},
+//		},
+//	}
+//	clientLogRecordsChart = module.Chart{
+//		ID:       "client_log_records",
+//		Title:    "Client log records",
+//		Units:    "records/s",
+//		Fam:      "client requests",
+//		Ctx:      "chrony.client_log_records",
+//		Type:     module.Stacked,
+//		Priority: prioClientLogRecords,
+//		Dims: module.Dims{
+//			{ID: "client_log_records_dropped", Name: "dropped", Algo: module.Incremental},
+//		},
+//	}
+//)
 
-func (c *Chrony) addServerStatsCharts(stats *serverStats) {
-	var err error
-
-	switch {
-	case stats.v1 != nil:
-		err = c.Charts().Add(*serverStatsVer1Charts.Copy()...)
-	case stats.v2 != nil:
-		err = c.Charts().Add(*serverStatsVer2Charts.Copy()...)
-	case stats.v3 != nil:
-		err = c.Charts().Add(*serverStatsVer3Charts.Copy()...)
-	case stats.v4 != nil:
-		err = c.Charts().Add(*serverStatsVer4Charts.Copy()...)
-	default:
-		err = errors.New("unknown stats chart")
-	}
-
-	if err != nil {
-		c.Warning(err)
-	}
-}
+//func (c *Chrony) addServerStatsCharts(stats *serverStats) {
+//	var err error
+//
+//	switch {
+//	case stats.v1 != nil:
+//		err = c.Charts().Add(*serverStatsVer1Charts.Copy()...)
+//	case stats.v2 != nil:
+//		err = c.Charts().Add(*serverStatsVer2Charts.Copy()...)
+//	case stats.v3 != nil:
+//		err = c.Charts().Add(*serverStatsVer3Charts.Copy()...)
+//	case stats.v4 != nil:
+//		err = c.Charts().Add(*serverStatsVer4Charts.Copy()...)
+//	default:
+//		err = errors.New("unknown stats chart")
+//	}
+//
+//	if err != nil {
+//		c.Warning(err)
+//	}
+//}

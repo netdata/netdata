@@ -131,13 +131,12 @@ func (p *Pihole) queryMetrics(pmx *piholeMetrics, doConcurrently bool) {
 }
 
 func (p *Pihole) querySummary(pmx *piholeMetrics) {
-	req, err := web.NewHTTPRequest(p.Request)
+	req, err := web.NewHTTPRequestWithPath(p.Request, urlPathAPI)
 	if err != nil {
 		p.Error(err)
 		return
 	}
 
-	req.URL.Path = urlPathAPI
 	req.URL.RawQuery = url.Values{
 		urlQueryKeyAuth:       []string{p.Password},
 		urlQueryKeySummaryRaw: []string{"true"},
@@ -153,13 +152,12 @@ func (p *Pihole) querySummary(pmx *piholeMetrics) {
 }
 
 func (p *Pihole) queryQueryTypes(pmx *piholeMetrics) {
-	req, err := web.NewHTTPRequest(p.Request)
+	req, err := web.NewHTTPRequestWithPath(p.Request, urlPathAPI)
 	if err != nil {
 		p.Error(err)
 		return
 	}
 
-	req.URL.Path = urlPathAPI
 	req.URL.RawQuery = url.Values{
 		urlQueryKeyAuth:          []string{p.Password},
 		urlQueryKeyGetQueryTypes: []string{"true"},
@@ -176,13 +174,12 @@ func (p *Pihole) queryQueryTypes(pmx *piholeMetrics) {
 }
 
 func (p *Pihole) queryForwardedDestinations(pmx *piholeMetrics) {
-	req, err := web.NewHTTPRequest(p.Request)
+	req, err := web.NewHTTPRequestWithPath(p.Request, urlPathAPI)
 	if err != nil {
 		p.Error(err)
 		return
 	}
 
-	req.URL.Path = urlPathAPI
 	req.URL.RawQuery = url.Values{
 		urlQueryKeyAuth:                   []string{p.Password},
 		urlQueryKeyGetForwardDestinations: []string{"true"},
@@ -199,12 +196,11 @@ func (p *Pihole) queryForwardedDestinations(pmx *piholeMetrics) {
 }
 
 func (p *Pihole) queryAPIVersion() (int, error) {
-	req, err := web.NewHTTPRequest(p.Request)
+	req, err := web.NewHTTPRequestWithPath(p.Request, urlPathAPI)
 	if err != nil {
 		return 0, err
 	}
 
-	req.URL.Path = urlPathAPI
 	req.URL.RawQuery = url.Values{
 		urlQueryKeyAuth:       []string{p.Password},
 		urlQueryKeyAPIVersion: []string{"true"},

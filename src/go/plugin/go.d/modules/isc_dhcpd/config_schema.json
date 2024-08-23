@@ -39,7 +39,7 @@
             },
             "networks": {
               "title": "Networks",
-              "description": "A space-separated list of [IP ranges](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/iprange#supported-formats) for the pool.",
+              "description": "A space-separated list of [IP ranges](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/iprange#supported-formats) for the pool.",
               "type": "string"
             }
           },

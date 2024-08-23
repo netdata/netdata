@@ -159,6 +159,34 @@ func TestNewHTTPRequest(t *testing.T) {
 	}
 }
 
+func TestNewRequest(t *testing.T) {
+	tests := map[string]struct {
+		url     string
+		path    string
+		wantURL string
+	}{
+		"base url": {
+			url:     "http://127.0.0.1:65535",
+			path:    "/bar",
+			wantURL: "http://127.0.0.1:65535/bar",
+		},
+		"with path": {
+			url:     "http://127.0.0.1:65535/foo/",
+			path:    "/bar",
+			wantURL: "http://127.0.0.1:65535/foo/bar",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			req, err := NewHTTPRequestWithPath(Request{URL: test.url}.Copy(), test.path)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.wantURL, req.URL.String())
+		})
+	}
+}
+
 func parseBasicAuth(auth string) (username, password string, ok bool) {
 	const prefix = "Basic "
 	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {

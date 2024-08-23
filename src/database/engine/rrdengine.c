@@ -1517,7 +1517,7 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
             break;
     }
 
-    errno = 0;
+    errno_clear();
     if(count)
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "DBENGINE: journal indexing done; %u files processed",

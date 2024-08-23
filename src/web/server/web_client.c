@@ -1855,7 +1855,7 @@ ssize_t web_client_receive(struct web_client *w)
     // do we have any space for more data?
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_INITIAL_SIZE);
 
-    errno = 0;
+    errno_clear();
 
 #ifdef ENABLE_HTTPS
     if ( (web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx) ) {
