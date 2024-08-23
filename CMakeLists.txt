@@ -2244,6 +2244,7 @@ add_executable(netdata
 
 if(OS_WINDOWS)
         add_executable(netdata_claim ${CLAIM_WINDOWS_FILES})
+        target_link_libraries(netdata_claim shell32)
 endif()
 
 target_compile_definitions(netdata PRIVATE
@@ -2433,6 +2434,13 @@ install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh
         COMPONENT netdata
         DESTINATION "${BINDIR}")
+
+if(OS_WINDOWS)
+        install(PROGRAMS
+                ${CMAKE_BINARY_DIR}/netdata_claim.exe
+                COMPONENT netdata
+                DESTINATION "${BINDIR}")
+endif()
 
 #
 # We don't check ENABLE_PLUGIN_CGROUP_NETWORK because rpm builds assume
