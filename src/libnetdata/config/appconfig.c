@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../libnetdata.h"
+#include "netdata_conf_header.h"
 
 /*
  * @Input:
@@ -817,19 +818,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
         }
     }
 
-    buffer_strcat(wb,
-                  "# netdata configuration\n"
-                  "#\n"
-                  "# You can download the latest version of this file, using:\n"
-                  "#\n"
-                  "#  wget -O /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
-                  "# or\n"
-                  "#  curl -o /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
-                  "#\n"
-                  "# You can uncomment and change any of the options below.\n"
-                  "# The value shown in the commented settings, is the default value.\n"
-                  "#\n"
-                  "\n# global netdata configuration\n");
+    buffer_strcat(wb, NETDATA_CONF_HEADER);
 
     for(i = 0; i <= 17 ;i++) {
         appconfig_wrlock(root);
