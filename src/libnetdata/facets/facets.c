@@ -571,11 +571,11 @@ static inline void FACET_VALUE_ADD_CURRENT_VALUE_TO_INDEX(FACET_KEY *k) {
     k->facets->operations.values.indexed++;
 }
 
-static inline void FACET_VALUE_ADD_OR_UPDATE_SELECTED(FACET_KEY *k, FACETS_HASH hash) {
+static inline void FACET_VALUE_ADD_OR_UPDATE_SELECTED(FACET_KEY *k, const char *name, FACETS_HASH hash) {
     FACET_VALUE tv = {
             .hash = hash,
             .selected = true,
-            .name = NULL,
+            .name = name,
             .name_len = 0,
     };
     FACET_VALUE_ADD_TO_INDEX(k, &tv);
@@ -1715,6 +1715,18 @@ void facets_reset_and_disable_all_facets(FACETS *facets) {
     foreach_key_in_facets_done(k);
 }
 
+inline FACET_KEY *facets_register_facet(FACETS *facets, const char *name, FACET_KEY_OPTIONS options) {
+    size_t name_length = strlen(name);
+    FACETS_HASH hash = FACETS_HASH_FUNCTION(name, name_length);
+
+    FACET_KEY *k = FACETS_KEY_ADD_TO_INDEX(facets, hash, name, name_length, options);
+    k->options |= FACET_KEY_OPTION_FACET;
+    k->options &= ~FACET_KEY_OPTION_NO_FACET;
+    facet_key_late_init(facets, k);
+
+    return k;
+}
+
 inline FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options) {
     if(!is_valid_string_hash(key_id))
         return NULL;
@@ -1732,13 +1744,22 @@ inline FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, F
     return k;
 }
 
-void facets_register_facet_id_filter(FACETS *facets, const char *key_id, const char *value_id, FACET_KEY_OPTIONS options) {
+void facets_register_facet_filter_id(FACETS *facets, const char *key_id, const char *value_id, FACET_KEY_OPTIONS options) {
     FACET_KEY *k = facets_register_facet_id(facets, key_id, options);
     if(k) {
         if(is_valid_string_hash(value_id)) {
             k->default_selected_for_values = false;
-            FACET_VALUE_ADD_OR_UPDATE_SELECTED(k, str_to_facets_hash(value_id));
+            FACET_VALUE_ADD_OR_UPDATE_SELECTED(k, NULL, str_to_facets_hash(value_id));
         }
+    }
+}
+
+void facets_register_facet_filter(FACETS *facets, const char *key, const char *value, FACET_KEY_OPTIONS options) {
+    FACET_KEY *k = facets_register_facet(facets, key, options);
+    if(k) {
+        FACETS_HASH hash = FACETS_HASH_FUNCTION(value, strlen(value));
+        k->default_selected_for_values = false;
+        FACET_VALUE_ADD_OR_UPDATE_SELECTED(k, value, hash);
     }
 }
 
@@ -2472,6 +2493,8 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                         wb, "name",
                         facets_key_name_cached(k, facets->report.used_hashes_registry));
 
+                    buffer_json_member_add_string(wb, "raw", k->name);
+
                     if(!k->order) k->order = facets->order++;
                     buffer_json_member_add_uint64(wb, "order", k->order);
 
@@ -2491,6 +2514,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
 
                                 facets_key_value_transformed(facets, k, v, tb, FACETS_TRANSFORM_FACET);
                                 buffer_json_member_add_string(wb, "name", buffer_tostring(tb));
+                                buffer_json_member_add_string(wb, "raw", v->name);
                                 buffer_json_member_add_uint64(wb, "count", v->final_facet_value_counter);
                                 buffer_json_member_add_uint64(wb, "order", v->order);
                             }

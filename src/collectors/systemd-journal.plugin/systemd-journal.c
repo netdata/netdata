@@ -1663,7 +1663,7 @@ static bool parse_json_payload(json_object *jobj, const char *path, void *data, 
             }
 
             const char *value = json_object_get_string(fct);
-            facets_register_facet_id(facets, value, FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS|FACET_KEY_OPTION_REORDER);
+            facets_register_facet(facets, value, FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS|FACET_KEY_OPTION_REORDER);
             buffer_json_add_array_item_string(wb, value);
         }
 
@@ -1699,9 +1699,8 @@ static bool parse_json_payload(json_object *jobj, const char *path, void *data, 
                 const char *value = json_object_get_string(value_obj);
 
                 // Call facets_register_facet_id_filter for each value
-                facets_register_facet_id_filter(
-                    facets, key, value,
-                    FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_REORDER);
+                facets_register_facet_filter(
+                    facets, key, value, FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_REORDER);
 
                 buffer_json_add_array_item_string(wb, value);
                 q->filters++;
@@ -1885,9 +1884,11 @@ static bool parse_get_params(FACETS *facets, JOURNAL_QUERY *q, BUFFER *wb, char 
                     if(sep)
                         *sep++ = '\0';
 
-                    facets_register_facet_id_filter(
-                        facets, keyword, value,
-                        FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS|FACET_KEY_OPTION_REORDER);
+                    facets_register_facet_filter_id(
+                        facets,
+                        keyword,
+                        value,
+                        FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_REORDER);
 
                     buffer_json_add_array_item_string(wb, value);
                     q->filters++;
