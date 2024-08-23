@@ -13,7 +13,8 @@ struct bearer_token_request {
     STRING *client_name;
 };
 
-static bool parse_payload(json_object *jobj, const char *path, struct bearer_token_request *rq, BUFFER *error) {
+static bool parse_json_payload(json_object *jobj, const char *path, void *data, BUFFER *error) {
+    struct bearer_token_request *rq = data;
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "claim_id", rq->claim_id, error, true);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "machine_guid", rq->machine_guid, error, true);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "node_id", rq->node_id, error, true);
@@ -25,33 +26,16 @@ static bool parse_payload(json_object *jobj, const char *path, struct bearer_tok
 }
 
 int function_bearer_get_token(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload, const char *source) {
-    if(!source_comes_from_cloud(source))
-        return rrd_call_function_error(wb, "You cannot access this function from outside Netdata Cloud", HTTP_RESP_BAD_REQUEST);
+    if(!request_source_is_cloud(source))
+        return rrd_call_function_error(
+            wb, "You cannot access this function from outside Netdata Cloud", HTTP_RESP_BAD_REQUEST);
 
-    if(!payload || !buffer_strlen(payload))
-        return rrd_call_function_error(wb, "No payload to generate token for", HTTP_RESP_BAD_REQUEST);
-
-    struct json_tokener *tokener = json_tokener_new();
-    if (!tokener)
-        return rrd_call_function_error(wb, "Cannot initialize json parser", HTTP_RESP_INTERNAL_SERVER_ERROR);
-
-    CLEAN_JSON_OBJECT *jobj = json_tokener_parse_ex(tokener, buffer_tostring(payload), (int)buffer_strlen(payload));
-    if (json_tokener_get_error(tokener) != json_tokener_success) {
-        const char *error_msg = json_tokener_error_desc(json_tokener_get_error(tokener));
-        char tmp[strlen(error_msg) + 100];
-        snprintf(tmp, sizeof(tmp), "JSON parser failed: %s", error_msg);
-        json_tokener_free(tokener);
-        return rrd_call_function_error(wb, tmp, HTTP_RESP_INTERNAL_SERVER_ERROR);
-    }
-    json_tokener_free(tokener);
-
-    CLEAN_BUFFER *error = buffer_create(0, NULL);
+    int code;
     struct bearer_token_request rq = { 0 };
-    if(!parse_payload(jobj, "", &rq, error)) {
+    CLEAN_JSON_OBJECT *jobj = json_parse_function_payload_or_error(wb, payload, &code, parse_json_payload, &rq);
+    if(!jobj || code != HTTP_RESP_OK) {
         string_freez(rq.client_name);
-        char tmp[buffer_strlen(error) + 100];
-        snprintfz(tmp, sizeof(tmp), "JSON parser failed: %s", buffer_tostring(error));
-        return rrd_call_function_error(wb, tmp, HTTP_RESP_BAD_REQUEST);
+        return code;
     }
 
     char claim_id[UUID_STR_LEN];

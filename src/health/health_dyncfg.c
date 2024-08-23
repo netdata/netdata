@@ -164,6 +164,11 @@ static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTO
 
     json_object *rules;
     if (json_object_object_get_ex(jobj, "rules", &rules)) {
+        if (json_object_get_type(rules) != json_type_array) {
+            buffer_sprintf(error, "member 'rules' is not an array");
+            return false;
+        }
+
         size_t rules_len = json_object_array_length(rules);
 
         RRD_ALERT_PROTOTYPE *ap = base; // fill the first entry

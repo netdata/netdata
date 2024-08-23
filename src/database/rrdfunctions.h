@@ -82,8 +82,6 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                      rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
                      BUFFER *payload, const char *source, bool hidden);
 
-int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
-
 bool rrd_function_available(RRDHOST *host, const char *function);
 
 bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, rrd_function_result_callback_t cb);

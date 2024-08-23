@@ -1413,7 +1413,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 }
 
 static void netdata_systemd_journal_function_help(const char *transaction) {
-    BUFFER *wb = buffer_create(0, NULL);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_sprintf(wb,
             "%s / %s\n"
             "\n"
@@ -1517,18 +1517,396 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
     netdata_mutex_lock(&stdout_mutex);
     pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
     netdata_mutex_unlock(&stdout_mutex);
+}
 
-    buffer_free(wb);
+typedef struct {
+    FACET_KEY_OPTIONS  default_facet;
+    bool info;
+    bool data_only;
+    bool slice;
+    bool delta;
+    bool tail;
+    time_t after_s;
+    time_t before_s;
+    usec_t anchor;
+    usec_t if_modified_since;
+    size_t last;
+    FACETS_ANCHOR_DIRECTION direction;
+    const char *query;
+    const char *chart;
+    SIMPLE_PATTERN *sources;
+    SD_JOURNAL_FILE_SOURCE_TYPE source_type;
+    size_t filters;
+    size_t sampling;
+} JOURNAL_QUERY;
+
+static SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value) {
+    if(strcmp(value, SDJF_SOURCE_ALL_NAME) == 0)
+        return SDJF_ALL;
+    else if(strcmp(value, SDJF_SOURCE_LOCAL_NAME) == 0)
+        return SDJF_LOCAL_ALL;
+    else if(strcmp(value, SDJF_SOURCE_REMOTES_NAME) == 0)
+        return SDJF_REMOTE_ALL;
+    else if(strcmp(value, SDJF_SOURCE_NAMESPACES_NAME) == 0)
+        return SDJF_LOCAL_NAMESPACE;
+    else if(strcmp(value, SDJF_SOURCE_LOCAL_SYSTEM_NAME) == 0)
+        return SDJF_LOCAL_SYSTEM;
+    else if(strcmp(value, SDJF_SOURCE_LOCAL_USERS_NAME) == 0)
+        return SDJF_LOCAL_USER;
+    else if(strcmp(value, SDJF_SOURCE_LOCAL_OTHER_NAME) == 0)
+        return SDJF_LOCAL_OTHER;
+
+    return SDJF_NONE;
+}
+
+static FACETS_ANCHOR_DIRECTION get_direction(const char *value) {
+    return strcasecmp(value, "forward") == 0 ? FACETS_ANCHOR_DIRECTION_FORWARD : FACETS_ANCHOR_DIRECTION_BACKWARD;
+}
+
+struct post_query_data {
+    const char *transaction;
+    FACETS *facets;
+    JOURNAL_QUERY *q;
+    BUFFER *wb;
+};
+
+static bool parse_json_payload(json_object *jobj, const char *path, void *data, BUFFER *error) {
+    struct post_query_data *qd = data;
+    JOURNAL_QUERY *q = qd->q;
+    BUFFER *wb = qd->wb;
+    FACETS *facets = qd->facets;
+    // const char *transaction = qd->transaction;
+
+    buffer_flush(error);
+
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_INFO, q->info, error, false);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_DELTA, q->delta, error, false);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_TAIL, q->tail, error, false);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_SLICE, q->slice, error, false);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_DATA_ONLY, q->data_only, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_SAMPLING, q->sampling, error, false);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_AFTER, q->after_s, error, false);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_BEFORE, q->before_s, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_IF_MODIFIED_SINCE, q->if_modified_since, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_ANCHOR, q->anchor, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_LAST, q->last, error, false);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_DIRECTION, get_direction, q->direction, error, false);
+    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_QUERY, q->query, error, false);
+    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_HISTOGRAM, q->chart, error, false);
+
+    json_object *sources;
+    if (json_object_object_get_ex(jobj, JOURNAL_PARAMETER_SOURCE, &sources)) {
+        if (json_object_get_type(sources) != json_type_array) {
+            buffer_sprintf(error, "member '%s' is not an array", JOURNAL_PARAMETER_SOURCE);
+            return false;
+        }
+
+        buffer_json_member_add_array(wb, JOURNAL_PARAMETER_SOURCE);
+
+        CLEAN_BUFFER *sources_list = buffer_create(0, NULL);
+
+        q->source_type = SDJF_NONE;
+
+        size_t sources_len = json_object_array_length(sources);
+        for (size_t i = 0; i < sources_len; i++) {
+            json_object *src = json_object_array_get_idx(sources, i);
+
+            if (json_object_get_type(src) != json_type_string) {
+                buffer_sprintf(error, "sources array item %zu is not a string", i);
+                return false;
+            }
+
+            const char *value = json_object_get_string(src);
+            buffer_json_add_array_item_string(wb, value);
+
+            SD_JOURNAL_FILE_SOURCE_TYPE t = get_internal_source_type(value);
+            if(t != SDJF_NONE) {
+                q->source_type |= t;
+                value = NULL;
+            }
+            else {
+                // else, match the source, whatever it is
+                if(buffer_strlen(sources_list))
+                    buffer_putc(sources_list, '|');
+
+                buffer_strcat(sources_list, value);
+            }
+        }
+
+        if(buffer_strlen(sources_list)) {
+            simple_pattern_free(q->sources);
+            q->sources = simple_pattern_create(buffer_tostring(sources_list), "|", SIMPLE_PATTERN_EXACT, false);
+        }
+
+        buffer_json_array_close(wb); // source
+    }
+
+    json_object *fcts;
+    if (json_object_object_get_ex(jobj, JOURNAL_PARAMETER_FACETS, &fcts)) {
+        if (json_object_get_type(sources) != json_type_array) {
+            buffer_sprintf(error, "member '%s' is not an array", JOURNAL_PARAMETER_FACETS);
+            return false;
+        }
+
+        buffer_json_member_add_array(wb, JOURNAL_PARAMETER_FACETS);
+
+        size_t facets_len = json_object_array_length(fcts);
+        for (size_t i = 0; i < facets_len; i++) {
+            json_object *fct = json_object_array_get_idx(fcts, i);
+
+            if (json_object_get_type(fct) != json_type_string) {
+                buffer_sprintf(error, "facets array item %zu is not a string", i);
+                return false;
+            }
+
+            const char *value = json_object_get_string(fct);
+            facets_register_facet_id(facets, value, FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS|FACET_KEY_OPTION_REORDER);
+            buffer_json_add_array_item_string(wb, value);
+        }
+
+        buffer_json_array_close(wb); // facets
+    }
+
+    json_object *selections;
+    if (json_object_object_get_ex(jobj, "selections", &selections)) {
+        if (json_object_get_type(selections) != json_type_object) {
+            buffer_sprintf(error, "member 'selections' is not an object");
+            return false;
+        }
+
+        buffer_json_member_add_object(wb, "selections");
+
+        json_object_object_foreach(selections, key, val) {
+            if (json_object_get_type(val) != json_type_array) {
+                buffer_sprintf(error, "selection '%s' is not an array", key);
+                return false;
+            }
+
+            buffer_json_member_add_array(wb, key);
+
+            size_t values_len = json_object_array_length(val);
+            for (size_t i = 0; i < values_len; i++) {
+                json_object *value_obj = json_object_array_get_idx(val, i);
+
+                if (json_object_get_type(value_obj) != json_type_string) {
+                    buffer_sprintf(error, "selection '%s' array item %zu is not a string", key, i);
+                    return false;
+                }
+
+                const char *value = json_object_get_string(value_obj);
+
+                // Call facets_register_facet_id_filter for each value
+                facets_register_facet_id_filter(
+                    facets, key, value,
+                    FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_REORDER);
+
+                buffer_json_add_array_item_string(wb, value);
+                q->filters++;
+            }
+
+            buffer_json_array_close(wb); // key
+        }
+
+        buffer_json_object_close(wb); // selections
+    }
+
+    return true;
+}
+
+static bool parse_post_params(FACETS *facets, JOURNAL_QUERY *q, BUFFER *wb, BUFFER *payload, const char *transaction) {
+    struct post_query_data qd = {
+        .transaction = transaction,
+        .facets = facets,
+        .q = q,
+        .wb = wb,
+    };
+
+    int code;
+    CLEAN_JSON_OBJECT *jobj = json_parse_function_payload_or_error(wb, payload, &code, parse_json_payload, &qd);
+    if(!jobj || code != HTTP_RESP_OK) {
+        netdata_mutex_lock(&stdout_mutex);
+        pluginsd_function_result_to_stdout(transaction, code, "application/json", now_realtime_sec() + 1, wb);
+        netdata_mutex_unlock(&stdout_mutex);
+        return false;
+    }
+
+    return true;
+}
+
+static bool parse_get_params(FACETS *facets, JOURNAL_QUERY *q, BUFFER *wb, char *function, const char *transaction) {
+    buffer_json_member_add_object(wb, "_request");
+
+    char *words[SYSTEMD_JOURNAL_MAX_PARAMS] = { NULL };
+    size_t num_words = quoted_strings_splitter_pluginsd(function, words, SYSTEMD_JOURNAL_MAX_PARAMS);
+    for(int i = 1; i < SYSTEMD_JOURNAL_MAX_PARAMS ;i++) {
+        char *keyword = get_word(words, num_words, i);
+        if(!keyword) break;
+
+        if(strcmp(keyword, JOURNAL_PARAMETER_HELP) == 0) {
+            netdata_systemd_journal_function_help(transaction);
+            return false;
+        }
+        else if(strcmp(keyword, JOURNAL_PARAMETER_INFO) == 0) {
+            q->info = true;
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_DELTA ":", sizeof(JOURNAL_PARAMETER_DELTA ":") - 1) == 0) {
+            char *v = &keyword[sizeof(JOURNAL_PARAMETER_DELTA ":") - 1];
+
+            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
+                q->delta = false;
+            else
+                q->delta = true;
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_TAIL ":", sizeof(JOURNAL_PARAMETER_TAIL ":") - 1) == 0) {
+            char *v = &keyword[sizeof(JOURNAL_PARAMETER_TAIL ":") - 1];
+
+            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
+                q->tail = false;
+            else
+                q->tail = true;
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_SAMPLING ":", sizeof(JOURNAL_PARAMETER_SAMPLING ":") - 1) == 0) {
+            q->sampling = str2ul(&keyword[sizeof(JOURNAL_PARAMETER_SAMPLING ":") - 1]);
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_DATA_ONLY ":", sizeof(JOURNAL_PARAMETER_DATA_ONLY ":") - 1) == 0) {
+            char *v = &keyword[sizeof(JOURNAL_PARAMETER_DATA_ONLY ":") - 1];
+
+            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
+                q->data_only = false;
+            else
+                q->data_only = true;
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_SLICE ":", sizeof(JOURNAL_PARAMETER_SLICE ":") - 1) == 0) {
+            char *v = &keyword[sizeof(JOURNAL_PARAMETER_SLICE ":") - 1];
+
+            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
+                q->slice = false;
+            else
+                q->slice = true;
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_SOURCE ":", sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1) == 0) {
+            const char *value = &keyword[sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1];
+
+            buffer_json_member_add_array(wb, JOURNAL_PARAMETER_SOURCE);
+
+            CLEAN_BUFFER *sources_list = buffer_create(0, NULL);
+
+            q->source_type = SDJF_NONE;
+            while(value) {
+                char *sep = strchr(value, ',');
+                if(sep)
+                    *sep++ = '\0';
+
+                buffer_json_add_array_item_string(wb, value);
+
+                SD_JOURNAL_FILE_SOURCE_TYPE t = get_internal_source_type(value);
+                if(t != SDJF_NONE) {
+                    q->source_type |= t;
+                    value = NULL;
+                }
+                else {
+                    // else, match the source, whatever it is
+                    if(buffer_strlen(sources_list))
+                        buffer_putc(sources_list, '|');
+
+                    buffer_strcat(sources_list, value);
+                }
+
+                value = sep;
+            }
+
+            if(buffer_strlen(sources_list)) {
+                simple_pattern_free(q->sources);
+                q->sources = simple_pattern_create(buffer_tostring(sources_list), "|", SIMPLE_PATTERN_EXACT, false);
+            }
+
+            buffer_json_array_close(wb); // source
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_AFTER ":", sizeof(JOURNAL_PARAMETER_AFTER ":") - 1) == 0) {
+            q->after_s = str2l(&keyword[sizeof(JOURNAL_PARAMETER_AFTER ":") - 1]);
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_BEFORE ":", sizeof(JOURNAL_PARAMETER_BEFORE ":") - 1) == 0) {
+            q->before_s = str2l(&keyword[sizeof(JOURNAL_PARAMETER_BEFORE ":") - 1]);
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_IF_MODIFIED_SINCE ":", sizeof(JOURNAL_PARAMETER_IF_MODIFIED_SINCE ":") - 1) == 0) {
+            q->if_modified_since = str2ull(&keyword[sizeof(JOURNAL_PARAMETER_IF_MODIFIED_SINCE ":") - 1], NULL);
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_ANCHOR ":", sizeof(JOURNAL_PARAMETER_ANCHOR ":") - 1) == 0) {
+            q->anchor = str2ull(&keyword[sizeof(JOURNAL_PARAMETER_ANCHOR ":") - 1], NULL);
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_DIRECTION ":", sizeof(JOURNAL_PARAMETER_DIRECTION ":") - 1) == 0) {
+            q->direction = get_direction(&keyword[sizeof(JOURNAL_PARAMETER_DIRECTION ":") - 1]);
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_LAST ":", sizeof(JOURNAL_PARAMETER_LAST ":") - 1) == 0) {
+            q->last = str2ul(&keyword[sizeof(JOURNAL_PARAMETER_LAST ":") - 1]);
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_QUERY ":", sizeof(JOURNAL_PARAMETER_QUERY ":") - 1) == 0) {
+            freez((void *)q->query);
+            q->query= strdupz(&keyword[sizeof(JOURNAL_PARAMETER_QUERY ":") - 1]);
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_HISTOGRAM ":", sizeof(JOURNAL_PARAMETER_HISTOGRAM ":") - 1) == 0) {
+            freez((void *)q->chart);
+            q->chart = strdupz(&keyword[sizeof(JOURNAL_PARAMETER_HISTOGRAM ":") - 1]);
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_FACETS ":", sizeof(JOURNAL_PARAMETER_FACETS ":") - 1) == 0) {
+            q->default_facet = FACET_KEY_OPTION_NONE;
+            facets_reset_and_disable_all_facets(facets);
+
+            char *value = &keyword[sizeof(JOURNAL_PARAMETER_FACETS ":") - 1];
+            if(*value) {
+                buffer_json_member_add_array(wb, JOURNAL_PARAMETER_FACETS);
+
+                while(value) {
+                    char *sep = strchr(value, ',');
+                    if(sep)
+                        *sep++ = '\0';
+
+                    facets_register_facet_id(facets, value, FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS|FACET_KEY_OPTION_REORDER);
+                    buffer_json_add_array_item_string(wb, value);
+
+                    value = sep;
+                }
+
+                buffer_json_array_close(wb); // JOURNAL_PARAMETER_FACETS
+            }
+        }
+        else {
+            char *value = strchr(keyword, ':');
+            if(value) {
+                *value++ = '\0';
+
+                buffer_json_member_add_array(wb, keyword);
+
+                while(value) {
+                    char *sep = strchr(value, ',');
+                    if(sep)
+                        *sep++ = '\0';
+
+                    facets_register_facet_id_filter(
+                        facets, keyword, value,
+                        FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS|FACET_KEY_OPTION_REORDER);
+
+                    buffer_json_add_array_item_string(wb, value);
+                    q->filters++;
+
+                    value = sep;
+                }
+
+                buffer_json_array_close(wb); // keyword
+            }
+        }
+    }
+
+    return true;
 }
 
 void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
-                              BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
+                              BUFFER *payload, HTTP_ACCESS access __maybe_unused,
                               const char *source __maybe_unused, void *data __maybe_unused) {
     fstat_thread_calls = 0;
     fstat_thread_cached_responses = 0;
-    FACET_KEY_OPTIONS  default_facet = FACET_KEY_OPTION_FACET;
 
-    BUFFER *wb = buffer_create(0, NULL);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
@@ -1566,201 +1944,30 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
     // ------------------------------------------------------------------------
     // parse the parameters
 
-    bool info = false, data_only = false, slice = JOURNAL_DEFAULT_SLICE_MODE, delta = false, tail = false;
-    time_t after_s = 0, before_s = 0;
-    usec_t anchor = 0;
-    usec_t if_modified_since = 0;
-    size_t last = 0;
-    FACETS_ANCHOR_DIRECTION direction = JOURNAL_DEFAULT_DIRECTION;
-    const char *query = NULL;
-    const char *chart = NULL;
-    SIMPLE_PATTERN *sources = NULL;
-    SD_JOURNAL_FILE_SOURCE_TYPE source_type = SDJF_ALL;
-    size_t filters = 0;
-    size_t sampling = SYSTEMD_JOURNAL_DEFAULT_ITEMS_SAMPLING;
+    JOURNAL_QUERY q = {
+        .default_facet = FACET_KEY_OPTION_FACET,
+        .info = false,
+        .data_only = false,
+        .slice = JOURNAL_DEFAULT_SLICE_MODE,
+        .delta = false,
+        .tail = false,
+        .after_s = 0,
+        .before_s = 0,
+        .anchor = 0,
+        .if_modified_since = 0,
+        .last = 0,
+        .direction = JOURNAL_DEFAULT_DIRECTION,
+        .query = NULL,
+        .chart = NULL,
+        .sources = NULL,
+        .source_type = SDJF_ALL,
+        .filters = 0,
+        .sampling = SYSTEMD_JOURNAL_DEFAULT_ITEMS_SAMPLING,
+    };
 
-    buffer_json_member_add_object(wb, "_request");
-
-    char *words[SYSTEMD_JOURNAL_MAX_PARAMS] = { NULL };
-    size_t num_words = quoted_strings_splitter_pluginsd(function, words, SYSTEMD_JOURNAL_MAX_PARAMS);
-    for(int i = 1; i < SYSTEMD_JOURNAL_MAX_PARAMS ;i++) {
-        char *keyword = get_word(words, num_words, i);
-        if(!keyword) break;
-
-        if(strcmp(keyword, JOURNAL_PARAMETER_HELP) == 0) {
-            netdata_systemd_journal_function_help(transaction);
-            goto cleanup;
-        }
-        else if(strcmp(keyword, JOURNAL_PARAMETER_INFO) == 0) {
-            info = true;
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_DELTA ":", sizeof(JOURNAL_PARAMETER_DELTA ":") - 1) == 0) {
-            char *v = &keyword[sizeof(JOURNAL_PARAMETER_DELTA ":") - 1];
-
-            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
-                delta = false;
-            else
-                delta = true;
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_TAIL ":", sizeof(JOURNAL_PARAMETER_TAIL ":") - 1) == 0) {
-            char *v = &keyword[sizeof(JOURNAL_PARAMETER_TAIL ":") - 1];
-
-            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
-                tail = false;
-            else
-                tail = true;
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_SAMPLING ":", sizeof(JOURNAL_PARAMETER_SAMPLING ":") - 1) == 0) {
-            sampling = str2ul(&keyword[sizeof(JOURNAL_PARAMETER_SAMPLING ":") - 1]);
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_DATA_ONLY ":", sizeof(JOURNAL_PARAMETER_DATA_ONLY ":") - 1) == 0) {
-            char *v = &keyword[sizeof(JOURNAL_PARAMETER_DATA_ONLY ":") - 1];
-
-            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
-                data_only = false;
-            else
-                data_only = true;
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_SLICE ":", sizeof(JOURNAL_PARAMETER_SLICE ":") - 1) == 0) {
-            char *v = &keyword[sizeof(JOURNAL_PARAMETER_SLICE ":") - 1];
-
-            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
-                slice = false;
-            else
-                slice = true;
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_SOURCE ":", sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1) == 0) {
-            const char *value = &keyword[sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1];
-
-            buffer_json_member_add_array(wb, JOURNAL_PARAMETER_SOURCE);
-
-            BUFFER *sources_list = buffer_create(0, NULL);
-
-            source_type = SDJF_NONE;
-            while(value) {
-                char *sep = strchr(value, ',');
-                if(sep)
-                    *sep++ = '\0';
-
-                buffer_json_add_array_item_string(wb, value);
-
-                if(strcmp(value, SDJF_SOURCE_ALL_NAME) == 0) {
-                    source_type |= SDJF_ALL;
-                    value = NULL;
-                }
-                else if(strcmp(value, SDJF_SOURCE_LOCAL_NAME) == 0) {
-                    source_type |= SDJF_LOCAL_ALL;
-                    value = NULL;
-                }
-                else if(strcmp(value, SDJF_SOURCE_REMOTES_NAME) == 0) {
-                    source_type |= SDJF_REMOTE_ALL;
-                    value = NULL;
-                }
-                else if(strcmp(value, SDJF_SOURCE_NAMESPACES_NAME) == 0) {
-                    source_type |= SDJF_LOCAL_NAMESPACE;
-                    value = NULL;
-                }
-                else if(strcmp(value, SDJF_SOURCE_LOCAL_SYSTEM_NAME) == 0) {
-                    source_type |= SDJF_LOCAL_SYSTEM;
-                    value = NULL;
-                }
-                else if(strcmp(value, SDJF_SOURCE_LOCAL_USERS_NAME) == 0) {
-                    source_type |= SDJF_LOCAL_USER;
-                    value = NULL;
-                }
-                else if(strcmp(value, SDJF_SOURCE_LOCAL_OTHER_NAME) == 0) {
-                    source_type |= SDJF_LOCAL_OTHER;
-                    value = NULL;
-                }
-                else {
-                    // else, match the source, whatever it is
-                    if(buffer_strlen(sources_list))
-                        buffer_strcat(sources_list, ",");
-
-                    buffer_strcat(sources_list, value);
-                }
-
-                value = sep;
-            }
-
-            if(buffer_strlen(sources_list)) {
-                simple_pattern_free(sources);
-                sources = simple_pattern_create(buffer_tostring(sources_list), ",", SIMPLE_PATTERN_EXACT, false);
-            }
-
-            buffer_free(sources_list);
-
-            buffer_json_array_close(wb); // source
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_AFTER ":", sizeof(JOURNAL_PARAMETER_AFTER ":") - 1) == 0) {
-            after_s = str2l(&keyword[sizeof(JOURNAL_PARAMETER_AFTER ":") - 1]);
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_BEFORE ":", sizeof(JOURNAL_PARAMETER_BEFORE ":") - 1) == 0) {
-            before_s = str2l(&keyword[sizeof(JOURNAL_PARAMETER_BEFORE ":") - 1]);
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_IF_MODIFIED_SINCE ":", sizeof(JOURNAL_PARAMETER_IF_MODIFIED_SINCE ":") - 1) == 0) {
-            if_modified_since = str2ull(&keyword[sizeof(JOURNAL_PARAMETER_IF_MODIFIED_SINCE ":") - 1], NULL);
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_ANCHOR ":", sizeof(JOURNAL_PARAMETER_ANCHOR ":") - 1) == 0) {
-            anchor = str2ull(&keyword[sizeof(JOURNAL_PARAMETER_ANCHOR ":") - 1], NULL);
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_DIRECTION ":", sizeof(JOURNAL_PARAMETER_DIRECTION ":") - 1) == 0) {
-            direction = strcasecmp(&keyword[sizeof(JOURNAL_PARAMETER_DIRECTION ":") - 1], "forward") == 0 ? FACETS_ANCHOR_DIRECTION_FORWARD : FACETS_ANCHOR_DIRECTION_BACKWARD;
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_LAST ":", sizeof(JOURNAL_PARAMETER_LAST ":") - 1) == 0) {
-            last = str2ul(&keyword[sizeof(JOURNAL_PARAMETER_LAST ":") - 1]);
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_QUERY ":", sizeof(JOURNAL_PARAMETER_QUERY ":") - 1) == 0) {
-            query= &keyword[sizeof(JOURNAL_PARAMETER_QUERY ":") - 1];
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_HISTOGRAM ":", sizeof(JOURNAL_PARAMETER_HISTOGRAM ":") - 1) == 0) {
-            chart = &keyword[sizeof(JOURNAL_PARAMETER_HISTOGRAM ":") - 1];
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_FACETS ":", sizeof(JOURNAL_PARAMETER_FACETS ":") - 1) == 0) {
-            default_facet = FACET_KEY_OPTION_NONE;
-            facets_reset_and_disable_all_facets(facets);
-
-            char *value = &keyword[sizeof(JOURNAL_PARAMETER_FACETS ":") - 1];
-            if(*value) {
-                buffer_json_member_add_array(wb, JOURNAL_PARAMETER_FACETS);
-
-                while(value) {
-                    char *sep = strchr(value, ',');
-                    if(sep)
-                        *sep++ = '\0';
-
-                    facets_register_facet_id(facets, value, FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS|FACET_KEY_OPTION_REORDER);
-                    buffer_json_add_array_item_string(wb, value);
-
-                    value = sep;
-                }
-
-                buffer_json_array_close(wb); // JOURNAL_PARAMETER_FACETS
-            }
-        }
-        else {
-            char *value = strchr(keyword, ':');
-            if(value) {
-                *value++ = '\0';
-
-                buffer_json_member_add_array(wb, keyword);
-
-                while(value) {
-                    char *sep = strchr(value, ',');
-                    if(sep)
-                        *sep++ = '\0';
-
-                    facets_register_facet_id_filter(facets, keyword, value, FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS|FACET_KEY_OPTION_REORDER);
-                    buffer_json_add_array_item_string(wb, value);
-                    filters++;
-
-                    value = sep;
-                }
-
-                buffer_json_array_close(wb); // keyword
-            }
-        }
-    }
+    if( (payload && !parse_post_params(facets, &q, wb, payload, transaction)) ||
+        (!payload && !parse_get_params(facets, &q, wb, function, transaction)) )
+        goto cleanup;
 
     // ----------------------------------------------------------------------------------------------------------------
     // register the fields in the order you want them on the dashboard
@@ -1769,7 +1976,7 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
 
     facets_register_key_name(
         facets, "_HOSTNAME",
-        default_facet | FACET_KEY_OPTION_VISIBLE);
+        q.default_facet | FACET_KEY_OPTION_VISIBLE);
 
     facets_register_dynamic_key_name(
         facets, JOURNAL_KEY_ND_JOURNAL_PROCESS,
@@ -1789,19 +1996,19 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
 
     facets_register_key_name_transformation(
         facets, "PRIORITY",
-        default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
+        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
             FACET_KEY_OPTION_EXPANDED_FILTER,
         netdata_systemd_journal_transform_priority, NULL);
 
     facets_register_key_name_transformation(
         facets, "SYSLOG_FACILITY",
-        default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
+        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
             FACET_KEY_OPTION_EXPANDED_FILTER,
         netdata_systemd_journal_transform_syslog_facility, NULL);
 
     facets_register_key_name_transformation(
         facets, "ERRNO",
-        default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_errno, NULL);
 
     facets_register_key_name(
@@ -1810,55 +2017,55 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
 
     facets_register_key_name(
         facets, "SYSLOG_IDENTIFIER",
-        default_facet);
+        q.default_facet);
 
     facets_register_key_name(
         facets, "UNIT",
-        default_facet);
+        q.default_facet);
 
     facets_register_key_name(
         facets, "USER_UNIT",
-        default_facet);
+        q.default_facet);
 
     facets_register_key_name_transformation(
         facets, "MESSAGE_ID",
-        default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
+        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
             FACET_KEY_OPTION_EXPANDED_FILTER,
         netdata_systemd_journal_transform_message_id, NULL);
 
     facets_register_key_name_transformation(
         facets, "_BOOT_ID",
-        default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_boot_id, NULL);
 
     facets_register_key_name_transformation(
         facets, "_SYSTEMD_OWNER_UID",
-        default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "_UID",
-        default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "OBJECT_SYSTEMD_OWNER_UID",
-        default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "OBJECT_UID",
-        default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "_GID",
-        default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_gid, NULL);
 
     facets_register_key_name_transformation(
         facets, "OBJECT_GID",
-        default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_gid, NULL);
 
     facets_register_key_name_transformation(
@@ -1892,71 +2099,70 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
     time_t now_s = now_realtime_sec();
     time_t expires = now_s + 1;
 
-    if(!after_s && !before_s) {
-        before_s = now_s;
-        after_s = before_s - SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION;
+    if(!q.after_s && !q.before_s) {
+        q.before_s = now_s;
+        q.after_s = q.before_s - SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION;
     }
     else
-        rrdr_relative_window_to_absolute(&after_s, &before_s, now_s);
+        rrdr_relative_window_to_absolute(&q.after_s, &q.before_s, now_s);
 
-    if(after_s > before_s) {
-        time_t tmp = after_s;
-        after_s = before_s;
-        before_s = tmp;
+    if(q.after_s > q.before_s) {
+        time_t tmp = q.after_s;
+        q.after_s = q.before_s;
+        q.before_s = tmp;
     }
 
-    if(after_s == before_s)
-        after_s = before_s - SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION;
+    if(q.after_s == q.before_s)
+        q.after_s = q.before_s - SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION;
 
-    if(!last)
-        last = SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY;
-
+    if(!q.last)
+        q.last = SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY;
 
     // ------------------------------------------------------------------------
     // set query time-frame, anchors and direction
 
     fqs->transaction = transaction;
-    fqs->after_ut = after_s * USEC_PER_SEC;
-    fqs->before_ut = (before_s * USEC_PER_SEC) + USEC_PER_SEC - 1;
-    fqs->if_modified_since = if_modified_since;
-    fqs->data_only = data_only;
-    fqs->delta = (fqs->data_only) ? delta : false;
-    fqs->tail = (fqs->data_only && fqs->if_modified_since) ? tail : false;
-    fqs->sources = sources;
-    fqs->source_type = source_type;
-    fqs->entries = last;
+    fqs->after_ut = q.after_s * USEC_PER_SEC;
+    fqs->before_ut = (q.before_s * USEC_PER_SEC) + USEC_PER_SEC - 1;
+    fqs->if_modified_since = q.if_modified_since;
+    fqs->data_only = q.data_only;
+    fqs->delta = (fqs->data_only) ? q.delta : false;
+    fqs->tail = (fqs->data_only && fqs->if_modified_since) ? q.tail : false;
+    fqs->sources = q.sources;
+    fqs->source_type = q.source_type;
+    fqs->entries = q.last;
     fqs->last_modified = 0;
-    fqs->filters = filters;
-    fqs->query = (query && *query) ? query : NULL;
-    fqs->histogram = (chart && *chart) ? chart : NULL;
-    fqs->direction = direction;
-    fqs->anchor.start_ut = anchor;
+    fqs->filters = q.filters;
+    fqs->query = (q.query && *q.query) ? q.query : NULL;
+    fqs->histogram = (q.chart && *q.chart) ? q.chart : NULL;
+    fqs->direction = q.direction;
+    fqs->anchor.start_ut = q.anchor;
     fqs->anchor.stop_ut = 0;
-    fqs->sampling = sampling;
+    fqs->sampling = q.sampling;
 
     if(fqs->anchor.start_ut && fqs->tail) {
         // a tail request
         // we need the top X entries from BEFORE
         // but, we need to calculate the facets and the
         // histogram up to the anchor
-        fqs->direction = direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
+        fqs->direction = q.direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
         fqs->anchor.start_ut = 0;
-        fqs->anchor.stop_ut = anchor;
+        fqs->anchor.stop_ut = q.anchor;
     }
 
-    if(anchor && anchor < fqs->after_ut) {
+    if(q.anchor && q.anchor < fqs->after_ut) {
         log_fqs(fqs, "received anchor is too small for query timeframe, ignoring anchor");
-        anchor = 0;
+        q.anchor = 0;
         fqs->anchor.start_ut = 0;
         fqs->anchor.stop_ut = 0;
-        fqs->direction = direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
+        fqs->direction = q.direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
     }
-    else if(anchor > fqs->before_ut) {
+    else if(q.anchor > fqs->before_ut) {
         log_fqs(fqs, "received anchor is too big for query timeframe, ignoring anchor");
-        anchor = 0;
+        q.anchor = 0;
         fqs->anchor.start_ut = 0;
         fqs->anchor.stop_ut = 0;
-        fqs->direction = direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
+        fqs->direction = q.direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
     }
 
     facets_set_anchor(facets, fqs->anchor.start_ut, fqs->anchor.stop_ut, fqs->direction);
@@ -1973,8 +2179,8 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
     facets_set_query(facets, fqs->query);
 
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
-    fqs->slice = slice;
-    if(slice)
+    fqs->slice = q.slice;
+    if(q.slice)
         facets_enable_slice_mode(facets);
 #else
     fqs->slice = false;
@@ -1999,7 +2205,7 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
     buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_AFTER, fqs->after_ut / USEC_PER_SEC);
     buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_BEFORE, fqs->before_ut / USEC_PER_SEC);
     buffer_json_member_add_uint64(wb, "if_modified_since", fqs->if_modified_since);
-    buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_ANCHOR, anchor);
+    buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_ANCHOR, q.anchor);
     buffer_json_member_add_string(wb, JOURNAL_PARAMETER_DIRECTION, fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
     buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_LAST, fqs->entries);
     buffer_json_member_add_string(wb, JOURNAL_PARAMETER_QUERY, fqs->query);
@@ -2013,7 +2219,7 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
 
     int response;
 
-    if(info) {
+    if(q.info) {
         facets_accepted_parameters_to_json_array(facets, wb, false);
         buffer_json_member_add_array(wb, "required_params");
         {
@@ -2061,7 +2267,8 @@ output:
     netdata_mutex_unlock(&stdout_mutex);
 
 cleanup:
-    simple_pattern_free(sources);
+    freez((void *)q.query);
+    freez((void *)q.chart);
+    simple_pattern_free(q.sources);
     facets_destroy(facets);
-    buffer_free(wb);
 }

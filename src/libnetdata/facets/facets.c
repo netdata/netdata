@@ -1732,7 +1732,7 @@ inline FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, F
     return k;
 }
 
-void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *value_id, FACET_KEY_OPTIONS options) {
+void facets_register_facet_id_filter(FACETS *facets, const char *key_id, const char *value_id, FACET_KEY_OPTIONS options) {
     FACET_KEY *k = facets_register_facet_id(facets, key_id, options);
     if(k) {
         if(is_valid_string_hash(value_id)) {

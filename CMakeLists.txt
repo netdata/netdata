@@ -755,6 +755,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setproctitle.h
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
+        src/libnetdata/json/json-c-parser-inline.c
 )
 
 if(ENABLE_PLUGIN_EBPF)

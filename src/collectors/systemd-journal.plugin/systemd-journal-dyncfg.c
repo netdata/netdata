@@ -58,6 +58,10 @@ static int systemd_journal_directories_dyncfg_update(BUFFER *result, BUFFER *pay
     struct json_object *journalDirectories;
     json_object_object_get_ex(jobj, JOURNAL_DIRECTORIES_JSON_NODE, &journalDirectories);
 
+    if (json_object_get_type(journalDirectories) != json_type_array)
+        return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST,
+                                       "member " JOURNAL_DIRECTORIES_JSON_NODE " is not an array");
+
     size_t n_directories = json_object_array_length(journalDirectories);
     if(n_directories > MAX_JOURNAL_DIRECTORIES)
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "too many directories configured");

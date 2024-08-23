@@ -136,7 +136,7 @@ void nd_web_api_init(void) {
 }
 
 
-bool source_comes_from_cloud(const char *source) {
+bool request_source_is_cloud(const char *source) {
     return source && *source && strstartswith(source, "method=NC,");
 }
 

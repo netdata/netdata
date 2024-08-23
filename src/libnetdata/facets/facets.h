@@ -101,7 +101,7 @@ bool facets_row_candidate_to_keep(FACETS *facets, usec_t usec);
 
 void facets_reset_and_disable_all_facets(FACETS *facets);
 FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options);
-void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *value_id, FACET_KEY_OPTIONS options);
+void facets_register_facet_id_filter(FACETS *facets, const char *key_id, const char *value_id, FACET_KEY_OPTIONS options);
 void facets_set_timeframe_and_histogram_by_id(FACETS *facets, const char *key_id, usec_t after_ut, usec_t before_ut);
 void facets_set_timeframe_and_histogram_by_name(FACETS *facets, const char *key_name, usec_t after_ut, usec_t before_ut);
 
