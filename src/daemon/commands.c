@@ -212,7 +212,9 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
     (void)args;
     netdata_log_info("COMMAND: reloading host labels.");
     reload_host_labels();
+#ifdef ENABLE_OPENSSL
     aclk_queue_node_info(localhost, 1);
+#endif
 
     BUFFER *wb = buffer_create(10, NULL);
     rrdlabels_log_to_buffer(localhost->rrdlabels, wb);
@@ -305,7 +307,9 @@ static cmd_status_t cmd_ping_execute(char *args, char **message)
 
 static cmd_status_t cmd_aclk_state(char *args, char **message)
 {
+#ifdef ENABLE_ACLK
     netdata_log_info("COMMAND: Reopening aclk/cloud state.");
+#endif
 #ifdef ENABLE_ACLK
     if (strstr(args, "json"))
         *message = aclk_state_json();

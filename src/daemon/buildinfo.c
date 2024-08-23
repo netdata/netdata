@@ -69,7 +69,7 @@ typedef enum __attribute__((packed)) {
     BIB_LIB_ZLIB,
     BIB_LIB_BROTLI,
     BIB_LIB_PROTOBUF,
-    BIB_LIB_OPENSSL,
+    BIB_LIB_SSL,
     BIB_LIB_LIBDATACHANNEL,
     BIB_LIB_JSONC,
     BIB_LIB_LIBCAP,
@@ -650,13 +650,18 @@ static struct {
                 .json = "protobuf",
                 .value = NULL,
         },
-        [BIB_LIB_OPENSSL] = {
+        [BIB_LIB_SSL] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
                 .analytics = NULL,
+#if defined(ENABLE_OPENSSL)
                 .print = "OpenSSL (cryptography)",
                 .json = "openssl",
-                .value = NULL,
+#elif defined(ENABLE_WOLFSSL)
+                .print = "WolfSSL (cryptography)",
+                .json = "wolfssl",
+#endif
+            .value = NULL,
         },
         [BIB_LIB_LIBDATACHANNEL] = {
                 .category = BIC_LIBS,
@@ -1120,7 +1125,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_DB_NONE, true);
 
     build_info_set_status(BIB_CONNECTIVITY_HTTPD_STATIC, true);
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
     build_info_set_status(BIB_CONNECTIVITY_HTTPD_H2O, true);
 #endif
 #ifdef ENABLE_WEBRTC
@@ -1162,8 +1167,8 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef HAVE_LIBDATACHANNEL
     build_info_set_status(BIB_LIB_LIBDATACHANNEL, true);
 #endif
-#ifdef ENABLE_OPENSSL
-    build_info_set_status(BIB_LIB_OPENSSL, true);
+#if defined(ENABLE_OPENSSL) || defined(ENABLE_WOLFSSL)
+    build_info_set_status(BIB_LIB_SSL, true);
 #endif
 #ifdef ENABLE_JSONC
     build_info_set_status(BIB_LIB_JSONC, true);

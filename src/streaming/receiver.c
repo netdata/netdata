@@ -57,7 +57,7 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
         return 0;
     }
 
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
     if (is_h2o_rrdpush(r)) {
         if(nd_thread_signaled_to_cancel())
             return -4;
@@ -330,7 +330,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         parser = parser_init(&user, NULL, NULL, fd, PARSER_INPUT_SPLIT, ssl);
     }
 
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
     parser->h2o_ctx = rpt->h2o_ctx;
 #endif
 
@@ -445,7 +445,9 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdpush_receiver_replication_reset(host);
 
         rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+#ifdef ENABLE_ACLK
         aclk_queue_node_info(rpt->host, true);
+#endif
 
         rrdpush_reset_destinations_postpone_time(host);
 
@@ -780,7 +782,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
         }
 
         netdata_log_debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
         if (is_h2o_rrdpush(rpt)) {
             h2o_stream_write(rpt->h2o_ctx, initial_response, strlen(initial_response));
         } else {
@@ -798,12 +800,12 @@ static void rrdpush_receive(struct receiver_state *rpt)
                         RRDPUSH_STATUS_CANT_REPLY, NDLP_ERR);
                 goto cleanup;
             }
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
         }
 #endif
     }
 
-#ifdef ENABLE_H2O
+#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
     unless_h2o_rrdpush(rpt)
 #endif
     {

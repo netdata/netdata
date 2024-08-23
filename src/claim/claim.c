@@ -52,7 +52,7 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
         return CLAIM_AGENT_CLOUD_DISABLED;
     }
 
-#ifndef DISABLE_CLOUD
+#if !defined(DISABLE_CLOUD) && defined(ENABLE_OPENSSL)
     char command_exec_buffer[CLAIMING_COMMAND_LENGTH + 1];
     char command_line_buffer[CLAIMING_COMMAND_LENGTH + 1];
 

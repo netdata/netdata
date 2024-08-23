@@ -146,9 +146,17 @@ endif()
 option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" True)
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
+# openssl/crypto
+option(ENABLE_WOLFSSL "Use WolfSSL in place of OpenSSL for TLS and crypto support" False)
+if(ENABLE_WOLFSSL)
+    set(ENABLE_OPENSSL False)
+else()
+    set(ENABLE_OPENSSL True)
+endif()
+
 # High-level features
-option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE})
+cmake_dependent_option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE} "NOT ENABLE_WOLFSSL" False)
+cmake_dependent_option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE} "NOT ENABLE_WOLFSSL" False)
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
@@ -166,6 +174,7 @@ cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" 
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" False "(NOT ENABLE_WOLFSSL) AND OS_LINUX AND ALLOW_PLATFORM_SENSITIVE_OPTIONS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
@@ -185,7 +194,7 @@ option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)
-option(ENABLE_H2O "Enable H2O web server (experimental)" True)
+cmake_dependent_option(ENABLE_H2O "Enable H2O web server (experimental)" True "NOT ENABLE_WOLFSSL" False)
 mark_as_advanced(ENABLE_H2O)
 
 # Other optional functionality
@@ -197,6 +206,16 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
+
+include(CheckFunctionExists)
+
+if(ENABLE_WOLFSSL)
+        include(NetdataWolfSSL)
+
+        netdata_is_there_wolfssl()
+else()
+        pkg_check_modules(TLS IMPORTED_TARGET openssl)
+endif()
 
 if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         set(NEED_PROTOBUF True)
@@ -264,11 +283,6 @@ endif()
 #
 # Libm
 #
-
-# checks link with cmake required libs
-cmake_policy(SET CMP0075 NEW)
-
-include(CheckFunctionExists)
 
 check_function_exists(log10 HAVE_LOG10)
 if(NOT HAVE_LOG10)
@@ -523,10 +537,6 @@ if(OS_FREEBSD OR OS_MACOS)
         set(HAVE_BUILTIN_ATOMICS True)
 endif()
 
-# openssl/crypto
-set(ENABLE_OPENSSL True)
-pkg_check_modules(TLS IMPORTED_TARGET openssl)
-
 if(NOT TARGET PkgConfig::TLS)
         if(OS_MACOS)
                 execute_process(COMMAND
@@ -553,7 +563,9 @@ if(NOT TARGET PkgConfig::TLS)
             message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
         endif()
 else()
-        pkg_check_modules(CRYPTO IMPORTED_TARGET REQUIRED libcrypto)
+        if (ENABLE_OPENSSL)
+                pkg_check_modules(CRYPTO IMPORTED_TARGET REQUIRED libcrypto)
+        endif()
 endif()
 
 #
@@ -672,6 +684,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/required_dummies.h
         src/libnetdata/socket/security.c
         src/libnetdata/socket/security.h
+        src/libnetdata/ssl/ssl.h
         src/libnetdata/simple_pattern/simple_pattern.c
         src/libnetdata/simple_pattern/simple_pattern.h
         src/libnetdata/socket/socket.c
@@ -1367,7 +1380,8 @@ set(NETDATA_FILES
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
-        ${ACLK_ALWAYS_BUILD}
+        "$<$<BOOL:${ENABLE_OPENSSL}>:${ACLK_ALWAYS_BUILD}>"
+        ${SPAWN_PLUGIN_FILES}
         ${PROFILE_PLUGIN_FILES}
 )
 
@@ -1661,7 +1675,9 @@ target_compile_options(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
 
 # crypto
-target_link_libraries(libnetdata PUBLIC PkgConfig::CRYPTO)
+if (ENABLE_OPENSSL)
+        target_link_libraries(libnetdata PUBLIC PkgConfig::CRYPTO)
+endif()
 
 # openssl
 target_link_libraries(libnetdata PUBLIC PkgConfig::TLS)

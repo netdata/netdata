@@ -18,7 +18,11 @@ static SOCKET_PEERS netdata_ssl_peers(NETDATA_SSL *ssl) {
     if(unlikely(!ssl->conn))
         sock_fd = -1;
     else
+#if defined(ENABLE_OPENSSL)
         sock_fd = SSL_get_rfd(ssl->conn);
+#elif defined(ENABLE_WOLFSSL)
+        sock_fd = SSL_get_fd(ssl->conn);
+#endif
 
     return socket_peers(sock_fd);
 }
@@ -359,7 +363,11 @@ static inline bool want_read_write_should_retry(NETDATA_SSL *ssl, int err) {
     int ssl_errno = SSL_get_error(ssl->conn, err);
     if(ssl_errno == SSL_ERROR_WANT_READ || ssl_errno == SSL_ERROR_WANT_WRITE) {
         struct pollfd pfds[1] = { [0] = {
+#if defined(ENABLE_OPENSSL)
                 .fd = SSL_get_rfd(ssl->conn),
+#elif  defined(ENABLE_WOLFSSL)
+                .fd = SSL_get_fd(ssl->conn),
+#endif
                 .events = (short)(((ssl_errno == SSL_ERROR_WANT_READ ) ? POLLIN  : 0) |
                                   ((ssl_errno == SSL_ERROR_WANT_WRITE) ? POLLOUT : 0)),
         }};
@@ -437,7 +445,13 @@ bool netdata_ssl_accept(NETDATA_SSL *ssl) {
 static void netdata_ssl_info_callback(const SSL *ssl, int where, int ret __maybe_unused) {
     (void)ssl;
     if (where & SSL_CB_ALERT) {
-        netdata_log_debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s", SSL_alert_type_string(ret), SSL_alert_desc_string_long(ret));
+        netdata_log_debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s",
+#if defined(ENABLE_OPENSSL)
+                          SSL_alert_type_string(ret),
+#else
+                          NULL,
+#endif
+                          SSL_alert_desc_string_long(ret));
     }
 }
 
@@ -448,7 +462,7 @@ static void netdata_ssl_info_callback(const SSL *ssl, int where, int ret __maybe
  */
 void netdata_ssl_initialize_openssl() {
 
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#if defined(ENABLE_OPENSSL) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
 # if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
     OPENSSL_config(NULL);
 # endif
@@ -466,7 +480,7 @@ void netdata_ssl_initialize_openssl() {
 #endif
 }
 
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110
+#if (defined(ENABLE_OPENSSL) && (OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_110)) || defined(ENABLE_WOLFSSL)
 /**
  * TLS version
  *
@@ -544,7 +558,7 @@ static SSL_CTX * netdata_ssl_create_server_ctx(unsigned long mode) {
 	static int netdata_id_context = 1;
 
     //TO DO: Confirm the necessity to check return for other OPENSSL function
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#if defined(ENABLE_OPENSSL) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
 	ctx = SSL_CTX_new(SSLv23_server_method());
     if (!ctx) {
 		netdata_log_error("Cannot create a new SSL context, netdata won't encrypt communication");
@@ -562,7 +576,7 @@ static SSL_CTX * netdata_ssl_create_server_ctx(unsigned long mode) {
     SSL_CTX_use_certificate_chain_file(ctx, netdata_ssl_security_cert);
 #endif
 
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#if defined(ENABLE_OPENSSL) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
     SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
     SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);
@@ -587,7 +601,7 @@ static SSL_CTX * netdata_ssl_create_server_ctx(unsigned long mode) {
 	SSL_CTX_set_session_id_context(ctx,(void*)&netdata_id_context,(unsigned int)sizeof(netdata_id_context));
     SSL_CTX_set_info_callback(ctx, netdata_ssl_info_callback);
 
-#if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_095)
+#if defined(ENABLE_OPENSSL) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_095)
 	SSL_CTX_set_verify_depth(ctx,1);
 #endif
     netdata_log_debug(D_WEB_CLIENT,"SSL GLOBAL CONTEXT STARTED\n");
@@ -684,8 +698,10 @@ void netdata_ssl_cleanup()
         netdata_ssl_exporting_ctx = NULL;
     }
 
-#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+#if defined(ENABLE_OPENSSL) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
     ERR_free_strings();
+#ellif defined(ENABLE_WOLFSSL)
+    wolfSSL_Cleanup();
 #endif
 }
 
