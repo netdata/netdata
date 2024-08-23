@@ -1274,7 +1274,7 @@ write_claim_config() {
 
   run_as_root touch "${claim_config}.tmp" || return 1
   run_as_root chmod 0640 "${claim_config}.tmp" || return 1
-  run_as_root chown ":${NETDATA_CLAIM_GROUP}" "${claim_config}.tmp" || return 1
+  run_as_root chown ":${NETDATA_CLAIM_GROUP:-netdata}" "${claim_config}.tmp" || return 1
   run_as_root echo "${config}" > "${claim_config}.tmp" || return 1
   run_as_root mv -f "${claim_config}.tmp" "${claim_config}" || return 1
 
@@ -1377,7 +1377,7 @@ claim() {
 
   case ${method} in
     script) run_claim_script ;;
-    internal)
+    config)
       if ! write_claim_config; then
         warning "Failed to write claiming configuration. This usually means you do not have permissions to access the configuration directory."
       fi
