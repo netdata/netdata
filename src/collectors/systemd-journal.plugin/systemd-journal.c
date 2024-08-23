@@ -1520,7 +1520,7 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
 }
 
 typedef struct {
-    FACET_KEY_OPTIONS  default_facet;
+    FACET_KEY_OPTIONS default_facet;
     bool info;
     bool data_only;
     bool slice;
@@ -1647,6 +1647,9 @@ static bool parse_json_payload(json_object *jobj, const char *path, void *data, 
             buffer_sprintf(error, "member '%s' is not an array", JOURNAL_PARAMETER_FACETS);
             return false;
         }
+
+        q->default_facet = FACET_KEY_OPTION_NONE;
+        facets_reset_and_disable_all_facets(facets);
 
         buffer_json_member_add_array(wb, JOURNAL_PARAMETER_FACETS);
 
