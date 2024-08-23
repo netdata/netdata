@@ -79,6 +79,7 @@ jobs:
             packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
+        if: github.event_name != 'workflow_dispatch'
         env:
           CHANGED_SOURCE_FILES: ${{ steps.check-source-files.outputs.all_changed_files }}
           CHANGED_BUILD_FILES: ${{ steps.check-build-files.outputs.all_changed_files }}
@@ -96,11 +97,9 @@ jobs:
           fi
       - name: Check Go
         id: check-go
-        env:
-          OTHER_CHANGED_FILES: ${{ steps.check-source-files.outputs.other_changed_files }}
         run: |
           if [ '${{ github.event_name }}' == 'pull_request' ]; then
-            if echo "${OTHER_CHANGED_FILES}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
+            if echo "${{ steps.check-source-files.outputs.other_changed_files }}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
               echo 'skip-go=' >> "${GITHUB_OUTPUT}"
             else
               echo 'skip-go=--disable-go' >> "${GITHUB_OUTPUT}"
