@@ -1,0 +1,171 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-boinc
+      plugin_name: go.d.plugin
+      module_name: boinc
+      monitored_instance:
+        name: BOINC
+        link: https://boinc.berkeley.edu/
+        categories:
+          - data-collection.database-servers
+        icon_filename: "bolt.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - boinc
+        - distributed
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors task counts for the Berkeley Open Infrastructure Networking Computing (BOINC) distributed computing client.
+        method_description: |
+          It communicates with BOING using [GIU RPC Protocol](https://boinc.berkeley.edu/trac/wiki/GuiRpcProtocol).
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects BOINC client instances running on localhost that are listening on port 31416.
+            On startup, it tries to collect metrics from:
+
+            - http://127.0.0.1:31416
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/boinc.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: The IP address and port where the BOINC client listens for connections.
+              default_value: 127.0.0.1:31416
+              required: true
+            - name: timeout
+              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              default_value: 1
+              required: false
+            - name: password
+              description: The GUI RPC password for authentication.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:31416
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:31416
+
+                  - name: remote
+                    address: 203.0.113.0:31416
+                    password: somePassword
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: boinc_total_tasks
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf
+        metric: boinc.tasks
+        info: average number of total tasks over the last 10 minutes
+      - name: boinc_active_tasks
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf
+        metric: boinc.tasks
+        info: average number of active tasks over the last 10 minutes
+      - name: boinc_compute_errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf
+        metric: boinc.tasks_state
+        info: average number of compute errors over the last 10 minutes
+      - name: boinc_upload_errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf
+        metric: boinc.tasks_state
+        info: average number of failed uploads over the last 10 minutes
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: boinc.tasks
+              description: Overall Tasks
+              unit: tasks
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: active
+            - name: boinc.tasks_per_state
+              description: Tasks per State
+              unit: tasks
+              chart_type: line
+              dimensions:
+                - name: new
+                - name: downloading
+                - name: downloaded
+                - name: compute_error
+                - name: uploading
+                - name: uploaded
+                - name: aborted
+                - name: upload_failed
+            - name: boinc.active_tasks_per_state
+              description: Active Tasks per State
+              unit: tasks
+              chart_type: line
+              dimensions:
+                - name: uninitialized
+                - name: executing
+                - name: abort_pending
+                - name: quit_pending
+                - name: suspended
+                - name: copy_pending
+            - name: boinc.active_tasks_per_scheduler_state
+              description: Active Tasks per Scheduler State
+              unit: tasks
+              chart_type: line
+              dimensions:
+                - name: uninitialized
+                - name: preempted
+                - name: scheduled
