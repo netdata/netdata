@@ -310,6 +310,25 @@ static void aclk_run_query_job(uv_work_t *req)
     aclk_run_query(config, query);
 }
 
+static int read_query_thread_count()
+{
+    int threads = MIN(get_netdata_cpus()/2, 6);
+    threads = MAX(threads, 2);
+    threads = config_get_number(CONFIG_SECTION_CLOUD, "query thread count", threads);
+    if(threads < 1) {
+        netdata_log_error("You need at least one query thread. Overriding configured setting of \"%d\"", threads);
+        threads = 1;
+        config_set_number(CONFIG_SECTION_CLOUD, "query thread count", threads);
+    }
+    else {
+        if (threads > libuv_worker_threads / 2) {
+            threads = MAX(libuv_worker_threads / 2, 2);
+            config_set_number(CONFIG_SECTION_CLOUD, "query thread count", threads);
+        }
+    }
+    return threads;
+}
+
 static void aclk_synchronization(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
@@ -339,8 +358,7 @@ static void aclk_synchronization(void *arg)
 
     sql_delete_aclk_table_list();
 
-    int query_thread_count = MIN(libuv_worker_threads / 10, 16);
-    query_thread_count = MAX(query_thread_count, 2);
+    int query_thread_count = read_query_thread_count();
     netdata_log_info("Starting ACLK synchronization thread with %d parallel query threads", query_thread_count);
 
     while (likely(service_running(SERVICE_ACLK))) {
