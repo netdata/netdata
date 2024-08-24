@@ -1,5 +1,24 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.99.0...HEAD)
+
+**Merged pull requests:**
+
+- Regenerate integrations.js [\#18400](https://github.com/netdata/netdata/pull/18400) ([netdatabot](https://github.com/netdatabot))
+- go.d boinc [\#18398](https://github.com/netdata/netdata/pull/18398) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/boinc [\#18397](https://github.com/netdata/netdata/pull/18397) ([ilyam8](https://github.com/ilyam8))
+- fix warnings in Dockerfile [\#18395](https://github.com/netdata/netdata/pull/18395) ([NicolasCARPi](https://github.com/NicolasCARPi))
+
+## [v1.99.0](https://github.com/netdata/netdata/tree/v1.99.0) (2024-08-23)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.0...v1.99.0)
+
+**Merged pull requests:**
+
+- WIP - Netdata v2 [\#18125](https://github.com/netdata/netdata/pull/18125) ([ktsaou](https://github.com/ktsaou))
+
 ## [v1.47.0](https://github.com/netdata/netdata/tree/v1.47.0) (2024-08-22)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.46.3...v1.47.0)
@@ -401,12 +420,6 @@
 - aclk: move "proxy" from "netdata.conf" to "cloud.conf" [\#17836](https://github.com/netdata/netdata/pull/17836) ([ilyam8](https://github.com/ilyam8))
 - tc plugin simplify config [\#17835](https://github.com/netdata/netdata/pull/17835) ([ilyam8](https://github.com/ilyam8))
 - health dyncfg userconfig: remove first newline [\#17834](https://github.com/netdata/netdata/pull/17834) ([ilyam8](https://github.com/ilyam8))
-- Dyncfg doc [\#17832](https://github.com/netdata/netdata/pull/17832) ([Ancairon](https://github.com/Ancairon))
-- docs: claiming: rename connect button [\#17831](https://github.com/netdata/netdata/pull/17831) ([ilyam8](https://github.com/ilyam8))
-- Sockets VFS \(context update\) [\#17830](https://github.com/netdata/netdata/pull/17830) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix order of loading schema files in dyncfg\_get\_schema\_from [\#17829](https://github.com/netdata/netdata/pull/17829) ([ilyam8](https://github.com/ilyam8))
-- claiming: add proxy to cloud.conf if set [\#17828](https://github.com/netdata/netdata/pull/17828) ([ilyam8](https://github.com/ilyam8))
-- Use bundled protobuf for openSUSE packages. [\#17827](https://github.com/netdata/netdata/pull/17827) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
