@@ -193,6 +193,10 @@ func TestDnsmasqDHCP_parseDHCPRangeValue(t *testing.T) {
 			wantFail: true,
 			input:    "1234::,ra-stateless",
 		},
+		"invalid": {
+			wantFail: true,
+			input:    "192.168.0.0",
+		},
 	}
 
 	for name, test := range tests {
