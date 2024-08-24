@@ -108,14 +108,12 @@ func parseDHCPRangeValue(s string) (r string) {
 	var start, end net.IP
 	parts := strings.Split(s, ",")
 
-	for i, v := range parts {
-		if start = net.ParseIP(strings.TrimSpace(v)); start == nil {
+	for _, v := range parts {
+		if start == nil {
+			start = net.ParseIP(v)
 			continue
 		}
-		if len(parts) < i+1 {
-			return ""
-		}
-		if end = net.ParseIP(parts[i+1]); end == nil || iprange.New(start, end) == nil {
+		if end = net.ParseIP(v); end == nil || iprange.New(start, end) == nil {
 			return ""
 		}
 		return fmt.Sprintf("%s-%s", start, end)
