@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#define UNICODE
+#define _UNICODE
 #include <windows.h>
 #include <shellapi.h>
-#include <wchar.h>
+
+#include "netdata_claim.h"
 
 LPWSTR token = NULL;
 LPWSTR room = NULL;
@@ -49,8 +52,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (argc)
         argc = nd_claim_parse_args(argc, argv);
 
+    // No data was given, user want to use graphic mode
+    int ret = 0;
+    if (!argc)
+        ret = netdata_claim_window_loop(hInstance, nCmdShow);
+
     LocalFree(argv);
 
-    return 0;
+    return ret;
 }
 

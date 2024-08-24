@@ -1298,6 +1298,9 @@ set(CLAIM_PLUGIN_FILES
 
 set(CLAIM_WINDOWS_FILES
         src/claim/netdata_claim.c
+        src/claim/netdata_claim.h
+        src/claim/netdata_claim_window.c
+        src/claim/netdata_claim_window.h
 )
 
 set(ACLK_ALWAYS_BUILD
@@ -2244,7 +2247,7 @@ add_executable(netdata
 
 if(OS_WINDOWS)
         add_executable(netdata_claim ${CLAIM_WINDOWS_FILES})
-        target_link_libraries(netdata_claim shell32)
+        target_link_libraries(netdata_claim shell32;gdi32;msftedit)
 endif()
 
 target_compile_definitions(netdata PRIVATE
