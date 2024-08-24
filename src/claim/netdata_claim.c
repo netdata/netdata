@@ -4,11 +4,16 @@
 #define _UNICODE
 #include <windows.h>
 #include <shellapi.h>
+#include <stdlib.h>
 
 #include "netdata_claim.h"
 
 LPWSTR token = NULL;
 LPWSTR room = NULL;
+LPWSTR *argv = NULL;
+
+char *aToken = NULL;
+char *aRoom = NULL;
 
 /**
  *  Parse Args
@@ -44,18 +49,46 @@ int nd_claim_parse_args(int argc, LPWSTR *argv)
     return argc;
 }
 
+static inline void netdata_claim_convert_str(char *dst, wchar_t *src, size_t len) {
+    size_t copied = wcstombs(dst, src, len);
+    dst[copied] = '\0';
+}
+
+static int netdata_claim_prepare_strings()
+{
+    size_t length = wcslen(token) + 1;
+    aToken = calloc(sizeof(char), length);
+    if (!aToken)
+        return -1;
+
+    netdata_claim_convert_str(aToken, token, length - 1);
+
+    length = wcslen(room) + 1;
+    aRoom = calloc(sizeof(char), length - 1);
+    if (!aRoom)
+        return -1;
+
+    netdata_claim_convert_str(aRoom, room, length - 1);
+
+    return 0;
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     int argc;
-    // TODO: We are using ASCII here, but we should work with UTF on MS
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argc)
         argc = nd_claim_parse_args(argc, argv);
 
-    // No data was given, user want to use graphic mode
+    // When no data is given, user must to use graphic mode
     int ret = 0;
-    if (!argc)
+    if (argc) {
+    }
+    /*
+    else {
         ret = netdata_claim_window_loop(hInstance, nCmdShow);
+    }
+        */
 
     LocalFree(argv);
 
