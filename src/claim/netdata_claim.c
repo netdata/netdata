@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <stdlib.h>
+#include <signal.h>
 
 #include "netdata_claim.h"
 
@@ -73,8 +74,24 @@ static int netdata_claim_prepare_strings()
     return 0;
 }
 
+static void netdata_claim_exit_callback(int signal)
+{
+    (void)signal;
+    if (aToken)
+        free(aToken);
+    if (aRoom)
+        free(aRoom);
+
+    if (argv)
+        LocalFree(argv);
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
+    signal(SIGABRT, netdata_claim_exit_callback);
+    signal(SIGINT, netdata_claim_exit_callback);
+    signal(SIGTERM, netdata_claim_exit_callback);
+
     int argc;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argc)
@@ -90,8 +107,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
         */
 
-    LocalFree(argv);
+    netdata_claim_exit_callback(0);
 
     return ret;
 }
-
