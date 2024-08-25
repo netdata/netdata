@@ -99,13 +99,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // When no data is given, user must to use graphic mode
     int ret = 0;
-    if (argc) {
-    }
-    /*
-    else {
+    if (!argc) {
         ret = netdata_claim_window_loop(hInstance, nCmdShow);
     }
-        */
 
     netdata_claim_exit_callback(0);
 

@@ -13,53 +13,31 @@ static HINSTANCE hInst;
 static HWND hToken;
 static HWND hRoom;
 
-static inline HWND CreateRichEdit(HWND hwnd, int x, int y, int width, int height) // Dimensions.
-{
-    HWND ptr = CreateWindowExW(0, MSFTEDIT_CLASS, L"Type here",
-                                  WS_VISIBLE | WS_CHILD | WS_BORDER | WS_TABSTOP,
-                                  x, y, width, height,
-                                  hwnd, NULL, hInst, NULL);
-    if (!ptr) {
-        MessageBoxW(NULL, L"Cannot create a Rich Text!", L"Error", 0);
-        return NULL;
-    }
-
-    return ptr;
-}
-
 LRESULT CALLBACK WndProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     PAINTSTRUCT ps;
     HDC hdc;
-    LPCTSTR topMsg =  _T("Claim your Agent for a specific room.");
+    LPCTSTR topMsg[] = { _T("                                         Help"),
+                         _T(" "),
+                         _T("In this initial version of the software, there are no fields for data"),
+                         _T(" entry. To claim your agent, you must use the following options:"),
+                         _T(" "),
+                         _T("/T TOKEN: The cloud token; "),
+                         _T("/R ROOMS: A list of rooms to claim;")};
 
     switch (message)
     {
-        case WM_CREATE: {
-            hToken = CreateRichEdit(hNetdatawnd, 30, 20, 400, 40);
-            if (!hToken) {
-                return 1;
-            }
-            SendMessage(hToken, EM_EXLIMITTEXT, 0, 125);
-            hRoom = CreateRichEdit(hNetdatawnd, 30, 40, 400, 40);
-            if (!hToken) {
-                return 1;
-            }
-            SendMessage(hRoom, EM_EXLIMITTEXT, 0, 36);
-            break;
-        }
         case WM_PAINT: {
             hdc = BeginPaint(hNetdatawnd, &ps);
 
-            TextOut(hdc, 5, 5, topMsg, wcslen(topMsg));
-
-            TextOut(hdc, 5, 20, L"Token", 5);
-
-            TextOut(hdc, 5, 40, L"Room", 4);
-
+            int i;
+            for (i = 0; i < sizeof(topMsg) / sizeof(LPCTSTR); i++) {
+                TextOut(hdc, 5, 5 + 15*i, topMsg[i], wcslen(topMsg[i]));
+            }
             EndPaint(hNetdatawnd, &ps);
             break;
         }
+        case WM_COMMAND:
         case WM_DESTROY: {
             PostQuitMessage(0);
             break;
@@ -102,7 +80,7 @@ int netdata_claim_window_loop(HINSTANCE hInstance, int nCmdShow)
                                       L"Netdata Claim",
                                       WS_OVERLAPPEDWINDOW,
                                       CW_USEDEFAULT, CW_USEDEFAULT,
-                                      500, 500,
+                                      460, 180,
                                       NULL,
                                       NULL,
                                       hInstance,
