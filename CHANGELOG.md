@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- remove pyyaml2 [\#18404](https://github.com/netdata/netdata/pull/18404) ([ilyam8](https://github.com/ilyam8))
+- imporve netdatacli help usage readability [\#18403](https://github.com/netdata/netdata/pull/18403) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/anomalies [\#18402](https://github.com/netdata/netdata/pull/18402) ([ilyam8](https://github.com/ilyam8))
+- go.d dnsmasqdhcp: fix potential panic in parseDHCPRangeValue [\#18401](https://github.com/netdata/netdata/pull/18401) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18400](https://github.com/netdata/netdata/pull/18400) ([netdatabot](https://github.com/netdatabot))
 - go.d boinc [\#18398](https://github.com/netdata/netdata/pull/18398) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/boinc [\#18397](https://github.com/netdata/netdata/pull/18397) ([ilyam8](https://github.com/ilyam8))
@@ -416,10 +420,6 @@
 - explicitly disable removed collectors in python.d.conf [\#17840](https://github.com/netdata/netdata/pull/17840) ([ilyam8](https://github.com/ilyam8))
 - fix tc plugin undeclared vars [\#17839](https://github.com/netdata/netdata/pull/17839) ([ilyam8](https://github.com/ilyam8))
 - hide sqlite config \(netdata.conf\) [\#17838](https://github.com/netdata/netdata/pull/17838) ([ilyam8](https://github.com/ilyam8))
-- proc net dev: simplify config [\#17837](https://github.com/netdata/netdata/pull/17837) ([ilyam8](https://github.com/ilyam8))
-- aclk: move "proxy" from "netdata.conf" to "cloud.conf" [\#17836](https://github.com/netdata/netdata/pull/17836) ([ilyam8](https://github.com/ilyam8))
-- tc plugin simplify config [\#17835](https://github.com/netdata/netdata/pull/17835) ([ilyam8](https://github.com/ilyam8))
-- health dyncfg userconfig: remove first newline [\#17834](https://github.com/netdata/netdata/pull/17834) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
