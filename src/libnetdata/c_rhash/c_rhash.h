@@ -1,8 +1,8 @@
-// Copyright: SPDX-License-Identifier:  GPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <sys/types.h>
-#include <stdint.h>
-#include <stddef.h>
+#ifndef C_RHASH_H
+#define C_RHASH_H
+#include "../libnetdata.h"
 
 #ifndef DEFAULT_BIN_COUNT
     #define DEFAULT_BIN_COUNT 1000
@@ -59,3 +59,5 @@ typedef struct {
 int c_rhash_iter_uint64_keys(c_rhash hash, c_rhash_iter_t *iter, uint64_t *key);
 
 int c_rhash_iter_str_keys(c_rhash hash, c_rhash_iter_t *iter, const char **key);
+
+#endif

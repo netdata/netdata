@@ -1,12 +1,8 @@
-// Copyright: SPDX-License-Identifier:  GPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <stdio.h>
+#include "libnetdata/libnetdata.h"
 
 #include "mqtt_wss_log.h"
-#include "common_internal.h"
 
 struct mqtt_wss_log_ctx {
     mqtt_wss_log_callback_t extern_log_fnc;

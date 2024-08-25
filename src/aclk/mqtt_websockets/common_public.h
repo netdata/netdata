@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef MQTT_WEBSOCKETS_COMMON_PUBLIC_H
 #define MQTT_WEBSOCKETS_COMMON_PUBLIC_H
 

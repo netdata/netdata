@@ -1,13 +1,9 @@
-// SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2020 Timotej Šiškovič
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef WS_CLIENT_H
 #define WS_CLIENT_H
 
-#include "c-rbuf/cringbuffer.h"
 #include "mqtt_wss_log.h"
-
-#include <stdint.h>
 
 #define WS_CLIENT_NEED_MORE_BYTES     0x10
 #define WS_CLIENT_PARSING_DONE        0x11

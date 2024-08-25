@@ -1,11 +1,10 @@
-
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "aclk_otp.h"
 #include "aclk_util.h"
 #include "aclk.h"
 
-#include "mqtt_websockets/c-rbuf/cringbuffer.h"
+//#include "daemon/common.h"
 
 static int aclk_https_request(https_req_t *request, https_req_response_t *response) {
     int rc;

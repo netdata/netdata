@@ -1,33 +1,13 @@
-// Copyright: SPDX-License-Identifier:  GPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "../libnetdata.h"
 #include "c_rhash_internal.h"
-
-#include <stdlib.h>
-#include <string.h>
-
-#ifdef DEBUG_VERBOSE
-#include <stdio.h>
-#endif
-
-#define c_rmalloc(...) malloc(__VA_ARGS__)
-#define c_rcalloc(...) calloc(__VA_ARGS__)
-#define c_rfree(...) free(__VA_ARGS__)
-
-static inline uint32_t simple_hash(const char *name) {
-    unsigned char *s = (unsigned char *) name;
-    uint32_t hval = 0x811c9dc5;
-    while (*s) {
-        hval *= 16777619;
-        hval ^= (uint32_t) *s++;
-    }
-    return hval;
-}
 
 c_rhash c_rhash_new(size_t bin_count) {
     if (!bin_count)
         bin_count = 1000;
 
-    c_rhash hash = c_rcalloc(1, sizeof(struct c_rhash_s) + (bin_count * sizeof(struct bin_ll*)) );
+    c_rhash hash = callocz(1, sizeof(struct c_rhash_s) + (bin_count * sizeof(struct bin_ll*)) );
     if (hash == NULL)
         return NULL;
 
@@ -75,16 +55,9 @@ static int insert_into_bin(c_rhash_bin *bin, uint8_t key_type, const void *key, 
     struct bin_item *prev = NULL;
     while (*bin != NULL) {
         if (!compare_bin_item(*bin, key_type, key)) {
-#ifdef DEBUG_VERBOSE
-            printf("Key already present! Updating value!\n");
-#endif
-// TODO: optimize here if the new value is of different kind compared to the old one
-// in case it is not crazily bigger we can reuse the memory and avoid malloc and free
-            c_rfree((*bin)->value);
+            freez((*bin)->value);
             (*bin)->value_type = value_type;
-            (*bin)->value = c_rmalloc(get_itemtype_len(value_type, value));
-            if ((*bin)->value == NULL)
-                return 1;
+            (*bin)->value = mallocz(get_itemtype_len(value_type, value));
             memcpy((*bin)->value, value, get_itemtype_len(value_type, value));
             return 0;
         }
@@ -93,18 +66,18 @@ static int insert_into_bin(c_rhash_bin *bin, uint8_t key_type, const void *key, 
     }
 
     if (*bin == NULL)
-        *bin = c_rcalloc(1, sizeof(struct bin_item));
+        *bin = callocz(1, sizeof(struct bin_item));
     if (prev != NULL)
         prev->next = *bin;
 
     (*bin)->key_type = key_type;
     size_t len = get_itemtype_len(key_type, key);
-    (*bin)->key = c_rmalloc(len);
+    (*bin)->key = mallocz(len);
     memcpy((*bin)->key, key, len);
 
     (*bin)->value_type = value_type;
     len = get_itemtype_len(value_type, value);
-    (*bin)->value = c_rmalloc(len);
+    (*bin)->value = mallocz(len);
     memcpy((*bin)->value, value, len);
     return 0;
 }
@@ -121,32 +94,17 @@ static inline c_rhash_bin *get_binptr_by_str(c_rhash hash, const char *key) {
 int c_rhash_insert_str_ptr(c_rhash hash, const char *key, void *value) {
     c_rhash_bin *bin = get_binptr_by_str(hash, key);
 
-#ifdef DEBUG_VERBOSE
-    if (bin != NULL)
-        printf("COLLISION. There will be more than one item in bin idx=%d\n", nhash);
-#endif
-
     return insert_into_bin(bin, ITEMTYPE_STRING, key, ITEMTYPE_OPAQUE_PTR, &value);
 }
 
 int c_rhash_insert_str_uint8(c_rhash hash, const char *key, uint8_t value) {
     c_rhash_bin *bin = get_binptr_by_str(hash, key);
 
-#ifdef DEBUG_VERBOSE
-    if (bin != NULL)
-        printf("COLLISION. There will be more than one item in bin idx=%d\n", nhash);
-#endif
-
     return insert_into_bin(bin, ITEMTYPE_STRING, key, ITEMTYPE_UINT8, &value);
 }
 
 int c_rhash_insert_uint64_ptr(c_rhash hash, uint64_t key, void *value) {
     c_rhash_bin *bin = &hash->bins[key % hash->bin_count];
-
-#ifdef DEBUG_VERBOSE
-    if (bin != NULL)
-        printf("COLLISION. There will be more than one item in bin idx=%d\n", nhash);
-#endif
 
     return insert_into_bin(bin, ITEMTYPE_UINT64, &key, ITEMTYPE_OPAQUE_PTR, &value);
 }
@@ -208,9 +166,9 @@ static void c_rhash_destroy_bin(c_rhash_bin bin) {
     struct bin_item *next;
     do {
         next = bin->next;
-        c_rfree(bin->key);
-        c_rfree(bin->value);
-        c_rfree(bin);
+        freez(bin->key);
+        freez(bin->value);
+        freez(bin);
         bin = next;
     } while (bin != NULL);
 }
@@ -260,5 +218,5 @@ void c_rhash_destroy(c_rhash hash) {
         if (hash->bins[i] != NULL)
             c_rhash_destroy_bin(hash->bins[i]);
     }
-    c_rfree(hash);
+    freez(hash);
 }

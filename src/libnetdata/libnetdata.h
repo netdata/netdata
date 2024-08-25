@@ -451,6 +451,8 @@ extern char *netdata_configured_host_prefix;
 #include "july/july.h"
 #include "threads/threads.h"
 #include "buffer/buffer.h"
+#include "ringbuffer/ringbuffer.h"
+#include "c_rhash/c_rhash.h"
 #include "locks/locks.h"
 #include "circular_buffer/circular_buffer.h"
 #include "avl/avl.h"

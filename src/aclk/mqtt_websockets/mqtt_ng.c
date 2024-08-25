@@ -1,16 +1,10 @@
-// Copyright: SPDX-License-Identifier:  GPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <pthread.h>
-#include <inttypes.h>
-
-#include "c_rhash/c_rhash.h"
+#include "libnetdata/libnetdata.h"
 
 #include "common_internal.h"
 #include "mqtt_constants.h"
@@ -26,10 +20,10 @@
 
 #define SMALL_STRING_DONT_FRAGMENT_LIMIT 128
 
-#define MIN(a,b) (((a)<(b))?(a):(b))
+//#define MIN(a,b) (((a)<(b))?(a):(b))
 
-#define LOCK_HDR_BUFFER(buffer) pthread_mutex_lock(&((buffer)->mutex))
-#define UNLOCK_HDR_BUFFER(buffer) pthread_mutex_unlock(&((buffer)->mutex))
+#define LOCK_HDR_BUFFER(buffer) spinlock_lock(&((buffer)->spinlock))
+#define UNLOCK_HDR_BUFFER(buffer) spinlock_unlock(&((buffer)->spinlock))
 
 #define BUFFER_FRAG_GARBAGE_COLLECT         0x01
 // some packets can be marked for garbage collection
@@ -75,7 +69,7 @@ struct transaction_buffer {
     // to be able to revert state easily
     // in case of error mid processing
     struct header_buffer state_backup;
-    pthread_mutex_t mutex;
+    SPINLOCK spinlock;
     struct buffer_fragment *sending_frag;
 };
 
@@ -578,7 +572,7 @@ static int transaction_buffer_grow(struct transaction_buffer *buf, mqtt_wss_log_
 
 inline static int transaction_buffer_init(struct transaction_buffer *to_init, size_t size)
 {
-    pthread_mutex_init(&to_init->mutex, NULL);
+    spinlock_init(&to_init->spinlock);
 
     to_init->hdr_buffer.size = size;
     to_init->hdr_buffer.data = mallocz(size);
@@ -593,7 +587,7 @@ inline static int transaction_buffer_init(struct transaction_buffer *to_init, si
 static void transaction_buffer_destroy(struct transaction_buffer *to_init)
 {
     buffer_purge(&to_init->hdr_buffer);
-    pthread_mutex_destroy(&to_init->mutex);
+//    pthread_mutex_destroy(&to_init->mutex);
     freez(to_init->hdr_buffer.data);
 }
 

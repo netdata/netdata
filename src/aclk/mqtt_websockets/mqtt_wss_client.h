@@ -1,11 +1,7 @@
-// SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2020 Timotej Šiškovič
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef MQTT_WSS_CLIENT_H
 #define MQTT_WSS_CLIENT_H
-
-#include <stdint.h>
-#include <stddef.h> //size_t
 
 #include "mqtt_wss_log.h"
 #include "common_public.h"

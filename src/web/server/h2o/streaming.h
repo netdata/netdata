@@ -3,8 +3,6 @@
 #ifndef HTTPD_STREAMING_H
 #define HTTPD_STREAMING_H
 
-#include "aclk/mqtt_websockets/c-rbuf/cringbuffer.h"
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
