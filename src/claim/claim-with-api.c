@@ -445,14 +445,18 @@ bool claim_agent_from_split_files(void) {
     snprintfz(filename, sizeof(filename), "%s/token", netdata_configured_cloud_dir);
     long token_len = 0;
     char *token = read_by_filename(filename, &token_len);
-    if(!token || !*token)
+    if(!token || !*token) {
+        freez(token);
         return false;
+    }
 
     snprintfz(filename, sizeof(filename), "%s/rooms", netdata_configured_cloud_dir);
     long rooms_len = 0;
     char *rooms = read_by_filename(filename, &rooms_len);
-    if(!rooms || !*rooms)
+    if(!rooms || !*rooms) {
+        freez(rooms);
         rooms = NULL;
+    }
 
     bool ret = claim_agent(cloud_config_url_get(), token, rooms, cloud_config_proxy_get(), cloud_config_insecure_get());
 
