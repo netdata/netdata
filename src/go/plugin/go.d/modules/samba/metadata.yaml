@@ -27,9 +27,9 @@ modules:
           It relies on the [`smbstatus`](https://www.samba.org/samba/docs/current/man-html/smbstatus.1.html CLI tool but avoids directly executing the binary.
           Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
           This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
-          
+
           Executed commands:
-          
+
           - `smbstatus -P`
         method_description: ""
       supported_platforms:
