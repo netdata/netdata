@@ -24,10 +24,11 @@ char *aRoom = NULL;
  *  Parse arguments identifying necessity to make a window
  *
  * @param argc number of arguments
+ * @param argv A pointer for all arguments given
  *
  * @return it return the number of arguments parsed.
  */
-int nd_claim_parse_args(int argc)
+int nd_claim_parse_args(int argc, LPWSTR *argv)
 {
     int i;
     for (i = 1 ; i < argc; i++) {
@@ -128,9 +129,9 @@ static void netdata_claim_execute_command()
     }
 
     // When we run from installer, usr\bin is ommited, so we have to check its presence
-    if (!strstr(runCmd, "\\usr\\bin")) {
-        strncpy(&runCmd[length], "\\usr\\bin", 8);
-        length += 8;
+    if (!strstr(runCmd, "usr\\bin")) {
+        strncpy(&runCmd[length], "usr\\bin", 7);
+        length += 7;
         runCmd[length] = '\0';
     }
     MessageBoxA(NULL, runCmd, "Test", MB_OK);
@@ -145,7 +146,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     int argc;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argc)
-        argc = nd_claim_parse_args(argc);
+        argc = nd_claim_parse_args(argc, argv);
 
     // When no data is given, user must to use graphic mode
     int ret = 0;
