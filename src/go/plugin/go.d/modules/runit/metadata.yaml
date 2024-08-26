@@ -1,0 +1,149 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-runit
+      plugin_name: go.d.plugin
+      module_name: runit
+      monitored_instance:
+        name: Runit services
+        link: https://smarden.org/runit/
+        icon_filename: runit.png
+        categories:
+          - data-collection.processes-and-system-services
+      keywords:
+        - runit
+        - service
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the state of Runit services.
+          It relies on the [`sv`](https://smarden.org/runit/sv.8) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects services running in
+            $SVDIR or (if $SVDIR is empty) /service directory.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Install sv (included in runit package)
+            description: |
+              If you want this collector then you already have runit package installed.
+              But if you'll run Netdata in a Docker then you need to also install runit in Netdata container.
+      configuration:
+        file:
+          name: go.d/runit.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 60
+              required: false
+            - name: dir
+              description: Directory with runit services.
+              default_value: "/service"
+              required: false
+              detailed_description: |
+                If environment variable $SVDIR is set to non-empty value then it will be used
+                as default instead of /service.
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: System services in non-default dir
+              description: Set custom directory for system services.
+              config: |
+                jobs:
+                  - name: system
+                    dir: /etc/service
+            - name: Some user also run services in addition to system ones
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Add directory with user services.
+              config: |
+                jobs:
+                  - name: system
+
+                  - name: someone
+                    dir: /home/someone/service
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: runit_service_undesired_state
+        metric: runit.service_state
+        info: runit service is not in desired state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/runit.conf
+      - name: runit_service_paused
+        metric: runit.service_state
+        info: runit service is paused
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/runit.conf
+      - name: runit_service_failed
+        metric: runit.service_state
+        info: runit service is failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/runit.conf
+      - name: runit_service_hangs_on_finish
+        metric: runit.service_state
+        info: runit service finishing takes too long
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/runit.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: service
+          description: These metrics refer to the runit service.
+          labels:
+            - name: service
+              description: runit service name
+          metrics:
+            - name: runit.service_state
+              description: Service State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: down
+                - name: starting
+                - name: up
+                - name: finishing
+                - name: paused
+                - name: enabled
+            - name: runit.service_state_duration
+              description: Service State Duration
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: down
+                - name: up

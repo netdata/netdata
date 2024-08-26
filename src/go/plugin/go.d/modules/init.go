@@ -88,6 +88,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/rethinkdb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/riakkv"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/rspamd"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/runit"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/scaleio"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/sensors"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/smartctl"
