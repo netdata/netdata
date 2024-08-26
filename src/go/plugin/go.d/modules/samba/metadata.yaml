@@ -24,7 +24,7 @@ modules:
       data_collection:
         metrics_description: >
           This collector monitors Samba syscalls and SMB2 calls.
-          It relies on the [`smbstatus`](https://www.samba.org/samba/docs/current/man-html/smbstatus.1.html CLI tool but avoids directly executing the binary.
+          It relies on the [`smbstatus`](https://www.samba.org/samba/docs/current/man-html/smbstatus.1.html) CLI tool but avoids directly executing the binary.
           Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
           This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
 
