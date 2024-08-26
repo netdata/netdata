@@ -144,7 +144,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     int argc;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    if (argc && argv)
+    if (argc)
         argc = nd_claim_parse_args(argc);
 
     // When no data is given, user must to use graphic mode
