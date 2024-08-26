@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <signal.h>
 
 #include "netdata_claim.h"
@@ -86,6 +87,48 @@ static void netdata_claim_exit_callback(int signal)
         LocalFree(argv);
 }
 
+static void netdata_claim_error_exit(LPCTSTR function)
+{
+    LPVOID lpMsgBuf;
+    LPVOID lpDisplayBuf;
+    DWORD dw = GetLastError();
+
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                 NULL,
+                 dw,
+                 MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                 (LPTSTR) &lpMsgBuf,
+                 0, NULL );
+
+    lpDisplayBuf = (LPVOID)LocalAlloc(LMEM_ZEROINIT,
+                                      (lstrlen((LPCTSTR)lpMsgBuf) + lstrlen((LPCTSTR)function) + 40) * sizeof(TCHAR));
+
+    snprintf((char *)lpDisplayBuf,
+                    LocalSize(lpDisplayBuf) / sizeof(TCHAR),
+                    "%s failed with error %d: %s",
+                    function,
+                    dw,
+                    lpMsgBuf);
+
+    MessageBox(NULL, (LPCTSTR)lpDisplayBuf, TEXT("Error"), MB_OK);
+
+    LocalFree(lpMsgBuf);
+    LocalFree(lpDisplayBuf);
+    netdata_claim_exit_callback(0);
+
+    ExitProcess(dw);
+}
+
+static void netdata_claim_execute_command()
+{
+    char runCmd[WINDOWS_MAX_PATH];
+    DWORD length = GetCurrentDirectoryA(WINDOWS_MAX_PATH, runCmd);
+    if (!length) {
+        netdata_claim_error_exit(TEXT("GetCurrentDirectoryA"));
+    }
+    MessageBoxA(NULL, runCmd, "Test", MB_OK);
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     signal(SIGABRT, netdata_claim_exit_callback);
@@ -101,6 +144,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     int ret = 0;
     if (!argc) {
         ret = netdata_claim_window_loop(hInstance, nCmdShow);
+    } else {
+        netdata_claim_execute_command();
     }
 
     netdata_claim_exit_callback(0);
