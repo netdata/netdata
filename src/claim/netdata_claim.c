@@ -24,11 +24,10 @@ char *aRoom = NULL;
  *  Parse arguments identifying necessity to make a window
  *
  * @param argc number of arguments
- * @param argv A pointer for all arguments given
  *
  * @return it return the number of arguments parsed.
  */
-int nd_claim_parse_args(int argc, LPWSTR *argv)
+int nd_claim_parse_args(int argc)
 {
     int i;
     for (i = 1 ; i < argc; i++) {
@@ -145,8 +144,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     int argc;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    if (argc)
-        argc = nd_claim_parse_args(argc, argv);
+    if (argc && argv)
+        argc = nd_claim_parse_args(argc);
 
     // When no data is given, user must to use graphic mode
     int ret = 0;
