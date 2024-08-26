@@ -161,7 +161,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (!argc) {
         ret = netdata_claim_window_loop(hInstance, nCmdShow);
     } else {
-        netdata_claim_execute_command();
+        if (!netdata_claim_prepare_strings())
+            netdata_claim_execute_command();
     }
 
     netdata_claim_exit_callback(0);
