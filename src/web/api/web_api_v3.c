@@ -15,7 +15,7 @@ static struct web_api_command api_commands_v3[] = {
         .callback = api_v2_data,
         .allow_subpaths = 0
     },
-    // badges can be fetched with both dashboard and badge ACL
+    // badges
     {
      .api = "badge.svg",
      .hash = 0,
