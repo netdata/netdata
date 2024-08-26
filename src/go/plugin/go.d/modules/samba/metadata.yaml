@@ -102,7 +102,7 @@ modules:
               config: |
                 jobs:
                   - name: samba
-                    update_every: 5  # Collect logical volume statistics every 5 seconds
+                    update_every: 5  # Collect statistics every 5 seconds
     troubleshooting:
       problems:
         list: []
