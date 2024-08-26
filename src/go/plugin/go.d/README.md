@@ -132,6 +132,7 @@ see the appropriate collector readme.
 | [rethinkdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/rethinkdb)                   |           RethinkDB           |
 | [riakkv](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/riakkv)                         |            Riak KV            |
 | [rspamd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/rspamd)                         |            Rspamd             |
+| [samba](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/samba)                           |             Samba             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/scaleio)                       |       Dell EMC ScaleIO        |
 | [sensors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/sensors)                       |       Hardware Sensors        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/snmp)                             |             SNMP              |
