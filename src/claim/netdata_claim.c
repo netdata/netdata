@@ -129,12 +129,20 @@ static void netdata_claim_execute_command()
     }
 
     // When we run from installer, usr\bin is ommited, so we have to check its presence
-    if (!strstr(runCmd, "usr\\bin")) {
-        strncpy(&runCmd[length], "usr\\bin", 7);
-        length += 7;
+    if (!strstr(runCmd, "\\usr\\bin")) {
+        strncpy(&runCmd[length], "\\usr\\bin", 8);
+        length += 8;
         runCmd[length] = '\0';
     }
+
+    char *path = strdup(runCmd);
+
+    snprintf(&runCmd[length], WINDOWS_MAX_PATH - length,
+             "\\bash.exe -c \"%s\\netdata-claim.sh --claim-token %s --claim-rooms %s --claim-url https://app.netdata.cloud\"",
+             path, aToken, aRoom);
     MessageBoxA(NULL, runCmd, "Test", MB_OK);
+
+    free(path);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
