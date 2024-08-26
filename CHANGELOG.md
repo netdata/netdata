@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- kickstart: fix write\_claim\_config when executed as a regular user [\#18406](https://github.com/netdata/netdata/pull/18406) ([ilyam8](https://github.com/ilyam8))
+- Fix coverity issues [\#18405](https://github.com/netdata/netdata/pull/18405) ([stelfrag](https://github.com/stelfrag))
 - remove pyyaml2 [\#18404](https://github.com/netdata/netdata/pull/18404) ([ilyam8](https://github.com/ilyam8))
 - imporve netdatacli help usage readability [\#18403](https://github.com/netdata/netdata/pull/18403) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/anomalies [\#18402](https://github.com/netdata/netdata/pull/18402) ([ilyam8](https://github.com/ilyam8))
@@ -418,8 +420,6 @@
 - Properly initialize spinlock in ARAL. [\#17844](https://github.com/netdata/netdata/pull/17844) ([vkalintiris](https://github.com/vkalintiris))
 - Fix compilation without dbengine [\#17843](https://github.com/netdata/netdata/pull/17843) ([stelfrag](https://github.com/stelfrag))
 - explicitly disable removed collectors in python.d.conf [\#17840](https://github.com/netdata/netdata/pull/17840) ([ilyam8](https://github.com/ilyam8))
-- fix tc plugin undeclared vars [\#17839](https://github.com/netdata/netdata/pull/17839) ([ilyam8](https://github.com/ilyam8))
-- hide sqlite config \(netdata.conf\) [\#17838](https://github.com/netdata/netdata/pull/17838) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
