@@ -21,7 +21,8 @@ int api_v1_ml_info(RRDHOST *host, struct web_client *w, char *url) {
 
     return HTTP_RESP_OK;
 #else
+    UNUSED(host);
+    UNUSED(w);
     return HTTP_RESP_SERVICE_UNAVAILABLE;
 #endif // ENABLE_ML
 }
-

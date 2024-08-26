@@ -39,7 +39,7 @@ const char *aclk_status_to_string(void);
 
 extern int aclk_ctx_based;
 extern int aclk_disable_runtime;
-extern int aclk_stats_enabled;
+//extern int aclk_stats_enabled;
 extern int aclk_kill_link;
 
 bool aclk_online(void);
@@ -65,10 +65,6 @@ extern int aclk_connection_counter;
 extern int disconnect_req;
 
 void *aclk_main(void *ptr);
-
-extern netdata_mutex_t aclk_shared_state_mutex;
-#define ACLK_SHARED_STATE_LOCK netdata_mutex_lock(&aclk_shared_state_mutex)
-#define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
 
 extern struct aclk_shared_state {
     // To wait for `disconnect` message PUBACK

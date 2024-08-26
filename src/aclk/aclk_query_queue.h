@@ -14,12 +14,7 @@ typedef enum {
     HTTP_API_V2,
     REGISTER_NODE,
     NODE_STATE_UPDATE,
-    CHART_DIMS_UPDATE,
-    CHART_CONFIG_UPDATED,
-    CHART_RESET,
-    RETENTION_UPDATED,
     UPDATE_NODE_INFO,
-    ALARM_PROVIDE_CHECKPOINT,
     ALARM_PROVIDE_CFG,
     ALARM_SNAPSHOT,
     UPDATE_NODE_COLLECTORS,
@@ -32,7 +27,7 @@ struct aclk_query_http_api_v2 {
     char *query;
 };
 
-struct aclk_bin_payload { 
+struct aclk_bin_payload {
     char *payload;
     size_t size;
     enum aclk_topics topic;
@@ -55,7 +50,6 @@ struct aclk_query {
     struct timeval created_tv;
     usec_t created;
     int timeout;
-    aclk_query_t prev, next;
 
     // TODO maybe remove?
     int version;
@@ -68,20 +62,16 @@ struct aclk_query {
 aclk_query_t aclk_query_new(aclk_query_type_t type);
 void aclk_query_free(aclk_query_t query);
 
-int aclk_queue_query(aclk_query_t query);
-aclk_query_t aclk_queue_pop(void);
-void aclk_queue_flush(void);
+void aclk_execute_query(aclk_query_t query);
 
-void aclk_queue_lock(void);
-void aclk_queue_unlock(void);
-
-#define QUEUE_IF_PAYLOAD_PRESENT(query) do {                                                                           \
-    if (likely(query->data.bin_payload.payload)) {                                                                     \
-        aclk_queue_query(query);                                                                                       \
-    } else {                                                                                                           \
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to generate payload");                                                   \
-        aclk_query_free(query);                                                                                        \
-    }                                                                                                                  \
-} while(0)
+#define QUEUE_IF_PAYLOAD_PRESENT(query)                                                                                \
+    do {                                                                                                               \
+        if (likely((query)->data.bin_payload.payload)) {                                                               \
+            aclk_execute_query(query);                                                                                 \
+        } else {                                                                                                       \
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to generate payload");                                               \
+            aclk_query_free(query);                                                                                    \
+        }                                                                                                              \
+    } while (0)
 
 #endif /* NETDATA_ACLK_QUERY_QUEUE_H */
