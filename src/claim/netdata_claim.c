@@ -6,6 +6,7 @@
 #include <shellapi.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <signal.h>
 
 #include "netdata_claim.h"
@@ -125,6 +126,13 @@ static void netdata_claim_execute_command()
     DWORD length = GetCurrentDirectoryA(WINDOWS_MAX_PATH, runCmd);
     if (!length) {
         netdata_claim_error_exit(TEXT("GetCurrentDirectoryA"));
+    }
+
+    // When we run from installer, usr\bin is ommited, so we have to check its presence
+    if (!strstr(runCmd, "\\usr\\bin")) {
+        strncpy(&runCmd[length], "\\usr\\bin", 8);
+        length += 8;
+        runCmd[length] = '\0';
     }
     MessageBoxA(NULL, runCmd, "Test", MB_OK);
 }
