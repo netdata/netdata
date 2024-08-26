@@ -4,8 +4,6 @@
 #include "aclk_util.h"
 #include "aclk.h"
 
-//#include "daemon/common.h"
-
 static int aclk_https_request(https_req_t *request, https_req_response_t *response) {
     int rc;
     // wrapper for ACLK only which loads ACLK specific proxy settings

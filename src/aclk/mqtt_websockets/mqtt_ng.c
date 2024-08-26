@@ -20,8 +20,6 @@
 
 #define SMALL_STRING_DONT_FRAGMENT_LIMIT 128
 
-//#define MIN(a,b) (((a)<(b))?(a):(b))
-
 #define LOCK_HDR_BUFFER(buffer) spinlock_lock(&((buffer)->spinlock))
 #define UNLOCK_HDR_BUFFER(buffer) spinlock_unlock(&((buffer)->spinlock))
 
@@ -587,7 +585,6 @@ inline static int transaction_buffer_init(struct transaction_buffer *to_init, si
 static void transaction_buffer_destroy(struct transaction_buffer *to_init)
 {
     buffer_purge(&to_init->hdr_buffer);
-//    pthread_mutex_destroy(&to_init->mutex);
     freez(to_init->hdr_buffer.data);
 }
 

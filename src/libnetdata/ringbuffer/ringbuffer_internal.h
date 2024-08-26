@@ -3,7 +3,7 @@
 #ifndef RINGBUFFER_INTERNAL_H
 #define RINGBUFFER_INTERNAL_H
 
-//#include "ringbuffer.h"
+#include "ringbuffer.h"
 
 struct rbuf {
     char *data;
@@ -22,19 +22,5 @@ struct rbuf {
 };
 
 typedef struct rbuf *rbuf_t;
-///* this exists so that it can be tested by unit tests
-// * without optimization that resets head and tail to
-// * beginning if buffer empty
-// */
-//inline static int rbuf_bump_tail_noopt(rbuf_t buffer, size_t bytes)
-//{
-//    if (bytes > buffer->size_data)
-//        return 0;
-//    int i = buffer->tail - buffer->data;
-//    buffer->tail = &buffer->data[(i + bytes) % buffer->size];
-//    buffer->size_data -= bytes;
-//
-//    return 1;
-//}
 
 #endif
