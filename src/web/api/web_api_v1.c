@@ -35,6 +35,14 @@ static struct web_api_command api_commands_v1[] = {
     },
 #endif
     {
+        .api = "badge.svg",
+        .hash = 0,
+        .acl = HTTP_ACL_BADGES,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v1_badge,
+        .allow_subpaths = 0
+    },
+    {
         // exporting API
         .api = "allmetrics",
         .hash = 0,
