@@ -759,6 +759,8 @@ static SPAWN_REQUEST *find_request_by_pid(pid_t pid) {
 static void spawn_server_process_sigchld(void) {
     // nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: checking for exited children");
 
+    spawn_server_sigchld = false;
+
     int status;
     pid_t pid;
 
@@ -868,13 +870,12 @@ static void spawn_server_event_loop(SPAWN_SERVER *server) {
     fds[1].events = POLLHUP | POLLERR;
 
     while(!spawn_server_exit) {
-        int ret = poll(fds, 2, -1);
-        if (spawn_server_sigchld) {
-            spawn_server_sigchld = false;
+        int ret = poll(fds, 2, 500);
+        if (spawn_server_sigchld || ret == 0) {
             spawn_server_process_sigchld();
             errno_clear();
 
-            if(ret == -1)
+            if(ret == -1 || ret == 0)
                 continue;
         }
 
