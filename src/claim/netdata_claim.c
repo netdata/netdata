@@ -120,6 +120,43 @@ static void netdata_claim_error_exit(LPCTSTR function)
     ExitProcess(dw);
 }
 
+static inline void netdata_claim_create_process(char *cmd)
+{
+    /*
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+
+    ZeroMemory( &si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory( &pi, sizeof(pi));
+
+    if( !CreateProcessA(NULL,
+                        cmd,
+                        NULL,
+                        NULL,
+                        FALSE,
+                        0,
+                        NULL,
+                        NULL,
+                        &si,
+                        &pi)
+                        )
+    {
+        netdata_claim_error_exit(TEXT("CreateProcessA"));
+    }
+
+    WaitForSingleObject( pi.hProcess, INFINITE );
+
+    CloseHandle( pi.hProcess );
+    CloseHandle( pi.hThread );
+
+    DWORD ret;
+    GetExitCodeProcess(pi.hProcess, ret);
+
+     //TODO: WORK WITH ERRORS:
+     */
+}
+
 static void netdata_claim_execute_command()
 {
     char runCmd[WINDOWS_MAX_PATH];
@@ -140,7 +177,8 @@ static void netdata_claim_execute_command()
     snprintf(&runCmd[length], WINDOWS_MAX_PATH - length,
              "\\bash.exe -c \"%s\\netdata-claim.sh --claim-token %s --claim-rooms %s --claim-url https://app.netdata.cloud\"",
              path, aToken, aRoom);
-    MessageBoxA(NULL, runCmd, "Test", MB_OK);
+
+    netdata_claim_create_process(runCmd);
 
     free(path);
 }
