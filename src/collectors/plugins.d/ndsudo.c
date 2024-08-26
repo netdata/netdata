@@ -14,6 +14,15 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "smbstatus-profile",
+        .params = "-P",
+        .search =
+            {
+                [0] = "smbstatus",
+                [1] = NULL,
+            },
+    },
+    {
         .name = "exim-bpc",
         .params = "-bpc",
         .search =

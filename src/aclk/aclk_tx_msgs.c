@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "aclk_tx_msgs.h"
-#include "daemon/common.h"
 #include "aclk_util.h"
-#include "aclk_stats.h"
 #include "aclk.h"
 #include "aclk_capas.h"
 
@@ -13,15 +11,14 @@
 #pragma region aclk_tx_msgs helper functions
 #endif
 
-// version for aclk legacy (old cloud arch)
-#define ACLK_VERSION 2
-
 static void freez_aclk_publish5a(void *ptr) {
     freez(ptr);
 }
 static void freez_aclk_publish5b(void *ptr) {
     freez(ptr);
 }
+
+#define ACLK_HEADER_VERSION (2)
 
 uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
@@ -38,10 +35,6 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
 
     mqtt_wss_publish5(client, (char*)topic, NULL, msg, &freez_aclk_publish5a, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    aclk_stats_msg_published(packet_id);
-#endif
-
     if (aclklog_enabled) {
         char *json = protomsg_to_json(msg, msg_len, msgname);
         log_aclk_message_bin(json, strlen(json), 1, topic, msgname);
@@ -51,14 +44,13 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
     return packet_id;
 }
 
-#define TOPIC_MAX_LEN 512
 #define V2_BIN_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
-static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_object *msg, const char *topic, const void *payload, size_t payload_len)
+static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_object *msg, const char *topic, const void *payload, size_t payload_len)
 {
     uint16_t packet_id;
     const char *str;
     char *full_msg = NULL;
-    int len;
+    size_t len;
 
     if (unlikely(!topic || topic[0] != '/')) {
         netdata_log_error("Full topic required!");
@@ -78,7 +70,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     json_object_put(msg);
 
     if (payload_len) {
-        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, strlen(V2_BIN_PAYLOAD_SEPARATOR));
+        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1);
         len += strlen(V2_BIN_PAYLOAD_SEPARATOR);
         memcpy(&full_msg[len], payload, payload_len);
     }
@@ -88,10 +80,6 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     if (rc == MQTT_WSS_ERR_TOO_BIG_FOR_SERVER)
         return HTTP_RESP_CONTENT_TOO_LONG;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    aclk_stats_msg_published(packet_id);
-#endif
-
     return 0;
 }
 
@@ -99,12 +87,14 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
  * Creates universal header common for all ACLK messages. User gets ownership of json object created.
  * Usually this is freed by send function after message has been sent.
  */
-static struct json_object *create_hdr(const char *type, const char *msg_id, time_t ts_secs, usec_t ts_us, int version)
+static struct json_object *create_hdr(const char *type, const char *msg_id)
 {
     nd_uuid_t uuid;
-    char uuid_str[36 + 1];
+    char uuid_str[UUID_STR_LEN];
     json_object *tmp;
     json_object *obj = json_object_new_object();
+    time_t ts_secs;
+    usec_t ts_us;
 
     tmp = json_object_new_string(type);
     json_object_object_add(obj, "type", tmp);
@@ -115,11 +105,9 @@ static struct json_object *create_hdr(const char *type, const char *msg_id, time
         msg_id = uuid_str;
     }
 
-    if (ts_secs == 0) {
-        ts_us = now_realtime_usec();
-        ts_secs = ts_us / USEC_PER_SEC;
-        ts_us = ts_us % USEC_PER_SEC;
-    }
+    ts_us = now_realtime_usec();
+    ts_secs = ts_us / USEC_PER_SEC;
+    ts_us = ts_us % USEC_PER_SEC;
 
     tmp = json_object_new_string(msg_id);
     json_object_object_add(obj, "msg-id", tmp);
@@ -144,7 +132,7 @@ static struct json_object *create_hdr(const char *type, const char *msg_id, time
     tmp = json_object_new_int64(aclk_session_us);
     json_object_object_add(obj, "connect-offset-usec", tmp);
 
-    tmp = json_object_new_int(version);
+    tmp = json_object_new_int(ACLK_HEADER_VERSION);
     json_object_object_add(obj, "version", tmp);
 
     return obj;
@@ -161,7 +149,7 @@ static struct json_object *create_hdr(const char *type, const char *msg_id, time
 void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char *msg_id, int http_code, int ec, const char* emsg, const char *payload, size_t payload_len)
 {
     json_object *tmp, *msg;
-    msg = create_hdr("http", msg_id, 0, 0, 2);
+    msg = create_hdr("http", msg_id);
     tmp = json_object_new_int(http_code);
     json_object_object_add(msg, "http-code", tmp);
 
@@ -176,11 +164,12 @@ void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char 
     }
 }
 
-int aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len)
+short aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created,
+    short http_code, const char *payload, size_t payload_len)
 {
     json_object *tmp, *msg;
 
-    msg = create_hdr("http", msg_id, 0, 0, 2);
+    msg = create_hdr("http", msg_id);
 
     tmp = json_object_new_int64(t_exec);
     json_object_object_add(msg, "t-exec", tmp);
@@ -191,7 +180,7 @@ int aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_
     tmp = json_object_new_int(http_code);
     json_object_object_add(msg, "http-code", tmp);
 
-    int rc = aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
+    short rc = aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
 
     switch (rc) {
         case HTTP_RESP_CONTENT_TOO_LONG:
@@ -200,12 +189,14 @@ int aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_
         case HTTP_RESP_INTERNAL_SERVER_ERROR:
             aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, payload, payload_len);
             break;
-        case HTTP_RESP_GATEWAY_TIMEOUT:
-        case HTTP_RESP_SERVICE_UNAVAILABLE:
-            aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
+//        case HTTP_RESP_SERVICE_UNAVAILABLE:
+//            aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
+//            break;
+        default:
+            rc = http_code;
             break;
     }
-    return rc ? rc : http_code;
+    return rc;
 }
 
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {

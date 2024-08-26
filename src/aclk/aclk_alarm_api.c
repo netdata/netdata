@@ -8,15 +8,6 @@
 
 #include "aclk.h"
 
-void aclk_send_provide_alarm_checkpoint(struct alarm_checkpoint *checkpoint)
-{
-    aclk_query_t query = aclk_query_new(ALARM_PROVIDE_CHECKPOINT);
-    query->data.bin_payload.payload = generate_alarm_checkpoint(&query->data.bin_payload.size, checkpoint);
-    query->data.bin_payload.topic = ACLK_TOPICID_ALARM_CHECKPOINT;
-    query->data.bin_payload.msg_name = "AlarmCheckpoint";
-    QUEUE_IF_PAYLOAD_PRESENT(query);
-}
-
 void aclk_send_alarm_log_entry(struct alarm_log_entry *log_entry)
 {
     size_t payload_size;
