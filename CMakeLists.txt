@@ -2830,8 +2830,6 @@ install(FILES src/collectors/python.d.plugin/python.d.conf
 
 install(FILES
         src/collectors/python.d.plugin/am2320/am2320.conf
-        src/collectors/python.d.plugin/anomalies/anomalies.conf
-        src/collectors/python.d.plugin/boinc/boinc.conf
         src/collectors/python.d.plugin/ceph/ceph.conf
         src/collectors/python.d.plugin/go_expvar/go_expvar.conf
         src/collectors/python.d.plugin/haproxy/haproxy.conf
@@ -2849,8 +2847,6 @@ install(FILES
 
 install(FILES
         src/collectors/python.d.plugin/am2320/am2320.chart.py
-        src/collectors/python.d.plugin/anomalies/anomalies.chart.py
-        src/collectors/python.d.plugin/boinc/boinc.chart.py
         src/collectors/python.d.plugin/ceph/ceph.chart.py
         src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
         src/collectors/python.d.plugin/haproxy/haproxy.chart.py

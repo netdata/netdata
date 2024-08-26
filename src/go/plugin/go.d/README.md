@@ -55,6 +55,7 @@ see the appropriate collector readme.
 | [apache](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/apache)                         |            Apache             |
 | [beanstalk](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/beanstalk)                   |           Beanstalk           |
 | [bind](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/bind)                             |           ISC Bind            |
+| [boinc](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/boinc)                           |             BOINC             |
 | [cassandra](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/cassandra)                   |           Cassandra           |
 | [chrony](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/chrony)                         |            Chrony             |
 | [clickhouse](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/clickhouse)                 |          ClickHouse           |

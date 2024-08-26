@@ -43,7 +43,7 @@ jobs:
       - name: Check source files
         id: check-source-files
         if: github.event_name != 'workflow_dispatch'
-        uses: tj-actions/changed-files@v44
+        uses: tj-actions/changed-files@v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -63,7 +63,7 @@ jobs:
       - name: Check build system files
         id: check-build-files
         if: github.event_name != 'workflow_dispatch'
-        uses: tj-actions/changed-files@v44
+        uses: tj-actions/changed-files@v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
