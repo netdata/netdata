@@ -1009,8 +1009,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Netapp ONTAP API](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/netapp_ontap_api.md)
 
-- [Samba](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/samba/integrations/samba.md)
-
 - [Starwind VSAN VSphere Edition](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/starwind_vsan_vsphere_edition.md)
 
 - [StoreCLI RAID](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/storcli/integrations/storecli_raid.md)
