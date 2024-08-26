@@ -82,12 +82,20 @@ Function NetdataConfigLeave
 
         StrLen $0 $cloudToken
         StrLen $1 $cloudRoom
-        ${If} $0 == 125
-        ${AndIf} $0 == 36
-                # We should start our new claiming software here
-                MessageBox MB_OK "$cloudToken | $cloudRoom | $startMsys"
+        ${If} $0 == 0
+        ${OrIf} $1 == 0
+                Goto runMsys
         ${EndIf}
 
+        ${If} $0 == 135
+        ${AndIf} $1 >= 36
+                nsExec::ExecToLog '$INSTDIR\usr\bin\netdata_claim.exe /T $cloudToken /R $cloudRoom'
+                pop $0
+        ${Else}
+                MessageBox MB_OK "The Cloud information does not have the expected length."
+        ${EndIf}
+
+        runMsys:
         ${If} $startMsys == 1
             nsExec::ExecToLog '$INSTDIR\msys2.exe'
             pop $0
