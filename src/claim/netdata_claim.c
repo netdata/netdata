@@ -59,6 +59,9 @@ static inline void netdata_claim_convert_str(char *dst, wchar_t *src, size_t len
 
 static int netdata_claim_prepare_strings()
 {
+    if (!token || !room)
+        return -1;
+
     size_t length = wcslen(token) + 1;
     aToken = calloc(sizeof(char), length);
     if (!aToken)
@@ -159,6 +162,7 @@ static inline void netdata_claim_create_process(char *cmd)
 
 static void netdata_claim_execute_command()
 {
+    char *usrPath = { "\\usr\\bin" };
     char runCmd[WINDOWS_MAX_PATH];
     DWORD length = GetCurrentDirectoryA(WINDOWS_MAX_PATH, runCmd);
     if (!length) {
@@ -166,9 +170,9 @@ static void netdata_claim_execute_command()
     }
 
     // When we run from installer, usr\bin is ommited, so we have to check its presence
-    if (!strstr(runCmd, "\\usr\\bin")) {
-        strncpy(&runCmd[length], "\\usr\\bin", 8);
-        length += 8;
+    if (!strstr(runCmd, usrPath)) {
+        strncpy(&runCmd[length], usrPath, sizeof(usrPath));
+        length += sizeof(usrPath);
         runCmd[length] = '\0';
     }
 

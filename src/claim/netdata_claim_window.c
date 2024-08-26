@@ -17,13 +17,13 @@ LRESULT CALLBACK WndProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM l
 {
     PAINTSTRUCT ps;
     HDC hdc;
-    LPCTSTR topMsg[] = { _T("                                         Help"),
-                         _T(" "),
-                         _T("In this initial version of the software, there are no fields for data"),
-                         _T(" entry. To claim your agent, you must use the following options:"),
-                         _T(" "),
-                         _T("/T TOKEN: The cloud token; "),
-                         _T("/R ROOMS: A list of rooms to claim;")};
+    LPCTSTR topMsg[] = { L"                                         Help",
+                         L" ",
+                         L"In this initial version of the software, there are no fields for data",
+                         L" entry. To claim your agent, you must use the following options:",
+                         L" ",
+                         L"/T TOKEN: The cloud token; ",
+                         L"/R ROOMS: A list of rooms to claim;"};
 
     switch (message)
     {
