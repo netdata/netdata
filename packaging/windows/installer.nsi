@@ -36,6 +36,10 @@ var hCloudToken
 var cloudToken
 var hCloudRoom
 var cloudRoom
+var hProxy
+var proxy
+var hInsecure
+var insecure
 
 Function .onInit
         nsExec::ExecToLog '$SYSDIR\sc.exe stop Netdata'
@@ -46,6 +50,7 @@ Function .onInit
         ${EndIf}
 
         StrCpy $startMsys ${BST_UNCHECKED}
+        StrCpy $insecure ${BST_UNCHECKED}
 FunctionEnd
 
 Function NetdataConfigPage
@@ -60,25 +65,36 @@ Function NetdataConfigPage
         ${NSD_CreateLabel} 0 0 100% 12u "Enter your Token and Cloud Room."
         ${NSD_CreateLabel} 0 15% 100% 12u "Optionally, you can open a terminal to execute additional commands."
 
-        ${NSD_CreateLabel} 0 35% 20% 10% "Token"
+        ${NSD_CreateLabel} 0 30% 20% 10% "Token"
         Pop $0
-        ${NSD_CreateText} 21% 35% 79% 10% ""
+        ${NSD_CreateText} 21% 30% 79% 10% ""
         Pop $hCloudToken
 
-        ${NSD_CreateLabel} 0 55% 20% 10% "Room"
+        ${NSD_CreateLabel} 0 45% 20% 10% "Room"
         Pop $0
-        ${NSD_CreateText} 21% 55% 79% 10% ""
+        ${NSD_CreateText} 21% 45% 79% 10% ""
         Pop $hCloudRoom
 
-        ${NSD_CreateCheckbox} 0 70% 100% 10u "Open terminal"
+        ${NSD_CreateLabel} 0 60% 20% 10% "Proxy"
+        Pop $0
+        ${NSD_CreateText} 21% 60% 79% 10% ""
+        Pop $hProxy
+
+        ${NSD_CreateCheckbox} 0 75% 100% 10u "Insecure connection"
+        Pop $hInsecure
+
+        ${NSD_CreateCheckbox} 0 90% 100% 10u "Open terminal"
         Pop $hStartMsys
+
         nsDialogs::Show
 FunctionEnd
 
 Function NetdataConfigLeave
         ${NSD_GetText} $hCloudToken $cloudToken
         ${NSD_GetText} $hCloudRoom $cloudRoom
+        ${NSD_GetText} $hProxy $proxy
         ${NSD_GetState} $hStartMsys $startMsys
+        ${NSD_GetState} $hInsecure $insecure
 
         StrLen $0 $cloudToken
         StrLen $1 $cloudRoom
@@ -89,7 +105,7 @@ Function NetdataConfigLeave
 
         ${If} $0 == 135
         ${AndIf} $1 >= 36
-                nsExec::ExecToLog '$INSTDIR\usr\bin\netdata_claim.exe /T $cloudToken /R $cloudRoom'
+                nsExec::ExecToLog '$INSTDIR\usr\bin\netdata_claim.exe /T $cloudToken /R $cloudRoom /P $proxy /I $insecure'
                 pop $0
         ${Else}
                 MessageBox MB_OK "The Cloud information does not have the expected length."
