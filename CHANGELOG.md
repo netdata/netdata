@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18421](https://github.com/netdata/netdata/pull/18421) ([netdatabot](https://github.com/netdatabot))
+- fix hyperlink in go.d samba meta [\#18420](https://github.com/netdata/netdata/pull/18420) ([ilyam8](https://github.com/ilyam8))
+- add go.d samba [\#18418](https://github.com/netdata/netdata/pull/18418) ([ilyam8](https://github.com/ilyam8))
+- restore /api/v1/badge.svg [\#18416](https://github.com/netdata/netdata/pull/18416) ([ktsaou](https://github.com/ktsaou))
+- add "smbstatus -P" to ndsudo [\#18414](https://github.com/netdata/netdata/pull/18414) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/sambsa [\#18413](https://github.com/netdata/netdata/pull/18413) ([ilyam8](https://github.com/ilyam8))
+- SPAWN-SERVER: re-evaluate signals even 500ms [\#18411](https://github.com/netdata/netdata/pull/18411) ([ktsaou](https://github.com/ktsaou))
 - kickstart: fix write\_claim\_config when executed as a regular user [\#18406](https://github.com/netdata/netdata/pull/18406) ([ilyam8](https://github.com/ilyam8))
 - Fix coverity issues [\#18405](https://github.com/netdata/netdata/pull/18405) ([stelfrag](https://github.com/stelfrag))
 - remove pyyaml2 [\#18404](https://github.com/netdata/netdata/pull/18404) ([ilyam8](https://github.com/ilyam8))
@@ -16,6 +23,7 @@
 - go.d boinc [\#18398](https://github.com/netdata/netdata/pull/18398) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/boinc [\#18397](https://github.com/netdata/netdata/pull/18397) ([ilyam8](https://github.com/ilyam8))
 - fix warnings in Dockerfile [\#18395](https://github.com/netdata/netdata/pull/18395) ([NicolasCARPi](https://github.com/NicolasCARPi))
+- Use existing ACLK event loop for cloud queries [\#18218](https://github.com/netdata/netdata/pull/18218) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.99.0](https://github.com/netdata/netdata/tree/v1.99.0) (2024-08-23)
 
@@ -410,16 +418,6 @@
 - DYNCFG: health, generate userconfig for incomplete alerts [\#17859](https://github.com/netdata/netdata/pull/17859) ([ktsaou](https://github.com/ktsaou))
 - Create retention charts for higher tiers [\#17855](https://github.com/netdata/netdata/pull/17855) ([stelfrag](https://github.com/stelfrag))
 - Bump github.com/vmware/govmomi from 0.37.2 to 0.37.3 in /src/go/collectors/go.d.plugin [\#17854](https://github.com/netdata/netdata/pull/17854) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump golang.org/x/net from 0.25.0 to 0.26.0 in /src/go/collectors/go.d.plugin [\#17852](https://github.com/netdata/netdata/pull/17852) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/docker/docker from 26.1.3+incompatible to 26.1.4+incompatible in /src/go/collectors/go.d.plugin [\#17851](https://github.com/netdata/netdata/pull/17851) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Delay retention check until agent has initialized [\#17850](https://github.com/netdata/netdata/pull/17850) ([stelfrag](https://github.com/stelfrag))
-- Fix tier statistics  [\#17849](https://github.com/netdata/netdata/pull/17849) ([stelfrag](https://github.com/stelfrag))
-- fix: check memory mode before creating dbengine retention chart [\#17848](https://github.com/netdata/netdata/pull/17848) ([ilyam8](https://github.com/ilyam8))
-- update dbengine retention chart family and priority [\#17847](https://github.com/netdata/netdata/pull/17847) ([ilyam8](https://github.com/ilyam8))
-- Remove unused variable [\#17846](https://github.com/netdata/netdata/pull/17846) ([stelfrag](https://github.com/stelfrag))
-- Properly initialize spinlock in ARAL. [\#17844](https://github.com/netdata/netdata/pull/17844) ([vkalintiris](https://github.com/vkalintiris))
-- Fix compilation without dbengine [\#17843](https://github.com/netdata/netdata/pull/17843) ([stelfrag](https://github.com/stelfrag))
-- explicitly disable removed collectors in python.d.conf [\#17840](https://github.com/netdata/netdata/pull/17840) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
