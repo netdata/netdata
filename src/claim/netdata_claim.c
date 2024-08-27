@@ -114,7 +114,7 @@ static void netdata_claim_error_exit(LPCTSTR function)
                     dw,
                     lpMsgBuf);
 
-    MessageBox(NULL, (LPCTSTR)lpDisplayBuf, TEXT("Error"), MB_OK);
+    MessageBoxA(NULL, (LPCTSTR)lpDisplayBuf, TEXT("Error"), MB_OK|MB_ICONERROR);
 
     LocalFree(lpMsgBuf);
     LocalFree(lpDisplayBuf);
@@ -125,8 +125,7 @@ static void netdata_claim_error_exit(LPCTSTR function)
 
 static inline void netdata_claim_create_process(char *cmd)
 {
-    /*
-    STARTUPINFO si;
+    STARTUPINFOA si;
     PROCESS_INFORMATION pi;
 
     ZeroMemory( &si, sizeof(si));
@@ -135,12 +134,7 @@ static inline void netdata_claim_create_process(char *cmd)
 
     if( !CreateProcessA(NULL,
                         cmd,
-                        NULL,
-                        NULL,
-                        FALSE,
-                        0,
-                        NULL,
-                        NULL,
+                        NULL, NULL, FALSE, 0, NULL, NULL,
                         &si,
                         &pi)
                         )
@@ -153,38 +147,66 @@ static inline void netdata_claim_create_process(char *cmd)
     CloseHandle( pi.hProcess );
     CloseHandle( pi.hThread );
 
+    // This Function does not get the child, so we are testing whether we could get the final result
     DWORD ret;
-    GetExitCodeProcess(pi.hProcess, ret);
+    GetExitCodeProcess(pi.hProcess, &ret);
+    if (ret)
+        MessageBoxA(NULL, cmd, "Error: Cannot run the command!", MB_OK|MB_ICONERROR);
+}
 
-     //TODO: WORK WITH ERRORS:
-     */
+static inline int netdata_claim_prepare_data(char *out, size_t length)
+{
+    return snprintf(out,
+                    length,
+                    "[global]\n    url = https://app.netdata.cloud\n    token = %s\n   rooms = %s",
+                    aToken,
+                    aRoom
+                    );
+}
+
+static void netdata_claim_write_config(char *path)
+{
+    char configPath[WINDOWS_MAX_PATH + 1];
+    char data[WINDOWS_MAX_PATH + 1];
+    snprintf(configPath, WINDOWS_MAX_PATH - 1, "%s\\etc\\netdata\\claim.conf", path);
+
+    HANDLE hf = CreateFileA(configPath, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hf == INVALID_HANDLE_VALUE)
+        netdata_claim_error_exit(TEXT("CreateFileA"));
+
+    DWORD length = netdata_claim_prepare_data(data, WINDOWS_MAX_PATH);
+    DWORD written = 0;
+
+    BOOL ret = WriteFile(hf, data, length, &written, NULL);
+    if (!ret)
+        netdata_claim_error_exit(TEXT("WriteFileA"));
+
+    if (length != written)
+        MessageBoxW(NULL, L"Cannot write claim.conf.", L"Error", MB_OK|MB_ICONERROR);
+
+    CloseHandle(hf);
 }
 
 static void netdata_claim_execute_command()
 {
     char *usrPath = { "\\usr\\bin" };
+    char basePath[WINDOWS_MAX_PATH];
     char runCmd[WINDOWS_MAX_PATH];
-    DWORD length = GetCurrentDirectoryA(WINDOWS_MAX_PATH, runCmd);
+    DWORD length = GetCurrentDirectoryA(WINDOWS_MAX_PATH, basePath);
     if (!length) {
         netdata_claim_error_exit(TEXT("GetCurrentDirectoryA"));
     }
 
-    // When we run from installer, usr\bin is ommited, so we have to check its presence
-    if (!strstr(runCmd, usrPath)) {
-        strncpy(&runCmd[length], usrPath, sizeof(usrPath));
-        length += sizeof(usrPath);
-        runCmd[length] = '\0';
+    if (strstr(basePath, usrPath)) {
+        length -= 7;
+        basePath[length] = '\0';
     }
 
-    char *path = strdup(runCmd);
-
-    snprintf(&runCmd[length], WINDOWS_MAX_PATH - length,
-             "\\bash.exe -c \"%s\\netdata-claim.sh --claim-token %s --claim-rooms %s --claim-url https://app.netdata.cloud\"",
-             path, aToken, aRoom);
+    snprintf(runCmd, WINDOWS_MAX_PATH - length,
+             "msys2_shell.cmd -c \"chmod 0640 %s/etc/netdata/claim.conf; %s/usr/bin/netdatacli reload-claiming-state\"",
+             basePath);
 
     netdata_claim_create_process(runCmd);
-
-    free(path);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
