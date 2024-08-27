@@ -23,8 +23,8 @@ LRESULT CALLBACK WndProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM l
                          L" entry. To claim your agent, you must use the following options:",
                          L" ",
                          L"/T TOKEN: The cloud token;",
-                         L"/R ROOMS: A list of rooms to claim;"
-                         L"/P PROXY: The proxy information;"
+                         L"/R ROOMS: A list of rooms to claim;",
+                         L"/P PROXY: The proxy information;",
                          L"/I      : Use insecure connection;"
     };
 
@@ -83,7 +83,7 @@ int netdata_claim_window_loop(HINSTANCE hInstance, int nCmdShow)
                                       L"Netdata Claim",
                                       WS_OVERLAPPEDWINDOW,
                                       CW_USEDEFAULT, CW_USEDEFAULT,
-                                      460, 280,
+                                      460, 220,
                                       NULL,
                                       NULL,
                                       hInstance,
