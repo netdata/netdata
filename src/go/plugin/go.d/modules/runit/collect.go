@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build !windows
-// +build !windows
-
 package runit
 
 const hintDimensions = hintServices * (6 + 2) // There are 8 dimensions per service.
