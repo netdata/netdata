@@ -8,5 +8,6 @@
 
 extern LPWSTR token;
 extern LPWSTR room;
+extern LPWSTR proxy;
 
 #endif //NETDATA_CLAIM_H_

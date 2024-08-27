@@ -22,8 +22,11 @@ LRESULT CALLBACK WndProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM l
                          L"In this initial version of the software, there are no fields for data",
                          L" entry. To claim your agent, you must use the following options:",
                          L" ",
-                         L"/T TOKEN: The cloud token; ",
-                         L"/R ROOMS: A list of rooms to claim;"};
+                         L"/T TOKEN: The cloud token;",
+                         L"/R ROOMS: A list of rooms to claim;"
+                         L"/P PROXY: The proxy information;"
+                         L"/I      : Use insecure connection;"
+    };
 
     switch (message)
     {
@@ -80,7 +83,7 @@ int netdata_claim_window_loop(HINSTANCE hInstance, int nCmdShow)
                                       L"Netdata Claim",
                                       WS_OVERLAPPEDWINDOW,
                                       CW_USEDEFAULT, CW_USEDEFAULT,
-                                      460, 180,
+                                      460, 280,
                                       NULL,
                                       NULL,
                                       hInstance,

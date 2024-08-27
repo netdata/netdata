@@ -13,10 +13,13 @@
 
 LPWSTR token = NULL;
 LPWSTR room = NULL;
+LPWSTR proxy = NULL;
 LPWSTR *argv = NULL;
 
 char *aToken = NULL;
 char *aRoom = NULL;
+char *aProxy = NULL;
+int insecure = 0;
 
 /**
  *  Parse Args
@@ -33,16 +36,27 @@ int nd_claim_parse_args(int argc, LPWSTR *argv)
     int i;
     for (i = 1 ; i < argc; i++) {
         // We are working with Microsoft, thus it does not make sense wait for only smallcase
-        if(wcscasecmp(L"claim-token", argv[i]) == 0 ||
-           wcscasecmp(L"/T", argv[i]) == 0) {
+        if(wcscasecmp(L"/T", argv[i]) == 0) {
             i++;
             token = argv[i];
         }
 
-        if(wcscasecmp(L"claim-rooms", argv[i]) == 0 ||
-           wcscasecmp(L"/R", argv[i]) == 0) {
+        if(wcscasecmp(L"/R", argv[i]) == 0) {
             i++;
             room = argv[i];
+        }
+
+        if(wcscasecmp(L"/P", argv[i]) == 0) {
+            i++;
+            proxy = argv[i];
+        }
+
+        if(wcscasecmp(L"/I", argv[i]) == 0) {
+            i++;
+            if (i < argc)
+                insecure = atoi(argv[i]);
+            else
+                insecure = 1;
         }
     }
 
@@ -76,6 +90,14 @@ static int netdata_claim_prepare_strings()
 
     netdata_claim_convert_str(aRoom, room, length - 1);
 
+    if (proxy) {
+        length = wcslen(proxy) + 1;
+        aProxy = calloc(sizeof(char), length - 1);
+        if (!aProxy)
+            return -1;
+
+        netdata_claim_convert_str(aProxy, proxy, length - 1);
+    }
     return 0;
 }
 
@@ -84,8 +106,12 @@ static void netdata_claim_exit_callback(int signal)
     (void)signal;
     if (aToken)
         free(aToken);
+
     if (aRoom)
         free(aRoom);
+
+    if (aProxy)
+        free(aProxy);
 
     if (argv)
         LocalFree(argv);
@@ -156,11 +182,16 @@ static inline void netdata_claim_create_process(char *cmd)
 
 static inline int netdata_claim_prepare_data(char *out, size_t length)
 {
+    char *proxyLabel = (aProxy) ? "proxy = " : "";
+    char *proxyValue = (aProxy) ? aProxy : "";
     return snprintf(out,
                     length,
-                    "[global]\n    url = https://app.netdata.cloud\n    token = %s\n   rooms = %s",
+                    "[global]\n    url = https://app.netdata.cloud\n    token = %s\n   rooms = %s\n    %s%s\n    Insecure = %s",
                     aToken,
-                    aRoom
+                    aRoom,
+                    proxyLabel,
+                    proxyValue,
+                    (insecure) ? "YES" : "NO"
                     );
 }
 
