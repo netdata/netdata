@@ -95,12 +95,12 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
 }
 
 void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *key, bool add_version) {
+    if(add_version)
+        buffer_json_member_add_uint64(wb, "version", 1);
+
     spinlock_lock(&host->rrdpush.path.spinlock);
     buffer_json_member_add_array(wb, key);
     {
-        if(add_version)
-            buffer_json_member_add_uint64(wb, "version", 1);
-
         buffer_json_add_array_item_object(wb);
         {
             STREAM_PATH tmp = rrdhost_stream_path_self(host);
