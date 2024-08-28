@@ -349,8 +349,10 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     rrdpush_sender_charts_and_replication_reset(host);
 
     // clear the parent's claim id
-    rrdpush_sender_clear_child_claim_id(host);
+    rrdpush_sender_clear_parent_claim_id(host);
     rrdpush_receiver_send_node_and_claim_id_to_child(host);
+
+    stream_path_parent_disconnected(host);
 }
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host) {
@@ -1172,25 +1174,60 @@ static void execute_commands_function(struct sender_state *s, const char *comman
     }
 }
 
-static void cleanup_intercepting_input(struct sender_state *s) {
-    freez((void *)s->functions.transaction);
-    freez((void *)s->functions.timeout_s);
-    freez((void *)s->functions.function);
-    freez((void *)s->functions.access);
-    freez((void *)s->functions.source);
-    buffer_free(s->functions.payload);
+struct deferred_function {
+    const char *transaction;
+    const char *timeout_s;
+    const char *function;
+    const char *access;
+    const char *source;
+};
 
-    s->functions.transaction = NULL;
-    s->functions.timeout_s = NULL;
-    s->functions.function = NULL;
-    s->functions.payload = NULL;
-    s->functions.access = NULL;
-    s->functions.source = NULL;
-    s->functions.intercept_input = false;
+static void execute_deferred_function(struct sender_state *s, void *data) {
+    struct deferred_function *dfd = data;
+    execute_commands_function(s, s->defer.end_keyword,
+                              dfd->transaction, dfd->timeout_s,
+                              dfd->function, s->defer.payload,
+                              dfd->access, dfd->source);
+}
+
+static void execute_deferred_json(struct sender_state *s, void *data) {
+    const char *keyword = data;
+
+    if(strcmp(keyword, PLUGINSD_KEYWORD_STREAM_PATH) == 0)
+        stream_path_set_from_json(s->host, buffer_tostring(s->defer.payload));
+    else
+        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM: unknown JSON keyword '%s' with payload: %s", keyword, buffer_tostring(s->defer.payload));
+}
+
+static void cleanup_deferred_json(struct sender_state *s __maybe_unused, void *data) {
+    const char *keyword = data;
+    freez((void *)keyword);
+}
+
+static void cleanup_deferred_function(struct sender_state *s __maybe_unused, void *data) {
+    struct deferred_function *dfd = data;
+    freez((void *)dfd->transaction);
+    freez((void *)dfd->timeout_s);
+    freez((void *)dfd->function);
+    freez((void *)dfd->access);
+    freez((void *)dfd->source);
+    freez(dfd);
+}
+
+static void cleanup_deferred_data(struct sender_state *s) {
+    if(s->defer.cleanup)
+        s->defer.cleanup(s, s->defer.action_data);
+
+    buffer_free(s->defer.payload);
+    s->defer.payload = NULL;
+    s->defer.end_keyword = NULL;
+    s->defer.action = NULL;
+    s->defer.cleanup = NULL;
+    s->defer.action_data = NULL;
 }
 
 static void execute_commands_cleanup(struct sender_state *s) {
-    cleanup_intercepting_input(s);
+    cleanup_deferred_data(s);
 }
 
 // This is just a placeholder until the gap filling state machine is inserted
@@ -1209,8 +1246,8 @@ void execute_commands(struct sender_state *s) {
         newline = strchr(start, '\n');
 
         if(!newline) {
-            if(s->functions.intercept_input) {
-                buffer_strcat(s->functions.payload, start);
+            if(s->defer.end_keyword) {
+                buffer_strcat(s->defer.payload, start);
                 start = end;
             }
             break;
@@ -1219,19 +1256,14 @@ void execute_commands(struct sender_state *s) {
         *newline = '\0';
         s->line.count++;
 
-        if(s->functions.intercept_input) {
-            if(strcmp(start, PLUGINSD_CALL_FUNCTION_PAYLOAD_END) == 0) {
-                execute_commands_function(s,
-                    PLUGINSD_CALL_FUNCTION_PAYLOAD_END,
-                                          s->functions.transaction, s->functions.timeout_s,
-                                          s->functions.function, s->functions.payload,
-                                          s->functions.access, s->functions.source);
-
-                cleanup_intercepting_input(s);
+        if(s->defer.end_keyword) {
+            if(strcmp(start, s->defer.end_keyword) == 0) {
+                s->defer.action(s, s->defer.action_data);
+                cleanup_deferred_data(s);
             }
             else {
-                buffer_strcat(s->functions.payload, start);
-                buffer_fast_charcat(s->functions.payload, '\n');
+                buffer_strcat(s->defer.payload, start);
+                buffer_putc(s->defer.payload, '\n');
             }
 
             continue;
@@ -1257,14 +1289,20 @@ void execute_commands(struct sender_state *s) {
             char *source       = get_word(s->line.words, s->line.num_words, 5);
             char *content_type = get_word(s->line.words, s->line.num_words, 6);
 
-            s->functions.transaction = strdupz(transaction ? transaction : "");
-            s->functions.timeout_s = strdupz(timeout_s ? timeout_s : "");
-            s->functions.function = strdupz(function ? function : "");
-            s->functions.access = strdupz(access ? access : "");
-            s->functions.source = strdupz(source ? source : "");
-            s->functions.payload = buffer_create(0, NULL);
-            s->functions.payload->content_type = content_type_string2id(content_type);
-            s->functions.intercept_input = true;
+            s->defer.end_keyword = PLUGINSD_CALL_FUNCTION_PAYLOAD_END;
+            s->defer.payload = buffer_create(0, NULL);
+            s->defer.payload->content_type = content_type_string2id(content_type);
+            s->defer.action = execute_deferred_function;
+            s->defer.cleanup = cleanup_deferred_function;
+
+            struct deferred_function *dfd = callocz(1, sizeof(*dfd));
+            dfd->transaction = strdupz(transaction ? transaction : "");
+            dfd->timeout_s = strdupz(timeout_s ? timeout_s : "");
+            dfd->function = strdupz(function ? function : "");
+            dfd->access = strdupz(access ? access : "");
+            dfd->source = strdupz(source ? source : "");
+
+            s->defer.action_data = dfd;
         }
         else if(command && strcmp(command, PLUGINSD_CALL_FUNCTION_CANCEL) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
@@ -1311,6 +1349,15 @@ void execute_commands(struct sender_state *s) {
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_NODE_ID) == 0) {
             rrdpush_sender_get_node_and_claim_id_from_parent(s);
+        }
+        else if(command && strcmp(command, PLUGINSD_KEYWORD_JSON) == 0) {
+            char *keyword = get_word(s->line.words, s->line.num_words, 1);
+
+            s->defer.end_keyword = PLUGINSD_KEYWORD_JSON_END;
+            s->defer.payload = buffer_create(0, NULL);
+            s->defer.action = execute_deferred_json;
+            s->defer.cleanup = cleanup_deferred_json;
+            s->defer.action_data = strdupz(keyword);
         }
         else {
             netdata_log_error("STREAM %s [send to %s] received unknown command over connection: %s",
@@ -1688,6 +1735,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 break;
 
             now_s = s->last_traffic_seen_t = now_monotonic_sec();
+            stream_path_send_to_parent(s->host);
             rrdpush_sender_send_claimed_id(s->host);
             rrdpush_send_host_labels(s->host);
             rrdpush_send_global_functions(s->host);

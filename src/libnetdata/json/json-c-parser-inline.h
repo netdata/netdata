@@ -137,7 +137,6 @@
     }                                                                                                           \
 } while(0)
 
-
 #define JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, member, converter, dst, error, required) do {      \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string))              \

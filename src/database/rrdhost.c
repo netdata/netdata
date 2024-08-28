@@ -36,13 +36,13 @@ time_t rrdhost_free_ephemeral_time_s = 86400;
 
 RRDHOST *find_host_by_node_id(char *node_id) {
 
-    nd_uuid_t node_uuid;
-    if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
+    ND_UUID node_uuid;
+    if (unlikely(!node_id || uuid_parse(node_id, node_uuid.uuid)))
         return NULL;
 
     RRDHOST *host, *ret = NULL;
     dfe_start_read(rrdhost_root_index, host) {
-        if (uuid_eq(host->node_id, node_uuid)) {
+        if (UUIDeq(host->node_id, node_uuid)) {
             ret = host;
             break;
         }
@@ -423,7 +423,7 @@ static RRDHOST *rrdhost_create(
     if(!host->rrdvars)
         host->rrdvars = rrdvariables_create();
 
-    if (likely(!uuid_parse(host->machine_guid, host->host_uuid)))
+    if (likely(!uuid_parse(host->machine_guid, host->host_id.uuid)))
         sql_load_node_id(host);
     else
         error_report("Host machine GUID %s is not valid", host->machine_guid);
@@ -1117,7 +1117,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     global_functions_add();
 
     if (likely(system_info)) {
-        detect_machine_guid_change(&localhost->host_uuid);
+        detect_machine_guid_change(&localhost->host_id.uuid);
         sql_aclk_sync_init();
         api_v1_management_init();
     }
@@ -1228,6 +1228,10 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
         if (host->prev)
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(localhost, host, prev, next);
     }
+
+    // ------------------------------------------------------------------------
+
+    rrdhost_stream_path_clear(host, true);
 
     // ------------------------------------------------------------------------
     // clean up streaming chart slots

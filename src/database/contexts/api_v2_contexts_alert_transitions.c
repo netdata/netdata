@@ -373,8 +373,8 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
             if(host) {
                 buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
 
-                if(!uuid_is_null(host->node_id))
-                    buffer_json_member_add_uuid(wb, "node_id", host->node_id);
+                if(!UUIDiszero(host->node_id))
+                    buffer_json_member_add_uuid(wb, "node_id", host->node_id.uuid);
             }
 
             buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);

@@ -83,7 +83,7 @@ static uint64_t bearer_token_signature(nd_uuid_t token, struct bearer_token *bt)
         .created_s = bt->created_s,
         .expires_s = bt->expires_s,
     };
-    uuid_copy(signature_payload.host_uuid, localhost->host_uuid);
+    uuid_copy(signature_payload.host_uuid, localhost->host_id.uuid);
     uuid_copy(signature_payload.token, token);
     uuid_copy(signature_payload.cloud_account_id, bt->cloud_account_id);
     memset(signature_payload.client_name, 0, sizeof(signature_payload.client_name));
@@ -96,7 +96,7 @@ static bool bearer_token_save_to_file(nd_uuid_t token, struct bearer_token *bt) 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_uint64(wb, "version", 1);
-    buffer_json_member_add_uuid(wb, "host_uuid", localhost->host_uuid);
+    buffer_json_member_add_uuid(wb, "host_uuid", localhost->host_id.uuid);
     buffer_json_member_add_uuid(wb, "token", token);
     buffer_json_member_add_uuid(wb, "cloud_account_id", bt->cloud_account_id);
     buffer_json_member_add_string(wb, "client_name", bt->client_name);
@@ -207,7 +207,7 @@ static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, B
         return false;
     }
 
-    if(uuid_compare(host_uuid, localhost->host_uuid) != 0) {
+    if(uuid_compare(host_uuid, localhost->host_id.uuid) != 0) {
         buffer_flush(error);
         buffer_strcat(error, "Host UUID in JSON file does not match our host UUID");
         return false;

@@ -4,18 +4,18 @@
 #include "collectors/plugins.d/pluginsd_internals.h"
 
 // the child disconnected from the parent, and it has to clear the parent's claim id
-void rrdpush_sender_clear_child_claim_id(RRDHOST *host) {
+void rrdpush_sender_clear_parent_claim_id(RRDHOST *host) {
     host->aclk.claim_id_of_parent = UUID_ZERO;
 }
 
 // the parent sends to the child its claim id, node id and cloud url
 void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
-    if(host == localhost || uuid_is_null(host->node_id)) return;
+    if(host == localhost || UUIDiszero(host->node_id)) return;
 
     spinlock_lock(&host->receiver_lock);
     if(host->receiver && stream_has_capability(host->receiver, STREAM_CAP_NODE_ID)) {
         char node_id_str[UUID_STR_LEN] = "";
-        uuid_unparse_lower(host->node_id, node_id_str);
+        uuid_unparse_lower(host->node_id.uuid, node_id_str);
 
         CLAIM_ID claim_id = claim_id_get();
 
@@ -68,7 +68,7 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
                "STREAM %s [send to %s] changed parent's claim id to %s",
                rrdhost_hostname(s->host), s->connected_to, claim_id ? claim_id : "(unset)");
 
-    if(!uuid_is_null(s->host->node_id) && uuid_compare(s->host->node_id, node_uuid.uuid) != 0) {
+    if(!UUIDiszero(s->host->node_id) && !UUIDeq(s->host->node_id, node_uuid)) {
         if(claimed) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM %s [send to %s] parent reports different node id '%s', but we are claimed. Ignoring it.",
@@ -105,8 +105,8 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
         // we are directly claimed and connected, ignore node id and cloud url
         return;
 
-    if(uuid_is_null(s->host->node_id))
-        uuid_copy(s->host->node_id, node_uuid.uuid);
+    if(UUIDiszero(s->host->node_id))
+        s->host->node_id = node_uuid;
 
     // we change the URL, to allow the agent dashboard to work with Netdata Cloud on-prem, if any.
     cloud_config_url_set(url);

@@ -399,8 +399,8 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
 
     char node_uuid[UUID_STR_LEN] = "";
 
-    if(!uuid_is_null(host->node_id))
-        uuid_unparse_lower(host->node_id, node_uuid);
+    if(!UUIDiszero(host->node_id))
+        uuid_unparse_lower(host->node_id.uuid, node_uuid);
 
     if(after != 0 && before != 0)
         rrdr_relative_window_to_absolute_query(&after, &before, NULL, false);

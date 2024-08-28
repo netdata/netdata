@@ -372,10 +372,10 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error)
 
     if (!rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST)) {
         rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
-        sql_set_host_label(&host->host_uuid, "_is_ephemeral", "true");
+        sql_set_host_label(&host->host_id.uuid, "_is_ephemeral", "true");
         aclk_host_state_update(host, 0, 0);
         unregister_node(host->machine_guid);
-        uuid_clear(host->node_id);
+        host->node_id = UUID_ZERO;
         buffer_sprintf(wb, "Unregistering node with machine guid %s, hostname = %s", host->machine_guid, rrdhost_hostname(host));
         rrd_wrlock();
         rrdhost_free___while_having_rrd_wrlock(host, true);
@@ -517,7 +517,7 @@ static void pipe_write_cb(uv_write_t* req, int status)
 
 static inline void add_char_to_command_reply(BUFFER *reply_string, unsigned *reply_string_size, char character)
 {
-    buffer_fast_charcat(reply_string, character);
+    buffer_putc(reply_string, character);
     *reply_string_size +=1;
 }
 

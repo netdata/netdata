@@ -166,8 +166,8 @@ bool load_claiming_state(void) {
         have_claimed_id = true;
     }
 
-    invalidate_node_instances(&localhost->host_uuid, have_claimed_id ? &uuid.uuid : NULL);
-    metaqueue_store_claim_id(&localhost->host_uuid, have_claimed_id ? &uuid.uuid : NULL);
+    invalidate_node_instances(&localhost->host_id.uuid, have_claimed_id ? &uuid.uuid : NULL);
+    metaqueue_store_claim_id(&localhost->host_id.uuid, have_claimed_id ? &uuid.uuid : NULL);
 
     errno_clear();
 
@@ -197,7 +197,7 @@ CLOUD_STATUS claim_reload_and_wait_online(void) {
         int ms = 0;
         do {
             status = cloud_status();
-            if ((status == CLOUD_STATUS_ONLINE || status == CLOUD_STATUS_INDIRECT) && !uuid_is_null(localhost->host_uuid))
+            if ((status == CLOUD_STATUS_ONLINE || status == CLOUD_STATUS_INDIRECT) && !UUIDiszero(localhost->host_id))
                 break;
 
             sleep_usec(50 * USEC_PER_MS);

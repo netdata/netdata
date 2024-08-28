@@ -897,9 +897,9 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     QUERY_TARGET *qt = qtl->qt;
     QUERY_NODE *qn = query_node_allocate(qt, host);
 
-    if(!uuid_is_null(host->node_id)) {
+    if(!UUIDiszero(host->node_id)) {
         if(!qtl->host_node_id_str[0])
-            uuid_unparse_lower(host->node_id, qn->node_id);
+            uuid_unparse_lower(host->node_id.uuid, qn->node_id);
         else
             memcpy(qn->node_id, qtl->host_node_id_str, sizeof(qn->node_id));
     }
@@ -1120,8 +1120,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     }
 
     if(host) {
-        if(!uuid_is_null(host->node_id))
-            uuid_unparse_lower(host->node_id, qtl.host_node_id_str);
+        if(!UUIDiszero(host->node_id))
+            uuid_unparse_lower(host->node_id.uuid, qtl.host_node_id_str);
         else
             qtl.host_node_id_str[0] = '\0';
 

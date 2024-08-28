@@ -388,7 +388,7 @@ static void aclk_synchronization(void *arg)
                     int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
                     struct aclk_sync_cfg_t *ahc = host->aclk_config;
                     if (unlikely(!ahc))
-                        create_aclk_config(host, &host->host_uuid, &host->node_id);
+                        create_aclk_config(host, &host->host_id.uuid, &host->node_id.uuid);
                     aclk_host_state_update(host, live, 1);
                     break;
                 case ACLK_DATABASE_NODE_UNREGISTER:
@@ -465,8 +465,8 @@ void create_aclk_config(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __may
         uuid_unparse_lower(*node_id, wc->node_id);
 
     host->aclk_config = wc;
-    if (node_id && uuid_is_null(host->node_id)) {
-        uuid_copy(host->node_id, *node_id);
+    if (node_id && UUIDiszero(host->node_id)) {
+        uuid_copy(host->node_id.uuid, *node_id);
     }
 
     wc->host = host;

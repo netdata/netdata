@@ -41,7 +41,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
         buffer_json_member_add_object(wb, "agent");
 
     buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
-    buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
+    buffer_json_member_add_uuid(wb, "nd", localhost->node_id.uuid);
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
     buffer_json_member_add_time_t(wb, "now", now_s);
 

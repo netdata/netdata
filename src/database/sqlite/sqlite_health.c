@@ -161,7 +161,7 @@ static void insert_alert_queue(
     int submit_delay = calculate_delay(old_status, new_status);
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)health_log_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, unique_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, alarm_id));
@@ -253,7 +253,7 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->alarm_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->config_hash_id, sizeof(ae->config_hash_id), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->name));
@@ -310,7 +310,7 @@ void sql_health_alarm_log_cleanup(RRDHOST *host)
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)host->health_log.health_log_history));
 
     param = 0;
@@ -339,7 +339,7 @@ bool sql_update_transition_in_health_log(RRDHOST *host, uint32_t alarm_id, nd_uu
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, transition_id, sizeof(*transition_id), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)alarm_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, last_transition, sizeof(*last_transition), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     param = 0;
     rc = execute_insert(res);
@@ -454,7 +454,7 @@ uint32_t sql_get_max_unique_id (RRDHOST *host)
         return 0;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW)
@@ -480,7 +480,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
@@ -514,7 +514,7 @@ static void sql_remove_alerts_from_deleted_charts(RRDHOST *host, nd_uuid_t *host
     sqlite3_stmt *res = NULL;
     int ret;
 
-    nd_uuid_t *actual_uuid = host ? &host->host_uuid : host_uuid;
+    nd_uuid_t *actual_uuid = host ? &host->host_id.uuid : host_uuid;
     if (!actual_uuid)
         return;
 
@@ -595,7 +595,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     DICTIONARY *all_rrdcalcs = dictionary_create(
         DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
@@ -887,7 +887,7 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
         return ret;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, (int) ae->alarm_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, (int) ae->unique_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, (uint32_t) HEALTH_ENTRY_FLAG_EXEC_RUN));
@@ -950,7 +950,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
      stmt_query = *active_stmt;
 
      int param = 0;
-     rc = sqlite3_bind_blob(stmt_query, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+     rc = sqlite3_bind_blob(stmt_query, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC);
      if (unlikely(rc != SQLITE_OK)) {
          error_report("Failed to bind host_id for SQL_SELECT_HEALTH_LOG.");
          goto finish;
@@ -1233,7 +1233,7 @@ uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *
         return alarm_id;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, chart));
     SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, name));
 

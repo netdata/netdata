@@ -255,16 +255,16 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
         return;
 
     if (unlikely(!node_id)) {
-        uuid_clear(host->node_id);
+        host->node_id = UUID_ZERO;
         return;
     }
 
     struct aclk_sync_cfg_t  *wc = host->aclk_config;
 
-    uuid_copy(host->node_id, *node_id);
+    uuid_copy(host->node_id.uuid, *node_id);
 
     if (unlikely(!wc))
-        create_aclk_config(host, &host->host_uuid, node_id);
+        create_aclk_config(host, &host->host_id.uuid, node_id);
     else
         uuid_unparse_lower(*node_id, wc->node_id);
 
@@ -451,7 +451,7 @@ struct node_instance_list *get_node_list(void)
             node_list[row].live =
                 (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
             node_list[row].hops = host->system_info ? host->system_info->hops :
-                                  uuid_eq(*host_id, localhost->host_uuid) ? 0 : 1;
+                                  uuid_eq(*host_id, localhost->host_id.uuid) ? 0 : 1;
             node_list[row].hostname =
                 sqlite3_column_bytes(res, 2) ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
         }
@@ -480,7 +480,7 @@ void sql_load_node_id(RRDHOST *host)
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     param = 0;
     int rc = sqlite3_step_monitored(res);
@@ -940,7 +940,7 @@ static int store_host_metadata(RRDHOST *host)
         return false;
 
     int param = 0;
-    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_hostname(host), 0));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_registry_hostname(host), 1));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->rrd_update_every));
@@ -1010,30 +1010,30 @@ static bool store_host_systeminfo(RRDHOST *host)
 
     int ret = 0;
 
-    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_NAME", system_info->container_os_name, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_ID", system_info->container_os_id, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_ID_LIKE", system_info->container_os_id_like, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_VERSION", system_info->container_os_version, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_VERSION_ID", system_info->container_os_version_id, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_DETECTION", system_info->host_os_detection, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_NAME", system_info->host_os_name, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_ID", system_info->host_os_id, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_ID_LIKE", system_info->host_os_id_like, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_VERSION", system_info->host_os_version, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_VERSION_ID", system_info->host_os_version_id, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_DETECTION", system_info->host_os_detection, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_KERNEL_NAME", system_info->kernel_name, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", system_info->host_cores, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_CPU_FREQ", system_info->host_cpu_freq, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_TOTAL_RAM", system_info->host_ram_total, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_TOTAL_DISK_SIZE", system_info->host_disk_space, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_KERNEL_VERSION", system_info->kernel_version, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_ARCHITECTURE", system_info->architecture, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_VIRTUALIZATION", system_info->virtualization, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_VIRT_DETECTION", system_info->virt_detection, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_CONTAINER", system_info->container, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_CONTAINER_DETECTION", system_info->container_detection, &host->host_uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_IS_K8S_NODE", system_info->is_k8s_node, &host->host_uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_NAME", system_info->container_os_name, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_ID", system_info->container_os_id, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_ID_LIKE", system_info->container_os_id_like, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_VERSION", system_info->container_os_version, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_VERSION_ID", system_info->container_os_version_id, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_DETECTION", system_info->host_os_detection, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_NAME", system_info->host_os_name, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_ID", system_info->host_os_id, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_ID_LIKE", system_info->host_os_id_like, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_VERSION", system_info->host_os_version, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_VERSION_ID", system_info->host_os_version_id, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_DETECTION", system_info->host_os_detection, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_KERNEL_NAME", system_info->kernel_name, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", system_info->host_cores, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_CPU_FREQ", system_info->host_cpu_freq, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_TOTAL_RAM", system_info->host_ram_total, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_TOTAL_DISK_SIZE", system_info->host_disk_space, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_KERNEL_VERSION", system_info->kernel_version, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_ARCHITECTURE", system_info->architecture, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_VIRTUALIZATION", system_info->virtualization, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_VIRT_DETECTION", system_info->virt_detection, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_CONTAINER", system_info->container, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_CONTAINER_DETECTION", system_info->container_detection, &host->host_id.uuid);
+    ret += add_host_sysinfo_key_value("NETDATA_HOST_IS_K8S_NODE", system_info->is_k8s_node, &host->host_id.uuid);
 
     return !(24 == ret);
 }
@@ -1052,7 +1052,7 @@ static int store_chart_metadata(RRDSET *st)
 
     int param = 0;
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &st->chart_uuid, sizeof(st->chart_uuid), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &st->rrdhost->host_uuid, sizeof(st->rrdhost->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &st->rrdhost->host_id.uuid, sizeof(st->rrdhost->host_id.uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, string2str(st->parts.type), -1, SQLITE_STATIC));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, string2str(st->parts.id), -1, SQLITE_STATIC));
 
@@ -1915,13 +1915,13 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_LABELS);
 
-            int rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_uuid);
+            int rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_id.uuid);
             if (likely(!rc)) {
                 query_counter++;
 
                 buffer_flush(work_buffer);
                 struct query_build tmp = {.sql = work_buffer, .count = 0};
-                uuid_unparse_lower(host->host_uuid, tmp.uuid_str);
+                uuid_unparse_lower(host->host_id.uuid, tmp.uuid_str);
                 rrdlabels_walkthrough_read(host->rrdlabels, host_label_store_to_sql_callback, &tmp);
                 buffer_strcat(work_buffer, " ON CONFLICT (host_id, label_key) DO UPDATE SET source_type = excluded.source_type, label_value=excluded.label_value, date_created=UNIXEPOCH()");
                 rc = db_execute(db_meta, buffer_tostring(work_buffer));
@@ -1943,9 +1943,9 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
             int rc;
             ND_UUID uuid = claim_id_get_uuid();
             if(!UUIDiszero(uuid))
-                rc = store_claim_id(&host->host_uuid, &uuid.uuid);
+                rc = store_claim_id(&host->host_id.uuid, &uuid.uuid);
             else
-                rc = store_claim_id(&host->host_uuid, NULL);
+                rc = store_claim_id(&host->host_id.uuid, NULL);
 
             if (unlikely(rc))
                 rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID | RRDHOST_FLAG_METADATA_UPDATE);

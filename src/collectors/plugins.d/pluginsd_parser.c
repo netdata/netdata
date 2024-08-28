@@ -1081,6 +1081,35 @@ static inline PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_wo
     return PARSER_RC_STOP;
 }
 
+static void pluginsd_json_stream_paths(PARSER *parser, void *action_data __maybe_unused) {
+    stream_path_set_from_json(parser->user.host, buffer_tostring(parser->defer.response));
+    buffer_free(parser->defer.response);
+}
+
+static void pluginsd_json_dev_null(PARSER *parser, void *action_data __maybe_unused) {
+    buffer_free(parser->defer.response);
+}
+
+static PARSER_RC pluginsd_json(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
+    RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_JSON);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+
+    char *keyword = get_word(words, num_words, 1);
+
+    parser->defer.response = buffer_create(0, NULL);
+    parser->defer.end_keyword = PLUGINSD_KEYWORD_JSON_END;
+    parser->defer.action = pluginsd_json_dev_null;
+    parser->defer.action_data = NULL;
+    parser->flags |= PARSER_DEFER_UNTIL_KEYWORD;
+
+    if(strcmp(keyword, PLUGINSD_KEYWORD_STREAM_PATH) == 0)
+        parser->defer.action = pluginsd_json_stream_paths;
+    else
+        netdata_log_error("PLUGINSD: invalid JSON payload keyword '%s'", keyword);
+
+    return PARSER_RC_OK;
+}
+
 PARSER_RC rrdpush_receiver_pluginsd_claimed_id(char **words, size_t num_words, PARSER *parser);
 
 // ----------------------------------------------------------------------------
@@ -1215,6 +1244,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
 #include "gperf-hashtable.h"
 
 PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **words, size_t num_words) {
+    // put all the keywords ordered by the frequency they are used
+
     switch(keyword->id) {
         case PLUGINSD_KEYWORD_ID_SET2:
             return pluginsd_set_v2(words, num_words, parser);
@@ -1254,6 +1285,8 @@ PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **w
             return pluginsd_function_result_begin(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_FUNCTION_PROGRESS:
             return pluginsd_function_progress(words, num_words, parser);
+        case PLUGINSD_KEYWORD_ID_JSON:
+            return pluginsd_json(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_LABEL:
             return pluginsd_label(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_OVERWRITE:

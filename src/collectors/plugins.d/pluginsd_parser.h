@@ -93,6 +93,8 @@ typedef struct parser_user_object {
     } v2;
 } PARSER_USER_OBJECT;
 
+typedef void (*parser_deferred_action_t)(struct parser *parser, void *action_data);
+
 struct parser {
     uint8_t version;                // Parser version
     PARSER_REPERTOIRE repertoire;
@@ -115,7 +117,7 @@ struct parser {
     struct {
         const char *end_keyword;
         BUFFER *response;
-        void (*action)(struct parser *parser, void *action_data);
+        parser_deferred_action_t action;
         void *action_data;
     } defer;
 
