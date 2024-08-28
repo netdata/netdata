@@ -2,8 +2,8 @@ package lmsensors
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -30,19 +30,19 @@ func TestScannerScan(t *testing.T) {
 				files: []memoryFile{
 					{
 						name: "/sys/class/hwmon",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
 					{
 						name: "/sys/class/hwmon/hwmon0",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							mode: os.ModeSymlink,
 						},
 					},
 					{
 						name: "/sys/devices/LNXSYSTM:00/device:00/ACPI0000:00",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
@@ -51,8 +51,8 @@ func TestScannerScan(t *testing.T) {
 						err:  os.ErrNotExist,
 					},
 					{
-						name: "/sys/devices/LNXSYSTM:00/device:00/ACPI0000:00/hwmon/hwmon0/device",
-						info: &memoryFileInfo{
+						name:     "/sys/devices/LNXSYSTM:00/device:00/ACPI0000:00/hwmon/hwmon0/device",
+						dirEntry: &memoryDirEntry{
 							// mode: os.ModeSymlink,
 						},
 					},
@@ -110,19 +110,19 @@ func TestScannerScan(t *testing.T) {
 				files: []memoryFile{
 					{
 						name: "/sys/class/hwmon",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
 					{
 						name: "/sys/class/hwmon/hwmon0",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							mode: os.ModeSymlink,
 						},
 					},
 					{
 						name: "/sys/devices/virtual/hwmon/hwmon0",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
@@ -162,19 +162,19 @@ func TestScannerScan(t *testing.T) {
 				files: []memoryFile{
 					{
 						name: "/sys/class/hwmon",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
 					{
 						name: "/sys/class/hwmon/hwmon1",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							mode: os.ModeSymlink,
 						},
 					},
 					{
 						name: "/sys/devices/platform/coretemp.0",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
@@ -183,8 +183,8 @@ func TestScannerScan(t *testing.T) {
 						err:  os.ErrNotExist,
 					},
 					{
-						name: "/sys/devices/platform/coretemp.0/hwmon/hwmon1/device",
-						info: &memoryFileInfo{
+						name:     "/sys/devices/platform/coretemp.0/hwmon/hwmon1/device",
+						dirEntry: &memoryDirEntry{
 							// mode: os.ModeSymlink,
 						},
 					},
@@ -266,19 +266,19 @@ func TestScannerScan(t *testing.T) {
 				files: []memoryFile{
 					{
 						name: "/sys/class/hwmon",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
 					{
 						name: "/sys/class/hwmon/hwmon2",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							mode: os.ModeSymlink,
 						},
 					},
 					{
 						name: "/sys/devices/platform/it87.2608",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
@@ -287,8 +287,8 @@ func TestScannerScan(t *testing.T) {
 						err:  os.ErrNotExist,
 					},
 					{
-						name: "/sys/devices/platform/it87.2608/hwmon/hwmon2/device",
-						info: &memoryFileInfo{
+						name:     "/sys/devices/platform/it87.2608/hwmon/hwmon2/device",
+						dirEntry: &memoryDirEntry{
 							// mode: os.ModeSymlink,
 						},
 					},
@@ -426,25 +426,25 @@ func TestScannerScan(t *testing.T) {
 				files: []memoryFile{
 					{
 						name: "/sys/class/hwmon",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
 					{
 						name: "/sys/class/hwmon/hwmon1",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							mode: os.ModeSymlink,
 						},
 					},
 					{
 						name: "/sys/class/hwmon/hwmon2",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							mode: os.ModeSymlink,
 						},
 					},
 					{
 						name: "/sys/devices/platform/coretemp.0",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
@@ -453,8 +453,8 @@ func TestScannerScan(t *testing.T) {
 						err:  os.ErrNotExist,
 					},
 					{
-						name: "/sys/devices/platform/coretemp.0/hwmon/hwmon1/device",
-						info: &memoryFileInfo{
+						name:     "/sys/devices/platform/coretemp.0/hwmon/hwmon1/device",
+						dirEntry: &memoryDirEntry{
 							// mode: os.ModeSymlink,
 						},
 					},
@@ -504,7 +504,7 @@ func TestScannerScan(t *testing.T) {
 					},
 					{
 						name: "/sys/devices/platform/coretemp.1",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
@@ -513,8 +513,8 @@ func TestScannerScan(t *testing.T) {
 						err:  os.ErrNotExist,
 					},
 					{
-						name: "/sys/devices/platform/coretemp.1/hwmon/hwmon2/device",
-						info: &memoryFileInfo{
+						name:     "/sys/devices/platform/coretemp.1/hwmon/hwmon2/device",
+						dirEntry: &memoryDirEntry{
 							// mode: os.ModeSymlink,
 						},
 					},
@@ -619,19 +619,19 @@ func TestScannerScan(t *testing.T) {
 				files: []memoryFile{
 					{
 						name: "/sys/class/hwmon",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
 					{
 						name: "/sys/class/hwmon/hwmon0",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							mode: os.ModeSymlink,
 						},
 					},
 					{
 						name: "/sys/devices/pci0000:00/0000:00:02.0/0000:03:00.0",
-						info: &memoryFileInfo{
+						dirEntry: &memoryDirEntry{
 							isDir: true,
 						},
 					},
@@ -640,8 +640,8 @@ func TestScannerScan(t *testing.T) {
 						err:  os.ErrNotExist,
 					},
 					{
-						name: "/sys/devices/pci0000:00/0000:00:02.0/0000:03:00.0/hwmon/hwmon0/device",
-						info: &memoryFileInfo{
+						name:     "/sys/devices/pci0000:00/0000:00:02.0/0000:03:00.0/hwmon/hwmon0/device",
+						dirEntry: &memoryDirEntry{
 							// mode: os.ModeSymlink,
 						},
 					},
@@ -747,11 +747,11 @@ func (fs *memoryFilesystem) Readlink(name string) (string, error) {
 func (fs *memoryFilesystem) Stat(name string) (os.FileInfo, error) {
 	for _, f := range fs.files {
 		if f.name == name {
-			info := f.info
-			if info == nil {
-				info = &memoryFileInfo{}
+			de := f.dirEntry
+			if de == nil {
+				de = &memoryDirEntry{}
 			}
-
+			info, _ := de.Info()
 			return info, f.err
 		}
 	}
@@ -759,7 +759,7 @@ func (fs *memoryFilesystem) Stat(name string) (os.FileInfo, error) {
 	return nil, fmt.Errorf("stat: file %q not in memory", name)
 }
 
-func (fs *memoryFilesystem) Walk(root string, walkFn filepath.WalkFunc) error {
+func (fs *memoryFilesystem) WalkDir(root string, walkFn fs.WalkDirFunc) error {
 	if _, err := fs.Stat(root); err != nil {
 		return err
 	}
@@ -770,12 +770,12 @@ func (fs *memoryFilesystem) Walk(root string, walkFn filepath.WalkFunc) error {
 			continue
 		}
 
-		info := f.info
-		if info == nil {
-			info = &memoryFileInfo{}
+		de := f.dirEntry
+		if de == nil {
+			de = &memoryDirEntry{}
 		}
 
-		if err := walkFn(f.name, info, nil); err != nil {
+		if err := walkFn(f.name, de, nil); err != nil {
 			return err
 		}
 	}
@@ -787,24 +787,24 @@ func (fs *memoryFilesystem) Walk(root string, walkFn filepath.WalkFunc) error {
 type memoryFile struct {
 	name     string
 	contents string
-	info     os.FileInfo
+	dirEntry fs.DirEntry
 	err      error
 }
 
-var _ os.FileInfo = &memoryFileInfo{}
+var _ fs.DirEntry = &memoryDirEntry{}
 
-// A memoryFileInfo is an os.FileInfo used by memoryFiles.
-type memoryFileInfo struct {
-	name    string
-	size    int64
-	mode    os.FileMode
-	modTime time.Time
-	isDir   bool
+// A memoryDirEntry is a fs.DirEntry used by memoryFiles.
+type memoryDirEntry struct {
+	name  string
+	mode  os.FileMode
+	isDir bool
 }
 
-func (fi *memoryFileInfo) Name() string       { return fi.name }
-func (fi *memoryFileInfo) Size() int64        { return fi.size }
-func (fi *memoryFileInfo) Mode() os.FileMode  { return fi.mode }
-func (fi *memoryFileInfo) ModTime() time.Time { return fi.modTime }
-func (fi *memoryFileInfo) IsDir() bool        { return fi.isDir }
-func (fi *memoryFileInfo) Sys() interface{}   { return nil }
+func (fi *memoryDirEntry) Name() string               { return fi.name }
+func (fi *memoryDirEntry) Type() os.FileMode          { return fi.mode }
+func (fi *memoryDirEntry) IsDir() bool                { return fi.isDir }
+func (fi *memoryDirEntry) Info() (fs.FileInfo, error) { return fi, nil }
+func (fi *memoryDirEntry) Sys() interface{}           { return nil }
+func (fi *memoryDirEntry) Size() int64                { return 0 }
+func (fi *memoryDirEntry) Mode() os.FileMode          { return fi.Type() }
+func (fi *memoryDirEntry) ModTime() time.Time         { return time.Now() }
