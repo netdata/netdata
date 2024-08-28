@@ -171,21 +171,26 @@ void stream_path_child_disconnected(RRDHOST *host) {
 void stream_path_parent_disconnected(RRDHOST *host) {
     spinlock_lock(&host->rrdpush.path.spinlock);
 
+    size_t cleared = 0;
     size_t used = host->rrdpush.path.used;
     for (size_t i = 0; i < used; i++) {
         STREAM_PATH *p = &host->rrdpush.path.array[i];
         if(UUIDeq(localhost->host_id, p->host_id)) {
             host->rrdpush.path.used = i + 1;
 
-            for(size_t j = i + 1; j < used ;j++)
+            for(size_t j = i + 1; j < used ;j++) {
                 stream_path_clear(&host->rrdpush.path.array[j]);
+                cleared++;
+            }
 
             break;
         }
     }
 
     spinlock_unlock(&host->rrdpush.path.spinlock);
-    stream_path_send_to_child(host);
+
+    if(cleared)
+        stream_path_send_to_child(host);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

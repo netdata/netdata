@@ -70,7 +70,7 @@ BUFFER *sender_start(struct sender_state *s) {
     return sender_thread_buffer;
 }
 
-static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
+static inline void rrdpush_sender_disconnect_and_cleanup(RRDHOST *host);
 
 #define SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
 
@@ -156,7 +156,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
                     worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
                     rrdpush_compression_deactivate(s);
-                    rrdpush_sender_thread_close_socket(s->host);
+                    rrdpush_sender_disconnect_and_cleanup(s->host);
                     sender_unlock(s);
                     return;
                 }
@@ -340,12 +340,18 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
         close(host->sender->rrdpush_sender_socket);
         host->sender->rrdpush_sender_socket = -1;
     }
+}
 
-    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
+static inline void rrdpush_sender_disconnect_and_cleanup(RRDHOST *host) {
+    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+
+    rrdpush_sender_thread_close_socket(host);
+
+    // we have been connected to this parent - let's cleanup
 
     // do not flush the circular buffer here
-    // this function is called sometimes with the mutex lock, sometimes without the lock
+    // this function is called sometimes with the sender lock, sometimes without the lock
+
     rrdpush_sender_charts_and_replication_reset(host);
 
     // clear the parent's claim id
@@ -1044,7 +1050,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR);
         netdata_log_debug(D_STREAM, "STREAM: Send failed - closing socket...");
         netdata_log_error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.",  rrdhost_hostname(s->host), s->connected_to, s->sent_bytes_on_this_connection);
-        rrdpush_sender_thread_close_socket(s->host);
+        rrdpush_sender_disconnect_and_cleanup(s->host);
     }
     else
         netdata_log_debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
@@ -1082,7 +1088,7 @@ static ssize_t attempt_read(struct sender_state *s) {
         netdata_log_error("STREAM %s [send to %s]: error during receive (%zd) - closing connection.", rrdhost_hostname(s->host), s->connected_to, ret);
     }
 
-    rrdpush_sender_thread_close_socket(s->host);
+    rrdpush_sender_disconnect_and_cleanup(s->host);
 
     return ret;
 }
@@ -1523,7 +1529,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *pptr) {
          rrdhost_hostname(host),
          host->sender->exit.reason != STREAM_HANDSHAKE_NEVER ? stream_handshake_error_to_string(host->sender->exit.reason) : "");
 
-    rrdpush_sender_thread_close_socket(host);
+    rrdpush_sender_disconnect_and_cleanup(host);
     rrdpush_sender_pipe_close(host, host->sender->rrdpush_sender_pipe, false);
     execute_commands_cleanup(host->sender);
 
@@ -1687,8 +1693,7 @@ void *rrdpush_sender_thread(void *ptr) {
         &stream_config, CONFIG_SECTION_STREAM, "parent using h2o", false);
 
     // initialize rrdpush globals
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
 
     int pipe_buffer_size = 10 * 1024;
 #ifdef F_GETPIPE_SZ
@@ -1760,7 +1765,7 @@ void *rrdpush_sender_thread(void *ptr) {
         )) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
             netdata_log_error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection via %zu send attempts.", rrdhost_hostname(s->host), s->connected_to, s->timeout, s->sent_bytes_on_this_connection, s->send_attempts);
-            rrdpush_sender_thread_close_socket(s->host);
+            rrdpush_sender_disconnect_and_cleanup(s->host);
             continue;
         }
 
@@ -1791,7 +1796,7 @@ void *rrdpush_sender_thread(void *ptr) {
             if(!rrdpush_sender_pipe_close(s->host, s->rrdpush_sender_pipe, true)) {
                 netdata_log_error("STREAM %s [send]: cannot create inter-thread communication pipe. Disabling streaming.",
                       rrdhost_hostname(s->host));
-                rrdpush_sender_thread_close_socket(s->host);
+                rrdpush_sender_disconnect_and_cleanup(s->host);
                 break;
             }
         }
@@ -1842,7 +1847,7 @@ void *rrdpush_sender_thread(void *ptr) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR);
             netdata_log_error("STREAM %s [send to %s]: failed to poll(). Closing socket.", rrdhost_hostname(s->host), s->connected_to);
             rrdpush_sender_pipe_close(s->host, s->rrdpush_sender_pipe, true);
-            rrdpush_sender_thread_close_socket(s->host);
+            rrdpush_sender_disconnect_and_cleanup(s->host);
             continue;
         }
 
@@ -1909,7 +1914,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR);
                 netdata_log_error("STREAM %s [send to %s]: restarting connection: %s - %zu bytes transmitted.",
                       rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
-                rrdpush_sender_thread_close_socket(s->host);
+                rrdpush_sender_disconnect_and_cleanup(s->host);
             }
         }
 
@@ -1919,7 +1924,7 @@ void *rrdpush_sender_thread(void *ptr) {
             errno_clear();
             netdata_log_error("STREAM %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. Restarting connection",
                   rrdhost_hostname(s->host), s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);
-            rrdpush_sender_thread_close_socket(s->host);
+            rrdpush_sender_disconnect_and_cleanup(s->host);
         }
 
         worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE) dictionary_entries(s->replication.requests));
