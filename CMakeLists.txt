@@ -1266,6 +1266,10 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream_path.h
         src/streaming/stream_capabilities.c
         src/streaming/stream_capabilities.h
+        src/streaming/sender_connect.c
+        src/streaming/sender_internals.h
+        src/streaming/sender_execute.c
+        src/streaming/sender_commit.c
 )
 
 set(WEB_PLUGIN_FILES
