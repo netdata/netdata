@@ -173,6 +173,8 @@ static void rrdhost_update_cached_retention(RRDHOST *host, time_t first_time_s, 
 
     spinlock_lock(&host->retention.spinlock);
 
+    time_t old_first_time_s = host->retention.first_time_s;
+
     if(global) {
         host->retention.first_time_s = first_time_s;
         host->retention.last_time_s = last_time_s;
@@ -185,7 +187,12 @@ static void rrdhost_update_cached_retention(RRDHOST *host, time_t first_time_s, 
             host->retention.last_time_s = last_time_s;
     }
 
+    bool stream_path_update_required = old_first_time_s != host->retention.first_time_s;
+
     spinlock_unlock(&host->retention.spinlock);
+
+    if(stream_path_update_required)
+        stream_path_retention_updated(host);
 }
 
 void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, bool worker_jobs) {

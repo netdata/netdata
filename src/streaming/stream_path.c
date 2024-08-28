@@ -193,6 +193,11 @@ void stream_path_parent_disconnected(RRDHOST *host) {
         stream_path_send_to_child(host);
 }
 
+void stream_path_retention_updated(RRDHOST *host) {
+    stream_path_send_to_parent(host);
+    stream_path_send_to_child(host);
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
 
