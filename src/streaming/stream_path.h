@@ -42,6 +42,6 @@ void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *k
 void stream_path_parent_disconnected(struct rrdhost *host);
 void rrdhost_stream_path_clear(struct rrdhost *host, bool destroy);
 
-bool stream_path_set_from_json(struct rrdhost *host, const char *json);
+bool stream_path_set_from_json(struct rrdhost *host, const char *json, bool from_parent);
 
 #endif //NETDATA_STREAM_PATH_H

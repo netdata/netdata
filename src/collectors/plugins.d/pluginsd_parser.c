@@ -1082,7 +1082,7 @@ static inline PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_wo
 }
 
 static void pluginsd_json_stream_paths(PARSER *parser, void *action_data __maybe_unused) {
-    stream_path_set_from_json(parser->user.host, buffer_tostring(parser->defer.response));
+    stream_path_set_from_json(parser->user.host, buffer_tostring(parser->defer.response), false);
     buffer_free(parser->defer.response);
 }
 

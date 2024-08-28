@@ -210,7 +210,7 @@ static XXH128_hash_t stream_path_hash_unsafe(RRDHOST *host) {
     return XXH3_128bits(host->rrdpush.path.array, sizeof(*host->rrdpush.path.array) * host->rrdpush.path.used);
 }
 
-bool stream_path_set_from_json(RRDHOST *host, const char *json) {
+bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent) {
     if(!json || !*json)
         return false;
 
@@ -256,7 +256,11 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json) {
     spinlock_unlock(&host->rrdpush.path.spinlock);
 
     if(!XXH128_isEqual(old_hash, new_hash)) {
-        stream_path_send_to_parent(host);
+        if(!from_parent)
+            stream_path_send_to_parent(host);
+
+        // when it comes from the child, we still need to send it back to the child
+        // including our own entry in it.
         stream_path_send_to_child(host);
     }
 

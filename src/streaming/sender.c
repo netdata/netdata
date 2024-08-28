@@ -1194,7 +1194,7 @@ static void execute_deferred_json(struct sender_state *s, void *data) {
     const char *keyword = data;
 
     if(strcmp(keyword, PLUGINSD_KEYWORD_STREAM_PATH) == 0)
-        stream_path_set_from_json(s->host, buffer_tostring(s->defer.payload));
+        stream_path_set_from_json(s->host, buffer_tostring(s->defer.payload), true);
     else
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM: unknown JSON keyword '%s' with payload: %s", keyword, buffer_tostring(s->defer.payload));
 }
