@@ -62,16 +62,15 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             dfe_start_read(rrdhost_root_index, host) {
                 total++;
 
-                if(host == localhost)
-                    continue;
-
-                if(rrdhost_state_cloud_emulation(host))
-                    receiving++;
-                else
-                    archived++;
-
                 if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED))
                     sending++;
+
+                if(host != localhost) {
+                    if (rrdhost_state_cloud_emulation(host))
+                        receiving++;
+                    else
+                        archived++;
+                }
             }
             dfe_done(host);
 
