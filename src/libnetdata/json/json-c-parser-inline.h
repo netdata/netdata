@@ -41,19 +41,24 @@
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         if (json_object_is_type(_j, json_type_string)) {                                                        \
-            if (uuid_parse(json_object_get_string(_j), dst) != 0 && required) {                                 \
-                buffer_sprintf(error, "invalid UUID '%s.%s'", path, member);                                    \
-                return false;                                                                                   \
+            if (uuid_parse(json_object_get_string(_j), dst) != 0) {                                             \
+                if(required) {                                                                                  \
+                    buffer_sprintf(error, "invalid UUID '%s.%s'", path, member);                                \
+                    return false;                                                                               \
+                }                                                                                               \
+                else                                                                                            \
+                    uuid_clear(dst);                                                                            \
             }                                                                                                   \
-            else                                                                                                \
-                uuid_clear(dst);                                                                                \
-        } else if (json_object_is_type(_j, json_type_null)) {                                                   \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_null)) {                                                     \
             uuid_clear(dst);                                                                                    \
-        } else if (required) {                                                                                  \
+        }                                                                                                       \
+        else if (required) {                                                                                    \
             buffer_sprintf(error, "expected UUID or null '%s.%s'", path, member);                               \
             return false;                                                                                       \
         }                                                                                                       \
-    } else if (required) {                                                                                      \
+    }                                                                                                           \
+    else if (required) {                                                                                        \
         buffer_sprintf(error, "missing UUID '%s.%s'", path, member);                                            \
         return false;                                                                                           \
     }                                                                                                           \
