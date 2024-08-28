@@ -1,4 +1,7 @@
-ARG BASE
+# The default value is overridden in every Dockerfile usage, but adding it here helps avoid issues with
+# CI checks that require a non-empty or valid base image name. See more details here:
+# https://docs.docker.com/go/dockerfile/rule/invalid-default-arg-in-from/
+ARG BASE="netdata"
 
 FROM ${BASE}
 
