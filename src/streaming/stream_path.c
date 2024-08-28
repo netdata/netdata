@@ -21,7 +21,6 @@ static void stream_path_clear(STREAM_PATH *p) {
     p->hops = 0;
     p->since = 0;
     p->first_time_t = 0;
-    p->last_time_t = 0;
     p->capabilities = 0;
     p->flags = STREAM_PATH_FLAG_NONE;
 }
@@ -51,7 +50,6 @@ static void stream_path_to_json_object(BUFFER *wb, STREAM_PATH *p) {
     buffer_json_member_add_int64(wb, "hops", p->hops);
     buffer_json_member_add_uint64(wb, "since", p->since);
     buffer_json_member_add_uint64(wb, "first_time_t", p->first_time_t);
-    buffer_json_member_add_uint64(wb, "last_time_t", p->last_time_t);
     stream_capabilities_to_json_array(wb, p->capabilities, "capabilities");
     STREAM_PATH_FLAGS_2json(wb, "flags", p->flags);
 }
@@ -87,9 +85,7 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
         p.capabilities = stream_our_capabilities(host, host == localhost);
     }
 
-    rrdhost_retention(host, now_realtime_sec(),
-                      is_localhost || has_receiver,
-                      &p.first_time_t, &p.last_time_t);
+    rrdhost_retention(host, 0, false, &p.first_time_t, NULL);
 
     return p;
 }
@@ -201,7 +197,6 @@ static bool parse_single_path(json_object *jobj, const char *path, STREAM_PATH *
     JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "hops", p->hops, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "since", p->since, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_t", p->first_time_t, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "last_time_t", p->last_time_t, error, true);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "flags", STREAM_PATH_FLAGS_2id_one, p->flags, error, true);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "capabilities", stream_capabilities_parse_one, p->capabilities, error, true);
     return true;

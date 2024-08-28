@@ -19,7 +19,6 @@ typedef struct stream_path {
     ND_UUID claim_id;
     time_t since;
     time_t first_time_t;
-    time_t last_time_t;
     int16_t hops; // -1 = stale node, 0 = localhost, >0 the hops count
     STREAM_PATH_FLAGS flags;
     STREAM_CAPABILITIES capabilities;
