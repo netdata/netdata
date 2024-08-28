@@ -2,7 +2,7 @@ package lmsensors
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +13,7 @@ type filesystem interface {
 	ReadFile(filename string) (string, error)
 	Readlink(name string) (string, error)
 	Stat(name string) (os.FileInfo, error)
-	Walk(root string, walkFn filepath.WalkFunc) error
+	WalkDir(root string, walkFn fs.WalkDirFunc) error
 }
 
 // A Scanner scans for Devices, so data can be read from their Sensors.
@@ -30,30 +30,31 @@ func New() *Scanner {
 
 // Scan scans for Devices and their Sensors.
 func (s *Scanner) Scan() ([]*Device, error) {
-	// Determine common device locations in Linux /sys filesystem.
 	paths, err := s.detectDevicePaths()
 	if err != nil {
 		return nil, err
 	}
 
 	var devices []*Device
-	for _, p := range paths {
-		d := &Device{}
-		raw := make(map[string]map[string]string, 0)
+
+	for _, rootPath := range paths {
+		dev := &Device{}
+		raw := make(map[string]map[string]string)
 
 		// Walk filesystem paths to fetch devices and sensors
-		err := s.fs.Walk(p, func(path string, info os.FileInfo, err error) error {
+		err := s.fs.WalkDir(rootPath, func(path string, de fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
 
-			// Skip directories and anything that isn't a regular file
-			if info.IsDir() || !info.Mode().IsRegular() {
+			if de.IsDir() || !de.Type().IsRegular() {
+				if de.IsDir() && path != rootPath {
+					return fs.SkipDir
+				}
 				return nil
 			}
 
-			// Skip some files that can't be read or don't provide useful
-			// sensor information
+			// Skip some files that can't be read or don't provide useful sensor information
 			file := filepath.Base(path)
 			if shouldSkip(file) {
 				return nil
@@ -64,48 +65,46 @@ func (s *Scanner) Scan() ([]*Device, error) {
 				return nil
 			}
 
-			switch file {
-			// Found name of device
-			case "name":
-				d.Name = s
-			}
-
-			// Sensor names in format "sensor#_foo", e.g. "temp1_input"
-			fs := strings.SplitN(file, "_", 2)
-			if len(fs) != 2 {
+			if file == "name" {
+				dev.Name = s
 				return nil
 			}
 
-			// Gather sensor data into map for later processing
-			if _, ok := raw[fs[0]]; !ok {
-				raw[fs[0]] = make(map[string]string, 0)
+			// Sensor names in format "sensor#_foo", e.g. "temp1_input"
+			parts := strings.SplitN(file, "_", 2)
+			if len(parts) != 2 {
+				return nil
 			}
 
-			raw[fs[0]][fs[1]] = s
+			if _, ok := raw[parts[0]]; !ok {
+				raw[parts[0]] = make(map[string]string)
+			}
+
+			raw[parts[0]][parts[1]] = s
+
 			return nil
 		})
 		if err != nil {
 			return nil, err
 		}
 
-		// Parse all possible sensors from raw data
 		sensors, err := parseSensors(raw)
 		if err != nil {
 			return nil, err
 		}
 
-		d.Sensors = sensors
-		devices = append(devices, d)
+		dev.Sensors = sensors
+		devices = append(devices, dev)
 	}
 
 	renameDevices(devices)
+
 	return devices, nil
 }
 
-// renameDevices renames devices in place to prevent duplicate device names,
-// and to number each device.
+// renameDevices renames devices in place to prevent duplicate device names, and to number each device.
 func renameDevices(devices []*Device) {
-	nameCount := make(map[string]int, 0)
+	nameCount := make(map[string]int)
 
 	for i := range devices {
 		name := devices[i].Name
@@ -117,19 +116,17 @@ func renameDevices(devices []*Device) {
 	}
 }
 
-// detectDevicePaths performs a filesystem walk to paths where devices may
-// reside on Linux.
+// detectDevicePaths performs a filesystem walk to paths where devices may reside on Linux.
 func (s *Scanner) detectDevicePaths() ([]string, error) {
 	const lookPath = "/sys/class/hwmon"
 
 	var paths []string
-	err := s.fs.Walk(lookPath, func(path string, info os.FileInfo, err error) error {
+	err := s.fs.WalkDir(lookPath, func(path string, de os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Skip anything that isn't a symlink
-		if info.Mode()&os.ModeSymlink == 0 {
+		if de.Type()&os.ModeSymlink == 0 {
 			return nil
 		}
 
@@ -137,10 +134,10 @@ func (s *Scanner) detectDevicePaths() ([]string, error) {
 		if err != nil {
 			return err
 		}
+
 		dest = filepath.Join(lookPath, filepath.Clean(dest))
 
-		// Symlink destination has a file called name, meaning a sensor exists
-		// here and data can be retrieved
+		// Symlink destination has a file called name, meaning a sensor exists here and data can be retrieved
 		fi, err := s.fs.Stat(filepath.Join(dest, "name"))
 		if err != nil && !os.IsNotExist(err) {
 			return err
@@ -150,16 +147,14 @@ func (s *Scanner) detectDevicePaths() ([]string, error) {
 			return nil
 		}
 
-		// Symlink destination has another symlink called device, which can be
-		// read and used to retrieve data
+		// Symlink destination has another symlink called device, which can be read and used to retrieve data
 		device := filepath.Join(dest, "device")
 		fi, err = s.fs.Stat(device)
 		if err != nil {
-			if os.IsNotExist(err) {
-				return nil
+			if !os.IsNotExist(err) {
+				return err
 			}
-
-			return err
+			return nil
 		}
 
 		if fi.Mode()&os.ModeSymlink != 0 {
@@ -170,27 +165,26 @@ func (s *Scanner) detectDevicePaths() ([]string, error) {
 		if err != nil {
 			return err
 		}
+
 		dest = filepath.Join(dest, filepath.Clean(device))
 
-		// Symlink destination has a file called name, meaning a sensor exists
-		// here and data can be retrieved
+		// Symlink destination has a file called name, meaning a sensor exists here and data can be retrieved
 		if _, err := s.fs.Stat(filepath.Join(dest, "name")); err != nil {
-			if os.IsNotExist(err) {
-				return nil
+			if !os.IsNotExist(err) {
+				return err
 			}
-
-			return err
+			return nil
 		}
 
 		paths = append(paths, dest)
+
 		return nil
 	})
 
 	return paths, err
 }
 
-// shouldSkip indicates if a given filename should be skipped during the
-// filesystem walk operation.
+// shouldSkip indicates if a given filename should be skipped during the filesystem walk operation.
 func shouldSkip(file string) bool {
 	if strings.HasPrefix(file, "runtime_") {
 		return true
@@ -212,21 +206,25 @@ func shouldSkip(file string) bool {
 
 var _ filesystem = &systemFilesystem{}
 
-// A systemFilesystem is a filesystem which uses operations on the host
-// filesystem.
+// A systemFilesystem is a filesystem which uses operations on the host filesystem.
 type systemFilesystem struct{}
 
 func (fs *systemFilesystem) ReadFile(filename string) (string, error) {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return "", err
 	}
-
 	return strings.TrimSpace(string(b)), nil
 }
 
-func (fs *systemFilesystem) Readlink(name string) (string, error)  { return os.Readlink(name) }
-func (fs *systemFilesystem) Stat(name string) (os.FileInfo, error) { return os.Stat(name) }
-func (fs *systemFilesystem) Walk(root string, walkFn filepath.WalkFunc) error {
-	return filepath.Walk(root, walkFn)
+func (fs *systemFilesystem) Readlink(name string) (string, error) {
+	return os.Readlink(name)
+}
+
+func (fs *systemFilesystem) Stat(name string) (os.FileInfo, error) {
+	return os.Stat(name)
+}
+
+func (fs *systemFilesystem) WalkDir(root string, walkFn fs.WalkDirFunc) error {
+	return filepath.WalkDir(root, walkFn)
 }
