@@ -212,6 +212,32 @@ static bool parse_single_path(json_object *jobj, const char *path, STREAM_PATH *
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_t", p->first_time_t, error, true);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "flags", STREAM_PATH_FLAGS_2id_one, p->flags, error, true);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "capabilities", stream_capabilities_parse_one, p->capabilities, error, true);
+
+    if(!p->hostname) {
+        buffer_strcat(error, "hostname cannot be empty");
+        return false;
+    }
+
+    if(UUIDiszero(p->host_id)) {
+        buffer_strcat(error, "host_id cannot be zero");
+        return false;
+    }
+
+    if(p->hops < 0) {
+        buffer_strcat(error, "hops cannot be negative");
+        return false;
+    }
+
+    if(p->capabilities == STREAM_CAP_NONE) {
+        buffer_strcat(error, "capabilities cannot be empty");
+        return false;
+    }
+
+    if(p->since <= 0) {
+        buffer_strcat(error, "since cannot be <= 0");
+        return false;
+    }
+
     return true;
 }
 
