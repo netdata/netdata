@@ -18,6 +18,7 @@ static void stream_path_clear(STREAM_PATH *p) {
     p->hostname = NULL;
     p->host_id = UUID_ZERO;
     p->node_id = UUID_ZERO;
+    p->claim_id = UUID_ZERO;
     p->hops = 0;
     p->since = 0;
     p->first_time_t = 0;
