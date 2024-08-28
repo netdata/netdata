@@ -248,6 +248,18 @@ static XXH128_hash_t stream_path_hash_unsafe(RRDHOST *host) {
     return XXH3_128bits(host->rrdpush.path.array, sizeof(*host->rrdpush.path.array) * host->rrdpush.path.used);
 }
 
+static int compare_by_hops(const void *a, const void *b) {
+    const STREAM_PATH *path1 = a;
+    const STREAM_PATH *path2 = b;
+
+    if (path1->hops < path2->hops)
+        return -1;
+    else if (path1->hops > path2->hops)
+        return 1;
+
+    return 0;
+}
+
 bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent) {
     if(!json || !*json)
         return false;
@@ -288,6 +300,12 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
             else
                 host->rrdpush.path.used++;
         }
+    }
+
+    if(host->rrdpush.path.used > 1) {
+        // sorting is required in order to support stream_path_parent_disconnected()
+        qsort(host->rrdpush.path.array, host->rrdpush.path.used,
+              sizeof(*host->rrdpush.path.array), compare_by_hops);
     }
 
     XXH128_hash_t new_hash = stream_path_hash_unsafe(host);
