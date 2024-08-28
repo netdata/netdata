@@ -204,12 +204,12 @@ function(_nd_perms_mark_path_filecaps var path capset)
 
   if(capset MATCHES "perfmon")
     string(REPLACE "perfmon" "sys_admin" capset2 "${capset}")
-    set(tmp_var "${tmp_var}    if ! capset '${capset2}' '${entry_path}' 2>/dev/null; then\n")
-    set(tmp_var "${tmp_var}        chmod -f 4750 '${entry_path}'\n")
+    set(tmp_var "${tmp_var}    if ! capset '${capset2}' '${path}' 2>/dev/null; then\n")
+    set(tmp_var "${tmp_var}        chmod -f 4750 '${path}'\n")
     set(tmp_var "${tmp_var}    fi\n")
     set(tmp_var "${tmp_var}fi\n")
   else()
-    set(tmp_var "${tmp_var}    chmod -f 4750 '${entry_path}'\n")
+    set(tmp_var "${tmp_var}    chmod -f 4750 '${path}'\n")
     set(tmp_var "${tmp_var}fi\n")
   endif()
 
@@ -218,19 +218,20 @@ endfunction()
 
 # Add shell script for the specified permissions entry to the specified
 # variable.
-function(_nd_perms_generate_entry_script var entry)
+function(_nd_perms_generate_entry_script var entry prefix)
   _nd_extract_path(entry_path "${entry}")
   _nd_extract_permissions(entry_perms "${entry}")
+  set(path "${prefix}/${entry_path}")
 
   if("${entry_perms}" STREQUAL "restrict")
-    _nd_perms_mark_path_restricted(result "${entry_path}")
+    _nd_perms_mark_path_restricted(result "${path}")
   elseif("${entry_perms}" STREQUAL "suid" OR NOT USE_FILE_CAPABILITIES)
-    _nd_perms_mark_path_suid(result "${entry_path}")
+    _nd_perms_mark_path_suid(result "${path}")
   else()
     list(TRANSFORM entry_perms PREPEND "cap_")
     list(JOIN entry_perms "," capset)
     set(capset "${capset}+eip")
-    _nd_perms_mark_path_filecaps(result "${entry_path}" "${capset}")
+    _nd_perms_mark_path_filecaps(result "${path}" "${capset}")
   endif()
 
   set(${var} "${${var}}${result}" PARENT_SCOPE)
@@ -269,7 +270,7 @@ function(nd_perms_prepare_deb_postinst_scripts entries)
     list(FILTER component_entries INCLUDE REGEX "^.+::${component}::.+$")
 
     foreach(item IN LISTS component_entries)
-      _nd_perms_generate_entry_script(ND_APPLY_PERMISSIONS "${item}")
+      _nd_perms_generate_entry_script(ND_APPLY_PERMISSIONS "${item}" "")
     endforeach()
 
     configure_file("${postinst_src}" "${postinst}" @ONLY)
@@ -290,7 +291,7 @@ function(nd_perms_prepare_static_postinstall_hook entries)
   set(hook_script "${hook_script}[ -z \"$NETDATA_GROUP\" ] && NETDATA_GROUP='${NETDATA_GROUP}'\n")
 
   foreach(entry IN LISTS entries)
-    _nd_perms_generate_entry_script(hook_script "${entry}")
+    _nd_perms_generate_entry_script(hook_script "${entry}" "/opt/netdata")
   endforeach()
 
   file(WRITE "${hook_path}" "${hook_script}")
