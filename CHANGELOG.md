@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- remove checks.plugin dir [\#18424](https://github.com/netdata/netdata/pull/18424) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18421](https://github.com/netdata/netdata/pull/18421) ([netdatabot](https://github.com/netdatabot))
 - fix hyperlink in go.d samba meta [\#18420](https://github.com/netdata/netdata/pull/18420) ([ilyam8](https://github.com/ilyam8))
 - add go.d samba [\#18418](https://github.com/netdata/netdata/pull/18418) ([ilyam8](https://github.com/ilyam8))
@@ -417,7 +418,6 @@
 - RBAC for dynamic configuration documentation [\#17861](https://github.com/netdata/netdata/pull/17861) ([Ancairon](https://github.com/Ancairon))
 - DYNCFG: health, generate userconfig for incomplete alerts [\#17859](https://github.com/netdata/netdata/pull/17859) ([ktsaou](https://github.com/ktsaou))
 - Create retention charts for higher tiers [\#17855](https://github.com/netdata/netdata/pull/17855) ([stelfrag](https://github.com/stelfrag))
-- Bump github.com/vmware/govmomi from 0.37.2 to 0.37.3 in /src/go/collectors/go.d.plugin [\#17854](https://github.com/netdata/netdata/pull/17854) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
