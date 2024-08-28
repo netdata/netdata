@@ -51,7 +51,7 @@ function(bundle_dashboard)
          RELATIVE ${DASHBOARD_SRC_DIR}
          "${DASHBOARD_SRC_DIR}/dist/agent/${dir}")
 
-    set(cmakelists "${cmakelists}install(FILES ${files} COMPONENT dashboard DESTINATION ${WEB_DEST}/v2/${dir})\n")
+    set(cmakelists "${cmakelists}install(FILES ${files} COMPONENT dashboard DESTINATION ${WEB_DEST}/${dir})\n")
   endforeach()
 
   file(WRITE "${DASHBOARD_SRC_DIR}/CMakeLists.txt" "${cmakelists}")
