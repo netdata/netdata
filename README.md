@@ -34,7 +34,7 @@ MENU: **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)*
 
 Netdata is also known for its **cost-efficient, distributed design**. Unlike traditional monitoring solutions that centralize data, **Netdata distributes the code**. Instead of funneling all data into a few central databases, Netdata processes data at the edge, keeping it close to the source. The smart open-source Netdata Agent acts as a distributed database, enabling the construction of complex observability pipelines with modular, Lego-like simplicity.
 
-Netdata provides **A.I. insights** for all monitored data, training machine learning models directly at the edge. This allows for fully automated and unsupervised anomaly detection, and With its intuitive APIs and UIs, users can quickly perform root cause analysis and troubleshoot issues, identifying correlations and gaining deeper insights into their infrastructure.
+Netdata provides **A.I. insights** for all monitored data, training machine learning models directly at the edge. This allows for fully automated and unsupervised anomaly detection, and with its intuitive APIs and UIs, users can quickly perform root cause analysis and troubleshoot issues, identifying correlations and gaining deeper insights into their infrastructure.
 
 ### The Netdata Ecosystem
 
