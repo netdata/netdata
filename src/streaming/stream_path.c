@@ -25,9 +25,7 @@ static void stream_path_clear(STREAM_PATH *p) {
     p->flags = STREAM_PATH_FLAG_NONE;
 }
 
-void rrdhost_stream_path_clear(RRDHOST *host, bool destroy) {
-    spinlock_lock(&host->rrdpush.path.spinlock);
-
+static void rrdhost_stream_path_clear_unsafe(RRDHOST *host, bool destroy) {
     for(size_t i = 0; i < host->rrdpush.path.used ; i++)
         stream_path_clear(&host->rrdpush.path.array[i]);
 
@@ -38,7 +36,11 @@ void rrdhost_stream_path_clear(RRDHOST *host, bool destroy) {
         host->rrdpush.path.array = NULL;
         host->rrdpush.path.size = 0;
     }
+}
 
+void rrdhost_stream_path_clear(RRDHOST *host, bool destroy) {
+    spinlock_lock(&host->rrdpush.path.spinlock);
+    rrdhost_stream_path_clear_unsafe(host, destroy);
     spinlock_unlock(&host->rrdpush.path.spinlock);
 }
 
@@ -222,7 +224,7 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
 
     spinlock_lock(&host->rrdpush.path.spinlock);
     XXH128_hash_t old_hash = stream_path_hash_unsafe(host);
-    rrdhost_stream_path_clear(host, true);
+    rrdhost_stream_path_clear_unsafe(host, true);
 
     CLEAN_BUFFER *error = buffer_create(0, NULL);
 
