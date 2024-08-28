@@ -66,21 +66,33 @@ int nd_claim_parse_args(int argc, LPWSTR *argv)
     for (i = 1 ; i < argc; i++) {
         // We are working with Microsoft, thus it does not make sense wait for only smallcase
         if(wcscasecmp(L"/T", argv[i]) == 0) {
+            if (argc <= i + 1)
+                continue;
             i++;
             token = argv[i];
         }
 
         if(wcscasecmp(L"/R", argv[i]) == 0) {
+            if (argc <= i + 1)
+                continue;
             i++;
             room = argv[i];
         }
 
         if(wcscasecmp(L"/P", argv[i]) == 0) {
+            if (argc <= i + 1)
+                continue;
             i++;
-            proxy = argv[i];
+            // Minimum IPV4
+            if(wcslen(argv[i]) >= 8) {
+                proxy = argv[i];
+            }
         }
 
         if(wcscasecmp(L"/I", argv[i]) == 0) {
+            if (argc <= i + 1)
+                continue;
+
             i++;
             size_t length = wcslen(argv[i]);
             char *tmp = calloc(sizeof(char), length);
@@ -149,37 +161,6 @@ static void netdata_claim_exit_callback(int signal)
         LocalFree(argv);
 }
 
-static inline void netdata_claim_create_process(char *cmd)
-{
-    STARTUPINFOA si;
-    PROCESS_INFORMATION pi;
-
-    ZeroMemory( &si, sizeof(si));
-    si.cb = sizeof(si);
-    ZeroMemory( &pi, sizeof(pi));
-
-    if( !CreateProcessA(NULL,
-                        cmd,
-                        NULL, NULL, FALSE, 0, NULL, NULL,
-                        &si,
-                        &pi)
-                        )
-    {
-        netdata_claim_error_exit(L"CreateProcessA");
-    }
-
-    WaitForSingleObject( pi.hProcess, INFINITE );
-
-    CloseHandle( pi.hProcess );
-    CloseHandle( pi.hThread );
-
-    // This Function does not get the child, so we are testing whether we could get the final result
-    DWORD ret;
-    GetExitCodeProcess(pi.hProcess, &ret);
-    if (ret)
-        MessageBoxA(NULL, cmd, "Error: Cannot run the command!", MB_OK|MB_ICONERROR);
-}
-
 static inline int netdata_claim_prepare_data(char *out, size_t length)
 {
     char *proxyLabel = (aProxy) ? "proxy = " : "";
@@ -193,6 +174,22 @@ static inline int netdata_claim_prepare_data(char *out, size_t length)
                     proxyValue,
                     (insecure) ? "YES" : "NO"
                     );
+}
+
+static int netdata_claim_get_path(char *path)
+{
+    char *usrPath = { "\\usr\\bin" };
+    DWORD length = GetCurrentDirectoryA(WINDOWS_MAX_PATH, path);
+    if (!length) {
+        return -1;
+    }
+
+    if (strstr(path, usrPath)) {
+        length -= 7;
+        path[length] = '\0';
+    }
+
+    return 0;
 }
 
 static void netdata_claim_write_config(char *path)
@@ -209,35 +206,15 @@ static void netdata_claim_write_config(char *path)
     DWORD written = 0;
 
     BOOL ret = WriteFile(hf, data, length, &written, NULL);
-    if (!ret)
+    if (!ret) {
+        CloseHandle(hf);
         netdata_claim_error_exit(L"WriteFileA");
+    }
 
     if (length != written)
         MessageBoxW(NULL, L"Cannot write claim.conf.", L"Error", MB_OK|MB_ICONERROR);
 
     CloseHandle(hf);
-}
-
-static void netdata_claim_execute_command()
-{
-    char *usrPath = { "\\usr\\bin" };
-    char basePath[WINDOWS_MAX_PATH];
-    char runCmd[WINDOWS_MAX_PATH];
-    DWORD length = GetCurrentDirectoryA(WINDOWS_MAX_PATH, basePath);
-    if (!length) {
-        netdata_claim_error_exit(L"GetCurrentDirectoryA");
-    }
-
-    if (strstr(basePath, usrPath)) {
-        length -= 7;
-        basePath[length] = '\0';
-    }
-
-    snprintf(runCmd, WINDOWS_MAX_PATH - length,
-             "msys2_shell.cmd -c \"chmod 0640 %s/etc/netdata/claim.conf; %s/usr/bin/netdatacli reload-claiming-state\"",
-             basePath);
-
-    netdata_claim_create_process(runCmd);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -256,10 +233,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (!argc) {
         ret = netdata_claim_window_loop(hInstance, nCmdShow);
     } else {
-        if (!netdata_claim_prepare_strings())
-            netdata_claim_execute_command();
+        if (netdata_claim_prepare_strings()) {
+            goto exit_claim;
+        }
+
+        char basePath[WINDOWS_MAX_PATH];
+        if (!netdata_claim_get_path(basePath)) {
+            netdata_claim_write_config(basePath);
+        }
     }
 
+exit_claim:
     netdata_claim_exit_callback(0);
 
     return ret;

@@ -116,6 +116,14 @@ Function NetdataConfigLeave
             nsExec::ExecToLog '$INSTDIR\msys2.exe'
             pop $0
         ${EndIf}
+
+	ClearErrors
+        nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
+        pop $0
+        ${If} $0 != 0
+	    MessageBox MB_OK "Warning: Failed to start Netdata service."
+        ${EndIf}
+
 FunctionEnd
 
 Function NetdataUninstallRegistry
@@ -174,13 +182,6 @@ Section "Install Netdata"
         pop $0
         ${If} $0 != 0
 	    DetailPrint "Warning: Failed to add Netdata service description."
-        ${EndIf}
-
-	ClearErrors
-        nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
-        pop $0
-        ${If} $0 != 0
-	    DetailPrint "Warning: Failed to start Netdata service."
         ${EndIf}
 
 	WriteUninstaller "$INSTDIR\Uninstall.exe"
