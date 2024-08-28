@@ -20,10 +20,6 @@ case "$1" in
       dpkg-statoverride --update --add netdata adm 02750 /var/log/netdata
     fi
 
-    if ! dpkg-statoverride --list /usr/share/netdata/www > /dev/null 2>&1; then
-      dpkg-statoverride --update --add root netdata 0755 /usr/share/netdata/www
-    fi
-
     dpkg-statoverride --force --update --add root netdata 0775 /var/lib/netdata/registry > /dev/null 2>&1
 
     grep /usr/libexec/netdata /var/lib/dpkg/info/netdata.list | xargs -n 30 chown root:netdata

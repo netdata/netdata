@@ -155,8 +155,8 @@ mark_as_advanced(DEFAULT_FEATURE_STATE)
 # High-level features
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
-option(DASHBOARD "Enable local dashboard" True)
-mark_as_advanced(DASHBOARD)
+option(ENABLE_DASHBOARD "Enable local dashboard" True)
+mark_as_advanced(ENABLE_DASHBOARD)
 
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
@@ -3023,7 +3023,7 @@ endif()
 include(src/web/gui/v1/dashboard_v1.cmake)
 include(src/web/gui/gui.cmake)
 
-if(DASHBOARD)
+if(ENABLE_DASHBOARD)
   include(NetdataDashboard)
   bundle_dashboard()
 endif()
