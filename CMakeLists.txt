@@ -118,6 +118,10 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
         endif()
 
         set(BINDIR usr/bin)
+        set(CMAKE_RC_COMPILER_INIT windres)
+        ENABLE_LANGUAGE(RC)
+
+        SET(CMAKE_RC_COMPILE_OBJECT "<CMAKE_RC_COMPILER> <FLAGS> -O coff <DEFINES> -i <SOURCE> -o <OBJECT>")
         add_definitions(-D_GNU_SOURCE)
 
         if($ENV{CLION_IDE})
@@ -2246,7 +2250,9 @@ add_executable(netdata
 )
 
 if(OS_WINDOWS)
-        add_executable(netdata_claim ${CLAIM_WINDOWS_FILES})
+        set(NETDATA_CLAIM_RES_FILES "src/claim/netdata_claim.rc")
+
+        add_executable(netdata_claim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
         target_link_libraries(netdata_claim shell32;gdi32;msftedit)
 endif()
 
