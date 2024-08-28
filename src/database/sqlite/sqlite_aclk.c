@@ -199,6 +199,34 @@ fail:
     buffer_free(sql);
 }
 
+#define SQL_INVALIDATE_HOST_LAST_CONNECTED "UPDATE host SET last_connected = 1 WHERE host_id = @host_id"
+
+static void invalidate_host_last_connected(nd_uuid_t *host_uuid)
+{
+    sqlite3_stmt *res = NULL;
+    if (!host_uuid)
+        return;
+
+    if (!PREPARE_STATEMENT(db_meta, SQL_INVALIDATE_HOST_LAST_CONNECTED, &res))
+        return;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
+
+    param = 0;
+    int rc = sqlite3_step_monitored(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        char wstr[UUID_STR_LEN];
+        uuid_unparse_lower(*host_uuid, wstr);
+        error_report("Failed invalidate last_connected time for host with GUID %s, rc = %d", wstr, rc);
+    }
+
+bind_fail:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+}
+
+
 // OPCODE: ACLK_DATABASE_NODE_UNREGISTER
 static void sql_unregister_node(char *machine_guid)
 {
@@ -226,6 +254,7 @@ static void sql_unregister_node(char *machine_guid)
         error_report("Failed to execute command to remove host node id");
     } else {
        // node: machine guid will be freed after processing
+       invalidate_host_last_connected(&host_uuid);
        metadata_delete_host_chart_labels(machine_guid);
        machine_guid = NULL;
     }
@@ -329,7 +358,6 @@ static void aclk_synchronization(void *arg)
                     break;
                 case ACLK_DATABASE_NODE_UNREGISTER:
                     sql_unregister_node(cmd.param[0]);
-
                     break;
                     // ALERTS
                 case ACLK_DATABASE_PUSH_ALERT_CONFIG:
