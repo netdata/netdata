@@ -30,7 +30,7 @@ modules:
         metrics_description: >
           This collector gathers real-time system sensor statistics, 
           including temperature, voltage, current, power, fan speed, energy consumption, and humidity, 
-          utilizing the [sensors](https://linux.die.net/man/1/sensors) binary.
+          utilizing the [sensors](https://linux.die.net/man/1/sensors) binary or [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface).
         method_description: ""
       supported_platforms:
         include: []
@@ -56,11 +56,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - title: Install lm-sensors
-            description: |
-              - Install `lm-sensors` using your distribution's package manager.
-              - Run `sensors-detect` to detect hardware monitoring chips.
+        list: []
       configuration:
         file:
           name: go.d/sensors.conf
@@ -76,7 +72,7 @@ modules:
               default_value: 10
               required: false
             - name: binary_path
-              description: Path to the `sensors` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable.
+              description: Path to the `sensors` binary. If left empty or if the binary is not found, [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) will be used to collect sensor statistics.
               default_value: /usr/bin/sensors
               required: true
             - name: timeout
@@ -94,6 +90,12 @@ modules:
                 jobs:
                   - name: sensors
                     binary_path: /usr/local/sbin/sensors
+            - name: Use sysfs instead of sensors
+              description: Set `binary_path` to an empty string to use sysfs.
+              config: |
+                jobs:
+                  - name: sensors
+                    binary_path: ""
     troubleshooting:
       problems:
         list: []

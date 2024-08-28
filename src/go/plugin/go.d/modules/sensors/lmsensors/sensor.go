@@ -16,53 +16,77 @@ type Device struct {
 	Sensors []Sensor
 }
 
-// A Sensor is a hardware sensor, used to retrieve device temperatures,
-// fan speeds, voltages, etc.  Use type assertions to check for specific
+type SensorType string
+
+const (
+	SensorTypeCurrent     SensorType = "current"
+	SensorTypeFan         SensorType = "fan"
+	SensorTypeIntrusion   SensorType = "intrusion"
+	SensorTypePower       SensorType = "power"
+	SensorTypeTemperature SensorType = "temperature"
+	SensorTypeVoltage     SensorType = "voltage"
+)
+
+// A Sensor is a hardware sensor, used to retrieve device temperatures, fan speeds, voltages, etc.
+// Use type assertions to check for specific
 // Sensor types and fetch their data.
 type Sensor interface {
-	parse(raw map[string]string) error
-	name() string
-	setName(name string)
+	Type() SensorType
 }
 
-// parseSensors parses all Sensors from an input raw data slice, produced
-// during a filesystem walk.
+// parseSensors parses all Sensors from an input raw data slice, produced during a filesystem walk.
 func parseSensors(raw map[string]map[string]string) ([]Sensor, error) {
 	sensors := make([]Sensor, 0, len(raw))
 	for k, v := range raw {
-		var s Sensor
+		var sn Sensor
+		var err error
+
 		switch {
 		case strings.HasPrefix(k, "curr"):
-			s = new(CurrentSensor)
+			s := &CurrentSensor{Name: k}
+			sn = s
+			err = s.parse(v)
 		case strings.HasPrefix(k, "intrusion"):
-			s = new(IntrusionSensor)
+			s := &IntrusionSensor{Name: k}
+			sn = s
+			err = s.parse(v)
 		case strings.HasPrefix(k, "in"):
-			s = new(VoltageSensor)
+			s := &VoltageSensor{Name: k}
+			sn = s
+			err = s.parse(v)
 		case strings.HasPrefix(k, "fan"):
-			s = new(FanSensor)
+			s := &FanSensor{Name: k}
+			sn = s
+			err = s.parse(v)
 		case strings.HasPrefix(k, "power"):
-			s = new(PowerSensor)
+			s := &PowerSensor{Name: k}
+			sn = s
+			err = s.parse(v)
 		case strings.HasPrefix(k, "temp"):
-			s = new(TemperatureSensor)
+			s := &TemperatureSensor{Name: k}
+			sn = s
+			err = s.parse(v)
 		default:
 			continue
 		}
-
-		s.setName(k)
-		if err := s.parse(v); err != nil {
+		if err != nil {
 			return nil, err
 		}
 
-		sensors = append(sensors, s)
+		if sn == nil {
+			continue
+		}
+
+		sensors = append(sensors, sn)
 	}
 
-	sort.Sort(byName(sensors))
+	type namer interface{ name() string }
+
+	sort.Slice(sensors, func(i, j int) bool {
+		v1, ok1 := sensors[i].(namer)
+		v2, ok2 := sensors[j].(namer)
+		return ok1 && ok2 && v1.name() < v2.name()
+	})
+
 	return sensors, nil
 }
-
-// byName implements sort.Interface for []Sensor.
-type byName []Sensor
-
-func (b byName) Len() int           { return len(b) }
-func (b byName) Less(i, j int) bool { return b[i].name() < b[j].name() }
-func (b byName) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/sensors/lmsensors"
 )
 
 const (
@@ -17,6 +18,7 @@ const (
 	prioSensorFan
 	prioSensorEnergy
 	prioSensorHumidity
+	prioSensorIntrusion
 )
 
 var sensorTemperatureChartTmpl = module.Chart{
@@ -110,10 +112,24 @@ var sensorHumidityChartTmpl = module.Chart{
 	},
 }
 
-func (s *Sensors) addSensorChart(sn sensorStats) {
+var sensorIntrusionChartTmpl = module.Chart{
+	ID:       "sensor_chip_%s_feature_%s_subfeature_%s_intrusion",
+	Title:    "Sensor intrusion",
+	Units:    "status",
+	Fam:      "intrusion",
+	Ctx:      "sensors.sensor_intrusion",
+	Type:     module.Line,
+	Priority: prioSensorIntrusion,
+	Dims: module.Dims{
+		{ID: "sensor_chip_%s_feature_%s_subfeature_%s_alarm_off", Name: "alarm_off"},
+		{ID: "sensor_chip_%s_feature_%s_subfeature_%s_alarm_on", Name: "alarm_on"},
+	},
+}
+
+func (s *Sensors) addExecSensorChart(sn execSensor) {
 	var chart *module.Chart
 
-	switch sensorType(sn) {
+	switch sn.sensorType() {
 	case sensorTypeTemp:
 		chart = sensorTemperatureChartTmpl.Copy()
 	case sensorTypeVoltage:
@@ -141,6 +157,50 @@ func (s *Sensors) addSensorChart(sn sensorStats) {
 	}
 	for _, dim := range chart.Dims {
 		dim.ID = fmt.Sprintf(dim.ID, chip, feat, subfeat)
+	}
+
+	if err := s.Charts().Add(chart); err != nil {
+		s.Warning(err)
+	}
+}
+
+func (s *Sensors) addSysfsSensorChart(devName string, sn lmsensors.Sensor) {
+	var chart *module.Chart
+	var feat, subfeat string
+	devName = snakeCase(devName)
+
+	switch v := sn.(type) {
+	case *lmsensors.TemperatureSensor:
+		chart = sensorTemperatureChartTmpl.Copy()
+		feat, subfeat = firstNotEmpty(v.Label, v.Name), v.Name+"_input"
+	case *lmsensors.VoltageSensor:
+		chart = sensorVoltageChartTmpl.Copy()
+		feat, subfeat = firstNotEmpty(v.Label, v.Name), v.Name+"_input"
+	case *lmsensors.CurrentSensor:
+		chart = sensorCurrentChartTmpl.Copy()
+		feat, subfeat = firstNotEmpty(v.Label, v.Name), v.Name+"_input"
+	case *lmsensors.PowerSensor:
+		chart = sensorPowerChartTmpl.Copy()
+		feat, subfeat = firstNotEmpty(v.Label, v.Name), v.Name+"_average"
+	case *lmsensors.FanSensor:
+		chart = sensorFanChartTmpl.Copy()
+		feat, subfeat = firstNotEmpty(v.Label, v.Name), v.Name+"_input"
+	case *lmsensors.IntrusionSensor:
+		chart = sensorIntrusionChartTmpl.Copy()
+		feat, subfeat = firstNotEmpty(v.Label, v.Name), v.Name+"_alarm"
+	default:
+		return
+	}
+
+	feat, subfeat = snakeCase(feat), snakeCase(subfeat)
+
+	chart.ID = fmt.Sprintf(chart.ID, devName, feat, subfeat)
+	chart.Labels = []module.Label{
+		{Key: "chip", Value: devName},
+		{Key: "feature", Value: feat},
+	}
+	for _, dim := range chart.Dims {
+		dim.ID = fmt.Sprintf(dim.ID, devName, feat, subfeat)
 	}
 
 	if err := s.Charts().Add(chart); err != nil {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/sensors/lmsensors"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
@@ -49,12 +50,16 @@ type (
 
 		charts *module.Charts
 
-		exec sensorsCLI
+		exec sensorsBinary
+		sc   sysfsScanner
 
 		sensors map[string]bool
 	}
-	sensorsCLI interface {
+	sensorsBinary interface {
 		sensorsInfo() ([]byte, error)
+	}
+	sysfsScanner interface {
+		Scan() ([]*lmsensors.Device, error)
 	}
 )
 
@@ -63,17 +68,15 @@ func (s *Sensors) Configuration() any {
 }
 
 func (s *Sensors) Init() error {
-	if err := s.validateConfig(); err != nil {
-		s.Errorf("config validation: %s", err)
-		return err
+	if sb, err := s.initSensorsBinary(); err != nil {
+		s.Infof("sensors exec initialization: %v", err)
+	} else if sb != nil {
+		s.exec = sb
 	}
 
-	sensorsExec, err := s.initSensorsCliExec()
-	if err != nil {
-		s.Errorf("sensors exec initialization: %v", err)
-		return err
-	}
-	s.exec = sensorsExec
+	sc := lmsensors.New()
+	sc.Logger = s.Logger
+	s.sc = sc
 
 	return nil
 }

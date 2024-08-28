@@ -4,8 +4,7 @@ import (
 	"strconv"
 )
 
-// A TemperatureSensorType is value that indicates the type of a
-// TemperatureSensor.
+// A TemperatureSensorType is value that indicates the type of TemperatureSensor.
 type TemperatureSensorType int
 
 // All possible TemperatureSensorType constants.
@@ -27,42 +26,44 @@ type TemperatureSensor struct {
 	// The name of the sensor.
 	Name string
 
-	// A label that describes what the sensor is monitoring.  Label may be
-	// empty.
+	// A label that describes what the sensor is monitoring.  Label may be empty.
 	Label string
 
-	// Whether or not the sensor has an alarm triggered.
+	// Whether the sensor has an alarm triggered.
 	Alarm bool
 
-	// Whether or not the sensor will sound an audible alarm if an alarm
+	// Whether the sensor will sound an audible alarm if an alarm
 	// is triggered.
 	Beep bool
 
-	// The type of sensor used to report tempearatures.
-	Type TemperatureSensorType
+	// The type of sensor used to report temperatures.
+	TempType TemperatureSensorType
 
 	// The input temperature, in degrees Celsius, indicated by the sensor.
 	Input float64
 
-	// A high threshold temperature, in degrees Celsius, indicated by the
-	// sensor.
-	High float64
+	// A low threshold temperature, in degrees Celsius, indicated by the sensor.
+	Minimum float64
 
-	// A critical threshold temperature, in degrees Celsius, indicated by the
-	// sensor.
+	// A high threshold temperature, in degrees Celsius, indicated by the sensor.
+	Maximum float64
+
+	// A critical threshold temperature, in degrees Celsius, indicated by the sensor.
 	Critical float64
 
-	// Whether or not the temperature is past the critical threshold.
+	// An emergency threshold temperature, in degrees Celsius, indicated by the sensor.
+	Emergency float64
+
+	// Whether the temperature is past the critical threshold.
 	CriticalAlarm bool
 }
 
-func (s *TemperatureSensor) name() string        { return s.Name }
-func (s *TemperatureSensor) setName(name string) { s.Name = name }
+func (s *TemperatureSensor) Type() SensorType { return SensorTypeTemperature }
 
 func (s *TemperatureSensor) parse(raw map[string]string) error {
 	for k, v := range raw {
 		switch k {
-		case "input", "crit", "max":
+		case "input", "min", "max", "crit", "emergency":
 			f, err := strconv.ParseFloat(v, 64)
 			if err != nil {
 				return err
@@ -74,10 +75,14 @@ func (s *TemperatureSensor) parse(raw map[string]string) error {
 			switch k {
 			case "input":
 				s.Input = f
+			case "min":
+				s.Minimum = f
+			case "max":
+				s.Maximum = f
 			case "crit":
 				s.Critical = f
-			case "max":
-				s.High = f
+			case "emergency":
+				s.Emergency = f
 			}
 		case "alarm":
 			s.Alarm = v != "0"
@@ -89,7 +94,7 @@ func (s *TemperatureSensor) parse(raw map[string]string) error {
 				return err
 			}
 
-			s.Type = TemperatureSensorType(t)
+			s.TempType = TemperatureSensorType(t)
 		case "crit_alarm":
 			s.CriticalAlarm = v != "0"
 		case "label":
@@ -99,3 +104,5 @@ func (s *TemperatureSensor) parse(raw map[string]string) error {
 
 	return nil
 }
+
+func (s *TemperatureSensor) name() string { return s.Name }

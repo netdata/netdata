@@ -13,7 +13,7 @@
       },
       "binary_path": {
         "title": "Binary path",
-        "description": "Path to the `sensors` binary.",
+        "description": "Path to the `sensors` binary. If left empty or if the binary is not found, [**sysfs**](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) will be used to collect sensor statistics.",
         "type": "string",
         "default": "/usr/bin/sensors"
       },
@@ -26,7 +26,6 @@
       }
     },
     "required": [
-      "binary_path"
     ],
     "additionalProperties": false,
     "patternProperties": {

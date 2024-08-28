@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/logger"
 )
 
 // A filesystem is an interface to a filesystem, used for testing.
@@ -18,6 +21,8 @@ type filesystem interface {
 
 // A Scanner scans for Devices, so data can be read from their Sensors.
 type Scanner struct {
+	*logger.Logger
+
 	fs filesystem
 }
 
@@ -29,20 +34,24 @@ func New() *Scanner {
 }
 
 // Scan scans for Devices and their Sensors.
-func (s *Scanner) Scan() ([]*Device, error) {
-	paths, err := s.detectDevicePaths()
+func (sc *Scanner) Scan() ([]*Device, error) {
+	paths, err := sc.detectDevicePaths()
 	if err != nil {
 		return nil, err
 	}
 
+	sc.Debugf("sysfs scanner: found %d paths", len(paths))
+
 	var devices []*Device
 
 	for _, rootPath := range paths {
+		sc.Debugf("sysfs scanner: scanning %s", rootPath)
+
 		dev := &Device{}
 		raw := make(map[string]map[string]string)
 
 		// Walk filesystem paths to fetch devices and sensors
-		err := s.fs.WalkDir(rootPath, func(path string, de fs.DirEntry, err error) error {
+		err := sc.fs.WalkDir(rootPath, func(path string, de fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -60,10 +69,12 @@ func (s *Scanner) Scan() ([]*Device, error) {
 				return nil
 			}
 
-			s, err := s.fs.ReadFile(path)
+			now := time.Now()
+			s, err := sc.fs.ReadFile(path)
 			if err != nil {
 				return nil
 			}
+			sc.Debugf("sysfs scanner: reading file '%s' took %s", path, time.Since(now))
 
 			if file == "name" {
 				dev.Name = s
@@ -93,6 +104,10 @@ func (s *Scanner) Scan() ([]*Device, error) {
 			return nil, err
 		}
 
+		for _, sn := range sensors {
+			sc.Debugf("sysfs scanner: found sensor %+v", sn)
+		}
+
 		dev.Sensors = sensors
 		devices = append(devices, dev)
 	}
@@ -117,11 +132,11 @@ func renameDevices(devices []*Device) {
 }
 
 // detectDevicePaths performs a filesystem walk to paths where devices may reside on Linux.
-func (s *Scanner) detectDevicePaths() ([]string, error) {
+func (sc *Scanner) detectDevicePaths() ([]string, error) {
 	const lookPath = "/sys/class/hwmon"
 
 	var paths []string
-	err := s.fs.WalkDir(lookPath, func(path string, de os.DirEntry, err error) error {
+	err := sc.fs.WalkDir(lookPath, func(path string, de os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -130,7 +145,7 @@ func (s *Scanner) detectDevicePaths() ([]string, error) {
 			return nil
 		}
 
-		dest, err := s.fs.Readlink(path)
+		dest, err := sc.fs.Readlink(path)
 		if err != nil {
 			return err
 		}
@@ -138,7 +153,7 @@ func (s *Scanner) detectDevicePaths() ([]string, error) {
 		dest = filepath.Join(lookPath, filepath.Clean(dest))
 
 		// Symlink destination has a file called name, meaning a sensor exists here and data can be retrieved
-		fi, err := s.fs.Stat(filepath.Join(dest, "name"))
+		fi, err := sc.fs.Stat(filepath.Join(dest, "name"))
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
@@ -149,7 +164,7 @@ func (s *Scanner) detectDevicePaths() ([]string, error) {
 
 		// Symlink destination has another symlink called device, which can be read and used to retrieve data
 		device := filepath.Join(dest, "device")
-		fi, err = s.fs.Stat(device)
+		fi, err = sc.fs.Stat(device)
 		if err != nil {
 			if !os.IsNotExist(err) {
 				return err
@@ -161,7 +176,7 @@ func (s *Scanner) detectDevicePaths() ([]string, error) {
 			return nil
 		}
 
-		device, err = s.fs.Readlink(device)
+		device, err = sc.fs.Readlink(device)
 		if err != nil {
 			return err
 		}
@@ -169,7 +184,7 @@ func (s *Scanner) detectDevicePaths() ([]string, error) {
 		dest = filepath.Join(dest, filepath.Clean(device))
 
 		// Symlink destination has a file called name, meaning a sensor exists here and data can be retrieved
-		if _, err := s.fs.Stat(filepath.Join(dest, "name")); err != nil {
+		if _, err := sc.fs.Stat(filepath.Join(dest, "name")); err != nil {
 			if !os.IsNotExist(err) {
 				return err
 			}
