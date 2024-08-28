@@ -45,6 +45,7 @@ void rrdhost_stream_path_clear(RRDHOST *host, bool destroy) {
 }
 
 static void stream_path_to_json_object(BUFFER *wb, STREAM_PATH *p) {
+    buffer_json_add_array_item_object(wb);
     buffer_json_member_add_string(wb, "hostname", string2str(p->hostname));
     buffer_json_member_add_uuid(wb, "host_id", p->host_id.uuid);
     buffer_json_member_add_uuid(wb, "node_id", p->node_id.uuid);
@@ -54,6 +55,7 @@ static void stream_path_to_json_object(BUFFER *wb, STREAM_PATH *p) {
     buffer_json_member_add_uint64(wb, "first_time_t", p->first_time_t);
     stream_capabilities_to_json_array(wb, p->capabilities, "capabilities");
     STREAM_PATH_FLAGS_2json(wb, "flags", p->flags);
+    buffer_json_object_close(wb);
 }
 
 static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
@@ -99,7 +101,6 @@ void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *k
     spinlock_lock(&host->rrdpush.path.spinlock);
     buffer_json_member_add_array(wb, key);
     {
-        buffer_json_add_array_item_object(wb);
         {
             STREAM_PATH tmp = rrdhost_stream_path_self(host);
 
@@ -122,7 +123,6 @@ void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *k
 
             stream_path_clear(&tmp);
         }
-        buffer_json_object_close(wb);
     }
     buffer_json_array_close(wb); // key
     spinlock_unlock(&host->rrdpush.path.spinlock);
