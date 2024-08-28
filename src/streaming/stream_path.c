@@ -166,6 +166,10 @@ void stream_path_send_to_child(RRDHOST *host) {
     spinlock_unlock(&host->receiver_lock);
 }
 
+void stream_path_child_disconnected(RRDHOST *host) {
+    rrdhost_stream_path_clear(host, true);
+}
+
 void stream_path_parent_disconnected(RRDHOST *host) {
     spinlock_lock(&host->rrdpush.path.spinlock);
 

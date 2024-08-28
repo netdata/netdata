@@ -39,8 +39,11 @@ void stream_path_send_to_parent(struct rrdhost *host);
 void stream_path_send_to_child(struct rrdhost *host);
 
 void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *key, bool add_version);
-void stream_path_parent_disconnected(struct rrdhost *host);
+
 void rrdhost_stream_path_clear(struct rrdhost *host, bool destroy);
+
+void stream_path_child_disconnected(struct rrdhost *host);
+void stream_path_parent_disconnected(struct rrdhost *host);
 
 bool stream_path_set_from_json(struct rrdhost *host, const char *json, bool from_parent);
 

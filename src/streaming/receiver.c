@@ -489,6 +489,8 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
             if(rpt->config.health_enabled)
                 rrdcalc_child_disconnected(host);
+
+            stream_path_child_disconnected(host);
         }
 
         spinlock_unlock(&host->receiver_lock);
