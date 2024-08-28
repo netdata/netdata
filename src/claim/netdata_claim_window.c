@@ -64,7 +64,7 @@ int netdata_claim_window_loop(HINSTANCE hInstance, int nCmdShow)
     wcex.cbClsExtra     = 0;
     wcex.cbWndExtra     = 0;
     wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(wcex.hInstance, 11);
+    wcex.hIcon          = LoadIcon(wcex.hInstance, MAKEINTRESOURCEW(11));
     wcex.hCursor        = LoadCursor(NULL, IDC_ARROW);
     wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
     wcex.lpszMenuName   = NULL;

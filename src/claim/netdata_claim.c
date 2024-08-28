@@ -21,6 +21,35 @@ char *aRoom = NULL;
 char *aProxy = NULL;
 int insecure = 0;
 
+LPWSTR netdata_claim_get_formatted_message(LPWSTR pMessage, ...)
+{
+    LPWSTR pBuffer = NULL;
+
+    va_list args = NULL;
+    va_start(args, pMessage);
+
+    FormatMessage(FORMAT_MESSAGE_FROM_STRING | FORMAT_MESSAGE_ALLOCATE_BUFFER, pMessage, 0, 0, (LPWSTR)&pBuffer,
+    0, &args);
+    va_end(args);
+
+    return pBuffer;
+}
+
+// Common Functions
+void netdata_claim_error_exit(wchar_t *function)
+{
+    DWORD error = GetLastError();
+    LPWSTR pMessage = L"The function %1 failed with error %2.";
+    LPWSTR pBuffer = netdata_claim_get_formatted_message(pMessage, function, error);
+
+    if (pBuffer) {
+        MessageBoxW(NULL, pBuffer, L"Error", MB_OK|MB_ICONERROR);
+        LocalFree(pBuffer);
+    }
+
+    ExitProcess(error);
+}
+
 /**
  *  Parse Args
  *
@@ -53,10 +82,18 @@ int nd_claim_parse_args(int argc, LPWSTR *argv)
 
         if(wcscasecmp(L"/I", argv[i]) == 0) {
             i++;
+            size_t length = wcslen(argv[i]);
+            char *tmp = calloc(sizeof(char), length);
+            if (!tmp)
+                ExitProcess(1);
+
+            netdata_claim_convert_str(tmp, argv[i], length - 1);
             if (i < argc)
-                insecure = atoi(argv[i]);
+                insecure = atoi(tmp);
             else
                 insecure = 1;
+
+            free(tmp);
         }
     }
 
@@ -64,11 +101,6 @@ int nd_claim_parse_args(int argc, LPWSTR *argv)
         return 0;
 
     return argc;
-}
-
-static inline void netdata_claim_convert_str(char *dst, wchar_t *src, size_t len) {
-    size_t copied = wcstombs(dst, src, len);
-    dst[copied] = '\0';
 }
 
 static int netdata_claim_prepare_strings()
@@ -117,38 +149,6 @@ static void netdata_claim_exit_callback(int signal)
         LocalFree(argv);
 }
 
-static void netdata_claim_error_exit(LPCTSTR function)
-{
-    LPVOID lpMsgBuf;
-    LPVOID lpDisplayBuf;
-    DWORD dw = GetLastError();
-
-    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                 NULL,
-                 dw,
-                 MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                 (LPTSTR) &lpMsgBuf,
-                 0, NULL );
-
-    lpDisplayBuf = (LPVOID)LocalAlloc(LMEM_ZEROINIT,
-                                      (lstrlen((LPCTSTR)lpMsgBuf) + lstrlen((LPCTSTR)function) + 40) * sizeof(TCHAR));
-
-    snprintf((char *)lpDisplayBuf,
-                    LocalSize(lpDisplayBuf) / sizeof(TCHAR),
-                    "%s failed with error %d: %s",
-                    function,
-                    dw,
-                    lpMsgBuf);
-
-    MessageBoxA(NULL, (LPCTSTR)lpDisplayBuf, TEXT("Error"), MB_OK|MB_ICONERROR);
-
-    LocalFree(lpMsgBuf);
-    LocalFree(lpDisplayBuf);
-    netdata_claim_exit_callback(0);
-
-    ExitProcess(dw);
-}
-
 static inline void netdata_claim_create_process(char *cmd)
 {
     STARTUPINFOA si;
@@ -165,7 +165,7 @@ static inline void netdata_claim_create_process(char *cmd)
                         &pi)
                         )
     {
-        netdata_claim_error_exit(TEXT("CreateProcessA"));
+        netdata_claim_error_exit(L"CreateProcessA");
     }
 
     WaitForSingleObject( pi.hProcess, INFINITE );
@@ -203,14 +203,14 @@ static void netdata_claim_write_config(char *path)
 
     HANDLE hf = CreateFileA(configPath, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hf == INVALID_HANDLE_VALUE)
-        netdata_claim_error_exit(TEXT("CreateFileA"));
+        netdata_claim_error_exit(L"CreateFileA");
 
     DWORD length = netdata_claim_prepare_data(data, WINDOWS_MAX_PATH);
     DWORD written = 0;
 
     BOOL ret = WriteFile(hf, data, length, &written, NULL);
     if (!ret)
-        netdata_claim_error_exit(TEXT("WriteFileA"));
+        netdata_claim_error_exit(L"WriteFileA");
 
     if (length != written)
         MessageBoxW(NULL, L"Cannot write claim.conf.", L"Error", MB_OK|MB_ICONERROR);
@@ -225,7 +225,7 @@ static void netdata_claim_execute_command()
     char runCmd[WINDOWS_MAX_PATH];
     DWORD length = GetCurrentDirectoryA(WINDOWS_MAX_PATH, basePath);
     if (!length) {
-        netdata_claim_error_exit(TEXT("GetCurrentDirectoryA"));
+        netdata_claim_error_exit(L"GetCurrentDirectoryA");
     }
 
     if (strstr(basePath, usrPath)) {
