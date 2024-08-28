@@ -39,13 +39,21 @@
 
 #define JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                 \
     json_object *_j;                                                                                            \
-    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
-        if(uuid_parse(json_object_get_string(_j), dst) != 0 && required) {                                      \
-            buffer_sprintf(error, "invalid UUID '%s.%s'", path, member);                                        \
+    if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
+        if (json_object_is_type(_j, json_type_string)) {                                                        \
+            if (uuid_parse(json_object_get_string(_j), dst) != 0 && required) {                                 \
+                buffer_sprintf(error, "invalid UUID '%s.%s'", path, member);                                    \
+                return false;                                                                                   \
+            }                                                                                                   \
+            else                                                                                                \
+                uuid_clear(dst);                                                                                \
+        } else if (json_object_is_type(_j, json_type_null)) {                                                   \
+            uuid_clear(dst);                                                                                    \
+        } else if (required) {                                                                                  \
+            buffer_sprintf(error, "expected UUID or null '%s.%s'", path, member);                               \
             return false;                                                                                       \
         }                                                                                                       \
-    }                                                                                                           \
-    else if(required) {                                                                                         \
+    } else if (required) {                                                                                      \
         buffer_sprintf(error, "missing UUID '%s.%s'", path, member);                                            \
         return false;                                                                                           \
     }                                                                                                           \
