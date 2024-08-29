@@ -1,33 +1,17 @@
-// Copyright: SPDX-License-Identifier:  GPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "cringbuffer.h"
-#include "cringbuffer_internal.h"
-
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
-
-#define MIN(a,b) (((a)<(b))?(a):(b))
-#define MAX(a,b) (((a)>(b))?(a):(b))
-
-// this allows user to use their own
-// custom memory allocation functions
-#ifdef RBUF_CUSTOM_MALLOC
-#include "../../helpers/ringbuffer_pal.h"
-#else
-#define crbuf_malloc(...) malloc(__VA_ARGS__)
-#define crbuf_free(...) free(__VA_ARGS__)
-#endif
+#include "../libnetdata.h"
+#include "ringbuffer_internal.h"
 
 rbuf_t rbuf_create(size_t size)
 {
-    rbuf_t buffer = crbuf_malloc(sizeof(struct rbuf_t) + size);
+    rbuf_t buffer = mallocz(sizeof(struct rbuf) + size);
     if (!buffer)
         return NULL;
 
-    memset(buffer, 0, sizeof(struct rbuf_t));
+    memset(buffer, 0, sizeof(struct rbuf));
 
-    buffer->data = ((char*)buffer) + sizeof(struct rbuf_t);
+    buffer->data = ((char*)buffer) + sizeof(struct rbuf);
 
     buffer->head = buffer->data;
     buffer->tail = buffer->data;
@@ -39,7 +23,7 @@ rbuf_t rbuf_create(size_t size)
 
 void rbuf_free(rbuf_t buffer)
 {
-    crbuf_free(buffer);
+    freez(buffer);
 }
 
 void rbuf_flush(rbuf_t buffer)
@@ -78,6 +62,17 @@ int rbuf_bump_head(rbuf_t buffer, size_t bytes)
     int i = buffer->head - buffer->data;
     buffer->head = &buffer->data[(i + bytes) % buffer->size];
     buffer->size_data += bytes;
+    return 1;
+}
+
+int rbuf_bump_tail_noopt(rbuf_t buffer, size_t bytes)
+{
+    if (bytes > buffer->size_data)
+        return 0;
+    int i = buffer->tail - buffer->data;
+    buffer->tail = &buffer->data[(i + bytes) % buffer->size];
+    buffer->size_data -= bytes;
+
     return 1;
 }
 

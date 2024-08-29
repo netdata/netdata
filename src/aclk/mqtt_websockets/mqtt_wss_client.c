@@ -1,26 +1,14 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 
+#include "libnetdata/libnetdata.h"
 #include "mqtt_wss_client.h"
 #include "mqtt_ng.h"
 #include "ws_client.h"
 #include "common_internal.h"
-
-#include <stdlib.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <poll.h>
-#include <string.h>
-#include <time.h>
-
-#include <sys/socket.h>
-#include <netinet/in.h>
-
-#include <openssl/err.h>
-#include <openssl/ssl.h>
 
 #define PIPE_READ_END  0
 #define PIPE_WRITE_END 1

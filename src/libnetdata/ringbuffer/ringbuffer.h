@@ -1,11 +1,10 @@
-// Copyright: SPDX-License-Identifier:  GPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef CRINGBUFFER_H
-#define CRINGBUFFER_H
+#ifndef RINGBUFFER_H
+#define RINGBUFFER_H
+#include "../libnetdata.h"
 
-#include <stddef.h>
-
-typedef struct rbuf_t *rbuf_t;
+typedef struct rbuf *rbuf_t;
 
 rbuf_t rbuf_create(size_t size);
 void rbuf_free(rbuf_t buffer);

@@ -1,30 +1,9 @@
-// Copyright (C) 2020 Timotej Šiškovič
-// SPDX-License-Identifier: GPL-3.0-only
-//
-// This program is free software: you can redistribute it and/or modify it
-// under the terms of the GNU General Public License as published by the Free Software Foundation, version 3.
-//
-// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-// See the GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License along with this program.
-// If not, see <https://www.gnu.org/licenses/>.
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <fcntl.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <ctype.h>
-
-#include <openssl/evp.h>
+#include "libnetdata/libnetdata.h"
 
 #include "ws_client.h"
 #include "common_internal.h"
-
-#ifdef MQTT_WEBSOCKETS_DEBUG
-#include "../c-rbuf/src/ringbuffer_internal.h"
-#endif
 
 #define UNIT_LOG_PREFIX "ws_client: "
 #define FATAL(fmt, ...) mws_fatal(client->log, UNIT_LOG_PREFIX fmt, ##__VA_ARGS__)
