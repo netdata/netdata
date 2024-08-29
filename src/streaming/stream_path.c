@@ -79,16 +79,16 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
         has_receiver = true;
         p.hops = (int16_t)host->receiver->hops;
         p.since = host->receiver->connected_since_s;
-        p.capabilities = host->receiver->capabilities;
     }
     spinlock_unlock(&host->receiver_lock);
 
     if(!has_receiver) {
         p.hops = (is_localhost) ? 0 : -1; // -1 for stale nodes
         p.since = netdata_start_time;
-        // the following may get the receiver lock again!
-        p.capabilities = stream_our_capabilities(host, host == localhost);
     }
+
+    // the following may get the receiver lock again!
+    p.capabilities = stream_our_capabilities(host, true);
 
     rrdhost_retention(host, 0, false, &p.first_time_t, NULL);
 
