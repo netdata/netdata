@@ -171,7 +171,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR);
         netdata_log_debug(D_STREAM, "STREAM: Send failed - closing socket...");
         netdata_log_error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.",  rrdhost_hostname(s->host), s->connected_to, s->sent_bytes_on_this_connection);
-        rrdpush_sender_thread_close_socket(s->host);
+        rrdpush_sender_thread_close_socket(s);
     }
     else
         netdata_log_debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
@@ -209,7 +209,7 @@ static ssize_t attempt_read(struct sender_state *s) {
         netdata_log_error("STREAM %s [send to %s]: error during receive (%zd) - closing connection.", rrdhost_hostname(s->host), s->connected_to, ret);
     }
 
-    rrdpush_sender_thread_close_socket(s->host);
+    rrdpush_sender_thread_close_socket(s);
 
     return ret;
 }
@@ -561,7 +561,7 @@ void *rrdpush_sender_thread(void *ptr) {
         )) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
             netdata_log_error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection via %zu send attempts.", rrdhost_hostname(s->host), s->connected_to, s->timeout, s->sent_bytes_on_this_connection, s->send_attempts);
-            rrdpush_sender_thread_close_socket(s->host);
+            rrdpush_sender_thread_close_socket(s);
             continue;
         }
 
@@ -592,7 +592,7 @@ void *rrdpush_sender_thread(void *ptr) {
             if(!rrdpush_sender_pipe_close(s->host, s->rrdpush_sender_pipe, true)) {
                 netdata_log_error("STREAM %s [send]: cannot create inter-thread communication pipe. "
                                   "Disabling streaming.", rrdhost_hostname(s->host));
-                rrdpush_sender_thread_close_socket(s->host);
+                rrdpush_sender_thread_close_socket(s);
                 break;
             }
         }
@@ -643,7 +643,7 @@ void *rrdpush_sender_thread(void *ptr) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR);
             netdata_log_error("STREAM %s [send to %s]: failed to poll(). Closing socket.", rrdhost_hostname(s->host), s->connected_to);
             rrdpush_sender_pipe_close(s->host, s->rrdpush_sender_pipe, true);
-            rrdpush_sender_thread_close_socket(s->host);
+            rrdpush_sender_thread_close_socket(s);
             continue;
         }
 
@@ -710,7 +710,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR);
                 netdata_log_error("STREAM %s [send to %s]: restarting connection: %s - %zu bytes transmitted.",
                                   rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
-                rrdpush_sender_thread_close_socket(s->host);
+                rrdpush_sender_thread_close_socket(s);
             }
         }
 
@@ -720,7 +720,7 @@ void *rrdpush_sender_thread(void *ptr) {
             errno_clear();
             netdata_log_error("STREAM %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. Restarting connection",
                               rrdhost_hostname(s->host), s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);
-            rrdpush_sender_thread_close_socket(s->host);
+            rrdpush_sender_thread_close_socket(s);
         }
 
         worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE) dictionary_entries(s->replication.requests));
@@ -735,7 +735,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
     sender_lock(s->host->sender);
     {
-        rrdpush_sender_thread_close_socket(s->host);
+        rrdpush_sender_thread_close_socket(s);
         rrdpush_sender_pipe_close(s->host, s->rrdpush_sender_pipe, false);
         rrdpush_sender_execute_commands_cleanup(s);
 

@@ -44,7 +44,7 @@ extern char *netdata_ssl_ca_file;
 bool attempt_to_connect(struct sender_state *state);
 void rrdpush_sender_on_connect(RRDHOST *host);
 void rrdpush_sender_after_connect(RRDHOST *host);
-void rrdpush_sender_thread_close_socket(RRDHOST *host);
+void rrdpush_sender_thread_close_socket(struct sender_state *s);
 
 void rrdpush_sender_execute_commands_cleanup(struct sender_state *s);
 void rrdpush_sender_execute_commands(struct sender_state *s);
