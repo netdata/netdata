@@ -221,9 +221,11 @@ func TestCockroachDB_Collect(t *testing.T) {
 		"valcount":                                     124081,
 	}
 
-	collected := cdb.Collect()
-	assert.Equal(t, expected, collected)
-	testCharts(t, cdb, collected)
+	mx := cdb.Collect()
+
+	assert.Equal(t, expected, mx)
+
+	module.TestMetricsHasAllChartsDims(t, cdb.Charts(), mx)
 }
 
 func TestCockroachDB_Collect_ReturnsNilIfNotCockroachDBMetrics(t *testing.T) {
@@ -252,23 +254,6 @@ func TestCockroachDB_Collect_ReturnsNilIfReceiveResponse404(t *testing.T) {
 	defer ts.Close()
 
 	assert.Nil(t, cdb.Collect())
-}
-
-func testCharts(t *testing.T, cdb *CockroachDB, collected map[string]int64) {
-	ensureCollectedHasAllChartsDimsVarsIDs(t, cdb, collected)
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, c *CockroachDB, collected map[string]int64) {
-	for _, chart := range *c.Charts() {
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
-	}
 }
 
 func prepareCockroachDB() *CockroachDB {

@@ -737,16 +737,7 @@ func testCharts(t *testing.T, w *WebLog, mx map[string]int64) {
 	testCustomTimeFieldCharts(t, w)
 	testCustomNumericFieldCharts(t, w)
 
-	testChartsDimIDs(t, w, mx)
-}
-
-func testChartsDimIDs(t *testing.T, w *WebLog, mx map[string]int64) {
-	for _, chart := range *w.Charts() {
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-	}
+	module.TestMetricsHasAllChartsDims(t, w.Charts(), mx)
 }
 
 func testVhostChart(t *testing.T, w *WebLog) {

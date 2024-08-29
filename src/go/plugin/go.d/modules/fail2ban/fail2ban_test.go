@@ -170,27 +170,13 @@ func TestFail2Ban_Collect(t *testing.T) {
 			mx := f2b.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
+
 			if len(test.wantMetrics) > 0 {
-				assert.Len(t, *f2b.Charts(), len(jailChartsTmpl)*2)
-				testMetricsHasAllChartsDims(t, f2b, mx)
+				assert.Len(t, *f2b.Charts(), len(jailChartsTmpl)*2, "wantCharts")
+
+				module.TestMetricsHasAllChartsDims(t, f2b.Charts(), mx)
 			}
 		})
-	}
-}
-
-func testMetricsHasAllChartsDims(t *testing.T, f2b *Fail2Ban, mx map[string]int64) {
-	for _, chart := range *f2b.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := mx[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
 	}
 }
 

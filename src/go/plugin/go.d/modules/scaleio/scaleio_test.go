@@ -298,9 +298,11 @@ func TestScaleIO_Collect(t *testing.T) {
 		"system_total_iops_write":                                                617200,
 	}
 
-	collected := scaleIO.Collect()
-	assert.Equal(t, expected, collected)
-	testCharts(t, scaleIO, collected)
+	mx := scaleIO.Collect()
+
+	assert.Equal(t, expected, mx)
+
+	testCharts(t, scaleIO, mx)
 }
 
 func TestScaleIO_Collect_ConnectionRefused(t *testing.T) {
@@ -317,7 +319,7 @@ func testCharts(t *testing.T, scaleIO *ScaleIO, collected map[string]int64) {
 	t.Helper()
 	ensureStoragePoolChartsAreCreated(t, scaleIO)
 	ensureSdcChartsAreCreated(t, scaleIO)
-	ensureCollectedHasAllChartsDimsVarsIDs(t, scaleIO, collected)
+	module.TestMetricsHasAllChartsDims(t, scaleIO.Charts(), collected)
 }
 
 func ensureStoragePoolChartsAreCreated(t *testing.T, scaleIO *ScaleIO) {
@@ -332,19 +334,6 @@ func ensureSdcChartsAreCreated(t *testing.T, scaleIO *ScaleIO) {
 	for _, sdc := range scaleIO.discovered.sdc {
 		for _, chart := range *newSdcCharts(sdc) {
 			assert.Truef(t, scaleIO.Charts().Has(chart.ID), "chart '%s' is not created", chart.ID)
-		}
-	}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, scaleIO *ScaleIO, collected map[string]int64) {
-	for _, chart := range *scaleIO.Charts() {
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
 		}
 	}
 }

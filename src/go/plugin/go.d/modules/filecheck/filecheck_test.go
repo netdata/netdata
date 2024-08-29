@@ -244,21 +244,11 @@ func TestFilecheck_Collect(t *testing.T) {
 			mx := fc.Collect()
 
 			copyModTime(test.wantCollected, mx)
-			assert.Equal(t, test.wantCollected, mx)
-			testMetricsHasAllChartsDims(t, fc, mx)
-		})
-	}
-}
 
-func testMetricsHasAllChartsDims(t *testing.T, fc *Filecheck, mx map[string]int64) {
-	for _, chart := range *fc.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "mx metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
+			assert.Equal(t, test.wantCollected, mx)
+
+			module.TestMetricsHasAllChartsDims(t, fc.Charts(), mx)
+		})
 	}
 }
 

@@ -91,9 +91,11 @@ func TestVerneMQ_Collect(t *testing.T) {
 	verneMQ, srv := prepareClientServerV1101(t)
 	defer srv.Close()
 
-	collected := verneMQ.Collect()
-	assert.Equal(t, v1101ExpectedMetrics, collected)
-	testCharts(t, verneMQ, collected)
+	mx := verneMQ.Collect()
+
+	assert.Equal(t, v1101ExpectedMetrics, mx)
+
+	module.TestMetricsHasAllChartsDims(t, verneMQ.Charts(), mx)
 }
 
 func TestVerneMQ_Collect_ReturnsNilIfConnectionRefused(t *testing.T) {
@@ -122,23 +124,6 @@ func TestVerneMQ_Collect_ReturnsNilIfReceiveResponse404(t *testing.T) {
 	defer ts.Close()
 
 	assert.Nil(t, verneMQ.Collect())
-}
-
-func testCharts(t *testing.T, verneMQ *VerneMQ, collected map[string]int64) {
-	ensureCollectedHasAllChartsDimsVarsIDs(t, verneMQ, collected)
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, verneMQ *VerneMQ, collected map[string]int64) {
-	for _, chart := range *verneMQ.Charts() {
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
-	}
 }
 
 func prepareVerneMQ() *VerneMQ {
