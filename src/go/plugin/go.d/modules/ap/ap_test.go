@@ -211,25 +211,11 @@ func TestAP_Collect(t *testing.T) {
 			mx := ap.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
-			assert.Equal(t, test.wantCharts, len(*ap.Charts()), "Charts")
-			testMetricsHasAllChartsDims(t, ap, mx)
-		})
-	}
-}
 
-func testMetricsHasAllChartsDims(t *testing.T, ap *AP, mx map[string]int64) {
-	for _, chart := range *ap.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := mx[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
+			assert.Equal(t, test.wantCharts, len(*ap.Charts()), "wantCharts")
+
+			module.TestMetricsHasAllChartsDims(t, ap.Charts(), mx)
+		})
 	}
 }
 

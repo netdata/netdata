@@ -192,21 +192,11 @@ func TestLVM_Collect(t *testing.T) {
 			mx := dmcache.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
-			assert.Len(t, *dmcache.Charts(), test.wantCharts)
-			testMetricsHasAllChartsDims(t, dmcache, mx)
-		})
-	}
-}
 
-func testMetricsHasAllChartsDims(t *testing.T, dmcache *DmCache, mx map[string]int64) {
-	for _, chart := range *dmcache.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
+			assert.Len(t, *dmcache.Charts(), test.wantCharts, "wantCharts")
+
+			module.TestMetricsHasAllChartsDims(t, dmcache.Charts(), mx)
+		})
 	}
 }
 

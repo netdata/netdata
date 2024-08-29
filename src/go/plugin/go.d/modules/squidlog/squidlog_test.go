@@ -238,16 +238,18 @@ func TestSquidLog_Collect_ReturnOldDataIfNothingRead(t *testing.T) {
 	}
 
 	_ = squid.Collect()
-	collected := squid.Collect()
 
-	assert.Equal(t, expected, collected)
-	testCharts(t, squid, collected)
+	mx := squid.Collect()
+
+	assert.Equal(t, expected, mx)
+
+	testCharts(t, squid, mx)
 }
 
-func testCharts(t *testing.T, squidlog *SquidLog, collected map[string]int64) {
+func testCharts(t *testing.T, squidlog *SquidLog, mx map[string]int64) {
 	t.Helper()
 	ensureChartsDynamicDimsCreated(t, squidlog)
-	ensureCollectedHasAllChartsDimsVarsIDs(t, squidlog, collected)
+	module.TestMetricsHasAllChartsDims(t, squidlog.Charts(), mx)
 }
 
 func ensureChartsDynamicDimsCreated(t *testing.T, squid *SquidLog) {
@@ -273,19 +275,6 @@ func ensureDynamicDimsCreated(t *testing.T, squid *SquidLog, chartID, dimPrefix 
 	for v := range data {
 		id := dimPrefix + v
 		assert.Truef(t, chart.HasDim(id), "chart '%s' has no dim for '%s', expected '%s'", chart.ID, v, id)
-	}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, s *SquidLog, collected map[string]int64) {
-	for _, chart := range *s.Charts() {
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
 	}
 }
 

@@ -242,26 +242,13 @@ func TestHddTemp_Collect(t *testing.T) {
 			mx := hdd.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
-			assert.Len(t, *hdd.Charts(), test.wantCharts)
-			assert.Equal(t, test.wantDisconnect, mock.disconnectCalled)
-			testMetricsHasAllChartsDims(t, hdd, mx)
-		})
-	}
-}
 
-func testMetricsHasAllChartsDims(t *testing.T, hdd *HddTemp, mx map[string]int64) {
-	for _, chart := range *hdd.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := mx[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
+			assert.Len(t, *hdd.Charts(), test.wantCharts, "wantCharts")
+
+			assert.Equal(t, test.wantDisconnect, mock.disconnectCalled, "disconnectCalled")
+
+			module.TestMetricsHasAllChartsDims(t, hdd.Charts(), mx)
+		})
 	}
 }
 

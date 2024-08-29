@@ -230,8 +230,10 @@ func TestStorCli_Collect(t *testing.T) {
 			mx := stor.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
-			assert.Len(t, *stor.Charts(), test.wantCharts)
-			testMetricsHasAllChartsDims(t, stor, mx)
+
+			assert.Len(t, *stor.Charts(), test.wantCharts, "wantCharts")
+
+			module.TestMetricsHasAllChartsDims(t, stor.Charts(), mx)
 		})
 	}
 }
@@ -290,20 +292,4 @@ func (m *mockStorCliExec) drivesInfo() ([]byte, error) {
 		return nil, errors.New("mock.drivesInfo() error")
 	}
 	return m.drivesInfoData, nil
-}
-
-func testMetricsHasAllChartsDims(t *testing.T, stor *StorCli, mx map[string]int64) {
-	for _, chart := range *stor.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := mx[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
-	}
 }

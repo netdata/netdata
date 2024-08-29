@@ -817,7 +817,7 @@ func TestWindows_Collect(t *testing.T) {
 
 func testCharts(t *testing.T, win *Windows, mx map[string]int64) {
 	ensureChartsDimsCreated(t, win)
-	ensureCollectedHasAllChartsDimsVarsIDs(t, win, mx)
+	module.TestMetricsHasAllChartsDims(t, win.Charts(), mx)
 }
 
 func ensureChartsDimsCreated(t *testing.T, w *Windows) {
@@ -1043,19 +1043,6 @@ func ensureChartsDimsCreated(t *testing.T, w *Windows) {
 		for _, chart := range hypervVswitchChartsTemplate {
 			id := fmt.Sprintf(chart.ID, hypervCleanName(vswitch))
 			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' virtual switch", id, vswitch)
-		}
-	}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, w *Windows, mx map[string]int64) {
-	for _, chart := range *w.Charts() {
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := mx[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
 		}
 	}
 }

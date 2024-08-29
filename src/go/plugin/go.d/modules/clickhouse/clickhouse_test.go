@@ -243,22 +243,11 @@ func TestClickHouse_Collect(t *testing.T) {
 			mx := click.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
+
 			if len(test.wantMetrics) > 0 {
-				testMetricsHasAllChartsDims(t, click, mx)
+				module.TestMetricsHasAllChartsDims(t, click.Charts(), mx)
 			}
 		})
-	}
-}
-
-func testMetricsHasAllChartsDims(t *testing.T, click *ClickHouse, mx map[string]int64) {
-	for _, chart := range *click.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
 	}
 }
 
