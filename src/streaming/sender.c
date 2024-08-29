@@ -751,8 +751,6 @@ void *rrdpush_sender_thread(void *ptr) {
     sender_unlock(s);
 
     freez(pipe_buffer);
-    freez(s);
-
     worker_unregister();
 
     return NULL;

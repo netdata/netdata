@@ -705,11 +705,12 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
         if(last_pos > 4) last_pos -= 4; // allow searching for \r\n\r\n
         else last_pos = 0;
 
-        if(w->header_parse_last_size < last_pos)
+        if(w->header_parse_last_size <= last_pos)
             last_pos = 0;
 
-        is_it_valid =
-            url_is_request_complete_and_extract_payload(s, &s[last_pos], w->header_parse_last_size, &w->payload);
+        is_it_valid = url_is_request_complete_and_extract_payload(s, &s[last_pos],
+                                                                  w->header_parse_last_size, &w->payload);
+
         if(!is_it_valid) {
             if(w->header_parse_tries > HTTP_REQ_MAX_HEADER_FETCH_TRIES) {
                 netdata_log_info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
@@ -1824,10 +1825,11 @@ ssize_t web_client_receive(struct web_client *w)
         return web_client_read_file(w);
 
     ssize_t bytes;
-    ssize_t left = (ssize_t)(w->response.data->size - w->response.data->len);
 
     // do we have any space for more data?
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_INITIAL_SIZE);
+
+    ssize_t left = (ssize_t)(w->response.data->size - w->response.data->len);
 
     errno_clear();
 
