@@ -115,27 +115,27 @@ Function NetdataConfigLeave
                         Goto runMsys
                 ${EndIf}
 
-            ${If} $0 == 135
-            ${AndIf} $1 >= 36
-                    nsExec::ExecToLog '$INSTDIR\usr\bin\netdata_claim.exe /T $cloudToken /R $cloudRoom /P $proxy /I $insecure'
-                    pop $0
-            ${Else}
-                    MessageBox MB_OK "The Cloud information does not have the expected length."
-            ${EndIf}
+                ${If} $0 == 135
+                ${AndIf} $1 >= 36
+                        nsExec::ExecToLog '$INSTDIR\usr\bin\netdata_claim.exe /T $cloudToken /R $cloudRoom /P $proxy /I $insecure'
+                        pop $0
+                ${Else}
+                        MessageBox MB_OK "The Cloud information does not have the expected length."
+                ${EndIf}
 
-            runMsys:
-            ${If} $startMsys == ${BST_CHECKED}
-                nsExec::ExecToLog '$INSTDIR\msys2.exe'
-                pop $0
-            ${EndIf}
+                runMsys:
+                ${If} $startMsys == ${BST_CHECKED}
+                        nsExec::ExecToLog '$INSTDIR\msys2.exe'
+                        pop $0
+                ${EndIf}
+        ${EndIf}
 
-    	    ClearErrors
-            nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
-            pop $0
-            ${If} $0 != 0
+        ClearErrors
+        nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
+        pop $0
+        ${If} $0 != 0
 	        MessageBox MB_OK "Warning: Failed to start Netdata service."
-            ${EndIf}
-    ${EndIf}
+        ${EndIf}
 FunctionEnd
 
 Function NetdataUninstallRegistry
