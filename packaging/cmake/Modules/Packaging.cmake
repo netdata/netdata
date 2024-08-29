@@ -115,8 +115,8 @@ set(CPACK_DEBIAN_NETDATA_DEBUGINFO_PACKAGE On)
 
 set(CPACK_COMPONENT_DASHBOARD_DEPENDS "netdata")
 set(CPACK_COMPONENT_DASHBOARD_DESCRIPTION
-    "The local dashboard for the Netdata Agent. This allows access to the dashboard on
- the local node without internet access.")
+    "The local dashboard for the Netdata Agent.
+ This allows access to the dashboard on the local node without internet access.")
 
 set(CPACK_DEBIAN_DASHBOARD_PACKAGE_NAME "netdata-dashboard")
 set(CPACK_DEBIAN_DASHBOARD_PACKAGE_SECTION "net")
