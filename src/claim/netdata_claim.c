@@ -163,11 +163,11 @@ static void netdata_claim_exit_callback(int signal)
 
 static inline int netdata_claim_prepare_data(char *out, size_t length)
 {
-    char *proxyLabel = (aProxy) ? "proxy = " : "";
+    char *proxyLabel = (aProxy) ? "proxy = " : "#    proxy = ";
     char *proxyValue = (aProxy) ? aProxy : "";
     return snprintf(out,
                     length,
-                    "[global]\n    url = https://app.netdata.cloud\n    token = %s\n   rooms = %s\n    %s%s\n    Insecure = %s",
+                    "[global]\n    url = https://app.netdata.cloud\n    token = %s\n    rooms = %s\n    %s%s\n    insecure = %s",
                     aToken,
                     aRoom,
                     proxyLabel,
