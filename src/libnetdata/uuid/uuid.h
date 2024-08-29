@@ -37,7 +37,7 @@ ND_UUID UUID_generate_from_hash(const void *payload, size_t payload_len);
 
 #define UUIDeq(a, b) ((a).parts.hig64 == (b).parts.hig64 && (a).parts.low64 == (b).parts.low64)
 
-#define UUIDiszero(a) (UUIDeq(a, UUID_ZERO))
+#define UUIDiszero(a) ((a).parts.hig64 == 0 && (a).parts.low64 == 0)
 
 static inline ND_UUID uuid2UUID(const nd_uuid_t uu1) {
     // uu1 may not be aligned, so copy it to the output

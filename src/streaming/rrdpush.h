@@ -8,89 +8,11 @@
 #include "web/server/web_client.h"
 #include "database/rrdfunctions.h"
 #include "database/rrd.h"
+#include "stream_capabilities.h"
 
 #define CONNECTED_TO_SIZE 100
 #define CBUFFER_INITIAL_SIZE (16 * 1024)
 #define THREAD_BUFFER_INITIAL_SIZE (CBUFFER_INITIAL_SIZE / 2)
-
-// ----------------------------------------------------------------------------
-// obsolete versions - do not use anymore
-
-#define STREAM_OLD_VERSION_CLAIM 3
-#define STREAM_OLD_VERSION_CLABELS 4
-#define STREAM_OLD_VERSION_LZ4 5
-
-// ----------------------------------------------------------------------------
-// capabilities negotiation
-
-typedef enum {
-    STREAM_CAP_NONE             = 0,
-
-    // do not use the first 3 bits
-    // they used to be versions 1, 2 and 3
-    // before we introduce capabilities
-
-    STREAM_CAP_V1               = (1 << 3), // v1 = the oldest protocol
-    STREAM_CAP_V2               = (1 << 4), // v2 = the second version of the protocol (with host labels)
-    STREAM_CAP_VN               = (1 << 5), // version negotiation supported (for versions 3, 4, 5 of the protocol)
-                                            // v3 = claiming supported
-                                            // v4 = chart labels supported
-                                            // v5 = lz4 compression supported
-    STREAM_CAP_VCAPS            = (1 << 6), // capabilities negotiation supported
-    STREAM_CAP_HLABELS          = (1 << 7), // host labels supported
-    STREAM_CAP_CLAIM            = (1 << 8), // claiming supported
-    STREAM_CAP_CLABELS          = (1 << 9), // chart labels supported
-    STREAM_CAP_LZ4              = (1 << 10), // lz4 compression supported
-    STREAM_CAP_FUNCTIONS        = (1 << 11), // plugin functions supported
-    STREAM_CAP_REPLICATION      = (1 << 12), // replication supported
-    STREAM_CAP_BINARY           = (1 << 13), // streaming supports binary data
-    STREAM_CAP_INTERPOLATED     = (1 << 14), // streaming supports interpolated streaming of values
-    STREAM_CAP_IEEE754          = (1 << 15), // streaming supports binary/hex transfer of double values
-    STREAM_CAP_DATA_WITH_ML     = (1 << 16), // streaming supports transferring anomaly bit
-    // STREAM_CAP_DYNCFG        = (1 << 17), // leave this unused for as long as possible
-    STREAM_CAP_SLOTS            = (1 << 18), // the sender can appoint a unique slot for each chart
-    STREAM_CAP_ZSTD             = (1 << 19), // ZSTD compression supported
-    STREAM_CAP_GZIP             = (1 << 20), // GZIP compression supported
-    STREAM_CAP_BROTLI           = (1 << 21), // BROTLI compression supported
-    STREAM_CAP_PROGRESS         = (1 << 22), // Functions PROGRESS support
-    STREAM_CAP_DYNCFG           = (1 << 23), // support for DYNCFG
-    STREAM_CAP_NODE_ID          = (1 << 24), // support for sending NODE_ID back to the child
-
-    STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
-    // this must be signed int, so don't use the last bit
-    // needed for negotiating errors between parent and child
-} STREAM_CAPABILITIES;
-
-#ifdef ENABLE_LZ4
-#define STREAM_CAP_LZ4_AVAILABLE STREAM_CAP_LZ4
-#else
-#define STREAM_CAP_LZ4_AVAILABLE 0
-#endif  // ENABLE_LZ4
-
-#ifdef ENABLE_ZSTD
-#define STREAM_CAP_ZSTD_AVAILABLE STREAM_CAP_ZSTD
-#else
-#define STREAM_CAP_ZSTD_AVAILABLE 0
-#endif  // ENABLE_ZSTD
-
-#ifdef ENABLE_BROTLI
-#define STREAM_CAP_BROTLI_AVAILABLE STREAM_CAP_BROTLI
-#else
-#define STREAM_CAP_BROTLI_AVAILABLE 0
-#endif  // ENABLE_BROTLI
-
-#define STREAM_CAP_COMPRESSIONS_AVAILABLE (STREAM_CAP_LZ4_AVAILABLE|STREAM_CAP_ZSTD_AVAILABLE|STREAM_CAP_BROTLI_AVAILABLE|STREAM_CAP_GZIP)
-
-extern STREAM_CAPABILITIES globally_disabled_capabilities;
-
-STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender);
-
-#define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)) == (capability))
-
-static inline bool stream_has_more_than_one_capability_of(STREAM_CAPABILITIES caps, STREAM_CAPABILITIES mask) {
-    STREAM_CAPABILITIES common = (STREAM_CAPABILITIES)(caps & mask);
-    return (common & (common - 1)) != 0 && common != 0;
-}
 
 // ----------------------------------------------------------------------------
 // stream handshake
@@ -200,6 +122,9 @@ typedef enum __attribute__((packed)) {
     SENDER_FLAG_OVERFLOW     = (1 << 0), // The buffer has been overflown
 } SENDER_FLAGS;
 
+typedef void (*rrdpush_defer_action_t)(struct sender_state *s, void *data);
+typedef void (*rrdpush_defer_cleanup_t)(struct sender_state *s, void *data);
+
 struct sender_state {
     RRDHOST *host;
     pid_t tid;                              // the thread id of the sender, from gettid_cached()
@@ -267,14 +192,12 @@ struct sender_state {
     } atomic;
 
     struct {
-        bool intercept_input;
-        const char *transaction;
-        const char *timeout_s;
-        const char *function;
-        const char *access;
-        const char *source;
+        const char *end_keyword;
         BUFFER *payload;
-    } functions;
+        rrdpush_defer_action_t action;
+        rrdpush_defer_cleanup_t cleanup;
+        void *action_data;
+    } defer;
 
     int parent_using_h2o;
 };
@@ -355,6 +278,7 @@ struct receiver_state {
     struct rrdhost_system_info *system_info;
     STREAM_CAPABILITIES capabilities;
     time_t last_msg_t;
+    time_t connected_since_s;
 
     struct buffered_reader reader;
 
@@ -479,13 +403,7 @@ void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
 
 void rrdpush_reset_destinations_postpone_time(RRDHOST *host);
 const char *stream_handshake_error_to_string(STREAM_HANDSHAKE handshake_error);
-void stream_capabilities_to_json_array(BUFFER *wb, STREAM_CAPABILITIES caps, const char *key);
 void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status, ND_LOG_FIELD_PRIORITY priority);
-void log_receiver_capabilities(struct receiver_state *rpt);
-void log_sender_capabilities(struct sender_state *s);
-STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDHOST *host, bool sender);
-int32_t stream_capabilities_to_vn(uint32_t caps);
-void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps);
 
 void receiver_state_free(struct receiver_state *rpt);
 bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason);
@@ -763,5 +681,6 @@ void rrdpush_select_receiver_compression_algorithm(struct receiver_state *rpt);
 void rrdpush_compression_deactivate(struct sender_state *s);
 
 #include "protocol/commands.h"
+#include "stream_path.h"
 
 #endif //NETDATA_RRDPUSH_H

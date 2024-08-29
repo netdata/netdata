@@ -71,12 +71,10 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
     if(id && *id)
         template = string_strdupz(id);
 
-    ND_UUID host_uuid = uuid2UUID(host->host_uuid);
-
     size_t path_len = strlen(path);
     DYNCFG *df;
     dfe_start_read(dyncfg_globals.nodes, df) {
-        if(!UUIDeq(df->host_uuid, host_uuid))
+        if(!UUIDeq(df->host_uuid, host->host_id))
             continue;
 
         if(strncmp(string2str(df->path), path, path_len) != 0)

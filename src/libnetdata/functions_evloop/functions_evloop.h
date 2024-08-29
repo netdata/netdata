@@ -75,6 +75,10 @@
 #define PLUGINSD_KEYWORD_NODE_ID                "NODE_ID"
 #define PLUGINSD_KEYWORD_CLAIMED_ID             "CLAIMED_ID"
 
+#define PLUGINSD_KEYWORD_JSON                   "JSON"
+#define PLUGINSD_KEYWORD_JSON_END               "JSON_PAYLOAD_END"
+#define PLUGINSD_KEYWORD_STREAM_PATH            "STREAM_PATH"
+
 typedef void (*functions_evloop_worker_execute_t)(const char *transaction, char *function, usec_t *stop_monotonic_ut,
                                                   bool *cancelled, BUFFER *payload, HTTP_ACCESS access,
                                                   const char *source, void *data);

@@ -2006,9 +2006,7 @@ int netdata_main(int argc, char **argv) {
         nd_log_initialize();
         netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
 
-        ieee754_doubles = is_system_ieee754_double();
-        if(!ieee754_doubles)
-            globally_disabled_capabilities |= STREAM_CAP_IEEE754;
+        check_local_streaming_capabilities();
 
         aral_judy_init();
 

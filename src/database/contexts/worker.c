@@ -99,8 +99,8 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
     if(host->rrdctx.contexts) return;
 
     rrdhost_create_rrdcontexts(host);
-    ctx_get_context_list(&host->host_uuid, rrdcontext_load_context_callback, host);
-    ctx_get_chart_list(&host->host_uuid, rrdinstance_load_chart_callback, host);
+    ctx_get_context_list(&host->host_id.uuid, rrdcontext_load_context_callback, host);
+    ctx_get_chart_list(&host->host_id.uuid, rrdinstance_load_chart_callback, host);
 
     RRDCONTEXT *rc;
     dfe_start_read(host->rrdctx.contexts, rc) {
@@ -173,6 +173,8 @@ static void rrdhost_update_cached_retention(RRDHOST *host, time_t first_time_s, 
 
     spinlock_lock(&host->retention.spinlock);
 
+    time_t old_first_time_s = host->retention.first_time_s;
+
     if(global) {
         host->retention.first_time_s = first_time_s;
         host->retention.last_time_s = last_time_s;
@@ -185,7 +187,12 @@ static void rrdhost_update_cached_retention(RRDHOST *host, time_t first_time_s, 
             host->retention.last_time_s = last_time_s;
     }
 
+    bool stream_path_update_required = old_first_time_s != host->retention.first_time_s;
+
     spinlock_unlock(&host->retention.spinlock);
+
+    if(stream_path_update_required)
+        stream_path_retention_updated(host);
 }
 
 void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, bool worker_jobs) {
@@ -349,7 +356,7 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
     rc->hub.family = string2str(rc->family);
 
     // delete it from SQL
-    if(ctx_delete_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
+    if(ctx_delete_context(&rc->rrdhost->host_id.uuid, &rc->hub) != 0)
         netdata_log_error("RRDCONTEXT: failed to delete context '%s' version %"PRIu64" from SQL.",
                           rc->hub.id, rc->hub.version);
 }
@@ -845,7 +852,7 @@ void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused
     if(rrd_flag_is_deleted(rc))
         rrdcontext_delete_from_sql_unsafe(rc);
 
-    else if (ctx_store_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
+    else if (ctx_store_context(&rc->rrdhost->host_id.uuid, &rc->hub) != 0)
         netdata_log_error("RRDCONTEXT: failed to save context '%s' version %"PRIu64" to SQL.", rc->hub.id, rc->hub.version);
 }
 
@@ -954,7 +961,7 @@ static void rrdcontext_dequeue_from_hub_queue(RRDCONTEXT *rc) {
 static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
 
     // check if we have received a streaming command for this host
-    if(uuid_is_null(host->node_id) || !rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS) || !aclk_online_for_contexts() || !host->rrdctx.hub_queue)
+    if(UUIDiszero(host->node_id) || !rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS) || !aclk_online_for_contexts() || !host->rrdctx.hub_queue)
         return;
 
     // check if there are queued items to send
@@ -985,10 +992,10 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
 
                         if(!bundle) {
                             // prepare the bundle to send the messages
-                            char uuid[UUID_STR_LEN];
-                            uuid_unparse_lower(host->node_id, uuid);
+                            char uuid_str[UUID_STR_LEN];
+                            uuid_unparse_lower(host->node_id.uuid, uuid_str);
 
-                            bundle = contexts_updated_new(claim_id.str, uuid, 0, now_ut);
+                            bundle = contexts_updated_new(claim_id.str, uuid_str, 0, now_ut);
                         }
                         // update the hub data of the context, give a new version, pack the message
                         // and save an update to SQL

@@ -201,8 +201,8 @@ void buffer_json_agent_status_id(BUFFER *wb, size_t ai, usec_t duration_ut) {
 void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status) {
     buffer_json_member_add_string(wb, "mg", host->machine_guid);
 
-    if(!uuid_is_null(host->node_id))
-        buffer_json_member_add_uuid(wb, "nd", host->node_id);
+    if(!UUIDiszero(host->node_id))
+        buffer_json_member_add_uuid(wb, "nd", host->node_id.uuid);
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
     buffer_json_member_add_uint64(wb, "ni", ni);
 
@@ -425,6 +425,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
 
             rrdhost_health_to_json_v2(wb, "health", &s);
             agent_capabilities_to_json(wb, host, "capabilities");
+            rrdhost_stream_path_to_json(wb, host, STREAM_PATH_JSON_MEMBER, false);
         }
 
         if (ctl->mode & (CONTEXTS_V2_NODE_INSTANCES)) {

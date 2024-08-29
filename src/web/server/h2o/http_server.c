@@ -290,7 +290,7 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
         char host_uuid_str[UUID_STR_LEN];
 
         if (host != NULL)
-            uuid_unparse_lower(host->host_uuid, host_uuid_str);
+            uuid_unparse_lower(host->host_id.uuid, host_uuid_str);
 
         nd_log(NDLS_ACCESS, NDLP_DEBUG, "HTTPD OK method: " PRINTF_H2O_IOVEC_FMT
                    ", path: " PRINTF_H2O_IOVEC_FMT

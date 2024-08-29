@@ -104,6 +104,8 @@ struct ml_metrics_statistics {
 #include "health/rrdvar.h"
 #include "health/rrdcalc.h"
 #include "rrdlabels.h"
+#include "streaming/stream_capabilities.h"
+#include "streaming/stream_path.h"
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
@@ -1217,6 +1219,8 @@ struct rrdhost {
                 RRDSET **array;
             } pluginsd_chart_slots;
         } receive;
+
+        RRDHOST_STREAM_PATH path;
     } rrdpush;
 
     struct rrdpush_destinations *destinations;      // a linked list of possible destinations
@@ -1307,8 +1311,8 @@ struct rrdhost {
         time_t last_time_s;
     } retention;
 
-    nd_uuid_t  host_uuid;                              // Global GUID for this host
-    nd_uuid_t  node_id;                                // Cloud node_id
+    ND_UUID host_id;                                // Global GUID for this host
+    ND_UUID node_id;                                // Cloud node_id
 
     struct {
         ND_UUID claim_id_of_origin;

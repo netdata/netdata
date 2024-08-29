@@ -192,7 +192,7 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
                                            rrd_function_execute_cb_t execute_cb, void *execute_cb_data,
                                            bool overwrite_cb) {
     DYNCFG tmp = {
-        .host_uuid = uuid2UUID(host->host_uuid),
+        .host_uuid = host->host_id,
         .path = string_strdupz(path),
         .cmds = cmds,
         .type = type,

@@ -9,11 +9,11 @@ static bool verify_host_uuids(RRDHOST *host, const char *machine_guid, const cha
     if(strcmp(machine_guid, host->machine_guid) != 0)
         return false;
 
-    if(uuid_is_null(host->node_id))
+    if(UUIDiszero(host->node_id))
         return false;
 
     char buf[UUID_STR_LEN];
-    uuid_unparse_lower(host->node_id, buf);
+    uuid_unparse_lower(host->node_id.uuid, buf);
 
     return strcmp(node_id, buf) == 0;
 }

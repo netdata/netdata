@@ -115,14 +115,14 @@ static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, ui
         return 1;
     }
 
-    if (is_event_from_alert_variable_config(unique_id, &host->host_uuid))
+    if (is_event_from_alert_variable_config(unique_id, &host->host_id.uuid))
         return 2;
 
     if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_QUEUE_ALERT_TO_CLOUD, &res))
         return -1;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, health_log_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (int64_t) unique_id));
 
@@ -151,7 +151,7 @@ static int delete_alert_from_submit_queue(RRDHOST *host, int64_t first_seq_id, i
         return -1;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, first_seq_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, last_seq_id));
 
@@ -265,7 +265,7 @@ static void commit_alert_events(RRDHOST *host)
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     int64_t first_sequence_id = 0;
     int64_t last_sequence_id = 0;
@@ -425,7 +425,7 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
 {
     CLAIM_ID claim_id = claim_id_get();
 
-    if (!claim_id_is_set(claim_id) || uuid_is_null(host->node_id))
+    if (!claim_id_is_set(claim_id) || UUIDiszero(host->node_id))
         return;
 
     sqlite3_stmt *res = NULL;
@@ -434,10 +434,10 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     char node_id_str[UUID_STR_LEN];
-    uuid_unparse_lower(host->node_id, node_id_str);
+    uuid_unparse_lower(host->node_id.uuid, node_id_str);
 
     struct alarm_log_entry alarm_log;
     alarm_log.node_id = node_id_str;
@@ -494,7 +494,7 @@ static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row1, int64_t
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, row1));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, row2));
 
@@ -525,7 +525,7 @@ void rebuild_host_alert_version_table(RRDHOST *host)
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     param = 0;
     int rc = execute_insert(res);
@@ -538,7 +538,7 @@ void rebuild_host_alert_version_table(RRDHOST *host)
     if (!PREPARE_STATEMENT(db_meta, SQL_REBUILD_HOST_ALERT_VERSION_TABLE, &res))
         return;
 
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     param = 0;
     rc = execute_insert(res);
@@ -563,7 +563,7 @@ bool process_alert_pending_queue(RRDHOST *host)
 
     int param = 0;
     int added =0, count = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     param = 0;
     int64_t start_row = 0;
@@ -781,7 +781,7 @@ static uint64_t calculate_node_alert_version(RRDHOST *host)
 
     uint64_t version = 0;
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
@@ -908,7 +908,7 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
         return;
 
     // Check the database for this node to see how many alerts we will need to put in the snapshot
-    int cnt = calculate_alert_snapshot_entries(&host->host_uuid);
+    int cnt = calculate_alert_snapshot_entries(&host->host_id.uuid);
     if (!cnt)
         return;
 
@@ -917,7 +917,7 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     nd_uuid_t local_snapshot_uuid;
     char snapshot_uuid_str[UUID_STR_LEN];

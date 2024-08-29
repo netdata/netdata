@@ -241,9 +241,9 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
                cmd->version_hash, rrdhost_hostname(host), our_version_hash);
 
         // prepare the snapshot
-        char uuid[UUID_STR_LEN];
-        uuid_unparse_lower(host->node_id, uuid);
-        contexts_snapshot_t bundle = contexts_snapshot_new(cmd->claim_id, uuid, our_version_hash);
+        char uuid_str[UUID_STR_LEN];
+        uuid_unparse_lower(host->node_id.uuid, uuid_str);
+        contexts_snapshot_t bundle = contexts_snapshot_new(cmd->claim_id, uuid_str, our_version_hash);
 
         // do a deep scan on every metric of the host to make sure all our data are updated
         rrdcontext_recalculate_host_retention(host, RRD_FLAG_NONE, false);
@@ -264,7 +264,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
     char node_str[UUID_STR_LEN];
-    uuid_unparse_lower(host->node_id, node_str);
+    uuid_unparse_lower(host->node_id.uuid, node_str);
     nd_log(NDLS_ACCESS, NDLP_DEBUG,
            "ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED",
            node_str, rrdhost_hostname(host));

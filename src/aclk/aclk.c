@@ -839,16 +839,16 @@ exit:
 
 void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 {
-    nd_uuid_t node_id;
+    ND_UUID node_id;
 
     if (!aclk_online())
         return;
 
-    if (!uuid_is_null(host->node_id)) {
-        uuid_copy(node_id, host->node_id);
+    if (!UUIDiszero(host->node_id)) {
+        node_id = host->node_id;
     }
     else {
-        int ret = get_node_id(&host->host_uuid, &node_id);
+        int ret = get_node_id(&host->host_id.uuid, &node_id.uuid);
         if (ret > 0) {
             // this means we were not able to check if node_id already present
             netdata_log_error("Unable to check for node_id. Ignoring the host state update.");
@@ -887,7 +887,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
         .session_id = aclk_session_newarch
     };
     node_state_update.node_id = mallocz(UUID_STR_LEN);
-    uuid_unparse_lower(node_id, (char*)node_state_update.node_id);
+    uuid_unparse_lower(node_id.uuid, (char*)node_state_update.node_id);
 
     node_state_update.capabilities = aclk_get_agent_capas();
 
@@ -1059,12 +1059,12 @@ char *aclk_state(void)
             else
                 buffer_strcat(wb, "null");
 
-            if (uuid_is_null(host->node_id))
+            if (UUIDiszero(host->node_id))
                 buffer_strcat(wb, "\n\tNode ID: null\n");
             else {
-                char node_id[GUID_LEN + 1];
-                uuid_unparse_lower(host->node_id, node_id);
-                buffer_sprintf(wb, "\n\tNode ID: %s\n", node_id);
+                char node_id_str[UUID_STR_LEN];
+                uuid_unparse_lower(host->node_id.uuid, node_id_str);
+                buffer_sprintf(wb, "\n\tNode ID: %s\n", node_id_str);
             }
 
             buffer_sprintf(wb, "\tStreaming Hops: %d\n\tRelationship: %s", host->system_info->hops, host == localhost ? "self" : "child");
@@ -1192,12 +1192,12 @@ char *aclk_state_json(void)
         } else
             json_object_object_add(nodeinstance, "claimed_id", NULL);
 
-        if (uuid_is_null(host->node_id)) {
+        if (UUIDiszero(host->node_id)) {
             json_object_object_add(nodeinstance, "node-id", NULL);
         } else {
-            char node_id[GUID_LEN + 1];
-            uuid_unparse_lower(host->node_id, node_id);
-            tmp = json_object_new_string(node_id);
+            char node_id_str[UUID_STR_LEN];
+            uuid_unparse_lower(host->node_id.uuid, node_id_str);
+            tmp = json_object_new_string(node_id_str);
             json_object_object_add(nodeinstance, "node-id", tmp);
         }
 
