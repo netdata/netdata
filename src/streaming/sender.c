@@ -731,9 +731,9 @@ void *rrdpush_sender_thread(void *ptr) {
 
     netdata_log_info("STREAM %s [send]: sending thread exits %s",
                      rrdhost_hostname(s->host),
-                     s->host->sender->exit.reason != STREAM_HANDSHAKE_NEVER ? stream_handshake_error_to_string(s->host->sender->exit.reason) : "");
+                     s->exit.reason != STREAM_HANDSHAKE_NEVER ? stream_handshake_error_to_string(s->exit.reason) : "");
 
-    sender_lock(s->host->sender);
+    sender_lock(s);
     {
         rrdpush_sender_thread_close_socket(s);
         rrdpush_sender_pipe_close(s->host, s->rrdpush_sender_pipe, false);
@@ -742,13 +742,13 @@ void *rrdpush_sender_thread(void *ptr) {
         rrdhost_clear_sender___while_having_sender_mutex(s->host);
 
 #ifdef NETDATA_LOG_STREAM_SENDER
-        if (s->host->sender->stream_log_fp) {
-            fclose(s->host->sender->stream_log_fp);
-            s->host->sender->stream_log_fp = NULL;
+        if (s->stream_log_fp) {
+            fclose(s->stream_log_fp);
+            s->stream_log_fp = NULL;
         }
 #endif
     }
-    sender_unlock(s->host->sender);
+    sender_unlock(s);
 
     freez(pipe_buffer);
     freez(s);
