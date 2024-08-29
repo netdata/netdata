@@ -2250,7 +2250,7 @@ add_executable(netdata
 )
 
 if(OS_WINDOWS)
-        set(NETDATA_CLAIM_RES_FILES "src/resources/netdata_claim.rc")
+        set(NETDATA_CLAIM_RES_FILES "packaging/windows/resources/netdata_claim.rc")
 
         add_executable(netdata_claim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
         target_link_libraries(netdata_claim shell32;gdi32;msftedit)
