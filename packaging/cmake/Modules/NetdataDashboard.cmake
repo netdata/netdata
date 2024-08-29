@@ -5,6 +5,12 @@
 
 include(NetdataUtil)
 
+# Add an install rule to the variable for the given source and target
+function(_nd_add_dashboard_install_rule var src target)
+  set(rule "install(install(FILES ${src} COMPONENT dashboard DESTINATION ${WEB_DEST}/${target})\n")
+  set(var "${var}${rule}" PARENT_SCOPE)
+endfunction()
+
 # Bundle the dashboard code for inclusion during install.
 #
 # This is unfortunately complicated due to how we need to handle the
@@ -12,16 +18,18 @@ include(NetdataUtil)
 function(bundle_dashboard)
   include(ExternalProject)
 
-  set(DASHBOARD_SRC_DIR "${CMAKE_BINARY_DIR}/dashboard-src")
-  set(DASHBOARD_BIN_DIR "${CMAKE_BINARY_DIR}/dashboard-bin")
-  set(DASHBOARD_URL "https://app.netdata.cloud/agent.tar.gz")
+  set(dashboard_src_dir "${CMAKE_BINARY_DIR}/dashboard-src")
+  set(dashboard_src_prefix "${dashboard_src_dir}/dist/agent")
+  set(dashboard_bin_dir "${CMAKE_BINARY_DIR}/dashboard-bin")
+  set(DASHBOARD_URL "https://app.netdata.cloud/agent.tar.gz" CACHE STRING
+      "URL used to fetch the local agent dashboard code")
 
   message(STATUS "Preparing dashboard code")
 
   message(STATUS "  Fetching ${DASHBOARD_URL}")
   file(DOWNLOAD
        "${DASHBOARD_URL}"
-       "${CMAKE_BINARY_DIR}/dashboard.tar"
+       "${CMAKE_BINARY_DIR}/dashboard.tar.gz"
        TIMEOUT 180
        STATUS fetch_status)
 
@@ -35,27 +43,34 @@ function(bundle_dashboard)
 
   message(STATUS "  Extracting dashboard code")
   extract_tarball(
-    "${CMAKE_BINARY_DIR}/dashboard.tar"
-    "${DASHBOARD_SRC_DIR}"
+    "${CMAKE_BINARY_DIR}/dashboard.tar.gz"
+    "${dashboard_src_dir}"
   )
   message(STATUS "  Extracting dashboard code -- Done")
 
   message(STATUS "  Generating CMakeLists.txt file for dashboard code")
   set(cmakelists "")
 
-  subdirlist(dash_dirs "${DASHBOARD_SRC_DIR}/dist/agent")
+  subdirlist(dash_dirs "${dashboard_src_prefix}")
 
   foreach(dir IN LISTS dash_dirs)
     file(GLOB files
          LIST_DIRECTORIES FALSE
-         RELATIVE ${DASHBOARD_SRC_DIR}
-         "${DASHBOARD_SRC_DIR}/dist/agent/${dir}")
+         RELATIVE "${dashboard_src_dir}"
+         "${dashboard_src_prefix}/${dir}")
 
-    set(cmakelists "${cmakelists}install(FILES ${files} COMPONENT dashboard DESTINATION ${WEB_DEST}/${dir})\n")
+    _nd_add_dashboard_install_rule(cmakelists "${files}" "${dir}")
   endforeach()
 
-  file(WRITE "${DASHBOARD_SRC_DIR}/CMakeLists.txt" "${cmakelists}")
+  file(GLOB files
+       LIST_DIRECTORIES FALSE
+       RELATIVE "${dashboard_src_dir}"
+       "${dashboard_src_prefix}"
+
+  _nd_add_dashboard_install_rule(cmakelists "${files}" "")
+
+  file(WRITE "${dashboard_src_dir}/CMakeLists.txt" "${cmakelists}")
   message(STATUS "  Generating CMakeLists.txt file for dashboard code -- Done")
-  add_subdirectory("${DASHBOARD_SRC_DIR}" "${DASHBOARD_BIN_DIR}")
+  add_subdirectory("${dashboard_src_dir}" "${dashboard_bin_dir}")
   message(STATUS "Preparing dashboard code -- Done")
 endfunction()

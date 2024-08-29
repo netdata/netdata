@@ -149,16 +149,17 @@ endfunction()
 #
 # This will use CMake’s native support if available, but will still
 # fall back cleanly if CMake is too old.
-function(extract_tarball tarball target)
+function(extract_gzipped_tarball tarball target)
   if(CMAKE_VERSION VERSION_LESS 3.18)
     find_program(TAR NAMES tar bsdtar DOC "TAR archive program")
+    find_program(GZIP NAMES gzip DOC "GZIP compression program")
 
-    if(TAR STREQUAL "TAR-NOTFOUND")
-      message(FATAL_ERROR "Unable to find tar command")
+    if(TAR STREQUAL "TAR-NOTFOUND" OR GZIP STREQUAL "GZIP-NOTFOUND")
+      message(FATAL_ERROR "Unable to find tar or gzip command")
     endif()
 
     file(MAKE_DIRECTORY "${target}")
-    execute_process(COMMAND tar -x -f "${tarball}" -C "${target}"
+    execute_process(COMMAND tar -x -z -f "${tarball}" -C "${target}"
                     RESULT_VARIABLE result)
 
     if(result)
