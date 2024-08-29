@@ -21,7 +21,7 @@ Module: sensors
 
 ## Overview
 
-This collector gathers real-time system sensor statistics,  including temperature, voltage, current, power, fan speed, energy consumption, and humidity,  utilizing the [sensors](https://linux.die.net/man/1/sensors) binary.
+This collector gathers real-time system sensor statistics,  including temperature, voltage, current, power, fan speed, energy consumption, and humidity,  utilizing the [sensors](https://linux.die.net/man/1/sensors) binary or [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface).
 
 
 
@@ -97,12 +97,7 @@ There are no alerts configured by default for this integration.
 
 ### Prerequisites
 
-#### Install lm-sensors
-
-- Install `lm-sensors` using your distribution's package manager.
-- Run `sensors-detect` to detect hardware monitoring chips.
-
-
+No action required.
 
 ### Configuration
 
@@ -128,7 +123,7 @@ The following options can be defined globally: update_every.
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | update_every | Data collection frequency. | 10 | no |
-| binary_path | Path to the `sensors` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable. | /usr/bin/sensors | yes |
+| binary_path | Path to the `sensors` binary. If left empty or if the binary is not found, [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) will be used to collect sensor statistics. | /usr/bin/sensors | yes |
 | timeout | Timeout for executing the binary, specified in seconds. | 2 | no |
 
 </details>
@@ -145,6 +140,20 @@ The executable is not in the directories specified in the PATH environment varia
 jobs:
   - name: sensors
     binary_path: /usr/local/sbin/sensors
+
+```
+</details>
+
+##### Use sysfs instead of sensors
+
+Set `binary_path` to an empty string to use sysfs.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: sensors
+    binary_path: ""
 
 ```
 </details>
