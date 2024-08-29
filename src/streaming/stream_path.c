@@ -139,10 +139,9 @@ static BUFFER *stream_path_payload(RRDHOST *host) {
 
 void stream_path_send_to_parent(RRDHOST *host) {
     struct sender_state *s = host->sender;
-    if(!s || !stream_has_capability(s, STREAM_CAP_PATHS))
-        return;
+    if(!s || !stream_has_capability(s, STREAM_CAP_PATHS)) return;
 
-    CLEAN_BUFFER *payload = stream_path_payload(s->host);
+    CLEAN_BUFFER *payload = stream_path_payload(host);
 
     BUFFER *wb = sender_start(s);
     buffer_sprintf(wb, PLUGINSD_KEYWORD_JSON " " PLUGINSD_KEYWORD_STREAM_PATH "\n%s\n" PLUGINSD_KEYWORD_JSON_END "\n", buffer_tostring(payload));
