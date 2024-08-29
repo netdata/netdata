@@ -66,7 +66,8 @@ void datafile_release(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS re
     spinlock_unlock(&df->users.spinlock);
 }
 
-bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
+bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdown)
+{
     bool can_be_deleted = false;
 
     spinlock_lock(&df->users.spinlock);
@@ -107,7 +108,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
 
                 if(!df->users.time_to_evict) {
                     // first time we did the above
-                    df->users.time_to_evict = now_s + 120;
+                    df->users.time_to_evict = now_s + is_shutdown ? DATAFILE_DELETE_TIMEOUT_SHORT : DATAFILE_DELETE_TIMEOUT_LONG;
                     internal_error(true, "DBENGINE: datafile %u of tier %d is not used by any open cache pages, "
                                          "but it has %u lockers (oc:%u, pd:%u), "
                                          "%zu clean and %zu hot open cache pages "
@@ -572,8 +573,8 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
         logged = false;
-        size_t iterations = 100;
-        while(!datafile_acquire_for_deletion(datafile) && datafile != ctx->datafiles.first->prev && --iterations > 0) {
+        size_t iterations = 10;
+        while(!datafile_acquire_for_deletion(datafile, true) && datafile != ctx->datafiles.first->prev && --iterations > 0) {
             if(!logged) {
                 netdata_log_info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->config.tier);
                 logged = true;

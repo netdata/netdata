@@ -1218,7 +1218,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
-    bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
+    bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
 
     if (update_retention)
         update_metrics_first_time_s(ctx, datafile, datafile->next, worker);
@@ -1227,7 +1227,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
         if(worker)
             worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
-        datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
+        datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
 
         if (!datafile_got_for_deletion) {
             netdata_log_info("DBENGINE: waiting for data file '%s/"
