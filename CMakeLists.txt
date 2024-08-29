@@ -2251,6 +2251,7 @@ add_executable(netdata
 
 if(OS_WINDOWS)
         set(NETDATA_CLAIM_RES_FILES "packaging/windows/resources/netdata_claim.rc")
+        configure_file(packaging/windows/resources/netdata_claim.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdata_claim.manifest @ONLY)
 
         add_executable(netdata_claim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
         target_link_libraries(netdata_claim shell32;gdi32;msftedit)
