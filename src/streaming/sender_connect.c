@@ -3,12 +3,17 @@
 #include "sender_internals.h"
 
 void rrdpush_sender_thread_close_socket(RRDHOST *host) {
+    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+
     netdata_ssl_close(&host->sender->ssl);
 
     if(host->sender->rrdpush_sender_socket != -1) {
         close(host->sender->rrdpush_sender_socket);
         host->sender->rrdpush_sender_socket = -1;
     }
+
+    // do not flush the circular buffer here
+    // this function is called sometimes with the sender lock, sometimes without the lock
 }
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host) {

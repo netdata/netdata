@@ -46,8 +46,6 @@ void rrdpush_sender_on_connect(RRDHOST *host);
 void rrdpush_sender_after_connect(RRDHOST *host);
 void rrdpush_sender_thread_close_socket(RRDHOST *host);
 
-void rrdpush_sender_disconnect_and_cleanup(RRDHOST *host);
-
 void rrdpush_sender_execute_commands_cleanup(struct sender_state *s);
 void rrdpush_sender_execute_commands(struct sender_state *s);
 
