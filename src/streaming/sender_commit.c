@@ -118,7 +118,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
                     worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
                     rrdpush_compression_deactivate(s);
-                    rrdpush_sender_disconnect_and_cleanup(s->host);
+                    rrdpush_sender_thread_close_socket(s);
                     sender_unlock(s);
                     return;
                 }

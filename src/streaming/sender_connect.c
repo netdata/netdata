@@ -2,13 +2,18 @@
 
 #include "sender_internals.h"
 
-void rrdpush_sender_thread_close_socket(RRDHOST *host) {
-    netdata_ssl_close(&host->sender->ssl);
+void rrdpush_sender_thread_close_socket(struct sender_state *s) {
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
 
-    if(host->sender->rrdpush_sender_socket != -1) {
-        close(host->sender->rrdpush_sender_socket);
-        host->sender->rrdpush_sender_socket = -1;
+    netdata_ssl_close(&s->ssl);
+
+    if(s->rrdpush_sender_socket != -1) {
+        close(s->rrdpush_sender_socket);
+        s->rrdpush_sender_socket = -1;
     }
+
+    // do not flush the circular buffer here
+    // this function is called sometimes with the sender lock, sometimes without the lock
 }
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host) {
@@ -204,7 +209,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     int delay = stream_responses[i].postpone_reconnect_seconds;
 
     worker_is_busy(worker_job_id);
-    rrdpush_sender_thread_close_socket(host);
+    rrdpush_sender_thread_close_socket(s);
     host->destination->reason = version;
     host->destination->postpone_reconnection_until = now_realtime_sec() + delay;
 
@@ -231,9 +236,9 @@ unsigned char alpn_proto_list[] = {
 
 #define CONN_UPGRADE_VAL "upgrade"
 
-static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
+static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
     RRDHOST *host = s->host;
-    bool ssl_required = host->destination && host->destination->ssl;
+    bool ssl_required = host && host->destination && host->destination->ssl;
 
     netdata_ssl_close(&host->sender->ssl);
 
@@ -251,7 +256,7 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
             ND_LOG_STACK_PUSH(lgs);
 
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
-            rrdpush_sender_thread_close_socket(host);
+            rrdpush_sender_thread_close_socket(s);
             host->destination->reason = STREAM_HANDSHAKE_ERROR_SSL_ERROR;
             host->destination->postpone_reconnection_until = now_realtime_sec() + 5 * 60;
             return false;
@@ -269,7 +274,7 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
 
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
             netdata_log_error("SSL: closing the stream connection, because the server SSL certificate is not valid.");
-            rrdpush_sender_thread_close_socket(host);
+            rrdpush_sender_thread_close_socket(s);
             host->destination->reason = STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE;
             host->destination->postpone_reconnection_until = now_realtime_sec() + 5 * 60;
             return false;
@@ -390,7 +395,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     };
 
     // make sure the socket is closed
-    rrdpush_sender_thread_close_socket(host);
+    rrdpush_sender_thread_close_socket(s);
 
     s->rrdpush_sender_socket = connect_to_one_of_destinations(
         host
@@ -527,7 +532,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         ND_LOG_STACK_PUSH(lgs);
 
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION);
-        rrdpush_sender_thread_close_socket(host);
+        rrdpush_sender_thread_close_socket(s);
         host->destination->reason = STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE;
         host->destination->postpone_reconnection_until = now_realtime_sec() + 1 * 60;
         return false;
@@ -550,7 +555,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         ND_LOG_STACK_PUSH(lgs);
 
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
-        rrdpush_sender_thread_close_socket(host);
+        rrdpush_sender_thread_close_socket(s);
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s]: failed to send HTTP header to remote netdata.",
@@ -577,7 +582,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         ND_LOG_STACK_PUSH(lgs);
 
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
-        rrdpush_sender_thread_close_socket(host);
+        rrdpush_sender_thread_close_socket(s);
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s]: remote netdata does not respond.",
