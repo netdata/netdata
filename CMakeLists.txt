@@ -2769,7 +2769,6 @@ install(PROGRAMS
         src/collectors/charts.d.plugin/example/example.chart.sh
         src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
         src/collectors/charts.d.plugin/opensips/opensips.chart.sh
-        src/collectors/charts.d.plugin/sensors/sensors.chart.sh
         COMPONENT plugin-chartsd
         DESTINATION usr/libexec/netdata/charts.d)
 
@@ -2778,7 +2777,6 @@ install(FILES
         src/collectors/charts.d.plugin/example/example.conf
         src/collectors/charts.d.plugin/libreswan/libreswan.conf
         src/collectors/charts.d.plugin/opensips/opensips.conf
-        src/collectors/charts.d.plugin/sensors/sensors.conf
         COMPONENT plugin-chartsd
         DESTINATION usr/lib/netdata/conf.d/charts.d)
 
