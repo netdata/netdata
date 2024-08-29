@@ -41,6 +41,8 @@ var proxy
 var hInsecure
 var insecure
 
+var avoidClaim
+
 Function .onInit
         nsExec::ExecToLog '$SYSDIR\sc.exe stop Netdata'
         pop $0
@@ -51,6 +53,7 @@ Function .onInit
 
         StrCpy $startMsys ${BST_UNCHECKED}
         StrCpy $insecure ${BST_UNCHECKED}
+        StrCpy $avoidClaim ${BST_UNCHECKED}
 FunctionEnd
 
 Function NetdataConfigPage
@@ -61,6 +64,8 @@ Function NetdataConfigPage
         ${If} $0 == error
             Abort
         ${EndIf}
+
+        IfFileExists "$INSTDIR\etc\netdata\claim.conf" NotNeeded
 
         ${NSD_CreateLabel} 0 0 100% 12u "Enter your Token and Cloud Room."
         ${NSD_CreateLabel} 0 15% 100% 12u "Optionally, you can open a terminal to execute additional commands."
@@ -85,45 +90,52 @@ Function NetdataConfigPage
 
         ${NSD_CreateCheckbox} 0 90% 100% 10u "Open terminal"
         Pop $hStartMsys
+        Goto EndDialogDraw
 
+        NotNeeded:
+        StrCpy $avoidClaim ${BST_CHECKED}
+        ${NSD_CreateLabel} 0 0 100% 12u "Your host has already been claimed. You can proceed with the update."
+
+        EndDialogDraw:
         nsDialogs::Show
 FunctionEnd
 
 Function NetdataConfigLeave
-        ${NSD_GetText} $hCloudToken $cloudToken
-        ${NSD_GetText} $hCloudRoom $cloudRoom
-        ${NSD_GetText} $hProxy $proxy
-        ${NSD_GetState} $hStartMsys $startMsys
-        ${NSD_GetState} $hInsecure $insecure
+        ${If} $avoidClaim == ${BST_UNCHECKED}
+                ${NSD_GetText} $hCloudToken $cloudToken
+                ${NSD_GetText} $hCloudRoom $cloudRoom
+                ${NSD_GetText} $hProxy $proxy
+                ${NSD_GetState} $hStartMsys $startMsys
+                ${NSD_GetState} $hInsecure $insecure
 
-        StrLen $0 $cloudToken
-        StrLen $1 $cloudRoom
-        ${If} $0 == 0
-        ${OrIf} $1 == 0
-                Goto runMsys
-        ${EndIf}
+                StrLen $0 $cloudToken
+                StrLen $1 $cloudRoom
+                ${If} $0 == 0
+                ${OrIf} $1 == 0
+                        Goto runMsys
+                ${EndIf}
 
-        ${If} $0 == 135
-        ${AndIf} $1 >= 36
-                nsExec::ExecToLog '$INSTDIR\usr\bin\netdata_claim.exe /T $cloudToken /R $cloudRoom /P $proxy /I $insecure'
+            ${If} $0 == 135
+            ${AndIf} $1 >= 36
+                    nsExec::ExecToLog '$INSTDIR\usr\bin\netdata_claim.exe /T $cloudToken /R $cloudRoom /P $proxy /I $insecure'
+                    pop $0
+            ${Else}
+                    MessageBox MB_OK "The Cloud information does not have the expected length."
+            ${EndIf}
+
+            runMsys:
+            ${If} $startMsys == ${BST_CHECKED}
+                nsExec::ExecToLog '$INSTDIR\msys2.exe'
                 pop $0
-        ${Else}
-                MessageBox MB_OK "The Cloud information does not have the expected length."
-        ${EndIf}
+            ${EndIf}
 
-        runMsys:
-        ${If} $startMsys == 1
-            nsExec::ExecToLog '$INSTDIR\msys2.exe'
+    	    ClearErrors
+            nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
             pop $0
-        ${EndIf}
-
-	ClearErrors
-        nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
-        pop $0
-        ${If} $0 != 0
-	    MessageBox MB_OK "Warning: Failed to start Netdata service."
-        ${EndIf}
-
+            ${If} $0 != 0
+	        MessageBox MB_OK "Warning: Failed to start Netdata service."
+            ${EndIf}
+    ${EndIf}
 FunctionEnd
 
 Function NetdataUninstallRegistry
