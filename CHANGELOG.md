@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- go.d lmsensors improve performance [\#18429](https://github.com/netdata/netdata/pull/18429) ([ilyam8](https://github.com/ilyam8))
+- ci fix InvalidDefaultArgInFrom warn [\#18428](https://github.com/netdata/netdata/pull/18428) ([ilyam8](https://github.com/ilyam8))
+- vendor https://github.com/mdlayher/lmsensors [\#18427](https://github.com/netdata/netdata/pull/18427) ([ilyam8](https://github.com/ilyam8))
+- Reset last connected when removing stale nodes with netdatacli [\#18425](https://github.com/netdata/netdata/pull/18425) ([stelfrag](https://github.com/stelfrag))
 - remove checks.plugin dir [\#18424](https://github.com/netdata/netdata/pull/18424) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18421](https://github.com/netdata/netdata/pull/18421) ([netdatabot](https://github.com/netdatabot))
 - fix hyperlink in go.d samba meta [\#18420](https://github.com/netdata/netdata/pull/18420) ([ilyam8](https://github.com/ilyam8))
@@ -331,7 +335,6 @@
 - eBPF cgroup and mutex [\#17915](https://github.com/netdata/netdata/pull/17915) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix small typo [\#17875](https://github.com/netdata/netdata/pull/17875) ([stelfrag](https://github.com/stelfrag))
 - spawn server \(Windows support for external plugins\) [\#17866](https://github.com/netdata/netdata/pull/17866) ([ktsaou](https://github.com/ktsaou))
-- sysinfo \(WinAPI\) [\#17857](https://github.com/netdata/netdata/pull/17857) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
@@ -416,8 +419,6 @@
 - Update CI infrastructure to publish to secondary packaging host. [\#17863](https://github.com/netdata/netdata/pull/17863) ([Ferroin](https://github.com/Ferroin))
 - Improve anacron detection in updater. [\#17862](https://github.com/netdata/netdata/pull/17862) ([Ferroin](https://github.com/Ferroin))
 - RBAC for dynamic configuration documentation [\#17861](https://github.com/netdata/netdata/pull/17861) ([Ancairon](https://github.com/Ancairon))
-- DYNCFG: health, generate userconfig for incomplete alerts [\#17859](https://github.com/netdata/netdata/pull/17859) ([ktsaou](https://github.com/ktsaou))
-- Create retention charts for higher tiers [\#17855](https://github.com/netdata/netdata/pull/17855) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
