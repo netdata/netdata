@@ -42,7 +42,7 @@ function(bundle_dashboard)
   endif()
 
   message(STATUS "  Extracting dashboard code")
-  extract_tarball(
+  extract_gzipped_tarball(
     "${CMAKE_BINARY_DIR}/dashboard.tar.gz"
     "${dashboard_src_dir}"
   )
@@ -65,7 +65,7 @@ function(bundle_dashboard)
   file(GLOB files
        LIST_DIRECTORIES FALSE
        RELATIVE "${dashboard_src_dir}"
-       "${dashboard_src_prefix}"
+       "${dashboard_src_prefix}")
 
   _nd_add_dashboard_install_rule(cmakelists "${files}" "")
 
