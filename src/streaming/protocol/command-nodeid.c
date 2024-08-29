@@ -39,46 +39,52 @@ void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
 
 // the sender of the child receives node id, claim id and cloud url from the receiver of the parent
 void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
-    char *claim_id = get_word(s->line.words, s->line.num_words, 1);
-    char *node_id = get_word(s->line.words, s->line.num_words, 2);
+    char *claim_id_str = get_word(s->line.words, s->line.num_words, 1);
+    char *node_id_str = get_word(s->line.words, s->line.num_words, 2);
     char *url = get_word(s->line.words, s->line.num_words, 3);
 
     bool claimed = is_agent_claimed();
+    bool update_node_id = false;
 
-    ND_UUID claim_uuid;
-    if (uuid_parse(claim_id ? claim_id : "", claim_uuid.uuid) != 0) {
+    ND_UUID claim_id;
+    if (uuid_parse(claim_id_str ? claim_id_str : "", claim_id.uuid) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s] received invalid claim id '%s'",
                rrdhost_hostname(s->host), s->connected_to,
-               claim_id ? claim_id : "(unset)");
+               claim_id_str ? claim_id_str : "(unset)");
         return;
     }
 
-    ND_UUID node_uuid;
-    if(uuid_parse(node_id ? node_id : "", node_uuid.uuid) != 0) {
+    ND_UUID node_id;
+    if(uuid_parse(node_id_str ? node_id_str : "", node_id.uuid) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s] received an invalid node id '%s'",
                rrdhost_hostname(s->host), s->connected_to,
-               node_id ? node_id : "(unset)");
+               node_id_str ? node_id_str : "(unset)");
         return;
     }
 
-    if (!UUIDiszero(s->host->aclk.claim_id_of_parent) && !UUIDeq(s->host->aclk.claim_id_of_parent, claim_uuid))
+    if (!UUIDiszero(s->host->aclk.claim_id_of_parent) && !UUIDeq(s->host->aclk.claim_id_of_parent, claim_id))
         nd_log(NDLS_DAEMON, NDLP_INFO,
                "STREAM %s [send to %s] changed parent's claim id to %s",
-               rrdhost_hostname(s->host), s->connected_to, claim_id ? claim_id : "(unset)");
+               rrdhost_hostname(s->host), s->connected_to,
+               claim_id_str ? claim_id_str : "(unset)");
 
-    if(!UUIDiszero(s->host->node_id) && !UUIDeq(s->host->node_id, node_uuid)) {
+    if(!UUIDiszero(s->host->node_id) && !UUIDeq(s->host->node_id, node_id)) {
         if(claimed) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM %s [send to %s] parent reports different node id '%s', but we are claimed. Ignoring it.",
-                   rrdhost_hostname(s->host), s->connected_to, node_id ? node_id : "(unset)");
+                   rrdhost_hostname(s->host), s->connected_to,
+                   node_id_str ? node_id_str : "(unset)");
             return;
         }
-        else
+        else {
+            update_node_id = true;
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "STREAM %s [send to %s] changed node id to %s",
-                   rrdhost_hostname(s->host), s->connected_to, node_id ? node_id : "(unset)");
+                   rrdhost_hostname(s->host), s->connected_to,
+                   node_id_str ? node_id_str : "(unset)");
+        }
     }
 
     if(!url || !*url) {
@@ -89,7 +95,7 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
         return;
     }
 
-    s->host->aclk.claim_id_of_parent = claim_uuid;
+    s->host->aclk.claim_id_of_parent = claim_id;
 
     // There are some very strange corner cases here:
     //
@@ -105,12 +111,18 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
         // we are directly claimed and connected, ignore node id and cloud url
         return;
 
-    if(UUIDiszero(s->host->node_id))
-        s->host->node_id = node_uuid;
+    bool node_id_updated = false;
+    if(UUIDiszero(s->host->node_id) || update_node_id) {
+        s->host->node_id = node_id;
+        node_id_updated = true;
+    }
 
     // we change the URL, to allow the agent dashboard to work with Netdata Cloud on-prem, if any.
     cloud_config_url_set(url);
 
     // send it down the line (to children)
     rrdpush_receiver_send_node_and_claim_id_to_child(s->host);
+
+    if(node_id_updated)
+        stream_path_node_id_updated(s->host);
 }
