@@ -3,20 +3,16 @@
 package sensors
 
 import (
-	"errors"
 	"os"
 	"os/exec"
 	"strings"
 )
 
-func (s *Sensors) validateConfig() error {
+func (s *Sensors) initSensorsBinary() (sensorsBinary, error) {
 	if s.BinaryPath == "" {
-		return errors.New("no sensors binary path specified")
+		return nil, nil
 	}
-	return nil
-}
 
-func (s *Sensors) initSensorsCliExec() (sensorsCLI, error) {
 	binPath := s.BinaryPath
 
 	if !strings.HasPrefix(binPath, "/") {

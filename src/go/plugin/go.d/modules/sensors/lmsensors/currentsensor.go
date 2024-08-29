@@ -11,11 +11,10 @@ type CurrentSensor struct {
 	// The name of the sensor.
 	Name string
 
-	// A label that describes what the sensor is monitoring.  Label may be
-	// empty.
+	// A label that describes what the sensor is monitoring.  Label may be empty.
 	Label string
 
-	// Whether or not the sensor has an alarm triggered.
+	// Whether the sensor has an alarm triggered.
 	Alarm bool
 
 	// The input current, in Amperes, indicated by the sensor.
@@ -28,8 +27,7 @@ type CurrentSensor struct {
 	Critical float64
 }
 
-func (s *CurrentSensor) name() string        { return s.Name }
-func (s *CurrentSensor) setName(name string) { s.Name = name }
+func (s *CurrentSensor) Type() SensorType { return SensorTypeCurrent }
 
 func (s *CurrentSensor) parse(raw map[string]string) error {
 	for k, v := range raw {
@@ -60,3 +58,5 @@ func (s *CurrentSensor) parse(raw map[string]string) error {
 
 	return nil
 }
+
+func (s *CurrentSensor) name() string { return s.Name }
