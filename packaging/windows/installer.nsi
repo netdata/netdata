@@ -34,8 +34,8 @@ var startMsys
 
 var hCloudToken
 var cloudToken
-var hCloudRoom
-var cloudRoom
+var hCloudRooms
+var cloudRooms
 var hProxy
 var proxy
 var hInsecure
@@ -67,7 +67,7 @@ Function NetdataConfigPage
 
         IfFileExists "$INSTDIR\etc\netdata\claim.conf" NotNeeded
 
-        ${NSD_CreateLabel} 0 0 100% 12u "Enter your Token and Cloud Room."
+        ${NSD_CreateLabel} 0 0 100% 12u "Enter your Token and Cloud Room(s)."
         ${NSD_CreateLabel} 0 15% 100% 12u "Optionally, you can open a terminal to execute additional commands."
 
         ${NSD_CreateLabel} 0 30% 20% 10% "Token"
@@ -75,10 +75,10 @@ Function NetdataConfigPage
         ${NSD_CreateText} 21% 30% 79% 10% ""
         Pop $hCloudToken
 
-        ${NSD_CreateLabel} 0 45% 20% 10% "Room"
+        ${NSD_CreateLabel} 0 45% 20% 10% "Room(s)"
         Pop $0
         ${NSD_CreateText} 21% 45% 79% 10% ""
-        Pop $hCloudRoom
+        Pop $hCloudRooms
 
         ${NSD_CreateLabel} 0 60% 20% 10% "Proxy"
         Pop $0
@@ -103,13 +103,13 @@ FunctionEnd
 Function NetdataConfigLeave
         ${If} $avoidClaim == ${BST_UNCHECKED}
                 ${NSD_GetText} $hCloudToken $cloudToken
-                ${NSD_GetText} $hCloudRoom $cloudRoom
+                ${NSD_GetText} $hCloudRooms $cloudRooms
                 ${NSD_GetText} $hProxy $proxy
                 ${NSD_GetState} $hStartMsys $startMsys
                 ${NSD_GetState} $hInsecure $insecure
 
                 StrLen $0 $cloudToken
-                StrLen $1 $cloudRoom
+                StrLen $1 $cloudRooms
                 ${If} $0 == 0
                 ${OrIf} $1 == 0
                         Goto runMsys
@@ -117,7 +117,7 @@ Function NetdataConfigLeave
 
                 ${If} $0 == 135
                 ${AndIf} $1 >= 36
-                        nsExec::ExecToLog '$INSTDIR\usr\bin\netdata_claim.exe /T $cloudToken /R $cloudRoom /P $proxy /I $insecure'
+                        nsExec::ExecToLog '$INSTDIR\usr\bin\netdata_claim.exe /T $cloudToken /R $cloudRooms /P $proxy /I $insecure'
                         pop $0
                 ${Else}
                         MessageBox MB_OK "The Cloud information does not have the expected length."
