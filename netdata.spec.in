@@ -196,6 +196,7 @@ Requires(pre): /usr/sbin/useradd
 # to support weak dependencies. Explicitly requiring our default plugins
 # makes it impossible to properly test the packages prior to upload,
 # so we just skip depending on them on CentOS 7.
+Requires: %{name}-dashboard
 %if 0%{?_have_ebpf}
 Requires: %{name}-plugin-ebpf = %{version}
 %endif

@@ -63,6 +63,10 @@ netdata-plugin-network-viewer")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
 
+if(ENABLE_DASHBOARD)
+  list(APPEND _main_deps "netdata-dashboard")
+endif()
+
 if(ENABLE_PLUGIN_CHARTS)
   list(APPEND _main_deps "netdata-plugin-chartsd")
 endif()
