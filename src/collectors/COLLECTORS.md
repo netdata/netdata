@@ -487,8 +487,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Linux Sensors (lm-sensors)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/sensors/integrations/linux_sensors_lm-sensors.md)
 
-- [Linux Sensors (sysfs)](https://github.com/netdata/netdata/blob/master/src/collectors/charts.d.plugin/sensors/integrations/linux_sensors_sysfs.md)
-
 - [NVML](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/nvml.md)
 
 - [Nvidia GPU](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/nvidia_smi/integrations/nvidia_gpu.md)
