@@ -192,12 +192,13 @@ func (s *Sensors) addSysfsSensorChart(devName string, sn lmsensors.Sensor) {
 		return
 	}
 
+	origFeat := feat
 	feat, subfeat = snakeCase(feat), snakeCase(subfeat)
 
 	chart.ID = fmt.Sprintf(chart.ID, devName, feat, subfeat)
 	chart.Labels = []module.Label{
 		{Key: "chip", Value: devName},
-		{Key: "feature", Value: feat},
+		{Key: "feature", Value: origFeat},
 	}
 	for _, dim := range chart.Dims {
 		dim.ID = fmt.Sprintf(dim.ID, devName, feat, subfeat)
