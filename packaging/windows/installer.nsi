@@ -34,8 +34,14 @@ var startMsys
 
 var hCloudToken
 var cloudToken
-var hCloudRoom
-var cloudRoom
+var hCloudRooms
+var cloudRooms
+var hProxy
+var proxy
+var hInsecure
+var insecure
+
+var avoidClaim
 
 Function .onInit
         nsExec::ExecToLog '$SYSDIR\sc.exe stop Netdata'
@@ -46,6 +52,8 @@ Function .onInit
         ${EndIf}
 
         StrCpy $startMsys ${BST_UNCHECKED}
+        StrCpy $insecure ${BST_UNCHECKED}
+        StrCpy $avoidClaim ${BST_UNCHECKED}
 FunctionEnd
 
 Function NetdataConfigPage
@@ -57,40 +65,76 @@ Function NetdataConfigPage
             Abort
         ${EndIf}
 
-        ${NSD_CreateLabel} 0 0 100% 12u "Enter your Token and Cloud Room."
+        IfFileExists "$INSTDIR\etc\netdata\claim.conf" NotNeeded
+
+        ${NSD_CreateLabel} 0 0 100% 12u "Enter your Token and Cloud Room(s)."
         ${NSD_CreateLabel} 0 15% 100% 12u "Optionally, you can open a terminal to execute additional commands."
 
-        ${NSD_CreateLabel} 0 35% 20% 10% "Token"
+        ${NSD_CreateLabel} 0 30% 20% 10% "Token"
         Pop $0
-        ${NSD_CreateText} 21% 35% 79% 10% ""
+        ${NSD_CreateText} 21% 30% 79% 10% ""
         Pop $hCloudToken
 
-        ${NSD_CreateLabel} 0 55% 20% 10% "Room"
+        ${NSD_CreateLabel} 0 45% 20% 10% "Room(s)"
         Pop $0
-        ${NSD_CreateText} 21% 55% 79% 10% ""
-        Pop $hCloudRoom
+        ${NSD_CreateText} 21% 45% 79% 10% ""
+        Pop $hCloudRooms
 
-        ${NSD_CreateCheckbox} 0 70% 100% 10u "Open terminal"
+        ${NSD_CreateLabel} 0 60% 20% 10% "Proxy"
+        Pop $0
+        ${NSD_CreateText} 21% 60% 79% 10% ""
+        Pop $hProxy
+
+        ${NSD_CreateCheckbox} 0 75% 100% 10u "Insecure connection"
+        Pop $hInsecure
+
+        ${NSD_CreateCheckbox} 0 90% 100% 10u "Open terminal"
         Pop $hStartMsys
+        Goto EndDialogDraw
+
+        NotNeeded:
+        StrCpy $avoidClaim ${BST_CHECKED}
+        ${NSD_CreateLabel} 0 0 100% 12u "Your host has already been claimed. You can proceed with the update."
+
+        EndDialogDraw:
         nsDialogs::Show
 FunctionEnd
 
 Function NetdataConfigLeave
-        ${NSD_GetText} $hCloudToken $cloudToken
-        ${NSD_GetText} $hCloudRoom $cloudRoom
-        ${NSD_GetState} $hStartMsys $startMsys
+        ${If} $avoidClaim == ${BST_UNCHECKED}
+                ${NSD_GetText} $hCloudToken $cloudToken
+                ${NSD_GetText} $hCloudRooms $cloudRooms
+                ${NSD_GetText} $hProxy $proxy
+                ${NSD_GetState} $hStartMsys $startMsys
+                ${NSD_GetState} $hInsecure $insecure
 
-        StrLen $0 $cloudToken
-        StrLen $1 $cloudRoom
-        ${If} $0 == 125
-        ${AndIf} $0 == 36
-                # We should start our new claiming software here
-                MessageBox MB_OK "$cloudToken | $cloudRoom | $startMsys"
+                StrLen $0 $cloudToken
+                StrLen $1 $cloudRooms
+                ${If} $0 == 0
+                ${OrIf} $1 == 0
+                        Goto runMsys
+                ${EndIf}
+
+                ${If} $0 == 135
+                ${AndIf} $1 >= 36
+                        nsExec::ExecToLog '$INSTDIR\usr\bin\netdata_claim.exe /T $cloudToken /R $cloudRooms /P $proxy /I $insecure'
+                        pop $0
+                ${Else}
+                        MessageBox MB_OK "The Cloud information does not have the expected length."
+                ${EndIf}
+
+                runMsys:
+                ${If} $startMsys == ${BST_CHECKED}
+                        nsExec::ExecToLog '$INSTDIR\msys2.exe'
+                        pop $0
+                ${EndIf}
         ${EndIf}
 
-        ${If} $startMsys == 1
-            nsExec::ExecToLog '$INSTDIR\msys2.exe'
-            pop $0
+        ClearErrors
+        nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
+        pop $0
+        ${If} $0 != 0
+	        MessageBox MB_OK "Warning: Failed to start Netdata service."
         ${EndIf}
 FunctionEnd
 
@@ -150,13 +194,6 @@ Section "Install Netdata"
         pop $0
         ${If} $0 != 0
 	    DetailPrint "Warning: Failed to add Netdata service description."
-        ${EndIf}
-
-	ClearErrors
-        nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
-        pop $0
-        ${If} $0 != 0
-	    DetailPrint "Warning: Failed to start Netdata service."
         ${EndIf}
 
 	WriteUninstaller "$INSTDIR\Uninstall.exe"
