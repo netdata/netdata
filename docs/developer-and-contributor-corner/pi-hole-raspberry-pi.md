@@ -100,26 +100,6 @@ part of your system might affect another.
 ![The Netdata dashboard in
 action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98-11ea-8f60-0d7824667cd3.gif)
 
-### Enable temperature sensor monitoring
-
-You need to manually enable Netdata's built-in [temperature sensor
-collector](/src/collectors/charts.d.plugin/sensors/README.md) to start collecting metrics.
-
-> Netdata uses a few plugins to manage its [collectors](/src/collectors/REFERENCE.md), each using a different language: Go,
-> Python, Node.js, and Bash. While our Go collectors are undergoing the most active development, we still support the
-> other languages. In this case, you need to enable a temperature sensor collector that's written in Bash.
-
-First, open the `charts.d.conf` file for editing. You should always use the `edit-config` script to edit Netdata's
-configuration files, as it ensures your settings persist across updates to the Netdata Agent.
-
-```bash
-cd /etc/netdata
-sudo ./edit-config charts.d.conf
-```
-
-Uncomment the `sensors=force` line and save the file. Restart Netdata with `sudo systemctl restart netdata` to enable
-Raspberry Pi temperature sensor monitoring.
-
 ### Storing historical metrics on your Raspberry Pi
 
 By default, Netdata allocates 256 MiB in disk space to store historical metrics inside the [database

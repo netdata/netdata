@@ -610,7 +610,7 @@ The `drm` path can be configured if it differs from the default:
 ```
 
 > [!NOTE]  
-> Temperature, fan speed, voltage and power metrics for AMD GPUs can be monitored using the [Sensors](/src/collectors/charts.d.plugin/sensors/README.md) plugin.
+> Temperature, fan speed, voltage and power metrics for AMD GPUs can be monitored using the [Sensors](/src/go/plugin/go.d/modules/sensors/README.md) plugin.
 
 ## IPC
 
