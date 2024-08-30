@@ -30,9 +30,13 @@ jobs:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
           known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
-      - name: Upload
-        id: upload
+      - name: Upload to packages.netdata.cloud
+        id: upload-primary
+        continue-on-error: true
         run: rsync -vp packaging/installer/kickstart.sh netdatabot@packages.netdata.cloud:/home/netdatabot/incoming/kickstart.sh
+      - name: Upload to packages2.netdata.cloud
+        id: upload-packages2
+        run: rsync -vp packaging/installer/kickstart.sh netdatabot@packages2.netdata.cloud:/home/netdatabot/incoming/kickstart.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -44,7 +48,8 @@ jobs:
               ${{ github.repository }}: Failed to upload updated kickstart script to repo server.
               Checkout: ${{ steps.checkout.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
-              Upload: ${{ steps.upload.outcome }}
+              Upload to packages.netdata.cloud: ${{ steps.upload-packages.outcome }}
+              Upload to packages2.netdata.cloud: ${{ steps.upload-packages2.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{

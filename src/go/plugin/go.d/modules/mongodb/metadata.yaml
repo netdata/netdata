@@ -1,0 +1,580 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-mongodb
+      plugin_name: go.d.plugin
+      module_name: mongodb
+      monitored_instance:
+        name: MongoDB
+        link: https://www.mongodb.com/
+        icon_filename: mongodb.svg
+        categories:
+          - data-collection.database-servers
+      keywords:
+        - mongodb
+        - databases
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors MongoDB servers.
+          
+          Executed queries:
+          
+          - [serverStatus](https://docs.mongodb.com/manual/reference/command/serverStatus/)
+          - [dbStats](https://docs.mongodb.com/manual/reference/command/dbStats/)
+          - [replSetGetStatus](https://www.mongodb.com/docs/manual/reference/command/replSetGetStatus/)
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Create a read-only user
+            description: |
+              Create a read-only user for Netdata in the admin database.
+              
+              - Authenticate as the admin user:
+              
+                ```bash
+                use admin
+                db.auth("admin", "<MONGODB_ADMIN_PASSWORD>")
+                ```
+              
+              - Create a user:
+              
+                ```bash
+                db.createUser({
+                  "user":"netdata",
+                  "pwd": "<UNIQUE_PASSWORD>",
+                  "roles" : [
+                    {role: 'read', db: 'admin' },
+                    {role: 'clusterMonitor', db: 'admin'},
+                    {role: 'read', db: 'local' }
+                  ]
+                })
+                ```
+      configuration:
+        file:
+          name: go.d/mongodb.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: uri
+              description: MongoDB connection string. See [URI syntax](https://www.mongodb.com/docs/manual/reference/connection-string/).
+              default_value: mongodb://localhost:27017
+              required: true
+            - name: timeout
+              description: Query timeout in seconds.
+              default_value: 1
+              required: false
+            - name: databases
+              description: Databases selector. Determines which database metrics will be collected.
+              default_value: ""
+              required: false
+              details: |
+                Metrics of databases matching the selector will be collected.
+
+                - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
+                - Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format).
+                - Syntax:
+
+                  ```yaml
+                  per_user_stats:
+                    includes:
+                      - pattern1
+                      - pattern2
+                    excludes:
+                      - pattern3
+                      - pattern4
+                  ```
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: TCP socket
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    uri: mongodb://netdata:password@localhost:27017
+            - name: With databases metrics
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    uri: mongodb://netdata:password@localhost:27017
+                    databases:
+                      includes:
+                        - "* *"
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    uri: mongodb://netdata:password@localhost:27017
+                
+                  - name: remote
+                    uri: mongodb://netdata:password@203.0.113.0:27017
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      availability: []
+      description: |
+        - WireTiger metrics are available only if [WiredTiger](https://docs.mongodb.com/v6.0/core/wiredtiger/) is used as the
+          storage engine.
+        - Sharding metrics are available on shards only
+          for [mongos](https://www.mongodb.com/docs/manual/reference/program/mongos/).
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: mongodb.operations_rate
+              description: Operations rate
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+                - name: commands
+            - name: mongodb.operations_latency_time
+              description: Operations Latency
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+                - name: commands
+            - name: mongodb.operations_by_type_rate
+              description: Operations by type
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: insert
+                - name: query
+                - name: update
+                - name: delete
+                - name: getmore
+                - name: command
+            - name: mongodb.document_operations_rate
+              description: Document operations
+              unit: operations/s
+              chart_type: stacked
+              dimensions:
+                - name: inserted
+                - name: deleted
+                - name: returned
+                - name: updated
+            - name: mongodb.scanned_indexes_rate
+              description: Scanned indexes
+              unit: indexes/s
+              chart_type: line
+              dimensions:
+                - name: scanned
+            - name: mongodb.scanned_documents_rate
+              description: Scanned documents
+              unit: documents/s
+              chart_type: line
+              dimensions:
+                - name: scanned
+            - name: mongodb.active_clients_count
+              description: Connected clients
+              unit: clients
+              chart_type: line
+              dimensions:
+                - name: readers
+                - name: writers
+            - name: mongodb.queued_operations_count
+              description: Queued operations because of a lock
+              unit: operations
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: mongodb.cursors_open_count
+              description: Open cursors
+              unit: cursors
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: mongodb.cursors_open_no_timeout_count
+              description: Open cursors with disabled timeout
+              unit: cursors
+              chart_type: line
+              dimensions:
+                - name: open_no_timeout
+            - name: mongodb.cursors_opened_rate
+              description: Opened cursors rate
+              unit: cursors/s
+              chart_type: line
+              dimensions:
+                - name: opened
+            - name: mongodb.cursors_timed_out_rate
+              description: Timed-out cursors
+              unit: cursors/s
+              chart_type: line
+              dimensions:
+                - name: timed_out
+            - name: mongodb.cursors_by_lifespan_count
+              description: Cursors lifespan
+              unit: cursors
+              chart_type: stacked
+              dimensions:
+                - name: le_1s
+                - name: 1s_5s
+                - name: 5s_15s
+                - name: 15s_30s
+                - name: 30s_1m
+                - name: 1m_10m
+                - name: ge_10m
+            - name: mongodb.transactions_count
+              description: Current transactions
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: open
+                - name: prepared
+            - name: mongodb.transactions_rate
+              description: Transactions rate
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: started
+                - name: aborted
+                - name: committed
+                - name: prepared
+            - name: mongodb.connections_usage
+              description: Connections usage
+              unit: connections
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: used
+            - name: mongodb.connections_by_state_count
+              description: Connections By State
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: threaded
+                - name: exhaust_is_master
+                - name: exhaust_hello
+                - name: awaiting_topology_changes
+            - name: mongodb.connections_rate
+              description: Connections Rate
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: created
+            - name: mongodb.asserts_rate
+              description: Raised assertions
+              unit: asserts/s
+              chart_type: stacked
+              dimensions:
+                - name: regular
+                - name: warning
+                - name: msg
+                - name: user
+                - name: tripwire
+                - name: rollovers
+            - name: mongodb.network_traffic_rate
+              description: Network traffic
+              unit: bytes/s
+              chart_type: stacked
+              dimensions:
+                - name: in
+                - name: out
+            - name: mongodb.network_requests_rate
+              description: Network Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: mongodb.network_slow_dns_resolutions_rate
+              description: Slow DNS resolution operations
+              unit: resolutions/s
+              chart_type: line
+              dimensions:
+                - name: slow_dns
+            - name: mongodb.network_slow_ssl_handshakes_rate
+              description: Slow SSL handshake operations
+              unit: handshakes/s
+              chart_type: line
+              dimensions:
+                - name: slow_ssl
+            - name: mongodb.memory_resident_size
+              description: Used resident memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: mongodb.memory_virtual_size
+              description: Used virtual memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: mongodb.memory_page_faults_rate
+              description: Memory page faults
+              unit: pgfaults/s
+              chart_type: line
+              dimensions:
+                - name: pgfaults
+            - name: mongodb.memory_tcmalloc_stats
+              description: TCMalloc statistics
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: allocated
+                - name: central_cache_freelist
+                - name: transfer_cache_freelist
+                - name: thread_cache_freelists
+                - name: pageheap_freelist
+                - name: pageheap_unmapped
+            - name: mongodb.wiredtiger_concurrent_read_transactions_usage
+              description: Wired Tiger concurrent read transactions usage
+              unit: transactions
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: used
+            - name: mongodb.wiredtiger_concurrent_write_transactions_usage
+              description: Wired Tiger concurrent write transactions usage
+              unit: transactions
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: used
+            - name: mongodb.wiredtiger_cache_usage
+              description: Wired Tiger cache usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: mongodb.wiredtiger_cache_dirty_space_size
+              description: Wired Tiger cache dirty space size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: dirty
+            - name: mongodb.wiredtiger_cache_io_rate
+              description: Wired Tiger IO activity
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: mongodb.wiredtiger_cache_evictions_rate
+              description: Wired Tiger cache evictions
+              unit: pages/s
+              chart_type: stacked
+              dimensions:
+                - name: unmodified
+                - name: modified
+            - name: mongodb.sharding_nodes_count
+              description: Sharding Nodes
+              unit: nodes
+              chart_type: stacked
+              dimensions:
+                - name: shard_aware
+                - name: shard_unaware
+            - name: mongodb.sharding_sharded_databases_count
+              description: Sharded databases
+              unit: databases
+              chart_type: stacked
+              dimensions:
+                - name: partitioned
+                - name: unpartitioned
+            - name: mongodb.sharding_sharded_collections_count
+              description: Sharded collections
+              unit: collections
+              chart_type: stacked
+              dimensions:
+                - name: partitioned
+                - name: unpartitioned
+        - name: lock type
+          description: These metrics refer to the lock type.
+          labels:
+            - name: lock_type
+              description: lock type (e.g. global, database, collection, mutex)
+          metrics:
+            - name: mongodb.lock_acquisitions_rate
+              description: Lock acquisitions
+              unit: acquisitions/s
+              chart_type: line
+              dimensions:
+                - name: shared
+                - name: exclusive
+                - name: intent_shared
+                - name: intent_exclusive
+        - name: commit type
+          description: These metrics refer to the commit type.
+          labels:
+            - name: commit_type
+              description: commit type (e.g. noShards, singleShard, singleWriteShard)
+          metrics:
+            - name: mongodb.transactions_commits_rate
+              description: Transactions commits
+              unit: commits/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: fail
+            - name: mongodb.transactions_commits_duration_time
+              description: Transactions successful commits duration
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: commits
+        - name: database
+          description: These metrics refer to the database.
+          labels:
+            - name: database
+              description: database name
+          metrics:
+            - name: mongodb.database_collection_count
+              description: Database collections
+              unit: collections
+              chart_type: line
+              dimensions:
+                - name: collections
+            - name: mongodb.database_indexes_count
+              description: Database indexes
+              unit: indexes
+              chart_type: line
+              dimensions:
+                - name: indexes
+            - name: mongodb.database_views_count
+              description: Database views
+              unit: views
+              chart_type: line
+              dimensions:
+                - name: views
+            - name: mongodb.database_documents_count
+              description: Database documents
+              unit: documents
+              chart_type: line
+              dimensions:
+                - name: documents
+            - name: mongodb.database_data_size
+              description: Database data size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: data_size
+            - name: mongodb.database_storage_size
+              description: Database storage size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: storage_size
+            - name: mongodb.database_index_size
+              description: Database index size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: index_size
+        - name: replica set member
+          description: These metrics refer to the replica set member.
+          labels:
+            - name: repl_set_member
+              description: replica set member name
+          metrics:
+            - name: mongodb.repl_set_member_state
+              description: Replica Set member state
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: primary
+                - name: startup
+                - name: secondary
+                - name: recovering
+                - name: startup2
+                - name: unknown
+                - name: arbiter
+                - name: down
+                - name: rollback
+                - name: removed
+            - name: mongodb.repl_set_member_health_status
+              description: Replica Set member health status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+            - name: mongodb.repl_set_member_replication_lag_time
+              description: Replica Set member replication lag
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: replication_lag
+            - name: mongodb.repl_set_member_heartbeat_latency_time
+              description: Replica Set member heartbeat latency
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: heartbeat_latency
+            - name: mongodb.repl_set_member_ping_rtt_time
+              description: Replica Set member ping RTT
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: ping_rtt
+            - name: mongodb.repl_set_member_uptime
+              description: Replica Set member uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: shard
+          description: These metrics refer to the shard.
+          labels:
+            - name: shard_id
+              description: shard id
+          metrics:
+            - name: mongodb.sharding_shard_chunks_count
+              description: Shard chunks
+              unit: chunks
+              chart_type: line
+              dimensions:
+                - name: chunks

@@ -40,7 +40,7 @@ The following guides provide instructions on how to do this.
 
 Netdata Parents automatically size resource utilization based on the workload they receive. The only possible option for improving query performance is to dedicate more RAM to them, by increasing their caches efficiency.
 
-Check [RAM Requirements](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md) for more information.
+Check [RAM Requirements](/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md) for more information.
 
 ## Innovations Netdata has for optimal performance and scalability
 

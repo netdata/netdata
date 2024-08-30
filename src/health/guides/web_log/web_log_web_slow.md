@@ -41,8 +41,7 @@ There are several factors that can cause slow web server performance. To trouble
 
 ### Useful resources
 
-1. [Optimizing NGINX for Performance](https://easyengine.io/tutorials/nginx/performance/)
-2. [Apache Performance Tuning](https://httpd.apache.org/docs/2.4/misc/perf-tuning.html)
-3. [Top 10 MySQL Performance Tuning Tips](https://www.databasejournal.com/features/mysql/top-10-mysql-performance-tuning-tips.html)
-4. [10 Tips for Optimal PostgreSQL Performance](https://www.digitalocean.com/community/tutorials/10-tips-for-optimizing-postgresql-performance-on-a-digitalocean-droplet)
-5. [A Beginner's Guide to HTTP Cache Headers](https://www.keycdn.com/blog/http-cache-headers)
+1. [Apache Performance Tuning](https://httpd.apache.org/docs/2.4/misc/perf-tuning.html)
+2. [Top 10 MySQL Performance Tuning Tips](https://www.databasejournal.com/features/mysql/top-10-mysql-performance-tuning-tips.html)
+3. [10 Tips for Optimal PostgreSQL Performance](https://www.digitalocean.com/community/tutorials/10-tips-for-optimizing-postgresql-performance-on-a-digitalocean-droplet)
+4. [A Beginner's Guide to HTTP Cache Headers](https://www.keycdn.com/blog/http-cache-headers)

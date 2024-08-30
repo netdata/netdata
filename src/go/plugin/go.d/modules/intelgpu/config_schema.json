@@ -1,0 +1,33 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Intel GPU collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "device": {
+        "title": "Device selector",
+        "description": "Select Intel GPU ([supported filters](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html#DEVICE_SELECTION)). Use `intel_gpu_top -L` for listing devices. If not set, defaults to first.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "device": {
+      "ui:placeholder": "For systems with multiple GPUs, create separate data collection jobs and specify the device for each job."
+    }
+  }
+}

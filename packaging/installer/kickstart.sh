@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0518
+# Next unused error code: F051B
 
 # ======================================================================
 # Constants
@@ -21,8 +21,8 @@ KICKSTART_SOURCE="$(
 )"
 DEFAULT_PLUGIN_PACKAGES=""
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
-REPOCONFIG_DEB_VERSION="2-2"
-REPOCONFIG_RPM_VERSION="2-2"
+REPOCONFIG_DEB_VERSION="3-2"
+REPOCONFIG_RPM_VERSION="3-2"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l armv6l aarch64 ppc64le"
 
@@ -53,11 +53,9 @@ INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="default"
 NETDATA_CLAIM_URL="https://app.netdata.cloud"
 NETDATA_COMMAND="default"
-NETDATA_DISABLE_CLOUD=0
 NETDATA_INSTALLER_OPTIONS=""
 NETDATA_FORCE_METHOD=""
 NETDATA_OFFLINE_INSTALL_SOURCE=""
-NETDATA_REQUIRE_CLOUD=1
 NETDATA_WARNINGS=""
 RELEASE_CHANNEL="default"
 
@@ -149,8 +147,6 @@ main() {
 
   if [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
     claim
-  elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ]; then
-    soft_disable_cloud
   fi
 
   set_auto_updates
@@ -185,8 +181,6 @@ USAGE: kickstart.sh [options]
   --native-only                    Only install if native binary packages are available.
   --static-only                    Only install if a static build is available.
   --build-only                     Only install using a local build.
-  --disable-cloud                  Disable support for Netdata Cloud (default: detect)
-  --require-cloud                  Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
   --install-prefix <path>          Specify an installation prefix for local builds (default: autodetect based on system type).
   --old-install-prefix <path>      Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
   --install-version <version>      Specify the version of Netdata to install.
@@ -196,6 +190,7 @@ USAGE: kickstart.sh [options]
   --no-cleanup                     Don't do any cleanup steps. This is intended to help with debugging the installer.
   --local-build-options            Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
   --static-install-options         Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
+  --offline-architecture           Limit an offline install source being prepared with --prepare-offline-install-source to only include the specified static build architecture.
 
 The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
 
@@ -311,23 +306,31 @@ telemetry_event() {
 EOF
 )"
 
+  succeeded=0
+
   if [ -n "${CURL}" ]; then
-    "${CURL}" --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null
-  elif command -v wget > /dev/null 2>&1; then
-    if wget --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
-      # BusyBox-compatible version of wget, there is no --no-check-certificate option
-      wget -q -O - \
-      -T 1 \
-      --header 'Content-Type: application/json' \
-      --post-data "${REQ_BODY}" \
-      "${TELEMETRY_URL}" > /dev/null
-    else
-      wget -q -O - --no-check-certificate \
-      --method POST \
-      --timeout=1 \
-      --header 'Content-Type: application/json' \
-      --body-data "${REQ_BODY}" \
-      "${TELEMETRY_URL}" > /dev/null
+    if "${CURL}" --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null; then
+      succeeded=1
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      if wget --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
+        # BusyBox-compatible version of wget, there is no --no-check-certificate option
+        wget -q -O - \
+        -T 1 \
+        --header 'Content-Type: application/json' \
+        --post-data "${REQ_BODY}" \
+        "${TELEMETRY_URL}" > /dev/null
+      else
+        wget -q -O - --no-check-certificate \
+        --method POST \
+        --timeout=1 \
+        --header 'Content-Type: application/json' \
+        --body-data "${REQ_BODY}" \
+        "${TELEMETRY_URL}" > /dev/null
+      fi
     fi
   fi
 }
@@ -369,12 +372,14 @@ trap 'trap_handler 15 0' TERM
 # Utility functions
 
 canonical_path() {
+  OLDPWD="$(pwd)"
   cd "$(dirname "${1}")" || exit 1
   case "$(basename "${1}")" in
     ..) dirname "$(pwd -P)" ;;
     .) pwd -P ;;
     *) echo "$(pwd -P)/$(basename "${1}")" ;;
   esac
+  cd "${OLDPWD}" || exit 1
 }
 
 setup_terminal() {
@@ -444,7 +449,7 @@ deferred_warnings() {
 
 fatal() {
   deferred_warnings
-  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
+  printf >&2 "%b\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
   printf >&2 "%s\n" "For community support, you can connect with us on:"
   support_list
   telemetry_event "INSTALL_FAILED" "${1}" "${2}"
@@ -605,15 +610,38 @@ set_tmpdir() {
 
 check_for_remote_file() {
   url="${1}"
+  succeeded=0
+  checked=0
 
   if echo "${url}" | grep -Eq "^file:///"; then
     [ -e "${url#file://}" ] || return 1
+    return 0
   elif [ -n "${NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT}" ]; then
     return 0
-  elif [ -n "${CURL}" ]; then
-    "${CURL}" --output /dev/null --silent --head --fail "${url}" || return 1
-  elif command -v wget > /dev/null 2>&1; then
-    wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK' || return 1
+  fi
+
+  if [ -n "${CURL}" ]; then
+    checked=1
+
+    if "${CURL}" --output /dev/null --silent --head --fail "${url}"; then
+      succeeded=1
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK'; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi
@@ -622,13 +650,39 @@ check_for_remote_file() {
 download() {
   url="${1}"
   dest="${2}"
+  succeeded=0
+  checked=0
 
   if echo "${url}" | grep -Eq "^file:///"; then
     run cp "${url#file://}" "${dest}" || return 1
-  elif [ -n "${CURL}" ]; then
-    run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
-  elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O "${dest}" "${url}" || return 1
+    return 0
+  fi
+
+
+  if [ -n "${CURL}" ]; then
+    checked=1
+
+    if run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"; then
+      succeeded=1
+    else
+      rm -f "${dest}"
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if run wget -T 15 -O "${dest}" "${url}"; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi
@@ -652,19 +706,37 @@ get_actual_version() {
 
 get_redirect() {
   url="${1}"
+  succeeded=0
+  checked=0
 
   if [ -n "${CURL}" ]; then
-    run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eo '[^/]+$'" || return 1
-  elif command -v wget > /dev/null 2>&1; then
-    run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -Eo '[^/]+$'" || return 1
+    checked=1
+
+    if run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eo '[^/]+$'"; then
+      succeeded=1
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -Eo '[^/]+$'"; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi
 }
 
 safe_sha256sum() {
-  # Within the context of the installer, we only use -c option that is common between the two commands
-  # We will have to reconsider if we start using non-common options
   if command -v shasum > /dev/null 2>&1; then
     shasum -a 256 "$@"
   elif command -v sha256sum > /dev/null 2>&1; then
@@ -672,6 +744,17 @@ safe_sha256sum() {
   else
     fatal "Could not find a usable checksum tool. Either sha256sum, or a version of shasum supporting SHA256 checksums is required to proceed with installation." F0004
   fi
+}
+
+report_bad_sha256sum() {
+    file="${1}"
+    sums="${2}"
+
+    actual="$(safe_sha256sum "${file}" | awk '{ print $1 }')"
+    expected="$(grep "${file}" "${sums}" | awk '{ print $1 }')"
+
+    printf "Expected: %s\n" "${expected}"
+    printf "Actual: %s\n" "${actual}"
 }
 
 get_system_info() {
@@ -815,6 +898,10 @@ update() {
         opts="--interactive"
     fi
 
+    if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+      export NETDATA_OFFLINE_INSTALL_SOURCE="${NETDATA_OFFLINE_INSTALL_SOURCE}"
+    fi
+
     if run_script "${updater}" ${opts} --not-running-from-cron; then
       progress "Updated existing install at ${ndprefix}"
       return 0
@@ -896,7 +983,7 @@ detect_existing_install() {
     _ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
 
     if [ -n "${_ndpath}" ]; then
-      _ndpath="$(canonical_path "$(ndpath)")"
+      _ndpath="$(canonical_path "${_ndpath}")"
     fi
 
     if [ -z "${ndpath}" ] && [ -n "${_ndpath}" ]; then
@@ -1090,41 +1177,6 @@ handle_existing_install() {
   esac
 }
 
-soft_disable_cloud() {
-  set_tmpdir
-
-  cloud_prefix="${INSTALL_PREFIX}/var/lib/netdata/cloud.d"
-
-  run_as_root mkdir -p "${cloud_prefix}"
-
-  cat > "${tmpdir}/cloud.conf" << EOF
-[global]
-  enabled = no
-EOF
-
-  run_as_root cp "${tmpdir}/cloud.conf" "${cloud_prefix}/cloud.conf"
-
-  if [ -z "${NETDATA_NO_START}" ]; then
-    case "${SYSTYPE}" in
-      Darwin) run_as_root launchctl kickstart -k com.github.netdata ;;
-      FreeBSD) run_as_root service netdata restart ;;
-      Linux)
-        initpath="$(run_as_root readlink /proc/1/exe)"
-
-        if command -v service > /dev/null 2>&1; then
-          run_as_root service netdata restart
-        elif command -v rc-service > /dev/null 2>&1; then
-          run_as_root rc-service netdata restart
-        elif [ "$(basename "${initpath}" 2> /dev/null)" = "systemd" ]; then
-          run_as_root systemctl restart netdata
-        elif [ -f /etc/init.d/netdata ]; then
-          run_as_root /etc/init.d/netdata restart
-        fi
-        ;;
-    esac
-  fi
-}
-
 confirm_install_prefix() {
   if [ -n "${INSTALL_PREFIX}" ] && [ "${NETDATA_FORCE_METHOD}" != 'build' ]; then
     fatal "The --install-prefix option is only supported together with the --build-only option." F0204
@@ -1153,10 +1205,9 @@ check_claim_opts() {
 # shellcheck disable=SC2235,SC2030
   if [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
     fatal "Invalid claiming options, claim rooms may only be specified when a token is specified." F0204
-  elif [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_EXTRA}" ]; then
+  elif [ -z "${NETDATA_CLAIM_TOKEN}" ] && [ -n "${NETDATA_CLAIM_EXTRA}${NETDATA_CLAIM_PROXY}${NETDATA_CLAIM_NORELOAD}${NETDATA_CLAIM_INSECURE}" ]; then
+    # The above condition checks if _any_ claiming options other than the rooms have been set when the token is unset.
     fatal "Invalid claiming options, a claiming token must be specified." F0204
-  elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ] && [ -n "${NETDATA_CLAIM_TOKEN}" ]; then
-    fatal "Cloud explicitly disabled, but automatic claiming requested. Either enable Netdata Cloud, or remove the --claim-* options." F0204
   fi
 }
 
@@ -1184,6 +1235,93 @@ is_netdata_running() {
   fi
 }
 
+write_claim_config() {
+  if [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
+    config_path="/etc/netdata"
+    netdatacli="$(command -v netdatacli)"
+  elif [ "${INSTALL_PREFIX}" = "/opt/netdata" ]; then
+    config_path="/opt/netdata/etc/netdata"
+    netdatacli="/opt/netdata/bin/netdatacli"
+  elif [ ! -d "${INSTALL_PREFIX}/netdata" ]; then
+    config_path="${INSTALL_PREFIX}/etc/netdata"
+    netdatacli="${INSTALL_PREFIX}/usr/sbin/netdatacli"
+  else
+    config_path="${INSTALL_PREFIX}/netdata/etc/netdata"
+    netdatacli="${INSTALL_PREFIX}/netdata/usr/sbin/netdatacli"
+  fi
+
+  claim_config="${config_path}/claim.conf"
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would attempt to write claiming configuration to ${claim_config}"
+    return 0
+  fi
+
+  progress "Writing claiming configuration to ${claim_config}"
+
+  config="[global]"
+  config="${config}\n    url = ${NETDATA_CLAIM_URL}"
+  config="${config}\n    token = ${NETDATA_CLAIM_TOKEN}"
+  if [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
+      config="${config}\n    rooms = ${NETDATA_CLAIM_ROOMS}"
+  fi
+  if [ -n "${NETDATA_CLAIM_PROXY}" ]; then
+      config="${config}\n    proxy = ${NETDATA_CLAIM_PROXY}"
+  fi
+  if [ -n "${NETDATA_CLAIM_INSECURE}" ]; then
+      config="${config}\n    insecure = ${NETDATA_CLAIM_INSECURE}"
+  fi
+
+  run_as_root touch "${claim_config}.tmp" || return 1
+  run_as_root chmod 0640 "${claim_config}.tmp" || return 1
+  run_as_root chown ":${NETDATA_CLAIM_GROUP:-netdata}" "${claim_config}.tmp" || return 1
+  run_as_root sh -c "echo \"${config}\" > \"${claim_config}.tmp\"" || return 1
+  run_as_root mv -f "${claim_config}.tmp" "${claim_config}" || return 1
+
+  if [ -z "${NETDATA_CLAIM_NORELOAD}" ]; then
+    run_as_root "${netdatacli}" reload-claiming-state || return 1
+  fi
+}
+
+run_claim_script() {
+  if [ -n "${NETDATA_CLAIM_NORELOAD}" ]; then
+    NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -daemon-not-running"
+  fi
+
+  if [ -n "${NETDATA_CLAIM_INSECURE}" ]; then
+    NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -insecure"
+  fi
+
+  if [ -n "${NETDATA_CLAIM_PROXY}" ]; then
+    if [ "${NETDATA_CLAIM_PROXY}" = "none" ]; then
+      NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -noproxy"
+    else
+      NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -proxy=${NETDATA_CLAIM_PROXY}"
+    fi
+  fi
+
+  # shellcheck disable=SC2086
+  run_as_root "${NETDATA_CLAIM_PATH}" -token="${NETDATA_CLAIM_TOKEN}" -rooms="${NETDATA_CLAIM_ROOMS}" -url="${NETDATA_CLAIM_URL}" ${NETDATA_CLAIM_EXTRA}
+  case $? in
+    0) progress "Successfully claimed node" ;;
+    1) warning "Unable to claim node due to invalid claiming options. If you are seeing this message, you’ve probably found a bug and should open a bug report at ${AGENT_BUG_REPORT_URL}" ;;
+    2) warning "Unable to claim node due to issues creating the claiming directory or preparing the local claiming key. Make sure you have a working openssl command and that ${INSTALL_PREFIX}/var/lib/netdata/cloud.d exists, then try again." ;;
+    3) warning "Unable to claim node due to missing dependencies. Usually this means that the Netdata Agent was built without support for Netdata Cloud. If you built the agent from source, please install all needed dependencies for Cloud support. If you used the regular installation script and see this error, please file a bug report at ${AGENT_BUG_REPORT_URL}." ;;
+    4) warning "Failed to claim node due to inability to connect to ${NETDATA_CLAIM_URL}. Usually this either means that the specified claiming URL is wrong, or that you are having networking problems." ;;
+    5) progress "Successfully claimed node, but was not able to notify the Netdata Agent. You will need to restart the Netdata service on this node before it will show up in the Cloud." ;;
+    8) warning "Failed to claim node due to an invalid agent ID. You can usually resolve this by removing ${INSTALL_PREFIX}/var/lib/netdata/registry/netdata.public.unique.id and restarting the agent. Then try to claim it again using the same options." ;;
+    9) warning "Failed to claim node due to an invalid node name. This probably means you tried to specify a custom name for this node (for example, using the --claim-hostname option), but the hostname itself was either empty or consisted solely of whitespace. You can resolve this by specifying a valid host name and trying again." ;;
+    10) warning "Failed to claim node due to an invalid room ID. This issue is most likely caused by a typo.  Please check if the room(s) you are trying to add appear on the list of rooms provided to the --claim-rooms option ('${NETDATA_CLAIM_ROOMS}'). Then verify if the rooms are visible in Netdata Cloud and try again." ;;
+    11) warning "Failed to claim node due to an issue with the generated RSA key pair. You can usually resolve this by removing all files in ${INSTALL_PREFIX}/var/lib/netdata/cloud.d and then trying again." ;;
+    12) warning "Failed to claim node due to an invalid or expired claiming token. Please check that the token specified with the --claim-token option ('${NETDATA_CLAIM_TOKEN}') matches what you see in the Cloud and try again." ;;
+    13) warning "Failed to claim node because the Cloud thinks it is already claimed. If this node was created by cloning a VM or as a container from a template, please remove the file ${INSTALL_PREFIX}/var/lib/netdata/registry/netdata.public.unique.id and restart the agent. Then try to claim it again with the same options. Otherwise, if you are certain this node has never been claimed before, you can use the --claim-id option to specify a new node ID to use for claiming, for example by using the uuidgen command like so: --claim-id \"\$(uuidgen)\"" ;;
+    14) warning "Failed to claim node because the node is already in the process of being claimed. You should not need to do anything to resolve this, the node should show up properly in the Cloud soon. If it does not, please report a bug at ${AGENT_BUG_REPORT_URL}." ;;
+    15|16|17) warning "Failed to claim node due to an internal server error in the Cloud. Please retry claiming this node later, and if you still see this message file a bug report at ${CLOUD_BUG_REPORT_URL}." ;;
+    18) warning "Unable to claim node because this Netdata installation does not have a unique ID yet. Make sure the agent is running and started up correctly, and then try again." ;;
+    *) warning "Failed to claim node for an unknown reason. This usually means either networking problems or a bug. Please retry claiming later, and if you still see this message file a bug report at ${AGENT_BUG_REPORT_URL}" ;;
+  esac
+}
+
 claim() {
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to claim agent to ${NETDATA_CLAIM_URL}"
@@ -1207,17 +1345,18 @@ claim() {
     NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
   fi
 
+  method="script"
   err_msg=
   err_code=
   if [ -z "${NETDATA_CLAIM_PATH}" ]; then
-    err_msg="Unable to claim node: could not find usable claiming script. Reinstalling Netdata may resolve this."
-    err_code=F050B
+    method="config"
   elif [ ! -e "${NETDATA_CLAIM_PATH}" ]; then
-    err_msg="Unable to claim node: ${NETDATA_CLAIM_PATH} does not exist."
-    err_code=F0512
+    method="config"
   elif [ ! -f "${NETDATA_CLAIM_PATH}" ]; then
     err_msg="Unable to claim node: ${NETDATA_CLAIM_PATH} is not a file."
     err_code=F0513
+  elif grep -q '%%NEW_CLAIMING_METHOD%%' "${NETDATA_CLAIM_PATH}"; then
+    method="config"
   elif [ ! -x "${NETDATA_CLAIM_PATH}" ]; then
     err_msg="Unable to claim node: claiming script at ${NETDATA_CLAIM_PATH} is not executable. Reinstalling Netdata may resolve this."
     err_code=F0514
@@ -1233,34 +1372,16 @@ claim() {
   fi
 
   if ! is_netdata_running; then
-    NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -daemon-not-running"
+    NETDATA_CLAIM_NORELOAD=1
   fi
 
-  # shellcheck disable=SC2086
-  run_as_root "${NETDATA_CLAIM_PATH}" -token="${NETDATA_CLAIM_TOKEN}" -rooms="${NETDATA_CLAIM_ROOMS}" -url="${NETDATA_CLAIM_URL}" ${NETDATA_CLAIM_EXTRA}
-  case $? in
-    0)
-      progress "Successfully claimed node"
-      return 0
+  case ${method} in
+    script) run_claim_script ;;
+    config)
+      if ! write_claim_config; then
+        warning "Failed to write claiming configuration. This usually means you do not have permissions to access the configuration directory."
+      fi
       ;;
-    1) warning "Unable to claim node due to invalid claiming options. If you are seeing this message, you’ve probably found a bug and should open a bug report at ${AGENT_BUG_REPORT_URL}" ;;
-    2) warning "Unable to claim node due to issues creating the claiming directory or preparing the local claiming key. Make sure you have a working openssl command and that ${INSTALL_PREFIX}/var/lib/netdata/cloud.d exists, then try again." ;;
-    3) warning "Unable to claim node due to missing dependencies. Usually this means that the Netdata Agent was built without support for Netdata Cloud. If you built the agent from source, please install all needed dependencies for Cloud support. If you used the regular installation script and see this error, please file a bug report at ${AGENT_BUG_REPORT_URL}." ;;
-    4) warning "Failed to claim node due to inability to connect to ${NETDATA_CLAIM_URL}. Usually this either means that the specified claiming URL is wrong, or that you are having networking problems." ;;
-    5)
-      progress "Successfully claimed node, but was not able to notify the Netdata Agent. You will need to restart the Netdata service on this node before it will show up in the Cloud."
-      return 0
-      ;;
-    8) warning "Failed to claim node due to an invalid agent ID. You can usually resolve this by removing ${INSTALL_PREFIX}/var/lib/netdata/registry/netdata.public.unique.id and restarting the agent. Then try to claim it again using the same options." ;;
-    9) warning "Failed to claim node due to an invalid node name. This probably means you tried to specify a custom name for this node (for example, using the --claim-hostname option), but the hostname itself was either empty or consisted solely of whitespace. You can resolve this by specifying a valid host name and trying again." ;;
-    10) warning "Failed to claim node due to an invalid room ID. This issue is most likely caused by a typo.  Please check if the room(s) you are trying to add appear on the list of rooms provided to the --claim-rooms option ('${NETDATA_CLAIM_ROOMS}'). Then verify if the rooms are visible in Netdata Cloud and try again." ;;
-    11) warning "Failed to claim node due to an issue with the generated RSA key pair. You can usually resolve this by removing all files in ${INSTALL_PREFIX}/var/lib/netdata/cloud.d and then trying again." ;;
-    12) warning "Failed to claim node due to an invalid or expired claiming token. Please check that the token specified with the --claim-token option ('${NETDATA_CLAIM_TOKEN}') matches what you see in the Cloud and try again." ;;
-    13) warning "Failed to claim node because the Cloud thinks it is already claimed. If this node was created by cloning a VM or as a container from a template, please remove the file ${INSTALL_PREFIX}/var/lib/netdata/registry/netdata.public.unique.id and restart the agent. Then try to claim it again with the same options. Otherwise, if you are certain this node has never been claimed before, you can use the --claim-id option to specify a new node ID to use for claiming, for example by using the uuidgen command like so: --claim-id \"\$(uuidgen)\"" ;;
-    14) warning "Failed to claim node because the node is already in the process of being claimed. You should not need to do anything to resolve this, the node should show up properly in the Cloud soon. If it does not, please report a bug at ${AGENT_BUG_REPORT_URL}." ;;
-    15|16|17) warning "Failed to claim node due to an internal server error in the Cloud. Please retry claiming this node later, and if you still see this message file a bug report at ${CLOUD_BUG_REPORT_URL}." ;;
-    18) warning "Unable to claim node because this Netdata installation does not have a unique ID yet. Make sure the agent is running and started up correctly, and then try again." ;;
-    *) warning "Failed to claim node for an unknown reason. This usually means either networking problems or a bug. Please retry claiming later, and if you still see this message file a bug report at ${AGENT_BUG_REPORT_URL}" ;;
   esac
 
   if [ "${ACTION}" = "claim" ]; then
@@ -1289,7 +1410,7 @@ set_auto_updates() {
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would have attempted to enable automatic updates."
     # This first case is for catching using a new kickstart script with an old build. It can be safely removed after v1.34.0 is released.
-    elif ! run_as_root grep -q '\-\-enable-auto-updates' "${updater}"; then
+    elif ! run_as_root grep -q '\--enable-auto-updates' "${updater}"; then
       echo
     elif ! run_as_root "${updater}" --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
       warning "Failed to enable auto updates. Netdata will still work, but you will need to update manually."
@@ -1712,11 +1833,11 @@ try_static_install() {
     return 2
   fi
 
-  if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "${tmpdir}/${netdata_agent}"; then
+  if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "./${netdata_agent}"; then
     fatal "Unable to download static build archive for ${SYSARCH}. ${BADNET_MSG}." F0208
   fi
 
-  if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"; then
+  if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
     fatal "Unable to fetch checksums to verify static build archive. ${BADNET_MSG}." F0206
   fi
 
@@ -1724,8 +1845,9 @@ try_static_install() {
     progress "Would validate SHA256 checksum of downloaded static build archive."
   else
     if [ -z "${INSTALL_VERSION}" ]; then
-      if ! grep "${netdata_agent}" "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-        fatal "Static binary checksum validation failed. ${BADCACHE_MSG}." F0207
+      if ! grep "${netdata_agent}" ./sha256sum.txt | safe_sha256sum -c - > /dev/null 2>&1; then
+        bad_sums_report="$(report_bad_sha256sum "${netdata_agent}" "./sha256sum.txt")"
+        fatal "Static binary checksum validation failed.\n${bad_sums_report}\n${BADCACHE_MSG}." F0207
       fi
     fi
   fi
@@ -1734,9 +1856,15 @@ try_static_install() {
     opts="${opts} --accept"
   fi
 
+  env_cmd="env NETDATA_CERT_TEST_URL=${NETDATA_CLAIM_URL} NETDATA_CERT_MODE=check"
+
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    env_cmd="env NETDATA_CERT_TEST_URL=${NETDATA_CLAIM_URL} NETDATA_CERT_MODE=auto"
+  fi
+
   progress "Installing netdata"
   # shellcheck disable=SC2086
-  if ! run_as_root sh "${tmpdir}/${netdata_agent}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
+  if ! run_as_root ${env_cmd} /bin/sh "./${netdata_agent}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
     warning "Failed to install static build of Netdata on ${SYSARCH}."
     run rm -rf /opt/netdata
     return 2
@@ -1838,16 +1966,11 @@ build_and_install() {
     opts="${opts} --stable-channel"
   fi
 
-  if [ "${NETDATA_REQUIRE_CLOUD}" -eq 1 ]; then
-    opts="${opts} --require-cloud"
-  elif [ "${NETDATA_DISABLE_CLOUD}" -eq 1 ]; then
-    opts="${opts} --disable-cloud"
-  fi
-
   # shellcheck disable=SC2086
   run_script ./netdata-installer.sh ${opts}
 
   case $? in
+    0) ;;
     1)
       if [ -n "${EXIT_REASON}" ]; then
         fatal "netdata-installer.sh failed to run: ${EXIT_REASON}" "${EXIT_CODE}"
@@ -1856,6 +1979,7 @@ build_and_install() {
       fi
       ;;
     2) fatal "Insufficient RAM to install netdata." F0008 ;;
+    *) fatal "netdata-installer.sh failed to run: Encountered an unhandled error in the installer code." F051A ;;
   esac
 }
 
@@ -1875,14 +1999,14 @@ try_build_install() {
   set_source_archive_urls "${SELECTED_RELEASE_CHANNEL}"
 
   if [ -n "${INSTALL_VERSION}" ]; then
-    if ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "${tmpdir}/netdata-v${INSTALL_VERSION}.tar.gz"; then
+    if ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "./netdata-v${INSTALL_VERSION}.tar.gz"; then
       fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
     fi
-  elif ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "${tmpdir}/netdata-latest.tar.gz"; then
+  elif ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "./netdata-latest.tar.gz"; then
     fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
   fi
 
-  if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt"; then
+  if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
     fatal "Failed to download checksums for source tarball verification. ${BADNET_MSG}." F000C
   fi
 
@@ -1891,18 +2015,19 @@ try_build_install() {
   else
     if [ -z "${INSTALL_VERSION}" ]; then
       # shellcheck disable=SC2086
-      if ! grep netdata-latest.tar.gz "${tmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-        fatal "Tarball checksum validation failed. ${BADCACHE_MSG}." F0005
+      if ! grep netdata-latest.tar.gz "./sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+        bad_sums_report="$(report_bad_sha256sum netdata-latest.tar.gz "./sha256sum.txt")"
+        fatal "Tarball checksum validation failed.\n${bad_sums_report}\n${BADCACHE_MSG}." F0005
       fi
     fi
   fi
 
   if [ -n "${INSTALL_VERSION}" ]; then
-    run tar -xf "${tmpdir}/netdata-v${INSTALL_VERSION}.tar.gz" -C "${tmpdir}"
-    rm -rf "${tmpdir}/netdata-v${INSTALL_VERSION}.tar.gz" > /dev/null 2>&1
+    run tar -xf "./netdata-v${INSTALL_VERSION}.tar.gz" -C "${tmpdir}"
+    rm -rf "./netdata-v${INSTALL_VERSION}.tar.gz" > /dev/null 2>&1
   else
-    run tar -xf "${tmpdir}/netdata-latest.tar.gz" -C "${tmpdir}"
-    rm -rf "${tmpdir}/netdata-latest.tar.gz" > /dev/null 2>&1
+    run tar -xf "./netdata-latest.tar.gz" -C "${tmpdir}"
+    rm -rf "./netdata-latest.tar.gz" > /dev/null 2>&1
   fi
 
   if [ "${DRY_RUN}" -ne 1 ]; then
@@ -1944,7 +2069,7 @@ prepare_offline_install_source() {
       fi
 
       if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-        for arch in ${STATIC_INSTALL_ARCHES}; do
+        for arch in $(echo "${NETDATA_OFFLINE_ARCHES:-${STATIC_INSTALL_ARCHES}}" | awk '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}{printf("\n")}'); do
           set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
 
           if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
@@ -1985,8 +2110,16 @@ prepare_offline_install_source() {
 
   if [ "${DRY_RUN}" -ne 1 ]; then
     progress "Verifying checksums."
-    if ! grep -e "$(find . -name '*.gz.run')" sha256sums.txt | safe_sha256sum -c -; then
-      fatal "Checksums for offline install files are incorrect. ${BADCACHE_MSG}." F0507
+
+    failed_files=""
+    for file in $(find . -name '*.gz.run'); do
+      if ! grep -e "${file}" sha256sums.txt | safe_sha256sum -c -; then
+        failed_files="${failed_files}\n${file}\n$(report_bad_sha256sums "${file}" sha256sums.txt)"
+      fi
+    done
+
+    if [ -n "${failed_files}" ]; then
+      fatal "Checksums for offline install files are incorrect.\n${failed_files}\n${BADCACHE_MSG}." F0507
     fi
   else
     progress "Would verify SHA256 checksums of downloaded installation files."
@@ -2163,6 +2296,10 @@ validate_args() {
     case "${NETDATA_FORCE_METHOD}" in
       native|build) fatal "Offline installs are only supported for static builds currently." F0502 ;;
     esac
+
+    if [ ! -d "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+      fatal "Offline install source must be a directory." F0519
+    fi
   fi
 
   if [ -n "${LOCAL_BUILD_OPTIONS}" ]; then
@@ -2277,12 +2414,10 @@ parse_args() {
         esac
         ;;
       "--disable-cloud")
-        NETDATA_DISABLE_CLOUD=1
-        NETDATA_REQUIRE_CLOUD=0
+        warning "Cloud cannot be disabled"
         ;;
       "--require-cloud")
-        NETDATA_DISABLE_CLOUD=0
-        NETDATA_REQUIRE_CLOUD=1
+        warning "Cloud is always required"
         ;;
       "--dont-start-it")
         NETDATA_NO_START=1
@@ -2332,26 +2467,21 @@ parse_args() {
       "--native-only") NETDATA_FORCE_METHOD="native" ;;
       "--static-only") NETDATA_FORCE_METHOD="static" ;;
       "--build-only") NETDATA_FORCE_METHOD="build" ;;
-      "--claim-token")
-        NETDATA_CLAIM_TOKEN="${2}"
-        shift 1
-        ;;
-      "--claim-rooms")
-        NETDATA_CLAIM_ROOMS="${2}"
-        shift 1
-        ;;
-      "--claim-url")
-        NETDATA_CLAIM_URL="${2}"
-        shift 1
-        ;;
       "--claim-"*)
         optname="$(echo "${1}" | cut -d '-' -f 4-)"
         case "${optname}" in
-          id|proxy|user|hostname)
+          token) NETDATA_CLAIM_TOKEN="${2}"; shift 1 ;;
+          rooms) NETDATA_CLAIM_ROOMS="${2}"; shift 1 ;;
+          url) NETDATA_CLAIM_URL="${2}"; shift 1 ;;
+          proxy) NETDATA_CLAIM_PROXY="${2}"; shift 1 ;;
+          noproxy) NETDATA_CLAIM_PROXY="none" ;;
+          insecure) NETDATA_CLAIM_INSECURE=yes ;;
+          noreload) NETDATA_CLAIM_NORELOAD=1 ;;
+          id|user|hostname)
             NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}=${2}"
             shift 1
             ;;
-          verbose|insecure|noproxy|noreload|daemon-not-running) NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}" ;;
+          verbose|daemon-not-running) NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}" ;;
           *) warning "Ignoring unrecognized claiming option ${optname}" ;;
         esac
         ;;
@@ -2372,9 +2502,19 @@ parse_args() {
           fatal "A target directory must be specified with the --prepare-offline-install-source option." F0500
         fi
         ;;
+      "--offline-architecture")
+        if echo "${STATIC_INSTALL_ARCHES}" | grep -qw "${2}"; then
+          NETDATA_OFFLINE_ARCHES="${NETDATA_OFFLINE_ARCHES} ${2}"
+        else
+          fatal "${2} is not a recognized static build architecture (supported architectures are ${STATIC_INSTALL_ARCHES})" F0518
+        fi
+        shift 1
+        ;;
       "--offline-install-source")
         if [ -d "${2}" ]; then
           NETDATA_OFFLINE_INSTALL_SOURCE="${2}"
+          # shellcheck disable=SC2164
+          NETDATA_TARBALL_BASEURL="file://$(cd "${2}"; pwd)"
           shift 1
         else
           fatal "A source directory must be specified with the --offline-install-source option." F0501

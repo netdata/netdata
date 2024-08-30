@@ -3,24 +3,24 @@
 #include "../libnetdata.h"
 
 static struct {
-    HTTP_USER_ROLE access;
+    HTTP_USER_ROLE role;
     const char *name;
 } user_roles[] = {
-    { .access = HTTP_USER_ROLE_NONE, .name = "none" },
-    { .access = HTTP_USER_ROLE_ADMIN, .name = "admin" },
-    { .access = HTTP_USER_ROLE_MANAGER, .name = "manager" },
-    { .access = HTTP_USER_ROLE_TROUBLESHOOTER, .name = "troubleshooter" },
-    { .access = HTTP_USER_ROLE_OBSERVER, .name = "observer" },
-    { .access = HTTP_USER_ROLE_MEMBER, .name = "member" },
-    { .access = HTTP_USER_ROLE_BILLING, .name = "billing" },
-    { .access = HTTP_USER_ROLE_ANY, .name = "any" },
+    { .role = HTTP_USER_ROLE_NONE, .name = "none" },
+    { .role = HTTP_USER_ROLE_ADMIN, .name = "admin" },
+    { .role = HTTP_USER_ROLE_MANAGER, .name = "manager" },
+    { .role = HTTP_USER_ROLE_TROUBLESHOOTER, .name = "troubleshooter" },
+    { .role = HTTP_USER_ROLE_OBSERVER, .name = "observer" },
+    { .role = HTTP_USER_ROLE_MEMBER, .name = "member" },
+    { .role = HTTP_USER_ROLE_BILLING, .name = "billing" },
+    { .role = HTTP_USER_ROLE_ANY, .name = "any" },
 
-    { .access = HTTP_USER_ROLE_MEMBER, .name = "members" },
-    { .access = HTTP_USER_ROLE_ADMIN, .name = "admins" },
-    { .access = HTTP_USER_ROLE_ANY, .name = "all" },
+    { .role = HTTP_USER_ROLE_MEMBER, .name = "members" },
+    { .role = HTTP_USER_ROLE_ADMIN, .name = "admins" },
+    { .role = HTTP_USER_ROLE_ANY, .name = "all" },
 
     // terminator
-    { .access = 0, .name = NULL },
+    { .role = 0, .name = NULL },
 };
 
 HTTP_USER_ROLE http_user_role2id(const char *role) {
@@ -29,7 +29,7 @@ HTTP_USER_ROLE http_user_role2id(const char *role) {
 
     for(size_t i = 0; user_roles[i].name ;i++) {
         if(strcmp(user_roles[i].name, role) == 0)
-            return user_roles[i].access;
+            return user_roles[i].role;
     }
 
     nd_log(NDLS_DAEMON, NDLP_WARNING, "HTTP user role '%s' is not valid", role);
@@ -38,7 +38,7 @@ HTTP_USER_ROLE http_user_role2id(const char *role) {
 
 const char *http_id2user_role(HTTP_USER_ROLE role) {
     for(size_t i = 0; user_roles[i].name ;i++) {
-        if(role == user_roles[i].access)
+        if(role == user_roles[i].role)
             return user_roles[i].name;
     }
 

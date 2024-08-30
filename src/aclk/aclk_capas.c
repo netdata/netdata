@@ -6,6 +6,10 @@
 
 #define HTTP_API_V2_VERSION 6
 
+size_t aclk_get_http_api_version(void) {
+    return HTTP_API_V2_VERSION;
+}
+
 const struct capability *aclk_get_agent_capas()
 {
     static struct capability agent_capabilities[] = {
@@ -16,7 +20,7 @@ const struct capability *aclk_get_agent_capas()
         { .name = "ctx",         .version = 1, .enabled = 1 },
         { .name = "funcs",       .version = 1, .enabled = 1 },
         { .name = "http_api_v2", .version = HTTP_API_V2_VERSION, .enabled = 1 },
-        { .name = "health",      .version = 1, .enabled = 0 }, // index 7, below
+        { .name = "health",      .version = 2, .enabled = 0 }, // index 7, below
         { .name = "req_cancel",  .version = 1, .enabled = 1 },
         { .name = "dyncfg",      .version = 2, .enabled = 1 },
         { .name = NULL,          .version = 0, .enabled = 0 }
@@ -46,7 +50,7 @@ struct capability *aclk_get_node_instance_capas(RRDHOST *host)
         { .name = "ctx",         .version = 1,                     .enabled = 1 },
         { .name = "funcs",       .version = functions ? 1 : 0,     .enabled = functions ? 1 : 0 },
         { .name = "http_api_v2", .version = HTTP_API_V2_VERSION,   .enabled = 1 },
-        { .name = "health",      .version = 1,                     .enabled = host->health.health_enabled },
+        { .name = "health",      .version = 2,                     .enabled = host->health.health_enabled },
         { .name = "req_cancel",  .version = 1,                     .enabled = 1 },
         { .name = "dyncfg",      .version = 2,                     .enabled = dyncfg },
         { .name = NULL,          .version = 0,                     .enabled = 0 }

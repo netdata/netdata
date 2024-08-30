@@ -194,14 +194,12 @@ int sock_setreuse(int fd, int reuse) {
 void sock_setcloexec(int fd)
 {
     UNUSED(fd);
-#ifndef SOCK_CLOEXEC
     int flags = fcntl(fd, F_GETFD);
     if (flags != -1)
         (void) fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
-#endif
 }
 
-int sock_setreuse_port(int fd, int reuse) {
+int sock_setreuse_port(int fd __maybe_unused, int reuse __maybe_unused) {
     int ret;
 
 #ifdef SO_REUSEPORT
@@ -290,7 +288,7 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
     name.sun_family = AF_UNIX;
     strncpy(name.sun_path, path, sizeof(name.sun_path)-1);
 
-    errno = 0;
+    errno_clear();
     if (unlink(path) == -1 && errno != ENOENT)
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "LISTENER: failed to remove existing (probably obsolete or left-over) file on UNIX socket path '%s'.",
@@ -517,7 +515,6 @@ HTTP_ACL socket_ssl_acl(char *acl) {
         //Due the format of the SSL command it is always the last command,
         //we finish it here to avoid problems with the ACLs
         *ssl = '\0';
-#ifdef ENABLE_HTTPS
         ssl++;
         if (!strncmp("SSL=",ssl,4)) {
             ssl += 4;
@@ -528,7 +525,6 @@ HTTP_ACL socket_ssl_acl(char *acl) {
                 return HTTP_ACL_SSL_FORCE;
             }
         }
-#endif
     }
 
     return HTTP_ACL_NONE;
@@ -757,10 +753,10 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
         char *e = s;
 
         // skip separators, moving both s(tart) and e(nd)
-        while(isspace(*e) || *e == ',') s = ++e;
+        while(isspace((uint8_t)*e) || *e == ',') s = ++e;
 
         // move e(nd) to the first separator
-        while(*e && !isspace(*e) && *e != ',') e++;
+        while(*e && !isspace((uint8_t)*e) && *e != ',') e++;
 
         // is there anything?
         if(!*s || s == e) break;
@@ -872,6 +868,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
 
     int fd = -1;
     for (ai = ai_head; ai != NULL && fd == -1; ai = ai->ai_next) {
+        if(nd_thread_signaled_to_cancel()) break;
 
         if (ai->ai_family == PF_INET6) {
             struct sockaddr_in6 *pSadrIn6 = (struct sockaddr_in6 *) ai->ai_addr;
@@ -917,7 +914,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
             }
             sock_setcloexec(fd);
 
-            errno = 0;
+            errno_clear();
             if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
                 if(errno == EALREADY || errno == EINPROGRESS) {
                     nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -925,53 +922,44 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                            hostBfr, servBfr);
 
                     // Convert 'struct timeval' to milliseconds for poll():
-                    int timeout_milliseconds = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
+                    int timeout_ms = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
 
-                    struct pollfd fds[1];
-                    fds[0].fd = fd;
-                    fds[0].events = POLLOUT;  // We are looking for the ability to write to the socket
-
-                    int ret = poll(fds, 1, timeout_milliseconds);
-                    if (ret > 0) {
-                        // poll() completed normally. We can check the revents to see what happened
-                        if (fds[0].revents & POLLOUT) {
-                            // connect() completed successfully, socket is writable.
-
+                    switch(wait_on_socket_or_cancel_with_timeout(
+                        NULL,
+                        fd, timeout_ms, POLLOUT, NULL)) {
+                        case  0: // proceed
                             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                                    "connect() to ip %s port %s completed successfully",
                                    hostBfr, servBfr);
+                            break;
 
-                        }
-                        else {
-                            // This means that the socket is in error. We will close it and set fd to -1
+                        case -1: // thread cancelled
+                            nd_log(NDLS_DAEMON, NDLP_ERR,
+                                   "Thread is cancelled while connecting to '%s', port '%s'.",
+                                   hostBfr, servBfr);
 
+                            close(fd);
+                            fd = -1;
+                            break;
+
+                        case  1: // timeout
+                            nd_log(NDLS_DAEMON, NDLP_ERR,
+                                   "Timed out while connecting to '%s', port '%s'.",
+                                   hostBfr, servBfr);
+
+                            close(fd);
+                            fd = -1;
+                            break;
+
+                        default:
+                        case  2: // error
                             nd_log(NDLS_DAEMON, NDLP_ERR,
                                    "Failed to connect to '%s', port '%s'.",
                                    hostBfr, servBfr);
 
                             close(fd);
                             fd = -1;
-                        }
-                    }
-                    else if (ret == 0) {
-                        // poll() timed out, the connection is not established within the specified timeout.
-                        errno = 0;
-
-                        nd_log(NDLS_DAEMON, NDLP_ERR,
-                               "Timed out while connecting to '%s', port '%s'.",
-                               hostBfr, servBfr);
-
-                        close(fd);
-                        fd = -1;
-                    }
-                    else { // ret < 0
-                        // poll() returned an error.
-                        nd_log(NDLS_DAEMON, NDLP_ERR,
-                               "Failed to connect to '%s', port '%s'. poll() returned %d",
-                               hostBfr, servBfr, ret);
-
-                        close(fd);
-                        fd = -1;
+                            break;
                     }
                 }
                 else {
@@ -1091,10 +1079,10 @@ void foreach_entry_in_connection_string(const char *destination, bool (*callback
         const char *e = s;
 
         // skip separators, moving both s(tart) and e(nd)
-        while(isspace(*e) || *e == ',') s = ++e;
+        while(isspace((uint8_t)*e) || *e == ',') s = ++e;
 
         // move e(nd) to the first separator
-        while(*e && !isspace(*e) && *e != ',') e++;
+        while(*e && !isspace((uint8_t)*e) && *e != ',') e++;
 
         // is there anything?
         if(!*s || s == e) break;
@@ -1177,83 +1165,106 @@ int connect_to_one_of_urls(const char *destination, int default_port, struct tim
 // --------------------------------------------------------------------------------------------------------------------
 // helpers to send/receive data in one call, in blocking mode, with a timeout
 
-#ifdef ENABLE_HTTPS
-ssize_t recv_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
-#else
-ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
-#endif
+// returns: -1 = thread cancelled, 0 = proceed to read/write, 1 = time exceeded, 2 = error on fd
+// timeout parameter can be zero to wait forever
+inline int wait_on_socket_or_cancel_with_timeout(
+    NETDATA_SSL *ssl,
+    int fd, int timeout_ms, short int poll_events, short int *revents) {
+    struct pollfd pfd = {
+        .fd = fd,
+        .events = poll_events,
+        .revents = 0,
+    };
 
-    for(;;) {
-        struct pollfd fd = {
-                .fd = sockfd,
-                .events = POLLIN,
-                .revents = 0
-        };
+    bool forever = (timeout_ms == 0);
 
-        errno = 0;
-        int retval = poll(&fd, 1, timeout * 1000);
+    while (timeout_ms > 0 || forever) {
+        if(nd_thread_signaled_to_cancel()) {
+            errno = ECANCELED;
+            return -1;
+        }
 
-        if(retval == -1) {
-            // failed
+        if(poll_events == POLLIN && ssl && SSL_connection(ssl) && netdata_ssl_has_pending(ssl))
+            return 0;
+
+        const int wait_ms = (timeout_ms >= ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS || forever) ?
+                                            ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS : timeout_ms;
+
+        errno_clear();
+
+        // check every wait_ms
+        const int ret = poll(&pfd, 1, wait_ms);
+
+        if(revents)
+            *revents = pfd.revents;
+
+        if(ret == -1) {
+            // poll failed
 
             if(errno == EINTR || errno == EAGAIN)
                 continue;
 
-            return -1;
+            return 2;
         }
 
-        if(!retval) {
+        if(ret == 0) {
             // timeout
-            return 0;
+            if(!forever)
+                timeout_ms -= wait_ms;
+            continue;
         }
 
-        if(fd.revents & POLLIN)
-            break;
+        if(pfd.revents & poll_events)
+            return 0;
+
+        // all other errors
+        return 2;
     }
 
-#ifdef ENABLE_HTTPS
-    if (SSL_connection(ssl)) {
-        return netdata_ssl_read(ssl, buf, len);
+    errno = ETIMEDOUT;
+    return 1;
+}
+
+ssize_t recv_timeout(NETDATA_SSL *ssl, int sockfd, void *buf, size_t len, int flags, int timeout) {
+
+    switch(wait_on_socket_or_cancel_with_timeout(
+        ssl,
+        sockfd, timeout * 1000, POLLIN, NULL)) {
+        case 0: // data are waiting
+            break;
+
+        case 1: // timeout
+            return 0;
+
+        default:
+        case -1: // thread cancelled
+        case 2:  // error on socket
+            return -1;
     }
-#endif
+
+    if (SSL_connection(ssl))
+        return netdata_ssl_read(ssl, buf, len);
 
     return recv(sockfd, buf, len, flags);
 }
 
-#ifdef ENABLE_HTTPS
-ssize_t send_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
-#else
-ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
-#endif
+ssize_t send_timeout(NETDATA_SSL *ssl, int sockfd, void *buf, size_t len, int flags, int timeout) {
 
-    for(;;) {
-        struct pollfd fd = {
-                .fd = sockfd,
-                .events = POLLOUT,
-                .revents = 0
-        };
+    switch(wait_on_socket_or_cancel_with_timeout(
+        ssl,
+        sockfd, timeout * 1000, POLLOUT, NULL)) {
+        case 0: // data are waiting
+            break;
 
-        errno = 0;
-        int retval = poll(&fd, 1, timeout * 1000);
-
-        if(retval == -1) {
-            // failed
-
-            if(errno == EINTR || errno == EAGAIN)
-                continue;
-
-            return -1;
-        }
-
-        if(!retval) {
-            // timeout
+        case 1: // timeout
             return 0;
-        }
 
-        if(fd.revents & POLLOUT) break;
+        default:
+        case -1: // thread cancelled
+        case 2:  // error on socket
+            return -1;
     }
 
-#ifdef ENABLE_HTTPS
     if(ssl->conn) {
         if (SSL_connection(ssl)) {
             return netdata_ssl_write(ssl, buf, len);
@@ -1265,7 +1276,7 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
             return -1;
         }
     }
-#endif
+
     return send(sockfd, buf, len, flags);
 }
 
@@ -1445,7 +1456,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 break;
         }
         if (!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection", allow_dns)) {
-            errno = 0;
+            errno_clear();
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "Permission denied for client '%s', port '%s'",
                    client_ip, client_port);
@@ -1560,7 +1571,6 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     pi->recv_count = 0;
     pi->send_count = 0;
 
-    netdata_thread_disable_cancelability();
     p->used++;
     if(unlikely(pi->slot > p->max))
         p->max = pi->slot;
@@ -1572,7 +1582,6 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     if(pi->flags & POLLINFO_FLAG_SERVER_SOCKET) {
         p->min = pi->slot;
     }
-    netdata_thread_enable_cancelability();
 
     return pi;
 }
@@ -1583,8 +1592,6 @@ inline void poll_close_fd(POLLINFO *pi) {
     struct pollfd *pf = &p->fds[pi->slot];
 
     if(unlikely(pf->fd == -1)) return;
-
-    netdata_thread_disable_cancelability();
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
         pi->del_callback(pi);
@@ -1633,7 +1640,6 @@ inline void poll_close_fd(POLLINFO *pi) {
             }
         }
     }
-    netdata_thread_enable_cancelability();
 }
 
 void *poll_default_add_callback(POLLINFO *pi, short int *events, void *data) {
@@ -1692,11 +1698,11 @@ void poll_default_tmr_callback(void *timer_data) {
     (void)timer_data;
 }
 
-static void poll_events_cleanup(void *data) {
-    POLLJOB *p = (POLLJOB *)data;
+static void poll_events_cleanup(void *pptr) {
+    POLLJOB *p = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!p) return;
 
-    size_t i;
-    for(i = 0 ; i <= p->max ; i++) {
+    for(size_t i = 0 ; i <= p->max ; i++) {
         POLLINFO *pi = &p->inf[i];
         poll_close_fd(pi);
     }
@@ -1933,7 +1939,6 @@ void poll_events(LISTEN_SOCKETS *sockets
 
     int listen_sockets_active = 1;
 
-    int timeout_ms = 1000; // in milliseconds
     time_t last_check = now_boottime_sec();
 
     usec_t timer_usec = timer_milliseconds * USEC_PER_MS;
@@ -1945,9 +1950,9 @@ void poll_events(LISTEN_SOCKETS *sockets
         next_timer_usec = now_usec - (now_usec % timer_usec) + timer_usec;
     }
 
-    netdata_thread_cleanup_push(poll_events_cleanup, &p);
+    CLEANUP_FUNCTION_REGISTER(poll_events_cleanup) cleanup_ptr = &p;
 
-    while(!check_to_stop_callback()) {
+    while(!check_to_stop_callback() && !nd_thread_signaled_to_cancel()) {
         if(unlikely(timer_usec)) {
             now_usec = now_boottime_usec();
 
@@ -1957,12 +1962,6 @@ void poll_events(LISTEN_SOCKETS *sockets
                 now_usec = now_boottime_usec();
                 next_timer_usec = now_usec - (now_usec % timer_usec) + timer_usec;
             }
-
-            usec_t dt_usec = next_timer_usec - now_usec;
-            if(dt_usec < 1000 * USEC_PER_MS)
-                timeout_ms = 1000;
-            else
-                timeout_ms = (int)(dt_usec / USEC_PER_MS);
         }
 
         // enable or disable the TCP listening sockets, based on the current number of sockets used and the limit set
@@ -1980,7 +1979,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             }
         }
 
-        retval = poll(p.fds, p.max + 1, timeout_ms);
+        retval = poll(p.fds, p.max + 1, ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS);
         time_t now = now_boottime_sec();
 
         if(unlikely(retval == -1)) {
@@ -2151,6 +2150,4 @@ void poll_events(LISTEN_SOCKETS *sockets
             }
         }
     }
-
-    netdata_thread_cleanup_pop(1);
 }

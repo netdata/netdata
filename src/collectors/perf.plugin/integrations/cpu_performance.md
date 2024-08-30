@@ -23,7 +23,7 @@ Module: perf.plugin
 
 This collector monitors CPU performance metrics about cycles, instructions, migrations, cache operations and more.
 
-It uses syscall (2) to open a file descriptior to monitor the perf events.
+It uses syscall (2) to open a file descriptor to monitor the perf events.
 
 This collector is only supported on the following platforms:
 
@@ -31,7 +31,7 @@ This collector is only supported on the following platforms:
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
-It needs setuid to use necessary syscall to collect perf events. Netada sets the permission during installation time.
+It needs setuid to use the necessary syscall to collect perf events. Netdata sets the permission during installation time.
 
 ### Default Behavior
 
@@ -97,21 +97,21 @@ There are no alerts configured by default for this integration.
 
 #### Install perf plugin
 
-If you are [using our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md#determine-which-installation-method-you-used), make sure the `netdata-plugin-perf` package is installed.
+If you are [using our official native DEB/RPM packages](/packaging/installer/UPDATE.md#determine-which-installation-method-you-used), make sure the `netdata-plugin-perf` package is installed.
 
 
-#### Enable the pref plugin
+#### Enable the perf plugin
 
 The plugin is disabled by default because the number of PMUs is usually quite limited and it is not desired to allow Netdata to struggle silently for PMUs, interfering with other performance monitoring software.
 
-To enable it, use `edit-config` from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md), which is typically at `/etc/netdata`, to edit the `netdata.conf` file.
+To enable it, use `edit-config` from the Netdata [config directory](/docs/netdata-agent/configuration/README.md), which is typically at `/etc/netdata`, to edit the `netdata.conf` file.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
 sudo ./edit-config netdata.conf
 ```
 
-Change the value of the `perf` setting to `yes` in the `[plugins]` section. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
+Change the value of the `perf` setting to `yes` in the `[plugins]` section. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
 
 
 
@@ -133,7 +133,7 @@ The file format is a modified INI syntax. The general structure is:
     option3 = some third value
 ```
 You can edit the configuration file using the `edit-config` script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory).
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -148,12 +148,12 @@ You can get the available options running:
 ````
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | update every | Data collection frequency. | 1 | no |
-| command options | Command options that specify charts shown by plugin. `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alignment`, `emulation`, `L1D`, `L1D-prefetch`, `L1I`, `LL`, `DTLB`, `ITLB`, `PBU`. | 1 | yes |
+| command options | Command options that specify charts shown by the plugin. `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alignment`, `emulation`, `L1D`, `L1D-prefetch`, `L1I`, `LL`, `DTLB`, `ITLB`, `PBU`. | 1 | yes |
 
 </details>
 
@@ -172,7 +172,7 @@ Monitor all metrics available.
 
 Monitor CPU cycles.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 [plugin:perf]

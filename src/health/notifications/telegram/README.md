@@ -39,7 +39,7 @@ The configuration file name for this integration is `health_alarm_notify.conf`.
 
 
 You can edit the configuration file using the `edit-config` script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory).
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -49,13 +49,13 @@ sudo ./edit-config health_alarm_notify.conf
 
 The following options can be defined for this notification
 
-<details><summary>Config Options</summary>
+<details open><summary>Config Options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | SEND_TELEGRAM | Set `SEND_TELEGRAM` to YES | YES | yes |
 | TELEGRAM_BOT_TOKEN | set `TELEGRAM_BOT_TOKEN` to your bot token. |  | yes |
-| DEFAULT_RECIPIENT_TELEGRAM | Set `DEFAULT_RECIPIENT_TELEGRAM` to the chat ID you want the alert notifications to be sent to. You can define multiple chat IDs like this: -49999333322 -1009999222255. |  | yes |
+| DEFAULT_RECIPIENT_TELEGRAM | Set the `DEFAULT_RECIPIENT_TELEGRAM` variable in your config file to your Telegram chat ID (find it with @myidbot). Separate multiple chat IDs with spaces. To send alerts to a specific topic within a chat, use `chatID:topicID`. |  | yes |
 
 ##### DEFAULT_RECIPIENT_TELEGRAM
 

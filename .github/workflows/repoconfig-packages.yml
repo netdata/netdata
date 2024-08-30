@@ -31,7 +31,8 @@ jobs:
       - name: Prepare tools
         id: prepare
         run: |
-          sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
+          sudo apt-get update || true
+          sudo apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
         run: |
@@ -102,7 +103,7 @@ jobs:
         env:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
         run: |
-          printf "Packages to upload:\n%s" "$(ls artifacts/*.${{ matrix.format }})"
+          printf "Packages to upload:\n%s" "$(ls packaging/repoconfig/artifacts/*.${{ matrix.format }})"
           for pkgfile in artifacts/*.${{ matrix.format }} ; do
             .github/scripts/package_cloud_wrapper.sh yank "${REPO_PREFIX}-repoconfig/${{ matrix.pkgclouddistro }}" \
                 "$(basename "${pkgfile}")" || true
@@ -118,15 +119,43 @@ jobs:
           known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
       - name: Upload to packages.netdata.cloud
         id: package-upload
+        continue-on-error: true
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
         run: |
           # shellcheck disable=SC2043
           for arch in ${{ matrix.arches }}; do
               .github/scripts/package-upload.sh \
+              packages.netdata.cloud \
               "${{ matrix.pkgclouddistro }}" \
               "${arch}" \
               "${{ matrix.format }}" \
-              netdata/netdata-repoconfig
+              netdata/netdata-repoconfig \
+              packaging/repoconfig/artifacts
+          done
+      - name: Import GPG Keys
+        id: import-keys
+        if: matrix.format == 'deb' && github.event_name != 'pull_request'
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
+      - name: Sign DEB Packages
+        id: sign-deb
+        if: matrix.format == 'deb' && github.event_name != 'pull_request'
+        shell: bash
+        run: .github/scripts/deb-sign.sh packaging/repoconfig/artifacts ${{ steps.import-keys.outputs.fingerprint }}
+      - name: Upload to packages2.netdata.cloud
+        id: package2-upload
+        if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
+        run: |
+          # shellcheck disable=SC2043
+          for arch in ${{ matrix.arches }}; do
+              .github/scripts/package-upload.sh \
+              packages2.netdata.cloud \
+              "${{ matrix.pkgclouddistro }}" \
+              "${arch}" \
+              "${{ matrix.format }}" \
+              netdata/netdata-repoconfig \
+              packaging/repoconfig/artifacts
           done
       - name: Failure Notification
         if: ${{ failure() && github.repository == 'netdata/netdata' }}
@@ -145,4 +174,7 @@ jobs:
               Publish to PackageCloud: ${{ steps.publish.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
               Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
+              Import GPG Keys: ${{ steps.import-keys.outcome }}
+              Sign DEB Packages: ${{ steps.sign-deb.outcome }}
+              Publish to packages2.netdata.cloud: ${{ steps.package2-upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}

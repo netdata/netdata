@@ -1,10 +1,8 @@
 ---
 exclude_paths:
-  - src/collectors/python.d.plugin/python_modules/pyyaml2/**
   - src/collectors/python.d.plugin/python_modules/pyyaml3/**
   - src/collectors/python.d.plugin/python_modules/urllib3/**
   - src/collectors/python.d.plugin/python_modules/third_party/**
-  - contrib/**
   - packaging/makeself/**
   - src/web/gui/css/**
   - src/web/gui/lib/**

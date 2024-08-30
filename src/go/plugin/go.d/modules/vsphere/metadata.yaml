@@ -1,0 +1,439 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-vsphere
+      plugin_name: go.d.plugin
+      module_name: vsphere
+      monitored_instance:
+        name: VMware vCenter Server
+        link: https://www.vmware.com/products/vcenter-server.html
+        icon_filename: vmware.svg
+        categories:
+          - data-collection.containers-and-vms
+      keywords:
+        - vmware
+        - esxi
+        - vcenter
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors hosts and vms performance statistics from `vCenter` servers.
+          
+          > **Warning**: The `vsphere` collector cannot re-login and continue collecting metrics after a vCenter reboot.
+          > go.d.plugin needs to be restarted.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: |
+            The default `update_every` is 20 seconds, and it doesn't make sense to decrease the value.
+            **VMware real-time statistics are generated at the 20-second specificity**.
+
+            It is likely that 20 seconds is not enough for big installations and the value should be tuned.
+
+            To get a better view we recommend running the collector in debug mode and seeing how much time it will take to collect metrics.
+
+            <details>
+            <summary>Example (all not related debug lines were removed)</summary>
+            
+            ```
+            [ilyam@pc]$ ./go.d.plugin -d -m vsphere
+            [ DEBUG ] vsphere[vsphere] discover.go:94 discovering : starting resource discovering process
+            [ DEBUG ] vsphere[vsphere] discover.go:102 discovering : found 3 dcs, process took 49.329656ms
+            [ DEBUG ] vsphere[vsphere] discover.go:109 discovering : found 12 folders, process took 49.538688ms
+            [ DEBUG ] vsphere[vsphere] discover.go:116 discovering : found 3 clusters, process took 47.722692ms
+            [ DEBUG ] vsphere[vsphere] discover.go:123 discovering : found 2 hosts, process took 52.966995ms
+            [ DEBUG ] vsphere[vsphere] discover.go:130 discovering : found 2 vms, process took 49.832979ms
+            [ INFO  ] vsphere[vsphere] discover.go:140 discovering : found 3 dcs, 12 folders, 3 clusters (2 dummy), 2 hosts, 3 vms, process took 249.655993ms
+            [ DEBUG ] vsphere[vsphere] build.go:12 discovering : building : starting building resources process
+            [ INFO  ] vsphere[vsphere] build.go:23 discovering : building : built 3/3 dcs, 12/12 folders, 3/3 clusters, 2/2 hosts, 3/3 vms, process took 63.3µs
+            [ DEBUG ] vsphere[vsphere] hierarchy.go:10 discovering : hierarchy : start setting resources hierarchy process
+            [ INFO  ] vsphere[vsphere] hierarchy.go:18 discovering : hierarchy : set 3/3 clusters, 2/2 hosts, 3/3 vms, process took 6.522µs
+            [ DEBUG ] vsphere[vsphere] filter.go:24 discovering : filtering : starting filtering resources process
+            [ DEBUG ] vsphere[vsphere] filter.go:45 discovering : filtering : removed 0 unmatched hosts
+            [ DEBUG ] vsphere[vsphere] filter.go:56 discovering : filtering : removed 0 unmatched vms
+            [ INFO  ] vsphere[vsphere] filter.go:29 discovering : filtering : filtered 0/2 hosts, 0/3 vms, process took 42.973µs
+            [ DEBUG ] vsphere[vsphere] metric_lists.go:14 discovering : metric lists : starting resources metric lists collection process
+            [ INFO  ] vsphere[vsphere] metric_lists.go:30 discovering : metric lists : collected metric lists for 2/2 hosts, 3/3 vms, process took 275.60764ms
+            [ INFO  ] vsphere[vsphere] discover.go:74 discovering : discovered 2/2 hosts, 3/3 vms, the whole process took 525.614041ms
+            [ INFO  ] vsphere[vsphere] discover.go:11 starting discovery process, will do discovery every 5m0s
+            [ DEBUG ] vsphere[vsphere] collect.go:11 starting collection process
+            [ DEBUG ] vsphere[vsphere] scrape.go:48 scraping : scraped metrics for 2/2 hosts, process took 96.257374ms
+            [ DEBUG ] vsphere[vsphere] scrape.go:60 scraping : scraped metrics for 3/3 vms, process took 57.879697ms
+            [ DEBUG ] vsphere[vsphere] collect.go:23 metrics collected, process took 154.77997ms
+            ```
+            
+            </details>
+            
+            There you can see that discovering took `525.614041ms`, and collecting metrics took `154.77997ms`. Discovering is a separate thread, it doesn't affect collecting.
+            `update_every` and `timeout` parameters should be adjusted based on these numbers.
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/vsphere.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 20
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: vCenter server URL.
+              default_value: ""
+              required: true
+            - name: host_include
+              description: Hosts selector (filter).
+              default_value: ""
+              required: false
+              detailed_description: |
+                Metrics of hosts matching the selector will be collected.
+                
+                - Include pattern syntax: "/Datacenter pattern/Cluster pattern/Host pattern".
+                - Match pattern syntax: [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
+                - Syntax:
+
+                  ```yaml
+                  host_include:
+                    - '/DC1/*'           # select all hosts from datacenter DC1
+                    - '/DC2/*/!Host2 *'  # select all hosts from datacenter DC2 except HOST2
+                    - '/DC3/Cluster3/*'  # select all hosts from datacenter DC3 cluster Cluster3
+                  ```
+            - name: vm_include
+              description: Virtual machines selector (filter).
+              default_value: ""
+              required: false
+              detailed_description: |
+                Metrics of VMs matching the selector will be collected.
+                
+                - Include pattern syntax: "/Datacenter pattern/Cluster pattern/Host pattern/VM pattern".
+                - Match pattern syntax: [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
+                - Syntax:
+
+                  ```yaml
+                  vm_include:
+                    - '/DC1/*'           # select all VMs from datacenter DC
+                    - '/DC2/*/*/!VM2 *'  # select all VMs from datacenter DC2 except VM2
+                    - '/DC3/Cluster3/*'  # select all VMs from datacenter DC3 cluster Cluster3
+                  ```
+            - name: discovery_interval
+              description: Hosts and VMs discovery interval.
+              default_value: 300
+              required: false
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 20
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name     : vcenter1
+                    url      : https://203.0.113.1
+                    username : admin@vsphere.local
+                    password : somepassword
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name     : vcenter1
+                    url      : https://203.0.113.1
+                    username : admin@vsphere.local
+                    password : somepassword
+
+                  - name     : vcenter2
+                    url      : https://203.0.113.10
+                    username : admin@vsphere.local
+                    password : somepassword
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: vsphere_vm_cpu_utilization
+        metric: vsphere.vm_cpu_utilization
+        info: Virtual Machine CPU utilization
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf
+      - name: vsphere_vm_mem_usage
+        metric: vsphere.vm_mem_utilization
+        info: Virtual Machine memory utilization
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf
+      - name: vsphere_host_cpu_utilization
+        metric: vsphere.host_cpu_utilization
+        info: ESXi Host CPU utilization
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf
+      - name: vsphere_host_mem_utilization
+        metric: vsphere.host_mem_utilization
+        info: ESXi Host memory utilization
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: virtual machine
+          description: These metrics refer to the Virtual Machine.
+          labels:
+            - name: datacenter
+              description: Datacenter name
+            - name: cluster
+              description: Cluster name
+            - name: host
+              description: Host name
+            - name: vm
+              description: Virtual Machine name
+          metrics:
+            - name: vsphere.vm_cpu_utilization
+              description: Virtual Machine CPU utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: vsphere.vm_mem_utilization
+              description: Virtual Machine memory utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: vsphere.vm_mem_usage
+              description: Virtual Machine memory usage
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: granted
+                - name: consumed
+                - name: active
+                - name: shared
+            - name: vsphere.vm_mem_swap_usage
+              description: Virtual Machine VMKernel memory swap usage
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: swapped
+            - name: vsphere.vm_mem_swap_io
+              description: Virtual Machine VMKernel memory swap IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: vsphere.vm_disk_io
+              description: Virtual Machine disk IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: vsphere.vm_disk_max_latency
+              description: Virtual Machine disk max latency
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: vsphere.vm_net_traffic
+              description: Virtual Machine network traffic
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vsphere.vm_net_packets
+              description: Virtual Machine network packets
+              unit: packets
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vsphere.vm_net_drops
+              description: Virtual Machine network dropped packets
+              unit: packets
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vsphere.vm_overall_status
+              description: Virtual Machine overall alarm status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: red
+                - name: yellow
+                - name: gray
+            - name: vsphere.vm_system_uptime
+              description: Virtual Machine system uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: host
+          description: These metrics refer to the ESXi host.
+          labels:
+            - name: datacenter
+              description: Datacenter name
+            - name: cluster
+              description: Cluster name
+            - name: host
+              description: Host name
+          metrics:
+            - name: vsphere.host_cpu_utilization
+              description: ESXi Host CPU utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: vsphere.host_mem_utilization
+              description: ESXi Host memory utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: vsphere.host_mem_usage
+              description: ESXi Host memory usage
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: granted
+                - name: consumed
+                - name: active
+                - name: shared
+                - name: sharedcommon
+            - name: vsphere.host_mem_swap_io
+              description: ESXi Host VMKernel memory swap IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: vsphere.host_disk_io
+              description: ESXi Host disk IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: vsphere.host_disk_max_latency
+              description: ESXi Host disk max latency
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: vsphere.host_net_traffic
+              description: ESXi Host network traffic
+              unit: KiB/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vsphere.host_net_packets
+              description: ESXi Host network packets
+              unit: packets
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vsphere.host_net_drops
+              description: ESXi Host network drops
+              unit: packets
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vsphere.host_net_errors
+              description: ESXi Host network errors
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vsphere.host_overall_status
+              description: ESXi Host overall alarm status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: red
+                - name: yellow
+                - name: gray
+            - name: vsphere.host_system_uptime
+              description: ESXi Host system uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime

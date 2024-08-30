@@ -277,7 +277,7 @@ static inline void send_key_value_constant(LOG_JOB *jb __maybe_unused, HASHED_KE
     //    fprintf(stderr, "SET %s=%.*s\n", ht_key->key, (int)ht_key->value.len, ht_key->value.txt);
 }
 
-static inline void send_key_value_error(LOG_JOB *jb, HASHED_KEY *key, const char *format, ...) __attribute__ ((format(__printf__, 3, 4)));
+static inline void send_key_value_error(LOG_JOB *jb, HASHED_KEY *key, const char *format, ...) PRINTFLIKE(3, 4);
 static inline void send_key_value_error(LOG_JOB *jb, HASHED_KEY *key, const char *format, ...) {
     HASHED_KEY *ht_key = get_key_from_hashtable(jb, key);
 

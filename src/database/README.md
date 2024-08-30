@@ -3,12 +3,12 @@
 Netdata is fully capable of long-term metrics storage, at per-second granularity, via its default database engine
 (`dbengine`). But to remain as flexible as possible, Netdata supports several storage options:
 
-1. `dbengine`, (the default) data are in database files. The [Database Engine](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md) works like a
+1. `dbengine`, (the default) data are in database files. The [Database Engine](/src/database/engine/README.md) works like a
    traditional database. There is some amount of RAM dedicated to data caching and indexing and the rest of the data
    reside compressed on disk. The number of history entries is not fixed in this case, but depends on the configured
    disk space and the effective compression ratio of the data stored. This is the **only mode** that supports changing
    the data collection update frequency (`update every`) **without losing** the previously stored metrics. For more
-   details see [here](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md).
+   details see [here](/src/database/engine/README.md).
 
 2. `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
 
@@ -23,13 +23,13 @@ The default mode `[db].mode = dbengine` has been designed to scale for longer re
 for parent Agents in the _Parent - Child_ setups
 
 The other available database modes are designed to minimize resource utilization and should only be considered on
-[Parent - Child](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md) setups at the children side and only when the
+[Parent - Child](/docs/observability-centralization-points/README.md) setups at the children side and only when the
 resource constraints are very strict.
 
 So,
 
 - On a single node setup, use `[db].mode = dbengine`.
-- On a [Parent - Child](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md) setup, use `[db].mode = dbengine` on the
+- On a [Parent - Child](/docs/observability-centralization-points/README.md) setup, use `[db].mode = dbengine` on the
   parent to increase retention, and a more resource-efficient mode like, `dbengine` with light retention settings, `ram`, or `none` for the children to minimize resource utilization.
 
 ## Choose your database mode
@@ -48,7 +48,7 @@ Metrics retention is controlled only by the disk space allocated to storing metr
 CPU required by the agent to query longer timeframes.
 
 Since Netdata Agents usually run on the edge, on production systems, Netdata Agent **parents** should be considered.
-When having a [**parent - child**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md) setup, the child (the
+When having a [**parent - child**](/docs/observability-centralization-points/README.md) setup, the child (the
 Netdata Agent running on a production system) delegates all of its functions, including longer metrics retention and
 querying, to the parent node that can dedicate more resources to this task. A single Netdata Agent parent can centralize
 multiple children Netdata Agents (dozens, hundreds, or even thousands depending on its available resources).
@@ -69,7 +69,7 @@ every 2 seconds. This will **cut in half** both CPU and RAM resources consumed b
 On very weak devices you might have to use `[db].update every = 5` and `[db].retention = 720` (still 1 hour of data, but
 1/5 of the CPU and RAM resources).
 
-You can also disable [data collection plugins](https://github.com/netdata/netdata/blob/master/src/collectors/README.md) that you don't need. Disabling such plugins will also
+You can also disable [data collection plugins](/src/collectors/README.md) that you don't need. Disabling such plugins will also
 free both CPU and RAM resources.
 
 ## Memory optimizations

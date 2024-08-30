@@ -3,7 +3,8 @@
 Description=Real time performance monitoring
 
 # append here other services you want netdata to wait for them to start
-After=network.target
+After=network.target network-online.target nss-lookup.target
+Wants=network-online.target nss-lookup.target
 
 [Service]
 LogNamespace=netdata

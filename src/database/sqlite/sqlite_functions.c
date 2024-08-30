@@ -43,7 +43,7 @@ SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
     return rc;
 }
 
-static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database)
+static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database, int rc)
 {
 
     if (!res && !database)
@@ -54,7 +54,7 @@ static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database)
 
     if (db_meta == database) {
         char recover_file[FILENAME_MAX + 1];
-        snprintfz(recover_file, FILENAME_MAX, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
+        snprintfz(recover_file, FILENAME_MAX, "%s/.netdata-meta.db.%s", netdata_configured_cache_dir, SQLITE_CORRUPT == rc ? "recover" : "delete" );
         int fd = open(recover_file, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 444);
         if (fd >= 0) {
             close(fd);
@@ -69,7 +69,7 @@ int execute_insert(sqlite3_stmt *res)
     int rc;
     rc =  sqlite3_step_monitored(res);
     if (rc == SQLITE_CORRUPT) {
-        (void)mark_database_to_recover(res, NULL);
+        (void)mark_database_to_recover(res, NULL, rc);
         error_report("SQLite error %d", rc);
     }
     return rc;
@@ -80,40 +80,59 @@ int configure_sqlite_database(sqlite3 *database, int target_version, const char 
     char buf[1024 + 1] = "";
     const char *list[2] = { buf, NULL };
 
+    const char *def_auto_vacuum = "INCREMENTAL";
+    const char *def_synchronous = "NORMAL";
+    const char *def_journal_mode = "WAL";
+    const char *def_temp_store = "MEMORY";
+    long long def_journal_size_limit = 16777216;
+    long long def_cache_size = -2000;
+
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
-    snprintfz(buf, sizeof(buf) - 1, "PRAGMA auto_vacuum=%s", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA auto_vacuum=%s", def_auto_vacuum);
+    if (config_exists(CONFIG_SECTION_SQLITE, "auto vacuum"))
+        snprintfz(buf, sizeof(buf) - 1, "PRAGMA auto_vacuum=%s",config_get(CONFIG_SECTION_SQLITE, "auto vacuum", def_auto_vacuum));
     if (init_database_batch(database, list, description))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_synchronous
     // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
-    snprintfz(buf, sizeof(buf) - 1, "PRAGMA synchronous=%s", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA synchronous=%s", def_synchronous);
+    if (config_exists(CONFIG_SECTION_SQLITE, "synchronous"))
+        snprintfz(buf, sizeof(buf) - 1, "PRAGMA synchronous=%s", config_get(CONFIG_SECTION_SQLITE, "synchronous", def_synchronous));
     if (init_database_batch(database, list, description))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_mode
     // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
-    snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_mode=%s", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_mode=%s", def_journal_mode);
+    if (config_exists(CONFIG_SECTION_SQLITE, "journal mode"))
+        snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_mode=%s", config_get(CONFIG_SECTION_SQLITE, "journal mode", def_journal_mode));
     if (init_database_batch(database, list, description))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_temp_store
     // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
-    snprintfz(buf, sizeof(buf) - 1, "PRAGMA temp_store=%s", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA temp_store=%s", def_temp_store);
+    if (config_exists(CONFIG_SECTION_SQLITE, "temp store"))
+        snprintfz(buf, sizeof(buf) - 1, "PRAGMA temp_store=%s", config_get(CONFIG_SECTION_SQLITE, "temp store", def_temp_store));
     if (init_database_batch(database, list, description))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
     // PRAGMA schema.journal_size_limit = N ;
-    snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_size_limit=%lld", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_size_limit=%lld", def_journal_size_limit);
+    if (config_exists(CONFIG_SECTION_SQLITE, "journal size limit"))
+        snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_size_limit=%lld", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", def_journal_size_limit));
     if (init_database_batch(database, list, description))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_cache_size
     // PRAGMA schema.cache_size = pages;
     // PRAGMA schema.cache_size = -kibibytes;
-    snprintfz(buf, sizeof(buf) - 1, "PRAGMA cache_size=%lld", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA cache_size=%lld", def_cache_size);
+    if (config_exists(CONFIG_SECTION_SQLITE, "cache size"))
+        snprintfz(buf, sizeof(buf) - 1, "PRAGMA cache_size=%lld", config_get_number(CONFIG_SECTION_SQLITE, "cache size", def_cache_size));
     if (init_database_batch(database, list, description))
         return 1;
 
@@ -210,8 +229,8 @@ int init_database_batch(sqlite3 *database, const char *batch[], const char *desc
                 analytics_set_data_str(&analytics_data.netdata_fail_reason, error_str);
             sqlite3_free(err_msg);
             freez(error_str);
-            if (SQLITE_CORRUPT == rc) {
-                if (mark_database_to_recover(NULL, database))
+            if (SQLITE_CORRUPT == rc || SQLITE_NOTADB == rc) {
+                if (mark_database_to_recover(NULL, database, rc))
                     error_report("Database is corrupted will attempt to fix");
                 return SQLITE_CORRUPT;
             }
@@ -244,7 +263,7 @@ int db_execute(sqlite3 *db, const char *cmd)
         }
 
         if (rc == SQLITE_CORRUPT)
-            mark_database_to_recover(NULL, db);
+            mark_database_to_recover(NULL, db, rc);
         break;
     }
     return (rc != SQLITE_OK);
@@ -279,18 +298,12 @@ void sql_drop_table(const char *table)
 static int get_pragma_value(sqlite3 *database, const char *sql)
 {
     sqlite3_stmt *res = NULL;
-    int rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK))
-        return -1;
-
     int result = -1;
-    rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW))
-        result = sqlite3_column_int(res, 0);
-
-    rc = sqlite3_finalize(res);
-    (void) rc;
-
+    if (PREPARE_STATEMENT(database, sql, &res)) {
+        if (likely(sqlite3_step_monitored(res) == SQLITE_ROW))
+            result = sqlite3_column_int(res, 0);
+        SQLITE_FINALIZE(res);
+    }
     return result;
 }
 
@@ -357,6 +370,22 @@ void sqlite_close_databases(void)
 
     sql_close_database(db_context_meta, "CONTEXT");
     sql_close_database(db_meta, "METADATA");
+}
+
+uint64_t get_total_database_space(void)
+{
+    return 0;
+
+/*
+    if (!new_dbengine_defaults)
+        return 0;
+
+    uint64_t database_space = sqlite_get_meta_space() + sqlite_get_context_space();
+#ifdef ENABLE_ML
+    database_space +=  sqlite_get_ml_space();
+#endif
+    return database_space;
+*/
 }
 
 int sqlite_library_init(void)

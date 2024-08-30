@@ -67,8 +67,8 @@ Each of these sections provides the same number of charts:
 -   Network
     -   Sockets open (`apps.sockets`)
     
-In addition, if the [eBPF collector](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/README.md) is running, your dashboard will also show an
-additional [list of charts](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/README.md#integration-with-appsplugin) using low-level Linux
+In addition, if the [eBPF collector](/src/collectors/ebpf.plugin/README.md) is running, your dashboard will also show an
+additional [list of charts](/src/collectors/ebpf.plugin/README.md#integration-with-appsplugin) using low-level Linux
 metrics.
 
 The above are reported:
@@ -164,10 +164,10 @@ There are a few command line options you can pass to `apps.plugin`. The list of 
 ### Integration with eBPF
 
 If you don't see charts under the **eBPF syscall** or **eBPF net** sections, you should edit your
-[`ebpf.d.conf`](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/README.md#configure-the-ebpf-collector) file to ensure the eBPF program is enabled.
+[`ebpf.d.conf`](/src/collectors/ebpf.plugin/README.md#configure-the-ebpf-collector) file to ensure the eBPF program is enabled.
 
 Also see our [guide on troubleshooting apps with eBPF
-metrics](https://github.com/netdata/netdata/blob/master/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md) for ideas on how to interpret these charts in a
+metrics](/docs/developer-and-contributor-corner/monitor-debug-applications-ebpf.md) for ideas on how to interpret these charts in a
 few scenarios.
 
 ## Permissions
@@ -237,7 +237,7 @@ Examples below for process group `sql`:
 -   Open Pipes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.fds_pipes&dimensions=sql&value_color=green=0%7Cred)
 -   Open Sockets ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.fds_sockets&dimensions=sql&value_color=green%3E=3%7Cred)
 
-For more information about badges check [Generating Badges](https://github.com/netdata/netdata/blob/master/src/web/api/badges/README.md)
+For more information about badges check [Generating Badges](/src/web/api/v2/api_v3_badge/README.md)
 
 ## Comparison with console tools
 

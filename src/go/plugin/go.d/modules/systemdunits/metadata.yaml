@@ -1,0 +1,344 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-systemdunits
+      plugin_name: go.d.plugin
+      module_name: systemdunits
+      monitored_instance:
+        name: Systemd Units
+        link: https://www.freedesktop.org/wiki/Software/systemd/
+        icon_filename: systemd.svg
+        categories:
+          - data-collection.systemd
+      keywords:
+        - systemd
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the state of Systemd units and unit files.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/systemdunits.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: timeout
+              description: System bus requests timeout.
+              default_value: 1
+              required: false
+            - name: include
+              description: Systemd units selector.
+              default_value: "*.service"
+              required: false
+              detailed_description: |
+                Systemd units matching the selector will be monitored.
+
+                - Logic: (pattern1 OR pattern2)
+                - Pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match)
+                - Syntax:
+
+                ```yaml
+                includes:
+                  - pattern1
+                  - pattern2
+                ```
+            - name: skip_transient
+              description: If set, skip data collection for systemd transient units.
+              default_value: "false"
+              required: false
+            - name: collect_unit_files
+              description: If set to true, collect the state of installed unit files. Enabling this may increase system overhead.
+              default_value: "false"
+              required: false
+            - name: collect_unit_files_every
+              description: Interval for querying systemd about unit files and their enablement state, measured in seconds. Data is cached for this interval to reduce system overhead.
+              default_value: 300
+              required: false
+            - name: include_unit_files
+              description: Systemd unit files selector.
+              default_value: "*.service"
+              required: false
+              detailed_description: |
+                Systemd unit files matching the selector will be monitored.
+
+                - Logic: (pattern1 OR pattern2)
+                - Pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match)
+                - Syntax:
+
+                ```yaml
+                includes:
+                  - pattern1
+                  - pattern2
+                ```
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Service units
+              description: Collect state of all service type units.
+              config: |
+                jobs:
+                  - name: service
+                    include:
+                      - '*.service'
+            - name: One specific unit
+              description: Collect state of one specific unit.
+              config: |
+                jobs:
+                  - name: my-specific-service
+                    include:
+                      - 'my-specific.service'
+            - name: All unit types
+              description: Collect state of all units.
+              config: |
+                jobs:
+                  - name: my-specific-service-unit
+                    include:
+                      - '*'
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collect state of all service and socket type units.
+              config: |
+                jobs:
+                  - name: service
+                    include:
+                      - '*.service'
+                
+                  - name: socket
+                    include:
+                      - '*.socket'
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: systemd_service_unit_failed_state
+        metric: systemd.service_unit_state
+        info: systemd service unit in the failed state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
+      - name: systemd_socket_unit_failed_state
+        metric: systemd.socket_unit_state
+        info: systemd socket unit in the failed state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
+      - name: systemd_target_unit_failed_state
+        metric: systemd.target_unit_state
+        info: systemd target unit in the failed state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
+      - name: systemd_path_unit_failed_state
+        metric: systemd.path_unit_state
+        info: systemd path unit in the failed state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
+      - name: systemd_device_unit_failed_state
+        metric: systemd.device_unit_state
+        info: systemd device unit in the failed state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
+      - name: systemd_mount_unit_failed_state
+        metric: systemd.mount_unit_state
+        info: systemd mount unit in the failed state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
+      - name: systemd_automount_unit_failed_state
+        metric: systemd.automount_unit_state
+        info: systemd automount unit in the failed state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
+      - name: systemd_swap_unit_failed_state
+        metric: systemd.swap_unit_state
+        info: systemd swap unit in the failed state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
+      - name: systemd_scope_unit_failed_state
+        metric: systemd.scope_unit_state
+        info: systemd scope unit in the failed state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
+      - name: systemd_slice_unit_failed_state
+        metric: systemd.slice_unit_state
+        info: systemd slice unit in the failed state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
+      - name: systemd_timer_unit_failed_state
+        metric: systemd.timer_unit_state
+        info: systemd timer unit in the failed state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: unit
+          description: These metrics refer to the systemd unit.
+          labels:
+            - name: unit_name
+              description: systemd unit name
+          metrics:
+            - name: systemd.service_unit_state
+              description: Service Unit State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: activating
+                - name: deactivating
+                - name: failed
+            - name: systemd.socket_unit_state
+              description: Socket Unit State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: activating
+                - name: deactivating
+                - name: failed
+            - name: systemd.target_unit_state
+              description: Target Unit State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: activating
+                - name: deactivating
+                - name: failed
+            - name: systemd.path_unit_state
+              description: Path Unit State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: activating
+                - name: deactivating
+                - name: failed
+            - name: systemd.device_unit_state
+              description: Device Unit State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: activating
+                - name: deactivating
+                - name: failed
+            - name: systemd.mount_unit_state
+              description: Mount Unit State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: activating
+                - name: deactivating
+                - name: failed
+            - name: systemd.automount_unit_state
+              description: Automount Unit State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: activating
+                - name: deactivating
+                - name: failed
+            - name: systemd.swap_unit_state
+              description: Swap Unit State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: activating
+                - name: deactivating
+                - name: failed
+            - name: systemd.timer_unit_state
+              description: Timer Unit State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: activating
+                - name: deactivating
+                - name: failed
+            - name: systemd.scope_unit_state
+              description: Scope Unit State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: activating
+                - name: deactivating
+                - name: failed
+            - name: systemd.slice_unit_state
+              description: Slice Unit State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: activating
+                - name: deactivating
+                - name: failed
+        - name: unit file
+          description: These metrics refer to the systemd unit file.
+          labels:
+            - name: unit_file_name
+              description: systemd unit file name
+            - name: unit_file_type
+              description: systemd unit file type
+          metrics:
+            - name: systemd.unit_file_state
+              description: Unit File State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: enabled
+                - name: enabled-runtime
+                - name: linked
+                - name: linked-runtime
+                - name: alias
+                - name: masked
+                - name: masked-runtime
+                - name: static
+                - name: disabled
+                - name: indirect
+                - name: generated
+                - name: transient
+                - name: bad

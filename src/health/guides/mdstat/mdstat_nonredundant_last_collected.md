@@ -52,4 +52,4 @@ The md (multiple device) driver is responsible for managing software RAID arrays
 ### Useful resources
 
 1. [Linux RAID: A Quick Guide](https://www.cyberciti.biz/tips/linux-raid-increase-resync-rebuild-speed.html)
-2. [Netdata Agent Configuration Guide](https://learn.netdata.cloud/docs/agent/daemon/config)
+2. [Netdata Agent Configuration Guide](/src/daemon/config/README.md)

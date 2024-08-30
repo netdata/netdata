@@ -12,10 +12,6 @@ unsigned long long zfs_arcstats_shrinkable_cache_size_bytes = 0;
 int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     (void)dt;
 
-    static int show_zero_charts = -1;
-    if(unlikely(show_zero_charts == -1))
-        show_zero_charts = config_get_boolean_ondemand("plugin:freebsd:zfs_arcstats", "show zero charts", CONFIG_BOOLEAN_NO);
-
     unsigned long long l2_size;
     size_t uint64_t_size = sizeof(uint64_t);
     static struct mibs {
@@ -220,8 +216,8 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
         zfs_arcstats_shrinkable_cache_size_bytes = 0;
     }
 
-    generate_charts_arcstats("freebsd.plugin", "zfs", show_zero_charts, update_every);
-    generate_charts_arc_summary("freebsd.plugin", "zfs", show_zero_charts, update_every);
+    generate_charts_arcstats("freebsd.plugin", "zfs", update_every);
+    generate_charts_arc_summary("freebsd.plugin", "zfs", update_every);
 
     return 0;
 }

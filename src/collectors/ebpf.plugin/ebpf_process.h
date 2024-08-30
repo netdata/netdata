@@ -33,16 +33,17 @@
 #define NETDATA_CGROUP_PROCESS_EXIT_CONTEXT "cgroup.task_exit"
 #define NETDATA_CGROUP_PROCESS_ERROR_CONTEXT "cgroup.task_error"
 
-#define NETDATA_SYSTEMD_PROCESS_CREATE_CONTEXT "systemd.services.process_create"
-#define NETDATA_SYSTEMD_THREAD_CREATE_CONTEXT "systemd.services.thread_create"
-#define NETDATA_SYSTEMD_PROCESS_CLOSE_CONTEXT "systemd.services.task_close"
-#define NETDATA_SYSTEMD_PROCESS_EXIT_CONTEXT "systemd.services.task_exit"
-#define NETDATA_SYSTEMD_PROCESS_ERROR_CONTEXT "systemd.services.task_error"
+#define NETDATA_SYSTEMD_PROCESS_CREATE_CONTEXT "systemd.service.process_create"
+#define NETDATA_SYSTEMD_THREAD_CREATE_CONTEXT "systemd.service.thread_create"
+#define NETDATA_SYSTEMD_PROCESS_CLOSE_CONTEXT "systemd.service.task_close"
+#define NETDATA_SYSTEMD_PROCESS_EXIT_CONTEXT "systemd.service.task_exit"
+#define NETDATA_SYSTEMD_PROCESS_ERROR_CONTEXT "systemd.service.task_error"
 
 #define NETDATA_EBPF_CGROUP_UPDATE 30
 
 enum netdata_ebpf_stats_order {
     NETDATA_EBPF_ORDER_STAT_THREADS = 140000,
+    NETDATA_EBPF_ORDER_PIDS,
     NETDATA_EBPF_ORDER_STAT_LIFE_TIME,
     NETDATA_EBPF_ORDER_STAT_LOAD_METHOD,
     NETDATA_EBPF_ORDER_STAT_KERNEL_MEMORY,

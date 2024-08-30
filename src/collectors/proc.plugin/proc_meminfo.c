@@ -5,6 +5,10 @@
 #define PLUGIN_PROC_MODULE_MEMINFO_NAME "/proc/meminfo"
 #define CONFIG_SECTION_PLUGIN_PROC_MEMINFO "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_MEMINFO_NAME
 
+#define _COMMON_PLUGIN_NAME PLUGIN_PROC_NAME
+#define _COMMON_PLUGIN_MODULE_NAME PLUGIN_PROC_MODULE_MEMINFO_NAME
+#include "../common-contexts/common-contexts.h"
+
 int do_proc_meminfo(int update_every, usec_t dt) {
     (void)dt;
 
@@ -25,7 +29,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     static ARL_BASE *arl_base = NULL;
     static ARL_ENTRY *arl_hwcorrupted = NULL, *arl_memavailable = NULL, *arl_hugepages_total = NULL,
-        *arl_zswapped = NULL, *arl_high_low = NULL, *arl_cma_total = NULL,
+        *arl_zswapped = NULL, *arl_high_low = NULL,
         *arl_directmap4k = NULL, *arl_directmap2m = NULL, *arl_directmap4m = NULL, *arl_directmap1g = NULL;
 
     static unsigned long long
@@ -97,18 +101,18 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             ;
 
     if(unlikely(!arl_base)) {
-        do_ram          = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system ram", 1);
+        do_ram          = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system ram", CONFIG_BOOLEAN_YES);
         do_swap         = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system swap", CONFIG_BOOLEAN_AUTO);
         do_hwcorrupt    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "hardware corrupted ECC", CONFIG_BOOLEAN_AUTO);
-        do_committed    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "committed memory", 1);
-        do_writeback    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "writeback memory", 1);
-        do_kernel       = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "kernel memory", 1);
-        do_slab         = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "slab memory", 1);
+        do_committed    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "committed memory", CONFIG_BOOLEAN_YES);
+        do_writeback    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "writeback memory", CONFIG_BOOLEAN_YES);
+        do_kernel       = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "kernel memory", CONFIG_BOOLEAN_YES);
+        do_slab         = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "slab memory", CONFIG_BOOLEAN_YES);
         do_hugepages    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "hugepages", CONFIG_BOOLEAN_AUTO);
         do_transparent_hugepages = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "transparent hugepages", CONFIG_BOOLEAN_AUTO);
         do_reclaiming   = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "memory reclaiming", CONFIG_BOOLEAN_AUTO);
         do_high_low     = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "high low memory", CONFIG_BOOLEAN_AUTO);
-        do_cma          = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "cma memory", CONFIG_BOOLEAN_AUTO);
+        do_cma          = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "cma memory", CONFIG_BOOLEAN_AUTO);
         do_directmap    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "direct maps", CONFIG_BOOLEAN_AUTO);
 
         // https://github.com/torvalds/linux/blob/master/fs/proc/meminfo.c
@@ -185,7 +189,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         arl_expect(arl_base, "FilePmdMapped", &FilePmdMapped);
 
         // CONFIG_CMA
-        arl_cma_total = arl_expect(arl_base, "CmaTotal", &CmaTotal);
+        arl_expect(arl_base, "CmaTotal", &CmaTotal);
         arl_expect(arl_base, "CmaFree", &CmaFree);
 
         // CONFIG_UNACCEPTED_MEMORY
@@ -242,102 +246,17 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     }
 
     if(do_ram) {
-        {
-            static RRDSET *st_system_ram = NULL;
-            static RRDDIM *rd_free = NULL, *rd_used = NULL, *rd_cached = NULL, *rd_buffers = NULL;
+        common_system_ram(MemFree * 1024, MemUsed * 1024, MemCached * 1024, Buffers * 1024, update_every);
 
-            if(unlikely(!st_system_ram)) {
-                st_system_ram = rrdset_create_localhost(
-                        "system"
-                        , "ram"
-                        , NULL
-                        , "ram"
-                        , NULL
-                        , "System RAM"
-                        , "MiB"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_MEMINFO_NAME
-                        , NETDATA_CHART_PRIO_SYSTEM_RAM
-                        , update_every
-                        , RRDSET_TYPE_STACKED
-                );
-
-                rd_free    = rrddim_add(st_system_ram, "free",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-                rd_used    = rrddim_add(st_system_ram, "used",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-                rd_cached  = rrddim_add(st_system_ram, "cached",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-                rd_buffers = rrddim_add(st_system_ram, "buffers", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            }
-
-            rrddim_set_by_pointer(st_system_ram, rd_free,    MemFree);
-            rrddim_set_by_pointer(st_system_ram, rd_used,    MemUsed);
-            rrddim_set_by_pointer(st_system_ram, rd_cached,  MemCached);
-            rrddim_set_by_pointer(st_system_ram, rd_buffers, Buffers);
-            rrdset_done(st_system_ram);
-        }
-
-        if(arl_memavailable->flags & ARL_ENTRY_FLAG_FOUND) {
-            static RRDSET *st_mem_available = NULL;
-            static RRDDIM *rd_avail = NULL;
-
-            if(unlikely(!st_mem_available)) {
-                st_mem_available = rrdset_create_localhost(
-                        "mem"
-                        , "available"
-                        , NULL
-                        , "overview"
-                        , NULL
-                        , "Available RAM for applications"
-                        , "MiB"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_MEMINFO_NAME
-                        , NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE
-                        , update_every
-                        , RRDSET_TYPE_AREA
-                );
-
-                rd_avail   = rrddim_add(st_mem_available, "MemAvailable", "avail", 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            }
-
-            rrddim_set_by_pointer(st_mem_available, rd_avail, MemAvailable);
-            rrdset_done(st_mem_available);
-        }
+        if(arl_memavailable->flags & ARL_ENTRY_FLAG_FOUND)
+            common_mem_available(MemAvailable * 1024, update_every);
     }
 
     unsigned long long SwapUsed = SwapTotal - SwapFree;
 
-    if(do_swap == CONFIG_BOOLEAN_YES || (do_swap == CONFIG_BOOLEAN_AUTO &&
-                                         (SwapTotal || SwapUsed || SwapFree ||
-                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (SwapTotal && (do_swap == CONFIG_BOOLEAN_YES || do_swap == CONFIG_BOOLEAN_AUTO)) {
         do_swap = CONFIG_BOOLEAN_YES;
-
-        static RRDSET *st_system_swap = NULL;
-        static RRDDIM *rd_free = NULL, *rd_used = NULL;
-
-        if(unlikely(!st_system_swap)) {
-            st_system_swap = rrdset_create_localhost(
-                    "mem"
-                    , "swap"
-                    , NULL
-                    , "swap"
-                    , NULL
-                    , "System Swap"
-                    , "MiB"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_MEMINFO_NAME
-                    , NETDATA_CHART_PRIO_MEM_SWAP
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-
-            rrdset_flag_set(st_system_swap, RRDSET_FLAG_DETAIL);
-
-            rd_free = rrddim_add(st_system_swap, "free",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rd_used = rrddim_add(st_system_swap, "used",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-        }
-
-        rrddim_set_by_pointer(st_system_swap, rd_used, SwapUsed);
-        rrddim_set_by_pointer(st_system_swap, rd_free, SwapFree);
-        rrdset_done(st_system_swap);
+        common_mem_swap(SwapFree * 1024, SwapUsed * 1024, update_every);
 
         {
             static RRDSET *st_mem_swap_cached = NULL;
@@ -366,7 +285,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             rrdset_done(st_mem_swap_cached);
         }
 
-        if(arl_zswapped->flags & ARL_ENTRY_FLAG_FOUND) {
+        if (is_mem_zswap_enabled && (arl_zswapped->flags & ARL_ENTRY_FLAG_FOUND)) {
             static RRDSET *st_mem_zswap = NULL;
             static RRDDIM *rd_zswap = NULL, *rd_zswapped = NULL;
 
@@ -396,10 +315,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         }
     }
 
-    if(arl_hwcorrupted->flags & ARL_ENTRY_FLAG_FOUND &&
-       (do_hwcorrupt == CONFIG_BOOLEAN_YES || (do_hwcorrupt == CONFIG_BOOLEAN_AUTO &&
-                                               (HardwareCorrupted > 0 ||
-                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))) {
+    if (arl_hwcorrupted->flags & ARL_ENTRY_FLAG_FOUND &&
+        (do_hwcorrupt == CONFIG_BOOLEAN_YES || do_hwcorrupt == CONFIG_BOOLEAN_AUTO)) {
         do_hwcorrupt = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_mem_hwcorrupt = NULL;
@@ -569,10 +486,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         rrdset_done(st_mem_slab);
     }
 
-    if(arl_hugepages_total->flags & ARL_ENTRY_FLAG_FOUND &&
-        (do_hugepages == CONFIG_BOOLEAN_YES || (do_hugepages == CONFIG_BOOLEAN_AUTO &&
-                                              ((Hugepagesize && HugePages_Total) ||
-                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))) {
+    if (arl_hugepages_total->flags & ARL_ENTRY_FLAG_FOUND && HugePages_Total &&
+        (do_hugepages == CONFIG_BOOLEAN_YES || do_hugepages == CONFIG_BOOLEAN_AUTO)) {
         do_hugepages = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_mem_hugepages = NULL;
@@ -609,10 +524,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         rrdset_done(st_mem_hugepages);
     }
 
-    if(do_transparent_hugepages == CONFIG_BOOLEAN_YES || (do_transparent_hugepages == CONFIG_BOOLEAN_AUTO &&
-                                                          (AnonHugePages ||
-                                                           ShmemHugePages ||
-                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (do_transparent_hugepages == CONFIG_BOOLEAN_YES || do_transparent_hugepages == CONFIG_BOOLEAN_AUTO) {
         do_transparent_hugepages = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_mem_transparent_hugepages = NULL;
@@ -761,7 +673,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         rrdset_done(st_mem_high_low);
     }
 
-    if(do_cma == CONFIG_BOOLEAN_YES || (do_cma == CONFIG_BOOLEAN_AUTO && (arl_cma_total->flags & ARL_ENTRY_FLAG_FOUND) && CmaTotal)) {
+    if (CmaTotal && do_cma != CONFIG_BOOLEAN_NO) {
         do_cma = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_mem_cma = NULL;

@@ -4,6 +4,10 @@
 
 #define PLUGIN_PROC_MODULE_STAT_NAME "/proc/stat"
 
+#define _COMMON_PLUGIN_NAME PLUGIN_PROC_NAME
+#define _COMMON_PLUGIN_MODULE_NAME PLUGIN_PROC_MODULE_STAT_NAME
+#include "../common-contexts/common-contexts.h"
+
 struct per_core_single_number_file {
     unsigned char found:1;
     const char *filename;
@@ -484,7 +488,7 @@ int do_proc_stat(int update_every, usec_t dt) {
            *time_in_state_filename = NULL, *schedstat_filename = NULL, *cpuidle_name_filename = NULL, *cpuidle_time_filename = NULL;
     static const RRDVAR_ACQUIRED *cpus_var = NULL;
     static int accurate_freq_avail = 0, accurate_freq_is_used = 0;
-    size_t cores_found = (size_t)get_system_cpus();
+    size_t cores_found = (size_t)os_get_system_cpus();
 
     if(unlikely(do_cpu == -1)) {
         do_cpu                    = config_get_boolean("plugin:proc:/proc/stat", "cpu utilization", CONFIG_BOOLEAN_YES);
@@ -495,7 +499,7 @@ int do_proc_stat(int update_every, usec_t dt) {
         do_processes              = config_get_boolean("plugin:proc:/proc/stat", "processes running", CONFIG_BOOLEAN_YES);
 
         // give sane defaults based on the number of processors
-        if(unlikely(get_system_cpus() > 128)) {
+        if(unlikely(os_get_system_cpus() > 128)) {
             // the system has too many processors
             keep_per_core_fds_open = CONFIG_BOOLEAN_NO;
             do_core_throttle_count = CONFIG_BOOLEAN_NO;
@@ -511,7 +515,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             do_cpu_freq = CONFIG_BOOLEAN_YES;
             do_cpuidle = CONFIG_BOOLEAN_NO;
         }
-        if(unlikely(get_system_cpus() > 24)) {
+        if(unlikely(os_get_system_cpus() > 24)) {
             // the system has too many processors
             keep_cpuidle_fds_open = CONFIG_BOOLEAN_NO;
         }
@@ -748,62 +752,14 @@ int do_proc_stat(int update_every, usec_t dt) {
         }
         else if(unlikely(hash == hash_intr && strcmp(row_key, "intr") == 0)) {
             if(likely(do_interrupts)) {
-                static RRDSET *st_intr = NULL;
-                static RRDDIM *rd_interrupts = NULL;
                 unsigned long long value = str2ull(procfile_lineword(ff, l, 1), NULL);
-
-                if(unlikely(!st_intr)) {
-                    st_intr = rrdset_create_localhost(
-                            "system"
-                            , "intr"
-                            , NULL
-                            , "interrupts"
-                            , NULL
-                            , "CPU Interrupts"
-                            , "interrupts/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_STAT_NAME
-                            , NETDATA_CHART_PRIO_SYSTEM_INTR
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rrdset_flag_set(st_intr, RRDSET_FLAG_DETAIL);
-
-                    rd_interrupts = rrddim_add(st_intr, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-
-                rrddim_set_by_pointer(st_intr, rd_interrupts, value);
-                rrdset_done(st_intr);
+                common_interrupts(value, update_every, NULL);
             }
         }
         else if(unlikely(hash == hash_ctxt && strcmp(row_key, "ctxt") == 0)) {
             if(likely(do_context)) {
-                static RRDSET *st_ctxt = NULL;
-                static RRDDIM *rd_switches = NULL;
                 unsigned long long value = str2ull(procfile_lineword(ff, l, 1), NULL);
-
-                if(unlikely(!st_ctxt)) {
-                    st_ctxt = rrdset_create_localhost(
-                            "system"
-                            , "ctxt"
-                            , NULL
-                            , "processes"
-                            , NULL
-                            , "CPU Context Switches"
-                            , "context switches/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_STAT_NAME
-                            , NETDATA_CHART_PRIO_SYSTEM_CTXT
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rd_switches = rrddim_add(st_ctxt, "switches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-
-                rrddim_set_by_pointer(st_ctxt, rd_switches, value);
-                rrdset_done(st_ctxt);
+                common_system_context_switch(value, update_every);
             }
         }
         else if(unlikely(hash == hash_processes && !processes && strcmp(row_key, "processes") == 0)) {
@@ -850,33 +806,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(likely(do_processes)) {
-        static RRDSET *st_processes = NULL;
-        static RRDDIM *rd_running = NULL;
-        static RRDDIM *rd_blocked = NULL;
-
-        if(unlikely(!st_processes)) {
-            st_processes = rrdset_create_localhost(
-                    "system"
-                    , "processes"
-                    , NULL
-                    , "processes"
-                    , NULL
-                    , "System Processes"
-                    , "processes"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_STAT_NAME
-                    , NETDATA_CHART_PRIO_SYSTEM_PROCESSES
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_running = rrddim_add(st_processes, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_blocked = rrddim_add(st_processes, "blocked", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
-        }
-
-        rrddim_set_by_pointer(st_processes, rd_running, running);
-        rrddim_set_by_pointer(st_processes, rd_blocked, blocked);
-        rrdset_done(st_processes);
+        common_system_processes(running, blocked, update_every);
     }
 
     if(likely(all_cpu_charts_size > 1)) {

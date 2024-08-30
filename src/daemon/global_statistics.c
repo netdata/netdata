@@ -5,17 +5,18 @@
 #define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01
 
 #define WORKER_JOB_GLOBAL             0
-#define WORKER_JOB_REGISTRY           1
-#define WORKER_JOB_WORKERS            2
-#define WORKER_JOB_DBENGINE           3
-#define WORKER_JOB_HEARTBEAT          4
-#define WORKER_JOB_STRINGS            5
-#define WORKER_JOB_DICTIONARIES       6
-#define WORKER_JOB_MALLOC_TRACE       7
-#define WORKER_JOB_SQLITE3            8
+#define WORKER_JOB_GLOBAL_EXT         1
+#define WORKER_JOB_REGISTRY           2
+#define WORKER_JOB_WORKERS            3
+#define WORKER_JOB_DBENGINE           4
+#define WORKER_JOB_HEARTBEAT          5
+#define WORKER_JOB_STRINGS            6
+#define WORKER_JOB_DICTIONARIES       7
+#define WORKER_JOB_MALLOC_TRACE       8
+#define WORKER_JOB_SQLITE3            9
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 9
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 9
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 10
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
 #endif
 
 bool global_statistics_enabled = true;
@@ -249,13 +250,9 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     ((stats).memory.dict + (stats).memory.values + (stats).memory.index)
 
 static void global_statistics_charts(void) {
-    static unsigned long long old_web_requests = 0,
-                              old_web_usec = 0,
-                              old_content_size = 0,
-                              old_compressed_content_size = 0;
+    static unsigned long long old_web_requests = 0, old_web_usec = 0;
 
-    static collected_number compression_ratio = -1,
-                            average_response_time = -1;
+    static collected_number average_response_time = -1;
 
     static time_t netdata_boottime_time = 0;
     if (!netdata_boottime_time)
@@ -265,7 +262,6 @@ static void global_statistics_charts(void) {
     struct global_statistics gs;
     struct rusage me;
 
-    struct replication_query_statistics replication = replication_get_query_statistics();
     global_statistics_copy(&gs, GLOBAL_STATS_RESET_WEB_USEC_MAX);
     getrusage(RUSAGE_SELF, &me);
 
@@ -300,167 +296,6 @@ static void global_statistics_charts(void) {
         rrddim_set_by_pointer(st_cpu, rd_cpu_system, me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec);
         rrdset_done(st_cpu);
     }
-
-    // ----------------------------------------------------------------
-
-    {
-        static RRDSET *st_memory = NULL;
-        static RRDDIM *rd_database = NULL;
-        static RRDDIM *rd_collectors = NULL;
-        static RRDDIM *rd_hosts = NULL;
-        static RRDDIM *rd_rrd = NULL;
-        static RRDDIM *rd_contexts = NULL;
-        static RRDDIM *rd_health = NULL;
-        static RRDDIM *rd_functions = NULL;
-        static RRDDIM *rd_labels = NULL;
-        static RRDDIM *rd_strings = NULL;
-        static RRDDIM *rd_streaming = NULL;
-        static RRDDIM *rd_replication = NULL;
-        static RRDDIM *rd_buffers = NULL;
-        static RRDDIM *rd_workers = NULL;
-        static RRDDIM *rd_aral = NULL;
-        static RRDDIM *rd_judy = NULL;
-        static RRDDIM *rd_other = NULL;
-
-        if (unlikely(!st_memory)) {
-            st_memory = rrdset_create_localhost(
-                    "netdata",
-                    "memory",
-                    NULL,
-                    "netdata",
-                    NULL,
-                    "Netdata Memory",
-                    "bytes",
-                    "netdata",
-                    "stats",
-                    130100,
-                    localhost->rrd_update_every,
-                    RRDSET_TYPE_STACKED);
-
-            rd_database = rrddim_add(st_memory, "db", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_collectors = rrddim_add(st_memory, "collectors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_hosts = rrddim_add(st_memory, "hosts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_rrd = rrddim_add(st_memory, "rrdset rrddim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_contexts = rrddim_add(st_memory, "contexts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_health = rrddim_add(st_memory, "health", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_functions = rrddim_add(st_memory, "functions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_labels = rrddim_add(st_memory, "labels", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_strings = rrddim_add(st_memory, "strings", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_streaming = rrddim_add(st_memory, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_replication = rrddim_add(st_memory, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers = rrddim_add(st_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_workers = rrddim_add(st_memory, "workers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_aral = rrddim_add(st_memory, "aral", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_judy = rrddim_add(st_memory, "judy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        }
-
-        size_t buffers =
-            netdata_buffers_statistics.query_targets_size +
-            netdata_buffers_statistics.rrdset_done_rda_size +
-            netdata_buffers_statistics.buffers_aclk +
-            netdata_buffers_statistics.buffers_api +
-            netdata_buffers_statistics.buffers_functions +
-            netdata_buffers_statistics.buffers_sqlite +
-            netdata_buffers_statistics.buffers_exporters +
-            netdata_buffers_statistics.buffers_health +
-            netdata_buffers_statistics.buffers_streaming +
-            netdata_buffers_statistics.cbuffers_streaming +
-            netdata_buffers_statistics.buffers_web +
-            replication_allocated_buffers() +
-            aral_by_size_overhead() +
-            judy_aral_overhead();
-
-        size_t strings = 0;
-        string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
-
-        rrddim_set_by_pointer(st_memory, rd_database, (collected_number)dbengine_total_memory + (collected_number)rrddim_db_memory_size);
-        rrddim_set_by_pointer(st_memory, rd_collectors, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_collectors));
-        rrddim_set_by_pointer(st_memory, rd_hosts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhost) + (collected_number)netdata_buffers_statistics.rrdhost_allocations_size);
-        rrddim_set_by_pointer(st_memory, rd_rrd, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdset_rrddim));
-        rrddim_set_by_pointer(st_memory, rd_contexts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdcontext));
-        rrddim_set_by_pointer(st_memory, rd_health, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhealth));
-        rrddim_set_by_pointer(st_memory, rd_functions, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_functions));
-        rrddim_set_by_pointer(st_memory, rd_labels, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdlabels));
-        rrddim_set_by_pointer(st_memory, rd_strings, (collected_number)strings);
-        rrddim_set_by_pointer(st_memory, rd_streaming, (collected_number)netdata_buffers_statistics.rrdhost_senders + (collected_number)netdata_buffers_statistics.rrdhost_receivers);
-        rrddim_set_by_pointer(st_memory, rd_replication, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
-        rrddim_set_by_pointer(st_memory, rd_buffers, (collected_number)buffers);
-        rrddim_set_by_pointer(st_memory, rd_workers, (collected_number) workers_allocated_memory());
-        rrddim_set_by_pointer(st_memory, rd_aral, (collected_number) aral_by_size_structures());
-        rrddim_set_by_pointer(st_memory, rd_judy, (collected_number) judy_aral_structures());
-        rrddim_set_by_pointer(st_memory, rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
-
-        rrdset_done(st_memory);
-    }
-
-    {
-        static RRDSET *st_memory_buffers = NULL;
-        static RRDDIM *rd_queries = NULL;
-        static RRDDIM *rd_collectors = NULL;
-        static RRDDIM *rd_buffers_aclk = NULL;
-        static RRDDIM *rd_buffers_api = NULL;
-        static RRDDIM *rd_buffers_functions = NULL;
-        static RRDDIM *rd_buffers_sqlite = NULL;
-        static RRDDIM *rd_buffers_exporters = NULL;
-        static RRDDIM *rd_buffers_health = NULL;
-        static RRDDIM *rd_buffers_streaming = NULL;
-        static RRDDIM *rd_cbuffers_streaming = NULL;
-        static RRDDIM *rd_buffers_replication = NULL;
-        static RRDDIM *rd_buffers_web = NULL;
-        static RRDDIM *rd_buffers_aral = NULL;
-        static RRDDIM *rd_buffers_judy = NULL;
-
-        if (unlikely(!st_memory_buffers)) {
-            st_memory_buffers = rrdset_create_localhost(
-                "netdata",
-                "memory_buffers",
-                NULL,
-                "netdata",
-                NULL,
-                "Netdata Memory Buffers",
-                "bytes",
-                "netdata",
-                "stats",
-                130101,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_STACKED);
-
-            rd_queries = rrddim_add(st_memory_buffers, "queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_collectors = rrddim_add(st_memory_buffers, "collection", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_aclk = rrddim_add(st_memory_buffers, "aclk", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_api = rrddim_add(st_memory_buffers, "api", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_functions = rrddim_add(st_memory_buffers, "functions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_sqlite = rrddim_add(st_memory_buffers, "sqlite", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_exporters = rrddim_add(st_memory_buffers, "exporters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_health = rrddim_add(st_memory_buffers, "health", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_streaming = rrddim_add(st_memory_buffers, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_cbuffers_streaming = rrddim_add(st_memory_buffers, "streaming cbuf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_replication = rrddim_add(st_memory_buffers, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_web = rrddim_add(st_memory_buffers, "web", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_aral = rrddim_add(st_memory_buffers, "aral", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_judy = rrddim_add(st_memory_buffers, "judy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        }
-
-        rrddim_set_by_pointer(st_memory_buffers, rd_queries, (collected_number)netdata_buffers_statistics.query_targets_size + (collected_number) onewayalloc_allocated_memory());
-        rrddim_set_by_pointer(st_memory_buffers, rd_collectors, (collected_number)netdata_buffers_statistics.rrdset_done_rda_size);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aclk, (collected_number)netdata_buffers_statistics.buffers_aclk);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_api, (collected_number)netdata_buffers_statistics.buffers_api);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_functions, (collected_number)netdata_buffers_statistics.buffers_functions);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_sqlite, (collected_number)netdata_buffers_statistics.buffers_sqlite);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_exporters, (collected_number)netdata_buffers_statistics.buffers_exporters);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_health, (collected_number)netdata_buffers_statistics.buffers_health);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_streaming, (collected_number)netdata_buffers_statistics.buffers_streaming);
-        rrddim_set_by_pointer(st_memory_buffers, rd_cbuffers_streaming, (collected_number)netdata_buffers_statistics.cbuffers_streaming);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_allocated_buffers());
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_web, (collected_number)netdata_buffers_statistics.buffers_web);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aral, (collected_number)aral_by_size_overhead());
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_judy, (collected_number)judy_aral_overhead());
-
-        rrdset_done(st_memory_buffers);
-    }
-
-    // ----------------------------------------------------------------
 
     {
         static RRDSET *st_uptime = NULL;
@@ -624,9 +459,174 @@ static void global_statistics_charts(void) {
 
         rrddim_set_by_pointer(st_duration, rd_max, ((gs.web_usec_max)?(collected_number)gs.web_usec_max:average_response_time));
         rrdset_done(st_duration);
+    }    
+}
+
+static void global_statistics_extended_charts(void) {
+    static unsigned long long old_content_size = 0, old_compressed_content_size = 0;
+    static collected_number compression_ratio = -1;
+
+    struct global_statistics gs;
+    struct replication_query_statistics replication = replication_get_query_statistics();
+    global_statistics_copy(&gs, GLOBAL_STATS_RESET_WEB_USEC_MAX);
+
+    {
+        static RRDSET *st_memory = NULL;
+        static RRDDIM *rd_database = NULL;
+        static RRDDIM *rd_collectors = NULL;
+        static RRDDIM *rd_hosts = NULL;
+        static RRDDIM *rd_rrd = NULL;
+        static RRDDIM *rd_contexts = NULL;
+        static RRDDIM *rd_health = NULL;
+        static RRDDIM *rd_functions = NULL;
+        static RRDDIM *rd_labels = NULL;
+        static RRDDIM *rd_strings = NULL;
+        static RRDDIM *rd_streaming = NULL;
+        static RRDDIM *rd_replication = NULL;
+        static RRDDIM *rd_buffers = NULL;
+        static RRDDIM *rd_workers = NULL;
+        static RRDDIM *rd_aral = NULL;
+        static RRDDIM *rd_judy = NULL;
+        static RRDDIM *rd_other = NULL;
+
+        if (unlikely(!st_memory)) {
+            st_memory = rrdset_create_localhost(
+                    "netdata",
+                    "memory",
+                    NULL,
+                    "netdata",
+                    NULL,
+                    "Netdata Memory",
+                    "bytes",
+                    "netdata",
+                    "stats",
+                    130100,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED);
+
+            rd_database = rrddim_add(st_memory, "db", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_collectors = rrddim_add(st_memory, "collectors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_hosts = rrddim_add(st_memory, "hosts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_rrd = rrddim_add(st_memory, "rrdset rrddim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_contexts = rrddim_add(st_memory, "contexts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_health = rrddim_add(st_memory, "health", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_functions = rrddim_add(st_memory, "functions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_labels = rrddim_add(st_memory, "labels", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_strings = rrddim_add(st_memory, "strings", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_streaming = rrddim_add(st_memory, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_replication = rrddim_add(st_memory, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers = rrddim_add(st_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_workers = rrddim_add(st_memory, "workers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_aral = rrddim_add(st_memory, "aral", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_judy = rrddim_add(st_memory, "judy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        size_t buffers =
+            netdata_buffers_statistics.query_targets_size +
+            netdata_buffers_statistics.rrdset_done_rda_size +
+            netdata_buffers_statistics.buffers_aclk +
+            netdata_buffers_statistics.buffers_api +
+            netdata_buffers_statistics.buffers_functions +
+            netdata_buffers_statistics.buffers_sqlite +
+            netdata_buffers_statistics.buffers_exporters +
+            netdata_buffers_statistics.buffers_health +
+            netdata_buffers_statistics.buffers_streaming +
+            netdata_buffers_statistics.cbuffers_streaming +
+            netdata_buffers_statistics.buffers_web +
+            replication_allocated_buffers() +
+            aral_by_size_overhead() +
+            judy_aral_overhead();
+
+        size_t strings = 0;
+        string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
+
+        rrddim_set_by_pointer(st_memory, rd_database, (collected_number)dbengine_total_memory + (collected_number)rrddim_db_memory_size);
+        rrddim_set_by_pointer(st_memory, rd_collectors, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_collectors));
+        rrddim_set_by_pointer(st_memory, rd_hosts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhost) + (collected_number)netdata_buffers_statistics.rrdhost_allocations_size);
+        rrddim_set_by_pointer(st_memory, rd_rrd, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdset_rrddim));
+        rrddim_set_by_pointer(st_memory, rd_contexts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdcontext));
+        rrddim_set_by_pointer(st_memory, rd_health, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhealth));
+        rrddim_set_by_pointer(st_memory, rd_functions, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_functions));
+        rrddim_set_by_pointer(st_memory, rd_labels, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdlabels));
+        rrddim_set_by_pointer(st_memory, rd_strings, (collected_number)strings);
+        rrddim_set_by_pointer(st_memory, rd_streaming, (collected_number)netdata_buffers_statistics.rrdhost_senders + (collected_number)netdata_buffers_statistics.rrdhost_receivers);
+        rrddim_set_by_pointer(st_memory, rd_replication, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
+        rrddim_set_by_pointer(st_memory, rd_buffers, (collected_number)buffers);
+        rrddim_set_by_pointer(st_memory, rd_workers, (collected_number) workers_allocated_memory());
+        rrddim_set_by_pointer(st_memory, rd_aral, (collected_number) aral_by_size_structures());
+        rrddim_set_by_pointer(st_memory, rd_judy, (collected_number) judy_aral_structures());
+        rrddim_set_by_pointer(st_memory, rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
+
+        rrdset_done(st_memory);
     }
 
-    // ----------------------------------------------------------------
+    {
+        static RRDSET *st_memory_buffers = NULL;
+        static RRDDIM *rd_queries = NULL;
+        static RRDDIM *rd_collectors = NULL;
+        static RRDDIM *rd_buffers_aclk = NULL;
+        static RRDDIM *rd_buffers_api = NULL;
+        static RRDDIM *rd_buffers_functions = NULL;
+        static RRDDIM *rd_buffers_sqlite = NULL;
+        static RRDDIM *rd_buffers_exporters = NULL;
+        static RRDDIM *rd_buffers_health = NULL;
+        static RRDDIM *rd_buffers_streaming = NULL;
+        static RRDDIM *rd_cbuffers_streaming = NULL;
+        static RRDDIM *rd_buffers_replication = NULL;
+        static RRDDIM *rd_buffers_web = NULL;
+        static RRDDIM *rd_buffers_aral = NULL;
+        static RRDDIM *rd_buffers_judy = NULL;
+
+        if (unlikely(!st_memory_buffers)) {
+            st_memory_buffers = rrdset_create_localhost(
+                "netdata",
+                "memory_buffers",
+                NULL,
+                "netdata",
+                NULL,
+                "Netdata Memory Buffers",
+                "bytes",
+                "netdata",
+                "stats",
+                130101,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_STACKED);
+
+            rd_queries = rrddim_add(st_memory_buffers, "queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_collectors = rrddim_add(st_memory_buffers, "collection", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_aclk = rrddim_add(st_memory_buffers, "aclk", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_api = rrddim_add(st_memory_buffers, "api", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_functions = rrddim_add(st_memory_buffers, "functions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_sqlite = rrddim_add(st_memory_buffers, "sqlite", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_exporters = rrddim_add(st_memory_buffers, "exporters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_health = rrddim_add(st_memory_buffers, "health", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_streaming = rrddim_add(st_memory_buffers, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_cbuffers_streaming = rrddim_add(st_memory_buffers, "streaming cbuf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_replication = rrddim_add(st_memory_buffers, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_web = rrddim_add(st_memory_buffers, "web", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_aral = rrddim_add(st_memory_buffers, "aral", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_judy = rrddim_add(st_memory_buffers, "judy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(st_memory_buffers, rd_queries, (collected_number)netdata_buffers_statistics.query_targets_size + (collected_number) onewayalloc_allocated_memory());
+        rrddim_set_by_pointer(st_memory_buffers, rd_collectors, (collected_number)netdata_buffers_statistics.rrdset_done_rda_size);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aclk, (collected_number)netdata_buffers_statistics.buffers_aclk);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_api, (collected_number)netdata_buffers_statistics.buffers_api);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_functions, (collected_number)netdata_buffers_statistics.buffers_functions);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_sqlite, (collected_number)netdata_buffers_statistics.buffers_sqlite);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_exporters, (collected_number)netdata_buffers_statistics.buffers_exporters);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_health, (collected_number)netdata_buffers_statistics.buffers_health);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_streaming, (collected_number)netdata_buffers_statistics.buffers_streaming);
+        rrddim_set_by_pointer(st_memory_buffers, rd_cbuffers_streaming, (collected_number)netdata_buffers_statistics.cbuffers_streaming);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_allocated_buffers());
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_web, (collected_number)netdata_buffers_statistics.buffers_web);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aral, (collected_number)aral_by_size_overhead());
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_judy, (collected_number)judy_aral_overhead());
+
+        rrdset_done(st_memory_buffers);
+    }
+
 
     {
         static RRDSET *st_compression = NULL;
@@ -670,8 +670,6 @@ static void global_statistics_charts(void) {
 
         rrdset_done(st_compression);
     }
-
-    // ----------------------------------------------------------------
 
     {
         static RRDSET *st_queries = NULL;
@@ -722,8 +720,6 @@ static void global_statistics_charts(void) {
         rrdset_done(st_queries);
     }
 
-    // ----------------------------------------------------------------
-
     {
         static RRDSET *st_points_read = NULL;
         static RRDDIM *rd_api_data_points_read = NULL;
@@ -773,8 +769,6 @@ static void global_statistics_charts(void) {
         rrdset_done(st_points_read);
     }
 
-    // ----------------------------------------------------------------
-
     if(gs.api_data_result_points_generated || replication.points_generated) {
         static RRDSET *st_points_generated = NULL;
         static RRDDIM *rd_api_data_points_generated = NULL;
@@ -818,7 +812,7 @@ static void global_statistics_charts(void) {
         rrdset_done(st_points_generated);
     }
 
-    // ----------------------------------------------------------------
+    ml_update_global_statistics_charts(gs.ml_models_consulted);
 
     {
         static RRDSET *st_points_stored = NULL;
@@ -852,10 +846,6 @@ static void global_statistics_charts(void) {
 
         rrdset_done(st_points_stored);
     }
-
-    ml_update_global_statistics_charts(gs.ml_models_consulted);
-
-    // ----------------------------------------------------------------
 
 #ifdef ENABLE_DBENGINE
     if (tier_page_type[0] == RRDENG_PAGE_TYPE_GORILLA_32BIT)
@@ -921,7 +911,6 @@ static void global_statistics_charts(void) {
     }
 #endif
 }
-
 // ----------------------------------------------------------------------------
 // sqlite3 statistics
 
@@ -2576,7 +2565,7 @@ static void dbengine2_statistics_charts(void) {
                 }
             }
         }
-        rrd_unlock();
+        rrd_rdunlock();
 
         if (dbengine_contexts) {
             /* deduplicate global statistics by getting the ones from the last context */
@@ -3513,13 +3502,13 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "DBENGINE",    .family = "workers dbengine instances",      .priority = 1000000 },
     { .name = "LIBUV",       .family = "workers libuv threadpool",        .priority = 1000000 },
     { .name = "WEB",         .family = "workers web server",              .priority = 1000000 },
-    { .name = "ACLKQUERY",   .family = "workers aclk query",              .priority = 1000000 },
-    { .name = "ACLKSYNC",    .family = "workers aclk host sync",          .priority = 1000000 },
+    { .name = "ACLKSYNC",    .family = "workers aclk sync",               .priority = 1000000 },
     { .name = "METASYNC",    .family = "workers metadata sync",           .priority = 1000000 },
     { .name = "PLUGINSD",    .family = "workers plugins.d",               .priority = 1000000 },
     { .name = "STATSD",      .family = "workers plugin statsd",           .priority = 1000000 },
     { .name = "STATSDFLUSH", .family = "workers plugin statsd flush",     .priority = 1000000 },
     { .name = "PROC",        .family = "workers plugin proc",             .priority = 1000000 },
+    { .name = "WIN",        .family = "workers plugin windows",           .priority = 1000000 },
     { .name = "NETDEV",      .family = "workers plugin proc netdev",      .priority = 1000000 },
     { .name = "FREEBSD",     .family = "workers plugin freebsd",          .priority = 1000000 },
     { .name = "MACOS",       .family = "workers plugin macos",            .priority = 1000000 },
@@ -4155,17 +4144,13 @@ static void worker_utilization_charts(void) {
     for(int i = 0; all_workers_utilization[i].name ;i++) {
         workers_utilization_reset_statistics(&all_workers_utilization[i]);
 
-        netdata_thread_disable_cancelability();
         workers_foreach(all_workers_utilization[i].name, worker_utilization_charts_callback, &all_workers_utilization[i]);
-        netdata_thread_enable_cancelability();
 
         // skip the first iteration, so that we don't accumulate startup utilization to our charts
         if(likely(iterations > 1))
             workers_utilization_update_chart(&all_workers_utilization[i]);
 
-        netdata_thread_disable_cancelability();
         workers_threads_cleanup(&all_workers_utilization[i]);
-        netdata_thread_enable_cancelability();
     }
 
     workers_total_cpu_utilization_chart();
@@ -4206,6 +4191,7 @@ static void worker_utilization_finish(void) {
 static void global_statistics_register_workers(void) {
     worker_register("STATS");
     worker_register_job_name(WORKER_JOB_GLOBAL, "global");
+    worker_register_job_name(WORKER_JOB_GLOBAL_EXT, "global_ext");
     worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
     worker_register_job_name(WORKER_JOB_DBENGINE, "dbengine");
     worker_register_job_name(WORKER_JOB_STRINGS, "strings");
@@ -4215,13 +4201,14 @@ static void global_statistics_register_workers(void) {
     worker_register_job_name(WORKER_JOB_SQLITE3, "sqlite3");
 }
 
-static void global_statistics_cleanup(void *ptr)
+static void global_statistics_cleanup(void *pptr)
 {
-    worker_unregister();
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
+    worker_unregister();
     netdata_log_info("cleaning up...");
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -4229,9 +4216,9 @@ static void global_statistics_cleanup(void *ptr)
 
 void *global_statistics_main(void *ptr)
 {
-    global_statistics_register_workers();
+    CLEANUP_FUNCTION_REGISTER(global_statistics_cleanup) cleanup_ptr = ptr;
 
-    netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
+    global_statistics_register_workers();
 
     int update_every =
         (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
@@ -4241,6 +4228,7 @@ void *global_statistics_main(void *ptr)
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
+    usec_t real_step = USEC_PER_SEC;
 
     // keep the randomness at zero
     // to make sure we are not close to any other thread
@@ -4248,13 +4236,70 @@ void *global_statistics_main(void *ptr)
 
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
-        heartbeat_next(&hb, step);
+        heartbeat_next(&hb, USEC_PER_SEC);
+        if (real_step < step) {
+            real_step += USEC_PER_SEC;
+            continue;
+        }
+        real_step = USEC_PER_SEC;
 
         worker_is_busy(WORKER_JOB_GLOBAL);
         global_statistics_charts();
+    }
 
-        worker_is_busy(WORKER_JOB_REGISTRY);
-        registry_statistics();
+    return NULL;
+}
+
+
+// ---------------------------------------------------------------------------------------------------------------------
+// global statistics extended thread
+
+static void global_statistics_extended_cleanup(void *pptr)
+{
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if (!static_thread)
+        return;
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    netdata_log_info("cleaning up...");
+
+    worker_unregister();
+    worker_utilization_finish();
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
+void *global_statistics_extended_main(void *ptr)
+{
+    CLEANUP_FUNCTION_REGISTER(global_statistics_extended_cleanup) cleanup_ptr = ptr;
+
+    global_statistics_register_workers();
+
+    int update_every =
+        (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+    if (update_every < localhost->rrd_update_every)
+        update_every = localhost->rrd_update_every;
+
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t real_step = USEC_PER_SEC;
+
+    while (service_running(SERVICE_COLLECTORS)) {
+        worker_is_idle();
+        heartbeat_next(&hb, USEC_PER_SEC);
+        if (real_step < step) {
+            real_step += USEC_PER_SEC;
+            continue;
+        }
+        real_step = USEC_PER_SEC;
+
+        worker_is_busy(WORKER_JOB_HEARTBEAT);
+        update_heartbeat_charts();
+
+        worker_is_busy(WORKER_JOB_GLOBAL_EXT);
+        global_statistics_extended_charts();
 
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
@@ -4263,9 +4308,9 @@ void *global_statistics_main(void *ptr)
         }
 #endif
 
-        worker_is_busy(WORKER_JOB_HEARTBEAT);
-        update_heartbeat_charts();
-        
+        worker_is_busy(WORKER_JOB_REGISTRY);
+        registry_statistics();
+
         worker_is_busy(WORKER_JOB_STRINGS);
         update_strings_charts();
 
@@ -4278,97 +4323,13 @@ void *global_statistics_main(void *ptr)
         worker_is_busy(WORKER_JOB_MALLOC_TRACE);
         malloc_trace_statistics();
 #endif
+
+        worker_is_busy(WORKER_JOB_WORKERS);
+        worker_utilization_charts();
+
+        worker_is_busy(WORKER_JOB_SQLITE3);
+        sqlite3_statistics_charts();
     }
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }
-
-
-// ---------------------------------------------------------------------------------------------------------------------
-// workers thread
-
-static void global_statistics_workers_cleanup(void *ptr)
-{
-    worker_unregister();
-
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-
-    netdata_log_info("cleaning up...");
-
-    worker_utilization_finish();
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-}
-
-void *global_statistics_workers_main(void *ptr)
-{
-    global_statistics_register_workers();
-
-    netdata_thread_cleanup_push(global_statistics_workers_cleanup, ptr)
-    {
-        int update_every =
-                (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
-        if (update_every < localhost->rrd_update_every)
-            update_every = localhost->rrd_update_every;
-
-        usec_t step = update_every * USEC_PER_SEC;
-        heartbeat_t hb;
-        heartbeat_init(&hb);
-
-        while (service_running(SERVICE_COLLECTORS)) {
-            worker_is_idle();
-            heartbeat_next(&hb, step);
-
-            worker_is_busy(WORKER_JOB_WORKERS);
-            worker_utilization_charts();
-        }
-    }
-    netdata_thread_cleanup_pop(1);
-    return NULL;
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// sqlite3 thread
-
-static void global_statistics_sqlite3_cleanup(void *ptr)
-{
-    worker_unregister();
-
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-
-    netdata_log_info("cleaning up...");
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-}
-
-void *global_statistics_sqlite3_main(void *ptr)
-{
-    global_statistics_register_workers();
-
-    netdata_thread_cleanup_push(global_statistics_sqlite3_cleanup, ptr)
-    {
-
-        int update_every =
-                (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
-        if (update_every < localhost->rrd_update_every)
-            update_every = localhost->rrd_update_every;
-
-        usec_t step = update_every * USEC_PER_SEC;
-        heartbeat_t hb;
-        heartbeat_init(&hb);
-
-        while (service_running(SERVICE_COLLECTORS)) {
-            worker_is_idle();
-            heartbeat_next(&hb, step);
-
-            worker_is_busy(WORKER_JOB_SQLITE3);
-            sqlite3_statistics_charts();
-        }
-    }
-    netdata_thread_cleanup_pop(1);
-    return NULL;
-}
-

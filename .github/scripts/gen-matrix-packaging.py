@@ -27,8 +27,9 @@ for i, v in enumerate(data['include']):
                     'repo_distro': data['include'][i]['packages']['repo_distro'],
                     'format': data['include'][i]['packages']['type'],
                     'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else ':'.join([data['include'][i]['distro'], data['include'][i]['version']]),
+                    'builder_rev': data['include'][i]['packages']['builder_rev'],
                     'platform': data['platform_map'][arch],
-                    'bundle_sentry': data['include'][i]['bundle_sentry'],
+                    'bundle_sentry': data['include'][i]['bundle_sentry'][arch],
                     'arch': arch
                 })
 

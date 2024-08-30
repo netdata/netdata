@@ -19,14 +19,14 @@ static inline int health_parse_delay(
     while(*s) {
         char *key = s;
 
-        while(*s && !isspace(*s)) s++;
-        while(*s && isspace(*s)) *s++ = '\0';
+        while(*s && !isspace((uint8_t)*s)) s++;
+        while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
         if(!*key) break;
 
         char *value = s;
-        while(*s && !isspace(*s)) s++;
-        while(*s && isspace(*s)) *s++ = '\0';
+        while(*s && !isspace((uint8_t)*s)) s++;
+        while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
         if(!strcasecmp(key, "up")) {
             if (!config_parse_duration(value, delay_up_duration)) {
@@ -91,12 +91,12 @@ static inline ALERT_ACTION_OPTIONS health_parse_options(const char *s) {
         buf[0] = '\0';
 
         // skip spaces
-        while(*s && isspace(*s))
+        while(*s && isspace((uint8_t)*s))
             s++;
 
         // find the next space
         size_t count = 0;
-        while(*s && count < 100 && !isspace(*s))
+        while(*s && count < 100 && !isspace((uint8_t)*s))
             buf[count++] = *s++;
 
         if(buf[0]) {
@@ -124,14 +124,14 @@ static inline int health_parse_repeat(
     while(*s) {
         char *key = s;
 
-        while(*s && !isspace(*s)) s++;
-        while(*s && isspace(*s)) *s++ = '\0';
+        while(*s && !isspace((uint8_t)*s)) s++;
+        while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
         if(!*key) break;
 
         char *value = s;
-        while(*s && !isspace(*s)) s++;
-        while(*s && isspace(*s)) *s++ = '\0';
+        while(*s && !isspace((uint8_t)*s)) s++;
+        while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
         if(!strcasecmp(key, "off")) {
             *warn_repeat_every = 0;
@@ -176,8 +176,8 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
 
     // first is the group method
     key = s;
-    while(*s && !isspace(*s) && *s != '(') s++;
-    while(*s && isspace(*s)) *s++ = '\0';
+    while(*s && !isspace((uint8_t)*s) && *s != '(') s++;
+    while(*s && isspace((uint8_t)*s)) *s++ = '\0';
     if(!*s) {
         netdata_log_error("Health configuration invalid chart calculation at line %zu of file '%s': expected group method followed by the 'after' time, but got '%s'",
                           line, filename, key);
@@ -224,12 +224,12 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
                 ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS;
         }
 
-        while(*s && isspace(*s)) s++;
+        while(*s && isspace((uint8_t)*s)) s++;
 
         if(*s) {
-            if(isdigit(*s) || *s == '.') {
+            if(isdigit((uint8_t)*s) || *s == '.') {
                 ac->time_group_value = str2ndd(s, &s);
-                while(s && *s && isspace(*s)) s++;
+                while(s && *s && isspace((uint8_t)*s)) s++;
 
                 if(!s || *s != ')') {
                     netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after number in aggregation method on '%s'",
@@ -270,8 +270,8 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
 
     // then is the 'after' time
     key = s;
-    while(*s && !isspace(*s)) s++;
-    while(*s && isspace(*s)) *s++ = '\0';
+    while(*s && !isspace((uint8_t)*s)) s++;
+    while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
     if(!config_parse_duration(key, &ac->after)) {
         netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' after group method",
@@ -285,14 +285,14 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
     // now we may have optional parameters
     while(*s) {
         key = s;
-        while(*s && !isspace(*s)) s++;
-        while(*s && isspace(*s)) *s++ = '\0';
+        while(*s && !isspace((uint8_t)*s)) s++;
+        while(*s && isspace((uint8_t)*s)) *s++ = '\0';
         if(!*key) break;
 
         if(!strcasecmp(key, "at")) {
             char *value = s;
-            while(*s && !isspace(*s)) s++;
-            while(*s && isspace(*s)) *s++ = '\0';
+            while(*s && !isspace((uint8_t)*s)) s++;
+            while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
             if (!config_parse_duration(value, &ac->before)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
@@ -301,8 +301,8 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
         }
         else if(!strcasecmp(key, HEALTH_EVERY_KEY)) {
             char *value = s;
-            while(*s && !isspace(*s)) s++;
-            while(*s && isspace(*s)) *s++ = '\0';
+            while(*s && !isspace((uint8_t)*s)) s++;
+            while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
             if (!config_parse_duration(value, &ac->update_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
@@ -651,7 +651,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                 lookup_data_source_from_rrdr_options(ap);
                 dims_grouping_from_rrdr_options(ap);
                 replace_green_red(ap, green, red);
-                health_prototype_add(ap);
+                health_prototype_add(ap, NULL);
                 freez(ap);
             }
 
@@ -833,7 +833,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         lookup_data_source_from_rrdr_options(ap);
         dims_grouping_from_rrdr_options(ap);
         replace_green_red(ap, green, red);
-        health_prototype_add(ap);
+        health_prototype_add(ap, NULL);
         freez(ap);
     }
 

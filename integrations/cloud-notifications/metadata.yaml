@@ -26,7 +26,7 @@
       2. Open the App and Choose the Sign In Option
         - Sign In with Email Address: Enter the Email Address of your registered Netdata Cloud Account and Click on the Verification link received by Email on your mobile device.
         - Sign In with QR Code: Scan the QR Code from your `Netdata Cloud` UI under **User Settings** --> **Notifications** --> **Mobile App Notifications** --> **Show QR Code**
-      3. Start receiving alert and reachability notifications for your **Space(s)** on a **Paid Business Subscription**
+      3. Start receiving alert and reachability notifications for your **Space(s)** on a **Paid Subscription plan**
 
       ### Netdata Configuration Steps
       1. Click on the **User settings** on the bottom left of your screen (your profile icon)
@@ -50,7 +50,7 @@
     description: |
       ### Prerequisites
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
+      - Access to the Netdata Space as an **Admin**
       - You need to have a Discord server able to receive webhooks integrations.
 
       ### Discord Server Configuration
@@ -91,8 +91,8 @@
     description: |
       ### Prerequisites
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
-      - The Netdata Space needs to be on **Business** plan or higher
+      - Access to the Netdata Space as an **Admin**
+      - The Netdata Space needs to be on a paid plan
       - You need to have a PagerDuty service to receive events using webhooks.
 
 
@@ -135,8 +135,8 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
-      - The Netdata Space needs to be on **Business** plan or higher
+      - Access to the Netdata Space as an **Admin**
+      - The Netdata Space needs to be on a paid plan
       - You need to have a Slack app on your workspace to receive the Webhooks.
 
       ### Slack Server Configuration
@@ -185,8 +185,8 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
-      - The Netdata Space needs to be on **Business** plan or higher
+      - Access to the Netdata Space as an **Admin**
+      - The Netdata Space needs to be on a paid plan
       - You need to have permissions on Opsgenie to add new integrations.
 
       ### Opsgenie Server Configuration
@@ -228,8 +228,8 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
-      - The Netdata Space needs to be on **Business** plan or higher
+      - Access to the Netdata Space as an **Admin**
+      - The Netdata Space needs to be on a paid plan
       - You need to have permissions on Mattermost to add new integrations.
       - You need to have a Mattermost app on your workspace to receive the webhooks.
 
@@ -279,8 +279,8 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
-      - The Netdata Space needs to be on **Business** plan or higher
+      - Access to the Netdata Space as an **Admin**
+      - The Netdata Space needs to be on a paid plan
       - You need to have permissions on Mattermost to add new integrations.
       - You need to have a RocketChat app on your workspace to receive the webhooks.
 
@@ -332,8 +332,8 @@
       To add AWS SNS notification you need:
 
       - A Netdata Cloud account
-      - Access to the space as an **administrator**
-      - Space needs to be on **Business** plan or higher
+      - Access to the space as an **Admin**
+      - The Space needs to be on a paid plan
       - Have an AWS account with AWS SNS access, for more details check [how to configure this on AWS SNS](#settings-on-aws-sns)
 
       ### Steps
@@ -381,20 +381,21 @@
       To add Microsoft Teams notifications integration to your Netdata Cloud space you will need the following:
 
       - A Netdata Cloud account.
-      - Access to the Netdata Cloud space as an **administrator**.
-      - The Space to be on **Business** plan or higher.
-      - A [Microsoft 365 for Business Account](https://www.microsoft.com/en-us/microsoft-365/business). Note that this is a **paid** account.
+      - Access to the Netdata Cloud space as an **Admin**.
+      - The Space to be on a paid plan.
+      - A [Microsoft Teams Essentials subscription](https://www.microsoft.com/en-sg/microsoft-teams/essentials) or higher. Note that this is a **paid** feature.
 
       ### Settings on Microsoft Teams
-     
-      - The integration gets enabled at a team's channel level.
-      - Click on the `...` (aka three dots) icon showing up next to the channel name, it should appear when you hover over it.
-      - Click on `Connectors`.
-      - Look for the `Incoming Webhook` connector and click configure.
-      - Provide a name for your Incoming Webhook Connector, for example _Netdata Alerts_. You can also customize it with a proper icon instead of using the default image.
-      - Click `Create`.
-      - The _Incoming Webhook URL_ is created.
-      - That is the URL to be provided to the Netdata Cloud configuration.
+
+      1. **Access the Channel Settings**: Navigate to the desired Microsoft Teams channel and hover over the channel name. Click the three dots (ellipsis) icon that appears.
+      2. **Create a New Workflow**: Select "Workflows" from the options, then choose "Post to a channel when a webhook request is received."
+      3. **Configure Workflow Details**:
+          - Give your workflow a descriptive name, such as "Netdata Alerts."
+          - Select the target team and channel to receive notifications.
+          - Click "Add workflow."
+      4. **Obtain the Webhook URL**:
+          - Once the workflow is created, you will receive a unique Workflow Webhook URL.
+          - Copy this URL, as it will be required to configure Netdata Cloud.
 
       ### Settings on Netdata Cloud
 
@@ -430,9 +431,9 @@
       To add Telegram notification you need:
 
       - A Netdata Cloud account
-      - Access to the space as an **administrator**
-      - Space needs to be on **Business** plan or higher
-      - The Telegram bot token and chat ID
+      - Access to the space as an **Admin**
+      - The Space needs to be on a paid plan
+      - The Telegram bot token, chat ID and _optionally_ the topic ID
 
       ### Steps
 
@@ -448,14 +449,15 @@
         - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Telegram:
             - Bot Token - the token of your bot
             - Chat ID - the chat id where your bot will deliver messages to
+            - Topic ID - the identifier of the chat topic to which your bot will send messages. If omitted or 0, messages will be sent to the General topic. If topics are not supported, messages will be sent to the chat.
 
-      ### Getting the Telegram bot token and chat ID
+      ### Getting the Telegram bot token, chat ID and topic ID
 
       - Bot token: To create one bot, contact the [@BotFather](https://t.me/BotFather) bot and send the command `/newbot` and follow the instructions. **Start a conversation with your bot or invite it into the group where you want it to send notifications**.
       - To get the chat ID you have two options:
           - Contact the [@myidbot](https://t.me/myidbot) bot and send the `/getid` command to get your personal chat ID, or invite it into a group and use the `/getgroupid` command to get the group chat ID.
           - Alternatively, you can get the chat ID directly from the bot API. Send your bot a command in the chat you want to use, then check `https://api.telegram.org/bot{YourBotToken}/getUpdates`, eg. `https://api.telegram.org/bot111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5/getUpdates`
-
+      - To get the topic ID, the easiest way is this: Post a message to that topic, then right-click on it and select `Copy Message Link`. Paste it on a scratchpad and notice that it has the following structure `https://t.me/c/XXXXXXXXXX/YY/ZZ`. The topic ID is `YY` (integer).
 - id: 'notify-cloud-splunk'
   meta:
     name: 'Splunk'
@@ -475,8 +477,8 @@
       To add Splunk notification you need:
 
       - A Netdata Cloud account
-      - Access to the space as an **administrator**
-      - Space needs to be on **Business** plan or higher
+      - Access to the space as an **Admin**
+      - The Space needs to be on a paid plan
       - URI and token for your Splunk HTTP Event Collector. Refer to the [Splunk documentation](https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector) for detailed instructions.
 
       ### Steps
@@ -493,6 +495,45 @@
         - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Splunk:
             - HTTP Event Collector URI - The URI of your HTTP event collector in Splunk
             - HTTP Event Collector Token - the token that Splunk provided to you when you created the HTTP Event Collector
+
+- id: 'notify-cloud-victorops'
+  meta:
+    name: 'Splunk VictorOps'
+    link: 'https://www.splunk.com/en_us/about-splunk/acquisitions/splunk-on-call.html'
+    categories:
+      - notify.cloud
+    icon_filename: 'victorops.svg'
+  keywords:
+    - VictorOps
+    - Splunk
+    - On-Call
+  overview:
+    notification_description: "From the Cloud interface, you can manage your space's notification settings and from there you can add a specific configuration to get notifications delivered on Splunk On-Call/VictorOps."
+    notification_limitations: ''
+  setup:
+    description: |
+      ### Prerequisites
+
+      To add Splunk VictorOps notification (also known as Splunk On-Call) you need:
+
+      - A Netdata Cloud account
+      - Access to the space as an **Admin**
+      - The Space needs to be on a paid plan
+      - Destination URL for your Splunk VictorOps REST Endpoint Integration. Refer to the [VictorOps documentation](https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide) for detailed instructions.
+
+      ### Steps
+
+      1. Click on the **Space settings** cog (located above your profile icon)
+      2. Click on the **Notification** tab
+      3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
+      4. On the **Splunk VictorOps** card click on **+ Add**
+      5. A modal will be presented to you to enter the required details to enable the configuration:
+        - **Notification settings** are Netdata specific settings
+            - Configuration name - provide a descriptive name for your configuration to easily identify it.
+            - Rooms - select the nodes or areas of your infrastructure you want to receive notifications about.
+            - Notification - choose the type of notifications you want to receive: All Alerts and unreachable, All Alerts, Critical only.
+        - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Splunk VictorOps:
+            - Destination URL - The URL provided by VictorOps of your REST endpoint.
 
 - id: 'notify-cloud-webhook'
   meta:
@@ -512,8 +553,8 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
-      - The Netdata Space needs to be on **Pro** plan or higher
+      - Access to the Netdata Space as an **Admin**
+      - The Netdata Space needs to be on a paid plan
       - You need to have an app that allows you to receive webhooks following a predefined schema.
 
       ### Netdata Configuration Steps
@@ -556,7 +597,7 @@
         | chart | string | The chart associated with the alert. |
         | context | string | The chart context. |
         | space | string | The space where the node that raised the alert is assigned. |
-        | rooms | object[object(string,string)] | Object with list of rooms names and urls where the node belongs to. |
+        | Rooms | object[object(string,string)] | Object with list of Rooms names and urls where the node belongs to. |
         | family | string | Context family. |
         | class | string | Classification of the alert, e.g. "Error". |
         | severity | string | Alert severity, can be one of "warning", "critical" or "clear". |

@@ -285,6 +285,10 @@ void mongodb_connector_worker(void *instance_p)
     struct mongodb_specific_data *connector_specific_data =
         (struct mongodb_specific_data *)instance->connector_specific_data;
 
+    char threadname[ND_THREAD_TAG_MAX + 1];
+    snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPMNG[%zu]", instance->index);
+    uv_thread_set_name_np(threadname);
+
     while (!instance->engine->exit) {
         struct stats *stats = &instance->stats;
 

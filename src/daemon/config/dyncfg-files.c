@@ -61,7 +61,10 @@ void dyncfg_file_save(const char *id, DYNCFG *df) {
     fclose(fp);
 }
 
-void dyncfg_file_load(const char *filename) {
+void dyncfg_file_load(const char *d_name) {
+    char filename[PATH_MAX];
+    snprintf(filename, sizeof(filename), "%s/%s", dyncfg_globals.dir, d_name);
+
     FILE *fp = fopen(filename, "r");
     if (!fp) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot open file '%s'", filename);
@@ -176,6 +179,18 @@ void dyncfg_file_load(const char *filename) {
     dyncfg_set_current_from_dyncfg(&tmp);
 
     dictionary_set(dyncfg_globals.nodes, id, &tmp, sizeof(tmp));
+
+    // check if we need to rename the file
+    CLEAN_CHAR_P *fixed_id = dyncfg_escape_id_for_filename(id);
+    char fixed_filename[PATH_MAX];
+    snprintf(fixed_filename, sizeof(fixed_filename), "%s/%s.dyncfg", dyncfg_globals.dir, fixed_id);
+
+    if(strcmp(filename, fixed_filename) != 0) {
+        if(rename(filename, fixed_filename) != 0)
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                "DYNCFG: cannot rename file '%s' into '%s'. Saving a new configuraton may not overwrite the old one.",
+                filename, fixed_filename);
+    }
 }
 
 void dyncfg_load_all(void) {
@@ -186,12 +201,9 @@ void dyncfg_load_all(void) {
     }
 
     struct dirent *entry;
-    char filepath[PATH_MAX];
     while ((entry = readdir(dir)) != NULL) {
-        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strendswith(entry->d_name, ".dyncfg")) {
-            snprintf(filepath, sizeof(filepath), "%s/%s", dyncfg_globals.dir, entry->d_name);
-            dyncfg_file_load(filepath);
-        }
+        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strendswith(entry->d_name, ".dyncfg"))
+            dyncfg_file_load(entry->d_name);
     }
 
     closedir(dir);
@@ -226,15 +238,26 @@ static bool dyncfg_read_file_to_buffer(const char *filename, BUFFER *dst) {
     return true;
 }
 
-bool dyncfg_get_schema(const char *id, BUFFER *dst) {
+static bool dyncfg_get_schema_from(const char *dir, const char *id, BUFFER *dst) {
     char filename[FILENAME_MAX + 1];
 
-    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", netdata_configured_user_config_dir, id);
+    CLEAN_CHAR_P *escaped_id = dyncfg_escape_id_for_filename(id);
+    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", dir, escaped_id);
     if(dyncfg_read_file_to_buffer(filename, dst))
         return true;
 
-    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", netdata_configured_stock_config_dir, id);
+    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", dir, id);
     if(dyncfg_read_file_to_buffer(filename, dst))
+        return true;
+
+    return false;
+}
+
+bool dyncfg_get_schema(const char *id, BUFFER *dst) {
+    if(dyncfg_get_schema_from(netdata_configured_user_config_dir, id, dst))
+        return true;
+
+    if(dyncfg_get_schema_from(netdata_configured_stock_config_dir, id, dst))
         return true;
 
     return false;

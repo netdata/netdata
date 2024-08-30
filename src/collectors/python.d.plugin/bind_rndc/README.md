@@ -1,1 +1,0 @@
-integrations/isc_bind_rndc.md

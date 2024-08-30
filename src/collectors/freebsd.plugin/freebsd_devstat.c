@@ -347,11 +347,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                         cur_dstat.busy_time_ms = dstat[i].busy_time.sec * 1000 + dstat[i].busy_time.frac * BINTIME_SCALE;
 
-                        if(dm->do_io == CONFIG_BOOLEAN_YES || (dm->do_io == CONFIG_BOOLEAN_AUTO &&
-                                                               (dstat[i].bytes[DEVSTAT_READ] ||
-                                                                dstat[i].bytes[DEVSTAT_WRITE] ||
-                                                                dstat[i].bytes[DEVSTAT_FREE] ||
-                                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                        if (dm->do_io == CONFIG_BOOLEAN_YES || dm->do_io == CONFIG_BOOLEAN_AUTO) {
                             if (unlikely(!dm->st_io)) {
                                 dm->st_io = rrdset_create_localhost("disk",
                                                                     disk,
@@ -381,12 +377,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                             rrdset_done(dm->st_io);
                         }
 
-                        if(dm->do_ops == CONFIG_BOOLEAN_YES || (dm->do_ops == CONFIG_BOOLEAN_AUTO &&
-                                                                (dstat[i].operations[DEVSTAT_READ] ||
-                                                                 dstat[i].operations[DEVSTAT_WRITE] ||
-                                                                 dstat[i].operations[DEVSTAT_NO_DATA] ||
-                                                                 dstat[i].operations[DEVSTAT_FREE] ||
-                                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                        if (dm->do_ops == CONFIG_BOOLEAN_YES || dm->do_ops == CONFIG_BOOLEAN_AUTO) {
                             if (unlikely(!dm->st_ops)) {
                                 dm->st_ops = rrdset_create_localhost("disk_ops",
                                                                      disk,
@@ -421,10 +412,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                             rrdset_done(dm->st_ops);
                         }
 
-                        if(dm->do_qops == CONFIG_BOOLEAN_YES || (dm->do_qops == CONFIG_BOOLEAN_AUTO &&
-                                                                 (dstat[i].start_count ||
-                                                                  dstat[i].end_count ||
-                                                                  netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                        if (dm->do_qops == CONFIG_BOOLEAN_YES || dm->do_qops == CONFIG_BOOLEAN_AUTO) {
                             if (unlikely(!dm->st_qops)) {
                                 dm->st_qops = rrdset_create_localhost("disk_qops",
                                                                       disk,
@@ -449,9 +437,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                             rrdset_done(dm->st_qops);
                         }
 
-                        if(dm->do_util == CONFIG_BOOLEAN_YES || (dm->do_util == CONFIG_BOOLEAN_AUTO &&
-                                                                 (cur_dstat.busy_time_ms ||
-                                                                  netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                        if (dm->do_util == CONFIG_BOOLEAN_YES || dm->do_util == CONFIG_BOOLEAN_AUTO) {
                             if (unlikely(!dm->st_util)) {
                                 dm->st_util = rrdset_create_localhost("disk_util",
                                                                       disk,
@@ -477,12 +463,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                             rrdset_done(dm->st_util);
                         }
 
-                        if(dm->do_iotime == CONFIG_BOOLEAN_YES || (dm->do_iotime == CONFIG_BOOLEAN_AUTO &&
-                                                                   (cur_dstat.duration_read_ms ||
-                                                                    cur_dstat.duration_write_ms ||
-                                                                    cur_dstat.duration_other_ms ||
-                                                                    cur_dstat.duration_free_ms ||
-                                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                        if (dm->do_iotime == CONFIG_BOOLEAN_YES || dm->do_iotime == CONFIG_BOOLEAN_AUTO) {
                             if (unlikely(!dm->st_iotime)) {
                                 dm->st_iotime = rrdset_create_localhost("disk_iotime",
                                                                         disk,
@@ -521,12 +502,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                         // only if this is not the first time we run
 
                         if (likely(dt)) {
-                            if(dm->do_await == CONFIG_BOOLEAN_YES || (dm->do_await == CONFIG_BOOLEAN_AUTO &&
-                                                                      (dstat[i].operations[DEVSTAT_READ] ||
-                                                                       dstat[i].operations[DEVSTAT_WRITE] ||
-                                                                       dstat[i].operations[DEVSTAT_NO_DATA] ||
-                                                                       dstat[i].operations[DEVSTAT_FREE] ||
-                                                                       netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                            if (dm->do_await == CONFIG_BOOLEAN_YES || dm->do_await == CONFIG_BOOLEAN_AUTO) {
                                 if (unlikely(!dm->st_await)) {
                                     dm->st_await = rrdset_create_localhost("disk_await",
                                                                            disk,
@@ -585,11 +561,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 rrdset_done(dm->st_await);
                             }
 
-                            if(dm->do_avagsz == CONFIG_BOOLEAN_YES || (dm->do_avagsz == CONFIG_BOOLEAN_AUTO &&
-                                                                       (dstat[i].operations[DEVSTAT_READ] ||
-                                                                        dstat[i].operations[DEVSTAT_WRITE] ||
-                                                                        dstat[i].operations[DEVSTAT_FREE] ||
-                                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                            if (dm->do_avagsz == CONFIG_BOOLEAN_YES || dm->do_avagsz == CONFIG_BOOLEAN_AUTO) {
                                 if (unlikely(!dm->st_avagsz)) {
                                     dm->st_avagsz = rrdset_create_localhost("disk_avgsz",
                                                                             disk,
@@ -639,12 +611,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 rrdset_done(dm->st_avagsz);
                             }
 
-                            if(dm->do_svctm == CONFIG_BOOLEAN_YES || (dm->do_svctm == CONFIG_BOOLEAN_AUTO &&
-                                                                      (dstat[i].operations[DEVSTAT_READ] ||
-                                                                       dstat[i].operations[DEVSTAT_WRITE] ||
-                                                                       dstat[i].operations[DEVSTAT_NO_DATA] ||
-                                                                       dstat[i].operations[DEVSTAT_FREE] ||
-                                                                       netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                            if (dm->do_svctm == CONFIG_BOOLEAN_YES || dm->do_svctm == CONFIG_BOOLEAN_AUTO) {
                                 if (unlikely(!dm->st_svctm)) {
                                     dm->st_svctm = rrdset_create_localhost("disk_svctm",
                                                                            disk,

@@ -6,28 +6,17 @@ void *aclk_main(void *ptr);
 void *analytics_main(void *ptr);
 void *cpuidlejitter_main(void *ptr);
 void *global_statistics_main(void *ptr);
-void *global_statistics_workers_main(void *ptr);
-void *global_statistics_sqlite3_main(void *ptr);
+void *global_statistics_extended_main(void *ptr);
 void *health_main(void *ptr);
 void *pluginsd_main(void *ptr);
 void *service_main(void *ptr);
 void *statsd_main(void *ptr);
-void *timex_main(void *ptr);
 void *profile_main(void *ptr);
 void *replication_thread_main(void *ptr);
 
 extern bool global_statistics_enabled;
 
 const struct netdata_static_thread static_threads_common[] = {
-    {
-        .name = "P[timex]",
-        .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "timex",
-        .enabled = 1,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = timex_main
-    },
     {
         .name = "P[idlejitter]",
         .config_section = CONFIG_SECTION_PLUGINS,
@@ -61,32 +50,21 @@ const struct netdata_static_thread static_threads_common[] = {
         .config_name = "netdata monitoring",
         .env_name = "NETDATA_INTERNALS_MONITORING",
         .global_variable = &global_statistics_enabled,
-        .enabled = 0,
+        .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = global_statistics_main
     },
     {
-        .name = "STATS_WORKERS",
+        .name = "STATS_GLOBAL_EXT",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "netdata monitoring extended",
-        .env_name = "NETDATA_INTERNALS_MONITORING",
+        .env_name = "NETDATA_INTERNALS_EXTENDED_MONITORING",
         .global_variable = &global_statistics_enabled,
         .enabled = 0, // this is ignored - check main() for "netdata monitoring extended"
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = global_statistics_workers_main
-    },
-    {
-        .name = "STATS_SQLITE3",
-        .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "netdata monitoring extended",
-        .env_name = "NETDATA_INTERNALS_MONITORING",
-        .global_variable = &global_statistics_enabled,
-        .enabled = 0, // this is ignored - check main() for "netdata monitoring extended"
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = global_statistics_sqlite3_main
+        .start_routine = global_statistics_extended_main
     },
     {
         .name = "PLUGINSD",
@@ -155,7 +133,6 @@ const struct netdata_static_thread static_threads_common[] = {
     },
 #endif
 
-#ifdef ENABLE_ACLK
     {
         .name = "ACLK_MAIN",
         .config_section = NULL,
@@ -165,7 +142,6 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = aclk_main
     },
-#endif
 
     {
         .name = "RRDCONTEXT",

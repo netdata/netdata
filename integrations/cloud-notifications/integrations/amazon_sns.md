@@ -25,8 +25,8 @@ From the Cloud interface, you can manage your space's notification settings and 
 To add AWS SNS notification you need:
 
 - A Netdata Cloud account
-- Access to the space as an **administrator**
-- Space needs to be on **Business** plan or higher
+- Access to the space as an **Admin**
+- The Space needs to be on a paid plan
 - Have an AWS account with AWS SNS access, for more details check [how to configure this on AWS SNS](#settings-on-aws-sns)
 
 ### Steps

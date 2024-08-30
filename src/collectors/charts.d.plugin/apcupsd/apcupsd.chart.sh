@@ -163,6 +163,7 @@ BEGIN {
   load = 0;
   temp = 0;
   time = 0;
+  online = 0;
   nompower = 0;
   load_usage = 0;
   selftest_OK = 0;
@@ -197,25 +198,25 @@ BEGIN {
 /^ITEMP.*/     { temp = \$3 * 100 };
 /^NOMPOWER.*/  { nompower = \$3 };
 /^TIMELEFT.*/  { time = \$3 * 100 };
-/^STATUS.*/    { online=(\$3 != \"COMMLOST\" && !(\$3 == \"SHUTTING\" && \$4 == \"DOWN\"))?1:0; };
+/^STATUS.*/    { online=(\$0 !~ \"COMMLOST\" && \$0 !~ \"SHUTTING\") ? 1 : 0; };
 /^SELFTEST.*/  { selftest_OK = (\$3 == \"OK\") ? 1 : 0;
                  selftest_NO = (\$3 == \"NO\") ? 1 : 0;
                  selftest_BT = (\$3 == \"BT\") ? 1 : 0;
                  selftest_NG = (\$3 == \"NG\") ? 1 : 0;
                };
-/^STATUS.*/    { status_ONLINE = (\$3 == \"ONLINE\") ? 1 : 0;
-                 status_CAL = (\$3 == \"CAL\") ? 1 : 0;
-                 status_TRIM = (\$3 == \"TRIM\") ? 1 : 0;
-                 status_BOOST = (\$3 == \"BOOST\") ? 1 : 0;
-                 status_ONBATT = (\$3 == \"ONBATT\") ? 1 : 0;
-                 status_OVERLOAD = (\$3 == \"OVERLOAD\") ? 1 : 0;
-                 status_LOWBATT = (\$3 == \"LOWBATT\") ? 1 : 0;
-                 status_REPLACEBATT = (\$3 == \"REPLACEBATT\") ? 1 : 0;
-                 status_NOBATT = (\$3 == \"NOBATT\") ? 1 : 0;
-                 status_SLAVE = (\$3 == \"SLAVE\") ? 1 : 0;
-                 status_SLAVEDOWN = (\$3 == \"SLAVEDOWN\") ? 1 : 0;
-                 status_COMMLOST = (\$3 == \"COMMLOST\") ? 1 : 0;
-                 status_SHUTTING_DOWN = (\$3 == \"SHUTTING\" && \$4 == \"DOWN\") ? 1 : 0;
+/^STATUS.*/    { status_ONLINE = (\$0 ~ \"ONLINE\") ? 1 : 0;
+                 status_CAL = (\$0 ~ \"CAL\") ? 1 : 0;
+                 status_TRIM = (\$0 ~ \"TRIM\") ? 1 : 0;
+                 status_BOOST = (\$0 ~ \"BOOST\") ? 1 : 0;
+                 status_ONBATT = (\$0 ~ \"ONBATT\") ? 1 : 0;
+                 status_OVERLOAD = (\$0 ~ \"OVERLOAD\") ? 1 : 0;
+                 status_LOWBATT = (\$0 ~ \"LOWBATT\") ? 1 : 0;
+                 status_REPLACEBATT = (\$0 ~ \"REPLACEBATT\") ? 1 : 0;
+                 status_NOBATT = (\$0 ~ \"NOBATT\") ? 1 : 0;
+                 status_SLAVE = (\$0 ~ \"SLAVE( |$)\") ? 1 : 0;
+                 status_SLAVEDOWN = (\$0 ~ \"SLAVEDOWN\") ? 1 : 0;
+                 status_COMMLOST = (\$0 ~ \"COMMLOST\") ? 1 : 0;
+                 status_SHUTTING_DOWN = (\$0 ~ \"SHUTTING\") ? 1 : 0;
                };
 
 END {

@@ -55,11 +55,17 @@ jobs:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
           known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
-      - name: Sync newer releases
+      - name: Sync newer releases to packages.netdata.cloud
         id: sync-releases
+        continue-on-error: true
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-newer-releases.outputs.versions_needs_update == 'true'
         run: |
-          .github/scripts/upload-new-version-tags.sh
+          .github/scripts/upload-new-version-tags.sh packages.netdata.cloud
+      - name: Sync newer releases to packages2.netdata.cloud
+        id: sync-releases2
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-newer-releases.outputs.versions_needs_update == 'true'
+        run: |
+          .github/scripts/upload-new-version-tags.sh packages2.netdata.cloud
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -77,5 +83,6 @@ jobs:
               Check for newer stable releaes: ${{ steps.check-newer-releases.outcome }}
               Setup ssh: ${{ steps.ssh-setup.outcome }}
               Syncing newer release to packages.netdata.cloud : ${{ steps.sync-releases.outcome }}
+              Syncing newer release to packages2.netdata.cloud : ${{ steps.sync-releases2.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: failure()

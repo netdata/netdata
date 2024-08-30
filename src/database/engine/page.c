@@ -183,7 +183,7 @@ PGD *pgd_create(uint8_t type, uint32_t slots)
             pg->slots = 8 * RRDENG_GORILLA_32BIT_BUFFER_SLOTS;
 
             // allocate new gorilla writer
-            pg->gorilla.aral_index = gettid() % 4;
+            pg->gorilla.aral_index = gettid_cached() % 4;
             pg->gorilla.writer = aral_mallocz(pgd_alloc_globals.aral_gorilla_writer[pg->gorilla.aral_index]);
 
             // allocate new gorilla buffer

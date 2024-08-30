@@ -10,7 +10,7 @@ static netdata_publish_syscall_t swap_publish_aggregated[NETDATA_SWAP_END];
 static netdata_idx_t swap_hash_values[NETDATA_SWAP_END];
 static netdata_idx_t *swap_values = NULL;
 
-netdata_publish_swap_t *swap_vector = NULL;
+netdata_ebpf_swap_t *swap_vector = NULL;
 
 struct config swap_config = { .first_section = NULL,
     .last_section = NULL,
@@ -92,9 +92,9 @@ static inline void ebpf_swap_disable_specific_probe(struct swap_bpf *obj)
 {
     if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
                 swap_read[NETDATA_KEY_SWAP_READPAGE_CALL])) {
-        bpf_program__set_autoload(obj->progs.netdata_swap_readpage_probe, false);
-    } else  {
         bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_probe, false);
+    } else  {
+        bpf_program__set_autoload(obj->progs.netdata_swap_readpage_probe, false);
     }
 }
 
@@ -123,9 +123,9 @@ static inline void ebpf_swap_disable_specific_trampoline(struct swap_bpf *obj)
 {
     if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
                 swap_read[NETDATA_KEY_SWAP_READPAGE_CALL])) {
-        bpf_program__set_autoload(obj->progs.netdata_swap_readpage_fentry, false);
-    } else  {
         bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_fentry, false);
+    } else  {
+        bpf_program__set_autoload(obj->progs.netdata_swap_readpage_fentry, false);
     }
 }
 
@@ -274,26 +274,26 @@ static void ebpf_obsolete_specific_swap_charts(char *type, int update_every);
  */
 static void ebpf_obsolete_swap_services(ebpf_module_t *em, char *id)
 {
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_MEM_SWAP_READ_CHART,
+                              "",
                               "Calls to function swap_readpage.",
-                              EBPF_COMMON_DIMENSION_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NETDATA_CGROUP_SWAP_READ_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100,
+                              NETDATA_SYSTEMD_SWAP_READ_CONTEXT,
+                              20191,
                               em->update_every);
 
-    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
-                              id,
+    ebpf_write_chart_obsolete(id,
                               NETDATA_MEM_SWAP_WRITE_CHART,
+                              "",
                               "Calls to function swap_writepage.",
-                              EBPF_COMMON_DIMENSION_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_CGROUP_SWAP_WRITE_CONTEXT,
-                              NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101,
+                              20192,
                               em->update_every);
 }
 
@@ -340,7 +340,7 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_call_swap_readpage",
                                   "Calls to function swap_readpage.",
-                                  EBPF_COMMON_DIMENSION_CALL,
+                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_call_swap_readpage",
@@ -351,7 +351,7 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
                                   w->clean_name,
                                   "_ebpf_call_swap_writepage",
                                   "Calls to function swap_writepage.",
-                                  EBPF_COMMON_DIMENSION_CALL,
+                                  EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                   NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_call_swap_writepage",
@@ -375,9 +375,9 @@ static void ebpf_obsolete_swap_global(ebpf_module_t *em)
                               NETDATA_MEM_SWAP_CHART,
                               "",
                               "Calls to access swap memory",
-                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "mem.swapcalls",
                               NETDATA_CHART_PRIO_MEM_SWAP_CALLS,
                               em->update_every);
 }
@@ -391,10 +391,15 @@ static void ebpf_obsolete_swap_global(ebpf_module_t *em)
  */
 static void ebpf_swap_exit(void *ptr)
 {
+    pids_fd[EBPF_PIDS_SWAP_IDX] = -1;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    pthread_mutex_lock(&lock);
+    collect_pids &= ~(1<<EBPF_MODULE_SWAP_IDX);
+    pthread_mutex_unlock(&lock);
+
     if (ebpf_read_swap.thread)
-        netdata_thread_cancel(*ebpf_read_swap.thread);
+        nd_thread_signal_cancel(ebpf_read_swap.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -447,14 +452,21 @@ static void ebpf_swap_exit(void *ptr)
  * @param out the vector with read values.
  * @param maps_per_core do I need to read all cores?
  */
-static void swap_apps_accumulator(netdata_publish_swap_t *out, int maps_per_core)
+static void swap_apps_accumulator(netdata_ebpf_swap_t *out, int maps_per_core)
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
-    netdata_publish_swap_t *total = &out[0];
+    netdata_ebpf_swap_t *total = &out[0];
+    uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
-        netdata_publish_swap_t *w = &out[i];
+        netdata_ebpf_swap_t *w = &out[i];
         total->write += w->write;
         total->read += w->read;
+
+        if (w->ct > ct)
+            ct = w->ct;
+
+        if (!total->name[0] && w->name[0])
+            strncpyz(total->name, w->name, sizeof(total->name) - 1);
     }
 }
 
@@ -472,12 +484,11 @@ static void ebpf_update_swap_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_swap_t *out = &pids->swap;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
-            if (local_pid) {
-                netdata_publish_swap_t *in = &local_pid->swap;
-
-                memcpy(out, in, sizeof(netdata_publish_swap_t));
-            }
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_SWAP_IDX);
+            netdata_publish_swap_t *in = local_pid->swap;
+            if (!in)
+                continue;
+            memcpy(out, in, sizeof(netdata_publish_swap_t));
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -496,15 +507,15 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_
     uint64_t local_read = 0;
     uint64_t local_write = 0;
 
-    while (root) {
+    for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
-        if (local_pid) {
-            netdata_publish_swap_t *w = &local_pid->swap;
-            local_write += w->write;
-            local_read += w->read;
-        }
-        root = root->next;
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_SWAP_IDX);
+        netdata_publish_swap_t *w = local_pid->swap;
+        if (!w)
+            continue;
+
+        local_write += w->write;
+        local_read += w->read;
     }
 
     // These conditions were added, because we are using incremental algorithm
@@ -532,12 +543,13 @@ void ebpf_swap_resume_apps_data() {
  * Read the apps table and store data inside the structure.
  *
  * @param maps_per_core do I need to read all cores?
+ * @param max_period    limit of iterations without updates before remove data from hash table
  */
-static void ebpf_read_swap_apps_table(int maps_per_core, int max_period)
+static void ebpf_read_swap_apps_table(int maps_per_core, uint32_t max_period)
 {
-    netdata_publish_swap_t *cv = swap_vector;
+    netdata_ebpf_swap_t *cv = swap_vector;
     int fd = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
-    size_t length = sizeof(netdata_publish_swap_t);
+    size_t length = sizeof(netdata_ebpf_swap_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
@@ -549,17 +561,22 @@ static void ebpf_read_swap_apps_table(int maps_per_core, int max_period)
 
         swap_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, cv->tgid);
-        if (!local_pid)
-            goto end_swap_loop;
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, EBPF_PIDS_SWAP_IDX);
+        netdata_publish_swap_t *publish = local_pid->swap;
+        if (!publish)
+            local_pid->swap = publish = ebpf_swap_allocate_publish_swap();
 
-        netdata_publish_swap_t *publish = &local_pid->swap;
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, cv, sizeof(netdata_publish_swap_t));
             local_pid->not_updated = 0;
-        } else if (++local_pid->not_updated >= max_period) {
-            bpf_map_delete_elem(fd, &key);
-            local_pid->not_updated = 0;
+        } else {
+            if (kill(key, 0)) { // No PID found
+                ebpf_reset_specific_pid_data(local_pid);
+            } else { // There is PID, but there is not data anymore
+                ebpf_release_pid_data(local_pid, fd, key, EBPF_PIDS_SWAP_IDX);
+                ebpf_swap_release_publish(publish);
+                local_pid->swap = NULL;
+            }
         }
 
         // We are cleaning to avoid passing data read from one process to other.
@@ -587,20 +604,22 @@ void *ebpf_read_swap_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
+    int collect_pid = (em->apps_charts || em->cgroup_charts);
+    if (!collect_pid)
+        return NULL;
 
     int counter = update_every - 1;
 
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
-    int max_period = update_every * EBPF_CLEANUP_FACTOR;
+    uint32_t max_period = EBPF_CLEANUP_FACTOR;
+    pids_fd[EBPF_PIDS_SWAP_IDX] = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
 
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
-
-        netdata_thread_disable_cancelability();
 
         pthread_mutex_lock(&collect_data_mutex);
         ebpf_read_swap_apps_table(maps_per_core, max_period);
@@ -617,7 +636,6 @@ void *ebpf_read_swap_thread(void *ptr)
 
         em->running_time = running_time;
         pthread_mutex_unlock(&ebpf_exit_cleanup);
-        netdata_thread_enable_cancelability();
     }
 
     return NULL;
@@ -725,11 +743,11 @@ static void ebpf_send_systemd_swap_charts()
             continue;
         }
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_MEM_SWAP_READ_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_MEM_SWAP_READ_CHART, "");
         write_chart_dimension("calls", (long long) ect->publish_systemd_swap.read);
         ebpf_write_end_chart();
 
-        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_MEM_SWAP_WRITE_CHART);
+        ebpf_write_begin_chart(ect->name, NETDATA_MEM_SWAP_WRITE_CHART, "");
         write_chart_dimension("calls", (long long) ect->publish_systemd_swap.write);
         ebpf_write_end_chart();
     }
@@ -748,7 +766,7 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
     char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_create_chart(type, NETDATA_MEM_SWAP_READ_CHART,
                       "Calls to function swap_readpage.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
                       NETDATA_CGROUP_SWAP_READ_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100,
                       ebpf_create_global_dimension,
@@ -758,7 +776,7 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
 
     ebpf_create_chart(type, NETDATA_MEM_SWAP_WRITE_CHART,
                       "Calls to function swap_writepage.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
                       NETDATA_CGROUP_SWAP_WRITE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101,
                       ebpf_create_global_dimension,
@@ -779,12 +797,12 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
 static void ebpf_obsolete_specific_swap_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_READ_CHART, "", "Calls to function swap_readpage.",
-                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SWAP_READ_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_WRITE_CHART, "",  "Calls to function swap_writepage.",
-                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SWAP_WRITE_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101, update_every);
 }
@@ -818,8 +836,8 @@ static void ebpf_send_specific_swap_data(char *type, netdata_publish_swap_t *val
 static void ebpf_create_systemd_swap_charts(int update_every)
 {
     static ebpf_systemd_args_t data_read = {
-        .title = "Calls to swap_readpage.",
-        .units = EBPF_COMMON_DIMENSION_CALL,
+        .title = "Calls to function swap_readpage.",
+        .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_SYSTEM_SWAP_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20191,
@@ -833,7 +851,7 @@ static void ebpf_create_systemd_swap_charts(int update_every)
 
     static ebpf_systemd_args_t data_write = {
         .title = "Calls to function swap_writepage.",
-        .units = EBPF_COMMON_DIMENSION_CALL,
+        .units = EBPF_COMMON_UNITS_CALLS_PER_SEC,
         .family = NETDATA_SYSTEM_SWAP_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20192,
@@ -920,16 +938,16 @@ static void swap_collector(ebpf_module_t *em)
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
     memset(stats, 0, sizeof(em->hash_table_stats));
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_swap_read_global_table(stats, maps_per_core);
 
-        if (cgroup)
+        if (cgroup && shm_ebpf_cgroup.header)
             ebpf_update_swap_cgroup();
 
         pthread_mutex_lock(&lock);
@@ -939,7 +957,7 @@ static void swap_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_swap_send_apps_data(apps_groups_root_target);
 
-        if (cgroup && shm_ebpf_cgroup.header && ebpf_cgroup_pids)
+        if (cgroup && shm_ebpf_cgroup.header)
             ebpf_swap_send_cgroup_data(update_every);
 
         pthread_mutex_unlock(&lock);
@@ -981,7 +999,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_call_swap_readpage",
                              "Calls to function swap_readpage.",
-                             EBPF_COMMON_DIMENSION_CALL,
+                             EBPF_COMMON_UNITS_CALLS_PER_SEC,
                              NETDATA_EBPF_MEMORY_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_call_swap_readpage",
@@ -996,7 +1014,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                              w->clean_name,
                              "_ebpf_call_swap_writepage",
                              "Calls to function swap_writepage.",
-                             EBPF_COMMON_DIMENSION_CALL,
+                             EBPF_COMMON_UNITS_CALLS_PER_SEC,
                              NETDATA_EBPF_MEMORY_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_call_swap_writepage",
@@ -1020,7 +1038,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_swap_allocate_global_vectors()
 {
-    swap_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_swap_t));
+    swap_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_ebpf_swap_t));
 
     swap_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
@@ -1044,8 +1062,8 @@ static void ebpf_create_swap_charts(int update_every)
 {
     ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_MEM_SWAP_CHART,
                       "Calls to access swap memory",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
-                      NULL,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_SYSTEM_SWAP_SUBMENU,
+                      "mem.swapcalls",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_MEM_SWAP_CALLS,
                       ebpf_create_global_dimension,
@@ -1131,9 +1149,10 @@ static int ebpf_swap_set_internal_value()
  */
 void *ebpf_swap_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_swap_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(ebpf_swap_exit) cleanup_ptr = em;
+
     em->maps = swap_maps;
 
     ebpf_update_pid_table(&swap_maps[NETDATA_PID_SWAP_TABLE], em);
@@ -1161,18 +1180,13 @@ void *ebpf_swap_thread(void *ptr)
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     pthread_mutex_unlock(&lock);
 
-    ebpf_read_swap.thread = mallocz(sizeof(netdata_thread_t));
-    netdata_thread_create(ebpf_read_swap.thread,
-                          ebpf_read_swap.name,
-                          NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_read_swap_thread,
-                          em);
+    ebpf_read_swap.thread = nd_thread_create(ebpf_read_swap.name, NETDATA_THREAD_OPTION_DEFAULT,
+                                             ebpf_read_swap_thread, em);
 
     swap_collector(em);
 
 endswap:
     ebpf_update_disabled_plugin_stats(em);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

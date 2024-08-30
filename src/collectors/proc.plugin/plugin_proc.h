@@ -9,7 +9,7 @@
 #define PLUGIN_PROC_NAME PLUGIN_PROC_CONFIG_NAME ".plugin"
 
 #define THREAD_NETDEV_NAME "P[proc netdev]"
-void *netdev_main(void *ptr);
+void *netdev_main(void *ptr_is_null);
 
 int do_proc_net_wireless(int update_every, usec_t dt);
 int do_proc_diskstats(int update_every, usec_t dt);
@@ -37,7 +37,6 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt);
 int do_proc_sys_devices_pci_aer(int update_every, usec_t dt);
 int do_proc_sys_devices_system_node(int update_every, usec_t dt);
 int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt);
-int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt);
 int do_sys_fs_btrfs(int update_every, usec_t dt);
 int do_proc_net_sockstat(int update_every, usec_t dt);
 int do_proc_net_sockstat6(int update_every, usec_t dt);
@@ -52,6 +51,10 @@ int get_numa_node_count(void);
 // metrics that need to be shared among data collectors
 extern unsigned long long zfs_arcstats_shrinkable_cache_size_bytes;
 extern bool inside_lxc_container;
+
+extern bool is_mem_swap_enabled;
+extern bool is_mem_zswap_enabled;
+extern bool is_mem_ksm_enabled;
 
 // netdev renames
 void cgroup_rename_task_add(

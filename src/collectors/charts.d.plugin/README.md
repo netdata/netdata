@@ -7,7 +7,7 @@
 3. It communicates with Netdata via a unidirectional pipe (sending data to the `netdata` daemon)
 4. Supports any number of data collection **modules**
 
-To better understand the guidelines and the API behind our External plugins, please have a look at the [Introduction to External plugins](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md) prior to reading this page.
+To better understand the guidelines and the API behind our External plugins, please have a look at the [Introduction to External plugins](/src/collectors/plugins.d/README.md) prior to reading this page.
 
 
 `charts.d.plugin` has been designed so that the actual script that will do data collection will be permanently in
@@ -17,11 +17,11 @@ memory, collecting data with as little overheads as possible
 `charts.d.plugin` looks for scripts in `/usr/lib/netdata/charts.d`.
 The scripts should have the filename suffix: `.chart.sh`.
 
-By default, `charts.d.plugin` is not included as part of the install when using [our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md). You can install it by installing the `netdata-plugin-chartsd` package.
+By default, `charts.d.plugin` is not included as part of the install when using [our official native DEB/RPM packages](/packaging/installer/methods/packages.md). You can install it by installing the `netdata-plugin-chartsd` package.
 
 ## Configuration
 
-`charts.d.plugin` itself can be [configured](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) using the configuration file `/etc/netdata/charts.d.conf`. This file is also a BASH script.
+`charts.d.plugin` itself can be [configured](/docs/netdata-agent/configuration/README.md#edit-netdataconf)using the configuration file `/etc/netdata/charts.d.conf`. This file is also a BASH script.
 
 In this file, you can place statements like this:
 

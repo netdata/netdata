@@ -27,6 +27,8 @@ fi
 
 STARTIT=1
 REINSTALL_OPTIONS=""
+NETDATA_CERT_MODE="${NETDATA_CERT_MODE:-auto}"
+NETDATA_CERT_TEST_URL="${NETDATA_CERT_TEST_URL:-https://app.netdata.cloud}"
 RELEASE_CHANNEL="nightly"
 
 while [ "${1}" ]; do
@@ -48,6 +50,19 @@ while [ "${1}" ]; do
       NETDATA_DISABLE_TELEMETRY=1
       REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       ;;
+    "--certificates")
+      case "${2}" in
+        auto|system) NETDATA_CERT_MODE="auto" ;;
+        check) NETDATA_CERT_MODE="check" ;;
+        bundled) NETDATA_CERT_MODE="bundled" ;;
+        *) run_failed "Unknown certificate handling mode '${2}'. Supported modes are auto, check, system, and bundled."; exit 1 ;;
+      esac
+      shift 1
+      ;;
+    "--certificate-test-url")
+      NETDATA_CERT_TEST_URL="${2}"
+      shift 1
+      ;;
 
     *) echo >&2 "Unknown option '${1}'. Ignoring it." ;;
   esac
@@ -60,6 +75,14 @@ if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
   [ -n "$DO_NOT_TRACK" ]; then
   NETDATA_DISABLE_TELEMETRY=1
   REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --disable-telemetry"
+fi
+
+if [ -n "${NETDATA_CERT_MODE}" ]; then
+  REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --certificates ${NETDATA_CERT_MODE}"
+fi
+
+if [ -n "${NETDATA_CERT_TEST_URL}" ]; then
+  REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --certificate-test-url ${NETDATA_CERT_TEST_URL}"
 fi
 
 # -----------------------------------------------------------------------------
@@ -100,6 +123,10 @@ fi
 progress "Install logrotate configuration for netdata"
 
 install_netdata_logrotate || run_failed "Cannot install logrotate file for netdata."
+
+progress "Install journald configuration for netdata"
+
+install_netdata_journald_conf || run_failed "Cannot install journald file for netdata."
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
@@ -192,13 +219,13 @@ if command -v setcap >/dev/null 2>&1; then
 
     run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"
 else
-  for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
+  for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
     f="usr/libexec/netdata/plugins.d/${x}"
     run chmod 4750 "${f}"
   done
 fi
 
-for x in freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin; do
+for x in ndsudo freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
 
   if [ -f "${f}" ]; then
@@ -208,26 +235,73 @@ done
 
 # -----------------------------------------------------------------------------
 
-echo "Configure TLS certificate paths"
+replace_symlink() {
+    target="${1}"
+    name="${2}"
+    rm -f "${name}"
+    ln -s "${target}" "${name}"
+}
+
+select_system_certs() {
+  if [ -d /etc/pki/tls ] ; then
+    echo "${1} /etc/pki/tls for TLS configuration and certificates"
+    replace_symlink /etc/pki/tls /opt/netdata/etc/ssl
+  elif [ -d /etc/ssl ] ; then
+    echo "${1} /etc/ssl for TLS configuration and certificates"
+    replace_symlink /etc/ssl /opt/netdata/etc/ssl
+  fi
+}
+
+select_internal_certs() {
+  echo "Using bundled TLS configuration and certificates"
+  replace_symlink /opt/netdata/share/ssl /opt/netdata/etc/ssl
+}
+
+certs_selected() {
+  [ -L /opt/netdata/etc/ssl ] || return 1
+}
+
+test_certs() {
+  /opt/netdata/bin/curl --fail --max-time 300 --silent --output /dev/null "${NETDATA_CERT_TEST_URL}"
+
+  case "$?" in
+    35|77) echo "Failed to load certificate files for test." ; return 1 ;;
+    60|82|83) echo "Certificates cannot be used to connect to ${NETDATA_CERT_TEST_URL}" ; return 1 ;;
+    53|54|66) echo "Unable to use OpenSSL configuration associated with certificates" ; return 1 ;;
+    0) echo "Successfully connected to ${NETDATA_CERT_TEST_URL} using certificates" ;;
+    *) echo "Unable to test certificates due to networking problems, blindly assuming they work" ;;
+  esac
+}
+
+# If the user has manually set up certificates, don’t mess with it.
 if [ ! -L /opt/netdata/etc/ssl ] && [ -d /opt/netdata/etc/ssl ] ; then
   echo "Preserving existing user configuration for TLS"
 else
-  if [ -d /etc/pki/tls ] ; then
-    echo "Using /etc/pki/tls for TLS configuration and certificates"
-    ln -sf /etc/pki/tls /opt/netdata/etc/ssl
-  elif [ -d /etc/ssl ] ; then
-    echo "Using /etc/ssl for TLS configuration and certificates"
-    ln -sf /etc/ssl /opt/netdata/etc/ssl
-  else
-    echo "Using bundled TLS configuration and certificates"
-    ln -sf /opt/netdata/share/ssl /opt/netdata/etc/ssl
-  fi
+  echo "Configure TLS certificate paths (mode: ${NETDATA_CERT_MODE})"
+  case "${NETDATA_CERT_MODE}" in
+    check)
+      select_system_certs "Testing"
+      if certs_selected && test_certs; then
+        select_system_certs "Using"
+      else
+        select_internal_certs
+      fi
+      ;;
+    bundled) select_internal_certs ;;
+    *)
+      select_system_certs "Using"
+      if ! certs_selected; then
+        select_internal_certs
+      fi
+      ;;
+  esac
 fi
 
 # -----------------------------------------------------------------------------
 
 echo "Save install options"
 grep -qv 'IS_NETDATA_STATIC_BINARY="yes"' "${NETDATA_PREFIX}/etc/netdata/.environment" || echo IS_NETDATA_STATIC_BINARY=\"yes\" >> "${NETDATA_PREFIX}/etc/netdata/.environment"
+REINSTALL_OPTIONS="$(echo "${REINSTALL_OPTIONS}" | awk '{gsub("/", "\\/"); print}')"
 sed -i "s/REINSTALL_OPTIONS=\".*\"/REINSTALL_OPTIONS=\"${REINSTALL_OPTIONS}\"/" "${NETDATA_PREFIX}/etc/netdata/.environment"
 
 # -----------------------------------------------------------------------------

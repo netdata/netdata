@@ -110,14 +110,4 @@ if [ -w "/etc/netdata" ]; then
   fi
 fi
 
-if [ -n "${NETDATA_CLAIM_URL}" ] && [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ ! -f /var/lib/netdata/cloud.d/claimed_id ]; then
-  # shellcheck disable=SC2086
-  /usr/sbin/netdata-claim.sh -token="${NETDATA_CLAIM_TOKEN}" \
-                             -url="${NETDATA_CLAIM_URL}" \
-                             ${NETDATA_CLAIM_ROOMS:+-rooms="${NETDATA_CLAIM_ROOMS}"} \
-                             ${NETDATA_CLAIM_PROXY:+-proxy="${NETDATA_CLAIM_PROXY}"} \
-                             ${NETDATA_EXTRA_CLAIM_OPTS} \
-                             -daemon-not-running
-fi
-
 exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_LISTENER_PORT}" "$@"

@@ -443,7 +443,7 @@ const char *db_models_prune =
     "WHERE after < @after LIMIT @n;";
 
 static int
-ml_dimension_add_model(const uuid_t *metric_uuid, const ml_kmeans_t *km)
+ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_t *km)
 {
     static __thread sqlite3_stmt *res = NULL;
     int param = 0;
@@ -520,7 +520,7 @@ bind_fail:
 }
 
 static int
-ml_dimension_delete_models(const uuid_t *metric_uuid, time_t before)
+ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc = 0;
@@ -1175,7 +1175,7 @@ ml_acquired_dimension_get(char *machine_guid, STRING *chart_id, STRING *dimensio
         }
     }
 
-    rrd_unlock();
+    rrd_rdunlock();
 
     ml_acquired_dimension_t acq_dim = {
         acq_rh, acq_rs, acq_rd, dim
@@ -1220,7 +1220,7 @@ ml_detect_main(void *arg)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    while (!Cfg.detection_stop) {
+    while (!Cfg.detection_stop && service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         heartbeat_next(&hb, USEC_PER_SEC);
 
@@ -1230,9 +1230,12 @@ ml_detect_main(void *arg)
             if (!rh->ml_host)
                 continue;
 
+            if (!service_running(SERVICE_COLLECTORS))
+                break;
+
             ml_host_detect_once((ml_host_t *) rh->ml_host);
         }
-        rrd_unlock();
+        rrd_rdunlock();
 
         if (Cfg.enable_statistics_charts) {
             // collect and update training thread stats
@@ -1266,6 +1269,7 @@ ml_detect_main(void *arg)
             }
         }
     }
+    Cfg.training_stop = true;
 
     return NULL;
 }
@@ -1833,12 +1837,14 @@ void ml_start_threads() {
     char tag[NETDATA_THREAD_TAG_MAX + 1];
 
     snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "PREDICT");
-    netdata_thread_create(&Cfg.detection_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, ml_detect_main, NULL);
+    Cfg.detection_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
+                                            ml_detect_main, NULL);
 
     for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
         ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "TRAIN[%zu]", training_thread->id);
-        netdata_thread_create(&training_thread->nd_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, ml_train_main, training_thread);
+        training_thread->nd_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
+                                                      ml_train_main, training_thread);
     }
 }
 
@@ -1853,7 +1859,7 @@ void ml_stop_threads()
     if (!Cfg.detection_thread)
         return;
 
-    netdata_thread_join(Cfg.detection_thread, NULL);
+    nd_thread_join(Cfg.detection_thread);
     Cfg.detection_thread = 0;
 
     // signal the training queue of each thread
@@ -1863,18 +1869,11 @@ void ml_stop_threads()
         ml_queue_signal(training_thread->training_queue);
     }
 
-    // cancel training threads
-    for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
-        ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
-
-        netdata_thread_cancel(training_thread->nd_thread);
-    }
-
     // join training threads
     for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
         ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
 
-        netdata_thread_join(training_thread->nd_thread, NULL);
+        nd_thread_join(training_thread->nd_thread);
     }
 
     // clear training thread data

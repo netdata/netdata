@@ -8,7 +8,7 @@
 
 int sql_context_cache_stats(int op);
 typedef struct ctx_chart {
-    uuid_t chart_id;
+    nd_uuid_t chart_id;
     const char *id;
     const char *name;
     const char *context;
@@ -21,7 +21,7 @@ typedef struct ctx_chart {
 } SQL_CHART_DATA;
 
 typedef struct ctx_dimension {
-    uuid_t dim_id;
+    nd_uuid_t dim_id;
     char *id;
     char *name;
     bool hidden;
@@ -52,20 +52,19 @@ typedef struct versioned_context_data {
 
 } VERSIONED_CONTEXT_DATA;
 
-void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data);
+void ctx_get_context_list(nd_uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data);
 
-void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data);
-void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, void *), void *data);
-void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data);
+void ctx_get_chart_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data);
+void ctx_get_label_list(nd_uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, void *), void *data);
+void ctx_get_dimension_list(nd_uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data);
 
-int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data);
+int ctx_store_context(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data);
 
 #define ctx_update_context(host_uuid, context_data)    ctx_store_context(host_uuid, context_data)
 
-int ctx_delete_context(uuid_t *host_id, VERSIONED_CONTEXT_DATA *context_data);
+int ctx_delete_context(nd_uuid_t *host_id, VERSIONED_CONTEXT_DATA *context_data);
 
 int sql_init_context_database(int memory);
 uint64_t sqlite_get_context_space(void);
-void sql_close_context_database(void);
 int ctx_unittest(void);
 #endif //NETDATA_SQLITE_CONTEXT_H

@@ -1,1 +1,0 @@
-integrations/megacli.md

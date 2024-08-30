@@ -8,17 +8,15 @@ team and the community, but you can also customize them yourself.
 
 There are two primary ways to view Netdata's dashboards on the agent:
 
-1.  The [local Agent dashboard](https://github.com/netdata/netdata/blob/master/src/web/gui/README.md) that comes pre-configured with every Netdata installation. You can
+1.  The [local Agent dashboard](/src/web/gui/README.md) that comes pre-configured with every Netdata installation. You can
     see it at `http://NODE:19999`, replacing `NODE` with `localhost`, the hostname of your node, or its IP address. You
     can customize the contents and colors of the standard dashboard [using
-    JavaScript](https://github.com/netdata/netdata/blob/master/src/web/gui/README.md#customizing-the-local-dashboard).
+    JavaScript](/src/web/gui/README.md#customizing-the-local-dashboard).
 
 2.  The [`dashboard.js` JavaScript library](#dashboardjs), which helps you
-   [customize the standard dashboards](https://github.com/netdata/netdata/blob/master/src/web/gui/README.md#customizing-the-local-dashboard)
-   using JavaScript, or create entirely new [custom dashboards](https://github.com/netdata/netdata/blob/master/src/web/gui/custom/README.md) or
-   [Atlassian Confluence dashboards](https://github.com/netdata/netdata/blob/master/src/web/gui/confluence/README.md).
-
-You can also view all the data Netdata collects through the [REST API v1](https://github.com/netdata/netdata/blob/master/src/web/api/README.md#netdata-rest-api).
+   [customize the standard dashboards](/src/web/gui/README.md#customizing-the-local-dashboard)
+   using JavaScript, or create entirely new [custom dashboards](/src/web/gui/custom/README.md)
+You can also view all the data Netdata collects through the [REST API v1](/src/web/api/README.md#netdata-rest-api).
 
 ## dashboard.js
 
@@ -27,7 +25,7 @@ all the charts and other visualizations that appear on any Netdata dashboard.
 You need to put `dashboard.js` on any HTML page that's going to render Netdata
 charts.
 
-The [custom dashboards documentation](https://github.com/netdata/netdata/blob/master/src/web/gui/custom/README.md) contains examples of such
+The [custom dashboards documentation](/src/web/gui/custom/README.md) contains examples of such
 custom HTML pages.
 
 ### Generating dashboard.js

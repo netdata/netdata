@@ -15,23 +15,28 @@
 
 #define NETDATA_CACHESTAT_SUBMENU "page_cache"
 
-#define EBPF_CACHESTAT_DIMENSION_PAGE "pages/s"
-#define EBPF_CACHESTAT_DIMENSION_HITS "hits/s"
-#define EBPF_CACHESTAT_DIMENSION_MISSES "misses/s"
+#define EBPF_CACHESTAT_UNITS_PAGE "pages/s"
+#define EBPF_CACHESTAT_UNITS_HITS "hits/s"
+#define EBPF_CACHESTAT_UNITS_MISSES "misses/s"
 
 // configuration file
 #define NETDATA_CACHESTAT_CONFIG_FILE "cachestat.conf"
 
 // Contexts
+#define NETDATA_MEM_CACHESTAT_HIT_RATIO_CONTEXT "mem.cachestat_ratio"
+#define NETDATA_MEM_CACHESTAT_MODIFIED_CACHE_CONTEXT "mem.cachestat_dirties"
+#define NETDATA_MEM_CACHESTAT_HIT_FILES_CONTEXT "mem.cachestat_hits"
+#define NETDATA_MEM_CACHESTAT_MISS_FILES_CONTEXT "mem.cachestat_misses"
+
 #define NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT "cgroup.cachestat_ratio"
 #define NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT "cgroup.cachestat_dirties"
 #define NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT "cgroup.cachestat_hits"
 #define NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT "cgroup.cachestat_misses"
 
-#define NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT "systemd.services.cachestat_ratio"
-#define NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT "systemd.services.cachestat_dirties"
-#define NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT "systemd.services.cachestat_hits"
-#define NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT "systemd.services.cachestat_misses"
+#define NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT "systemd.service.cachestat_ratio"
+#define NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT "systemd.service.cachestat_dirties"
+#define NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT "systemd.service.cachestat_hits"
+#define NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT "systemd.service.cachestat_misses"
 
 // variables
 enum cachestat_counters {
@@ -64,20 +69,27 @@ enum cachestat_tables {
     NETDATA_CACHESTAT_CTRL
 };
 
-typedef struct netdata_publish_cachestat_pid {
+typedef struct netdata_cachestat_pid {
     uint64_t ct;
     uint32_t tgid;
     uint32_t uid;
     uint32_t gid;
     char name[TASK_COMM_LEN];
 
-    uint64_t add_to_page_cache_lru;
-    uint64_t mark_page_accessed;
-    uint64_t account_page_dirtied;
-    uint64_t mark_buffer_dirty;
+    uint32_t add_to_page_cache_lru;
+    uint32_t mark_page_accessed;
+    uint32_t account_page_dirtied;
+    uint32_t mark_buffer_dirty;
 } netdata_cachestat_pid_t;
 
-typedef struct netdata_publish_cachestat {
+typedef struct __attribute__((packed)) netdata_cachestat {
+    uint32_t add_to_page_cache_lru;
+    uint32_t mark_page_accessed;
+    uint32_t account_page_dirtied;
+    uint32_t mark_buffer_dirty;
+} netdata_cachestat_t;
+
+typedef struct __attribute__((packed)) netdata_publish_cachestat {
     uint64_t ct;
 
     long long ratio;
@@ -85,8 +97,8 @@ typedef struct netdata_publish_cachestat {
     long long hit;
     long long miss;
 
-    netdata_cachestat_pid_t current;
-    netdata_cachestat_pid_t prev;
+    netdata_cachestat_t current;
+    netdata_cachestat_t prev;
 } netdata_publish_cachestat_t;
 
 void *ebpf_cachestat_thread(void *ptr);

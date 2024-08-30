@@ -10,7 +10,7 @@ struct rrd_function_inflight {
     bool used;
 
     RRDHOST *host;
-    uuid_t transaction_uuid;
+    nd_uuid_t transaction_uuid;
     const char *transaction;
     const char *cmd;
     const char *sanitized_cmd;
@@ -398,7 +398,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                      rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                     BUFFER *payload, const char *source) {
+                     BUFFER *payload, const char *source, bool hidden) {
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
@@ -436,15 +436,21 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
 
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
+    if((rdcf->options & RRD_FUNCTION_HIDDEN) && !hidden) {
+        code = rrd_call_function_error(result_wb,
+                                       "You cannot access a hidden function like this. ",
+                                       HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+        dictionary_acquired_item_release(host->functions, host_function_acquired);
+
+        if(result_cb)
+            result_cb(result_wb, code, result_cb_data);
+
+        return code;
+    }
+
     if(!http_access_user_has_enough_access_level_for_endpoint(user_access, rdcf->access)) {
 
-        if(!aclk_connected)
-            code = rrd_call_function_error(result_wb,
-                                           "This Netdata must be connected to Netdata Cloud for Single-Sign-On (SSO) "
-                                           "access this feature. Claim this Netdata to Netdata Cloud to enable access.",
-                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
-
-        else if((rdcf->access & HTTP_ACCESS_SIGNED_ID) && !(user_access & HTTP_ACCESS_SIGNED_ID))
+        if((rdcf->access & HTTP_ACCESS_SIGNED_ID) && !(user_access & HTTP_ACCESS_SIGNED_ID))
             code = rrd_call_function_error(result_wb,
                                            "You need to be authenticated via Netdata Cloud Single-Sign-On (SSO) "
                                            "to access this feature. Sign-in on this dashboard, "
@@ -491,7 +497,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     // validate and parse the transaction, or generate a new transaction id
 
     char uuid_str[UUID_COMPACT_STR_LEN];
-    uuid_t uuid;
+    nd_uuid_t uuid;
 
     if(!transaction || !*transaction || uuid_parse_flexi(transaction, uuid) != 0)
         uuid_generate_random(uuid);
@@ -597,7 +603,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     return rrd_call_function_async(r, wait);
 }
 
-bool rrd_function_has_this_original_result_callback(uuid_t *transaction, rrd_function_result_callback_t cb) {
+bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, rrd_function_result_callback_t cb) {
     bool ret = false;
     char str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(*transaction, str);
@@ -684,7 +690,7 @@ cleanup:
     dictionary_acquired_item_release(rrd_functions_inflight_requests, item);
 }
 
-void rrd_function_call_progresser(uuid_t *transaction) {
+void rrd_function_call_progresser(nd_uuid_t *transaction) {
     char str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(*transaction, str);
     rrd_function_progress(str);

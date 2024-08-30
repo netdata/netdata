@@ -19,7 +19,7 @@ static bool sentry_telemetry_disabled(void)
     return getenv("DISABLE_TELEMETRY") != NULL;
 }
 
-void sentry_native_init(void)
+void nd_sentry_init(void)
 {
     if (sentry_telemetry_disabled())
         return;
@@ -32,7 +32,12 @@ void sentry_native_init(void)
     sentry_options_set_dsn(options, NETDATA_SENTRY_DSN);
     sentry_options_set_database_path(options, path);
     sentry_options_set_environment(options, NETDATA_SENTRY_ENVIRONMENT);
-    sentry_options_set_release(options, NETDATA_SENTRY_RELEASE);
+
+    char release[64];
+    snprintfz(release, 64 - 1, "%s.%s.%s",
+              NETDATA_VERSION_MINOR, NETDATA_VERSION_PATCH, NETDATA_VERSION_TWEAK);
+    sentry_options_set_release(options, release);
+
     sentry_options_set_dist(options, NETDATA_SENTRY_DIST);
 #ifdef NETDATA_INTERNAL_CHECKS
     sentry_options_set_debug(options, 1);
@@ -41,10 +46,17 @@ void sentry_native_init(void)
     sentry_init(options);
 }
 
-void sentry_native_fini(void)
+void nd_sentry_fini(void)
 {
     if (sentry_telemetry_disabled())
         return;
 
     sentry_close();
+}
+
+void nd_sentry_set_user(const char *guid)
+{
+    sentry_value_t user = sentry_value_new_object();
+    sentry_value_set_by_key(user, "id", sentry_value_new_string(guid));
+    sentry_set_user(user);
 }

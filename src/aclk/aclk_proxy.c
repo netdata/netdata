@@ -79,7 +79,7 @@ static inline int check_socks_enviroment(const char **proxy)
 {
     char *tmp = getenv("socks_proxy");
 
-    if (!tmp)
+    if (!tmp || !*tmp)
         return 1;
 
     if (aclk_verify_proxy(tmp) == PROXY_TYPE_SOCKS5) {
@@ -97,7 +97,7 @@ static inline int check_http_enviroment(const char **proxy)
 {
     char *tmp = getenv("http_proxy");
 
-    if (!tmp)
+    if (!tmp || !*tmp)
         return 1;
 
     if (aclk_verify_proxy(tmp) == PROXY_TYPE_HTTP) {
@@ -113,10 +113,11 @@ static inline int check_http_enviroment(const char **proxy)
 
 const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
 {
-    const char *proxy = config_get(CONFIG_SECTION_CLOUD, ACLK_PROXY_CONFIG_VAR, ACLK_PROXY_ENV);
+    const char *proxy = cloud_config_proxy_get();
+
     *type = PROXY_DISABLED;
 
-    if (strcmp(proxy, "none") == 0)
+    if (!proxy || !*proxy || strcmp(proxy, "none") == 0)
         return proxy;
 
     if (strcmp(proxy, ACLK_PROXY_ENV) == 0) {

@@ -30,7 +30,6 @@ This alert calculates the average total `CPU utilization` on a Windows system ov
 
 ### Useful resources
 
-1. [How to Monitor CPU Usage on Windows](https://www.tomsguide.com/how-to/how-to-monitor-cpu-usage-on-windows)
-2. [Windows Task Manager: A Troubleshooting Guide](https://www.howtogeek.com/66622/stupid-geek-tricks-6-ways-to-open-windows-task-manager/)
-3. [How to Use the Performance Monitor on Windows](https://www.digitalcitizen.life/how-use-performance-monitor-windows/)
-4. [Understanding Process Explorer](https://docs.microsoft.com/en-us/sysinternals/downloads/process-explorer)
+1. [Windows Task Manager: A Troubleshooting Guide](https://www.howtogeek.com/66622/stupid-geek-tricks-6-ways-to-open-windows-task-manager/)
+2. [How to Use the Performance Monitor on Windows](https://www.digitalcitizen.life/how-use-performance-monitor-windows/)
+3. [Understanding Process Explorer](https://docs.microsoft.com/en-us/sysinternals/downloads/process-explorer)

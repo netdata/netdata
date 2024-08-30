@@ -13,13 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Add issues to Agent project board
-        uses: actions/add-to-project@v1.0.0
+        uses: actions/add-to-project@v1.0.2
         with:
           project-url: https://github.com/orgs/netdata/projects/32
           github-token: ${{ secrets.NETDATABOT_ORG_GITHUB_TOKEN }}
 
       - name: Add issues to Product Bug project board
-        uses: actions/add-to-project@v1.0.0
+        uses: actions/add-to-project@v1.0.2
         with:
           project-url: https://github.com/orgs/netdata/projects/45
           github-token: ${{ secrets.NETDATABOT_ORG_GITHUB_TOKEN }}

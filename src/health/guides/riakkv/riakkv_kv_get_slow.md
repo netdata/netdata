@@ -17,6 +17,5 @@ The `riakkv_kv_get_slow` alert is related to Riak KV, a distributed NoSQL key-va
 ### Useful resources
 
 1. [Riak KV documentation](https://riak.com/documentation/)
-2. [Monitoring Riak KV with Netdata](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/riakkv/)
-3. [Riak Control: Monitoring and Administration Interface](https://docs.riak.com/riak/kv/2.2.3/configuring/reference/riak-vars/#riak-control)
-4. [Riak KV Monitoring and Metrics](https://docs.riak.com/riak/kv/2.2.3/using/performance/monitoring/index.html)
+2. [Riak Control: Monitoring and Administration Interface](https://docs.riak.com/riak/kv/2.2.3/configuring/reference/riak-vars/#riak-control)
+3. [Riak KV Monitoring and Metrics](https://docs.riak.com/riak/kv/2.2.3/using/performance/monitoring/index.html)

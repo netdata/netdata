@@ -20,7 +20,7 @@
           description: |
             - The url of the homeserver (`https://homeserver:port`).
             - Credentials for connecting to the homeserver, in the form of a valid access token for your account (or for a dedicated notification account). These tokens usually don't expire.
-            - The room ids that you want to sent the notification to.
+            - The Room ids that you want to sent the notification to.
             - Access to the terminal where Netdata Agent is running
     configuration:
       file:
@@ -50,16 +50,16 @@
               ```
           - name: 'DEFAULT_RECIPIENT_MATRIX'
             default_value: ''
-            description: "Set `DEFAULT_RECIPIENT_MATRIX`  to the rooms you want the alert notifications to be sent to. The format is `!roomid:homeservername`."
+            description: "Set `DEFAULT_RECIPIENT_MATRIX`  to the Rooms you want the alert notifications to be sent to. The format is `!roomid:homeservername`."
             required: true
             detailed_description: |
-              The room ids are unique identifiers and can be obtained from the room settings in a Matrix client (e.g. Riot).
+              The Room ids are unique identifiers and can be obtained from the Room settings in a Matrix client (e.g. Riot).
               
-              You can define multiple rooms like this: `!roomid1:homeservername` `!roomid2:homeservername`.
+              You can define multiple Rooms like this: `!roomid1:homeservername` `!roomid2:homeservername`.
               
               All roles will default to this variable if left unconfigured.
 
-              You can have different rooms per role, by editing `DEFAULT_RECIPIENT_MATRIX` with the `!roomid:homeservername` you want, in the following entries at the bottom of the same file:
+              You can have different Rooms per role, by editing `DEFAULT_RECIPIENT_MATRIX` with the `!roomid:homeservername` you want, in the following entries at the bottom of the same file:
 
               ```conf
               role_recipients_matrix[sysadmin]="!roomid1:homeservername"

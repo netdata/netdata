@@ -691,7 +691,7 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method)
         }
     }
     if(!found) {
-        errno = 0;
+        errno_clear();
         internal_error(true, "QUERY: grouping method %u not found. Using 'average'", (unsigned int)group_method);
         r->time_grouping.create  = tg_average_create;
         r->time_grouping.reset   = tg_average_reset;
@@ -1966,7 +1966,11 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
     if(unlikely(tier >= storage_tiers)) return;
-    if(storage_tiers_backfill[tier] == RRD_BACKFILL_NONE) return;
+#ifdef ENABLE_DBENGINE
+    if(default_backfill == RRD_BACKFILL_NONE) return;
+#else
+    return;
+#endif
 
     struct rrddim_tier *t = &rd->tiers[tier];
     if(unlikely(!t)) return;
@@ -1976,7 +1980,11 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
     time_t time_diff   = now_s - latest_time_s;
 
     // if the user wants only NEW backfilling, and we don't have any data
-    if(storage_tiers_backfill[tier] == RRD_BACKFILL_NEW && latest_time_s <= 0) return;
+#ifdef ENABLE_DBENGINE
+    if(default_backfill == RRD_BACKFILL_NEW && latest_time_s <= 0) return;
+#else
+    return;
+#endif
 
     // there is really nothing we can do
     if(now_s <= latest_time_s || time_diff < granularity) return;

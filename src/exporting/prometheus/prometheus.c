@@ -403,7 +403,7 @@ static int print_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unu
             opts->prefix,
             opts->name,
             label_pre,
-            opts->labels,
+            (opts->labels[0] == ',') ? &opts->labels[1] : opts->labels,
             label_post,
             value,
             opts->now * 1000ULL);
@@ -414,7 +414,7 @@ static int print_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unu
             opts->prefix,
             opts->name,
             label_pre,
-            opts->labels,
+            (opts->labels[0] == ',') ? &opts->labels[1] : opts->labels,
             label_post,
             value);
 
@@ -552,8 +552,8 @@ static void prometheus_print_os_info(
           if (!in_val_part) {
               /* Only accepts alphabetic characters and '_'
                * in key part */
-              if (isalpha(*in) || *in == '_') {
-                  *(sanitized++) = tolower(*in);
+              if (isalpha((uint8_t)*in) || *in == '_') {
+                  *(sanitized++) = tolower((uint8_t)*in);
               } else if (*in == '=') {
                   in_val_part = 1;
                   *(sanitized++) = '=';
@@ -568,7 +568,7 @@ static void prometheus_print_os_info(
                   case '\t':
                       break;
                   default:
-                      if (isprint(*in)) {
+                      if (isprint((uint8_t)*in)) {
                           *(sanitized++) = *in;
                       }
               }
@@ -875,7 +875,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         .host = host,
         .wb = wb,
         .plabels_buffer = plabels_buffer,
-        .labels = (labels[0] == ',') ? &labels[1] : labels,
+        .labels = labels, // FIX: very misleading name and poor implementation of adding the "instance" label
         .exporting_options = exporting_options,
         .output_options = output_options,
         .prefix = prefix,

@@ -1,0 +1,131 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-dmcache
+      plugin_name: go.d.plugin
+      module_name: dmcache
+      monitored_instance:
+        name: DMCache devices
+        link: ""
+        icon_filename: filesystem.svg
+        categories:
+          - data-collection.storage-mount-points-and-filesystems
+      keywords:
+        - dmcache
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: >
+          This collector monitors DMCache, providing insights into capacity usage, efficiency, and activity.
+          It relies on the [`dmsetup`](https://man7.org/linux/man-pages/man8/dmsetup.8.html) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/dmcache.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: timeout
+              description: dmsetup binary execution timeout.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
+              config: |
+                jobs:
+                  - name: dmcache
+                    update_every: 5  # Collect DMCache statistics every 5 seconds
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: dmcache device
+          description: These metrics refer to the DMCache device.
+          labels:
+            - name: device
+              description: Device name
+          metrics:
+            - name: dmcache.device_cache_space_usage
+              description: DMCache space usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+            - name: dmcache.device_metadata_space_usage
+              description: DMCache metadata space usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+            - name: dmcache.device_cache_read_efficiency
+              description: DMCache read efficiency
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: dmcache.device_cache_write_efficiency
+              description: DMCache write efficiency
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: dmcache.device_cache_activity
+              description: DMCache activity
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: promotions
+                - name: demotions
+            - name: dmcache.device_cache_dirty_size
+              description: DMCache dirty data size
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: dirty

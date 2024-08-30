@@ -50,4 +50,3 @@ Expired messages are removed from the queue and are not delivered to subscribers
 ### Useful resources
 
 1. [VerneMQ Documentation](https://vernemq.com/docs/)
-2. [How to Monitor VerneMQ MQTT broker with Netdata](https://learn.netdata.cloud/guides/monitor/vernemq.html)

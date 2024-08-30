@@ -763,7 +763,7 @@ int main(int argc, char **argv) {
             }
         }
         else if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
-            printf("nfacct.plugin %s\n", VERSION);
+            printf("nfacct.plugin %s\n", NETDATA_VERSION);
             exit(0);
         }
         else if(strcmp("debug", argv[i]) == 0) {
@@ -798,7 +798,7 @@ int main(int argc, char **argv) {
                     " For more information:\n"
                     " https://github.com/netdata/netdata/tree/master/src/collectors/nfacct.plugin\n"
                     "\n"
-                    , VERSION
+                    , NETDATA_VERSION
                     , netdata_update_every
             );
             exit(1);
@@ -809,7 +809,7 @@ int main(int argc, char **argv) {
 
     nfacct_signals();
 
-    errno = 0;
+    errno_clear();
 
     if(freq >= netdata_update_every)
         netdata_update_every = freq;

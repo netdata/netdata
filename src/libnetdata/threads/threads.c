@@ -2,135 +2,202 @@
 
 #include "../libnetdata.h"
 
-static pthread_attr_t *netdata_threads_attr = NULL;
+#define nd_thread_status_get(nti)           __atomic_load_n(&((nti)->options), __ATOMIC_ACQUIRE)
+#define nd_thread_status_check(nti, flag)   (__atomic_load_n(&((nti)->options), __ATOMIC_ACQUIRE) & (flag))
+#define nd_thread_status_set(nti, flag)     __atomic_or_fetch(&((nti)->options), flag, __ATOMIC_RELEASE)
+#define nd_thread_status_clear(nti, flag)   __atomic_and_fetch(&((nti)->options), ~(flag), __ATOMIC_RELEASE)
 
-// ----------------------------------------------------------------------------
-// per thread data
+typedef void (*nd_thread_canceller)(void *data);
 
-typedef struct {
+struct nd_thread {
     void *arg;
-    char tag[NETDATA_THREAD_NAME_MAX + 1];
+    pid_t tid;
+    char tag[ND_THREAD_TAG_MAX + 1];
+    void *ret; // the return value of start routine
     void *(*start_routine) (void *);
     NETDATA_THREAD_OPTIONS options;
-} NETDATA_THREAD;
+    pthread_t thread;
+    bool cancel_atomic;
 
-static __thread NETDATA_THREAD *netdata_thread = NULL;
-
-inline int netdata_thread_tag_exists(void) {
-    return (netdata_thread && *netdata_thread->tag);
-}
-
-static const char *thread_name_get(bool recheck) {
-    static __thread char threadname[NETDATA_THREAD_NAME_MAX + 1] = "";
-
-    if(netdata_thread_tag_exists())
-        strncpyz(threadname, netdata_thread->tag, NETDATA_THREAD_NAME_MAX);
-    else {
-        if(!recheck && threadname[0])
-            return threadname;
-
-#if defined(__FreeBSD__)
-        pthread_get_name_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX + 1);
-        if(strcmp(threadname, "netdata") == 0)
-            strncpyz(threadname, "MAIN", NETDATA_THREAD_NAME_MAX);
-#elif defined(__APPLE__)
-        strncpyz(threadname, "MAIN", NETDATA_THREAD_NAME_MAX);
-#elif defined(HAVE_PTHREAD_GETNAME_NP)
-        pthread_getname_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX + 1);
-        if(strcmp(threadname, "netdata") == 0)
-            strncpyz(threadname, "MAIN", NETDATA_THREAD_NAME_MAX);
-#else
-        strncpyz(threadname, "MAIN", NETDATA_THREAD_NAME_MAX);
+#ifdef NETDATA_INTERNAL_CHECKS
+    // keep track of the locks currently held
+    // used to detect locks that are left locked during exit
+    int rwlocks_read_locks;
+    int rwlocks_write_locks;
+    int mutex_locks;
+    int spinlock_locks;
+    int rwspinlock_read_locks;
+    int rwspinlock_write_locks;
 #endif
-    }
 
-    return threadname;
+    struct {
+        SPINLOCK spinlock;
+        nd_thread_canceller cb;
+        void *data;
+    } canceller;
+
+    struct nd_thread *prev, *next;
+};
+
+static struct {
+    struct {
+        SPINLOCK spinlock;
+        ND_THREAD *list;
+    } exited;
+
+    struct {
+        SPINLOCK spinlock;
+        ND_THREAD *list;
+    } running;
+
+    pthread_attr_t *attr;
+} threads_globals = {
+    .exited = {
+        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .list = NULL,
+    },
+    .running = {
+        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .list = NULL,
+    },
+    .attr = NULL,
+};
+
+static __thread ND_THREAD *_nd_thread_info = NULL;
+static __thread char _nd_thread_os_name[ND_THREAD_TAG_MAX + 1] = "";
+
+// --------------------------------------------------------------------------------------------------------------------
+// O/S abstraction
+
+// get the thread name from the operating system
+static inline void os_get_thread_name(char *out, size_t size) {
+#if defined(__FreeBSD__)
+    pthread_get_name_np(pthread_self(), out, size);
+    if(strcmp(_nd_thread_os_name, "netdata") == 0)
+        strncpyz(out, "MAIN", size - 1);
+#elif defined(HAVE_PTHREAD_GETNAME_NP)
+    pthread_getname_np(pthread_self(), out, size - 1);
+    if(strcmp(out, "netdata") == 0)
+        strncpyz(out, "MAIN", size - 1);
+#else
+    strncpyz(out, "MAIN", size - 1);
+#endif
 }
 
-const char *netdata_thread_tag(void) {
-    return thread_name_get(false);
+// set the thread name to the operating system
+static inline void os_set_thread_name(const char *name) {
+#if defined(__FreeBSD__)
+    pthread_set_name_np(pthread_self(), name);
+#elif defined(__APPLE__)
+    pthread_setname_np(name);
+#else
+    pthread_setname_np(pthread_self(), name);
+#endif
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// internal API for managing names
+
+inline int nd_thread_has_tag(void) {
+    return (_nd_thread_info && _nd_thread_info->tag[0]);
+}
+
+// For threads created by netdata, return the tag of the thread.
+// For threads created by others (libuv, webrtc, etc), return the tag of the operating system.
+// This caches the response, so that it won't query the operating system multiple times.
+static inline const char *nd_thread_get_name(bool recheck) {
+    if(nd_thread_has_tag())
+        return _nd_thread_info->tag;
+
+    if(!recheck && _nd_thread_os_name[0])
+        return _nd_thread_os_name;
+
+    os_get_thread_name(_nd_thread_os_name, sizeof(_nd_thread_os_name));
+
+    return _nd_thread_os_name;
+}
+
+const char *nd_thread_tag(void) {
+    return nd_thread_get_name(false);
+}
+
+void nd_thread_tag_set(const char *tag) {
+    if(!tag || !*tag) return;
+
+    if(_nd_thread_info)
+        strncpyz(_nd_thread_info->tag, tag, sizeof(_nd_thread_info->tag) - 1);
+
+    strncpyz(_nd_thread_os_name, tag, sizeof(_nd_thread_os_name) - 1);
+
+    os_set_thread_name(_nd_thread_os_name);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+static __thread bool libuv_name_set = false;
+void uv_thread_set_name_np(const char* name) {
+    if(libuv_name_set) return;
+
+    strncpyz(_nd_thread_os_name, name, sizeof(_nd_thread_os_name) - 1);
+    os_set_thread_name(_nd_thread_os_name);
+    libuv_name_set = true;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 
 static size_t webrtc_id = 0;
 static __thread bool webrtc_name_set = false;
 void webrtc_set_thread_name(void) {
-    if(!netdata_thread && !webrtc_name_set) {
-        webrtc_name_set = true;
-        char threadname[NETDATA_THREAD_NAME_MAX + 1];
+    if(_nd_thread_info || webrtc_name_set) return;
 
-#if defined(__FreeBSD__)
-        snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "WEBRTC[%zu]", __atomic_fetch_add(&webrtc_id, 1, __ATOMIC_RELAXED));
-        pthread_set_name_np(pthread_self(), threadname);
-#elif defined(__APPLE__)
-        snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "WEBRTC[%zu]", __atomic_fetch_add(&webrtc_id, 1, __ATOMIC_RELAXED));
-        pthread_setname_np(threadname);
-#elif defined(HAVE_PTHREAD_GETNAME_NP)
-        pthread_getname_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX+1);
-        if(strcmp(threadname, "netdata") == 0) {
-            snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "WEBRTC[%zu]", __atomic_fetch_add(&webrtc_id, 1, __ATOMIC_RELAXED));
-            pthread_setname_np(pthread_self(), threadname);
-        }
-#else
-        snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "WEBRTC[%zu]", __atomic_fetch_add(&webrtc_id, 1, __ATOMIC_RELAXED));
-        pthread_setname_np(pthread_self(), threadname);
+    webrtc_name_set = true;
+
+    char tmp[ND_THREAD_TAG_MAX + 1] = "";
+    os_get_thread_name(tmp, sizeof(tmp));
+
+    if(!tmp[0] || strcmp(tmp, "netdata") == 0) {
+        char name[ND_THREAD_TAG_MAX + 1];
+        snprintfz(name, ND_THREAD_TAG_MAX, "WEBRTC[%zu]", __atomic_fetch_add(&webrtc_id, 1, __ATOMIC_RELAXED));
+        os_set_thread_name(name);
+    }
+
+    nd_thread_get_name(true);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// locks tracking
+
+#ifdef NETDATA_INTERNAL_CHECKS
+void nd_thread_rwlock_read_locked(void) { if(_nd_thread_info) _nd_thread_info->rwlocks_read_locks++; }
+void nd_thread_rwlock_read_unlocked(void) { if(_nd_thread_info) _nd_thread_info->rwlocks_read_locks--; }
+void nd_thread_rwlock_write_locked(void) { if(_nd_thread_info) _nd_thread_info->rwlocks_write_locks++; }
+void nd_thread_rwlock_write_unlocked(void) { if(_nd_thread_info) _nd_thread_info->rwlocks_write_locks--; }
+void nd_thread_mutex_locked(void) { if(_nd_thread_info) _nd_thread_info->mutex_locks++; }
+void nd_thread_mutex_unlocked(void) { if(_nd_thread_info) _nd_thread_info->mutex_locks--; }
+void nd_thread_spinlock_locked(void) { if(_nd_thread_info) _nd_thread_info->spinlock_locks++; }
+void nd_thread_spinlock_unlocked(void) { if(_nd_thread_info) _nd_thread_info->spinlock_locks--; }
+void nd_thread_rwspinlock_read_locked(void) { if(_nd_thread_info) _nd_thread_info->rwspinlock_read_locks++; }
+void nd_thread_rwspinlock_read_unlocked(void) { if(_nd_thread_info) _nd_thread_info->rwspinlock_read_locks--; }
+void nd_thread_rwspinlock_write_locked(void) { if(_nd_thread_info) _nd_thread_info->rwspinlock_write_locks++; }
+void nd_thread_rwspinlock_write_unlocked(void) { if(_nd_thread_info) _nd_thread_info->rwspinlock_write_locks--; }
 #endif
 
-        thread_name_get(true);
-    }
-}
-
-// ----------------------------------------------------------------------------
-// compatibility library functions
-
-static __thread pid_t gettid_cached_tid = 0;
-pid_t gettid(void) {
-    pid_t tid = 0;
-
-    if(likely(gettid_cached_tid > 0))
-        return gettid_cached_tid;
-
-#ifdef __FreeBSD__
-
-    tid = (pid_t)pthread_getthreadid_np();
-
-#elif defined(__APPLE__)
-
-    #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
-        uint64_t curthreadid;
-        pthread_threadid_np(NULL, &curthreadid);
-        tid = (pid_t)curthreadid;
-    #else /* __MAC_OS_X_VERSION_MIN_REQUIRED */
-        tid = (pid_t)pthread_self;
-    #endif /* __MAC_OS_X_VERSION_MIN_REQUIRED */
-
-#else /* __APPLE__*/
-
-    tid = (pid_t)syscall(SYS_gettid);
-
-#endif /* __FreeBSD__, __APPLE__*/
-
-    gettid_cached_tid = tid;
-    return tid;
-}
-
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // early initialization
 
 size_t netdata_threads_init(void) {
     int i;
 
-    // --------------------------------------------------------------------
-    // get the required stack size of the threads of netdata
-
-    if(!netdata_threads_attr) {
-        netdata_threads_attr = callocz(1, sizeof(pthread_attr_t));
-        i = pthread_attr_init(netdata_threads_attr);
+    if(!threads_globals.attr) {
+        threads_globals.attr = callocz(1, sizeof(pthread_attr_t));
+        i = pthread_attr_init(threads_globals.attr);
         if (i != 0)
             fatal("pthread_attr_init() failed with code %d.", i);
     }
 
+    // get the required stack size of the threads of netdata
     size_t stacksize = 0;
-    i = pthread_attr_getstacksize(netdata_threads_attr, &stacksize);
+    i = pthread_attr_getstacksize(threads_globals.attr, &stacksize);
     if(i != 0)
         fatal("pthread_attr_getstacksize() failed with code %d.", i);
 
@@ -143,11 +210,9 @@ size_t netdata_threads_init(void) {
 void netdata_threads_init_after_fork(size_t stacksize) {
     int i;
 
-    // ------------------------------------------------------------------------
     // set pthread stack size
-
-    if(netdata_threads_attr && stacksize > (size_t)PTHREAD_STACK_MIN) {
-        i = pthread_attr_setstacksize(netdata_threads_attr, stacksize);
+    if(threads_globals.attr && stacksize > (size_t)PTHREAD_STACK_MIN) {
+        i = pthread_attr_setstacksize(threads_globals.attr, stacksize);
         if(i != 0)
             nd_log(NDLS_DAEMON, NDLP_WARNING, "pthread_attr_setstacksize() to %zu bytes, failed with code %d.", stacksize, i);
         else
@@ -169,7 +234,6 @@ void netdata_threads_init_for_external_plugins(size_t stacksize) {
 }
 
 // ----------------------------------------------------------------------------
-// netdata_thread_create
 
 void rrdset_thread_rda_free(void);
 void sender_thread_buffer_free(void);
@@ -177,14 +241,68 @@ void query_target_free(void);
 void service_exits(void);
 void rrd_collector_finished(void);
 
-static void thread_cleanup(void *ptr) {
-    if(netdata_thread != ptr) {
-        NETDATA_THREAD *info = (NETDATA_THREAD *)ptr;
-        nd_log(NDLS_DAEMON, NDLP_ERR, "THREADS: internal error - thread local variable does not match the one passed to this function. Expected thread '%s', passed thread '%s'", netdata_thread->tag, info->tag);
+static void nd_thread_join_exited_detached_threads(void) {
+    while(1) {
+        spinlock_lock(&threads_globals.exited.spinlock);
+
+        ND_THREAD *nti = threads_globals.exited.list;
+        while (nti && nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) == 0)
+            nti = nti->next;
+
+        if(nti)
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+
+        spinlock_unlock(&threads_globals.exited.spinlock);
+
+        if(nti) {
+            nd_log(NDLS_DAEMON, NDLP_INFO, "Joining detached thread '%s', tid %d", nti->tag, nti->tid);
+            nd_thread_join(nti);
+        }
+        else
+            break;
+    }
+}
+
+static void nd_thread_exit(void *pptr) {
+    ND_THREAD *nti = CLEANUP_FUNCTION_GET_PTR(pptr);
+
+    if(nti != _nd_thread_info || !nti || !_nd_thread_info) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "THREADS: internal error - thread local variable does not match the one passed to this function. "
+               "Expected thread '%s', passed thread '%s'",
+               _nd_thread_info ? _nd_thread_info->tag : "(null)", nti ? nti->tag : "(null)");
+
+        if(!nti) nti = _nd_thread_info;
     }
 
-    if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP))
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread with task id %d finished", gettid());
+    if(!nti) return;
+
+    internal_fatal(nti->rwlocks_read_locks != 0,
+        "THREAD '%s' WITH PID %d HAS %d RWLOCKS READ ACQUIRED WHILE EXITING !!!",
+        (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwlocks_read_locks);
+
+    internal_fatal(nti->rwlocks_write_locks != 0,
+        "THREAD '%s' WITH PID %d HAS %d RWLOCKS WRITE ACQUIRED WHILE EXITING !!!",
+        (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwlocks_write_locks);
+
+    internal_fatal(nti->mutex_locks != 0,
+        "THREAD '%s' WITH PID %d HAS %d MUTEXES ACQUIRED WHILE EXITING !!!",
+        (nti) ? nti->tag : "(unset)", gettid_cached(), nti->mutex_locks);
+
+    internal_fatal(nti->spinlock_locks != 0,
+        "THREAD '%s' WITH PID %d HAS %d SPINLOCKS ACQUIRED WHILE EXITING !!!",
+        (nti) ? nti->tag : "(unset)", gettid_cached(), nti->spinlock_locks);
+
+    internal_fatal(nti->rwspinlock_read_locks != 0,
+        "THREAD '%s' WITH PID %d HAS %d RWSPINLOCKS READ ACQUIRED WHILE EXITING !!!",
+        (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwspinlock_read_locks);
+
+    internal_fatal(nti->rwspinlock_write_locks != 0,
+        "THREAD '%s' WITH PID %d HAS %d RWSPINLOCKS WRITE ACQUIRED WHILE EXITING !!!",
+        (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwspinlock_write_locks);
+
+    if(nd_thread_status_check(nti, NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP) != NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread with task id %d finished", nti->tid);
 
     rrd_collector_finished();
     sender_thread_buffer_free();
@@ -194,75 +312,28 @@ static void thread_cleanup(void *ptr) {
     service_exits();
     worker_unregister();
 
-    netdata_thread->tag[0] = '\0';
+    nd_thread_status_set(nti, NETDATA_THREAD_STATUS_FINISHED);
 
-    freez(netdata_thread);
-    netdata_thread = NULL;
-}
+    spinlock_lock(&threads_globals.running.spinlock);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+    spinlock_unlock(&threads_globals.running.spinlock);
 
-void netdata_thread_set_tag(const char *tag) {
-    if(!tag || !*tag)
-        return;
-
-    int ret = 0;
-
-    char threadname[NETDATA_THREAD_NAME_MAX+1];
-    strncpyz(threadname, tag, NETDATA_THREAD_NAME_MAX);
-
-#if defined(__FreeBSD__)
-    pthread_set_name_np(pthread_self(), threadname);
-#elif defined(__APPLE__)
-    ret = pthread_setname_np(threadname);
-#else
-    ret = pthread_setname_np(pthread_self(), threadname);
-#endif
-
-    if (ret != 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread name of %d to %s. ErrCode: %d", gettid(), threadname, ret);
-    else
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "set name of thread %d to %s", gettid(), threadname);
-
-    if(netdata_thread) {
-        strncpyz(netdata_thread->tag, threadname, sizeof(netdata_thread->tag) - 1);
+    if (nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) != NETDATA_THREAD_OPTION_JOINABLE) {
+        spinlock_lock(&threads_globals.exited.spinlock);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+        spinlock_unlock(&threads_globals.exited.spinlock);
     }
 }
 
-void uv_thread_set_name_np(uv_thread_t ut, const char* name) {
-    int ret = 0;
+static void *nd_thread_starting_point(void *ptr) {
+    ND_THREAD *nti = _nd_thread_info = (ND_THREAD *)ptr;
+    nd_thread_status_set(nti, NETDATA_THREAD_STATUS_STARTED);
 
-    char threadname[NETDATA_THREAD_NAME_MAX+1];
-    strncpyz(threadname, name, NETDATA_THREAD_NAME_MAX);
+    nti->tid = gettid_cached();
+    nd_thread_tag_set(nti->tag);
 
-#if defined(__FreeBSD__)
-    pthread_set_name_np(ut ? ut : pthread_self(), threadname);
-#elif defined(__APPLE__)
-    // Apple can only set its own name
-    UNUSED(ut);
-#else
-    ret = pthread_setname_np(ut ? ut : pthread_self(), threadname);
-#endif
-
-    thread_name_get(true);
-
-    if (ret)
-        nd_log(NDLS_DAEMON, NDLP_NOTICE, "cannot set libuv thread name to %s. Err: %d", threadname, ret);
-}
-
-void os_thread_get_current_name_np(char threadname[NETDATA_THREAD_NAME_MAX + 1])
-{
-    threadname[0] = '\0';
-#if defined(__FreeBSD__)
-    pthread_get_name_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX + 1);
-#elif defined(HAVE_PTHREAD_GETNAME_NP) /* Linux & macOS */
-    (void)pthread_getname_np(pthread_self(), threadname, NETDATA_THREAD_NAME_MAX + 1);
-#endif
-}
-
-static void *netdata_thread_init(void *ptr) {
-    netdata_thread = (NETDATA_THREAD *)ptr;
-
-    if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_STARTUP))
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread created with task id %d", gettid());
+    if(nd_thread_status_check(nti, NETDATA_THREAD_OPTION_DONT_LOG_STARTUP) != NETDATA_THREAD_OPTION_DONT_LOG_STARTUP)
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread created with task id %d", gettid_cached());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel type to DEFERRED.");
@@ -270,72 +341,101 @@ static void *netdata_thread_init(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel state to ENABLE.");
 
-    netdata_thread_set_tag(netdata_thread->tag);
+    CLEANUP_FUNCTION_REGISTER(nd_thread_exit) cleanup_ptr = nti;
 
-    if (!(netdata_thread->options & NETDATA_THREAD_OPTION_JOINABLE)) {
-        int rc = pthread_detach(pthread_self());
-        if (rc != 0)
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "cannot request detach of newly created %s thread. pthread_detach() failed with code %d",
-                   netdata_thread->tag, rc);
-    }
+    // run the thread code
+    nti->ret = nti->start_routine(nti->arg);
 
-    void *ret = NULL;
-    pthread_cleanup_push(thread_cleanup, ptr) {
-        ret = netdata_thread->start_routine(netdata_thread->arg);
-    }
-    pthread_cleanup_pop(1);
-
-    return ret;
+    return nti;
 }
 
-int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine) (void *), void *arg) {
-    NETDATA_THREAD *info = callocz(1, sizeof(NETDATA_THREAD));
-    info->arg = arg;
-    info->start_routine = start_routine;
-    info->options = options;
-    strncpyz(info->tag, tag, NETDATA_THREAD_NAME_MAX);
+ND_THREAD *nd_thread_self(void) {
+    return _nd_thread_info;
+}
 
-    int ret = pthread_create(thread, netdata_threads_attr, netdata_thread_init, info);
-    if(ret != 0)
-        nd_log(NDLS_DAEMON, NDLP_ERR, "failed to create new thread for %s. pthread_create() failed with code %d", tag, ret);
+bool nd_thread_is_me(ND_THREAD *nti) {
+    return nti && nti->thread == pthread_self();
+}
 
-    return ret;
+ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine)(void *), void *arg) {
+    nd_thread_join_exited_detached_threads();
+
+    ND_THREAD *nti = callocz(1, sizeof(*nti));
+    spinlock_init(&nti->canceller.spinlock);
+    nti->arg = arg;
+    nti->start_routine = start_routine;
+    nti->options = options & NETDATA_THREAD_OPTIONS_ALL;
+    strncpyz(nti->tag, tag, ND_THREAD_TAG_MAX);
+
+    spinlock_lock(&threads_globals.running.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+    spinlock_unlock(&threads_globals.running.spinlock);
+
+    int ret = pthread_create(&nti->thread, threads_globals.attr, nd_thread_starting_point, nti);
+    if(ret != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "failed to create new thread for %s. pthread_create() failed with code %d",
+               tag, ret);
+
+        spinlock_lock(&threads_globals.running.spinlock);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+        spinlock_unlock(&threads_globals.running.spinlock);
+        freez(nti);
+        return NULL;
+    }
+
+    return nti;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+void nd_thread_register_canceller(nd_thread_canceller cb, void *data) {
+    ND_THREAD *nti = _nd_thread_info;
+    if(!nti) return;
+
+    spinlock_lock(&nti->canceller.spinlock);
+    nti->canceller.cb = cb;
+    nti->canceller.data = data;
+    spinlock_unlock(&nti->canceller.spinlock);
+}
+
+void nd_thread_signal_cancel(ND_THREAD *nti) {
+    if(!nti) return;
+
+    __atomic_store_n(&nti->cancel_atomic, true, __ATOMIC_RELAXED);
+
+    spinlock_lock(&nti->canceller.spinlock);
+    if(nti->canceller.cb)
+        nti->canceller.cb(nti->canceller.data);
+    spinlock_unlock(&nti->canceller.spinlock);
+}
+
+bool nd_thread_signaled_to_cancel(void) {
+    if(!_nd_thread_info) return false;
+    return __atomic_load_n(&_nd_thread_info->cancel_atomic, __ATOMIC_RELAXED);
 }
 
 // ----------------------------------------------------------------------------
-// netdata_thread_cancel
-#ifdef NETDATA_INTERNAL_CHECKS
-int netdata_thread_cancel_with_trace(netdata_thread_t thread, int line, const char *file, const char *function) {
-#else
-int netdata_thread_cancel(netdata_thread_t thread) {
-#endif
-    int ret = pthread_cancel(thread);
-    if(ret != 0)
-#ifdef NETDATA_INTERNAL_CHECKS
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot cancel thread. pthread_cancel() failed with code %d at %d@%s, function %s()", ret, line, file, function);
-#else
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot cancel thread. pthread_cancel() failed with code %d.", ret);
-#endif
+// nd_thread_join
 
-    return ret;
-}
+int nd_thread_join(ND_THREAD *nti) {
+    if(!nti)
+        return ESRCH;
 
-// ----------------------------------------------------------------------------
-// netdata_thread_join
+    int ret = pthread_join(nti->thread, NULL);
+    if(ret != 0) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot join thread. pthread_join() failed with code %d. (tag=%s)", ret, nti->tag);
+    }
+    else {
+        nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);
 
-int netdata_thread_join(netdata_thread_t thread, void **retval) {
-    int ret = pthread_join(thread, retval);
-    if(ret != 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot join thread. pthread_join() failed with code %d.", ret);
+        spinlock_lock(&threads_globals.exited.spinlock);
+        if(nti->prev)
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+        spinlock_unlock(&threads_globals.exited.spinlock);
 
-    return ret;
-}
-
-int netdata_thread_detach(pthread_t thread) {
-    int ret = pthread_detach(thread);
-    if(ret != 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot detach thread. pthread_detach() failed with code %d.", ret);
+        freez(nti);
+    }
 
     return ret;
 }

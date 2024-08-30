@@ -104,6 +104,8 @@ struct ml_metrics_statistics {
 #include "health/rrdvar.h"
 #include "health/rrdcalc.h"
 #include "rrdlabels.h"
+#include "streaming/stream_capabilities.h"
+#include "streaming/stream_path.h"
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
@@ -154,8 +156,6 @@ typedef enum __attribute__ ((__packed__)) {
     RRD_BACKFILL_FULL,
     RRD_BACKFILL_NEW
 } RRD_BACKFILL;
-
-extern RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
 
 #define UPDATE_EVERY 1
 #define UPDATE_EVERY_MAX 3600
@@ -226,16 +226,16 @@ typedef enum __attribute__ ((__packed__)) rrddim_options {
 // flags are runtime changing status flags (atomics are required to alter/access them)
 typedef enum __attribute__ ((__packed__)) rrddim_flags {
     RRDDIM_FLAG_NONE                            = 0,
-    RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION   = (1 << 0),
 
-    RRDDIM_FLAG_OBSOLETE                        = (1 << 1),  // this is marked by the collector/module as obsolete
+    RRDDIM_FLAG_OBSOLETE                        = (1 << 0),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
-    RRDDIM_FLAG_ARCHIVED                        = (1 << 2),
-    RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 3),  // Metadata needs to go to the database
 
-    RRDDIM_FLAG_META_HIDDEN                     = (1 << 4),  // Status of hidden option in the metadata database
-    RRDDIM_FLAG_ML_MODEL_LOAD                   = (1 << 5),  // Do ML LOAD for this dimension
+    RRDDIM_FLAG_ARCHIVED                        = (1 << 1),
+    RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 2),  // Metadata needs to go to the database
+
+    RRDDIM_FLAG_META_HIDDEN                     = (1 << 3),  // Status of hidden option in the metadata database
+    RRDDIM_FLAG_ML_MODEL_LOAD                   = (1 << 4),  // Do ML LOAD for this dimension
 
     // this is 8 bit
 } RRDDIM_FLAGS;
@@ -270,7 +270,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
 // RRD DIMENSION - this is a metric
 
 struct rrddim {
-    uuid_t metric_uuid;                             // global UUID for this metric (unique_across hosts)
+    nd_uuid_t metric_uuid;                             // global UUID for this metric (unique_across hosts)
 
     // ------------------------------------------------------------------------
     // dimension definition
@@ -361,9 +361,9 @@ size_t rrddim_size(void);
 // ------------------------------------------------------------------------
 // DATA COLLECTION STORAGE OPS
 
-STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si, uuid_t *uuid);
-STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si, uuid_t *uuid);
-static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si, uuid_t *uuid) {
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
+static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
     internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
@@ -635,11 +635,11 @@ static inline time_t storage_engine_align_to_optimal_before(struct storage_engin
 // function pointers for all APIs provided by a storage engine
 typedef struct storage_engine_api {
     // metric management
-    STORAGE_METRIC_HANDLE *(*metric_get)(STORAGE_INSTANCE *si, uuid_t *uuid);
+    STORAGE_METRIC_HANDLE *(*metric_get)(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
     STORAGE_METRIC_HANDLE *(*metric_get_or_create)(RRDDIM *rd, STORAGE_INSTANCE *si);
     void (*metric_release)(STORAGE_METRIC_HANDLE *);
     STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
-    bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *si, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
+    bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *si, nd_uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
 } STORAGE_ENGINE_API;
 
 typedef struct storage_engine {
@@ -719,7 +719,7 @@ struct pluginsd_rrddim {
 };
 
 struct rrdset {
-    uuid_t chart_uuid;                             // the global UUID for this chart
+    nd_uuid_t chart_uuid;                             // the global UUID for this chart
 
     // ------------------------------------------------------------------------
     // chart configuration
@@ -1025,8 +1025,8 @@ struct alarm_entry {
     uint32_t alarm_id;
     uint32_t alarm_event_id;
     usec_t global_id;
-    uuid_t config_hash_id;
-    uuid_t transition_id;
+    nd_uuid_t config_hash_id;
+    nd_uuid_t transition_id;
 
     time_t when;
     time_t duration;
@@ -1045,7 +1045,6 @@ struct alarm_entry {
     STRING *recipient;
     time_t exec_run_timestamp;
     int exec_code;
-    uint64_t exec_spawn_serial;
 
     STRING *source;
     STRING *units;
@@ -1070,6 +1069,8 @@ struct alarm_entry {
     uint32_t updates_id;
 
     time_t last_repeat;
+
+    POPEN_INSTANCE *popen_instance;
 
     struct alarm_entry *next;
     struct alarm_entry *next_in_progress;
@@ -1189,7 +1190,7 @@ struct rrdhost {
     struct rrdhost_system_info *system_info;        // information collected from the host environment
 
     // ------------------------------------------------------------------------
-    // streaming of data to remote hosts - rrdpush sender
+    // streaming of data to remote hosts - rrdpush
 
     struct {
         struct {
@@ -1205,6 +1206,10 @@ struct rrdhost {
 
                 uint32_t last_used;                 // the last slot we used for a chart (increments only)
             } pluginsd_chart_slots;
+
+            char *destination;                      // where to send metrics to
+            char *api_key;                          // the api key at the receiving netdata
+            SIMPLE_PATTERN *charts_matching;        // pattern to match the charts to be sent
         } send;
 
         struct {
@@ -1214,13 +1219,12 @@ struct rrdhost {
                 RRDSET **array;
             } pluginsd_chart_slots;
         } receive;
+
+        RRDHOST_STREAM_PATH path;
     } rrdpush;
 
-    char *rrdpush_send_destination;                 // where to send metrics to
-    char *rrdpush_send_api_key;                     // the api key at the receiving netdata
     struct rrdpush_destinations *destinations;      // a linked list of possible destinations
     struct rrdpush_destinations *destination;       // the current destination from the above list
-    SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
     int32_t rrdpush_last_receiver_exit_reason;
     time_t rrdpush_seconds_to_replicate;            // max time we want to replicate from the child
@@ -1231,7 +1235,7 @@ struct rrdhost {
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
     struct sender_state *sender;
-    netdata_thread_t rrdpush_sender_thread;         // the sender thread
+    ND_THREAD *rrdpush_sender_thread;               // the sender thread
     size_t rrdpush_sender_replicating_charts;       // the number of charts currently being replicated to a parent
     struct aclk_sync_cfg_t *aclk_config;
 
@@ -1248,7 +1252,7 @@ struct rrdhost {
     int connected_children_count;                   // number of senders currently streaming
 
     struct receiver_state *receiver;
-    netdata_mutex_t receiver_lock;
+    SPINLOCK receiver_lock;
     int trigger_chart_obsoletion_check;             // set when child connects, will instruct parent to
                                                     // trigger a check for obsoleted charts since previous connect
 
@@ -1307,11 +1311,13 @@ struct rrdhost {
         time_t last_time_s;
     } retention;
 
-    uuid_t  host_uuid;                              // Global GUID for this host
-    uuid_t  *node_id;                               // Cloud node_id
+    ND_UUID host_id;                                // Global GUID for this host
+    ND_UUID node_id;                                // Cloud node_id
 
-    netdata_mutex_t aclk_state_lock;
-    aclk_rrdhost_state aclk_state;
+    struct {
+        ND_UUID claim_id_of_origin;
+        ND_UUID claim_id_of_parent;
+    } aclk;
 
     struct rrdhost *next;
     struct rrdhost *prev;
@@ -1325,9 +1331,6 @@ extern RRDHOST *localhost;
 #define rrdhost_abbrev_timezone(host) string2str((host)->abbrev_timezone)
 #define rrdhost_program_name(host) string2str((host)->program_name)
 #define rrdhost_program_version(host) string2str((host)->program_version)
-
-#define rrdhost_aclk_state_lock(host) netdata_mutex_lock(&((host)->aclk_state_lock))
-#define rrdhost_aclk_state_unlock(host) netdata_mutex_unlock(&((host)->aclk_state_lock))
 
 #define rrdhost_receiver_replicating_charts(host) (__atomic_load_n(&((host)->rrdpush_receiver_replicating_charts), __ATOMIC_RELAXED))
 #define rrdhost_receiver_replicating_charts_plus_one(host) (__atomic_add_fetch(&((host)->rrdpush_receiver_replicating_charts), 1, __ATOMIC_RELAXED))
@@ -1365,7 +1368,8 @@ extern netdata_rwlock_t rrd_rwlock;
 
 #define rrd_rdlock() netdata_rwlock_rdlock(&rrd_rwlock)
 #define rrd_wrlock() netdata_rwlock_wrlock(&rrd_rwlock)
-#define rrd_unlock() netdata_rwlock_unlock(&rrd_rwlock)
+#define rrd_rdunlock() netdata_rwlock_rdunlock(&rrd_rwlock)
+#define rrd_wrunlock() netdata_rwlock_wrunlock(&rrd_rwlock)
 
 // ----------------------------------------------------------------------------
 

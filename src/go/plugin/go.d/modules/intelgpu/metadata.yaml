@@ -1,0 +1,119 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-intelgpu
+      plugin_name: go.d.plugin
+      module_name: intelgpu
+      monitored_instance:
+        name: Intel GPU
+        link: https://www.intel.com/
+        icon_filename: microchip.svg
+        categories:
+          - data-collection.hardware-devices-and-sensors
+      keywords:
+        - intel
+        - gpu
+        - hardware
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector gathers performance metrics for Intel integrated GPUs.
+          It relies on the [`intel_gpu_top`](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to grant the CAP_PERFMON capability to `intel_gpu_top`, improving security and potentially simplifying permission management.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Install intel-gpu-tools
+            description: Install `intel-gpu-tools` using your distribution's package manager.
+      configuration:
+        file:
+          name: go.d/intelgpu.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: device
+              description: 'Select a specific GPU using [supported filter](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html#DESCRIPTION).'
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
+              config: |
+                jobs:
+                  - name: intelgpu
+                    update_every: 5  # Collect Intel iGPU metrics every 5 seconds
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the Intel GPU.
+          labels: []
+          metrics:
+            - name: intelgpu.frequency
+              description: Intel GPU frequency
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: intelgpu.power
+              description: Intel GPU power
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: gpu
+                - name: package
+        - name: engine
+          description: These metrics refer to the GPU hardware engine.
+          labels:
+            - name: engine_class
+              description: Engine class (Render/3D, Blitter, VideoEnhance, Video, Compute).
+            - name: engine_instance
+              description: Engine instance (e.g. Render/3D/0, Video/0, Video/1).
+          metrics:
+            - name: intelgpu.engine_busy_perc
+              description: Intel GPU engine busy time percentage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: busy

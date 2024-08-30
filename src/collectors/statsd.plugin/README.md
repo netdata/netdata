@@ -40,11 +40,11 @@ On synthetic charts, we can have alerts as with any metric and chart.
 
 - [K6 load testing tool](https://k6.io)
   - **Description:** k6 is a developer-centric, free and open-source load testing tool built for making performance testing a productive and enjoyable experience.
-  - [Documentation](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/k6.md)
+  - [Documentation](/src/collectors/statsd.plugin/k6.md)
   - [Configuration](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/k6.conf)
 - [Asterisk](https://www.asterisk.org/)
   - **Description:** Asterisk is an Open Source PBX and telephony toolkit.
-  - [Documentation](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/asterisk.md)
+  - [Documentation](/src/collectors/statsd.plugin/asterisk.md)
   - [Configuration](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/asterisk.conf)
 
 ## Metrics supported by Netdata
@@ -220,7 +220,7 @@ Netdata can visualize StatsD collected metrics in 2 ways:
 
 ### Private metric charts
 
-Private charts are controlled with `create private charts for metrics matching = *`. This setting accepts a space-separated list of [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). Netdata will create private charts for all metrics **by default**.
+Private charts are controlled with `create private charts for metrics matching = *`. This setting accepts a space-separated list of [simple patterns](/src/libnetdata/simple_pattern/README.md). Netdata will create private charts for all metrics **by default**.
 
 For example, to render charts for all `myapp.*` metrics, except `myapp.*.badmetric`, use:
 
@@ -228,7 +228,7 @@ For example, to render charts for all `myapp.*` metrics, except `myapp.*.badmetr
 create private charts for metrics matching = !myapp.*.badmetric myapp.*
 ```
 
-You can specify Netdata StatsD to have a different `memory mode` than the rest of the Netdata Agent. You can read more about `memory mode` in the [documentation](https://github.com/netdata/netdata/blob/master/src/database/README.md).
+You can specify Netdata StatsD to have a different `memory mode` than the rest of the Netdata Agent. You can read more about `memory mode` in the [documentation](/src/database/README.md).
 
 The default behavior is to use the same settings as the rest of the Netdata Agent. If you wish to change them, edit the following settings:
 - `private charts memory mode`
@@ -305,7 +305,7 @@ Synthetic charts are organized in
 -   **charts for each application** aka family in Netdata Dashboard.
 -   **StatsD metrics for each chart** /aka charts and context Netdata Dashboard.
 
-> You can read more about how the Netdata Agent organizes information in the relevant [documentation](https://github.com/netdata/netdata/blob/master/src/web/README.md)
+> You can read more about how the Netdata Agent organizes information in the relevant [documentation](/src/web/README.md)
 
 For each application you need to create a `.conf` file in `/etc/netdata/statsd.d`.
 
@@ -341,12 +341,12 @@ Using the above configuration `myapp` should get its own section on the dashboar
 `[app]` starts a new application definition. The supported settings in this section are:
 
 -   `name` defines the name of the app.
--   `metrics` is a Netdata [simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). This pattern should match all the possible StatsD metrics that will be participating in the application `myapp`.
+-   `metrics` is a Netdata [simple pattern](/src/libnetdata/simple_pattern/README.md). This pattern should match all the possible StatsD metrics that will be participating in the application `myapp`.
 -   `private charts = yes|no`, enables or disables private charts for the metrics matched.
 -   `gaps when not collected = yes|no`, enables or disables gaps on the charts of the application in case that no metrics are collected.
 -   `memory mode` sets the memory mode for all charts of the application. The default is the global default for Netdata (not the global default for StatsD private charts). We suggest not to use this (we have commented it out in the example) and let your app use the global default for Netdata, which is our dbengine.
 
--   `history` sets the size of the round-robin database for this application. The default is the global default for Netdata (not the global default for StatsD private charts). This is only relevant if you use `memory mode = save`. Read more on our [metrics storage(]/docs/store/change-metrics-storage.md) doc.
+-   `history` sets the size of the round-robin database for this application. The default is the global default for Netdata (not the global default for StatsD private charts). This is only relevant if you use `memory mode = save`. Read more on our [metrics storage(]/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md) doc.
 
 `[dictionary]` defines name-value associations. These are used to renaming metrics, when added to synthetic charts. Metric names are also defined at each `dimension` line. However, using the dictionary dimension names can be declared globally, for each app and is the only way to rename dimensions when using patterns. Of course the dictionary can be empty or missing.
 
@@ -367,7 +367,7 @@ So, the format is this:
 dimension = [pattern] METRIC NAME TYPE MULTIPLIER DIVIDER OPTIONS
 ```
 
-`pattern` is a keyword. When set, `METRIC` is expected to be a Netdata [simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) that will be used to match all the StatsD metrics to be added to the chart. So, `pattern` automatically matches any number of StatsD metrics, all of which will be added as separate chart dimensions.
+`pattern` is a keyword. When set, `METRIC` is expected to be a Netdata [simple pattern](/src/libnetdata/simple_pattern/README.md) that will be used to match all the StatsD metrics to be added to the chart. So, `pattern` automatically matches any number of StatsD metrics, all of which will be added as separate chart dimensions.
 
 `TYPE`, `MULTIPLIER`, `DIVIDER` and `OPTIONS` are optional.
 
@@ -390,7 +390,7 @@ Then for histograms and timers the following types are also supported:
 
 StatsD metrics: `foo` and `bar`.
 
-Contents of file `/etc/netdata/stats.d/foobar.conf`:
+Contents of file `/etc/netdata/statsd.d/foobar.conf`:
 
 ```
 [app]
@@ -728,7 +728,7 @@ In general, the process for creating a StatsD collector can be summarized in 2 s
 
     - Make sure to reload the dashboard tab **after** you start sending data to Netdata.
 
-- Create a configuration file for your app using [edit-config](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md): `sudo ./edit-config
+- Create a configuration file for your app using [edit-config](/docs/netdata-agent/configuration/README.md): `sudo ./edit-config
   statsd.d/myapp.conf`
 
     - Each app will have it's own section in the right-hand menu.
@@ -737,7 +737,7 @@ Now, let's see the above process in detail.
 
 ### Prerequisites
 
-- A node with the [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) installed.
+- A node with the [Netdata](/packaging/installer/README.md) installed.
 - An application to instrument. For this guide, that will be [k6](https://k6.io/docs/getting-started/installation).
 
 ### Understanding the metrics
@@ -784,8 +784,8 @@ visualize all the available operations.
 ### Create a new StatsD configuration file
 
 Start by creating a new configuration file under the `statsd.d/` folder in the 
-[Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory). 
-Use [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) 
+[Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory). 
+Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-netdataconf) 
 to create a new file called `k6.conf`.
 
 ```bash=
@@ -832,7 +832,7 @@ Context is a second way to group metrics, when the metrics are of the same natur
 our case, if we ran several different load testing experiments side-by-side, we could define the same app, 
 but different context (e.g `http_requests.experiment1`, `http_requests.experiment2`).
 
-Find more details about family and context in our [documentation](https://github.com/netdata/netdata/blob/master/src/web/README.md#families).
+Find more details about family and context in our [documentation](/src/web/README.md#families).
 
 #### Dimensions 
 
@@ -845,10 +845,10 @@ metrics into different charts. This is particularly important, since we decide:
 The dimension option has this syntax: `dimension = [pattern] METRIC NAME TYPE MULTIPLIER DIVIDER OPTIONS`
 
 - **pattern**: A keyword that tells the StatsD server the `METRIC` string is actually a 
-  [simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). 
+  [simple pattern](/src/libnetdata/simple_pattern/README.md). 
   We don't use simple patterns in the example, but if we wanted to visualize all the `http_req` metrics, we 
   could have a single dimension: `dimension = pattern 'k6.http_req*' last 1 1`. Find detailed examples with 
-  patterns in [dimension patterns](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/README.md#dimension-patterns).
+  patterns in [dimension patterns](/src/collectors/statsd.plugin/README.md#dimension-patterns).
 
 - **METRIC** The id of the metric as it comes from the client. You can easily find this in the private charts above, 
   for example: `k6.http_req_connecting`.
@@ -973,7 +973,7 @@ Note that Netdata will report the rate for metrics and counters, even if k6 or a
 sends an _absolute_ number. For example, k6 sends absolute HTTP requests with `http_reqs`, 
 but Netdata visualizes that in `requests/second`.
 
-To enable this StatsD configuration, [restart Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
+To enable this StatsD configuration, [restart Netdata](/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
 
 ### Final touches
 
@@ -981,7 +981,7 @@ At this point, you have used StatsD to gather metrics for k6, creating a whole n
 Netdata dashboard in the process. Moreover, you can further customize the icon of the particular section, 
 as well as the description for each chart.
 
-To edit the section, please follow the Netdata [documentation](https://github.com/netdata/netdata/blob/master/src/web/gui/README.md#customizing-the-local-dashboard).
+To edit the section, please follow the Netdata [documentation](/src/web/gui/README.md#customizing-the-local-dashboard).
 
 While the following configuration will be placed in a new file, as the documentation suggests, it is 
 instructing to use `dashboard_info.js` as a template. Open the file and see how the rest of sections and collectors have been defined.

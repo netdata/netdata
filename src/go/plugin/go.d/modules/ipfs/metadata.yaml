@@ -1,0 +1,224 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-ipfs
+      plugin_name: go.d.plugin
+      module_name: ipfs
+      monitored_instance:
+        name: IPFS
+        link: "https://ipfs.tech/"
+        categories:
+          - data-collection.storage-mount-points-and-filesystems
+        icon_filename: "ipfs.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - ipfs
+        - filesystem
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This collector monitors IPFS daemon health and network activity."
+        method_description: |
+          It uses [RPC API](https://docs.ipfs.tech/reference/kubo/rpc/) to collect metrics.
+
+          Used endpoints:
+
+          - [/api/v0/stats/bw](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-stats-bw)
+          - [/api/v0/swarm/peers](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-swarm-peers)
+          - [/api/v0/stats/repo](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-stats-repo)
+          - [/api/v0/pin/ls](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-pin-ls)
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects IPFS instances running on localhost that are listening on port 5001.
+        limits:
+          description: ""
+        performance_impact:
+          description: |
+            Calls to the following endpoints are disabled by default due to IPFS bugs:
+
+            - /api/v0/stats/repo ([#7528](https://github.com/ipfs/go-ipfs/issues/7528)).
+            - /api/v0/pin/ls ([#3874](https://github.com/ipfs/go-ipfs/issues/3874)).
+
+            **Disabled by default** due to potential high CPU usage. Consider enabling only if necessary.
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/ipfs.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: repoapi
+              description: Enables querying the [/api/v0/stats/repo](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-repo-stat) endpoint for repository statistics.
+              default_value: false
+              required: false
+            - name: pinapi
+              description: Enables querying the [/api/v0/pin/ls](https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-pin-ls) endpoint to retrieve a list of all pinned objects.
+              default_value: false
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:5001
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: POST
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: "Config"
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:5001
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:5001
+
+                  - name: remote
+                    url: http://192.0.2.1:5001
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: ipfs_datastore_usage
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipfs.conf
+        metric: ipfs.datastore_space_utilization
+        info: IPFS datastore utilization
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: ipfs.bandwidth
+              description: IPFS Bandwidth
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: ipfs.peers
+              description: IPFS Peers
+              unit: "peers"
+              chart_type: line
+              dimensions:
+                - name: peers
+            - name: ipfs.datastore_space_utilization
+              description: IPFS Datastore Space Utilization
+              unit: "percent"
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: ipfs.repo_size
+              description: IPFS Repo Size
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: ipfs.repo_objects
+              description: IPFS Repo Objects
+              unit: "objects"
+              chart_type: line
+              dimensions:
+                - name: objects
+            - name: ipfs.repo_pinned_objects
+              description: IPFS Repo Pinned Objects
+              unit: "objects"
+              chart_type: line
+              dimensions:
+                - name: pinned
+                - name: recursive_pins

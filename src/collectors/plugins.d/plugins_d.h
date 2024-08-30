@@ -33,7 +33,8 @@ struct plugind {
         SPINLOCK spinlock;
         bool running;                  // do not touch this structure after setting this to 1
         bool enabled;                   // if this is enabled or not
-        netdata_thread_t thread;
+        ND_THREAD *thread;
+        POPEN_INSTANCE *pi;
         pid_t pid;
     } unsafe;
 
@@ -45,8 +46,11 @@ struct plugind {
 
 extern struct plugind *pluginsd_root;
 
-size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations);
-void pluginsd_process_thread_cleanup(void *ptr);
+size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations);
+
+struct parser;
+void pluginsd_process_cleanup(struct parser *parser);
+void pluginsd_process_thread_cleanup(void *pptr);
 
 size_t pluginsd_initialize_plugin_directories();
 

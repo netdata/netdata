@@ -40,7 +40,6 @@ Ensure that your network interface card (NIC) drivers and firmware are up-to-dat
 
 ### Useful resources
 
-1. [Netstat Command Usage on Windows](https://www.computerhope.com/issues/ch001/stat.htm)
-2. [Wireshark - A Network Protocol Analyzer](https://www.wireshark.org/)
-3. [Tcpdump - A Packet Analyzer](https://www.tcpdump.org/)
-4. [Network Performance Monitoring and Diagnostics Guide](https://docs.microsoft.com/en-us/windows-server/networking/technologies/npmd/npmd)
+1. [Wireshark - A Network Protocol Analyzer](https://www.wireshark.org/)
+2. [Tcpdump - A Packet Analyzer](https://www.tcpdump.org/)
+3. [Network Performance Monitoring and Diagnostics Guide](https://docs.microsoft.com/en-us/windows-server/networking/technologies/npmd/npmd)

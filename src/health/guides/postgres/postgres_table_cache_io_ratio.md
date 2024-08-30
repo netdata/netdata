@@ -29,4 +29,3 @@ Keep monitoring cache hit ratios after making changes to your configuration or o
 ### Useful resources
 
 1. [Tuning Your PostgreSQL Server](https://www.postgresql.org/docs/current/runtime-config-resource.html)
-2. [Performance Monitoring and Tuning in PostgreSQL](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/postgres#monitoring)

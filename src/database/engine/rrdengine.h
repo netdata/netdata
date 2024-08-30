@@ -3,9 +3,6 @@
 #ifndef NETDATA_RRDENGINE_H
 #define NETDATA_RRDENGINE_H
 
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
 #include <fcntl.h>
 #include <lz4.h>
 #include <Judy.h>
@@ -35,6 +32,12 @@ struct rrdeng_cmd;
 
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
+
+typedef struct dbengine_tier_stats  {
+    RRDSET *st;
+    RRDDIM *rd_space;
+    RRDDIM *rd_time;
+} DBENGINE_TIER_STATS;
 
 typedef enum __attribute__ ((__packed__)) {
     // final status for all pages
@@ -143,7 +146,7 @@ struct jv2_extents_info {
 };
 
 struct jv2_metrics_info {
-    uuid_t *uuid;
+    nd_uuid_t *uuid;
     uint32_t page_list_header;
     time_t first_time_s;
     time_t last_time_s;
@@ -349,16 +352,25 @@ extern rrdeng_stats_t rrdeng_reserved_file_descriptors;
 extern rrdeng_stats_t global_pg_cache_over_half_dirty_events;
 extern rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of deleted pages */
 
-struct rrdengine_instance {
+typedef struct tier_config_prototype {
+    int tier;                                   // the tier of this ctx
+    uint8_t page_type;                          // default page type for this context
+    uint64_t max_disk_space;                    // the max disk space this ctx is allowed to use
+    time_t max_retention_s;                     // The max retention in seconds
+    uint8_t disk_percentage;                    // percentage of metadata that contribute towards tier space used
+    uint8_t global_compress_alg;                // the wanted compression algorithm
+    char dbfiles_path[FILENAME_MAX + 1];
+
     struct {
-        int tier;                                   // the tier of this ctx
-        uint8_t page_type;                          // default page type for this context
+        uint32_t uses;
+        bool enabled;
+        bool is_on_disk;
+        SPINLOCK spinlock;
+    } _internal;
+} TIER_CONFIG_PROTOTYPE;
 
-        uint64_t max_disk_space;                    // the max disk space this ctx is allowed to use
-        uint8_t global_compress_alg;                // the wanted compression algorithm
-
-        char dbfiles_path[FILENAME_MAX + 1];
-    } config;
+struct rrdengine_instance {
+    TIER_CONFIG_PROTOTYPE config;
 
     struct {
         uv_rwlock_t rwlock;                         // the linked list of datafiles is protected by this lock
@@ -451,7 +463,7 @@ static inline void ctx_last_flush_fileno_set(struct rrdengine_instance *ctx, uns
 void *dbengine_extent_alloc(size_t size);
 void dbengine_extent_free(void *extent, size_t size);
 
-bool rrdeng_ctx_exceeded_disk_quota(struct rrdengine_instance *ctx);
+bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx);
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
@@ -497,7 +509,7 @@ typedef struct validated_page_descriptor {
 #define page_entries_by_size(page_length_in_bytes, point_size_in_bytes) \
         ((page_length_in_bytes) / (point_size_in_bytes))
 
-VALIDATED_PAGE_DESCRIPTOR validate_page(uuid_t *uuid,
+VALIDATED_PAGE_DESCRIPTOR validate_page(nd_uuid_t *uuid,
                                         time_t start_time_s,
                                         time_t end_time_s,
                                         uint32_t update_every_s,
@@ -526,8 +538,22 @@ static inline time_t max_acceptable_collected_time(void) {
 
 void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool update_retention, bool worker);
 
-static inline int journal_metric_uuid_compare(const void *key, const void *metric) {
-    return uuid_memcmp((uuid_t *)key, &(((struct journal_metric_list *) metric)->uuid));
+// --------------------------------------------------------------------------------------------------------------------
+// the following functions are used to sort UUIDs in the journal files
+// DO NOT CHANGE, as this will break backwards compatibility with the data files users have.
+
+static inline int journal_uuid_memcmp(const nd_uuid_t *uu1, const nd_uuid_t *uu2) {
+    return memcmp(uu1, uu2, sizeof(nd_uuid_t));
 }
+
+static inline int journal_metric_uuid_compare(const void *key, const void *metric) {
+    return journal_uuid_memcmp((const nd_uuid_t *)key, (const nd_uuid_t *)&(((struct journal_metric_list *) metric)->uuid));
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+uint64_t get_used_disk_space(struct rrdengine_instance *ctx);
+void calculate_tier_disk_space_percentage(void);
+void dbengine_retention_statistics(void);
+uint64_t get_directory_free_bytes_space(struct rrdengine_instance *ctx);
 
 #endif /* NETDATA_RRDENGINE_H */

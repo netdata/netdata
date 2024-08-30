@@ -1,0 +1,15 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+  configure|reconfigure)
+    chown root:netdata /usr/libexec/netdata/plugins.d/go.d.plugin
+    chmod 0750 /usr/libexec/netdata/plugins.d/go.d.plugin
+    if ! setcap "cap_dac_read_search+epi cap_net_admin=eip cap_net_raw=eip" /usr/libexec/netdata/plugins.d/go.d.plugin; then
+        chmod -f 4750 /usr/libexec/netdata/plugins.d/go.d.plugin
+    fi
+    ;;
+esac
+
+exit 0

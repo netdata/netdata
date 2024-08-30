@@ -103,7 +103,7 @@ The following alerts are available:
 
 #### Install charts.d plugin
 
-If [using our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md#determine-which-installation-method-you-used), make sure `netdata-plugin-chartsd` is installed.
+If [using our official native DEB/RPM packages](/packaging/installer/UPDATE.md#determine-which-installation-method-you-used), make sure `netdata-plugin-chartsd` is installed.
 
 
 #### Required software
@@ -119,7 +119,7 @@ The configuration file name for this integration is `charts.d/apcupsd.conf`.
 
 
 You can edit the configuration file using the `edit-config` script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory).
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -132,7 +132,7 @@ The config file is sourced by the charts.d plugin. It's a standard bash file.
 The following collapsed table contains all the options that can be configured for the apcupsd collector.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -178,6 +178,7 @@ apcupsd_update_every=5
 
 ### Debug Mode
 
+
 To troubleshoot issues with the `apcupsd` collector, run the `charts.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.
 
@@ -199,5 +200,38 @@ should give you clues as to why the collector isn't working.
   ```bash
   ./charts.d.plugin debug 1 apcupsd
   ```
+
+### Getting Logs
+
+If you're encountering problems with the `apcupsd` collector, follow these steps to retrieve logs and identify potential issues:
+
+- **Run the command** specific to your system (systemd, non-systemd, or Docker container).
+- **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
+
+#### System with systemd
+
+Use the following command to view logs generated since the last Netdata service restart:
+
+```bash
+journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep apcupsd
+```
+
+#### System without systemd
+
+Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
+
+```bash
+grep apcupsd /var/log/netdata/collector.log
+```
+
+**Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
+
+#### Docker Container
+
+If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
+
+```bash
+docker logs netdata 2>&1 | grep apcupsd
+```
 
 

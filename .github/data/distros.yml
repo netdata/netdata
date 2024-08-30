@@ -16,6 +16,15 @@ arch_order:  # sort order for per-architecture jobs in CI
   - armhfp
   - arm64
   - aarch64
+default_sentry: &default_sentry # Default configuration for Sentry usage
+  amd64: false
+  x86_64: false
+  i386: false
+  armhf: false
+  armhfp: false
+  arm64: false
+  aarch64: false
+default_builder_rev: &def_builder_rev v1
 include:
   - &alpine
     distro: alpine
@@ -23,6 +32,7 @@ include:
     support_type: Community
     notes: ''
     eol_check: false
+    bundle_sentry: *default_sentry
     env_prep: |
       apk add -U bash
     jsonc_removal: |
@@ -30,23 +40,22 @@ include:
     test:
       ebpf-core: true
   - <<: *alpine
+    version: "3.20"
+    support_type: Core
+    notes: ''
+    eol_check: true
+  - <<: *alpine
     version: "3.19"
     support_type: Core
     notes: ''
     eol_check: true
-    bundle_sentry: false
   - <<: *alpine
     version: "3.18"
-    support_type: Core
-    notes: ''
-    eol_check: true
-  - <<: *alpine
-    version: "3.17"
     support_type: Intermediate
     notes: ''
     eol_check: true
   - <<: *alpine
-    version: "3.16"
+    version: "3.17"
     support_type: Intermediate
     notes: ''
     eol_check: true
@@ -56,7 +65,7 @@ include:
     support_type: Intermediate
     notes: ''
     eol_check: false
-    bundle_sentry: false
+    bundle_sentry: *default_sentry
     env_prep: |
       pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
     test:
@@ -68,10 +77,11 @@ include:
     support_type: Core
     notes: ''
     eol_check: 'amazon-linux'
-    bundle_sentry: false
+    bundle_sentry: *default_sentry
     packages: &amzn_packages
       type: rpm
       repo_distro: amazonlinux/2
+      builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
@@ -89,13 +99,15 @@ include:
 
   - distro: centos
     version: "7"
+    base_image: "netdata/legacy:centos7"
     support_type: Core
     notes: ''
     eol_check: false
-    bundle_sentry: false
+    bundle_sentry: *default_sentry
     packages:
       type: rpm
       repo_distro: el/7
+      builder_rev: *def_builder_rev
       alt_links:
         - el/7Server
         - el/7Client
@@ -114,21 +126,16 @@ include:
     jsonc_removal: |
       dnf remove -y json-c-devel
     eol_check: true
-    bundle_sentry: false
+    bundle_sentry: *default_sentry
     packages: &cs_packages
       type: rpm
       repo_distro: el/c9s
+      builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
     test:
       ebpf-core: true
-  - <<: *centos_stream
-    version: '8'
-    base_image: 'quay.io/centos/centos:stream8'
-    packages:
-      <<: *cs_packages
-      repo_distro: el/c8s
 
   - &debian
     distro: debian
@@ -137,7 +144,10 @@ include:
     notes: ''
     base_image: debian:bookworm
     eol_check: true
-    bundle_sentry: true
+    eol_lts: true
+    bundle_sentry:
+      <<: *default_sentry
+      amd64: true
     env_prep: |
       apt-get update
     jsonc_removal: |
@@ -145,6 +155,7 @@ include:
     packages: &debian_packages
       type: deb
       repo_distro: debian/bookworm
+      builder_rev: v2
       arches:
         - i386
         - amd64
@@ -160,15 +171,6 @@ include:
       repo_distro: debian/bullseye
     test:
       ebpf-core: false
-  - <<: *debian
-    version: "10"
-    base_image: debian:buster
-    bundle_sentry: false
-    packages:
-      <<: *debian_packages
-      repo_distro: debian/buster
-    test:
-      ebpf-core: false
 
   - &fedora
     distro: fedora
@@ -176,12 +178,13 @@ include:
     support_type: Core
     notes: ''
     eol_check: true
-    bundle_sentry: false
+    bundle_sentry: *default_sentry
     jsonc_removal: |
       dnf remove -y json-c-devel
     packages: &fedora_packages
       type: rpm
       repo_distro: fedora/40
+      builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
@@ -194,32 +197,32 @@ include:
       repo_distro: fedora/39
     test:
       ebpf-core: true
-  - <<: *fedora
-    version: "38"
-    packages:
-      <<: *fedora_packages
-      repo_distro: fedora/38
-    test:
-      ebpf-core: true
 
   - &opensuse
     distro: opensuse
-    version: "15.5"
+    version: "15.6"
     support_type: Core
     notes: ''
     eol_check: true
-    bundle_sentry: false
-    base_image: opensuse/leap:15.5
+    bundle_sentry: *default_sentry
+    base_image: opensuse/leap:15.6
     jsonc_removal: |
       zypper rm -y libjson-c-devel
     packages: &opensuse_packages
       type: rpm
-      repo_distro: opensuse/15.5
+      repo_distro: opensuse/15.6
+      builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
     test:
       ebpf-core: true
+  - <<: *opensuse
+    version: "15.5"
+    base_image: opensuse/leap:15.5
+    packages:
+      <<: *opensuse_packages
+      repo_distro: opensuse/15.5
 
   - &oracle
     distro: oraclelinux
@@ -227,12 +230,13 @@ include:
     support_type: Core
     notes: ''
     eol_check: true
-    bundle_sentry: false
+    bundle_sentry: *default_sentry
     jsonc_removal: |
       dnf remove -y json-c-devel
     packages: &oracle_packages
       type: rpm
       repo_distro: ol/8
+      builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
@@ -252,10 +256,11 @@ include:
     jsonc_removal: |
       dnf remove -y json-c-devel
     eol_check: true
-    bundle_sentry: false
+    bundle_sentry: *default_sentry
     packages: &rocky_packages
       type: rpm
       repo_distro: el/9
+      builder_rev: *def_builder_rev
       alt_links:
         - el/9Server
         - el/9Client
@@ -281,7 +286,9 @@ include:
     support_type: Core
     notes: ''
     eol_check: true
-    bundle_sentry: true
+    bundle_sentry:
+      <<: *default_sentry
+      amd64: true
     env_prep: |
       rm -f /etc/apt/apt.conf.d/docker && apt-get update
     jsonc_removal: |
@@ -289,17 +296,13 @@ include:
     packages: &ubuntu_packages
       type: deb
       repo_distro: ubuntu/noble
+      builder_rev: v2
       arches:
         - amd64
         - armhf
         - arm64
     test:
       ebpf-core: true
-  - <<: *ubuntu
-    version: "23.10"
-    packages:
-      <<: *ubuntu_packages
-      repo_distro: ubuntu/mantic
   - <<: *ubuntu
     version: "22.04"
     packages:
@@ -311,18 +314,37 @@ include:
       <<: *ubuntu_packages
       repo_distro: ubuntu/focal
 legacy: # Info for platforms we used to support and still need to handle packages for
+  - <<: *debian
+    version: "10"
+    packages:
+      <<: *debian_packages
+      repo_distro: debian/buster
   - <<: *fedora
     version: "37"
-    bundle_sentry: false
     packages:
       <<: *fedora_packages
       repo_distro: fedora/37
+  - <<: *fedora
+    version: "38"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/38
   - <<: *opensuse
     version: "15.4"
-    bundle_sentry: false
     packages:
       <<: *opensuse_packages
       repo_distro: opensuse/15.4
+  - <<: *centos_stream
+    version: '8'
+    base_image: 'quay.io/centos/centos:stream8'
+    packages:
+      <<: *cs_packages
+      repo_distro: el/c8s
+  - <<: *ubuntu
+    version: "23.10"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/mantic
 no_include: # Info for platforms not covered in CI
   - distro: docker
     version: "19.03 or newer"

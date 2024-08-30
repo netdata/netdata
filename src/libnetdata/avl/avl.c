@@ -334,7 +334,7 @@ static inline void avl_write_lock(avl_tree_lock *t) {
 
 static inline void avl_read_unlock(avl_tree_lock *t) {
 #if defined(AVL_LOCK_WITH_RWLOCK)
-    netdata_rwlock_unlock(&t->rwlock);
+    netdata_rwlock_rdunlock(&t->rwlock);
 #else
     rw_spinlock_read_unlock(&t->rwlock);
 #endif
@@ -342,7 +342,7 @@ static inline void avl_read_unlock(avl_tree_lock *t) {
 
 static inline void avl_write_unlock(avl_tree_lock *t) {
 #if defined(AVL_LOCK_WITH_RWLOCK)
-    netdata_rwlock_unlock(&t->rwlock);
+    netdata_rwlock_wrunlock(&t->rwlock);
 #else
     rw_spinlock_write_unlock(&t->rwlock);
 #endif

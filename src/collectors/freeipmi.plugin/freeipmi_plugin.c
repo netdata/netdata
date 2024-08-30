@@ -105,7 +105,7 @@ unsigned int register_spacing = 0;  /* not used if probing */
 char *driver_device = NULL;         /* not used if probing */
 
 /* Out-of-band Communication Configuration */
-int protocol_version = -1;      // IPMI_MONITORING_PROTOCOL_VERSION_1_5, etc. or -1 for default
+int freeimpi_protocol_version = -1;      // IPMI_MONITORING_PROTOCOL_VERSION_1_5, etc. or -1 for default
 char *username = "";
 char *password = "";
 unsigned char *k_g = NULL;
@@ -151,7 +151,7 @@ static void initialize_ipmi_config (struct ipmi_monitoring_ipmi_config *ipmi_con
     ipmi_config->register_spacing = register_spacing;
     ipmi_config->driver_device = driver_device;
 
-    ipmi_config->protocol_version = protocol_version;
+    ipmi_config->protocol_version = freeimpi_protocol_version;
     ipmi_config->username = username;
     ipmi_config->password = password;
     ipmi_config->k_g = k_g;
@@ -1120,7 +1120,7 @@ static void netdata_update_ipmi_sel_events_count(struct netdata_ipmi_state *stt,
 }
 
 int netdata_ipmi_collect_data(struct ipmi_monitoring_ipmi_config *ipmi_config, IPMI_COLLECTION_TYPE type, struct netdata_ipmi_state *stt) {
-    errno = 0;
+    errno_clear();
 
     if(type & IPMI_COLLECT_TYPE_SENSORS) {
         stt->sensors.collected = 0;
@@ -1637,7 +1637,8 @@ close_and_send:
 // ----------------------------------------------------------------------------
 // main, command line arguments parsing
 
-static NORETURN void plugin_exit(int code) {
+static void plugin_exit(int code) NORETURN;
+static void plugin_exit(int code) {
     fflush(stdout);
     function_plugin_should_exit = true;
     exit(code);
@@ -1652,6 +1653,10 @@ int main (int argc, char **argv) {
 
     bool debug = false;
 
+    // TODO: Workaround for https://github.com/netdata/netdata/issues/17931
+    // This variable will be removed once the issue is fixed.
+    bool restart_every = true;
+
     // ------------------------------------------------------------------------
     // parse command line parameters
 
@@ -1665,11 +1670,15 @@ int main (int argc, char **argv) {
             }
         }
         else if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
-            printf("%s %s\n", program_name, VERSION);
+            printf("%s %s\n", program_name, NETDATA_VERSION);
             exit(0);
         }
         else if(strcmp("debug", argv[i]) == 0) {
             debug = true;
+            continue;
+        }
+        else if(strcmp("no-restart", argv[i]) == 0) {
+            restart_every = false;
             continue;
         }
         else if(strcmp("sel", argv[i]) == 0) {
@@ -1827,7 +1836,7 @@ int main (int argc, char **argv) {
                     " For more information:\n"
                     " https://github.com/netdata/netdata/tree/master/src/collectors/freeipmi.plugin\n"
                     "\n"
-                    , program_name, VERSION
+                    , program_name, NETDATA_VERSION
                     , update_every
                     , netdata_do_sel?"enabled":"disabled"
                     , sdr_cache_directory?sdr_cache_directory:"system default"
@@ -1862,9 +1871,9 @@ int main (int argc, char **argv) {
         }
         else if(strcmp("driver-type", argv[i]) == 0) {
             if (hostname) {
-                protocol_version = netdata_parse_outofband_driver_type(argv[++i]);
-                if(debug) fprintf(stderr, "%s: outband protocol version set to '%d'\n",
-                                  program_name, protocol_version);
+                freeimpi_protocol_version = netdata_parse_outofband_driver_type(argv[++i]);
+                if(debug) fprintf(stderr, "%s: outband FreeIMPI protocol version set to '%d'\n",
+                                  program_name, freeimpi_protocol_version);
             }
             else {
                 driver_type = netdata_parse_inband_driver_type(argv[++i]);
@@ -1879,7 +1888,7 @@ int main (int argc, char **argv) {
                             program_name);
 
             }
-            else if (protocol_version < 0 || protocol_version == IPMI_MONITORING_PROTOCOL_VERSION_1_5) {
+            else if (freeimpi_protocol_version < 0 || freeimpi_protocol_version == IPMI_MONITORING_PROTOCOL_VERSION_1_5) {
                 workaround_flags |= IPMI_MONITORING_WORKAROUND_FLAGS_PROTOCOL_VERSION_1_5_NO_AUTH_CODE_CHECK;
 
                 if (debug)
@@ -1922,7 +1931,7 @@ int main (int argc, char **argv) {
         collector_error("%s(): ignoring parameter '%s'", __FUNCTION__, argv[i]);
     }
 
-    errno = 0;
+    errno_clear();
 
     if(freq_s && freq_s < update_every)
         collector_info("%s(): update frequency %d seconds is too small for IPMI. Using %d.",
@@ -1977,12 +1986,9 @@ int main (int argc, char **argv) {
             },
     };
 
-    netdata_thread_t sensors_thread = 0, sel_thread = 0;
-
-    netdata_thread_create(&sensors_thread, "IPMI[sensors]", NETDATA_THREAD_OPTION_DONT_LOG, netdata_ipmi_collection_thread, &sensors_data);
-
+    nd_thread_create("IPMI[sensors]", NETDATA_THREAD_OPTION_DONT_LOG, netdata_ipmi_collection_thread, &sensors_data);
     if(netdata_do_sel)
-        netdata_thread_create(&sel_thread, "IPMI[sel]", NETDATA_THREAD_OPTION_DONT_LOG, netdata_ipmi_collection_thread, &sel_data);
+        nd_thread_create("IPMI[sel]", NETDATA_THREAD_OPTION_DONT_LOG, netdata_ipmi_collection_thread, &sel_data);
 
     // ------------------------------------------------------------------------
     // the main loop
@@ -2103,7 +2109,7 @@ int main (int argc, char **argv) {
                 "END\n");
 
         // restart check (14400 seconds)
-        if (now_monotonic_sec() - started_t > IPMI_RESTART_EVERY_SECONDS) {
+        if (restart_every && (now_monotonic_sec() - started_t > IPMI_RESTART_EVERY_SECONDS)) {
             collector_info("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
             fprintf(stdout, "EXIT\n");
             plugin_exit(0);

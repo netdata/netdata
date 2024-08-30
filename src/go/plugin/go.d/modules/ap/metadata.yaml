@@ -1,0 +1,141 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      plugin_name: go.d.plugin
+      module_name: ap
+      monitored_instance:
+        name: Access Points
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - ap
+        - access
+        - point
+        - wireless
+        - network
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors various wireless access point metrics like connected clients, bandwidth, packets, transmit issues, signal strength, and bitrate for each device and its associated SSID.
+        method_description: >
+          This tool uses the `iw` command-line utility to discover nearby access points.
+          It starts by running `iw dev`, which provides information about all wireless interfaces. 
+          Then, for each interface identified as an access point (type AP), the `iw INTERFACE station dump` command is executed to gather relevant metrics.
+      supported_platforms:
+        include: [Linux]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: "The plugin is able to auto-detect any access points on your Linux machine."
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: "`iw` utility."
+            description: "Make sure the `iw` utility is installed."
+      configuration:
+        file:
+          name: go.d/ap.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: binary_path
+              description: Path to the `iw` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable.
+              default_value: /usr/sbin/iw
+              required: true
+            - name: timeout
+              description: Timeout for executing the binary, specified in seconds.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: ""
+            enabled: false
+          list:
+            - name: Custom binary path
+              description: The executable is not in the directories specified in the PATH environment variable.
+              config: |
+                jobs:
+                  - name: custom_iw
+                    binary_path: /usr/local/sbin/iw
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: wireless device
+          description: "These metrics refer to the entire monitored application."
+          labels:
+            - name: device
+              description: Wireless interface name
+            - name: ssid
+              description: SSID
+          metrics:
+            - name: ap.clients
+              description: Connected clients
+              unit: "clients"
+              chart_type: line
+              dimensions:
+                - name: clients
+            - name: ap.net
+              description: Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ap.packets
+              description: Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ap.issues
+              description: Transmit Issues
+              unit: "issues/s"
+              chart_type: line
+              dimensions:
+                - name: retries
+                - name: failures
+            - name: ap.signal
+              description: Average Signal
+              unit: "dBm"
+              chart_type: line
+              dimensions:
+                - name: average signal
+            - name: ap.bitrate
+              description: Bitrate
+              unit: "Mbps"
+              chart_type: line
+              dimensions:
+                - name: receive
+                - name: transmit

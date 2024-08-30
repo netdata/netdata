@@ -30,7 +30,4 @@ An increase in workload means that your web server is handling more traffic than
 
 ### Useful resources
 
-1. [Analyzing Web server logs with ApacheTop](https://www.howtoforge.com/how-to-analyze-apache-web-server-logs-apachetop)
-2. [Logstash Guide: Analyzing Logs](https://www.elastic.co/guide/en/logstash/current/logstash-intro.html)
-3. [Web Application Performance Monitoring with New Relic](https://newrelic.com/platform/web-application-monitoring)
-4. [Vertically or Horizontally Scaling Your Web Server](https://www.digitalocean.com/community/tutorials/5-common-server-setups-for-your-web-application)
+1. [Vertically or Horizontally Scaling Your Web Server](https://www.digitalocean.com/community/tutorials/5-common-server-setups-for-your-web-application)

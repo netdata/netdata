@@ -20,13 +20,10 @@ static int ebpf_function_start_thread(ebpf_module_t *em, int period)
 {
     struct netdata_static_thread *st = em->thread;
     // another request for thread that already ran, cleanup and restart
-    if (st->thread)
-        freez(st->thread);
-
     if (period <= 0)
         period = EBPF_DEFAULT_LIFETIME;
 
-    st->thread = mallocz(sizeof(netdata_thread_t));
+    st->thread = NULL;
     em->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
     em->lifetime = period;
 
@@ -34,7 +31,8 @@ static int ebpf_function_start_thread(ebpf_module_t *em, int period)
     netdata_log_info("Starting thread %s with lifetime = %d", em->info.thread_name, period);
 #endif
 
-    return netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
+    st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
+    return st->thread ? 0 : 1;
 }
 
 /*****************************************************************
@@ -333,7 +331,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
         "Filters can be combined. Each filter can be given only one time. Default all ports\n"
     };
 
-for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
+    for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
             break;
@@ -430,6 +428,7 @@ for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         ebpf_socket_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
+        collect_pids |= 1<<EBPF_MODULE_SOCKET_IDX;
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction,
@@ -714,10 +713,10 @@ void *ebpf_function_thread(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    while(!ebpf_plugin_exit) {
+    while(!ebpf_plugin_stop()) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
-        if (ebpf_plugin_exit) {
+        if (ebpf_plugin_stop()) {
             break;
         }
     }

@@ -1,0 +1,140 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Smartctl collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Interval for updating Netdata charts, measured in seconds. Collector might use cached data if less than **Devices poll interval**.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for executing the `smartctl` binary, specified in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 5
+      },
+      "scan_every": {
+        "title": "Scan interval",
+        "description": "Interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup.",
+        "type": "number",
+        "minimum": 1,
+        "default": 900
+      },
+      "poll_devices_every": {
+        "title": "Devices poll interval",
+        "description": "Interval for gathering data for every device, measured in seconds. Data is cached for this interval.",
+        "type": "number",
+        "minimum": 1,
+        "default": 300
+      },
+      "no_check_power_mode": {
+        "title": "No check power mode",
+        "description": "ATA only. Skip data collection when the device is in a low-power mode. Prevents unnecessary disk spin-up.",
+        "type": "string",
+        "enum": [
+          "standby",
+          "never",
+          "sleep",
+          "idle"
+        ],
+        "default": "standby"
+      },
+      "device_selector": {
+        "title": "Device selector",
+        "description": "Specifies a [pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) to match the 'info name' of devices as reported by `smartctl --scan --json`. Only devices whose 'info name' matches this pattern will be collected.",
+        "type": "string",
+        "minimum": 1,
+        "default": "*"
+      },
+      "extra_devices": {
+        "title": "Extra devices",
+        "description": "Allows manual specification of devices not automatically detected by `smartctl --scan`. Each device entry must include both a name and a type.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "Device",
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "name",
+            "type"
+          ],
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "type": {
+              "title": "Type",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "timeout",
+            "scan_every",
+            "poll_devices_every",
+            "no_check_power_mode"
+          ]
+        },
+        {
+          "title": "Devices",
+          "fields": [
+            "device_selector",
+            "extra_devices"
+          ]
+        }
+      ]
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "no_check_power_mode": {
+      "ui:help": "`never` - check the device always; `sleep` - check the device unless it is in SLEEP mode; `standby` - check the device unless it is in SLEEP or STANDBY mode; `idle` - check the device unless it is in SLEEP, STANDBY or IDLE mode.",
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
+    },
+    "device_selector": {
+      "ui:help": "Leave blank or use `*` to collect data for all devices."
+    },
+    "extra_devices": {
+      "items": {
+        "name": {
+          "ui:placeholder": "/dev/sda"
+        },
+        "type": {
+          "ui:placeholder": "jmb39x-q,3"
+        }
+      }
+    }
+  }
+}

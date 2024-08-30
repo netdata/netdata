@@ -15,7 +15,7 @@ An HTTP request timeout occurs when a client (such as a web browser) sends a req
 
 - Verify the issue
 
-Check the HTTP endpoint to see if it is responsive and reachable. You can use tools like `curl` or online services like [https://www.isitdownrightnow.com/](https://www.isitdownrightnow.com/) to check the availability of the website or service.
+Check the HTTP endpoint to see if it is responsive and reachable. You can use tools like `curl` or online services like <https://www.isitdownrightnow.com/> to check the availability of the website or service.
 
 - Analyze server logs
 
@@ -36,4 +36,3 @@ Make sure your web server configurations are optimized for performance. For inst
 - Verify network configurations
 
 Examine the network configurations for potential issues that can lead to HTTP request timeouts. Check for misconfigured firewalls or faulty load balancers that may be interfering with traffic to the HTTP endpoint.
-

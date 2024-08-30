@@ -12,14 +12,14 @@ learn_rel_path: "Developers/Web/Api/Exporters"
 Shell scripts can now query Netdata:
 
 ```sh
-eval "$(curl -s 'http://localhost:19999/api/v1/allmetrics')"
+eval "$(curl -s 'http://localhost:19999/api/v3/allmetrics')"
 ```
 
 after this command, all the Netdata metrics are exposed to shell. Check:
 
 ```sh
 # source the metrics
-eval "$(curl -s 'http://localhost:19999/api/v1/allmetrics')"
+eval "$(curl -s 'http://localhost:19999/api/v3/allmetrics')"
 
 # let's see if there are variables exposed by Netdata for system.cpu
 set | grep "^NETDATA_SYSTEM_CPU"
@@ -50,7 +50,7 @@ echo ${NETDATA_ALARM_SYSTEM_SWAP_USED_SWAP_STATUS}
 CLEAR
 
 # is it fast?
-time curl -s 'http://localhost:19999/api/v1/allmetrics' >/dev/null
+time curl -s 'http://localhost:19999/api/v3/allmetrics' >/dev/null
 
 real  0m0,070s
 user  0m0,000s

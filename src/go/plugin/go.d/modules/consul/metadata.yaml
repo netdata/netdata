@@ -1,0 +1,599 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-consul
+      plugin_name: go.d.plugin
+      module_name: consul
+      monitored_instance:
+        name: Consul
+        link: https://www.consul.io/
+        categories:
+          - data-collection.service-discovery-registry
+        icon_filename: consul.svg
+      alternative_monitored_instances: []
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - service networking platform
+        - hashicorp
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors [key metrics](https://developer.hashicorp.com/consul/docs/agent/telemetry#key-metrics) of Consul Agents: transaction timings, leadership changes, memory usage and more.
+        method_description: |
+          It periodically sends HTTP requests to [Consul REST API](https://developer.hashicorp.com/consul/api-docs).
+          
+          Used endpoints:
+          
+          - [/operator/autopilot/health](https://developer.hashicorp.com/consul/api-docs/operator/autopilot#read-health)
+          - [/agent/checks](https://developer.hashicorp.com/consul/api-docs/agent/check#list-checks)
+          - [/agent/self](https://developer.hashicorp.com/consul/api-docs/agent#read-configuration)
+          - [/agent/metrics](https://developer.hashicorp.com/consul/api-docs/agent#view-metrics)
+          - [/coordinate/nodes](https://developer.hashicorp.com/consul/api-docs/coordinate#read-lan-coordinates-for-all-nodes)
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector discovers instances running on the local host, that provide metrics on port 8500.
+            
+            On startup, it tries to collect metrics from:
+            
+            - http://localhost:8500
+            - http://127.0.0.1:8500
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable Prometheus telemetry
+            description: |
+              [Enable](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-prometheus_retention_time) telemetry on your Consul agent, by increasing the value of `prometheus_retention_time` from `0`.
+          - title: Add required ACLs to Token
+            description: |
+              Required **only if authentication is enabled**.
+              
+              |       ACL       | Endpoint                                                                                                                                                                                                                                                                                       |
+              |:---------------:|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+              | `operator:read` | [autopilot health status](https://developer.hashicorp.com/consul/api-docs/operator/autopilot#read-health)                                                                                                                                                                                      |
+              |   `node:read`   | [checks](https://developer.hashicorp.com/consul/api-docs/agent/check#list-checks)                                                                                                                                                                                                              |
+              |  `agent:read`   | [configuration](https://developer.hashicorp.com/consul/api-docs/agent#read-configuration), [metrics](https://developer.hashicorp.com/consul/api-docs/agent#view-metrics), and [lan coordinates](https://developer.hashicorp.com/consul/api-docs/coordinate#read-lan-coordinates-for-all-nodes) |
+      configuration:
+        file:
+          name: go.d/consul.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: All options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://localhost:8500
+              required: true
+            - name: acl_token
+              description: ACL token used in every request.
+              default_value: ""
+              required: false
+            - name: max_checks
+              description: Checks processing/charting limit.
+              default_value: ""
+              required: false
+            - name: max_filter
+              description: Checks processing/charting filter. Uses [simple patterns](/src/libnetdata/simple_pattern/README.md).
+              default_value: ""
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client tls certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client tls key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8500
+                    acl_token: "ec15675e-2999-d789-832e-8c4794daa8d7"
+            - name: Basic HTTP auth
+              description: Local server with basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8500
+                    acl_token: "ec15675e-2999-d789-832e-8c4794daa8d7"
+                    username: foo
+                    password: bar
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8500
+                    acl_token: "ec15675e-2999-d789-832e-8c4794daa8d7"
+                
+                  - name: remote
+                    url: http://203.0.113.10:8500
+                    acl_token: "ada7f751-f654-8872-7f93-498e799158b6"
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: consul_node_health_check_status
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
+        metric: consul.node_health_check_status
+        info: node health check ${label:check_name} has failed on server ${label:node_name} datacenter ${label:datacenter}
+      - name: consul_service_health_check_status
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
+        metric: consul.service_health_check_status
+        info: service health check ${label:check_name} for service ${label:service_name} has failed on server ${label:node_name} datacenter ${label:datacenter}
+      - name: consul_client_rpc_requests_exceeded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
+        metric: consul.client_rpc_requests_exceeded_rate
+        info: number of rate-limited RPC requests made by server ${label:node_name} datacenter ${label:datacenter}
+      - name: consul_client_rpc_requests_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
+        metric: consul.client_rpc_requests_failed_rate
+        info: number of failed RPC requests made by server ${label:node_name} datacenter ${label:datacenter}
+      - name: consul_gc_pause_time
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
+        metric: consul.gc_pause_time
+        info: time spent in stop-the-world garbage collection pauses on server ${label:node_name} datacenter ${label:datacenter}
+      - name: consul_autopilot_health_status
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
+        metric: consul.autopilot_health_status
+        info: datacenter ${label:datacenter} cluster is unhealthy as reported by server ${label:node_name}
+      - name: consul_autopilot_server_health_status
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
+        metric: consul.autopilot_server_health_status
+        info: server ${label:node_name} from datacenter ${label:datacenter} is unhealthy
+      - name: consul_raft_leader_last_contact_time
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
+        metric: consul.raft_leader_last_contact_time
+        info: median time elapsed since leader server ${label:node_name} datacenter ${label:datacenter} was last able to contact the follower nodes
+      - name: consul_raft_leadership_transitions
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
+        metric: consul.raft_leadership_transitions_rate
+        info: there has been a leadership change and server ${label:node_name} datacenter ${label:datacenter} has become the leader
+      - name: consul_raft_thread_main_saturation
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
+        metric: consul.raft_thread_main_saturation_perc
+        info: average saturation of the main Raft goroutine on server ${label:node_name} datacenter ${label:datacenter}
+      - name: consul_raft_thread_fsm_saturation
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
+        metric: consul.raft_thread_fsm_saturation_perc
+        info: average saturation of the FSM Raft goroutine on server ${label:node_name} datacenter ${label:datacenter}
+      - name: consul_license_expiration_time
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
+        metric: consul.license_expiration_time
+        info: Consul Enterprise licence expiration time on node ${label:node_name} datacenter ${label:datacenter}
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        The set of metrics depends on the [Consul Agent mode](https://developer.hashicorp.com/consul/docs/install/glossary#agent).
+      availability:
+        - Leader
+        - Follower
+        - Client
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: consul.client_rpc_requests_rate
+              description: Client RPC requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: rpc
+            - name: consul.client_rpc_requests_exceeded_rate
+              description: Client rate-limited RPC requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: exceeded
+            - name: consul.client_rpc_requests_failed_rate
+              description: Client failed RPC requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: failed
+            - name: consul.memory_allocated
+              description: Memory allocated by the Consul process
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: allocated
+            - name: consul.memory_sys
+              description: Memory obtained from the OS
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: sys
+            - name: consul.gc_pause_time
+              description: Garbage collection stop-the-world pause time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: gc_pause
+            - name: consul.kvs_apply_time
+              description: KVS apply time
+              unit: ms
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: quantile_0.5
+                - name: quantile_0.9
+                - name: quantile_0.99
+            - name: consul.kvs_apply_operations_rate
+              description: KVS apply operations
+              unit: ops/s
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: kvs_apply
+            - name: consul.txn_apply_time
+              description: Transaction apply time
+              unit: ms
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: quantile_0.5
+                - name: quantile_0.9
+                - name: quantile_0.99
+            - name: consul.txn_apply_operations_rate
+              description: Transaction apply operations
+              unit: ops/s
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: txn_apply
+            - name: consul.autopilot_health_status
+              description: Autopilot cluster health status
+              unit: status
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: healthy
+                - name: unhealthy
+            - name: consul.autopilot_failure_tolerance
+              description: Autopilot cluster failure tolerance
+              unit: servers
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: failure_tolerance
+            - name: consul.autopilot_server_health_status
+              description: Autopilot server health status
+              unit: status
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: healthy
+                - name: unhealthy
+            - name: consul.autopilot_server_stable_time
+              description: Autopilot server stable time
+              unit: seconds
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: stable
+            - name: consul.autopilot_server_serf_status
+              description: Autopilot server Serf status
+              unit: status
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: active
+                - name: failed
+                - name: left
+                - name: none
+            - name: consul.autopilot_server_voter_status
+              description: Autopilot server Raft voting membership
+              unit: status
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: voter
+                - name: not_voter
+            - name: consul.network_lan_rtt
+              description: Network lan RTT
+              unit: ms
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: min
+                - name: max
+                - name: avg
+            - name: consul.raft_commit_time
+              description: Raft commit time
+              unit: ms
+              chart_type: line
+              availability:
+                - Leader
+              dimensions:
+                - name: quantile_0.5
+                - name: quantile_0.9
+                - name: quantile_0.99
+            - name: consul.raft_commits_rate
+              description: Raft commits rate
+              unit: commits/s
+              chart_type: line
+              availability:
+                - Leader
+              dimensions:
+                - name: commits
+            - name: consul.raft_leader_last_contact_time
+              description: Raft leader last contact time
+              unit: ms
+              chart_type: line
+              availability:
+                - Leader
+              dimensions:
+                - name: quantile_0.5
+                - name: quantile_0.9
+                - name: quantile_0.99
+            - name: consul.raft_leader_oldest_log_age
+              description: Raft leader oldest log age
+              unit: seconds
+              chart_type: line
+              availability:
+                - Leader
+              dimensions:
+                - name: oldest_log_age
+            - name: consul.raft_follower_last_contact_leader_time
+              description: Raft follower last contact with the leader time
+              unit: ms
+              chart_type: line
+              availability:
+                - Follower
+              dimensions:
+                - name: leader_last_contact
+            - name: consul.raft_rpc_install_snapshot_time
+              description: Raft RPC install snapshot time
+              unit: ms
+              chart_type: line
+              availability:
+                - Follower
+              dimensions:
+                - name: quantile_0.5
+                - name: quantile_0.9
+                - name: quantile_0.99
+            - name: consul.raft_leader_elections_rate
+              description: Raft leader elections rate
+              unit: elections/s
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: leader
+            - name: consul.raft_leadership_transitions_rate
+              description: Raft leadership transitions rate
+              unit: transitions/s
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: leadership
+            - name: consul.server_leadership_status
+              description: Server leadership status
+              unit: status
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: leader
+                - name: not_leader
+            - name: consul.raft_thread_main_saturation_perc
+              description: Raft main thread saturation
+              unit: percentage
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: quantile_0.5
+                - name: quantile_0.9
+                - name: quantile_0.99
+            - name: consul.raft_thread_fsm_saturation_perc
+              description: Raft FSM thread saturation
+              unit: percentage
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: quantile_0.5
+                - name: quantile_0.9
+                - name: quantile_0.99
+            - name: consul.raft_fsm_last_restore_duration
+              description: Raft last restore duration
+              unit: ms
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: last_restore_duration
+            - name: consul.raft_boltdb_freelist_bytes
+              description: Raft BoltDB freelist
+              unit: bytes
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: freelist
+            - name: consul.raft_boltdb_logs_per_batch_rate
+              description: Raft BoltDB logs written per batch
+              unit: logs/s
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: written
+            - name: consul.raft_boltdb_store_logs_time
+              description: Raft BoltDB store logs time
+              unit: ms
+              chart_type: line
+              availability:
+                - Leader
+                - Follower
+              dimensions:
+                - name: quantile_0.5
+                - name: quantile_0.9
+                - name: quantile_0.99
+            - name: consul.license_expiration_time
+              description: License expiration time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: license_expiration
+        - name: node check
+          description: Metrics about checks on Node level.
+          labels:
+            - name: datacenter
+              description: Datacenter Identifier
+            - name: node_name
+              description: The node's name
+            - name: check_name
+              description: The check's name
+          metrics:
+            - name: consul.node_health_check_status
+              description: Node health check status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: passing
+                - name: maintenance
+                - name: warning
+                - name: critical
+        - name: service check
+          description: Metrics about checks at a Service level.
+          labels:
+            - name: datacenter
+              description: Datacenter Identifier
+            - name: node_name
+              description: The node's name
+            - name: check_name
+              description: The check's name
+            - name: service_name
+              description: The service's name
+          metrics:
+            - name: consul.service_health_check_status
+              description: Service health check status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: passing
+                - name: maintenance
+                - name: warning
+                - name: critical

@@ -149,6 +149,43 @@ issystemd() {
   return 1
 }
 
+# shellcheck disable=SC2009
+running_under_anacron() {
+    pid="${1:-$$}"
+    iter="${2:-0}"
+
+    [ "${iter}" -gt 50 ] && return 1
+
+    if [ "$(uname -s)" = "Linux" ] && [ -r "/proc/${pid}/stat" ]; then
+        ppid="$(cut -f 4 -d ' ' "/proc/${pid}/stat")"
+        if [ -n "${ppid}" ]; then
+            # The below case accounts for the hidepid mount option for procfs, as well as setups with LSM
+            [ ! -r "/proc/${ppid}/comm" ] && return 1
+
+            [ "${ppid}" -eq "${pid}" ] && return 1
+
+            grep -q anacron "/proc/${ppid}/comm" && return 0
+
+            running_under_anacron "${ppid}" "$((iter + 1))"
+
+            return "$?"
+        fi
+    else
+        ppid="$(ps -o pid= -o ppid= 2>/dev/null | grep -e "^ *${pid}" | xargs | cut -f 2 -d ' ')"
+        if [ -n "${ppid}" ]; then
+            [ "${ppid}" -eq "${pid}" ] && return 1
+
+            ps -o pid= -o command= 2>/dev/null | grep -e "^ *${ppid}" | grep -q anacron && return 0
+
+            running_under_anacron "${ppid}" "$((iter + 1))"
+
+            return "$?"
+        fi
+    fi
+
+    return 1
+}
+
 _get_intervaldir() {
   if [ -d /etc/cron.daily ]; then
     echo /etc/cron.daily
@@ -396,15 +433,42 @@ check_for_curl() {
 _safe_download() {
   url="${1}"
   dest="${2}"
+  succeeded=0
+  checked=0
+
+  if echo "${url}" | grep -Eq "^file:///"; then
+    run cp "${url#file://}" "${dest}" || return 1
+    return 0
+  fi
 
   check_for_curl
 
   if [ -n "${curl}" ]; then
-    "${curl}" -fsSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
-    return $?
-  elif command -v wget > /dev/null 2>&1; then
-    wget -T 15 -O - "${url}" > "${dest}"
-    return $?
+    checked=1
+
+    if "${curl}" -fsSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"; then
+      succeeded=1
+    else
+      rm -f "${dest}"
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if wget -T 15 -O - "${url}" > "${dest}"; then
+        succeeded=1
+      else
+        rm -f "${dest}"
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     return 255
   fi
@@ -432,12 +496,20 @@ get_netdata_latest_tag() {
   check_for_curl
 
   if [ -n "${curl}" ]; then
-    tag=$("${curl}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eom 1 '[^/]*/?$')
-  elif command -v wget >/dev/null 2>&1; then
-    tag=$(wget -S -O /dev/null "${url}" 2>&1 | grep -m 1 Location | grep -Eo '[^/]*/?$')
-  else
+    tag=$("${curl}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}')
+  fi
+
+  if [ -z "${tag}" ]; then
+    if command -v wget >/dev/null 2>&1; then
+      tag=$(wget -S -O /dev/null "${url}" 2>&1 | grep Location)
+    fi
+  fi
+
+  if [ -z "${tag}" ]; then
     fatal "I need curl or wget to proceed, but neither of them are available on this system." U0006
   fi
+
+  tag="$(echo "${tag}" | grep -Eom 1 '[^/]*/?$')"
 
   # Fallback case for simpler local testing.
   if echo "${tag}" | grep -Eq 'latest/?$'; then
@@ -461,7 +533,17 @@ newer_commit_date() {
   info "Checking if a newer version of the updater script is available."
 
   commit_check_url="https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1"
-  python_version_check="from __future__ import print_function;import sys,json;data = json.load(sys.stdin);print(data[0]['commit']['committer']['date'] if isinstance(data, list) else '')"
+  python_version_check="
+from __future__ import print_function
+import sys, json
+
+try:
+    data = json.load(sys.stdin)
+except:
+    print('')
+else:
+    print(data[0]['commit']['committer']['date'] if isinstance(data, list) and data else '')
+"
 
   if command -v jq > /dev/null 2>&1; then
     commit_date="$(_safe_download "${commit_check_url}" /dev/stdout | jq '.[0].commit.committer.date' 2>/dev/null | tr -d '"')"
@@ -630,7 +712,11 @@ set_tarball_urls() {
     fi
   fi
 
-  if [ "$1" = "stable" ]; then
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" || exit 1; pwd)"
+    export NETDATA_TARBALL_URL="file://${path}/${filename}"
+    export NETDATA_TARBALL_CHECKSUM_URL="file://${path}/sha256sums.txt"
+  elif [ "$1" = "stable" ]; then
     latest="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")"
     export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/sha256sums.txt"
@@ -1014,6 +1100,10 @@ while [ -n "${1}" ]; do
     --force-update) NETDATA_FORCE_UPDATE=1 ;;
     --non-interactive) INTERACTIVE=0 ;;
     --interactive) INTERACTIVE=1 ;;
+    --offline-install-source)
+      NETDATA_OFFLINE_INSTALL_SOURCE="${2}"
+      shift 1
+      ;;
     --tmpdir-path)
       NETDATA_TMPDIR_PATH="${2}"
       shift 1
@@ -1031,6 +1121,18 @@ while [ -n "${1}" ]; do
 
   shift 1
 done
+
+if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+  NETDATA_NO_UPDATER_SELF_UPDATE=1
+  NETDATA_UPDATER_JITTER=0
+  NETDATA_FORCE_UPDATE=1
+fi
+
+# If we seem to be running under anacron, act as if we’re not running from cron.
+# This is mostly to disable jitter, which should not be needed when run from anacron.
+if running_under_anacron; then
+  NETDATA_NOT_RUNNING_FROM_CRON="${NETDATA_NOT_RUNNING_FROM_CRON:-1}"
+fi
 
 # Random sleep to alleviate stampede effect of Agents upgrading
 # and disconnecting/reconnecting at the same time (or near to).

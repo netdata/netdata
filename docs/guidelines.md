@@ -35,7 +35,7 @@ Check out our [blog](https://github.com/netdata/blog#readme) repo! Any blog subm
 
 #### Before you get started
 
-Anyone interested in contributing significantly to documentation should first read the [Netdata style guide](https://github.com/netdata/netdata/blob/master/docs/contributing/style-guide.md) and the [Netdata Community Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md).
+Anyone interested in contributing significantly to documentation should first read the [Netdata style guide](/docs/developer-and-contributor-corner/style-guide.md) and the [Netdata Community Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md).
 
 Netdata's documentation uses Markdown syntax. If you're not familiar with Markdown, read the [Mastering Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub for the basics on creating paragraphs, styled text, lists, tables, and more.
 
@@ -50,7 +50,7 @@ Please ensure that any links to a different documentation resource are fully exp
 e.g.
 
 ```
-[Correct link to this document](https://github.com/netdata/netdata/blob/master/docs/guidelines.md)
+[Correct link to this document](/docs/guidelines.md)
 vs
 [Incorrect link to this document](https://learn.netdata.cloud/XYZ)
 ```

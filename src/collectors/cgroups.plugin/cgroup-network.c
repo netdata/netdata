@@ -3,12 +3,6 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
-#ifdef HAVE_SETNS
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE             /* See feature_test_macros(7) */
-#endif
-#endif
-
 char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
 char env_netdata_log_method[FILENAME_MAX + 50] = "";
 char env_netdata_log_format[FILENAME_MAX + 50] = "";
@@ -427,19 +421,19 @@ void detect_veth_interfaces(pid_t pid) {
 
     host = read_proc_net_dev("host", netdata_configured_host_prefix);
     if(!host) {
-        errno = 0;
+        errno_clear();
         collector_error("cannot read host interface list.");
         goto cleanup;
     }
 
     if(!eligible_ifaces(host)) {
-        errno = 0;
+        errno_clear();
         collector_info("there are no double-linked host interfaces available.");
         goto cleanup;
     }
 
     if(switch_namespace(netdata_configured_host_prefix, pid)) {
-        errno = 0;
+        errno_clear();
         collector_error("cannot switch to the namespace of pid %u", (unsigned int) pid);
         goto cleanup;
     }
@@ -450,13 +444,13 @@ void detect_veth_interfaces(pid_t pid) {
 
     cgroup = read_proc_net_dev("cgroup", NULL);
     if(!cgroup) {
-        errno = 0;
+        errno_clear();
         collector_error("cannot read cgroup interface list.");
         goto cleanup;
     }
 
     if(!eligible_ifaces(cgroup)) {
-        errno = 0;
+        errno_clear();
         collector_error("there are not double-linked cgroup interfaces available.");
         goto cleanup;
     }
@@ -511,22 +505,20 @@ void call_the_helper(pid_t pid, const char *cgroup) {
 
     collector_info("running: %s", command);
 
-    pid_t cgroup_pid;
-    FILE *fp_child_input, *fp_child_output;
+    POPEN_INSTANCE *pi;
 
-    if(cgroup) {
-        (void)netdata_popen_raw_default_flags(&cgroup_pid, environment, &fp_child_input, &fp_child_output, PLUGINS_DIR "/cgroup-network-helper.sh", "--cgroup", cgroup);
-    }
+    if(cgroup)
+        pi = spawn_popen_run_variadic(PLUGINS_DIR "/cgroup-network-helper.sh", "--cgroup", cgroup, NULL);
     else {
         char buffer[100];
         snprintfz(buffer, sizeof(buffer) - 1, "%d", pid);
-        (void)netdata_popen_raw_default_flags(&cgroup_pid, environment, &fp_child_input, &fp_child_output, PLUGINS_DIR "/cgroup-network-helper.sh", "--pid", buffer);
+        pi = spawn_popen_run_variadic(PLUGINS_DIR "/cgroup-network-helper.sh", "--pid", buffer, NULL);
     }
 
-    if(fp_child_output) {
+    if(pi) {
         char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
         char *s;
-        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp_child_output))) {
+        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, spawn_popen_stdout(pi)))) {
             trim(s);
 
             if(*s && *s != '\n') {
@@ -542,7 +534,7 @@ void call_the_helper(pid_t pid, const char *cgroup) {
             }
         }
 
-        netdata_pclose(fp_child_input, fp_child_output, cgroup_pid);
+        spawn_popen_kill(pi);
     }
     else
         collector_error("cannot execute cgroup-network helper script: %s", command);
@@ -654,7 +646,6 @@ void usage(void) {
 int main(int argc, char **argv) {
     pid_t pid = 0;
 
-    program_version = VERSION;
     clocks_init();
     nd_log_initialize_for_external_plugins("cgroup-network");
 
@@ -692,7 +683,7 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
 
     if(argc == 2 && (!strcmp(argv[1], "version") || !strcmp(argv[1], "-version") || !strcmp(argv[1], "--version") || !strcmp(argv[1], "-v") || !strcmp(argv[1], "-V"))) {
-        fprintf(stderr, "cgroup-network %s\n", VERSION);
+        fprintf(stderr, "cgroup-network %s\n", NETDATA_VERSION);
         exit(0);
     }
 
@@ -708,7 +699,7 @@ int main(int argc, char **argv) {
         pid = atoi(argv[arg+1]);
 
         if(pid <= 0) {
-            errno = 0;
+            errno_clear();
             collector_error("Invalid pid %d given", (int) pid);
             return 2;
         }
@@ -726,7 +717,7 @@ int main(int argc, char **argv) {
         if(helper) call_the_helper(pid, cgroup);
 
         if(pid <= 0 && !detected_devices) {
-            errno = 0;
+            errno_clear();
             collector_error("Cannot find a cgroup PID from cgroup '%s'", cgroup);
         }
     }

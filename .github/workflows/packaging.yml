@@ -41,7 +41,7 @@ jobs:
           submodules: recursive
       - name: Check files
         id: check-files
-        uses: tj-actions/changed-files@v44
+        uses: tj-actions/changed-files@v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -53,7 +53,6 @@ jobs:
             **/*.patch
             **/*.cmake
             netdata.spec.in
-            contrib/debian/
             CMakeLists.txt
             .github/data/distros.yml
             .github/workflows/packaging.yml
@@ -69,6 +68,7 @@ jobs:
             src/web/server/h2o/libh2o/
           files_ignore: |
             **/*.md
+            packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
         env:
@@ -98,7 +98,8 @@ jobs:
       - name: Prepare tools
         id: prepare
         run: |
-          sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
+          sudo apt-get update || true
+          sudo apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
         run: |
@@ -248,7 +249,7 @@ jobs:
           timeout_seconds: 900
           command: |
             docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}
-            docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-v1
+            docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-${{ matrix.builder_rev }}
       - name: Build Packages
         id: build
         if: needs.file-check.outputs.run == 'true'
@@ -258,7 +259,7 @@ jobs:
                     -e ENABLE_SENTRY=${{ matrix.bundle_sentry }} -e RELEASE_PIPELINE=${{ env.RELEASE_PIPELINE }} \
                     -e BUILD_DESTINATION=${{ matrix.distro }}${{ matrix.version }}_${{ matrix.arch }} -e UPLOAD_SENTRY=${{ env.UPLOAD_SENTRY }} \
                     -e SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_CLI_TOKEN }} -e NETDATA_SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
-                     --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-v1
+                     --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-${{ matrix.builder_rev }}
       - name: Save Packages
         id: artifacts
         if: needs.file-check.outputs.run == 'true'
@@ -298,11 +299,34 @@ jobs:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
           known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Import GPG Keys
+        id: import-keys
+        if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
+      - name: Sign DEB Packages
+        id: sign-deb
+        if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
+        shell: bash
+        run: .github/scripts/deb-sign.sh artifacts ${{ steps.import-keys.outputs.fingerprint }}
       - name: Upload to packages.netdata.cloud
         id: package-upload
+        continue-on-error: true
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
         run: |
           .github/scripts/package-upload.sh \
+          packages.netdata.cloud \
+          ${{ matrix.repo_distro }} \
+          ${{ matrix.arch }} \
+          ${{ matrix.format }} \
+          ${{ needs.version-check.outputs.repo }}
+      - name: Upload to packages2.netdata.cloud
+        id: package2-upload
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
+        run: |
+          .github/scripts/package-upload.sh \
+          packages2.netdata.cloud \
           ${{ matrix.repo_distro }} \
           ${{ matrix.arch }} \
           ${{ matrix.format }} \
@@ -325,6 +349,9 @@ jobs:
               Publish to PackageCloud: ${{ steps.upload.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
               Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
+              Import GPG Keys: ${{ steps.import-keys.outcome }}
+              Sign DEB Packages: ${{ steps.sign-deb.outcome }}
+              Publish to packages2.netdata.cloud: ${{ steps.package2-upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{

@@ -225,6 +225,10 @@ void rrd_functions_host_destroy(RRDHOST *host) {
 
 // ----------------------------------------------------------------------------
 
+static inline bool is_function_hidden(const char *name, const char *tags) {
+    return (name && name[0] == '_' && name[1] == '_') || (tags && strstr(tags, RRDFUNCTIONS_TAG_HIDDEN) != NULL);
+}
+
 static inline bool is_function_dyncfg(const char *name) {
     if(!name || !*name)
         return false;
@@ -237,6 +241,15 @@ static inline bool is_function_dyncfg(const char *name) {
         return true;
 
     return false;
+}
+
+static inline RRD_FUNCTION_OPTIONS get_function_options(RRDSET *st, const char *name, const char *tags) {
+    if(is_function_dyncfg(name))
+        return RRD_FUNCTION_DYNCFG;
+
+    RRD_FUNCTION_OPTIONS options = st ? RRD_FUNCTION_LOCAL : RRD_FUNCTION_GLOBAL;
+
+    return options | (is_function_hidden(name, tags) ? RRD_FUNCTION_HIDDEN : 0);
 }
 
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority,
@@ -263,7 +276,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     struct rrd_host_function tmp = {
         .sync = sync,
         .timeout = timeout,
-        .options = st ? RRD_FUNCTION_LOCAL: (is_function_dyncfg(name) ? RRD_FUNCTION_DYNCFG : RRD_FUNCTION_GLOBAL),
+        .options = get_function_options(st, name, tags),
         .access = access,
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
@@ -294,17 +307,6 @@ void rrd_function_del(RRDHOST *host, RRDSET *st, const char *name) {
     dictionary_garbage_collect(host->functions);
 }
 
-int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
-    char buffer[PLUGINSD_LINE_MAX];
-    json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
-
-    buffer_flush(wb);
-    buffer_sprintf(wb, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
-    wb->content_type = CT_APPLICATION_JSON;
-    buffer_no_cacheable(wb);
-    return code;
-}
-
 int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, const DICTIONARY_ITEM **item) {
     char buffer[MAX_FUNCTION_LENGTH + 1];
     strncpyz(buffer, name, sizeof(buffer) - 1);
@@ -333,10 +335,10 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
                 s = &buffer[key_length - 1];
 
             // skip a word from the end
-            while (s >= buffer && !isspace(*s)) *s-- = '\0';
+            while (s >= buffer && !isspace((uint8_t)*s)) *s-- = '\0';
 
             // skip all spaces
-            while (s >= buffer && isspace(*s)) *s-- = '\0';
+            while (s >= buffer && isspace((uint8_t)*s)) *s-- = '\0';
         }
     }
 

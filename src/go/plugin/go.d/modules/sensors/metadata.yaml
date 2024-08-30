@@ -1,0 +1,159 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-sensors
+      plugin_name: go.d.plugin
+      module_name: sensors
+      monitored_instance:
+        name: Linux Sensors (lm-sensors)
+        link: https://hwmon.wiki.kernel.org/lm_sensors
+        icon_filename: "microchip.svg"
+        categories:
+          - data-collection.hardware-devices-and-sensors
+      keywords:
+        - sensors
+        - temperature
+        - voltage
+        - current
+        - power
+        - fan
+        - energy
+        - humidity
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: >
+          This collector gathers real-time system sensor statistics, 
+          including temperature, voltage, current, power, fan speed, energy consumption, and humidity, 
+          utilizing the [sensors](https://linux.die.net/man/1/sensors) binary or [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface).
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The following type of sensors are auto-detected:
+
+            - temperature
+            - fan
+            - voltage
+            - current
+            - power
+            - energy
+            - humidity
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/sensors.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: binary_path
+              description: Path to the `sensors` binary. If left empty or if the binary is not found, [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) will be used to collect sensor statistics.
+              default_value: /usr/bin/sensors
+              required: true
+            - name: timeout
+              description: Timeout for executing the binary, specified in seconds.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom binary path
+              description: The executable is not in the directories specified in the PATH environment variable.
+              config: |
+                jobs:
+                  - name: sensors
+                    binary_path: /usr/local/sbin/sensors
+            - name: Use sysfs instead of sensors
+              description: Set `binary_path` to an empty string to use sysfs.
+              config: |
+                jobs:
+                  - name: sensors
+                    binary_path: ""
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: sensor
+          description: These metrics refer to the sensor.
+          labels:
+            - name: chip
+              description: The hardware component responsible for the sensor monitoring.
+            - name: feature
+              description: The specific sensor or monitoring point provided by the chip.
+          metrics:
+            - name: sensors.sensor_temperature
+              description: Sensor temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: sensors.sensor_voltage
+              description: Sensor voltage
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: voltage
+            - name: sensors.sensor_current
+              description: Sensor current
+              unit: Amperes
+              chart_type: line
+              dimensions:
+                - name: current
+            - name: sensors.sensor_power
+              description: Sensor power
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: power
+            - name: sensors.sensor_fan_speed
+              description: Sensor fan speed
+              unit: RPM
+              chart_type: line
+              dimensions:
+                - name: fan
+            - name: sensors.sensor_energy
+              description: Sensor energy
+              unit: Joules
+              chart_type: line
+              dimensions:
+                - name: energy
+            - name: sensors.sensor_humidity
+              description: Sensor humidity
+              unit: percent
+              chart_type: area
+              dimensions:
+                - name: humidity

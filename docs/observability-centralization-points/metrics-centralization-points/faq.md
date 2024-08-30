@@ -4,7 +4,7 @@
 
 Netdata Parents generally scale well. According [to our tests](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/) Netdata Parents scale better than Prometheus for the same workload: -35% CPU utilization, -49% Memory Consumption, -12% Network Bandwidth, -98% Disk I/O, -75% Disk footprint.
 
-For more information, Check [Sizing Netdata Parents](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/metrics-centralization-points/sizing-netdata-parents.md).
+For more information, Check [Sizing Netdata Parents](/docs/observability-centralization-points/metrics-centralization-points/sizing-netdata-parents.md).
 
 ## If I set up a parents cluster, will I be able to have more Child nodes stream to them?
 
@@ -43,7 +43,7 @@ Yes. Function requests will be received by the Parents and forwarded to the Chil
 
 ## If I have a cluster of parents and get one out for maintenance for a few hours, will it have missing data when it returns back online?
 
-Check [Restoring a Netdata Parent after maintenance](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md).
+Check [Restoring a Netdata Parent after maintenance](/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md).
 
 ## I have a cluster of parents. Which one is used by Netdata Cloud?
 

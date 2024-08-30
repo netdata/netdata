@@ -235,10 +235,10 @@ static void ebpf_obsolete_mount_global(ebpf_module_t *em)
                               NETDATA_EBPF_MOUNT_CALLS,
                               "",
                               "Calls to mount and umount syscalls",
-                              EBPF_COMMON_DIMENSION_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_EBPF_MOUNT_FAMILY,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "mount_points.call",
                               NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
                               em->update_every);
 
@@ -246,10 +246,10 @@ static void ebpf_obsolete_mount_global(ebpf_module_t *em)
                               NETDATA_EBPF_MOUNT_ERRORS,
                               "",
                               "Errors to mount and umount file systems",
-                              EBPF_COMMON_DIMENSION_CALL,
+                              EBPF_COMMON_UNITS_CALLS_PER_SEC,
                               NETDATA_EBPF_MOUNT_FAMILY,
                               NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              "mount_points.error",
                               NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
                               em->update_every);
 }
@@ -261,9 +261,10 @@ static void ebpf_obsolete_mount_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
-static void ebpf_mount_exit(void *ptr)
+static void ebpf_mount_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -369,9 +370,9 @@ static void mount_collector(ebpf_module_t *em)
     int maps_per_core = em->maps_per_core;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
         counter = 0;
@@ -410,8 +411,8 @@ static void ebpf_create_mount_charts(int update_every)
 {
     ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_CALLS,
                       "Calls to mount and umount syscalls",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_MOUNT_FAMILY,
-                      NULL,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_EBPF_MOUNT_FAMILY,
+                      "mount_points.call",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
                       ebpf_create_global_dimension,
@@ -420,8 +421,8 @@ static void ebpf_create_mount_charts(int update_every)
 
     ebpf_create_chart(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY, NETDATA_EBPF_MOUNT_ERRORS,
                       "Errors to mount and umount file systems",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_EBPF_MOUNT_FAMILY,
-                      NULL,
+                      EBPF_COMMON_UNITS_CALLS_PER_SEC, NETDATA_EBPF_MOUNT_FAMILY,
+                      "mount_points.error",
                       NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
                       ebpf_create_global_dimension,
@@ -484,9 +485,9 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_mount_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_mount_exit, ptr);
+    ebpf_module_t *em = ptr;
+    CLEANUP_FUNCTION_REGISTER(ebpf_mount_exit) cleanup_ptr = em;
 
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = mount_maps;
 
 #ifdef LIBBPF_MAJOR_VERSION
@@ -512,6 +513,5 @@ void *ebpf_mount_thread(void *ptr)
 endmount:
     ebpf_update_disabled_plugin_stats(em);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

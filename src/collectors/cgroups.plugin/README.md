@@ -17,9 +17,9 @@ processes. When cgroups are bundled with namespaces (i.e. isolation), they form 
 cgroups are hierarchical, meaning that cgroups can contain child cgroups, which can contain more cgroups, etc. All
 accounting is reported (and resource usage limits are applied) also in a hierarchical way.
 
-To visualize cgroup metrics Netdata provides configuration for cherry picking the cgroups of interest. By default (
-without any configuration) Netdata should pick **systemd services**, all kinds of **containers** (lxc, docker, etc)
-and **virtual machines** spawn by managers that register them with cgroups (qemu, libvirt, etc).
+To visualize cgroup metrics Netdata provides configuration for cherry-picking the cgroups of interest. By default,
+Netdata should pick **systemd services**, all kinds of **containers** (lxc, docker, etc.) and **virtual machines** spawn
+by managers that register them with cgroups (qemu, libvirt, etc.).
 
 ## Configuring Netdata for cgroups
 
@@ -29,19 +29,10 @@ collects their metrics.
 ### How Netdata finds the available cgroups
 
 Linux exposes resource usage reporting and provides dynamic configuration for cgroups, using virtual files (usually)
-under `/sys/fs/cgroup`. Netdata reads `/proc/self/mountinfo` to detect the exact mount point of cgroups. Netdata also
-allows manual configuration of this mount point, using these settings:
+under `/sys/fs/cgroup`. Netdata reads `/proc/self/mountinfo` to detect the exact mount point of cgroups.
 
-```text
-[plugin:cgroups]
-	check for new cgroups every = 10
-	path to /sys/fs/cgroup/cpuacct = /sys/fs/cgroup/cpuacct
-	path to /sys/fs/cgroup/blkio = /sys/fs/cgroup/blkio
-	path to /sys/fs/cgroup/memory = /sys/fs/cgroup/memory
-	path to /sys/fs/cgroup/devices = /sys/fs/cgroup/devices
-```
-
-Netdata rescans these directories for added or removed cgroups every `check for new cgroups every` seconds.
+Netdata rescans directories inside `/sys/fs/cgroup` for added or removed cgroups every `checking for new cgroups every`
+seconds.
 
 ### Hierarchical search for cgroups
 
@@ -61,24 +52,10 @@ cgroups ([systemd services are monitored by Netdata](#monitoring-systemd-service
 desktop and remote user sessions), qemu virtual machines (child cgroups of virtual machines) and `init.scope`. All
 others are enabled.
 
-### Unified cgroups (cgroups v2) support
-
-Netdata automatically detects cgroups version. If detection fails Netdata assumes v1.
-To switch to v2 manually add:
-
-```text
-[plugin:cgroups]
-	use unified cgroups = yes
-	path to unified cgroups = /sys/fs/cgroup
-```
-
-Unified cgroups use same name pattern matching as v1 cgroups. `cgroup_enable_systemd_services_detailed_memory` is
-currently unsupported when using unified cgroups.
-
 ### Enabled cgroups
 
 To provide a sane default, Netdata uses the
-following [pattern list](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md):
+following [pattern list](/src/libnetdata/simple_pattern/README.md):
 
 - Checks the pattern against the path of the cgroup
 
@@ -106,7 +83,7 @@ The whole point for the additional pattern list, is to limit the number of times
 pattern list, the script might be called thousands of times, depending on the number of cgroups available in the system.
 
 The above pattern list is matched against the path of the cgroup. For matched cgroups, Netdata calls the
-script [cgroup-name.sh](https://raw.githubusercontent.com/netdata/netdata/master/src/collectors/cgroups.plugin/cgroup-name.sh)
+script [cgroup-name.sh](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/cgroup-name.sh.in)
 to get its name. This script queries `docker`, `kubectl`, `podman`, or applies heuristics to find give a name for the
 cgroup.
 
@@ -120,36 +97,21 @@ container names. To do this, ensure `podman system service` is running and Netda
 to `/run/podman/podman.sock` (the default permissions as specified by upstream are `0600`, with owner `root`, so you
 will have to adjust the configuration).
 
-[Docker Socket Proxy (HAProxy)](https://github.com/Tecnativa/docker-socket-proxy) or [CetusGuard](https://github.com/hectorm/cetusguard)
-can also be used to give Netdata restricted access to the socket. Note that `PODMAN_HOST` in Netdata's environment should
-be set to the proxy's URL in this case.
-
-### Charts with zero metrics
-
-By default, Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are
-ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be
-automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Set `yes` for a
-chart instead of `auto` to enable it permanently. For example:
-
-```text
-[plugin:cgroups]
-	enable memory (used mem including cache) = yes
-```
-
-You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero
-metrics for all internal Netdata plugins.
+[Docker Socket Proxy (HAProxy)](https://github.com/Tecnativa/docker-socket-proxy)
+or [CetusGuard](https://github.com/hectorm/cetusguard)
+can also be used to give Netdata restricted access to the socket. Note that `PODMAN_HOST` in Netdata's environment
+should be set to the proxy's URL in this case.
 
 ### Alerts
 
 CPU and memory limits are watched and used to rise alerts. Memory usage for every cgroup is checked against `ram`
-and `ram+swap` limits. CPU usage for every cgroup is checked against `cpuset.cpus` and `cpu.cfs_period_us` + `cpu.cfs_quota_us` pair assigned for the cgroup. Configuration for the alerts is available in `health.d/cgroups.conf`
-file.
+and `ram+swap` limits. CPU usage for every cgroup is checked against `cpuset.cpus`
+and `cpu.cfs_period_us` + `cpu.cfs_quota_us` pair assigned for the cgroup. Configuration for the alerts is available
+in `health.d/cgroups.conf` file.
 
 ## Monitoring systemd services
 
-Netdata monitors **systemd services**. Example:
-
-![image](https://cloud.githubusercontent.com/assets/2662304/21964372/20cd7b84-db53-11e6-98a2-b9c986b082c0.png)
+Netdata monitors **systemd services**.
 
 Support per distribution:
 
@@ -233,7 +195,8 @@ sudo systemctl daemon-reexec
 (`systemctl daemon-reload` does not reload the configuration of the server - so you have to
 execute `systemctl daemon-reexec`).
 
-Now, when you run `systemd-cgtop`, services will start reporting usage (if it does not, restart any service to wake it up). Refresh your Netdata dashboard, and you will have the charts too.
+Now, when you run `systemd-cgtop`, services will start reporting usage (if it does not, restart any service to wake it
+up). Refresh your Netdata dashboard, and you will have the charts too.
 
 In case memory accounting is missing, you will need to enable it at your kernel, by appending the following kernel boot
 options and rebooting:
@@ -260,15 +223,15 @@ Which systemd services are monitored by Netdata is determined by the following p
 Netdata monitors containers automatically when it is installed at the host, or when it is installed in a container that
 has access to the `/proc` and `/sys` filesystems of the host.
 
-Network interfaces and cgroups (containers) are self-cleaned. When a network interface or container stops, Netdata might log 
-a few errors in error.log complaining about files it cannot find, but immediately:
+Network interfaces and cgroups (containers) are self-cleaned. When a network interface or container stops, Netdata might
+log a few errors in error.log complaining about files it cannot find, but immediately:
 
 1. It will detect this is a removed container or network interface
 2. It will freeze/pause all alerts for them
 3. It will mark their charts as obsolete
 4. Obsolete charts are not be offered on new dashboard sessions (so hit F5 and the charts are gone)
 5. Existing dashboard sessions will continue to see them, but of course they will not refresh
-6. Obsolete charts will be removed from memory, 1 hour after the last user viewed them (configurable
+6. Obsolete charts will be removed from memory, 1 hour after the last user viewed them (configurable)
    with `[global].cleanup obsolete charts after seconds = 3600` (at `netdata.conf`).
 
 ### Monitored container metrics
@@ -297,4 +260,4 @@ a few errors in error.log complaining about files it cannot find, but immediatel
 - I/O full pressure
 
 Network interfaces are monitored by means of
-the [proc plugin](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/README.md#monitored-network-interface-metrics).
+the [proc plugin](/src/collectors/proc.plugin/README.md#monitored-network-interface-metrics).

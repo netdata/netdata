@@ -84,14 +84,14 @@ There are no alerts configured by default for this integration.
 
 #### Enable the go_expvar collector
 
-The `go_expvar` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md), which is typically at `/etc/netdata`, to edit the `python.d.conf` file.
+The `go_expvar` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config directory](/docs/netdata-agent/configuration/README.md), which is typically at `/etc/netdata`, to edit the `python.d.conf` file.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
 sudo ./edit-config python.d.conf
 ```
 
-Change the value of the `go_expvar` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
+Change the value of the `go_expvar` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
 
 
 #### Sample `expvar` usage in a Go application
@@ -172,7 +172,7 @@ The configuration file name for this integration is `python.d/go_expvar.conf`.
 
 
 You can edit the configuration file using the `edit-config` script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory).
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -192,7 +192,7 @@ Additionally, the following collapsed table contains all the options that can be
 Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified. Each JOB can be used to monitor a different Go application.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -231,8 +231,8 @@ See [this issue](https://github.com/netdata/netdata/pull/1902#issuecomment-28449
 
 Please see these two links to the official Netdata documentation for more information about the values:
 
--   [External plugins - charts](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#chart)
--   [Chart variables](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/README.md#global-variables-order-and-chart)
+-   [External plugins - charts](/src/collectors/plugins.d/README.md#chart)
+-   [Chart variables](/src/collectors/python.d.plugin/README.md#global-variables-order-and-chart)
 
 **Line definitions**
 
@@ -255,7 +255,7 @@ hidden: False
 ```
 
 Please see the following link for more information about the options and their default values:
-[External plugins - dimensions](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#dimension)
+[External plugins - dimensions](/src/collectors/plugins.d/README.md#dimension)
 
 Apart from top-level expvars, this plugin can also parse expvars stored in a multi-level map;
 All dicts in the resulting JSON document are then flattened to one level.
@@ -310,6 +310,7 @@ app1:
 
 ### Debug Mode
 
+
 To troubleshoot issues with the `go_expvar` collector, run the `python.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.
 
@@ -331,5 +332,38 @@ should give you clues as to why the collector isn't working.
   ```bash
   ./python.d.plugin go_expvar debug trace
   ```
+
+### Getting Logs
+
+If you're encountering problems with the `go_expvar` collector, follow these steps to retrieve logs and identify potential issues:
+
+- **Run the command** specific to your system (systemd, non-systemd, or Docker container).
+- **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
+
+#### System with systemd
+
+Use the following command to view logs generated since the last Netdata service restart:
+
+```bash
+journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep go_expvar
+```
+
+#### System without systemd
+
+Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
+
+```bash
+grep go_expvar /var/log/netdata/collector.log
+```
+
+**Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
+
+#### Docker Container
+
+If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
+
+```bash
+docker logs netdata 2>&1 | grep go_expvar
+```
 
 

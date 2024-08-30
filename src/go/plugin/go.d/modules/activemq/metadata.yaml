@@ -1,0 +1,230 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-activemq
+      module_name: activemq
+      plugin_name: go.d.plugin
+      monitored_instance:
+        categories:
+          - data-collection.message-brokers
+        icon_filename: activemq.png
+        name: ActiveMQ
+        link: https://activemq.apache.org/
+      alternative_monitored_instances: []
+      keywords:
+        - message broker
+      most_popular: false
+      info_provided_to_referring_integrations:
+        description: ""
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: go.d.plugin
+              module_name: httpcheck
+            - plugin_name: apps.plugin
+              module_name: apps
+    overview:
+      data_collection:
+        metrics_description: This collector monitors ActiveMQ queues and topics.
+        method_description: It collects metrics by sending HTTP requests to the Web Console API.
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector discovers instances running on the local host that provide metrics on port 8161.
+            On startup, it tries to collect metrics from:
+            
+            - http://localhost:8161
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/activemq.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://localhost:8161
+              required: true
+            - name: webadmin
+              description: Webadmin root path.
+              default_value: admin
+              required: true
+            - name: max_queues
+              description: Maximum number of concurrently collected queues.
+              default_value: 50
+              required: false
+            - name: max_topics
+              description: Maximum number of concurrently collected topics.
+              default_value: 50
+              required: false
+            - name: queues_filter
+              description: |
+                Queues filter. Syntax is [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
+              default_value: ""
+              required: false
+            - name: topics_filter
+              description: |
+                Topics filter. Syntax is [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
+              default_value: ""
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8161
+                    webadmin: admin
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8161
+                    webadmin: admin
+                    username: foo
+                    password: bar
+            - name: Filters and limits
+              description: Using filters and limits for queues and topics.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8161
+                    webadmin: admin
+                    max_queues: 100
+                    max_topics: 100
+                    queues_filter: '!sandr* *'
+                    topics_filter: '!sandr* *'
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8161
+                    webadmin: admin
+                
+                  - name: remote
+                    url: http://192.0.2.1:8161
+                    webadmin: admin
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: activemq.messages
+              availability: []
+              description: Messaged
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: enqueued
+                - name: dequeued
+            - name: activemq.unprocessed_messages
+              availability: []
+              description: Unprocessed Messages
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: unprocessed
+            - name: activemq.consumers
+              availability: []
+              description: Consumers
+              unit: consumers
+              chart_type: line
+              dimensions:
+                - name: consumers

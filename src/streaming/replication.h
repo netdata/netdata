@@ -17,9 +17,9 @@ struct replication_query_statistics replication_get_query_statistics(void);
 
 bool replicate_chart_response(RRDHOST *rh, RRDSET *rs, bool start_streaming, time_t after, time_t before);
 
-typedef ssize_t (*send_command)(const char *txt, void *data);
+typedef ssize_t (*send_command)(const char *txt, struct parser *parser);
 
-bool replicate_chart_request(send_command callback, void *callback_data,
+bool replicate_chart_request(send_command callback, struct parser *parser,
                              RRDHOST *rh, RRDSET *rs,
                              time_t child_first_entry, time_t child_last_entry, time_t child_wall_clock_time,
                              time_t response_first_start_time, time_t response_last_end_time);

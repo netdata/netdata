@@ -522,7 +522,7 @@ journalctl -f --namespace=nginx-logs
 
 Netdata will automatically pick the new namespace and present it at the list of sources of the dashboard.
 
-You can also instruct `systemd-cat-native` to log to a remote system, sending the logs to a `systemd-journal-remote` instance running on another server. Check [the manual of systemd-cat-native](https://github.com/netdata/netdata/blob/master/src/libnetdata/log/systemd-cat-native.md).
+You can also instruct `systemd-cat-native` to log to a remote system, sending the logs to a `systemd-journal-remote` instance running on another server. Check [the manual of systemd-cat-native](/src/libnetdata/log/systemd-cat-native.md).
 
 
 ## Performance
@@ -909,4 +909,4 @@ You can find the most common fields at 'man systemd.journal-fields'.
 
 ## `systemd-cat-native` options
 
-Read [the manual of systemd-cat-native](https://github.com/netdata/netdata/blob/master/src/libnetdata/log/systemd-cat-native.md).
+Read [the manual of systemd-cat-native](/src/libnetdata/log/systemd-cat-native.md).

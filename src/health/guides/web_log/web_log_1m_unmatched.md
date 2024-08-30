@@ -12,14 +12,4 @@ Web servers like NGINX and Apache2 give you the ability to modify the log patter
 
 You must create a new job in the `web_log` collector for your Agent.
 
-1. See how you can [configure this collector](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/web_log#configuration)
-
-2. Follow the job template specified in the [default web_log.conf file](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/web_log/web_log.conf#L53-L86), focus on the lines [83:85](https://github.com/netdata/netdata/blob/e6d9fbc4a53f1d35363e9b342231bb11627bafbd/collectors/python.d.plugin/web_log/web_log.conf#L83-L85) where you can see how you define a `custom_log_format`.
-
-3. Restart the Netdata Agent
-   ```
-   systemctl restart netdata
-   ```
-
-
-
+1. See how you can [configure this collector](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/weblog#configuration)

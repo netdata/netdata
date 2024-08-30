@@ -5,10 +5,8 @@
 
 #include "libnetdata/libnetdata.h"
 
-// disable libmnl for the moment
-#undef HAVE_LIBMNL
-
 #ifdef HAVE_LIBMNL
+#include <linux/rtnetlink.h>
 #include <linux/inet_diag.h>
 #include <linux/sock_diag.h>
 #include <linux/unix_diag.h>
@@ -67,36 +65,50 @@ struct local_port;
 struct local_socket_state;
 typedef void (*local_sockets_cb_t)(struct local_socket_state *state, struct local_socket *n, void *data);
 
+struct local_sockets_config {
+    bool listening;
+    bool inbound;
+    bool outbound;
+    bool local;
+    bool tcp4;
+    bool tcp6;
+    bool udp4;
+    bool udp6;
+    bool pid;
+    bool cmdline;
+    bool comm;
+    bool uid;
+    bool namespaces;
+    bool tcp_info;
+
+    size_t max_errors;
+    size_t max_concurrent_namespaces;
+
+    local_sockets_cb_t cb;
+    void *data;
+
+    const char *host_prefix;
+
+    // internal use
+    uint64_t net_ns_inode;
+};
+
 typedef struct local_socket_state {
-    struct {
-        bool listening;
-        bool inbound;
-        bool outbound;
-        bool local;
-        bool tcp4;
-        bool tcp6;
-        bool udp4;
-        bool udp6;
-        bool pid;
-        bool cmdline;
-        bool comm;
-        bool uid;
-        bool namespaces;
-        size_t max_errors;
-
-        local_sockets_cb_t cb;
-        void *data;
-
-        const char *host_prefix;
-    } config;
+    struct local_sockets_config config;
 
     struct {
+        size_t mnl_sends;
+        size_t namespaces_found;
+        size_t tcp_info_received;
         size_t pid_fds_processed;
         size_t pid_fds_opendir_failed;
         size_t pid_fds_readlink_failed;
         size_t pid_fds_parse_failed;
         size_t errors_encountered;
     } stats;
+
+    bool spawn_server_is_mine;
+    SPAWN_SERVER *spawn_server;
 
 #ifdef HAVE_LIBMNL
     bool use_nl;
@@ -106,6 +118,7 @@ typedef struct local_socket_state {
 
     ARAL *local_socket_aral;
     ARAL *pid_socket_aral;
+    SPINLOCK spinlock; // for namespaces
 
     uint64_t proc_self_net_ns_inode;
 
@@ -181,11 +194,20 @@ typedef struct local_socket {
     SOCKET_DIRECTION direction;
 
     uint8_t timer;
-    uint8_t retransmits;
+    uint8_t retransmits; // the # of packets currently queued for retransmission (not yet acknowledged)
     uint32_t expires;
     uint32_t rqueue;
     uint32_t wqueue;
     uid_t uid;
+
+    struct {
+        bool checked;
+        bool ipv46;
+    } ipv6ony;
+
+    union {
+        struct tcp_info tcp;
+    } info;
 
     char comm[TASK_COMM_LEN];
     STRING *cmdline;
@@ -201,16 +223,18 @@ typedef struct local_socket {
 #endif
 } LOCAL_SOCKET;
 
+static inline int local_sockets_spawn_server_callback(SPAWN_REQUEST *request);
+
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) __attribute__ ((format(__printf__, 2, 3)));
+static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) PRINTFLIKE(2, 3);
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
-    if(++ls->stats.errors_encountered == ls->config.max_errors) {
+    if(ls && ++ls->stats.errors_encountered == ls->config.max_errors) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-SOCKETS: max number of logs reached. Not logging anymore");
         return;
     }
 
-    if(ls->stats.errors_encountered > ls->config.max_errors)
+    if(ls && ls->stats.errors_encountered > ls->config.max_errors)
         return;
 
     char buf[16384];
@@ -220,6 +244,133 @@ static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
     va_end(args);
 
     nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-SOCKETS: %s", buf);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+static bool local_sockets_is_ipv4_mapped_ipv6_address(const struct in6_addr *addr) {
+    // An IPv4-mapped IPv6 address starts with 80 bits of zeros followed by 16 bits of ones
+    static const unsigned char ipv4_mapped_prefix[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF };
+    return memcmp(addr->s6_addr, ipv4_mapped_prefix, 12) == 0;
+}
+
+static bool local_sockets_is_loopback_address(struct socket_endpoint *se) {
+    if (se->family == AF_INET) {
+        // For IPv4, loopback addresses are in the 127.0.0.0/8 range
+        return (ntohl(se->ip.ipv4) >> 24) == 127; // Check if the first byte is 127
+    } else if (se->family == AF_INET6) {
+        // Check if the address is an IPv4-mapped IPv6 address
+        if (local_sockets_is_ipv4_mapped_ipv6_address(&se->ip.ipv6)) {
+            // Extract the last 32 bits (IPv4 address) and check if it's in the 127.0.0.0/8 range
+            uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
+            const uint32_t ipv4_addr = *((const uint32_t *)(ip6 + 12));
+            return (ntohl(ipv4_addr) >> 24) == 127;
+        }
+
+        // For IPv6, loopback address is ::1
+        return memcmp(&se->ip.ipv6, &in6addr_loopback, sizeof(se->ip.ipv6)) == 0;
+    }
+
+    return false;
+}
+
+static inline bool local_sockets_is_ipv4_reserved_address(uint32_t ip) {
+    // Check for the reserved address ranges
+    ip = ntohl(ip);
+    return (
+            (ip >> 24 == 10) ||                         // Private IP range (A class)
+            (ip >> 20 == (172 << 4) + 1) ||             // Private IP range (B class)
+            (ip >> 16 == (192 << 8) + 168) ||           // Private IP range (C class)
+            (ip >> 24 == 127) ||                        // Loopback address (127.0.0.0)
+            (ip >> 24 == 0) ||                          // Reserved (0.0.0.0)
+            (ip >> 24 == 169 && (ip >> 16) == 254) ||   // Link-local address (169.254.0.0)
+            (ip >> 16 == (192 << 8) + 0)                // Test-Net (192.0.0.0)
+            );
+}
+
+static inline bool local_sockets_is_private_address(struct socket_endpoint *se) {
+    if (se->family == AF_INET) {
+        return local_sockets_is_ipv4_reserved_address(se->ip.ipv4);
+    }
+    else if (se->family == AF_INET6) {
+        uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
+
+        // Check if the address is an IPv4-mapped IPv6 address
+        if (local_sockets_is_ipv4_mapped_ipv6_address(&se->ip.ipv6)) {
+            // Extract the last 32 bits (IPv4 address) and check if it's in the 127.0.0.0/8 range
+            const uint32_t ipv4_addr = *((const uint32_t *)(ip6 + 12));
+            return local_sockets_is_ipv4_reserved_address(ipv4_addr);
+        }
+
+        // Check for link-local addresses (fe80::/10)
+        if ((ip6[0] == 0xFE) && ((ip6[1] & 0xC0) == 0x80))
+            return true;
+
+        // Check for Unique Local Addresses (ULA) (fc00::/7)
+        if ((ip6[0] & 0xFE) == 0xFC)
+            return true;
+
+        // Check for multicast addresses (ff00::/8)
+        if (ip6[0] == 0xFF)
+            return true;
+
+        // For IPv6, loopback address is :: or ::1
+        return memcmp(&se->ip.ipv6, &in6addr_any, sizeof(se->ip.ipv6)) == 0 ||
+               memcmp(&se->ip.ipv6, &in6addr_loopback, sizeof(se->ip.ipv6)) == 0;
+    }
+
+    return false;
+}
+
+static bool local_sockets_is_multicast_address(struct socket_endpoint *se) {
+    if (se->family == AF_INET) {
+        // For IPv4, check if the address is 0.0.0.0
+        uint32_t ip = htonl(se->ip.ipv4);
+        return (ip >= 0xE0000000 && ip <= 0xEFFFFFFF);   // Multicast address range (224.0.0.0/4)
+    }
+    else if (se->family == AF_INET6) {
+        // For IPv6, check if the address is ff00::/8
+        uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
+        return ip6[0] == 0xff;
+    }
+
+    return false;
+}
+
+static bool local_sockets_is_zero_address(struct socket_endpoint *se) {
+    if (se->family == AF_INET) {
+        // For IPv4, check if the address is 0.0.0.0
+        return se->ip.ipv4 == 0;
+    }
+    else if (se->family == AF_INET6) {
+        // For IPv6, check if the address is ::
+        return memcmp(&se->ip.ipv6, &in6addr_any, sizeof(se->ip.ipv6)) == 0;
+    }
+
+    return false;
+}
+
+static inline const char *local_sockets_address_space(struct socket_endpoint *se) {
+    if(local_sockets_is_zero_address(se))
+        return "zero";
+    else if(local_sockets_is_loopback_address(se))
+        return "loopback";
+    else if(local_sockets_is_multicast_address(se))
+        return "multicast";
+    else if(local_sockets_is_private_address(se))
+        return "private";
+    else
+        return "public";
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+static inline bool is_local_socket_ipv46(LOCAL_SOCKET *n) {
+    return n->local.family == AF_INET6 &&
+            n->direction == SOCKET_DIRECTION_LISTEN &&
+            local_sockets_is_zero_address(&n->local) &&
+            n->ipv6ony.checked &&
+            n->ipv6ony.ipv46;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -425,123 +576,6 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static bool local_sockets_is_ipv4_mapped_ipv6_address(const struct in6_addr *addr) {
-    // An IPv4-mapped IPv6 address starts with 80 bits of zeros followed by 16 bits of ones
-    static const unsigned char ipv4_mapped_prefix[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF };
-    return memcmp(addr->s6_addr, ipv4_mapped_prefix, 12) == 0;
-}
-
-static bool local_sockets_is_loopback_address(struct socket_endpoint *se) {
-    if (se->family == AF_INET) {
-        // For IPv4, loopback addresses are in the 127.0.0.0/8 range
-        return (ntohl(se->ip.ipv4) >> 24) == 127; // Check if the first byte is 127
-    } else if (se->family == AF_INET6) {
-        // Check if the address is an IPv4-mapped IPv6 address
-        if (local_sockets_is_ipv4_mapped_ipv6_address(&se->ip.ipv6)) {
-            // Extract the last 32 bits (IPv4 address) and check if it's in the 127.0.0.0/8 range
-            uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
-            const uint32_t ipv4_addr = *((const uint32_t *)(ip6 + 12));
-            return (ntohl(ipv4_addr) >> 24) == 127;
-        }
-
-        // For IPv6, loopback address is ::1
-        return memcmp(&se->ip.ipv6, &in6addr_loopback, sizeof(se->ip.ipv6)) == 0;
-    }
-
-    return false;
-}
-
-static inline bool local_sockets_is_ipv4_reserved_address(uint32_t ip) {
-    // Check for the reserved address ranges
-    ip = ntohl(ip);
-    return (
-            (ip >> 24 == 10) ||                         // Private IP range (A class)
-            (ip >> 20 == (172 << 4) + 1) ||             // Private IP range (B class)
-            (ip >> 16 == (192 << 8) + 168) ||           // Private IP range (C class)
-            (ip >> 24 == 127) ||                        // Loopback address (127.0.0.0)
-            (ip >> 24 == 0) ||                          // Reserved (0.0.0.0)
-            (ip >> 24 == 169 && (ip >> 16) == 254) ||   // Link-local address (169.254.0.0)
-            (ip >> 16 == (192 << 8) + 0)                // Test-Net (192.0.0.0)
-            );
-}
-
-static inline bool local_sockets_is_private_address(struct socket_endpoint *se) {
-    if (se->family == AF_INET) {
-        return local_sockets_is_ipv4_reserved_address(se->ip.ipv4);
-    }
-    else if (se->family == AF_INET6) {
-        uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
-
-        // Check if the address is an IPv4-mapped IPv6 address
-        if (local_sockets_is_ipv4_mapped_ipv6_address(&se->ip.ipv6)) {
-            // Extract the last 32 bits (IPv4 address) and check if it's in the 127.0.0.0/8 range
-            const uint32_t ipv4_addr = *((const uint32_t *)(ip6 + 12));
-            return local_sockets_is_ipv4_reserved_address(ipv4_addr);
-        }
-
-        // Check for link-local addresses (fe80::/10)
-        if ((ip6[0] == 0xFE) && ((ip6[1] & 0xC0) == 0x80))
-            return true;
-
-        // Check for Unique Local Addresses (ULA) (fc00::/7)
-        if ((ip6[0] & 0xFE) == 0xFC)
-            return true;
-
-        // Check for multicast addresses (ff00::/8)
-        if (ip6[0] == 0xFF)
-            return true;
-
-        // For IPv6, loopback address is :: or ::1
-        return memcmp(&se->ip.ipv6, &in6addr_any, sizeof(se->ip.ipv6)) == 0 ||
-               memcmp(&se->ip.ipv6, &in6addr_loopback, sizeof(se->ip.ipv6)) == 0;
-    }
-
-    return false;
-}
-
-static bool local_sockets_is_multicast_address(struct socket_endpoint *se) {
-    if (se->family == AF_INET) {
-        // For IPv4, check if the address is 0.0.0.0
-        uint32_t ip = htonl(se->ip.ipv4);
-        return (ip >= 0xE0000000 && ip <= 0xEFFFFFFF);   // Multicast address range (224.0.0.0/4)
-    }
-    else if (se->family == AF_INET6) {
-        // For IPv6, check if the address is ff00::/8
-        uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
-        return ip6[0] == 0xff;
-    }
-
-    return false;
-}
-
-static bool local_sockets_is_zero_address(struct socket_endpoint *se) {
-    if (se->family == AF_INET) {
-        // For IPv4, check if the address is 0.0.0.0
-        return se->ip.ipv4 == 0;
-    }
-    else if (se->family == AF_INET6) {
-        // For IPv6, check if the address is ::
-        return memcmp(&se->ip.ipv6, &in6addr_any, sizeof(se->ip.ipv6)) == 0;
-    }
-
-    return false;
-}
-
-static inline const char *local_sockets_address_space(struct socket_endpoint *se) {
-    if(local_sockets_is_zero_address(se))
-        return "zero";
-    else if(local_sockets_is_loopback_address(se))
-        return "loopback";
-    else if(local_sockets_is_multicast_address(se))
-        return "multicast";
-    else if(local_sockets_is_private_address(se))
-        return "private";
-    else
-        return "public";
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-
 static inline void local_sockets_index_listening_port(LS_STATE *ls, LOCAL_SOCKET *n) {
     if(n->direction & SOCKET_DIRECTION_LISTEN) {
         // for the listening sockets, keep a hashtable with all the local ports
@@ -636,28 +670,31 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
 
 #ifdef HAVE_LIBMNL
 
-static inline void local_sockets_netlink_init(LS_STATE *ls) {
-    ls->use_nl = true;
+static inline void local_sockets_libmnl_init(LS_STATE *ls) {
     ls->nl = mnl_socket_open(NETLINK_INET_DIAG);
-    if (!ls->nl) {
-        local_sockets_log(ls, "cannot open netlink socket");
+    if (ls->nl == NULL) {
+        local_sockets_log(ls, "cannot open libmnl netlink socket");
         ls->use_nl = false;
     }
-
-    if (mnl_socket_bind(ls->nl, 0, MNL_SOCKET_AUTOPID) < 0) {
-        local_sockets_log(ls, "cannot bind netlink socket");
+    else if (mnl_socket_bind(ls->nl, 0, MNL_SOCKET_AUTOPID) < 0) {
+        local_sockets_log(ls, "cannot bind libmnl netlink socket");
+        mnl_socket_close(ls->nl);
+        ls->nl = NULL;
         ls->use_nl = false;
     }
+    else
+        ls->use_nl = true;
 }
 
-static inline void local_sockets_netlink_cleanup(LS_STATE *ls) {
+static inline void local_sockets_libmnl_cleanup(LS_STATE *ls) {
     if(ls->nl) {
         mnl_socket_close(ls->nl);
         ls->nl = NULL;
+        ls->use_nl = false;
     }
 }
 
-static inline int local_sockets_netlink_cb_data(const struct nlmsghdr *nlh, void *data) {
+static inline int local_sockets_libmnl_cb_data(const struct nlmsghdr *nlh, void *data) {
     LS_STATE *ls = data;
 
     struct inet_diag_msg *diag_msg = mnl_nlmsg_get_payload(nlh);
@@ -666,15 +703,19 @@ static inline int local_sockets_netlink_cb_data(const struct nlmsghdr *nlh, void
         .inode = diag_msg->idiag_inode,
         .direction = SOCKET_DIRECTION_NONE,
         .state = diag_msg->idiag_state,
+        .ipv6ony = {
+            .checked = false,
+            .ipv46 = false,
+        },
         .local = {
             .protocol = ls->tmp_protocol,
             .family = diag_msg->idiag_family,
-            .port = diag_msg->id.idiag_sport,
+            .port = ntohs(diag_msg->id.idiag_sport),
         },
         .remote = {
             .protocol = ls->tmp_protocol,
             .family = diag_msg->idiag_family,
-            .port = diag_msg->id.idiag_dport,
+            .port = ntohs(diag_msg->id.idiag_dport),
         },
         .timer = diag_msg->idiag_timer,
         .retransmits = diag_msg->idiag_retrans,
@@ -693,12 +734,37 @@ static inline int local_sockets_netlink_cb_data(const struct nlmsghdr *nlh, void
         memcpy(&n.remote.ip.ipv6, diag_msg->id.idiag_dst, sizeof(n.remote.ip.ipv6));
     }
 
+    struct rtattr *attr = (struct rtattr *)(diag_msg + 1);
+    int rtattrlen = nlh->nlmsg_len - NLMSG_LENGTH(sizeof(*diag_msg));
+    for (; !n.ipv6ony.checked && RTA_OK(attr, rtattrlen); attr = RTA_NEXT(attr, rtattrlen)) {
+        switch (attr->rta_type) {
+            case INET_DIAG_INFO: {
+                if(ls->tmp_protocol == IPPROTO_TCP) {
+                    struct tcp_info *info = (struct tcp_info *)RTA_DATA(attr);
+                    n.info.tcp = *info;
+                    ls->stats.tcp_info_received++;
+                }
+            }
+            break;
+
+            case INET_DIAG_SKV6ONLY: {
+                n.ipv6ony.checked = true;
+                int ipv6only = *(int *)RTA_DATA(attr);
+                n.ipv6ony.ipv46 = !ipv6only;
+            }
+            break;
+
+            default:
+                break;
+        }
+    }
+
     local_sockets_add_socket(ls, &n);
 
     return MNL_CB_OK;
 }
 
-static inline bool local_sockets_netlink_get_sockets(LS_STATE *ls, uint16_t family, uint16_t protocol) {
+static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t family, uint16_t protocol) {
     ls->tmp_protocol = protocol;
 
     char buf[MNL_SOCKET_BUFFER_SIZE];
@@ -710,14 +776,22 @@ static inline bool local_sockets_netlink_get_sockets(LS_STATE *ls, uint16_t fami
     req.sdiag_family = family;
     req.sdiag_protocol = protocol;
     req.idiag_states = -1;
+    req.idiag_ext = 0;
+
+    if(family == AF_INET6)
+        req.idiag_ext |= 1 << (INET_DIAG_SKV6ONLY - 1);
+
+    if(protocol == IPPROTO_TCP && ls->config.tcp_info)
+        req.idiag_ext |= 1 << (INET_DIAG_INFO - 1);
 
     nlh = mnl_nlmsg_put_header(buf);
     nlh->nlmsg_type = SOCK_DIAG_BY_FAMILY;
-    nlh->nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST;
+    nlh->nlmsg_flags = NLM_F_ROOT | NLM_F_MATCH | NLM_F_REQUEST;
     nlh->nlmsg_seq = seq = time(NULL);
     mnl_nlmsg_put_extra_header(nlh, sizeof(req));
     memcpy(mnl_nlmsg_get_payload(nlh), &req, sizeof(req));
 
+    ls->stats.mnl_sends++;
     if (mnl_socket_sendto(ls->nl, nlh, nlh->nlmsg_len) < 0) {
         local_sockets_log(ls, "mnl_socket_send failed");
         return false;
@@ -725,7 +799,7 @@ static inline bool local_sockets_netlink_get_sockets(LS_STATE *ls, uint16_t fami
 
     ssize_t ret;
     while ((ret = mnl_socket_recvfrom(ls->nl, buf, sizeof(buf))) > 0) {
-        ret = mnl_cb_run(buf, ret, seq, portid, local_sockets_netlink_cb_data, ls);
+        ret = mnl_cb_run(buf, ret, seq, portid, local_sockets_libmnl_cb_data, ls);
         if (ret <= MNL_CB_STOP)
             break;
     }
@@ -774,6 +848,10 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
 
         LOCAL_SOCKET n = {
             .direction = SOCKET_DIRECTION_NONE,
+            .ipv6ony = {
+                .checked = false,
+                .ipv46 = false,
+            },
             .local = {
                 .family = family,
                 .protocol = protocol,
@@ -904,6 +982,10 @@ static inline void local_sockets_detect_directions(LS_STATE *ls) {
 // --------------------------------------------------------------------------------------------------------------------
 
 static inline void local_sockets_init(LS_STATE *ls) {
+    ls->config.host_prefix = netdata_configured_host_prefix;
+
+    spinlock_init(&ls->spinlock);
+
     simple_hashtable_init_NET_NS(&ls->ns_hashtable, 1024);
     simple_hashtable_init_PID_SOCKET(&ls->pid_sockets_hashtable, 65535);
     simple_hashtable_init_LOCAL_SOCKET(&ls->sockets_hashtable, 65535);
@@ -923,9 +1005,36 @@ static inline void local_sockets_init(LS_STATE *ls) {
         65536,
         65536,
         NULL, NULL, NULL, false, true);
+
+    memset(&ls->stats, 0, sizeof(ls->stats));
+
+#ifdef HAVE_LIBMNL
+    ls->use_nl = false;
+    ls->nl = NULL;
+    ls->tmp_protocol = 0;
+    local_sockets_libmnl_init(ls);
+#endif
+
+    if(ls->config.namespaces && ls->spawn_server == NULL) {
+        ls->spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, NULL, local_sockets_spawn_server_callback, 0, NULL);
+        ls->spawn_server_is_mine = true;
+    }
+    else
+        ls->spawn_server_is_mine = false;
 }
 
 static inline void local_sockets_cleanup(LS_STATE *ls) {
+
+    if(ls->spawn_server_is_mine) {
+        spawn_server_destroy(ls->spawn_server);
+        ls->spawn_server = NULL;
+        ls->spawn_server_is_mine = false;
+    }
+
+#ifdef HAVE_LIBMNL
+    local_sockets_libmnl_cleanup(ls);
+#endif
+
     // free the sockets hashtable data
     for(SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_first_read_only_LOCAL_SOCKET(&ls->sockets_hashtable);
          sl;
@@ -963,8 +1072,8 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
 
 static inline void local_sockets_do_family_protocol(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
 #ifdef HAVE_LIBMNL
-    if(ls->use_nl) {
-        ls->use_nl = local_sockets_netlink_get_sockets(ls, family, protocol);
+    if(ls->nl && ls->use_nl) {
+        ls->use_nl = local_sockets_libmnl_get_sockets(ls, family, protocol);
 
         if(ls->use_nl)
             return;
@@ -974,7 +1083,7 @@ static inline void local_sockets_do_family_protocol(LS_STATE *ls, const char *fi
     local_sockets_read_proc_net_x(ls, filename, family, protocol);
 }
 
-static inline void local_sockets_read_sockets_from_proc(LS_STATE *ls) {
+static inline void local_sockets_read_all_system_sockets(LS_STATE *ls) {
     char path[FILENAME_MAX + 1];
 
     if(ls->config.namespaces) {
@@ -1036,7 +1145,54 @@ static inline void local_sockets_send_to_parent(struct local_socket_state *ls __
             local_sockets_log(ls, "failed to write cmdline to pipe");
 }
 
-static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_socket *ps, pid_t *pid) {
+static inline int local_sockets_spawn_server_callback(SPAWN_REQUEST *request) {
+    LS_STATE ls = { 0 };
+    ls.config = *((struct local_sockets_config *)request->data);
+
+    // we don't need these inside namespaces
+    ls.config.cmdline = false;
+    ls.config.comm = false;
+    ls.config.pid = false;
+    ls.config.namespaces = false;
+
+    // initialize local sockets
+    local_sockets_init(&ls);
+
+    ls.config.host_prefix = ""; // we need the /proc of the container
+
+    struct local_sockets_child_work cw = {
+        .net_ns_inode = ls.proc_self_net_ns_inode,
+        .fd = request->fds[1], // stdout
+    };
+
+    ls.config.cb = local_sockets_send_to_parent;
+    ls.config.data = &cw;
+    ls.proc_self_net_ns_inode = ls.config.net_ns_inode;
+
+    // switch namespace using the custom fd passed via the spawn server
+    if (setns(request->fds[3], CLONE_NEWNET) == -1) {
+        local_sockets_log(&ls, "failed to switch network namespace at child process using fd %d", request->fds[3]);
+        return EXIT_FAILURE;
+    }
+
+    // read all sockets from /proc
+    local_sockets_read_all_system_sockets(&ls);
+
+    // send all sockets to parent
+    local_sockets_foreach_local_socket_call_cb(&ls);
+
+    // send the terminating socket
+    struct local_socket zero = {
+        .net_ns_inode = ls.config.net_ns_inode,
+    };
+    local_sockets_send_to_parent(&ls, &zero, &cw);
+
+    local_sockets_cleanup(&ls);
+
+    return EXIT_SUCCESS;
+}
+
+static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, struct pid_socket *ps) {
     char filename[1024];
     snprintfz(filename, sizeof(filename), "%s/proc/%d/ns/net", ls->config.host_prefix, ps->pid);
 
@@ -1060,80 +1216,32 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
         return false;
     }
 
-    int pipefd[2];
-    if (pipe(pipefd) != 0) {
-        local_sockets_log(ls, "cannot create pipe");
+    if(ls->spawn_server == NULL) {
         close(fd);
+        local_sockets_log(ls, "spawn server is not available");
         return false;
     }
 
-    *pid = fork();
-    if (*pid == 0) {
-        // Child process
-        close(pipefd[0]);
+    struct local_sockets_config config = ls->config;
+    config.net_ns_inode = ps->net_ns_inode;
+    SPAWN_INSTANCE *si = spawn_server_exec(ls->spawn_server, STDERR_FILENO, fd, NULL, &config, sizeof(config), SPAWN_INSTANCE_TYPE_CALLBACK);
+    close(fd); fd = -1;
 
-        // local_sockets_log(ls, "child is here for inode %"PRIu64" and namespace %"PRIu64, ps->inode, ps->net_ns_inode);
-
-        struct local_sockets_child_work cw = {
-            .net_ns_inode = ps->net_ns_inode,
-            .fd = pipefd[1],
-        };
-
-        ls->config.host_prefix = ""; // we need the /proc of the container
-        ls->config.cb = local_sockets_send_to_parent;
-        ls->config.data = &cw;
-        ls->config.cmdline = false; // we have these already
-        ls->config.comm = false; // we have these already
-        ls->config.pid = false; // we have these already
-        ls->config.namespaces = false;
-        ls->proc_self_net_ns_inode = ps->net_ns_inode;
-
-
-        // switch namespace
-        if (setns(fd, CLONE_NEWNET) == -1) {
-            local_sockets_log(ls, "failed to switch network namespace at child process");
-            exit(EXIT_FAILURE);
-        }
-
-#ifdef HAVE_LIBMNL
-        local_sockets_netlink_cleanup(ls);
-        local_sockets_netlink_init(ls);
-#endif
-
-        // read all sockets from /proc
-        local_sockets_read_sockets_from_proc(ls);
-
-        // send all sockets to parent
-        local_sockets_foreach_local_socket_call_cb(ls);
-
-        // send the terminating socket
-        struct local_socket zero = {
-            .net_ns_inode = ps->net_ns_inode,
-        };
-        local_sockets_send_to_parent(ls, &zero, &cw);
-
-#ifdef HAVE_LIBMNL
-        local_sockets_netlink_cleanup(ls);
-#endif
-
-        close(pipefd[1]); // Close write end of pipe
-        exit(EXIT_SUCCESS);
+    if(si == NULL) {
+        local_sockets_log(ls, "cannot create spawn instance");
+        return false;
     }
-    // parent
-
-    close(fd);
-    close(pipefd[1]);
 
     size_t received = 0;
     struct local_socket buf;
-    while(read(pipefd[0], &buf, sizeof(buf)) == sizeof(buf)) {
+    while(read(spawn_server_instance_read_fd(si), &buf, sizeof(buf)) == sizeof(buf)) {
         size_t len = 0;
-        if(read(pipefd[0], &len, sizeof(len)) != sizeof(len))
+        if(read(spawn_server_instance_read_fd(si), &len, sizeof(len)) != sizeof(len))
             local_sockets_log(ls, "failed to read cmdline length from pipe");
 
         if(len) {
             char cmdline[len + 1];
-            if(read(pipefd[0], cmdline, len) != (ssize_t)len)
+            if(read(spawn_server_instance_read_fd(si), cmdline, len) != (ssize_t)len)
                 local_sockets_log(ls, "failed to read cmdline from pipe");
             else {
                 cmdline[len] = '\0';
@@ -1153,15 +1261,15 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
             break;
         }
 
+        spinlock_lock(&ls->spinlock);
+
         SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ls->sockets_hashtable, buf.inode, &buf, true);
         LOCAL_SOCKET *n = SIMPLE_HASHTABLE_SLOT_DATA(sl);
         if(n) {
             string_freez(buf.cmdline);
-
 //            local_sockets_log(ls,
 //                              "ns inode %" PRIu64" (comm: '%s', pid: %u, ns: %"PRIu64") already exists in hashtable (comm: '%s', pid: %u, ns: %"PRIu64") - ignoring duplicate",
 //                              buf.inode, buf.comm, buf.pid, buf.net_ns_inode, n->comm, n->pid, n->net_ns_inode);
-            continue;
         }
         else {
             n = aral_mallocz(ls->local_socket_aral);
@@ -1170,75 +1278,109 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
 
             local_sockets_index_listening_port(ls, n);
         }
+
+        spinlock_unlock(&ls->spinlock);
     }
 
-    close(pipefd[0]);
-
+    spawn_server_exec_kill(ls->spawn_server, si);
     return received > 0;
 }
 
-static inline void local_socket_waitpid(LS_STATE *ls, pid_t pid) {
-    if(!pid) return;
+struct local_sockets_namespace_worker {
+    LS_STATE *ls;
+    uint64_t inode;
+};
 
-    int status;
-    waitpid(pid, &status, 0);
+static inline void *local_sockets_get_namespace_sockets(void *arg) {
+    struct local_sockets_namespace_worker *data = arg;
+    LS_STATE *ls = data->ls;
+    const uint64_t inode = data->inode;
 
-    if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
-        local_sockets_log(ls, "Child exited with status %d", WEXITSTATUS(status));
-    else if (WIFSIGNALED(status))
-        local_sockets_log(ls, "Child terminated by signal %d", WTERMSIG(status));
+    spinlock_lock(&ls->spinlock);
+
+    // find a pid_socket that has this namespace
+    for(SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl_pid = simple_hashtable_first_read_only_PID_SOCKET(&ls->pid_sockets_hashtable) ;
+        sl_pid ;
+        sl_pid = simple_hashtable_next_read_only_PID_SOCKET(&ls->pid_sockets_hashtable, sl_pid)) {
+        struct pid_socket *ps = SIMPLE_HASHTABLE_SLOT_DATA(sl_pid);
+        if(!ps || ps->net_ns_inode != inode) continue;
+
+        // now we have a pid that has the same namespace inode
+
+        spinlock_unlock(&ls->spinlock);
+        const bool worked = local_sockets_get_namespace_sockets_with_pid(ls, ps);
+        spinlock_lock(&ls->spinlock);
+
+        if(worked)
+            break;
+    }
+
+    spinlock_unlock(&ls->spinlock);
+
+    return NULL;
 }
 
 static inline void local_sockets_namespaces(LS_STATE *ls) {
-    pid_t children[5] = { 0 };
-    size_t last_child = 0;
+    size_t threads = ls->config.max_concurrent_namespaces;
+    if(threads == 0) threads = 5;
+    if(threads > 100) threads = 100;
+
+    size_t last_thread = 0;
+    ND_THREAD *workers[threads];
+    struct local_sockets_namespace_worker workers_data[threads];
+    memset(workers, 0, sizeof(workers));
+    memset(workers_data, 0, sizeof(workers_data));
+
+    spinlock_lock(&ls->spinlock);
 
     for(SIMPLE_HASHTABLE_SLOT_NET_NS *sl = simple_hashtable_first_read_only_NET_NS(&ls->ns_hashtable);
          sl;
          sl = simple_hashtable_next_read_only_NET_NS(&ls->ns_hashtable, sl)) {
-        uint64_t inode = (uint64_t)SIMPLE_HASHTABLE_SLOT_DATA(sl);
+         const uint64_t inode = (uint64_t)SIMPLE_HASHTABLE_SLOT_DATA(sl);
 
         if(inode == ls->proc_self_net_ns_inode)
             continue;
 
-        // find a pid_socket that has this namespace
-        for(SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl_pid = simple_hashtable_first_read_only_PID_SOCKET(&ls->pid_sockets_hashtable) ;
-            sl_pid ;
-            sl_pid = simple_hashtable_next_read_only_PID_SOCKET(&ls->pid_sockets_hashtable, sl_pid)) {
-            struct pid_socket *ps = SIMPLE_HASHTABLE_SLOT_DATA(sl_pid);
-            if(!ps || ps->net_ns_inode != inode) continue;
+        spinlock_unlock(&ls->spinlock);
 
-            if(++last_child >= 5)
-                last_child = 0;
+        ls->stats.namespaces_found++;
 
-            local_socket_waitpid(ls, children[last_child]);
-            children[last_child] = 0;
+        if(workers[last_thread] != NULL) {
+            if(++last_thread >= threads)
+                last_thread = 0;
 
-            // now we have a pid that has the same namespace inode
-            if(local_sockets_get_namespace_sockets(ls, ps, &children[last_child]))
-                break;
+            if(workers[last_thread]) {
+                nd_thread_join(workers[last_thread]);
+                workers[last_thread] = NULL;
+            }
         }
+
+        workers_data[last_thread].ls = ls;
+        workers_data[last_thread].inode = inode;
+        workers[last_thread] = nd_thread_create(
+            "local-sockets-worker", NETDATA_THREAD_OPTION_JOINABLE,
+            local_sockets_get_namespace_sockets, &workers_data[last_thread]);
+
+        spinlock_lock(&ls->spinlock);
     }
 
-    for(size_t i = 0; i < 5 ;i++)
-        local_socket_waitpid(ls, children[i]);
+    spinlock_unlock(&ls->spinlock);
+
+    // wait all the threads running
+    for(size_t i = 0; i < threads ;i++) {
+        if(workers[i])
+            nd_thread_join(workers[i]);
+    }
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
 static inline void local_sockets_process(LS_STATE *ls) {
-
-#ifdef HAVE_LIBMNL
-    local_sockets_netlink_init(ls);
-#endif
-
-    ls->config.host_prefix = netdata_configured_host_prefix;
-
     // initialize our hashtables
     local_sockets_init(ls);
 
     // read all sockets from /proc
-    local_sockets_read_sockets_from_proc(ls);
+    local_sockets_read_all_system_sockets(ls);
 
     // check all socket namespaces
     if(ls->config.namespaces)
@@ -1253,10 +1395,6 @@ static inline void local_sockets_process(LS_STATE *ls) {
 
     // free all memory
     local_sockets_cleanup(ls);
-
-#ifdef HAVE_LIBMNL
-    local_sockets_netlink_cleanup(ls);
-#endif
 }
 
 static inline void ipv6_address_to_txt(struct in6_addr *in6_addr, char *dst) {

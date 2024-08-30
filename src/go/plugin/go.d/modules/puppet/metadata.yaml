@@ -1,0 +1,184 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-puppet
+      plugin_name: go.d.plugin
+      module_name: puppet
+      monitored_instance:
+        name: Puppet
+        link: "https://www.puppet.com/"
+        categories:
+          - data-collection.ci-cd-systems
+        icon_filename: "puppet.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - puppet
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Puppet metrics, including JVM heap and non-heap memory, CPU usage, and file descriptors.
+        method_description: |
+          It uses Puppet's metrics API endpoint [/status/v1/services](https://www.puppet.com/docs/puppetserver/5.3/status-api/v1/services.html) to gather the metrics.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects Puppet instances running on localhost that are listening on port 8140.
+            On startup, it tries to collect metrics from:
+
+            - https://127.0.0.1:8140
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "go.d/puppet.conf"
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: ""
+            enabled: true
+          list:
+            - name: url
+              description: The base URL where the Puppet instance can be accessed.
+              default_value: https://127.0.0.1:8140
+              required: true
+            - name: timeout
+              description: HTTPS request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTPS authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTPS authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTPS authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTPS authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTPS request method.
+              default_value: POST
+              required: false
+            - name: body
+              description: HTTPS request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTPS request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: "Config"
+          list:
+            - name: Basic with self-signed certificate
+              description: Puppet with self-signed TLS certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:8140
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:8140
+                    tls_skip_verify: yes
+
+                  - name: remote
+                    url: https://192.0.2.1:8140
+                    tls_skip_verify: yes
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: puppet.jvm_heap
+              description: JVM Heap
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: committed
+                - name: used
+            - name: puppet.jvm_nonheap
+              description: JVM Non-Heap
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: committed
+                - name: used
+            - name: puppet.cpu
+              description: CPU usage
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: execution
+                - name: GC
+            - name: puppet.fdopen
+              description: File Descriptors
+              unit: "descriptors"
+              chart_type: line
+              dimensions:
+                - name: used

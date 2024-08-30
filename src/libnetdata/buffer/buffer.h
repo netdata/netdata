@@ -141,6 +141,9 @@ static inline void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE typ
     assert(wb->json.depth <= BUFFER_JSON_MAX_DEPTH && "BUFFER JSON: max nesting reached");
 #endif
     wb->json.depth++;
+#ifdef NETDATA_INTERNAL_CHECKS
+    assert(wb->json.depth >= 0 && "Depth wrapped around and is negative");
+#endif
     wb->json.stack[wb->json.depth].count = 0;
     wb->json.stack[wb->json.depth].type = type;
 }
@@ -149,13 +152,10 @@ static inline void _buffer_json_depth_pop(BUFFER *wb) {
     wb->json.depth--;
 }
 
-static inline void buffer_fast_charcat(BUFFER *wb, const char c) {
-
+static inline void buffer_putc(BUFFER *wb, char c) {
     buffer_need_bytes(wb, 2);
-    *(&wb->buffer[wb->len]) = c;
-    wb->len += 1;
+    wb->buffer[wb->len++] = c;
     wb->buffer[wb->len] = '\0';
-
     buffer_overflow_check(wb);
 }
 
@@ -175,13 +175,6 @@ static inline void buffer_fast_rawcat(BUFFER *wb, const char *txt, size_t len) {
     wb->len += len;
     wb->buffer[wb->len] = '\0';
 
-    buffer_overflow_check(wb);
-}
-
-static inline void buffer_putc(BUFFER *wb, char c) {
-    buffer_need_bytes(wb, 2);
-    wb->buffer[wb->len++] = c;
-    wb->buffer[wb->len] = '\0';
     buffer_overflow_check(wb);
 }
 
@@ -772,7 +765,7 @@ static inline void buffer_json_member_add_quoted_string(BUFFER *wb, const char *
     wb->json.stack[wb->json.depth].count++;
 }
 
-static inline void buffer_json_member_add_uuid(BUFFER *wb, const char *key, uuid_t *value) {
+static inline void buffer_json_member_add_uuid_ptr(BUFFER *wb, const char *key, nd_uuid_t *value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
     buffer_fast_strcat(wb, ":", 1);
@@ -780,6 +773,22 @@ static inline void buffer_json_member_add_uuid(BUFFER *wb, const char *key, uuid
     if(value && !uuid_is_null(*value)) {
         char uuid[GUID_LEN + 1];
         uuid_unparse_lower(*value, uuid);
+        buffer_json_add_string_value(wb, uuid);
+    }
+    else
+        buffer_json_add_string_value(wb, NULL);
+
+    wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_member_add_uuid(BUFFER *wb, const char *key, nd_uuid_t value) {
+    buffer_print_json_comma_newline_spacing(wb);
+    buffer_print_json_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+
+    if(!uuid_is_null(value)) {
+        char uuid[GUID_LEN + 1];
+        uuid_unparse_lower(value, uuid);
         buffer_json_add_string_value(wb, uuid);
     }
     else
@@ -834,7 +843,7 @@ static inline void buffer_json_add_array_item_string(BUFFER *wb, const char *val
     wb->json.stack[wb->json.depth].count++;
 }
 
-static inline void buffer_json_add_array_item_uuid(BUFFER *wb, uuid_t *value) {
+static inline void buffer_json_add_array_item_uuid(BUFFER *wb, nd_uuid_t *value) {
     if(value && !uuid_is_null(*value)) {
         char uuid[GUID_LEN + 1];
         uuid_unparse_lower(*value, uuid);
@@ -844,7 +853,7 @@ static inline void buffer_json_add_array_item_uuid(BUFFER *wb, uuid_t *value) {
         buffer_json_add_array_item_string(wb, NULL);
 }
 
-static inline void buffer_json_add_array_item_uuid_compact(BUFFER *wb, uuid_t *value) {
+static inline void buffer_json_add_array_item_uuid_compact(BUFFER *wb, nd_uuid_t *value) {
     if(value && !uuid_is_null(*value)) {
         char uuid[GUID_LEN + 1];
         uuid_unparse_lower_compact(*value, uuid);

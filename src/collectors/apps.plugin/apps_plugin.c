@@ -51,7 +51,6 @@ size_t
     inodes_changed_counter = 0,
     links_changed_counter = 0,
     targets_assignment_counter = 0,
-    all_pids_count = 0, // the number of processes running
     apps_groups_targets_count = 0;       // # of apps_groups.conf targets
 
 int
@@ -136,20 +135,6 @@ struct target
 
 size_t pagesize;
 
-struct pid_stat
-        *root_of_pids = NULL,   // global list of all processes running
-        **all_pids = NULL;      // to avoid allocations, we pre-allocate
-                                // a pointer for each pid in the entire pid space.
-
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-// Another pre-allocated list of all possible pids.
-// We need it to pids and assign them a unique sortlist id, so that we
-// read parents before children. This is needed to prevent a situation where
-// a child is found running, but until we read its parent, it has exited and
-// its parent has accumulated its resources.
-pid_t *all_pids_sortlist = NULL;
-#endif
-
 // ----------------------------------------------------------------------------
 
 int managed_log(struct pid_stat *p, PID_LOG log, int status) {
@@ -208,7 +193,7 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status) {
                 }
             }
         }
-        errno = 0;
+        errno_clear();
     }
     else if(unlikely(p->log_thrown & log)) {
         // netdata_log_error("unsetting log %u on pid %d", log, p->pid);
@@ -300,12 +285,14 @@ static void apply_apps_groups_targets_inheritance(void) {
     }
 
     // init goes always to default target
-    if(all_pids[INIT_PID] && !all_pids[INIT_PID]->matched_by_config)
-        all_pids[INIT_PID]->target = apps_groups_default_target;
+    struct pid_stat *pi = find_pid_entry(INIT_PID);
+    if(pi && !pi->matched_by_config)
+        pi->target = apps_groups_default_target;
 
     // pid 0 goes always to default target
-    if(all_pids[0] && !all_pids[INIT_PID]->matched_by_config)
-        all_pids[0]->target = apps_groups_default_target;
+    pi = find_pid_entry(0);
+    if(pi && !pi->matched_by_config)
+        pi->target = apps_groups_default_target;
 
     // give a default target on all top level processes
     if(unlikely(debug_enabled)) loops++;
@@ -320,8 +307,9 @@ static void apply_apps_groups_targets_inheritance(void) {
             p->sortlist = sortlist++;
     }
 
-    if(all_pids[1])
-        all_pids[1]->sortlist = sortlist++;
+    pi = find_pid_entry(1);
+    if(pi)
+        pi->sortlist = sortlist++;
 
     // give a target to all merged child processes
     found = 1;
@@ -552,7 +540,7 @@ static void normalize_utilization(struct target *root) {
     // here we try to eliminate them by disabling childs processing either for specific dimensions
     // or entirely. Of course, either way, we disable it just a single iteration.
 
-    kernel_uint_t max_time = get_system_cpus() * time_factor * RATES_DETAIL;
+    kernel_uint_t max_time = os_get_system_cpus() * time_factor * RATES_DETAIL;
     kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
 
     if(global_utime > max_time) global_utime = max_time;
@@ -729,7 +717,7 @@ static void parse_args(int argc, char **argv)
         }
 
         if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
-            printf("apps.plugin %s\n", VERSION);
+            printf("apps.plugin %s\n", NETDATA_VERSION);
             exit(0);
         }
 
@@ -863,7 +851,7 @@ static void parse_args(int argc, char **argv)
 #endif
                     " version or -v or -V print program version and exit\n"
                     "\n"
-                    , VERSION
+                    , NETDATA_VERSION
 #if !defined(__FreeBSD__) && !defined(__APPLE__)
                     , max_fds_cache_seconds
 #endif
@@ -1013,7 +1001,7 @@ int main(int argc, char **argv) {
 
     procfile_adaptive_initial_allocation = 1;
 
-    get_system_HZ();
+    os_get_system_HZ();
 #if defined(__FreeBSD__)
     time_factor = 1000000ULL / RATES_DETAIL; // FreeBSD uses usecs
 #endif
@@ -1025,8 +1013,8 @@ int main(int argc, char **argv) {
     time_factor = system_hz; // Linux uses clock ticks
 #endif
 
-    get_system_pid_max();
-    get_system_cpus_uncached();
+    os_get_system_pid_max();
+    os_get_system_cpus_uncached();
 
     parse_args(argc, argv);
 
@@ -1052,12 +1040,7 @@ int main(int argc, char **argv) {
     netdata_log_info("started on pid %d", getpid());
 
     users_and_groups_init();
-
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-    all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max + 1);
-#endif
-
-    all_pids          = callocz(sizeof(struct pid_stat *), (size_t) pid_max + 1);
+    pids_init();
 
     // ------------------------------------------------------------------------
     // the event loop for functions

@@ -99,7 +99,7 @@ void rrdcontext_updated_rrddim_multiplier(RRDDIM *rd);
 void rrdcontext_updated_rrddim_divisor(RRDDIM *rd);
 void rrdcontext_updated_rrddim_flags(RRDDIM *rd);
 void rrdcontext_collected_rrddim(RRDDIM *rd);
-int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, uuid_t *store_uuid);
+int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, nd_uuid_t *store_uuid);
 
 // ----------------------------------------------------------------------------
 // public API for rrdsets
@@ -110,7 +110,7 @@ void rrdcontext_updated_rrdset_name(RRDSET *st);
 void rrdcontext_updated_rrdset_flags(RRDSET *st);
 void rrdcontext_updated_retention_rrdset(RRDSET *st);
 void rrdcontext_collected_rrdset(RRDSET *st);
-int rrdcontext_find_chart_uuid(RRDSET *st, uuid_t *store_uuid);
+int rrdcontext_find_chart_uuid(RRDSET *st, nd_uuid_t *store_uuid);
 
 // ----------------------------------------------------------------------------
 // public API for ACLK
@@ -165,7 +165,7 @@ typedef struct query_alerts_counts {    // counts the number of alerts related t
     size_t other;                       // number of alerts in any other state
 } QUERY_ALERTS_COUNTS;
 
-typedef struct query_node {
+typedef struct _query_node {
     uint32_t slot;
     RRDHOST *rrdhost;
     char node_id[UUID_STR_LEN];
@@ -177,7 +177,7 @@ typedef struct query_node {
     QUERY_ALERTS_COUNTS alerts;
 } QUERY_NODE;
 
-typedef struct query_context {
+typedef struct _query_context {
     uint32_t slot;
     RRDCONTEXT_ACQUIRED *rca;
 
@@ -187,7 +187,7 @@ typedef struct query_context {
     QUERY_ALERTS_COUNTS alerts;
 } QUERY_CONTEXT;
 
-typedef struct query_instance {
+typedef struct _query_instance {
     uint32_t slot;
     uint32_t query_host_id;
     RRDINSTANCE_ACQUIRED *ria;
@@ -199,14 +199,14 @@ typedef struct query_instance {
     QUERY_ALERTS_COUNTS alerts;
 } QUERY_INSTANCE;
 
-typedef struct query_dimension {
+typedef struct _query_dimension {
     uint32_t slot;
     uint32_t priority;
     RRDMETRIC_ACQUIRED *rma;
     QUERY_STATUS status;
 } QUERY_DIMENSION;
 
-typedef struct query_metric {
+typedef struct _query_metric {
     RRDR_DIMENSION_FLAGS status;
 
     struct query_metric_tier {
@@ -300,7 +300,7 @@ typedef struct query_target_request {
     qt_interrupt_callback_t interrupt_callback;
     void *interrupt_callback_data;
 
-    uuid_t *transaction;
+    nd_uuid_t *transaction;
 } QUERY_TARGET_REQUEST;
 
 #define GROUP_BY_MAX_LABEL_KEYS 10
@@ -421,9 +421,9 @@ typedef struct query_target {
 
 struct sql_alert_transition_data {
     usec_t global_id;
-    uuid_t *transition_id;
-    uuid_t *host_id;
-    uuid_t *config_hash_id;
+    nd_uuid_t *transition_id;
+    nd_uuid_t *host_id;
+    nd_uuid_t *config_hash_id;
     uint32_t alarm_id;
     const char *alert_name;
     const char *chart;
@@ -454,7 +454,7 @@ struct sql_alert_transition_data {
 };
 
 struct sql_alert_config_data {
-    uuid_t *config_hash_id;
+    nd_uuid_t *config_hash_id;
     const char *name;
 
     struct {
@@ -539,9 +539,9 @@ struct sql_alert_instance_v2_entry {
     time_t last_updated;
     time_t last_status_change;
     NETDATA_DOUBLE last_status_change_value;
-    uuid_t config_hash_id;
+    nd_uuid_t config_hash_id;
     usec_t global_id;
-    uuid_t last_transition_id;
+    nd_uuid_t last_transition_id;
     uint32_t alarm_id;
     RRDHOST *host;
     size_t ni;
@@ -623,10 +623,10 @@ struct api_v2_contexts_request {
     char *contexts;
     char *q;
 
-    CONTEXTS_V2_OPTIONS options;
+    CONTEXTS_OPTIONS options;
 
     struct {
-        CONTEXTS_V2_ALERT_STATUS status;
+        CONTEXTS_ALERT_STATUS status;
         char *alert;
         char *transition;
         uint32_t last;

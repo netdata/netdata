@@ -37,6 +37,7 @@ void rrdlabels_destroy(RRDLABELS *labels_dict);
 void rrdlabels_add(RRDLABELS *labels, const char *name, const char *value, RRDLABEL_SRC ls);
 void rrdlabels_add_pair(RRDLABELS *labels, const char *string, RRDLABEL_SRC ls);
 void rrdlabels_value_to_buffer_array_item_or_null(RRDLABELS *labels, BUFFER *wb, const char *key);
+void rrdlabels_key_to_buffer_array_item(RRDLABELS *labels, BUFFER *wb);
 void rrdlabels_get_value_strdup_or_null(RRDLABELS *labels, char **value, const char *key);
 void rrdlabels_get_value_to_buffer_or_unset(RRDLABELS *labels, BUFFER *wb, const char *key, const char *unset);
 bool rrdlabels_exist(RRDLABELS *labels, const char *key);

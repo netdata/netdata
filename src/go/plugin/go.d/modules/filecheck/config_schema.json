@@ -1,0 +1,164 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Filecheck collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "discovery_every": {
+        "title": "Scan interval",
+        "description": "Scan frequency interval (seconds) for files and directories with patterns (globs) in their paths.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 60
+      },
+      "files": {
+        "title": "File selector",
+        "description": "Configuration for monitoring specific files. If left empy, no files will be monitored.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "include": {
+            "title": "Include",
+            "description": "Include files that match any of the specified include [patterns](https://golang.org/pkg/path/filepath/#Match).",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Filepath",
+              "type": "string",
+              "pattern": "^$|^/"
+            },
+            "uniqueItems": true
+          },
+          "exclude": {
+            "title": "Exclude",
+            "description": "Exclude files that match any of the specified exclude [patterns](https://golang.org/pkg/path/filepath/#Match).",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Filepath",
+              "type": "string",
+              "pattern": "^$|^/"
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "include"
+        ]
+      },
+      "dirs": {
+        "title": "Directory selector",
+        "description": "Configuration for monitoring specific directories. If left empy, no directories will be monitored.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "collect_dir_size": {
+            "title": "Collect directory size",
+            "description": "Enable the collection of directory sizes for each monitored directory. **Enabling this option may introduce additional overhead** on both Netdata and the host system, particularly if directories contain a large number of subdirectories and files.",
+            "type": "boolean",
+            "default": false
+          },
+          "include": {
+            "title": "Include",
+            "description": "Include directories that match any of the specified include [patterns](https://golang.org/pkg/path/filepath/#Match).",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Directory",
+              "type": "string",
+              "pattern": "^$|^/"
+            },
+            "uniqueItems": true
+          },
+          "exclude": {
+            "title": "Exclude",
+            "description": "Exclude directories that match any of the specified exclude [patterns](https://golang.org/pkg/path/filepath/#Match).",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Directory",
+              "type": "string",
+              "pattern": "^$|^/"
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "include"
+        ]
+      }
+    },
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "discovery_every"
+          ]
+        },
+        {
+          "title": "Files",
+          "fields": [
+            "files"
+          ]
+        },
+        {
+          "title": "Directories",
+          "fields": [
+            "dirs"
+          ]
+        }
+      ]
+    },
+    "files": {
+      "ui:help": "The logic for inclusion and exclusion is as follows: `(include1 OR include2) AND !(exclude1 OR exclude2)`.",
+      "ui:collapsible": true,
+      "include": {
+        "ui:listFlavour": "list"
+      },
+      "exclude": {
+        "ui:listFlavour": "list"
+      }
+    },
+    "dirs": {
+      "ui:help": "The logic for inclusion and exclusion is as follows: `(include1 OR include2) AND !(exclude1 OR exclude2)`.",
+      "ui:collapsible": true,
+      "include": {
+        "ui:listFlavour": "list"
+      },
+      "exclude": {
+        "ui:listFlavour": "list"
+      }
+    }
+  }
+}

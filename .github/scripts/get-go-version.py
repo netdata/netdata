@@ -32,7 +32,7 @@ for modfile in GO_SRC.glob('**/go.mod'):
         modules.append({
             'module': str(modfile.parent),
             'version': str(version),
-            'build_target': f'github.com/netdata/netdata/go/{ modfile.parts[-2] }/{ str(mainpath) }/',
+            'build_target': f'github.com/netdata/netdata/go/plugins/{ str(mainpath) }/',
         })
 
 with GITHUB_OUTPUT.open('a') as f:

@@ -42,5 +42,5 @@ This alert is related to your American Power Conversion (APC) uninterruptible po
 
 ### Useful resources
 
-1. [Netdata - APC UPS monitoring](https://learn.netdata.cloud/docs/data-collection/ups/apc-ups)
+1. [Netdata - APC UPS monitoring](/src/collectors/charts.d.plugin/apcupsd/integrations/apc_ups.md)
 2. [`apcupsd` - Power management and control software for APC UPS](https://github.com/apcupsd/apcupsd)

@@ -74,4 +74,4 @@ Where `[module]` is the directory name under <https://github.com/netdata/netdata
 
 ## How to write a new module
 
-See [develop a custom collector in Python](https://github.com/netdata/netdata/edit/master/docs/guides/python-collector.md).
+See [develop a custom collector in Python](https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/python-collector.md).

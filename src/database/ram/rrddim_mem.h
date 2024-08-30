@@ -23,13 +23,13 @@ struct mem_query_handle {
 };
 
 STORAGE_METRIC_HANDLE *rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si);
-STORAGE_METRIC_HANDLE *rrddim_metric_get(STORAGE_INSTANCE *si, uuid_t *uuid);
+STORAGE_METRIC_HANDLE *rrddim_metric_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
 STORAGE_METRIC_HANDLE *rrddim_metric_dup(STORAGE_METRIC_HANDLE *smh);
 void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh);
 
-bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
+bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
 
-STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si, uuid_t *uuid);
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
 void rrddim_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg);
 
 STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg);

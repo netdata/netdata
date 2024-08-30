@@ -33,6 +33,4 @@ Memory utilization refers to the percentage of a system's RAM that is currently 
 
 ### Useful resources
 
-1. [How to use Task Manager to monitor Windows PC's performance](https://support.microsoft.com/en-us/windows/how-to-use-task-manager-to-monitor-windows-pc-s-performance-171100cb-5e7d-aaba-29abfedfb06f)
-2. [How to use Performance Monitor on Windows 10](https://www.windowscentral.com/how-use-performance-monitor-windows-10)
-3. [How to fix high memory usage in Windows](https://pureinfotech.com/reduce-ram-memory-usage-windows/)
+1. [How to use Performance Monitor on Windows 10](https://www.windowscentral.com/how-use-performance-monitor-windows-10)

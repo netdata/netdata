@@ -50,6 +50,7 @@ along with their descriptions.
 |       Component        |           Mounts           | Description                                                                                                                                | 
 |:----------------------:|:--------------------------:|--------------------------------------------------------------------------------------------------------------------------------------------|
 |        netdata         |      /etc/os-release       | Host info detection.                                                                                                                       |
+|    diskspace.plugin    |             /              | Host mount points monitoring.                                                                                                              |
 |     cgroups.plugin     | /sys, /var/run/docker.sock | Docker containers monitoring and name resolution.                                                                                          |
 |      go.d.plugin       |    /var/run/docker.sock    | Docker Engine and containers monitoring. See [docker](https://github.com/netdata/go.d.plugin/tree/master/modules/docker#readme) collector. |
 |      go.d.plugin       |          /var/log          | Web servers logs tailing. See [weblog](https://github.com/netdata/go.d.plugin/tree/master/modules/weblog#readme) collector.                |
@@ -80,6 +81,7 @@ docker run -d --name=netdata \
   -v netdataconfig:/etc/netdata \
   -v netdatalib:/var/lib/netdata \
   -v netdatacache:/var/cache/netdata \
+  -v /:/host/root:ro,rslave \
   -v /etc/passwd:/host/etc/passwd:ro \
   -v /etc/group:/host/etc/group:ro \
   -v /etc/localtime:/etc/localtime:ro \
@@ -121,6 +123,7 @@ services:
       - netdataconfig:/etc/netdata
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata
+      - /:/host/root:ro,rslave
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /etc/localtime:/etc/localtime:ro
@@ -233,6 +236,7 @@ docker run -d --name=netdata \
   -v $(pwd)/netdataconfig/netdata:/etc/netdata \
   -v netdatalib:/var/lib/netdata \
   -v netdatacache:/var/cache/netdata \
+  -v /:/host/root:ro,rslave \
   -v /etc/passwd:/host/etc/passwd:ro \
   -v /etc/group:/host/etc/group:ro \
   -v /etc/localtime:/etc/localtime:ro \
@@ -274,6 +278,7 @@ services:
       - ./netdataconfig/netdata:/etc/netdata
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata
+      - /:/host/root:ro,rslave
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /etc/localtime:/etc/localtime:ro
@@ -294,7 +299,7 @@ volumes:
 ### With SSL/TLS enabled HTTP Proxy
 
 For a permanent installation on a public server, you
-should [secure the Netdata instance](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/secure-nodes.md). This
+should [secure the Netdata instance](/docs/netdata-agent/securing-netdata-agents.md). This
 section contains an example of how to install Netdata with an SSL reverse proxy and basic authentication.
 
 You can use the following `docker-compose.yml` and Caddyfile files to run Netdata with Docker. Replace the domains and
@@ -308,7 +313,7 @@ executed internally by the caddy server.
 
 ```caddyfile
 netdata.example.org {
-  reverse_proxy netdata:19999
+  reverse_proxy host.docker.internal:19999
   tls admin@example.org
 }
 ```
@@ -318,11 +323,15 @@ netdata.example.org {
 After setting Caddyfile run this with `docker-compose up -d` to have a fully functioning Netdata setup behind an HTTP reverse
 proxy.
 
+Make sure Netdata bind to docker0 interface if you've custom `web.bind to` setting in `netdata.conf`.
+
 ```yaml
 version: '3'
 services:
   caddy:
     image: caddy:2
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # To access netdata running with "network_mode: host".
     ports:
       - "80:80"
       - "443:443"
@@ -333,9 +342,9 @@ services:
   netdata:
     image: netdata/netdata
     container_name: netdata
-    hostname: example.com # set to fqdn of host
-    restart: always
     pid: host
+    network_mode: host
+    restart: unless-stopped
     cap_add:
       - SYS_PTRACE
       - SYS_ADMIN
@@ -345,6 +354,7 @@ services:
       - netdataconfig:/etc/netdata
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata
+      - /:/host/root:ro,rslave
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /etc/localtime:/etc/localtime:ro
@@ -368,8 +378,10 @@ to Caddyfile.
 
 ### With Docker socket proxy
 
+> **Note**: Using Netdata with a Docker socket proxy might have some features not working as expected. It hasn't been fully tested by the Netdata team.
+
 Deploy a Docker socket proxy that accepts and filters out requests using something like
-[HAProxy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-haproxy.md) or
+[HAProxy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md) or
 [CetusGuard](https://github.com/hectorm/cetusguard) so that it restricts connections to read-only access to
 the `/containers` endpoint.
 
@@ -396,6 +408,7 @@ services:
       - netdataconfig:/etc/netdata
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata
+      - /:/host/root:ro,rslave
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /etc/localtime:/etc/localtime:ro
@@ -443,6 +456,7 @@ services:
       - netdataconfig:/etc/netdata
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata
+      - /:/host/root:ro,rslave
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /etc/localtime:/etc/localtime:ro

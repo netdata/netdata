@@ -4,7 +4,6 @@
 #include "libnetdata/required_dummies.h"
 
 RRDHOST *localhost;
-int netdata_zero_metrics_enabled = 1;
 struct config netdata_config;
 char *netdata_configured_primary_plugins_dir = NULL;
 

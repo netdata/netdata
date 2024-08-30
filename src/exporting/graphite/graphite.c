@@ -19,12 +19,10 @@ int init_graphite_instance(struct instance *instance)
     struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
     instance->connector_specific_data = connector_specific_data;
 
-#ifdef ENABLE_HTTPS
     connector_specific_data->ssl = NETDATA_SSL_UNSET_CONNECTION;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
         netdata_ssl_initialize_ctx(NETDATA_SSL_EXPORTING_CTX);
     }
-#endif
 
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_graphite_plaintext;
@@ -74,7 +72,7 @@ int init_graphite_instance(struct instance *instance)
 void sanitize_graphite_label_value(char *dst, const char *src, size_t len)
 {
     while (*src != '\0' && len) {
-        if (isspace(*src) || *src == ';' || *src == '~')
+        if (isspace((uint8_t)*src) || *src == ';' || *src == '~')
             *dst++ = '_';
         else
             *dst++ = *src;

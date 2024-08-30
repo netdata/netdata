@@ -10,10 +10,10 @@ The default script is `alarm-notify.sh`.
 >
 > This file mentions editing configuration files.  
 >
-> - To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
+> - To edit configuration files in a safe way, we provide the [`edit config` script](/docs/netdata-agent/configuration/README.md#edit-netdataconf)located in your [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
 > Note that to run the script you need to be inside your Netdata config directory.
 >
-> - Please also note that after most configuration changes you will need to [restart the Agent](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for the changes to take effect.
+> - Please also note that after most configuration changes you will need to [restart the Agent](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for the changes to take effect.
 >
 > It is recommended to use this way for configuring Netdata.
 
@@ -113,7 +113,7 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 /usr/libexec/netdata/plugins.d/alarm-notify.sh test "ROLE"
 ```
 
-If you are [running your own registry](https://github.com/netdata/netdata/blob/master/src/registry/README.md#run-your-own-registry), add `export NETDATA_REGISTRY_URL=[YOUR_URL]` before calling `alarm-notify.sh`.
+If you are [running your own registry](/src/registry/README.md#run-your-own-registry), add `export NETDATA_REGISTRY_URL=[YOUR_URL]` before calling `alarm-notify.sh`.
 
 > If you need to dig even deeper, you can trace the execution with `bash -x`. Note that in test mode, `alarm-notify.sh` calls itself with many more arguments. So first do:
 >

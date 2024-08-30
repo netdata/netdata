@@ -4,8 +4,8 @@
 
 #define PLUGIN_DISKSPACE_NAME "diskspace.plugin"
 
-#define DEFAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
-#define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
+#define DEFAULT_EXCLUDED_PATHS "/dev /dev/shm /proc/* /sys/* /var/run/user/* /run/lock /run/user/* /snap/* /var/lib/docker/* /var/lib/containers/storage/* /run/credentials/* /run/containerd/*  /rpool /rpool/*"
+#define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs cgroup cgroup2 hugetlbfs devtmpfs fuse.lxcfs"
 #define DEFAULT_EXCLUDED_FILESYSTEMS_INODES "msdosfs msdos vfat overlayfs aufs* *unionfs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
@@ -14,7 +14,7 @@
 #define MAX_STAT_USEC 10000LU
 #define SLOW_UPDATE_EVERY 5
 
-static netdata_thread_t *diskspace_slow_thread = NULL;
+static ND_THREAD *diskspace_slow_thread = NULL;
 
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
@@ -111,6 +111,7 @@ void mountpoint_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *entr
 struct basic_mountinfo {
     char *persistent_id;    
     char *root;             
+    char *mount_point_stat_path;
     char *mount_point;      
     char *filesystem;       
 
@@ -123,12 +124,13 @@ static netdata_mutex_t slow_mountinfo_mutex;
 static struct basic_mountinfo *basic_mountinfo_create_and_copy(struct mountinfo* mi)
 {
     struct basic_mountinfo *bmi = callocz(1, sizeof(struct basic_mountinfo));
-    
+
     if (mi) {
         bmi->persistent_id = strdupz(mi->persistent_id);
-        bmi->root          = strdupz(mi->root);
-        bmi->mount_point   = strdupz(mi->mount_point);
-        bmi->filesystem    = strdupz(mi->filesystem);
+        bmi->root = strdupz(mi->root);
+        bmi->mount_point_stat_path = strdupz(mi->mount_point_stat_path);
+        bmi->mount_point = strdupz(mi->mount_point);
+        bmi->filesystem = strdupz(mi->filesystem);
     }
 
     return bmi;
@@ -150,6 +152,7 @@ static void free_basic_mountinfo(struct basic_mountinfo *bmi)
     if (bmi) {
         freez(bmi->persistent_id);
         freez(bmi->root);
+        freez(bmi->mount_point_stat_path);
         freez(bmi->mount_point);
         freez(bmi->filesystem);
 
@@ -212,9 +215,7 @@ static void calculate_values_and_show_charts(
 
     int rendered = 0;
 
-    if(m->do_space == CONFIG_BOOLEAN_YES || (m->do_space == CONFIG_BOOLEAN_AUTO &&
-                                             (bavail || breserved_root || bused ||
-                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (m->do_space == CONFIG_BOOLEAN_YES || m->do_space == CONFIG_BOOLEAN_AUTO) {
         if(unlikely(!m->st_space) || m->st_space->update_every != update_every) {
             m->do_space = CONFIG_BOOLEAN_YES;
             m->st_space = rrdset_find_active_bytype_localhost("disk_space", disk);
@@ -252,9 +253,7 @@ static void calculate_values_and_show_charts(
         rendered++;
     }
 
-    if(m->do_inodes == CONFIG_BOOLEAN_YES || (m->do_inodes == CONFIG_BOOLEAN_AUTO &&
-                                              (favail || freserved_root || fused ||
-                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (m->do_inodes == CONFIG_BOOLEAN_YES || m->do_inodes == CONFIG_BOOLEAN_AUTO) {
         if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
             m->do_inodes = CONFIG_BOOLEAN_YES;
             m->st_inodes = rrdset_find_active_bytype_localhost("disk_inodes", disk);
@@ -363,9 +362,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             usec_t start_time = now_monotonic_high_precision_usec();
             struct stat bs;
 
-            if(stat(mi->mount_point, &bs) == -1) {
+            if(stat(mi->mount_point_stat_path, &bs) == -1) {
                 collector_error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
-                               , mi->mount_point
+                               , mi->mount_point_stat_path
                                , disk
                                , mi->filesystem?mi->filesystem:""
                                , mi->root?mi->root:""
@@ -376,7 +375,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             else {
                 if((bs.st_mode & S_IFMT) != S_IFDIR) {
                     collector_error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
-                                   , mi->mount_point
+                                   , mi->mount_point_stat_path
                                    , disk
                                    , mi->filesystem?mi->filesystem:""
                                    , mi->root?mi->root:""
@@ -455,10 +454,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     usec_t start_time = now_monotonic_high_precision_usec();
     struct statvfs buff_statvfs;
 
-    if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
+    if (statvfs(mi->mount_point_stat_path, &buff_statvfs) < 0) {
         if(!m->shown_error) {
             collector_error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
-                            , mi->mount_point
+                            , mi->mount_point_stat_path
                             , disk
                             , mi->filesystem?mi->filesystem:""
                             , mi->root?mi->root:""
@@ -493,10 +492,10 @@ static inline void do_slow_disk_space_stats(struct basic_mountinfo *mi, int upda
     m->updated = true;
 
     struct statvfs buff_statvfs;
-    if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
+    if (statvfs(mi->mount_point_stat_path, &buff_statvfs) < 0) {
         if(!m->shown_error) {
             collector_error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
-                            , mi->mount_point
+                            , mi->mount_point_stat_path
                             , mi->persistent_id
                             , mi->filesystem?mi->filesystem:""
                             , mi->root?mi->root:""
@@ -513,9 +512,9 @@ cleanup:
     dictionary_acquired_item_release(dict_mountpoints, item);
 }
 
-static void diskspace_slow_worker_cleanup(void *ptr)
-{
-    UNUSED(ptr);
+static void diskspace_slow_worker_cleanup(void *pptr) {
+    struct slow_worker_data *data = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(data) return;
 
     collector_info("cleaning up...");
 
@@ -526,14 +525,14 @@ static void diskspace_slow_worker_cleanup(void *ptr)
 #define WORKER_JOB_SLOW_CLEANUP 1
 
 struct slow_worker_data {
-    netdata_thread_t *slow_thread;
     int update_every;
 };
 
 void *diskspace_slow_worker(void *ptr)
 {
     struct slow_worker_data *data = (struct slow_worker_data *)ptr;
-    
+    CLEANUP_FUNCTION_REGISTER(diskspace_slow_worker_cleanup) cleanup_ptr = data;
+
     worker_register("DISKSPACE_SLOW");
     worker_register_job_name(WORKER_JOB_SLOW_MOUNTPOINT, "mountpoint");
     worker_register_job_name(WORKER_JOB_SLOW_CLEANUP, "cleanup");
@@ -541,8 +540,6 @@ void *diskspace_slow_worker(void *ptr)
     struct basic_mountinfo *slow_mountinfo_root = NULL;
 
     int slow_update_every = data->update_every > SLOW_UPDATE_EVERY ? data->update_every : SLOW_UPDATE_EVERY;
-
-    netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, data->slow_thread);
 
     usec_t step = slow_update_every * USEC_PER_SEC;
     usec_t real_step = USEC_PER_SEC;
@@ -600,26 +597,24 @@ void *diskspace_slow_worker(void *ptr)
         }
     }
 
-    netdata_thread_cleanup_pop(1);
-
     free_basic_mountinfo_list(slow_mountinfo_root);
 
     return NULL;
 }
 
-static void diskspace_main_cleanup(void *ptr) {
-    rrd_collector_finished();
-    worker_unregister();
+static void diskspace_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
 
-    if (diskspace_slow_thread) {
-        netdata_thread_join(*diskspace_slow_thread, NULL);
-        freez(diskspace_slow_thread);
-    }
+    rrd_collector_finished();
+    worker_unregister();
+
+    if (diskspace_slow_thread)
+        nd_thread_join(diskspace_slow_thread);
 
     free_basic_mountinfo_list(slow_mountinfo_tmp_root);
 
@@ -634,7 +629,7 @@ static void diskspace_main_cleanup(void *ptr) {
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
 #endif
 
-int diskspace_function_mount_points(BUFFER *wb, const char *function __maybe_unused) {
+static int diskspace_function_mount_points(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload __maybe_unused, const char *source __maybe_unused) {
     netdata_mutex_lock(&slow_mountinfo_mutex);
 
     buffer_flush(wb);
@@ -846,6 +841,8 @@ int diskspace_function_mount_points(BUFFER *wb, const char *function __maybe_unu
 }
 
 void *diskspace_main(void *ptr) {
+    CLEANUP_FUNCTION_REGISTER(diskspace_main_cleanup) cleanup_ptr = ptr;
+
     worker_register("DISKSPACE");
     worker_register_job_name(WORKER_JOB_MOUNTINFO, "mountinfo");
     worker_register_job_name(WORKER_JOB_MOUNTPOINT, "mountpoint");
@@ -855,8 +852,6 @@ void *diskspace_main(void *ptr) {
                             RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_DISKSPACE_HELP,
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
                             diskspace_function_mount_points);
-
-    netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 
     cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 
@@ -870,12 +865,9 @@ void *diskspace_main(void *ptr) {
 
     netdata_mutex_init(&slow_mountinfo_mutex);
 
-    diskspace_slow_thread = mallocz(sizeof(netdata_thread_t));
+    struct slow_worker_data slow_worker_data = { .update_every = update_every };
 
-    struct slow_worker_data slow_worker_data = {.slow_thread = diskspace_slow_thread, .update_every = update_every};
-
-    netdata_thread_create(
-        diskspace_slow_thread,
+    diskspace_slow_thread = nd_thread_create(
         "P[diskspace slow]",
         NETDATA_THREAD_OPTION_JOINABLE,
         diskspace_slow_worker,
@@ -926,8 +918,5 @@ void *diskspace_main(void *ptr) {
             mount_points_cleanup(false);
         }
     }
-    worker_unregister();
-
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

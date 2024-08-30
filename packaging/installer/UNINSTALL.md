@@ -3,7 +3,7 @@
 > ### Note 
 > 
 > If you're having trouble updating Netdata, moving from one installation method to another, or generally having
-> issues with your Netdata Agent installation, consider our [reinstalling Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md) instead of removing the Netdata Agent entirely.
+> issues with your Netdata Agent installation, consider our [reinstalling Netdata](/packaging/installer/REINSTALL.md) instead of removing the Netdata Agent entirely.
 
 The recommended method to uninstall Netdata on a system is to use our kickstart installer script with the `--uninstall` option like so:
 

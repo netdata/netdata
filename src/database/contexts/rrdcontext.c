@@ -105,7 +105,7 @@ void rrdcontext_db_rotation(void) {
     rrdcontext_next_db_rotation_ut = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
 }
 
-int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, uuid_t *store_uuid) {
+int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, nd_uuid_t *store_uuid) {
     if(!st->rrdhost) return 1;
     if(!st->context) return 2;
 
@@ -139,7 +139,7 @@ int rrdcontext_find_dimension_uuid(RRDSET *st, const char *id, uuid_t *store_uui
     return 0;
 }
 
-int rrdcontext_find_chart_uuid(RRDSET *st, uuid_t *store_uuid) {
+int rrdcontext_find_chart_uuid(RRDSET *st, nd_uuid_t *store_uuid) {
     if(!st->rrdhost) return 1;
     if(!st->context) return 2;
 
@@ -198,43 +198,21 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
 // ----------------------------------------------------------------------------
 // ACLK interface
 
-static bool rrdhost_check_our_claim_id(const char *claim_id) {
-    if(!localhost->aclk_state.claimed_id) return false;
-    return (strcasecmp(claim_id, localhost->aclk_state.claimed_id) == 0) ? true : false;
-}
-
-static RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
-    uuid_t uuid;
-    if (uuid_parse(node_id, uuid))
-        return NULL;
-
-    RRDHOST *host = NULL;
-    dfe_start_read(rrdhost_root_index, host) {
-        if(!host->node_id) continue;
-
-        if(uuid_memcmp(&uuid, host->node_id) == 0)
-            break;
-    }
-    dfe_done(host);
-
-    return host;
-}
-
 void rrdcontext_hub_checkpoint_command(void *ptr) {
     struct ctxs_checkpoint *cmd = ptr;
 
-    if(!rrdhost_check_our_claim_id(cmd->claim_id)) {
+    if(!claim_id_matches(cmd->claim_id)) {
+        CLAIM_ID claim_id = claim_id_get();
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received checkpoint command for claim_id '%s', node id '%s', "
                "but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
                cmd->claim_id, cmd->node_id,
-               localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
-               cmd->claim_id);
+               claim_id.str, cmd->claim_id);
 
         return;
     }
 
-    RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
+    RRDHOST *host = find_host_by_node_id(cmd->node_id);
     if(!host) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', "
@@ -262,11 +240,10 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
                "Sending snapshot of all contexts.",
                cmd->version_hash, rrdhost_hostname(host), our_version_hash);
 
-#ifdef ENABLE_ACLK
         // prepare the snapshot
-        char uuid[UUID_STR_LEN];
-        uuid_unparse_lower(*host->node_id, uuid);
-        contexts_snapshot_t bundle = contexts_snapshot_new(cmd->claim_id, uuid, our_version_hash);
+        char uuid_str[UUID_STR_LEN];
+        uuid_unparse_lower(host->node_id.uuid, uuid_str);
+        contexts_snapshot_t bundle = contexts_snapshot_new(cmd->claim_id, uuid_str, our_version_hash);
 
         // do a deep scan on every metric of the host to make sure all our data are updated
         rrdcontext_recalculate_host_retention(host, RRD_FLAG_NONE, false);
@@ -279,7 +256,6 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 
         // send it
         aclk_send_contexts_snapshot(bundle);
-#endif
     }
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -288,7 +264,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
     char node_str[UUID_STR_LEN];
-    uuid_unparse_lower(*host->node_id, node_str);
+    uuid_unparse_lower(host->node_id.uuid, node_str);
     nd_log(NDLS_ACCESS, NDLP_DEBUG,
            "ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED",
            node_str, rrdhost_hostname(host));
@@ -297,18 +273,18 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 void rrdcontext_hub_stop_streaming_command(void *ptr) {
     struct stop_streaming_ctxs *cmd = ptr;
 
-    if(!rrdhost_check_our_claim_id(cmd->claim_id)) {
+    if(!claim_id_matches(cmd->claim_id)) {
+        CLAIM_ID claim_id = claim_id_get();
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received stop streaming command for claim_id '%s', node id '%s', "
                "but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
                cmd->claim_id, cmd->node_id,
-               localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
-               cmd->claim_id);
+               claim_id.str, cmd->claim_id);
 
         return;
     }
 
-    RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
+    RRDHOST *host = find_host_by_node_id(cmd->node_id);
     if(!host) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', "

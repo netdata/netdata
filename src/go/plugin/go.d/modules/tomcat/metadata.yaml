@@ -1,0 +1,241 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      plugin_name: go.d.plugin
+      module_name: tomcat
+      monitored_instance:
+        name: Tomcat
+        link: "https://tomcat.apache.org/"
+        categories:
+          - data-collection.web-servers-and-web-proxies
+        icon_filename: "tomcat.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - apache
+        - tomcat
+        - webserver
+        - websocket
+        - jakarta
+        - javaEE
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Tomcat metrics about bandwidth, processing time, threads and more.
+        method_description: |
+          It parses the information provided by the [Server Status](https://tomcat.apache.org/tomcat-10.0-doc/manager-howto.html#Server_Status) HTTP endpoint.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: >
+          By default, this Tomcat collector cannot access the server's status page.
+          To enable data collection, you will need to configure access credentials with appropriate permissions.
+      default_behavior:
+        auto_detection:
+          description: >
+            If the Netdata agent and Tomcat are on the same host, the collector will attempt to connect to the Tomcat server's status page at `http://localhost:8080/manager/status?XML=true`.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Access to Tomcat Status Endpoint
+            description: |
+              The Netdata agent needs read-only access to its status endpoint to collect data from the Tomcat server.
+
+              You can achieve this by creating a dedicated user named `netdata` with read-only permissions specifically for accessing the [Server Status](https://tomcat.apache.org/tomcat-10.0-doc/manager-howto.html#Server_Status) endpoint.
+
+              Once you've created the `netdata` user, you'll need to configure the username and password in the collector configuration file.
+      configuration:
+        file:
+          name: "go.d/tomcat.conf"
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:8080
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: POST
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: "Config"
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080
+                    username: John
+                    password: Doe
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080
+                    username: admin1
+                    password: hackme1
+
+                  - name: remote
+                    url: http://192.0.2.1:8080
+                    username: admin2
+                    password: hackme2
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: tomcat.jvm_memory_usage
+              description: Requests
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+        - name: jvm memory pool
+          description: "These metrics refer to the JVM memory pool."
+          labels:
+            - name: mempool_name
+              description: Memory Pool name.
+            - name: mempool_type
+              description: Memory Pool type.
+          metrics:
+            - name: tomcat.jvm_mem_pool_memory_usage
+              description: JVM Mem Pool Memory Usage
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: commited
+                - name: used
+                - name: max
+        - name: connector
+          description: "These metrics refer to the connector."
+          labels:
+            - name: connector_name
+              description: Connector name.
+          metrics:
+            - name: tomcat.connector_requests
+              description: Connector Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: tomcat.connector_bandwidth
+              description: Connector Bandwidth
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: tomcat.connector_requests_processing_time
+              description: Connector Requests Processing Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: processing_time
+            - name: tomcat.connector_errors
+              description: Connector Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: errors
+            - name: tomcat.connector_request_threads
+              description: Connector Request Threads
+              unit: threads
+              chart_type: stacked
+              dimensions:
+                - name: idle
+                - name: busy

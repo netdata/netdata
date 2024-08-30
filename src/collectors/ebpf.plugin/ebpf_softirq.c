@@ -73,10 +73,10 @@ static void ebpf_obsolete_softirq_global(ebpf_module_t *em)
                               "softirq_latency",
                               "",
                               "Software IRQ latency",
-                              EBPF_COMMON_DIMENSION_MILLISECONDS,
+                              EBPF_COMMON_UNITS_MILLISECONDS,
                               "softirqs",
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
+                              "system.softirq_latency",
                               NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS+1,
                               em->update_every);
 }
@@ -88,9 +88,10 @@ static void ebpf_obsolete_softirq_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
-static void softirq_cleanup(void *ptr)
+static void softirq_cleanup(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -164,9 +165,9 @@ static void softirq_create_charts(int update_every)
         NETDATA_EBPF_SYSTEM_GROUP,
         "softirq_latency",
         "Software IRQ latency",
-        EBPF_COMMON_DIMENSION_MILLISECONDS,
+        EBPF_COMMON_UNITS_MILLISECONDS,
         "softirqs",
-        NULL,
+        "system.softirq_latency",
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS+1,
         NULL, NULL, 0, update_every,
@@ -219,9 +220,9 @@ static void softirq_collector(ebpf_module_t *em)
     //This will be cancelled by its parent
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
         counter = 0;
@@ -258,9 +259,10 @@ static void softirq_collector(ebpf_module_t *em)
  */
 void *ebpf_softirq_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(softirq_cleanup, ptr);
+    ebpf_module_t *em = ptr;
 
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    CLEANUP_FUNCTION_REGISTER(softirq_cleanup) cleanup_ptr = em;
+
     em->maps = softirq_maps;
 
     if (ebpf_enable_tracepoints(softirq_tracepoints) == 0) {
@@ -279,8 +281,6 @@ void *ebpf_softirq_thread(void *ptr)
 
 endsoftirq:
     ebpf_update_disabled_plugin_stats(em);
-
-    netdata_thread_cleanup_pop(1);
 
     return NULL;
 }

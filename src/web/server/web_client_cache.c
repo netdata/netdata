@@ -119,15 +119,14 @@ struct web_client *web_client_get_from_cache(void) {
     w->mode = HTTP_REQUEST_MODE_GET;
     web_client_reset_permissions(w);
     memset(w->transaction, 0, sizeof(w->transaction));
+    memset(&w->auth, 0, sizeof(w->auth));
 
     return w;
 }
 
 void web_client_release_to_cache(struct web_client *w) {
 
-#ifdef ENABLE_HTTPS
     netdata_ssl_close(&w->ssl);
-#endif
 
     // unlink it from the used
     spinlock_lock(&web_clients_cache.used.spinlock);

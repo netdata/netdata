@@ -1,0 +1,49 @@
+@PKG_NAME@ (3-4) unstable; urgency=medium
+
+  * Convert sources to DEB822 format
+
+ -- Netdata Builder <bot@netdata.cloud>  Mon, 19 Aug 2024 07:49:00 -0400
+
+@PKG_NAME@ (3-3) unstable; urgency=medium
+
+  * Version bump to keep in sync with RPM repo packages
+
+ -- Netdata Builder <bot@netdata.cloud>  Fri, 9 Aug 2024 09:37:00 -0400
+
+@PKG_NAME@ (3-2) unstable; urgency=medium
+
+  * Version bump to keep in sync with RPM repo packages
+
+ -- Netdata Builder <bot@netdata.cloud>  Mon, 24 Jun 2024 07:54:00 -0400
+
+@PKG_NAME@ (3-1) unstable; urgency=medium
+
+  * Migrate to CPack for package builds
+
+ -- Netdata Builder <bot@netdata.cloud>  Fri, 14 Jun 2024 08:22:00 -0400
+
+@PKG_NAME@ (2-2) unstable; urgency=medium
+
+  * Version bump to keep in sync with RPM repo packages
+
+ -- Netdata Builder <bot@netdata.cloud>  Mon, 13 Nov 2023 11:15:00 -0500
+
+@PKG_NAME@ (2-1) unstable; urgency=medium
+
+  * Switched to new package hosting infrastructure
+  * Removed apt-transport-https requirement
+
+ -- Netdata Builder <bot@netdata.cloud>  Wed, 18 Jan 2023 08:30:00 -0500
+
+@PKG_NAME@ (1-2) unstable; urgency=medium
+
+  * Fixed package file naming for repo layout compliance
+
+ -- Netdata Builder <bot@netdata.cloud>  Mon, 6 Jun 2022 09:30:00 -0400
+
+@PKG_NAME@ (1-1) unstable; urgency=medium
+
+  * Initial Release
+
+ -- Netdata Builder <bot@netdata.cloud>  Mon, 14 Jun 2021 08:00:00 -0400
+

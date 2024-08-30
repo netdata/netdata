@@ -653,7 +653,9 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
 
     FILE *fp = fopen(filename, "r");
     if(!fp) {
-        // netdata_log_info("CONFIG: cannot open file '%s'. Using internal defaults.", filename);
+        if(errno != ENOENT)
+            netdata_log_info("CONFIG: cannot open file '%s'. Using internal defaults.", filename);
+
         return 0;
     }
 
@@ -799,7 +801,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
     return 1;
 }
 
-void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
+void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool netdata_conf)
 {
     int i, pri;
     struct section *co;
@@ -811,12 +813,13 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
             if(!strcmp(co->name, CONFIG_SECTION_HOST_LABEL))
                 found_host_labels = 1;
 
-        if(!found_host_labels) {
+        if(netdata_conf && !found_host_labels) {
             appconfig_section_create(root, CONFIG_SECTION_HOST_LABEL);
             appconfig_get(root, CONFIG_SECTION_HOST_LABEL, "name", "value");
         }
     }
 
+    if(netdata_conf) {
     buffer_strcat(wb,
                   "# netdata configuration\n"
                   "#\n"
@@ -830,6 +833,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                   "# The value shown in the commented settings, is the default value.\n"
                   "#\n"
                   "\n# global netdata configuration\n");
+    }
 
     for(i = 0; i <= 17 ;i++) {
         appconfig_wrlock(root);
@@ -884,7 +888,12 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                     if(used && !(cv->flags & CONFIG_VALUE_USED)) {
                         buffer_sprintf(wb, "\n\t# option '%s' is not used.\n", cv->name);
                     }
-                    buffer_sprintf(wb, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_LOADED)) && (!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
+                    buffer_sprintf(wb, "\t%s%s = %s\n",
+                                   (
+                                       !(cv->flags & CONFIG_VALUE_LOADED) &&
+                                       !(cv->flags & CONFIG_VALUE_CHANGED) &&
+                                       (cv->flags & CONFIG_VALUE_USED)
+                                       )?"# ":"", cv->name, cv->value);
                 }
                 config_section_unlock(co);
             }
@@ -904,7 +913,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
  * @return It returns 1 on success and 0 otherwise
  */
 int config_parse_duration(const char* string, int* result) {
-    while(*string && isspace(*string)) string++;
+    while(*string && isspace((uint8_t)*string)) string++;
 
     if(unlikely(!*string)) goto fallback;
 
@@ -915,7 +924,7 @@ int config_parse_duration(const char* string, int* result) {
     }
 
     // make sure it is a number
-    if(!(isdigit(*string) || *string == '+' || *string == '-')) goto fallback;
+    if(!(isdigit((uint8_t)*string) || *string == '+' || *string == '-')) goto fallback;
 
     char *e = NULL;
     NETDATA_DOUBLE n = str2ndd(string, &e);

@@ -1,0 +1,74 @@
+BBU status for Adapter: 0
+
+BatteryType: iBBU08
+Voltage: 3922 mV
+Current: 0 mA
+Temperature: 33 C
+Battery State: Optimal
+Design Mode  : 48+ Hrs retention with a non-transparent learn cycle and balanced service life.
+
+BBU Firmware Status:
+
+  Charging Status              : None
+  Voltage                                 : OK
+  Temperature                             : OK
+  Learn Cycle Requested                      : No
+  Learn Cycle Active                      : No
+  Learn Cycle Status                      : OK
+  Learn Cycle Timeout                     : No
+  I2c Errors Detected                     : No
+  Battery Pack Missing                    : No
+  Battery Replacement required            : No
+  Remaining Capacity Low                  : No
+  Periodic Learn Required                 : No
+  Transparent Learn                       : No
+  No space to cache offload               : No
+  Pack is about to fail & should be replaced : No
+  Cache Offload premium feature required  : No
+  Module microcode update required        : No
+
+BBU GasGauge Status: 0x0100
+  Relative State of Charge: 71 %
+  Charger System State: 1
+  Charger System Ctrl: 0
+  Charging current: 0 mA
+  Absolute state of charge: 63 %
+  Max Error: 0 %
+  Battery backup charge time : 48 hours +
+
+BBU Capacity Info for Adapter: 0
+
+  Relative State of Charge: 71 %
+  Absolute State of charge: 63 %
+  Remaining Capacity: 969 mAh
+  Full Charge Capacity: 1365 mAh
+  Run time to empty: Battery is not being charged.
+  Average time to empty: 1 Hour, 56 Min.
+  Estimated Time to full recharge: Battery is not being charged.
+  Cycle Count: 4
+
+BBU Design Info for Adapter: 0
+
+  Date of Manufacture: 03/18, 2011
+  Design Capacity: 1530 mAh
+  Design Voltage: 4100 mV
+  Specification Info: 0
+  Serial Number: 5164
+  Pack Stat Configuration: 0x0000
+  Manufacture Name: LS36681
+  Firmware Version   :
+  Device Name: bq27541
+  Device Chemistry: LPMR
+  Battery FRU: N/A
+  Transparent Learn = 0
+  App Data = 0
+
+BBU Properties for Adapter: 0
+
+  Auto Learn Period: 28 Days
+  Next Learn time: Thu Dec 21 18:32:56 2023
+  Learn Delay Interval:0 Hours
+  Auto-Learn Mode: Enabled
+  BBU Mode = 4
+
+Exit Code: 0x00

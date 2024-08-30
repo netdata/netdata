@@ -103,13 +103,33 @@ check_for_curl() {
 
 get() {
   url="${1}"
+  checked=0
+  succeeded=0
 
   check_for_curl
 
   if [ -n "${curl}" ]; then
-    "${curl}" -q -o - -sSL --connect-timeout 10 --retry 3 "${url}"
-  elif command -v wget > /dev/null 2>&1; then
-    wget -T 15 -O - "${url}"
+    checked=1
+
+    if "${curl}" -q -o - -sSL --connect-timeout 10 --retry 3 "${url}"; then
+      succeeded=1
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if wget -T 15 -O - "${url}"; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     fatal "I need curl or wget to proceed, but neither is available on this system." "L0002"
   fi
@@ -124,9 +144,29 @@ download_file() {
   check_for_curl
 
   if [ -n "${curl}" ]; then
-    run "${curl}" -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"
-  elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O "${dest}" "${url}"
+    checked=1
+
+    if run "${curl}" -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"; then
+      succeeded=1
+    else
+      rm -f "${dest}"
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if run wget -T 15 -O "${dest}" "${url}"; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     echo >&2
     echo >&2 "Downloading ${name} from '${url}' failed because of missing mandatory packages."
@@ -300,11 +340,7 @@ prepare_cmake_options() {
   enable_feature PLUGIN_LOCAL_LISTENERS "${IS_LINUX}"
   enable_feature PLUGIN_NETWORK_VIEWER "${IS_LINUX}"
   enable_feature PLUGIN_EBPF "${ENABLE_EBPF:-0}"
-  enable_feature PLUGIN_LOGS_MANAGEMENT "${ENABLE_LOGS_MANAGEMENT:-0}"
-  enable_feature LOGS_MANAGEMENT_TESTS "${ENABLE_LOGS_MANAGEMENT_TESTS:-0}"
 
-  enable_feature ACLK "${ENABLE_CLOUD:-1}"
-  enable_feature CLOUD "${ENABLE_CLOUD:-1}"
   enable_feature BUNDLED_JSONC "${NETDATA_BUILD_JSON_C:-0}"
   enable_feature DBENGINE "${ENABLE_DBENGINE:-1}"
   enable_feature H2O "${ENABLE_H2O:-1}"
@@ -867,6 +903,28 @@ install_netdata_logrotate() {
   fi
 
   return 1
+}
+
+# -----------------------------------------------------------------------------
+# install netdata journald configuration
+
+install_netdata_journald_conf() {
+  src="${NETDATA_PREFIX}/usr/lib/netdata/system/systemd/journald@netdata.conf"
+
+  [ ! -d /usr/lib/systemd/ ] && return 0
+  [ "${UID}" -ne 0 ] && return 1
+
+  if [ ! -d /usr/lib/systemd/journald@netdata.conf.d/ ]; then
+    run mkdir /usr/lib/systemd/journald@netdata.conf.d/
+  fi
+
+  run cp "${src}" /usr/lib/systemd/journald@netdata.conf.d/netdata.conf
+
+  if [ -f /usr/lib/systemd/journald@netdata.conf.d/netdata.conf ]; then
+    run chmod 644 /usr/lib/systemd/journald@netdata.conf.d/netdata.conf
+  fi
+
+  return 0
 }
 
 # -----------------------------------------------------------------------------

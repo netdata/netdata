@@ -25,9 +25,9 @@ From the Cloud interface, you can manage your space's notification settings and 
 To add Telegram notification you need:
 
 - A Netdata Cloud account
-- Access to the space as an **administrator**
-- Space needs to be on **Business** plan or higher
-- The Telegram bot token and chat ID
+- Access to the space as an **Admin**
+- The Space needs to be on a paid plan
+- The Telegram bot token, chat ID and _optionally_ the topic ID
 
 ### Steps
 
@@ -43,12 +43,14 @@ To add Telegram notification you need:
   - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Telegram:
       - Bot Token - the token of your bot
       - Chat ID - the chat id where your bot will deliver messages to
+      - Topic ID - the identifier of the chat topic to which your bot will send messages. If omitted or 0, messages will be sent to the General topic. If topics are not supported, messages will be sent to the chat.
 
-### Getting the Telegram bot token and chat ID
+### Getting the Telegram bot token, chat ID and topic ID
 
 - Bot token: To create one bot, contact the [@BotFather](https://t.me/BotFather) bot and send the command `/newbot` and follow the instructions. **Start a conversation with your bot or invite it into the group where you want it to send notifications**.
 - To get the chat ID you have two options:
     - Contact the [@myidbot](https://t.me/myidbot) bot and send the `/getid` command to get your personal chat ID, or invite it into a group and use the `/getgroupid` command to get the group chat ID.
     - Alternatively, you can get the chat ID directly from the bot API. Send your bot a command in the chat you want to use, then check `https://api.telegram.org/bot{YourBotToken}/getUpdates`, eg. `https://api.telegram.org/bot111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5/getUpdates`
+- To get the topic ID, the easiest way is this: Post a message to that topic, then right-click on it and select `Copy Message Link`. Paste it on a scratchpad and notice that it has the following structure `https://t.me/c/XXXXXXXXXX/YY/ZZ`. The topic ID is `YY` (integer).
 
 

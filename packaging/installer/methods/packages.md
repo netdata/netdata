@@ -8,19 +8,17 @@ learn_rel_path: "Installation/Installation methods"
 sidebar_position: 20
 -->
 
-# Install Netdata using native DEB/RPM packages.
+# Install Netdata using native DEB/RPM packages
 
 For most common Linux distributions that use either DEB or RPM packages, Netdata provides pre-built native packages
 for current releases in-line with
-our [official platform support policy](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/versions-and-platforms.md).
+our [official platform support policy](/docs/netdata-agent/versions-and-platforms.md).
 These packages will be used by default when attempting to install on a supported platform using our
-[kickstart.sh installer script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md).
+[kickstart.sh installer script](/packaging/installer/methods/kickstart.md).
 
 When using the kickstart script, you can force usage of native DEB or RPM packages by passing the option
 `--native-only` when invoking the script. This will cause it to only attempt to use native packages for the install,
 and fail if it cannot do so.
-
-
 
 > ### Note
 >
@@ -31,10 +29,9 @@ and fail if it cannot do so.
 > When selecting a repository configuration package, note that the version 2 packages provide configuration for
 > our self-hosted repositories, and then version 1 packages provide configuration for Package Cloud.
 
+## Manual setup of RPM packages
 
-## Manual setup of RPM packages.
-
-Netdata’s official RPM repositories are hosted at https://repo.netdata.cloud/repos. We provide four groups of
+Netdata’s official RPM repositories are hosted at <https://repo.netdata.cloud/repos>. We provide four groups of
 repositories at that top level:
 
 - `stable`: Contains packages for stable releases of the Netdata Agent.
@@ -55,14 +52,14 @@ Under each of those directories is a directory for each supported release of tha
 directory for each supported CPU architecture which contains the actual repository.
 
 For example, for stable release packages for RHEL 9 on 64-bit x86, the full URL for the repository would be
-https://repo.netdata.cloud/repos/stable/el/9/x86_64/
+<https://repo.netdata.cloud/repos/stable/el/9/x86_64/>
 
 Our RPM packages and repository metadata are signed using a GPG key with a user name of ‘Netdatabot’. The
 current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The associated public key can be fetched from
 `https://repo.netdata.cloud/netdatabot.gpg.key`.
 
 If you are explicitly configuring a system to use our repositories, the recommended setup is to download the
-appropriate repository configuration package from https://repo.netdata.cloud/repos/repoconfig and install it
+appropriate repository configuration package from <https://repo.netdata.cloud/repos/repoconfig> and install it
 directly on the target system using the system package manager. This will ensure any packages needed to use the
 repository are also installed, and will help enable a seamless transition if we ever need to change our infrastructure.
 
@@ -73,9 +70,9 @@ repository are also installed, and will help enable a seamless transition if we 
 > repository _should_ be pulled in automatically by our repository config packages, but if it is not you may need
 > to manually install `epel-release` to be able to successfully install the Netdata packages.
 
-## Manual setup of DEB packages.
+## Manual setup of DEB packages
 
-Netdata’s official DEB repositories are hosted at https://repo.netdata.cloud/repos. We provide four groups of
+Netdata’s official DEB repositories are hosted at <https://repo.netdata.cloud/repos>. We provide four groups of
 repositories at that top level:
 
 - `stable`: Contains packages for stable releases of the Netdata Agent.
@@ -105,7 +102,7 @@ current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The assoc
 `https://repo.netdata.cloud/netdatabot.gpg.key`.
 
 If you are explicitly configuring a system to use our repositories, the recommended setup is to download the
-appropriate repository configuration package from https://repo.netdata.cloud/repos/repoconfig and install it
+appropriate repository configuration package from <https://repo.netdata.cloud/repos/repoconfig> and install it
 directly on the target system using the system package manager. This will ensure any packages needed to use the
 repository are also installed, and will help enable a seamless transition if we ever need to change our infrastructure.
 

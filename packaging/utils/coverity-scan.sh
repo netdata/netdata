@@ -27,9 +27,6 @@
 # this includes the token, so the default is not to print it.
 # COVERITY_SUBMIT_DEBUG=1
 #
-# Override the standard coverity build version we know is supported
-# COVERITY_BUILD_VERSION="cov-analysis-linux64-2019.03"
-#
 # All these variables can also be exported before running this script.
 #
 # If the first parameter of this script is "install",
@@ -37,10 +34,12 @@
 
 set -e
 
-INSTALL_DIR="/opt"
+if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
+  echo "This script can only be used on a 64-bit x86 Linux system."
+  exit 1
+fi
 
-# the version of coverity to use
-COVERITY_BUILD_VERSION="${COVERITY_BUILD_VERSION:-cov-analysis-linux64-2023.6.2}"
+INSTALL_DIR="/opt"
 
 SCRIPT_SOURCE="$(
     self=${0}
@@ -158,24 +157,21 @@ scanit() {
 }
 
 installit() {
-  ORIGINAL_DIR="${PWD}"
   TMP_DIR="$(mktemp -d /tmp/netdata-coverity-scan-XXXXX)"
   progress "Downloading coverity in ${TMP_DIR}..."
-  cd "${TMP_DIR}"
+  (cd "${TMP_DIR}" && debugrun curl --remote-name --remote-header-name --show-error --location --data "token=${token}&project=${repo}" https://scan.coverity.com/download/linux64)
 
-  debugrun curl --remote-name --remote-header-name --show-error --location --data "token=${token}&project=${repo}" https://scan.coverity.com/download/linux64
+  COVERITY_ARCHIVE="$(find  "${TMP_DIR}" -maxdepth 1 -mindepth 1 -name 'cov-analysis-linux64-*.tar.gz')"
 
-  if [ -f "${COVERITY_BUILD_VERSION}.tar.gz" ]; then
+  if [ -n "${COVERITY_ARCHIVE}" ] && [ -f "${COVERITY_ARCHIVE}" ]; then
     progress "Installing coverity..."
-    cd "${INSTALL_DIR}"
-
-    run sudo tar -z -x -f "${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz" || exit 1
-    rm "${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz"
+    run sudo tar -z -x -f "${COVERITY_ARCHIVE}" -C "${INSTALL_DIR}"
+    rm -f "${COVERITY_ARCHIVE}"
     COVERITY_PATH=$(find "${INSTALL_DIR}" -maxdepth 1 -name 'cov*linux*')
-    export PATH=${PATH}:${COVERITY_PATH}/bin/
-  elif find . -name "*.tar.gz" > /dev/null 2>&1; then
-    ls ./*.tar.gz
-    fatal "Downloaded coverity tool tarball does not appear to be the version we were expecting, exiting."
+    export PATH="${PATH}:${COVERITY_PATH}/bin/"
+  elif find "${TMP_DIR}" -name "*.tar.gz" > /dev/null 2>&1; then
+    ls "${TMP_DIR}"/*.tar.gz
+    fatal "Downloaded coverity tool tarball does not appear to be the file-name we were expecting, exiting."
   else
     fatal "Failed to download coverity tool tarball!"
   fi
@@ -187,7 +183,6 @@ installit() {
   fi
 
   progress "Coverity scan tools are installed."
-  cd "$ORIGINAL_DIR"
 
   # Clean temp directory
   [ -n "${TMP_DIR}" ] && rm -rf "${TMP_DIR}"

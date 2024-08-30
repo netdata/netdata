@@ -109,7 +109,7 @@ The configuration file name for this integration is `python.d/pandas.conf`.
 
 
 You can edit the configuration file using the `edit-config` script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory).
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -129,15 +129,15 @@ Additionally, the following collapsed table contains all the options that can be
 Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
 
 
-<details><summary>Config options</summary>
+<details open><summary>Config options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | chart_configs | an array of chart configuration dictionaries | [] | yes |
 | chart_configs.name | name of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.title | title of the chart to be displayed in the dashboard. | None | yes |
-| chart_configs.family | [family](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#families) of the chart to be displayed in the dashboard. | None | yes |
-| chart_configs.context | [context](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#contexts) of the chart to be displayed in the dashboard. | None | yes |
+| chart_configs.family | [family](/docs/dashboards-and-charts/netdata-charts.md#families) of the chart to be displayed in the dashboard. | None | yes |
+| chart_configs.context | [context](/docs/dashboards-and-charts/netdata-charts.md#contexts) of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.type | the type of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.units | the units of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.df_steps | a series of pandas operations (one per line) that each returns a dataframe. | None | yes |
@@ -155,7 +155,7 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 example pulling some hourly temperature data, a chart for today forecast (mean,min,max) and another chart for current.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 temperature:
@@ -227,7 +227,7 @@ temperature:
 
 example showing a read_csv from a url and some light pandas data wrangling.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 example_csv:
@@ -255,7 +255,7 @@ example_csv:
 
 example showing a read_json from a url and some light pandas data wrangling.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 example_json:
@@ -282,7 +282,7 @@ example_json:
 
 example showing a read_xml from a url and some light pandas data wrangling.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 example_xml:
@@ -308,7 +308,7 @@ example_xml:
 
 example showing a read_sql from a postgres database using sqlalchemy.
 
-<details><summary>Config</summary>
+<details open><summary>Config</summary>
 
 ```yaml
 sql:
@@ -340,6 +340,7 @@ sql:
 
 ### Debug Mode
 
+
 To troubleshoot issues with the `pandas` collector, run the `python.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.
 
@@ -361,5 +362,38 @@ should give you clues as to why the collector isn't working.
   ```bash
   ./python.d.plugin pandas debug trace
   ```
+
+### Getting Logs
+
+If you're encountering problems with the `pandas` collector, follow these steps to retrieve logs and identify potential issues:
+
+- **Run the command** specific to your system (systemd, non-systemd, or Docker container).
+- **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
+
+#### System with systemd
+
+Use the following command to view logs generated since the last Netdata service restart:
+
+```bash
+journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep pandas
+```
+
+#### System without systemd
+
+Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
+
+```bash
+grep pandas /var/log/netdata/collector.log
+```
+
+**Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
+
+#### Docker Container
+
+If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
+
+```bash
+docker logs netdata 2>&1 | grep pandas
+```
 
 

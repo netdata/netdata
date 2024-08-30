@@ -6,6 +6,11 @@
 
 #define OOM_KILL_STRING "oom_kill"
 
+#define _COMMON_PLUGIN_NAME PLUGIN_PROC_NAME
+#define _COMMON_PLUGIN_MODULE_NAME PLUGIN_PROC_MODULE_VMSTAT_NAME
+#include "../common-contexts/common-contexts.h"
+
+
 int do_proc_vmstat(int update_every, usec_t dt) {
     (void)dt;
 
@@ -173,9 +178,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         else
             do_oom_kill = CONFIG_BOOLEAN_NO;
 
-        if(do_numa == CONFIG_BOOLEAN_YES || (do_numa == CONFIG_BOOLEAN_AUTO &&
-                                             (get_numa_node_count() >= 2 ||
-                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+        if (do_numa == CONFIG_BOOLEAN_YES || (do_numa == CONFIG_BOOLEAN_AUTO && get_numa_node_count() >= 2)) {
             arl_expect(arl_base, "numa_foreign", &numa_foreign);
             arl_expect(arl_base, "numa_hint_faults_local", &numa_hint_faults_local);
             arl_expect(arl_base, "numa_hint_faults", &numa_hint_faults);
@@ -185,8 +188,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             arl_expect(arl_base, "numa_other", &numa_other);
             arl_expect(arl_base, "numa_pages_migrated", &numa_pages_migrated);
             arl_expect(arl_base, "numa_pte_updates", &numa_pte_updates);
-        }
-        else {
+        } else {
             // Do not expect numa metrics when they are not needed.
             // By not adding them, the ARL will stop processing the file
             // when all the expected metrics are collected.
@@ -261,9 +263,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_swapio == CONFIG_BOOLEAN_YES || (do_swapio == CONFIG_BOOLEAN_AUTO &&
-                                           (pswpin || pswpout ||
-                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (is_mem_swap_enabled && (do_swapio == CONFIG_BOOLEAN_YES || do_swapio == CONFIG_BOOLEAN_AUTO)) {
         do_swapio = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_swapio = NULL;
@@ -328,40 +328,12 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_pgfaults) {
-        static RRDSET *st_pgfaults = NULL;
-        static RRDDIM *rd_minor = NULL, *rd_major = NULL;
-
-        if(unlikely(!st_pgfaults)) {
-            st_pgfaults = rrdset_create_localhost(
-                    "mem"
-                    , "pgfaults"
-                    , NULL
-                    , "page faults"
-                    , NULL
-                    , "Memory Page Faults"
-                    , "faults/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
-                    , NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rrdset_flag_set(st_pgfaults, RRDSET_FLAG_DETAIL);
-
-            rd_minor = rrddim_add(st_pgfaults, "minor", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_major = rrddim_add(st_pgfaults, "major", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_pgfaults, rd_minor, pgfault);
-        rrddim_set_by_pointer(st_pgfaults, rd_major, pgmajfault);
-        rrdset_done(st_pgfaults);
+        common_mem_pgfaults(pgfault, pgmajfault, update_every);
     }
 
         // --------------------------------------------------------------------
 
-    if (do_oom_kill == CONFIG_BOOLEAN_YES ||
-        (do_oom_kill == CONFIG_BOOLEAN_AUTO && (oom_kill || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (do_oom_kill == CONFIG_BOOLEAN_YES || do_oom_kill == CONFIG_BOOLEAN_AUTO) {
         static RRDSET *st_oom_kill = NULL;
         static RRDDIM *rd_oom_kill = NULL;
 
@@ -458,8 +430,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_balloon == CONFIG_BOOLEAN_YES || (do_balloon == CONFIG_BOOLEAN_AUTO && (balloon_inflate || balloon_deflate ||
-            balloon_migrate || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (do_balloon == CONFIG_BOOLEAN_YES || do_balloon == CONFIG_BOOLEAN_AUTO) {
         do_balloon = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_balloon = NULL;
@@ -495,9 +466,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_zswapio == CONFIG_BOOLEAN_YES || (do_zswapio == CONFIG_BOOLEAN_AUTO &&
-                                           (zswpin || zswpout ||
-                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (is_mem_zswap_enabled && (do_zswapio == CONFIG_BOOLEAN_YES || do_zswapio == CONFIG_BOOLEAN_AUTO)) {
         do_zswapio = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_zswapio = NULL;
@@ -530,9 +499,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ksm == CONFIG_BOOLEAN_YES || (do_ksm == CONFIG_BOOLEAN_AUTO &&
-                                            (cow_ksm || ksm_swpin_copy ||
-                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (is_mem_ksm_enabled && (do_ksm == CONFIG_BOOLEAN_YES || do_ksm == CONFIG_BOOLEAN_AUTO)) {
         do_ksm = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_ksm_cow = NULL;
@@ -568,241 +535,225 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     if(do_thp == CONFIG_BOOLEAN_YES || do_thp == CONFIG_BOOLEAN_AUTO) {
 
-        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
-                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || thp_fault_alloc || thp_fault_fallback || thp_fault_fallback_charge))) {
+        static RRDSET *st_thp_fault = NULL;
+        static RRDDIM *rd_alloc = NULL, *rd_fallback = NULL, *rd_fallback_charge = NULL;
 
-            static RRDSET *st_thp_fault = NULL;
-            static RRDDIM *rd_alloc = NULL, *rd_fallback = NULL, *rd_fallback_charge = NULL;
+        if(unlikely(!st_thp_fault)) {
+            st_thp_fault = rrdset_create_localhost(
+                    "mem"
+                    , "thp_faults"
+                    , NULL
+                    , "hugepages"
+                    , NULL
+                    , "Transparent Huge Page Fault Allocations"
+                    , "events/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                    , NETDATA_CHART_PRIO_MEM_HUGEPAGES_FAULTS
+                    , update_every
+                    , RRDSET_TYPE_LINE
+                    );
 
-            if(unlikely(!st_thp_fault)) {
-                st_thp_fault = rrdset_create_localhost(
-                        "mem"
-                        , "thp_faults"
-                        , NULL
-                        , "hugepages"
-                        , NULL
-                        , "Transparent Huge Page Fault Allocations"
-                        , "events/s"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
-                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_FAULTS
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                        );
-
-                rd_alloc  = rrddim_add(st_thp_fault, "alloc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_fallback = rrddim_add(st_thp_fault, "fallback", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_fallback_charge = rrddim_add(st_thp_fault, "fallback_charge", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
-
-            rrddim_set_by_pointer(st_thp_fault, rd_alloc, thp_fault_alloc);
-            rrddim_set_by_pointer(st_thp_fault, rd_fallback, thp_fault_fallback);
-            rrddim_set_by_pointer(st_thp_fault, rd_fallback_charge, thp_fault_fallback_charge);
-
-            rrdset_done(st_thp_fault);
+            rd_alloc  = rrddim_add(st_thp_fault, "alloc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_fallback = rrddim_add(st_thp_fault, "fallback", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_fallback_charge = rrddim_add(st_thp_fault, "fallback_charge", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
-                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || thp_fault_alloc || thp_fault_fallback || thp_fault_fallback_charge || thp_file_mapped))) {
+        rrddim_set_by_pointer(st_thp_fault, rd_alloc, thp_fault_alloc);
+        rrddim_set_by_pointer(st_thp_fault, rd_fallback, thp_fault_fallback);
+        rrddim_set_by_pointer(st_thp_fault, rd_fallback_charge, thp_fault_fallback_charge);
 
-            static RRDSET *st_thp_file = NULL;
-            static RRDDIM *rd_alloc = NULL, *rd_fallback = NULL, *rd_fallback_charge = NULL, *rd_mapped = NULL;
+        rrdset_done(st_thp_fault);
+    }
 
-            if(unlikely(!st_thp_file)) {
-                st_thp_file = rrdset_create_localhost(
-                        "mem"
-                        , "thp_file"
-                        , NULL
-                        , "hugepages"
-                        , NULL
-                        , "Transparent Huge Page File Allocations"
-                        , "events/s"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
-                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_FILE
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                        );
+    if (do_thp == CONFIG_BOOLEAN_YES || do_thp == CONFIG_BOOLEAN_AUTO) {
+        static RRDSET *st_thp_file = NULL;
+        static RRDDIM *rd_alloc = NULL, *rd_fallback = NULL, *rd_fallback_charge = NULL, *rd_mapped = NULL;
 
-                rd_alloc  = rrddim_add(st_thp_file, "alloc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_fallback = rrddim_add(st_thp_file, "fallback", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_mapped = rrddim_add(st_thp_file, "mapped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_fallback_charge = rrddim_add(st_thp_file, "fallback_charge", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
+        if(unlikely(!st_thp_file)) {
+            st_thp_file = rrdset_create_localhost(
+                    "mem"
+                    , "thp_file"
+                    , NULL
+                    , "hugepages"
+                    , NULL
+                    , "Transparent Huge Page File Allocations"
+                    , "events/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                    , NETDATA_CHART_PRIO_MEM_HUGEPAGES_FILE
+                    , update_every
+                    , RRDSET_TYPE_LINE
+                    );
 
-            rrddim_set_by_pointer(st_thp_file, rd_alloc, thp_file_alloc);
-            rrddim_set_by_pointer(st_thp_file, rd_fallback, thp_file_fallback);
-            rrddim_set_by_pointer(st_thp_file, rd_mapped, thp_file_fallback_charge);
-            rrddim_set_by_pointer(st_thp_file, rd_fallback_charge, thp_file_fallback_charge);
-
-            rrdset_done(st_thp_file);
+            rd_alloc  = rrddim_add(st_thp_file, "alloc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_fallback = rrddim_add(st_thp_file, "fallback", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_mapped = rrddim_add(st_thp_file, "mapped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_fallback_charge = rrddim_add(st_thp_file, "fallback_charge", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
-                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || thp_zero_page_alloc || thp_zero_page_alloc_failed))) {
+        rrddim_set_by_pointer(st_thp_file, rd_alloc, thp_file_alloc);
+        rrddim_set_by_pointer(st_thp_file, rd_fallback, thp_file_fallback);
+        rrddim_set_by_pointer(st_thp_file, rd_mapped, thp_file_fallback_charge);
+        rrddim_set_by_pointer(st_thp_file, rd_fallback_charge, thp_file_fallback_charge);
 
-            static RRDSET *st_thp_zero = NULL;
-            static RRDDIM *rd_alloc = NULL, *rd_failed = NULL;
+        rrdset_done(st_thp_file);
+    }
 
-            if(unlikely(!st_thp_zero)) {
-                st_thp_zero = rrdset_create_localhost(
-                        "mem"
-                        , "thp_zero"
-                        , NULL
-                        , "hugepages"
-                        , NULL
-                        , "Transparent Huge Zero Page Allocations"
-                        , "events/s"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
-                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_ZERO
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                        );
+    if (do_thp == CONFIG_BOOLEAN_YES || do_thp == CONFIG_BOOLEAN_AUTO) {
+        static RRDSET *st_thp_zero = NULL;
+        static RRDDIM *rd_alloc = NULL, *rd_failed = NULL;
 
-                rd_alloc  = rrddim_add(st_thp_zero, "alloc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_failed = rrddim_add(st_thp_zero, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
+        if(unlikely(!st_thp_zero)) {
+            st_thp_zero = rrdset_create_localhost(
+                    "mem"
+                    , "thp_zero"
+                    , NULL
+                    , "hugepages"
+                    , NULL
+                    , "Transparent Huge Zero Page Allocations"
+                    , "events/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                    , NETDATA_CHART_PRIO_MEM_HUGEPAGES_ZERO
+                    , update_every
+                    , RRDSET_TYPE_LINE
+                    );
 
-            rrddim_set_by_pointer(st_thp_zero, rd_alloc, thp_zero_page_alloc);
-            rrddim_set_by_pointer(st_thp_zero, rd_failed, thp_zero_page_alloc_failed);
-
-            rrdset_done(st_thp_zero);
+            rd_alloc  = rrddim_add(st_thp_zero, "alloc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_failed = rrddim_add(st_thp_zero, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
-                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || thp_collapse_alloc || thp_collapse_alloc_failed))) {
+        rrddim_set_by_pointer(st_thp_zero, rd_alloc, thp_zero_page_alloc);
+        rrddim_set_by_pointer(st_thp_zero, rd_failed, thp_zero_page_alloc_failed);
 
-            static RRDSET *st_khugepaged = NULL;
-            static RRDDIM *rd_alloc = NULL, *rd_failed = NULL;
+        rrdset_done(st_thp_zero);
+    }
 
-            if(unlikely(!st_khugepaged)) {
-                st_khugepaged = rrdset_create_localhost(
-                        "mem"
-                        , "thp_collapse"
-                        , NULL
-                        , "hugepages"
-                        , NULL
-                        , "Transparent Huge Pages Collapsed by khugepaged"
-                        , "events/s"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
-                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_KHUGEPAGED
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                        );
+    if (do_thp == CONFIG_BOOLEAN_YES || do_thp == CONFIG_BOOLEAN_AUTO) {
+        static RRDSET *st_khugepaged = NULL;
+        static RRDDIM *rd_alloc = NULL, *rd_failed = NULL;
 
-                rd_alloc  = rrddim_add(st_khugepaged, "alloc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_failed = rrddim_add(st_khugepaged, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
+        if(unlikely(!st_khugepaged)) {
+            st_khugepaged = rrdset_create_localhost(
+                    "mem"
+                    , "thp_collapse"
+                    , NULL
+                    , "hugepages"
+                    , NULL
+                    , "Transparent Huge Pages Collapsed by khugepaged"
+                    , "events/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                    , NETDATA_CHART_PRIO_MEM_HUGEPAGES_KHUGEPAGED
+                    , update_every
+                    , RRDSET_TYPE_LINE
+                    );
 
-            rrddim_set_by_pointer(st_khugepaged, rd_alloc, thp_collapse_alloc);
-            rrddim_set_by_pointer(st_khugepaged, rd_failed, thp_collapse_alloc_failed);
-
-            rrdset_done(st_khugepaged);
+            rd_alloc  = rrddim_add(st_khugepaged, "alloc", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_failed = rrddim_add(st_khugepaged, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
-                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || thp_split_page || thp_split_page_failed || thp_deferred_split_page || thp_split_pmd))) {
+        rrddim_set_by_pointer(st_khugepaged, rd_alloc, thp_collapse_alloc);
+        rrddim_set_by_pointer(st_khugepaged, rd_failed, thp_collapse_alloc_failed);
 
-            static RRDSET *st_thp_split = NULL;
-            static RRDDIM *rd_split = NULL, *rd_failed = NULL, *rd_deferred_split = NULL, *rd_split_pmd = NULL;
+        rrdset_done(st_khugepaged);
+    }
 
-            if(unlikely(!st_thp_split)) {
-                st_thp_split = rrdset_create_localhost(
-                        "mem"
-                        , "thp_split"
-                        , NULL
-                        , "hugepages"
-                        , NULL
-                        , "Transparent Huge Page Splits"
-                        , "events/s"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
-                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_SPLITS
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                        );
+    if (do_thp == CONFIG_BOOLEAN_YES || do_thp == CONFIG_BOOLEAN_AUTO) {
+        static RRDSET *st_thp_split = NULL;
+        static RRDDIM *rd_split = NULL, *rd_failed = NULL, *rd_deferred_split = NULL, *rd_split_pmd = NULL;
 
-                rd_split  = rrddim_add(st_thp_split, "split", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_failed = rrddim_add(st_thp_split, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_split_pmd = rrddim_add(st_thp_split, "split_pmd", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_deferred_split = rrddim_add(st_thp_split, "split_deferred", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
+        if(unlikely(!st_thp_split)) {
+            st_thp_split = rrdset_create_localhost(
+                    "mem"
+                    , "thp_split"
+                    , NULL
+                    , "hugepages"
+                    , NULL
+                    , "Transparent Huge Page Splits"
+                    , "events/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                    , NETDATA_CHART_PRIO_MEM_HUGEPAGES_SPLITS
+                    , update_every
+                    , RRDSET_TYPE_LINE
+                    );
 
-            rrddim_set_by_pointer(st_thp_split, rd_split, thp_split_page);
-            rrddim_set_by_pointer(st_thp_split, rd_failed, thp_split_page_failed);
-            rrddim_set_by_pointer(st_thp_split, rd_split_pmd, thp_split_pmd);
-            rrddim_set_by_pointer(st_thp_split, rd_deferred_split, thp_deferred_split_page);
-
-            rrdset_done(st_thp_split);
+            rd_split  = rrddim_add(st_thp_split, "split", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_failed = rrddim_add(st_thp_split, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_split_pmd = rrddim_add(st_thp_split, "split_pmd", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_deferred_split = rrddim_add(st_thp_split, "split_deferred", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
-                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || thp_swpout || thp_swpout_fallback))) {
+        rrddim_set_by_pointer(st_thp_split, rd_split, thp_split_page);
+        rrddim_set_by_pointer(st_thp_split, rd_failed, thp_split_page_failed);
+        rrddim_set_by_pointer(st_thp_split, rd_split_pmd, thp_split_pmd);
+        rrddim_set_by_pointer(st_thp_split, rd_deferred_split, thp_deferred_split_page);
 
-            static RRDSET *st_tmp_swapout = NULL;
-            static RRDDIM *rd_swapout = NULL, *rd_fallback = NULL;
+        rrdset_done(st_thp_split);
+    }
 
-            if(unlikely(!st_tmp_swapout)) {
-                st_tmp_swapout = rrdset_create_localhost(
-                        "mem"
-                        , "thp_swapout"
-                        , NULL
-                        , "hugepages"
-                        , NULL
-                        , "Transparent Huge Pages Swap Out"
-                        , "events/s"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
-                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_SWAPOUT
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                        );
+    if (do_thp == CONFIG_BOOLEAN_YES || do_thp == CONFIG_BOOLEAN_AUTO) {
+        static RRDSET *st_tmp_swapout = NULL;
+        static RRDDIM *rd_swapout = NULL, *rd_fallback = NULL;
 
-                rd_swapout  = rrddim_add(st_tmp_swapout, "swapout", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_fallback = rrddim_add(st_tmp_swapout, "fallback", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
+        if(unlikely(!st_tmp_swapout)) {
+            st_tmp_swapout = rrdset_create_localhost(
+                    "mem"
+                    , "thp_swapout"
+                    , NULL
+                    , "hugepages"
+                    , NULL
+                    , "Transparent Huge Pages Swap Out"
+                    , "events/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                    , NETDATA_CHART_PRIO_MEM_HUGEPAGES_SWAPOUT
+                    , update_every
+                    , RRDSET_TYPE_LINE
+                    );
 
-            rrddim_set_by_pointer(st_tmp_swapout, rd_swapout, thp_swpout);
-            rrddim_set_by_pointer(st_tmp_swapout, rd_fallback, thp_swpout_fallback);
-
-            rrdset_done(st_tmp_swapout);
+            rd_swapout  = rrddim_add(st_tmp_swapout, "swapout", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_fallback = rrddim_add(st_tmp_swapout, "fallback", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        if(do_thp == CONFIG_BOOLEAN_YES || (do_thp == CONFIG_BOOLEAN_AUTO &&
-                                            (netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES || compact_stall || compact_fail || compact_success))) {
+        rrddim_set_by_pointer(st_tmp_swapout, rd_swapout, thp_swpout);
+        rrddim_set_by_pointer(st_tmp_swapout, rd_fallback, thp_swpout_fallback);
 
-            static RRDSET *st_thp_compact = NULL;
-            static RRDDIM *rd_success = NULL, *rd_fail = NULL, *rd_stall = NULL;
+        rrdset_done(st_tmp_swapout);
+    }
 
-            if(unlikely(!st_thp_compact)) {
-                st_thp_compact = rrdset_create_localhost(
-                        "mem"
-                        , "thp_compact"
-                        , NULL
-                        , "hugepages"
-                        , NULL
-                        , "Transparent Huge Pages Compaction"
-                        , "events/s"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_VMSTAT_NAME
-                        , NETDATA_CHART_PRIO_MEM_HUGEPAGES_COMPACT
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                        );
+    if (do_thp == CONFIG_BOOLEAN_YES || do_thp == CONFIG_BOOLEAN_AUTO) {
+        static RRDSET *st_thp_compact = NULL;
+        static RRDDIM *rd_success = NULL, *rd_fail = NULL, *rd_stall = NULL;
 
-                rd_success  = rrddim_add(st_thp_compact, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_fail = rrddim_add(st_thp_compact, "fail", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_stall = rrddim_add(st_thp_compact, "stall", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
+        if(unlikely(!st_thp_compact)) {
+            st_thp_compact = rrdset_create_localhost(
+                    "mem"
+                    , "thp_compact"
+                    , NULL
+                    , "hugepages"
+                    , NULL
+                    , "Transparent Huge Pages Compaction"
+                    , "events/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                    , NETDATA_CHART_PRIO_MEM_HUGEPAGES_COMPACT
+                    , update_every
+                    , RRDSET_TYPE_LINE
+                    );
 
-            rrddim_set_by_pointer(st_thp_compact, rd_success, compact_success);
-            rrddim_set_by_pointer(st_thp_compact, rd_fail, compact_fail);
-            rrddim_set_by_pointer(st_thp_compact, rd_stall, compact_stall);
-
-            rrdset_done(st_thp_compact);
+            rd_success  = rrddim_add(st_thp_compact, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_fail = rrddim_add(st_thp_compact, "fail", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_stall = rrddim_add(st_thp_compact, "stall", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
+
+        rrddim_set_by_pointer(st_thp_compact, rd_success, compact_success);
+        rrddim_set_by_pointer(st_thp_compact, rd_fail, compact_fail);
+        rrddim_set_by_pointer(st_thp_compact, rd_stall, compact_stall);
+
+        rrdset_done(st_thp_compact);
     }
 
     return 0;

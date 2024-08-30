@@ -12,7 +12,7 @@ A user can specify:
 
 ## Configuration
 
-Edit the `netdata.conf` configuration file using [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) from the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory), which is typically at `/etc/netdata`.
+Edit the `netdata.conf` configuration file using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-netdataconf) from the [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory), which is typically at `/etc/netdata`.
 
 Scroll down to the `[plugin:profile]` section to find the available options:
 

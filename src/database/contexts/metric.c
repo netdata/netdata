@@ -108,7 +108,7 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
                    "RRDMETRIC: '%s' cannot change id to '%s'",
                    string2str(rm->id), string2str(rm_new->id));
 
-    if(uuid_memcmp(&rm->uuid, &rm_new->uuid) != 0) {
+    if(!uuid_eq(rm->uuid, rm_new->uuid)) {
 #ifdef NETDATA_INTERNAL_CHECKS
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(rm->uuid, uuid1);
@@ -150,7 +150,7 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(rm->rrddim && uuid_memcmp(&rm->uuid, &rm->rrddim->metric_uuid) != 0) {
+    if(rm->rrddim && !uuid_eq(rm->uuid, rm->rrddim->metric_uuid)) {
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(rm->uuid, uuid1);
         uuid_unparse(rm_new->uuid, uuid2);

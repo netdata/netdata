@@ -1,0 +1,19 @@
+[netdata]
+name=Netdata
+baseurl=https://repo.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/@DIST_VERSION@/$basearch
+repo_gpgcheck=1
+pkg_gpgcheck=1
+gpgkey=https://repo.netdata.cloud/netdatabot.gpg.key
+enabled=1
+type=rpm-md
+autorefresh=1
+
+[netdata-repoconfig]
+name=Netdata Repoconfig
+baseurl=https://repo.netdata.cloud/repos/repoconfig/@DIST_NAME@/@DIST_VERSION@/$basearch
+repo_gpgcheck=1
+pkg_gpgcheck=1
+gpgkey=https://repo.netdata.cloud/netdatabot.gpg.key
+enabled=1
+type=rpm-md
+autorefresh=1

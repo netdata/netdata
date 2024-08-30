@@ -3,6 +3,8 @@
 #ifndef NETDATA_EBPF_DCSTAT_H
 #define NETDATA_EBPF_DCSTAT_H 1
 
+#include "ebpf.h"
+
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_DCSTAT "dcstat"
 #define NETDATA_EBPF_DC_MODULE_DESC "Monitor file access using directory cache. This thread is integrated with apps and cgroup."
@@ -19,18 +21,24 @@
 #define NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE "dcstat.conf"
 
 // Contexts
+#define NETDATA_FS_DC_HIT_RATIO_CONTEXT "filesystem.dc_hit_ratio"
+#define NETDATA_FS_DC_REFERENCE_CONTEXT "filesystem.dc_reference"
+
 #define NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT "cgroup.dc_ratio"
 #define NETDATA_CGROUP_DC_REFERENCE_CONTEXT "cgroup.dc_reference"
 #define NETDATA_CGROUP_DC_NOT_CACHE_CONTEXT "cgroup.dc_not_cache"
 #define NETDATA_CGROUP_DC_NOT_FOUND_CONTEXT "cgroup.dc_not_found"
 
-#define NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT "systemd.services.dc_ratio"
-#define NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT "systemd.services.dc_reference"
-#define NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT "systemd.services.dc_not_cache"
-#define NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT "systemd.services.dc_not_found"
+#define NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT "systemd.service.dc_ratio"
+#define NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT "systemd.service.dc_reference"
+#define NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT "systemd.service.dc_not_cache"
+#define NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT "systemd.service.dc_not_found"
 
 // ARAL name
 #define NETDATA_EBPF_DCSTAT_ARAL_NAME "ebpf_dcstat"
+
+// Unity
+#define EBPF_COMMON_UNITS_FILES "files"
 
 enum directory_cache_indexes {
     NETDATA_DCSTAT_IDX_RATIO,
@@ -63,26 +71,32 @@ enum directory_cache_targets {
     NETDATA_DC_TARGET_D_LOOKUP
 };
 
-typedef struct netdata_publish_dcstat_pid {
+typedef struct __attribute__((packed)) netdata_publish_dcstat_pid {
+    uint64_t cache_access;
+    uint32_t file_system;
+    uint32_t not_found;
+} netdata_publish_dcstat_pid_t;
+
+typedef struct netdata_dcstat_pid {
     uint64_t ct;
     uint32_t tgid;
     uint32_t uid;
     uint32_t gid;
     char name[TASK_COMM_LEN];
 
-    uint64_t cache_access;
-    uint64_t file_system;
-    uint64_t not_found;
+    uint32_t cache_access;
+    uint32_t file_system;
+    uint32_t not_found;
 } netdata_dcstat_pid_t;
 
-typedef struct netdata_publish_dcstat {
+typedef struct __attribute__((packed)) netdata_publish_dcstat {
     uint64_t ct;
 
     long long ratio;
     long long cache_access;
 
-    netdata_dcstat_pid_t curr;
-    netdata_dcstat_pid_t prev;
+    netdata_publish_dcstat_pid_t curr;
+    netdata_publish_dcstat_pid_t prev;
 } netdata_publish_dcstat_t;
 
 void *ebpf_dcstat_thread(void *ptr);

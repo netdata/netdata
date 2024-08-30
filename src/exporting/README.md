@@ -15,13 +15,13 @@ configuring, and monitoring Netdata's exporting engine, which allows you to send
 databases.
 
 For a quick introduction to the exporting engine's features, read our doc on [exporting metrics to time-series
-databases](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md), or jump in to [enabling a connector](https://github.com/netdata/netdata/blob/master/docs/export/enable-connector.md).
+databases](/docs/exporting-metrics/README.md), or jump in to [enabling a connector](/docs/exporting-metrics/enable-an-exporting-connector.md).
 
 The exporting engine has a modular structure and supports metric exporting via multiple exporting connector instances at
 the same time. You can have different update intervals and filters configured for every exporting connector instance. 
 
 When you enable the exporting engine and a connector, the Netdata Agent exports metrics _beginning from the time you
-restart its process_, not the entire [database of long-term metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
+restart its process_, not the entire [database of long-term metrics](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
 
 Since Netdata collects thousands of metrics per server per second, which would easily congest any database server when
 several Netdata servers are sending data to it, Netdata allows sending metrics at a lower frequency, by resampling them.
@@ -34,27 +34,27 @@ X seconds (though, it can send them per second if you need it to).
 ### Integration
 
 The exporting engine uses a number of connectors to send Netdata metrics to external time-series databases. See our
-[list of supported databases](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md#supported-databases) for information on which
+[list of supported databases](/docs/exporting-metrics/README.md#supported-databases) for information on which
 connector to enable and configure for your database of choice.
 
--   [**AWS Kinesis Data Streams**](https://github.com/netdata/netdata/blob/master/src/exporting/aws_kinesis/README.md): Metrics are sent to the service in `JSON`
+-   [**AWS Kinesis Data Streams**](/src/exporting/aws_kinesis/README.md): Metrics are sent to the service in `JSON`
     format.
--   [**Google Cloud Pub/Sub Service**](https://github.com/netdata/netdata/blob/master/src/exporting/pubsub/README.md): Metrics are sent to the service in `JSON`
+-   [**Google Cloud Pub/Sub Service**](/src/exporting/pubsub/README.md): Metrics are sent to the service in `JSON`
     format.
--   [**Graphite**](https://github.com/netdata/netdata/blob/master/src/exporting/graphite/README.md): A plaintext interface. Metrics are sent to the database server as
+-   [**Graphite**](/src/exporting/graphite/README.md): A plaintext interface. Metrics are sent to the database server as
     `prefix.hostname.chart.dimension`. `prefix` is configured below, `hostname` is the hostname of the machine (can
     also be configured). Learn more in our guide to [export and visualize Netdata metrics in
-    Graphite](https://github.com/netdata/netdata/blob/master/src/exporting/graphite/README.md).
--   [**JSON** document databases](https://github.com/netdata/netdata/blob/master/src/exporting/json/README.md)
--   [**OpenTSDB**](https://github.com/netdata/netdata/blob/master/src/exporting/opentsdb/README.md): Use a plaintext or HTTP interfaces. Metrics are sent to
+    Graphite](/src/exporting/graphite/README.md).
+-   [**JSON** document databases](/src/exporting/json/README.md)
+-   [**OpenTSDB**](/src/exporting/opentsdb/README.md): Use a plaintext or HTTP interfaces. Metrics are sent to
     OpenTSDB as `prefix.chart.dimension` with tag `host=hostname`.
--   [**MongoDB**](https://github.com/netdata/netdata/blob/master/src/exporting/mongodb/README.md): Metrics are sent to the database in `JSON` format.
--   [**Prometheus**](https://github.com/netdata/netdata/blob/master/src/exporting/prometheus/README.md): Use an existing Prometheus installation to scrape metrics
+-   [**MongoDB**](/src/exporting/mongodb/README.md): Metrics are sent to the database in `JSON` format.
+-   [**Prometheus**](/src/exporting/prometheus/README.md): Use an existing Prometheus installation to scrape metrics
     from node using the Netdata API.
--   [**Prometheus remote write**](https://github.com/netdata/netdata/blob/master/src/exporting/prometheus/remote_write/README.md). A binary snappy-compressed protocol
+-   [**Prometheus remote write**](/src/exporting/prometheus/remote_write/README.md). A binary snappy-compressed protocol
     buffer encoding over HTTP. Supports many [storage
     providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
--   [**TimescaleDB**](https://github.com/netdata/netdata/blob/master/src/exporting/TIMESCALE.md): Use a community-built connector that takes JSON streams from a
+-   [**TimescaleDB**](/src/exporting/TIMESCALE.md): Use a community-built connector that takes JSON streams from a
     Netdata client and writes them to a TimescaleDB table.
 
 ### Chart filtering
@@ -295,7 +295,7 @@ Configure individual connectors and override any global settings with the follow
 Netdata can send metrics to external databases using the TLS/SSL protocol. Unfortunately, some of
 them does not support encrypted connections, so you will have to configure a reverse proxy to enable
 HTTPS communication between Netdata and an external database. You can set up a reverse proxy with
-[Nginx](https://github.com/netdata/netdata/blob/master/docs/Running-behind-nginx.md).
+[Nginx](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md).
 
 ## Exporting engine monitoring
 

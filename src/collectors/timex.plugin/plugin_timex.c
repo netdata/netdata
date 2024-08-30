@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon/common.h"
-#include "libnetdata/os.h"
+#include "libnetdata/os/os.h"
 
 #define PLUGIN_TIMEX_NAME "timex.plugin"
 
@@ -30,24 +30,25 @@ struct status_codes {
     {NULL, 0, NULL},
 };
 
-static void timex_main_cleanup(void *ptr)
+static void timex_main_cleanup(void *pptr)
 {
-    worker_unregister();
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     netdata_log_info("cleaning up...");
+    worker_unregister();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *timex_main(void *ptr)
 {
+    CLEANUP_FUNCTION_REGISTER(timex_main_cleanup) cleanup_ptr = ptr;
+
     worker_register("TIMEX");
     worker_register_job_name(0, "clock check");
-
-    netdata_thread_cleanup_push(timex_main_cleanup, ptr);
 
     int update_every = (int)config_get_number(CONFIG_SECTION_TIMEX, "update every", 10);
     if (update_every < localhost->rrd_update_every)
@@ -62,18 +63,26 @@ void *timex_main(void *ptr)
     }
 
     usec_t step = update_every * USEC_PER_SEC;
+    usec_t real_step = USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
-        heartbeat_next(&hb, step);
+        heartbeat_next(&hb, USEC_PER_SEC);
+
+        if (real_step < step) {
+            real_step += USEC_PER_SEC;
+            continue;
+        }
+        real_step = USEC_PER_SEC;
+
         worker_is_busy(0);
 
         struct timex timex_buf = {};
         int sync_state = 0;
         static int prev_sync_state = 0;
 
-        sync_state = ADJUST_TIMEX(&timex_buf);
+        sync_state = os_adjtimex(&timex_buf);
         
         int non_seq_failure = (sync_state == -1 && prev_sync_state != -1);
         prev_sync_state = sync_state;
@@ -171,6 +180,5 @@ void *timex_main(void *ptr)
     }
 
 exit:
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

@@ -5,13 +5,11 @@
 
 #include "libnetdata/libnetdata.h"
 
-#include "mqtt_websockets/c-rbuf/cringbuffer.h"
-#include "mqtt_websockets/c_rhash/c_rhash.h"
-
 typedef enum http_req_type {
     HTTP_REQ_GET = 0,
     HTTP_REQ_POST,
-    HTTP_REQ_CONNECT
+    HTTP_REQ_CONNECT,
+    HTTP_REQ_INVALID
 } http_req_type_t;
 
 typedef struct {
@@ -82,7 +80,8 @@ int https_request(https_req_t *request, https_req_response_t *response);
 // we expose previously internal parser as this is usefull also from
 // other parts of the code
 enum http_parse_state {
-    HTTP_PARSE_INITIAL = 0,
+    HTTP_PARSE_PROXY_CONNECT = 0,
+    HTTP_PARSE_INITIAL,
     HTTP_PARSE_HEADERS,
     HTTP_PARSE_CONTENT
 };
@@ -118,7 +117,7 @@ typedef struct {
     size_t chunk_got;
 } http_parse_ctx;
 
-void http_parse_ctx_create(http_parse_ctx *ctx);
+void http_parse_ctx_create(http_parse_ctx *ctx, enum http_parse_state parse_state);
 void http_parse_ctx_destroy(http_parse_ctx *ctx);
 
 typedef enum {

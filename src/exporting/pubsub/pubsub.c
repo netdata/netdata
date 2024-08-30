@@ -99,6 +99,10 @@ void pubsub_connector_worker(void *instance_p)
     struct pubsub_specific_config *connector_specific_config = instance->config.connector_specific_config;
     struct pubsub_specific_data *connector_specific_data = instance->connector_specific_data;
 
+    char threadname[ND_THREAD_TAG_MAX + 1];
+    snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPPBSB[%zu]", instance->index);
+    uv_thread_set_name_np(threadname);
+
     while (!instance->engine->exit) {
         struct stats *stats = &instance->stats;
         char error_message[ERROR_LINE_MAX + 1] = "";

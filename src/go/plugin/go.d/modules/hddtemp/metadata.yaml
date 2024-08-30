@@ -1,0 +1,134 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-hddtemp
+      plugin_name: go.d.plugin
+      module_name: hddtemp
+      monitored_instance:
+        name: HDD temperature
+        link: https://linux.die.net/man/8/hddtemp
+        categories:
+          - data-collection.hardware-devices-and-sensors
+        icon_filename: "hard-drive.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - hardware
+        - hdd temperature
+        - disk temperature
+        - temperature
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors disk temperatures.
+        method_description: |
+          It retrieves temperature data for attached disks by querying the hddtemp daemon at regular intervals.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: By default, this collector will attempt to connect to the `hddtemp` daemon on `127.0.0.1:7634`
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Install hddtemp
+            description: |
+              Install `hddtemp` using your distribution's package manager.
+      configuration:
+        file:
+          name: go.d/hddtemp.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: The IP address and port where the hddtemp daemon listens for connections.
+              default_value: 127.0.0.1:7634
+              required: true
+            - name: timeout
+              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:7634
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:7634
+
+                  - name: remote
+                    address: 203.0.113.0:7634
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: disk
+          description: These metrics refer to the Disk.
+          labels:
+            - name: disk_id
+              description: Disk identifier. It is derived from the device path (e.g. sda or ata-HUP722020APA330_BFJ0WS3F)
+            - name: model
+              description: Disk model
+          metrics:
+            - name: hddtemp.disk_temperature
+              description: Disk temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: hddtemp.disk_temperature_sensor_status
+              description: Disk temperature sensor status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: err
+                - name: na
+                - name: unk
+                - name: nos
+                - name: slp

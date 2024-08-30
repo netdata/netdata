@@ -1,7 +1,7 @@
 # Build new dashboards with HTML
 
 >❗This feature is only available on v1 dashboards and is not currently supported on v2.
->  For more information on the new Custom Dashboards check [this documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).
+>  For more information on the new Custom Dashboards check [this documentation](/docs/dashboards-and-charts/dashboards-tab.md).
 
 You can build dashboards with Netdata charts just with some basic HTML knowledge.
 
@@ -234,7 +234,7 @@ Each chart can get data from a different Netdata server. You can specify the Net
  ></div>
 ```
 
-If you have ephemeral monitoring setup ([More info here](https://github.com/netdata/netdata/blob/master/src/streaming/README.md#monitoring-ephemeral-nodes)) and have no
+If you have ephemeral monitoring setup ([More info here](/src/streaming/README.md#monitoring-ephemeral-nodes)) and have no
 direct access to the nodes dashboards, you can use the following:
 
 ```html
@@ -358,7 +358,7 @@ select specific dimensions using this:
 ```
 
 Netdata supports coma (`,`) or pipe (`|`) separated [simple
-patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) for dimensions. By default it
+patterns](/src/libnetdata/simple_pattern/README.md) for dimensions. By default it
 searches for both dimension IDs and dimension NAMEs. You can control the target
 of the match with: `data-append-options="match-ids"` or
 `data-append-options="match-names"`. Spaces in `data-dimensions=""` are matched
@@ -426,7 +426,7 @@ it, using this:
 
 ### API options
 
-You can append Netdata **[REST API v1](https://github.com/netdata/netdata/blob/master/src/web/api/README.md)** data options, using this:
+You can append Netdata **[REST API v1](/src/web/api/README.md)** data options, using this:
 
 ```html
 <div data-netdata="unique.id"

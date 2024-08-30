@@ -1,0 +1,198 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-filecheck
+      plugin_name: go.d.plugin
+      module_name: filecheck
+      monitored_instance:
+        name: Files and directories
+        link: ""
+        icon_filename: filesystem.svg
+        categories:
+          - data-collection.other
+      keywords:
+        - files
+        - directories
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the existence, last modification time, and size of arbitrary files and directories on the system.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          This collector requires the DAC_READ_SEARCH capability when monitoring files not normally accessible to the Netdata user, but it is set automatically during installation, so no manual configuration is needed.
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/filecheck.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: files
+              description: List of files to monitor.
+              default_value: ""
+              required: true
+              detailed_description: |
+                Files matching the selector will be monitored.
+
+                - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
+                - Pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match)
+                - Syntax:
+
+                ```yaml
+                files:
+                  includes:
+                    - pattern1
+                    - pattern2
+                  excludes:
+                    - pattern3
+                    - pattern4
+                ```
+            - name: dirs
+              description: List of directories to monitor.
+              default_value: ""
+              required: true
+              detailed_description: |
+                Directories matching the selector will be monitored.
+
+                - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
+                - Pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match)
+                - Syntax:
+
+                ```yaml
+                dirs:
+                  includes:
+                    - pattern1
+                    - pattern2
+                  excludes:
+                    - pattern3
+                    - pattern4
+                ```
+            - name: discovery_every
+              description: Files and directories discovery interval.
+              default_value: 60
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Files
+              description: Files monitoring example configuration.
+              config: |
+                jobs:
+                  - name: files_example
+                    files:
+                      include:
+                        - '/path/to/file1'
+                        - '/path/to/file2'
+                        - '/path/to/*.log'
+            - name: Directories
+              description: Directories monitoring example configuration.
+              config: |
+                jobs:
+                  - name: files_example
+                    dirs:
+                      collect_dir_size: no
+                      include:
+                        - '/path/to/dir1'
+                        - '/path/to/dir2'
+                        - '/path/to/dir3*'
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: file
+          description: These metrics refer to the File.
+          labels:
+            - name: file_path
+              description: File absolute path
+          metrics:
+            - name: filecheck.file_existence_status
+              description: File existence
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: exist
+                - name: not_exist
+            - name: filecheck.file_modification_time_ago
+              description: File time since the last modification
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: mtime_ago
+            - name: filecheck.file_size_bytes
+              description: File size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+        - name: directory
+          description: These metrics refer to the Directory.
+          labels:
+            - name: dir_path
+              description: Directory absolute path
+          metrics:
+            - name: filecheck.dir_existence_status
+              description: Directory existence
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: exist
+                - name: not_exist
+            - name: filecheck.dir_modification_time_ago
+              description: Directory time since the last modification
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: mtime_ago
+            - name: filecheck.dir_size_bytes
+              description: Directory size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: filecheck.dir_files count
+              description: Directory files count
+              unit: files
+              chart_type: line
+              dimensions:
+                - name: files

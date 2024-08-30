@@ -75,7 +75,7 @@ area/collectors:
       - changed-files:
           - any-glob-to-any-file:
               - src/collectors/**
-              - src/go/collectors/go.d.plugin/**
+              - src/go/**
 
 collectors/plugins.d:
   - any:
@@ -137,11 +137,11 @@ collectors/freeipmi:
           - any-glob-to-any-file:
               - src/collectors/freeipmi.plugin/**
 
-collectors/go.d.plugin:
+collectors/go.d:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - src/go/collectors/go.d.plugin/**
+              - src/go/**
 
 collectors/idlejitter:
   - any:
@@ -215,6 +215,12 @@ collectors/timex:
           - any-glob-to-any-file:
               - src/collectors/timex.plugin/**
 
+collectors/windows:
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - src/collectors/windows.plugin/**
+
 collectors/xenstat:
   - any:
       - changed-files:
@@ -252,7 +258,6 @@ area/packaging:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - contrib/**
               - packaging/**
               - system/**
               - Dockerfile*
@@ -284,9 +289,3 @@ area/web:
       - changed-files:
           - any-glob-to-any-file:
               - src/web/**
-
-area/logs-management:
-  - any:
-      - changed-files:
-          - any-glob-to-any-file:
-              - src/logsmanagement/**

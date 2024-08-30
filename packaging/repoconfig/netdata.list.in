@@ -1,2 +1,0 @@
-deb http://repo.netdata.cloud/repos/__VARIANT__/__DISTRO__/ __SUITE__/
-deb http://repo.netdata.cloud/repos/repoconfig/__DISTRO__/ __SUITE__/

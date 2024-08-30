@@ -1,0 +1,234 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-nvidia_smi
+      plugin_name: go.d.plugin
+      module_name: nvidia_smi
+      monitored_instance:
+        name: Nvidia GPU
+        link: https://www.nvidia.com/en-us/
+        icon_filename: nvidia.svg
+        categories:
+          - data-collection.hardware-devices-and-sensors
+      keywords:
+        - nvidia
+        - gpu
+        - hardware
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors GPUs performance metrics using
+          the [nvidia-smi](https://developer.nvidia.com/nvidia-system-management-interface) CLI tool.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/nvidia_smi.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: binary_path
+              description: Path to nvidia_smi binary. The default is "nvidia_smi" and the executable is looked for in the directories specified in the PATH environment variable.
+              default_value: nvidia_smi
+              required: false
+            - name: timeout
+              description: nvidia_smi binary execution timeout.
+              default_value: 2
+              required: false
+            - name: loop_mode
+              description: "When enabled, `nvidia-smi` is executed continuously in a separate thread using the `-l` option."
+              default_value: true
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom binary path
+              description: The executable is not in the directories specified in the PATH environment variable.
+              config: |
+                jobs:
+                  - name: nvidia_smi
+                    binary_path: /usr/local/sbin/nvidia_smi
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: gpu
+          description: These metrics refer to the GPU.
+          labels:
+            - name: uuid
+              description: GPU id (e.g. 00000000:00:04.0)
+            - name: product_name
+              description: GPU product name (e.g. NVIDIA A100-SXM4-40GB)
+          metrics:
+            - name: nvidia_smi.gpu_pcie_bandwidth_usage
+              description: PCI Express Bandwidth Usage
+              unit: B/s
+              chart_type: line
+              dimensions:
+                - name: rx
+                - name: tx
+            - name: nvidia_smi.gpu_pcie_bandwidth_utilization
+              description: PCI Express Bandwidth Utilization
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: rx
+                - name: tx
+            - name: nvidia_smi.gpu_fan_speed_perc
+              description: Fan speed
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: fan_speed
+            - name: nvidia_smi.gpu_utilization
+              description: GPU utilization
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: gpu
+            - name: nvidia_smi.gpu_memory_utilization
+              description: Memory utilization
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: memory
+            - name: nvidia_smi.gpu_decoder_utilization
+              description: Decoder utilization
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: decoder
+            - name: nvidia_smi.gpu_encoder_utilization
+              description: Encoder utilization
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: encoder
+            - name: nvidia_smi.gpu_frame_buffer_memory_usage
+              description: Frame buffer memory usage
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+                - name: reserved
+            - name: nvidia_smi.gpu_bar1_memory_usage
+              description: BAR1 memory usage
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+            - name: nvidia_smi.gpu_temperature
+              description: Temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: nvidia_smi.gpu_voltage
+              description: Voltage
+              unit: V
+              chart_type: line
+              dimensions:
+                - name: voltage
+            - name: nvidia_smi.gpu_clock_freq
+              description: Clock current frequency
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: graphics
+                - name: video
+                - name: sm
+                - name: mem
+            - name: nvidia_smi.gpu_power_draw
+              description: Power draw
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: power_draw
+            - name: nvidia_smi.gpu_performance_state
+              description: Performance state
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: P0-P15
+            - name: nvidia_smi.gpu_mig_mode_current_status
+              description: MIG current mode
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: enabled
+                - name: disabled
+            - name: nvidia_smi.gpu_mig_devices_count
+              description: MIG devices
+              unit: devices
+              chart_type: line
+              dimensions:
+                - name: mig
+        - name: mig
+          description: These metrics refer to the Multi-Instance GPU (MIG).
+          labels:
+            - name: uuid
+              description: GPU id (e.g. 00000000:00:04.0)
+            - name: product_name
+              description: GPU product name (e.g. NVIDIA A100-SXM4-40GB)
+            - name: gpu_instance_id
+              description: GPU instance id (e.g. 1)
+          metrics:
+            - name: nvidia_smi.gpu_mig_frame_buffer_memory_usage
+              description: Frame buffer memory usage
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+                - name: reserved
+            - name: nvidia_smi.gpu_mig_bar1_memory_usage
+              description: BAR1 memory usage
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used

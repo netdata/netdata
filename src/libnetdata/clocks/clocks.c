@@ -92,7 +92,7 @@ void clocks_init(void) {
 inline time_t now_sec(clockid_t clk_id) {
     struct timespec ts;
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
-        netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
+        netdata_log_error("clock_gettime(%ld, &timespec) failed.", (long int)clk_id);
         return 0;
     }
     return ts.tv_sec;
@@ -101,7 +101,7 @@ inline time_t now_sec(clockid_t clk_id) {
 inline usec_t now_usec(clockid_t clk_id) {
     struct timespec ts;
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
-        netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
+        netdata_log_error("clock_gettime(%ld, &timespec) failed.", (long int)clk_id);
         return 0;
     }
     return (usec_t)ts.tv_sec * USEC_PER_SEC + (usec_t)(ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
@@ -111,7 +111,7 @@ inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
     struct timespec ts;
 
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
-        netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
+        netdata_log_error("clock_gettime(%ld, &timespec) failed.", (long int)clk_id);
         tv->tv_sec = 0;
         tv->tv_usec = 0;
         return -1;
@@ -343,7 +343,7 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
     }
 
     if(unlikely(now < next)) {
-        errno = 0;
+        errno_clear();
         nd_log_limit_static_global_var(erl, 10, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
                      "heartbeat clock: woke up %"PRIu64" microseconds earlier than expected "
@@ -351,7 +351,7 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
                      next - now);
     }
     else if(unlikely(now - next >  tick / 2)) {
-        errno = 0;
+        errno_clear();
         nd_log_limit_static_global_var(erl, 10, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
                      "heartbeat clock: woke up %"PRIu64" microseconds later than expected "
@@ -368,6 +368,35 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
     return dt;
 }
 
+#ifdef OS_WINDOWS
+
+#include "windows.h"
+
+void sleep_usec_with_now(usec_t usec, usec_t started_ut)
+{
+    if (!started_ut)
+        started_ut = now_realtime_usec();
+
+    usec_t end_ut = started_ut + usec;
+    usec_t remaining_ut = usec;
+
+    timeBeginPeriod(1);
+
+    while (remaining_ut >= 1000)
+    {
+        DWORD sleep_ms = (DWORD) (remaining_ut / USEC_PER_MS);
+        Sleep(sleep_ms);
+
+        usec_t now_ut = now_realtime_usec();
+        if (now_ut >= end_ut)
+            break;
+
+        remaining_ut = end_ut - now_ut;
+    }
+
+    timeEndPeriod(1);
+}
+#else
 void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
     // we expect microseconds (1.000.000 per second)
     // but timespec is nanoseconds (1.000.000.000 per second)
@@ -411,6 +440,7 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
         }
     }
 }
+#endif
 
 static inline collected_number uptime_from_boottime(void) {
 #ifdef CLOCK_BOOTTIME_IS_AVAILABLE

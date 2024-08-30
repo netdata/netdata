@@ -70,12 +70,10 @@ int init_json_http_instance(struct instance *instance)
     struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
     instance->connector_specific_data = connector_specific_data;
 
-#ifdef ENABLE_HTTPS
     connector_specific_data->ssl = NETDATA_SSL_UNSET_CONNECTION;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
         netdata_ssl_initialize_ctx(NETDATA_SSL_EXPORTING_CTX);
     }
-#endif
 
     instance->start_batch_formatting = open_batch_json_http;
     instance->start_host_formatting = format_host_labels_json_plaintext;

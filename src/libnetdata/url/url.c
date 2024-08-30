@@ -25,7 +25,7 @@ char *url_encode(char *str) {
     pbuf = buf = mallocz(strlen(str) * 3 + 1);
 
     while (*str) {
-        if (isalnum(*str) || *str == '-' || *str == '_' || *str == '.' || *str == '~')
+        if (isalnum((uint8_t)*str) || *str == '-' || *str == '_' || *str == '.' || *str == '~')
             *pbuf++ = *str;
 
         else if (*str == ' ')
@@ -267,9 +267,9 @@ url_is_request_complete_and_extract_payload(const char *begin, const char *end, 
             const char *ct = strcasestr(begin, "Content-Type: ");
             if(ct) {
                 ct = &ct[14];
-                while (*ct && isspace(*ct)) ct++;
+                while (*ct && isspace((uint8_t)*ct)) ct++;
                 const char *space = ct;
-                while (*space && !isspace(*space) && *space != ';') space++;
+                while (*space && !isspace((uint8_t)*space) && *space != ';') space++;
                 size_t ct_len = space - ct;
 
                 char ct_copy[ct_len + 1];

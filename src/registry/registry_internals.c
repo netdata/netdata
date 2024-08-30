@@ -11,7 +11,7 @@ struct registry registry;
 // parse a GUID and re-generated to be always lower case
 // this is used as a protection against the variations of GUIDs
 int regenerate_guid(const char *guid, char *result) {
-    uuid_t uuid;
+    nd_uuid_t uuid;
     if(unlikely(uuid_parse(guid, uuid) == -1)) {
         netdata_log_info("Registry: GUID '%s' is not a valid GUID.", guid);
         return -1;
@@ -35,12 +35,12 @@ static inline char *registry_fix_machine_name(char *name, size_t *len) {
     char *s = name?name:"";
 
     // skip leading spaces
-    while(*s && isspace(*s)) s++;
+    while(*s && isspace((uint8_t)*s)) s++;
 
     // make sure all spaces are a SPACE
     char *t = s;
     while(*t) {
-        if(unlikely(isspace(*t)))
+        if(unlikely(isspace((uint8_t)*t)))
             *t = ' ';
 
         t++;
@@ -270,7 +270,7 @@ char *registry_get_this_machine_hostname(void) {
     return registry.hostname;
 }
 
-char *registry_get_this_machine_guid(void) {
+const char *registry_get_this_machine_guid(void) {
     static char guid[GUID_LEN + 1] = "";
 
     if(likely(guid[0]))
@@ -298,7 +298,7 @@ char *registry_get_this_machine_guid(void) {
 
     // generate a new one?
     if(!guid[0]) {
-        uuid_t uuid;
+        nd_uuid_t uuid;
 
         uuid_generate_time(uuid);
         uuid_unparse_lower(uuid, guid);
@@ -315,7 +315,7 @@ char *registry_get_this_machine_guid(void) {
         close(fd);
     }
 
-    setenv("NETDATA_REGISTRY_UNIQUE_ID", guid, 1);
+    nd_setenv("NETDATA_REGISTRY_UNIQUE_ID", guid, 1);
 
     return guid;
 }

@@ -4,7 +4,7 @@
 #define NETDATA_COMMON_H 1
 
 #include "libnetdata/libnetdata.h"
-#include "event_loop.h"
+#include "libuv_workers.h"
 
 // ----------------------------------------------------------------------------
 // shortcuts for the default netdata configuration
@@ -26,13 +26,15 @@
 #define config_exists(section, name) appconfig_exists(&netdata_config, section, name)
 #define config_move(section_old, name_old, section_new, name_new) appconfig_move(&netdata_config, section_old, name_old, section_new, name_new)
 
-#define config_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed)
+#define netdata_conf_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed, true)
 
 #define config_section_destroy(section) appconfig_section_destroy_non_loaded(&netdata_config, section)
 #define config_section_option_destroy(section, name) appconfig_section_option_destroy_non_loaded(&netdata_config, section, name)
 
 // ----------------------------------------------------------------------------
 // netdata include files
+
+#include "web/api/maps/maps.h"
 
 #include "daemon/config/dyncfg.h"
 
@@ -84,9 +86,6 @@
 
 // global GUID map functions
 
-// netdata agent spawn server
-#include "spawn/spawn.h"
-
 // the netdata daemon
 #include "daemon.h"
 #include "main.h"
@@ -106,37 +105,19 @@ extern char *netdata_configured_web_dir;
 extern char *netdata_configured_cache_dir;
 extern char *netdata_configured_varlib_dir;
 extern char *netdata_configured_lock_dir;
+extern char *netdata_configured_cloud_dir;
 extern char *netdata_configured_home_dir;
 extern char *netdata_configured_host_prefix;
 extern char *netdata_configured_timezone;
 extern char *netdata_configured_abbrev_timezone;
 extern int32_t netdata_configured_utc_offset;
-extern int netdata_zero_metrics_enabled;
 extern int netdata_anonymous_statistics_enabled;
 
 extern bool netdata_ready;
-extern int netdata_cloud_enabled;
-
 extern time_t netdata_start_time;
 
 long get_netdata_cpus(void);
 
-typedef enum __attribute__((packed)) {
-    CLOUD_STATUS_UNAVAILABLE = 0,   // cloud and aclk functionality is not available on this agent
-    CLOUD_STATUS_AVAILABLE,         // cloud and aclk functionality is available, but the agent is not claimed
-    CLOUD_STATUS_DISABLED,          // cloud and aclk functionality is available, but it is disabled
-    CLOUD_STATUS_BANNED,            // the agent has been banned from cloud
-    CLOUD_STATUS_OFFLINE,           // the agent tries to connect to cloud, but cannot do it
-    CLOUD_STATUS_ONLINE,            // the agent is connected to cloud
-} CLOUD_STATUS;
-
-const char *cloud_status_to_string(CLOUD_STATUS status);
-CLOUD_STATUS cloud_status(void);
-time_t cloud_last_change(void);
-time_t cloud_next_connection_attempt(void);
-size_t cloud_connection_id(void);
-const char *cloud_offline_reason(void);
-const char *cloud_base_url(void);
-CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s);
+void set_environment_for_plugins_and_scripts(void);
 
 #endif /* NETDATA_COMMON_H */

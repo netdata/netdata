@@ -8,6 +8,79 @@
 
 void analytics_set_data_str(char **name, const char *value);
 
+#define SQLITE_BIND_FAIL(label, rc)                                                                                    \
+    do {                                                                                                               \
+        if ((rc) != SQLITE_OK)                                                                                         \
+            goto label;                                                                                                \
+    } while (0)
+
+#define REPORT_BIND_FAIL(res, param)                                                                                   \
+    do {                                                                                                               \
+        if (unlikely((param))) {                                                                                       \
+            const char *failed_param = sqlite3_bind_parameter_name((res), (param));                                    \
+            nd_log(                                                                                                    \
+                NDLS_DAEMON,                                                                                           \
+                NDLP_ERR,                                                                                              \
+                "Failed to bind parameter %d (%s) in %s",                                                              \
+                (param),                                                                                               \
+                failed_param ? failed_param : "?",                                                                     \
+                __FUNCTION__);                                                                                         \
+        }                                                                                                              \
+    } while (0)
+
+#define SQLITE_FINALIZE(res)                                                                                           \
+    do {                                                                                                               \
+        if ((res)) {                                                                                                   \
+            int _rc = sqlite3_finalize((res));                                                                         \
+            if (_rc != SQLITE_OK) {                                                                                    \
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to finalize statement rc=%d in %s", _rc, __FUNCTION__);          \
+            }                                                                                                          \
+        }                                                                                                              \
+    } while (0)
+
+#define SQLITE_RESET(res)                                                                                              \
+    do {                                                                                                               \
+        if ((res)) {                                                                                                   \
+            int _rc = sqlite3_reset((res));                                                                            \
+            if (_rc != SQLITE_OK) {                                                                                    \
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to reset statement rc=%d in %s", _rc, __FUNCTION__);             \
+            }                                                                                                          \
+        }                                                                                                              \
+    } while (0)
+
+#define REQUIRE_DB(db)                                                                                                 \
+    ({                                                                                                                 \
+        if (unlikely(!(db))) {                                                                                         \
+            if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)                                                   \
+                error_report("Database has not been initialized in %s", __FUNCTION__);                                 \
+        }                                                                                                              \
+        (db) != NULL;                                                                                                  \
+    })
+
+#define PREPARE_COMPILED_STATEMENT(db, sql, stmt_ptr)                                                                  \
+    ({                                                                                                                 \
+        bool _ret = true;                                                                                              \
+        if ((!*(stmt_ptr))) {                                                                                          \
+            int _rc = prepare_statement((db), (sql), stmt_ptr);                                                        \
+            if (_rc != SQLITE_OK) {                                                                                    \
+                internal_error(true, "Failed to prepare statement \"%s\", rc=%d in %s", (sql), _rc, __FUNCTION__);     \
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to prepare statement, rc=%d in %s", _rc, __FUNCTION__);          \
+            }                                                                                                          \
+            _ret = (_rc == SQLITE_OK);                                                                                 \
+        }                                                                                                              \
+        _ret;                                                                                                          \
+    })
+
+#define PREPARE_STATEMENT(db, sql, stmt_ptr)                                                                           \
+    ({                                                                                                                 \
+        int _rc = sqlite3_prepare_v2((db), (sql), -1, stmt_ptr, 0);                                                    \
+        if (_rc != SQLITE_OK) {                                                                                        \
+            internal_error(true, "Failed to prepare statement \"%s\", rc=%d in %s", (sql), _rc, __FUNCTION__);         \
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to prepare statement, rc=%d in %s", _rc, __FUNCTION__);              \
+        }                                                                                                              \
+        _rc == SQLITE_OK;                                                                                              \
+    })
+
 #define SQL_MAX_RETRY (100)
 #define SQLITE_INSERT_DELAY (10)        // Insert delay in case of lock
 
@@ -44,4 +117,5 @@ void sqlite_library_shutdown(void);
 
 void sql_close_database(sqlite3 *database, const char *database_name);
 void sqlite_close_databases(void);
+uint64_t get_total_database_space(void);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

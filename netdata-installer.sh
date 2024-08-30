@@ -202,12 +202,9 @@ USAGE: ${PROGRAM} [options]
   --nightly-channel          Use most recent nightly updates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-ebpf             Disable eBPF Kernel plugin. Default: enabled.
-  --disable-cloud            Disable all Netdata Cloud functionality.
-  --require-cloud            Fail the install if it can't build Netdata Cloud support.
   --force-legacy-cxx         Force usage of an older C++ standard to allow building on older systems. This will usually be autodetected.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi  Explicitly disable the FreeIPMI plugin.
-  --disable-https            Explicitly disable TLS support.
   --disable-dbengine         Explicitly disable DB engine support.
   --enable-plugin-go         Enable the Go plugin. Default: Enabled when possible.
   --disable-plugin-go        Disable the Go plugin.
@@ -240,10 +237,14 @@ USAGE: ${PROGRAM} [options]
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
   --disable-telemetry        Opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)
   --skip-available-ram-check Skip checking the amount of RAM the system has and pretend it has enough to build safely.
-  --disable-logsmanagement   Disable the logs management plugin. Default: autodetect.
-  --enable-logsmanagement-tests Enable the logs management tests. Default: disabled.
 HEREDOC
 }
+
+if [ "$(uname -s)" = "Linux" ]; then
+  case "$(uname -m)" in
+    x86_64|i?86) ENABLE_EBPF=1 ;;
+  esac
+fi
 
 DONOTSTART=0
 DONOTWAIT=0
@@ -251,12 +252,8 @@ NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_ENABLE_ML=""
 ENABLE_DBENGINE=1
-ENABLE_EBPF=1
 ENABLE_GO=1
 ENABLE_H2O=1
-ENABLE_CLOUD=1
-ENABLE_LOGS_MANAGEMENT=1
-ENABLE_LOGS_MANAGEMENT_TESTS=0
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 
@@ -278,9 +275,7 @@ while [ -n "${1}" ]; do
     "--enable-plugin-freeipmi") ENABLE_FREEIPMI=1 ;;
     "--disable-plugin-freeipmi") ENABLE_FREEIPMI=0 ;;
     "--disable-https")
-      ENABLE_DBENGINE=0
-      ENABLE_H2O=0
-      ENABLE_CLOUD=0
+      warning "HTTPS cannot be disabled."
       ;;
     "--disable-dbengine") ENABLE_DBENGINE=0 ;;
     "--enable-plugin-go") ENABLE_GO=1 ;;
@@ -313,9 +308,6 @@ while [ -n "${1}" ]; do
     "--enable-lto")
       # TODO: Needs CMake support
       ;;
-    "--enable-logs-management") ENABLE_LOGS_MANAGEMENT=1 ;;
-    "--disable-logsmanagement") ENABLE_LOGS_MANAGEMENT=0 ;;
-    "--enable-logsmanagement-tests") ENABLE_LOGS_MANAGEMENT_TESTS=1 ;;
     "--disable-lto")
       # TODO: Needs CMake support
       ;;
@@ -323,34 +315,16 @@ while [ -n "${1}" ]; do
       # XXX: No longer supported.
       ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
-    "--enable-ebpf")
-      ENABLE_EBPF=1
-      NETDATA_DISABLE_EBPF=0
-      ;;
-    "--disable-ebpf")
-      ENABLE_EBPF=0
-      NETDATA_DISABLE_EBPF=1
-      ;;
+    "--enable-ebpf") ENABLE_EBPF=1 ;;
+    "--disable-ebpf") ENABLE_EBPF=0 ;;
     "--skip-available-ram-check") SKIP_RAM_CHECK=1 ;;
     "--one-time-build")
       # XXX: No longer supported
       ;;
     "--disable-cloud")
-      if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
-        warning "Cloud explicitly enabled, ignoring --disable-cloud."
-      else
-        ENABLE_CLOUD=0
-        NETDATA_DISABLE_CLOUD=1
-      fi
+      warning "Cloud cannot be disabled."
       ;;
-    "--require-cloud")
-      if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
-        warning "Cloud explicitly disabled, ignoring --require-cloud."
-      else
-        ENABLE_CLOUD=1
-        NETDATA_REQUIRE_CLOUD=1
-      fi
-      ;;
+    "--require-cloud") ;;
     "--build-json-c")
       NETDATA_BUILD_JSON_C=1
       ;;
@@ -512,7 +486,7 @@ fi
 
 CMAKE_OPTS="${ninja:+-G Ninja}"
 BUILD_OPTS="VERBOSE=1"
-[ -n "${ninja}" ] && BUILD_OPTS="-v"
+[ -n "${ninja}" ] && BUILD_OPTS="-k 1"
 
 if [ ${DONOTWAIT} -eq 0 ]; then
   if [ -n "${NETDATA_PREFIX}" ]; then
@@ -555,271 +529,6 @@ if [ ${LIBS_ARE_HERE} -eq 1 ]; then
 fi
 
 trap build_error EXIT
-
-# -----------------------------------------------------------------------------
-
-get_kernel_version() {
-  r="$(uname -r | cut -f 1 -d '-')"
-
-  tmpfile="$(mktemp)"
-  echo "${r}" | tr '.' ' ' > "${tmpfile}"
-
-  read -r maj min patch _ < "${tmpfile}"
-
-  rm -f "${tmpfile}"
-
-  printf "%03d%03d%03d" "${maj}" "${min}" "${patch}"
-}
-
-detect_libc() {
-  libc=
-  if ldd --version 2>&1 | grep -q -i glibc; then
-    echo >&2 " Detected GLIBC"
-    libc="glibc"
-  elif ldd --version 2>&1 | grep -q -i 'gnu libc'; then
-    echo >&2 " Detected GLIBC"
-    libc="glibc"
-  elif ldd --version 2>&1 | grep -q -i musl; then
-    echo >&2 " Detected musl"
-    libc="musl"
-  else
-      cmd=$(ldd /bin/sh | grep -w libc | cut -d" " -f 3)
-      if bash -c "${cmd}" 2>&1 | grep -q -i "GNU C Library"; then
-        echo >&2 " Detected GLIBC"
-        libc="glibc"
-      fi
-  fi
-
-  if [ -z "$libc" ]; then
-    warning "Cannot detect a supported libc on your system, eBPF support will be disabled."
-    return 1
-  fi
-
-  echo "${libc}"
-  return 0
-}
-
-build_libbpf() {
-  cd "${1}/src" > /dev/null || return 1
-  mkdir root build
-  # shellcheck disable=SC2086
-  run env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} ${MAKEOPTS} install
-  cd - > /dev/null || return 1
-}
-
-copy_libbpf() {
-  target_dir="${PWD}/externaldeps/libbpf"
-
-  if [ "$(uname -m)" = x86_64 ]; then
-    lib_subdir="lib64"
-  else
-    lib_subdir="lib"
-  fi
-
-  run mkdir -p "${target_dir}" || return 1
-
-  run cp "${1}/usr/${lib_subdir}/libbpf.a" "${target_dir}/libbpf.a" || return 1
-  run cp -r "${1}/usr/include" "${target_dir}" || return 1
-  run cp -r "${1}/include/uapi" "${target_dir}/include" || return 1
-}
-
-bundle_libbpf() {
-  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 1 ]; } || [ "$(uname -s)" != Linux ]; then
-    ENABLE_EBPF=0
-    NETDATA_DISABLE_EBPF=1
-    return 0
-  fi
-
-  if [ -z "${make}" ]; then
-    warning "No usable copy of Make found, which is required to bundle libbpf. Disabling eBPF support."
-    ENABLE_EBPF=0
-    NETDATA_DISABLE_EBPF=1
-    return 0
-  fi
-
-  # When libc is not detected, we do not have necessity to compile libbpf and we should not do download of eBPF programs
-  libc="${EBPF_LIBC:-"$(detect_libc)"}"
-  if [ -z "$libc" ]; then
-    NETDATA_DISABLE_EBPF=1
-    ENABLE_EBPF=0
-    return 0
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libbpf."
-
-  progress "Prepare libbpf"
-
-  if [ "$(get_kernel_version)" -ge "004014000" ]; then
-    LIBBPF_PACKAGE_VERSION="$(cat packaging/current_libbpf.version)"
-    LIBBPF_PACKAGE_COMPONENT="current_libbpf"
-  else
-    LIBBPF_PACKAGE_VERSION="$(cat packaging/libbpf_0_0_9.version)"
-    LIBBPF_PACKAGE_COMPONENT="libbpf_0_0_9"
-  fi
-
-  tmp="$(mktemp -d -t netdata-libbpf-XXXXXX)"
-  LIBBPF_PACKAGE_BASENAME="v${LIBBPF_PACKAGE_VERSION}.tar.gz"
-
-  if fetch_and_verify "${LIBBPF_PACKAGE_COMPONENT}" \
-    "https://github.com/netdata/libbpf/archive/${LIBBPF_PACKAGE_BASENAME}" \
-    "${LIBBPF_PACKAGE_BASENAME}" \
-    "${tmp}" \
-    "${NETDATA_LOCAL_TARBALL_OVERRIDE_LIBBPF}"; then
-    if run tar --no-same-owner -xf "${tmp}/${LIBBPF_PACKAGE_BASENAME}" -C "${tmp}" &&
-      build_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
-      copy_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
-      rm -rf "${tmp}"; then
-      run_ok "libbpf built and prepared."
-      ENABLE_EBPF=1
-    else
-      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
-        fatal "failed to build libbpf." I0005
-      else
-        run_failed "Failed to build libbpf. eBPF support will be disabled"
-        ENABLE_EBPF=0
-        NETDATA_DISABLE_EBPF=1
-      fi
-    fi
-  else
-    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
-      fatal "Failed to fetch sources for libbpf." I0006
-    else
-      run_failed "Unable to fetch sources for libbpf. eBPF support will be disabled"
-      ENABLE_EBPF=0
-      NETDATA_DISABLE_EBPF=1
-    fi
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-}
-
-bundle_libbpf
-
-copy_co_re() {
-  cp -R "${1}/includes" "src/libnetdata/ebpf/"
-}
-
-bundle_ebpf_co_re() {
-  if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 1 ]; } || [ "$(uname -s)" != Linux ]; then
-    return 0
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libbpf."
-
-  progress "eBPF CO-RE"
-
-  CORE_PACKAGE_VERSION="$(cat packaging/ebpf-co-re.version)"
-
-  tmp="$(mktemp -d -t netdata-ebpf-co-re-XXXXXX)"
-  CORE_PACKAGE_BASENAME="netdata-ebpf-co-re-glibc-${CORE_PACKAGE_VERSION}.tar.xz"
-
-  if fetch_and_verify "ebpf-co-re" \
-    "https://github.com/netdata/ebpf-co-re/releases/download/${CORE_PACKAGE_VERSION}/${CORE_PACKAGE_BASENAME}" \
-    "${CORE_PACKAGE_BASENAME}" \
-    "${tmp}" \
-    "${NETDATA_LOCAL_TARBALL_OVERRIDE_CORE}"; then
-    if run tar --no-same-owner -xf "${tmp}/${CORE_PACKAGE_BASENAME}" -C "${tmp}" &&
-      copy_co_re "${tmp}" &&
-      rm -rf "${tmp}"; then
-      run_ok "libbpf built and prepared."
-      ENABLE_EBPF=1
-    else
-      if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
-        fatal "Failed to get eBPF CO-RE files." I0007
-      else
-        run_failed "Failed to get eBPF CO-RE files. eBPF support will be disabled"
-        NETDATA_DISABLE_EBPF=1
-        ENABLE_EBPF=0
-        enable_feature PLUGIN_EBPF 0
-      fi
-    fi
-  else
-    if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
-      fatal "Failed to fetch eBPF CO-RE files." I0008
-    else
-      run_failed "Failed to fetch eBPF CO-RE files. eBPF support will be disabled"
-      NETDATA_DISABLE_EBPF=1
-      ENABLE_EBPF=0
-      enable_feature PLUGIN_EBPF 0
-    fi
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-}
-
-bundle_ebpf_co_re
-
-# -----------------------------------------------------------------------------
-build_fluentbit() {
-  env_cmd="env CFLAGS='-w' CXXFLAGS='-w' LDFLAGS="
-
-  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS='-fPIC -pipe -w' CXXFLAGS='-fPIC -pipe -w' LDFLAGS="
-  fi
-
-  mkdir -p src/fluent-bit/build || return 1
-  cd src/fluent-bit/build > /dev/null || return 1
-
-  rm CMakeCache.txt > /dev/null 2>&1
-
-  if ! run eval "${env_cmd} $1 -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../"; then
-    cd - > /dev/null || return 1
-    rm -rf src/fluent-bit/build > /dev/null 2>&1
-    return 1
-  fi
-
-  if ! run eval "${env_cmd} ${make} ${MAKEOPTS}"; then
-    cd - > /dev/null || return 1
-    rm -rf src/fluent-bit/build > /dev/null 2>&1
-    return 1
-  fi
-
-  cd - > /dev/null || return 1
-}
-
-bundle_fluentbit() {
-  progress "Prepare Fluent-Bit"
-
-  if [ "${ENABLE_LOGS_MANAGEMENT}" = 0 ]; then
-    warning "You have explicitly requested to disable Netdata Logs Management support, Fluent-Bit build is skipped."
-    return 0
-  fi
-
-  if [ ! -d "src/fluent-bit" ]; then
-    warning "Missing submodule Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
-    ENABLE_LOGS_MANAGEMENT=0
-    return 0
-  fi
-
-  patch -N -p1 src/fluent-bit/CMakeLists.txt -i src/logsmanagement/fluent_bit_build/CMakeLists.patch
-  patch -N -p1 src/fluent-bit/src/flb_log.c -i src/logsmanagement/fluent_bit_build/flb-log-fmt.patch
-
-  # If musl is used, we need to patch chunkio, providing fts has been previously installed.
-  libc="$(detect_libc)"
-  if [ "${libc}" = "musl" ]; then
-    patch -N -p1 src/fluent-bit/lib/chunkio/src/CMakeLists.txt -i src/logsmanagement/fluent_bit_build/chunkio-static-lib-fts.patch
-    patch -N -p1 src/fluent-bit/cmake/luajit.cmake -i src/logsmanagement/fluent_bit_build/exclude-luajit.patch
-    patch -N -p1 src/fluent-bit/src/flb_network.c -i src/logsmanagement/fluent_bit_build/xsi-strerror.patch
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling Fluent-Bit."
-
-  if build_fluentbit "$cmake"; then
-    # If Fluent-Bit built with inotify support, use it.
-    if [ "$(grep -o '^FLB_HAVE_INOTIFY:INTERNAL=.*' src/fluent-bit/build/CMakeCache.txt | cut -d '=' -f 2)" ]; then
-      CFLAGS="${CFLAGS} -DFLB_HAVE_INOTIFY"
-    fi
-    FLUENT_BIT_BUILD_SUCCESS=1
-    run_ok "Fluent-Bit built successfully."
-  else
-    warning "Failed to build Fluent-Bit, Netdata Logs Management support will be disabled in this build."
-    ENABLE_LOGS_MANAGEMENT=0
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-}
-
-bundle_fluentbit
 
 # -----------------------------------------------------------------------------
 # If we’re installing the Go plugin, ensure a working Go toolchain is installed.
@@ -965,6 +674,10 @@ fi
 progress "Install logrotate configuration for netdata"
 
 install_netdata_logrotate
+
+progress "Install journald configuration for netdata"
+
+install_netdata_journald_conf
 
 # -----------------------------------------------------------------------------
 progress "Read installation options from netdata.conf"
@@ -1128,21 +841,6 @@ if [ "$(id -u)" -eq 0 ]; then
     fi
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"
-    capabilities=0
-    if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
-      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"
-      if run setcap cap_dac_read_search,cap_syslog+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"; then
-        capabilities=1
-      fi
-    fi
-
-    if [ $capabilities -eq 0 ]; then
-      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"
-    fi
-  fi
-
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin"
     capabilities=0
@@ -1248,172 +946,6 @@ else
 fi
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-
-should_install_ebpf() {
-  if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
-    run_failed "eBPF has been explicitly disabled, it will not be available in this install."
-    return 1
-  fi
-
-  if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
-    if [ "${NETDATA_DISABLE_EBPF:=1}" -eq 0 ]; then
-      run_failed "Currently eBPF is only supported on Linux on X86_64."
-    fi
-
-    return 1
-  fi
-
-  # Check Kernel Config
-  if ! run "${INSTALLER_DIR}"/packaging/check-kernel-config.sh; then
-    warning "Kernel unsupported or missing required config (eBPF may not work on your system)"
-  fi
-
-  return 0
-}
-
-remove_old_ebpf() {
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin" ]; then
-    echo >&2 "Removing alpha eBPF collector."
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf_process.plugin"
-  fi
-
-  if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf" ]; then
-    echo >&2 "Removing alpha eBPF stock file"
-    rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_process.conf"
-  fi
-
-  if [ -f "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" ]; then
-    echo >&2 "Renaming eBPF configuration file."
-    mv "${NETDATA_PREFIX}/etc/netdata/ebpf_process.conf" "${NETDATA_PREFIX}/etc/netdata/ebpf.d.conf"
-  fi
-
-  # Added to remove eBPF programs with name pattern: NAME_VERSION.SUBVERSION.PATCH
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.0.o" ]; then
-    echo >&2 "Removing old eBPF programs with patch."
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.*.o
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.*.o
-  fi
-
-  # Remove old eBPF program to store new eBPF program inside subdirectory
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf_process.3.10.o" ]; then
-    echo >&2 "Removing old eBPF programs installed in old directory."
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/rnetdata_ebpf"*.?.*.o
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/pnetdata_ebpf"*.?.*.o
-  fi
-
-  # Remove old eBPF programs that did not have "rhf" suffix
-  if [ ! -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.d/pnetdata_ebpf_process.3.10.rhf.o" ]; then
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.d/"*.o
-  fi
-
-  # Remove old reject list from previous directory
-  if [ -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt" ]; then
-    echo >&2 "Removing old ebpf_kernel_reject_list.txt."
-    rm -f "${NETDATA_PREFIX}/usr/lib/netdata/conf.d/ebpf_kernel_reject_list.txt"
-  fi
-
-  # Remove old reset script
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/reset_netdata_trace.sh" ]; then
-    echo >&2 "Removing old reset_netdata_trace.sh."
-    rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/reset_netdata_trace.sh"
-  fi
-}
-
-install_ebpf() {
-  if ! should_install_ebpf; then
-    return 0
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing eBPF code."
-
-  remove_old_ebpf
-
-  progress "Installing eBPF plugin"
-
-  # Detect libc
-  libc="${EBPF_LIBC:-"$(detect_libc)"}"
-
-  EBPF_VERSION="$(cat packaging/ebpf.version)"
-  EBPF_TARBALL="netdata-kernel-collector-${libc}-${EBPF_VERSION}.tar.xz"
-
-  tmp="$(mktemp -d -t netdata-ebpf-XXXXXX)"
-
-  if ! fetch_and_verify "ebpf" \
-    "https://github.com/netdata/kernel-collector/releases/download/${EBPF_VERSION}/${EBPF_TARBALL}" \
-    "${EBPF_TARBALL}" \
-    "${tmp}" \
-    "${NETDATA_LOCAL_TARBALL_OVERRIDE_EBPF}"; then
-    run_failed "Failed to download eBPF collector package"
-    echo 2>&" Removing temporary directory ${tmp} ..."
-    rm -rf "${tmp}"
-
-    [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-    return 1
-  fi
-
-  echo >&2 " Extracting ${EBPF_TARBALL} ..."
-  tar --no-same-owner -xf "${tmp}/${EBPF_TARBALL}" -C "${tmp}"
-
-  # chown everything to root:netdata before we start copying out of our package
-  run chown -R root:netdata "${tmp}"
-
-  if [ ! -d "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/ebpf.d ]; then
-    mkdir "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/ebpf.d
-    RET=$?
-    if [ "${RET}" != "0" ]; then
-      rm -rf "${tmp}"
-
-      [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-      return 1
-    fi
-  fi
-
-  run cp -a -v "${tmp}"/*netdata_ebpf_*.o "${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/ebpf.d
-
-  rm -rf "${tmp}"
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-}
-
-progress "eBPF Kernel Collector"
-install_ebpf
-
-should_install_fluentbit() {
-  if [ "$(uname -s)" = "Darwin" ]; then
-    return 1
-  fi
-  if [ "${ENABLE_LOGS_MANAGEMENT}" = 0 ]; then
-    warning "netdata-installer.sh run with --disable-logsmanagement, Fluent-Bit installation is skipped."
-    return 1
-  elif [ "${FLUENT_BIT_BUILD_SUCCESS:=0}" -eq 0 ]; then
-    run_failed "Fluent-Bit was not built successfully, Netdata Logs Management support will be disabled in this build."
-    return 1
-  elif [ ! -f src/fluent-bit/build/lib/libfluent-bit.so ]; then
-    run_failed "libfluent-bit.so is missing, Netdata Logs Management support will be disabled in this build."
-    return 1
-  fi
-
-  return 0
-}
-
-install_fluentbit() {
-  if ! should_install_fluentbit; then
-    enable_feature PLUGIN_LOGS_MANAGEMENT 0
-    return 0
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing Fluent-Bit."
-
-  run chown "root:${NETDATA_GROUP}" src/fluent-bit/build/lib
-  run chmod 0644 src/fluent-bit/build/lib/libfluent-bit.so
-
-  run cp -a -v src/fluent-bit/build/lib/libfluent-bit.so "${NETDATA_PREFIX}"/usr/lib/netdata
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-}
-
-progress "Installing Fluent-Bit plugin"
-install_fluentbit
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"

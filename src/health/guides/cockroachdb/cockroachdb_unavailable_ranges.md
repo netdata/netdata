@@ -44,7 +44,7 @@ This alert indicates that there are unavailable ranges in your CockroachDB clust
 
 6. Consider rebalancing the cluster
 
-   Rebalancing the cluster can help distribute the load more evenly across nodes and reduce the number of unavailable ranges. See the [CockroachDB documentation](https://www.cockroachlabs.com/docs/stable/training/manual-rebalancing.html) for more information on manual rebalancing.
+   Rebalancing the cluster can help distribute the load more evenly across nodes and reduce the number of unavailable ranges. See the [CockroachDB documentation](https://www.cockroachlabs.com/docs/stable/demo-replication-and-rebalancing.html) for more information on manual rebalancing.
 
 ### Useful resources
 

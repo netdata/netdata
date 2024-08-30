@@ -3,7 +3,7 @@
 
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007
-FROM netdata/builder:v2 as builder
+FROM netdata/builder:v2 AS builder
 
 # One of 'nightly' or 'stable'
 ARG RELEASE_CHANNEL=nightly
@@ -47,7 +47,6 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /var/lib/netdata     /app/var/lib/ && \
     mv /etc/netdata         /app/etc/ && \
     mv /usr/sbin/netdata    /app/usr/sbin/ && \
-    mv /usr/sbin/netdata-claim.sh    /app/usr/sbin/ && \
     mv /usr/sbin/netdatacli    /app/usr/sbin/ && \
     mv /usr/sbin/systemd-cat-native /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
@@ -60,7 +59,7 @@ RUN mkdir -p /app/usr/sbin/ \
 #####################################################################
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007
-FROM netdata/base:v2 as base
+FROM netdata/base:v2 AS base
 
 LABEL org.opencontainers.image.authors="Netdatabot <bot@netdata.cloud>"
 LABEL org.opencontainers.image.url="https://netdata.cloud"
@@ -77,11 +76,11 @@ ONBUILD ENV NETDATA_OFFICIAL_IMAGE=false
 
 ARG NETDATA_UID=201
 ARG NETDATA_GID=201
-ENV DOCKER_GRP netdata
-ENV DOCKER_USR netdata
+ENV DOCKER_GRP=netdata
+ENV DOCKER_USR=netdata
 # If DISABLE_TELEMETRY is set, it will disable anonymous stats collection and reporting
 #ENV DISABLE_TELEMETRY=1
-ENV NETDATA_LISTENER_PORT 19999
+ENV NETDATA_LISTENER_PORT=19999
 EXPOSE $NETDATA_LISTENER_PORT
 
 ENV NETDATA_EXTRA_DEB_PACKAGES=""

@@ -2,7 +2,7 @@
 
 The Netdata daemon is practically a synonym for the Netdata Agent, as it controls its 
 entire operation. We support various methods to 
-[start, stop, or restart the daemon](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
+[start, stop, or restart the daemon](/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
 
 This document provides some basic information on the command line options, log files, and how to debug and troubleshoot
 
@@ -104,16 +104,13 @@ The command line options of the Netdata 1.10.0 version are the following:
   -W simple-pattern pattern string
                            Check if string matches pattern and exit.
 
-  -W "claim -token=TOKEN -rooms=ROOM1,ROOM2 url=https://app.netdata.cloud"
-                           Connect the agent to the workspace rooms pointed to by TOKEN and ROOM*.
-
  Signals netdata handles:
 
   - HUP                    Close and reopen log files.
   - USR2                   Reload health configuration.
 ```
 
-You can send commands during runtime via [netdatacli](https://github.com/netdata/netdata/blob/master/src/cli/README.md).
+You can send commands during runtime via [netdatacli](/src/cli/README.md).
 
 ## Log files
 
@@ -142,7 +139,7 @@ For most Netdata programs (including standard external plugins shipped by netdat
 | `ERROR` | Something that might disable a part of netdata.<br/>The log line includes `errno` (if it is not zero).                    |
 | `FATAL` | Something prevented a program from running.<br/>The log line includes `errno` (if it is not zero) and the program exited. |
 
-The `FATAL` and `ERROR` messages will always appear in the logs, and `INFO`can be filtered using [severity level](https://github.com/netdata/netdata/blob/master/src/daemon/config/README.md#logs-section-options) option.
+The `FATAL` and `ERROR` messages will always appear in the logs, and `INFO`can be filtered using [severity level](/src/daemon/config/README.md#logs-section-options) option.
 
 So, when auto-detection of data collection fail, `ERROR` lines are logged and the relevant modules are disabled, but the
 program continues to run.
@@ -151,7 +148,7 @@ When a Netdata program cannot run at all, a `FATAL` line is logged.
 
 ### collector.log
 
-The `collector.log` is the `stderr` of all [collectors](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md)
+The `collector.log` is the `stderr` of all [collectors](/src/collectors/COLLECTORS.md)
  run by `netdata`.
 
 So if any process, in the Netdata process tree, writes anything to its standard error,
@@ -281,7 +278,7 @@ all programs), edit `netdata.conf` and set:
   process nice level = -1
 ```
 
-then execute this to [restart Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation):
+then execute this to [restart Netdata](/packaging/installer/README.md#maintaining-a-netdata-agent-installation):
 
 ```sh
 sudo systemctl restart netdata

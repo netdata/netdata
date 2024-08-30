@@ -457,7 +457,7 @@ For more options and reference to documentation, check `man systemd-journal-remo
 
 #### _passive_ journal centralization without encryption
 
-If you want to setup your own passive journal centralization setup without encryption, [check out guide on it](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md).
+If you want to setup your own passive journal centralization setup without encryption, [check out guide on it](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md).
 
 #### _passive_ journal centralization with encryption using self-signed certificates
 

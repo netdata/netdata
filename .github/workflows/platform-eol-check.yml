@@ -26,7 +26,8 @@ jobs:
       - name: Prepare tools
         id: prepare
         run: |
-          sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
+          sudo apt-get update || true
+          sudo apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
         run: |
@@ -72,7 +73,7 @@ jobs:
         id: check
         shell: sh {0}
         run: |
-          d="$(.github/scripts/platform-impending-eol.py ${{ matrix.distro }} ${{ matrix.release }})"
+          d="$(.github/scripts/platform-impending-eol.py ${{ matrix.distro }} ${{ matrix.release }} ${{ matrix.lts }})"
           case $? in
             0) echo "pending=false" >> "${GITHUB_OUTPUT}" ;;
             1)
@@ -118,7 +119,7 @@ jobs:
         if: steps.check.outputs.pending == 'true' && steps.existing.outputs.exists == 'false'
         uses: imjohnbo/issue-bot@v3
         with:
-          assignees: Ferroin, tkatsoulas
+          assignees: Ferroin
           labels: area/packaging, needs triage
           title: ${{ steps.title.outputs.title }}
           body: |

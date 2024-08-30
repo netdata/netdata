@@ -7,7 +7,6 @@
 # Ownership by directory structure
 .github/ @netdata/agent-sre
 src/aclk/ @stelfrag
-contrib/debian @netdata/agent-sre
 src/collectors/ @thiagoftsm
 src/collectors/ebpf.plugin/ @thiagoftsm
 src/collectors/charts.d.plugin/ @ilyam8 @Ferroin
@@ -33,7 +32,6 @@ system/ @netdata/agent-sre
 tests/ @netdata/agent-sre @vkalintiris
 src/web/ @thiagoftsm @vkalintiris
 src/web/gui/ @novykh
-src/logsmanagement/ @thiagoftsm
 
 # Ownership by filetype (overwrites ownership by directory)
 *.md @Ancairon
@@ -48,6 +46,7 @@ CMakeLists.txt @netdata/agent-sre @vkalintiris
 netdata.spec.in @netdata/agent-sre
 netdata-installer.sh @netdata/agent-sre
 packaging/version @netdatabot @netdata/agent-sre
+packaging/repoconfig/CMakelists.txt @netdata/agent-sre
 
 LICENSE.md @netdata/agent-sre @vkalintiris
 CHANGELOG.md @netdatabot @netdata/agent-sre

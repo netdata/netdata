@@ -1266,8 +1266,10 @@ static void ebpf_update_target_with_conf(ebpf_module_t *em, netdata_ebpf_program
  *
  * @return it returns the new load mode.
  */
-static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file, netdata_ebpf_load_mode_t load,
-                                                      int kver, int is_rh)
+static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file __maybe_unused,
+                                                      netdata_ebpf_load_mode_t load,
+                                                      int kver __maybe_unused,
+                                                      int is_rh __maybe_unused)
 {
 #ifdef LIBBPF_MAJOR_VERSION
     if ((load & EBPF_LOAD_CORE) || (load & EBPF_LOAD_PLAY_DICE)) {

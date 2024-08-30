@@ -1,0 +1,172 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-x509check
+      plugin_name: go.d.plugin
+      module_name: x509check
+      monitored_instance:
+        name: X.509 certificate
+        link: ""
+        categories:
+          - data-collection.synthetic-checks
+        icon_filename: lock.svg
+      keywords:
+        - x509
+        - certificate
+      most_popular: false
+      info_provided_to_referring_integrations:
+        description: ""
+      related_resources:
+        integrations:
+          list: []
+    overview:
+      data_collection:
+        metrics_description: ""
+        method_description: |
+          This collectors monitors x509 certificates expiration time and revocation status.
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "go.d/x509check.conf"
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: source
+              description: "Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file, smtp."
+              default_value: ""
+              required: false
+            - name: days_until_expiration_warning
+              description: Number of days before the alarm status is warning.
+              default_value: 30
+              required: false
+            - name: days_until_expiration_critical
+              description: Number of days before the alarm status is critical.
+              default_value: 15
+              required: false
+            - name: check_revocation_status
+              description: Whether to check the revocation status of the certificate.
+              default_value: false
+              required: false
+            - name: timeout
+              description: SSL connection timeout.
+              default_value: 2
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Website certificate
+              description: Website certificate.
+              config: |
+                jobs:
+                  - name: my_site_cert
+                    source: https://my_site.org:443
+            - name: Local file certificate
+              description: Local file certificate.
+              config: |
+                jobs:
+                  - name: my_file_cert
+                    source: file:///home/me/cert.pem
+            - name: SMTP certificate
+              description: SMTP certificate.
+              config: |
+                jobs:
+                  - name: my_smtp_cert
+                    source: smtp://smtp.my_mail.org:587
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define more than one job, their names must be unique.
+                
+                Check the expiration status of the multiple websites' certificates.
+              config: |
+                jobs:
+                  - name: my_site_cert1
+                    source: https://my_site1.org:443
+                
+                  - name: my_site_cert2
+                    source: https://my_site1.org:443
+                
+                  - name: my_site_cert3
+                    source: https://my_site3.org:443
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: x509check_days_until_expiration
+        metric: x509check.time_until_expiration
+        info: "Time until x509 certificate expires for ${label:source}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf
+      - name: x509check_revocation_status
+        metric: x509check.revocation_status
+        info: "x509 certificate revocation status for ${label:source}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: source
+          description: These metrics refer to the configured source.
+          labels:
+            - name: source
+              description: Configured source.
+          metrics:
+            - name: x509check.time_until_expiration
+              description: Time Until Certificate Expiration
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: expiry
+            - name: x509check.revocation_status
+              description: Revocation Status
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: not_revoked
+                - name: revoked

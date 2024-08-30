@@ -246,7 +246,7 @@ static int perf_init() {
     struct perf_event *current_event = NULL;
     unsigned long flags = 0;
 
-    number_of_cpus = (int)get_system_cpus();
+    number_of_cpus = (int)os_get_system_cpus();
 
     // initialize all perf event file descriptors
     for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {
@@ -1093,7 +1093,7 @@ void parse_command_line(int argc, char **argv) {
             }
         }
         else if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
-            printf("perf.plugin %s\n", VERSION);
+            printf("perf.plugin %s\n", NETDATA_VERSION);
             exit(0);
         }
         else if(strcmp("all", argv[i]) == 0) {
@@ -1266,7 +1266,7 @@ void parse_command_line(int argc, char **argv) {
                     " For more information:\n"
                     " https://github.com/netdata/netdata/tree/master/src/collectors/perf.plugin\n"
                     "\n"
-                    , VERSION
+                    , NETDATA_VERSION
                     , update_every
             );
             exit(1);
@@ -1288,7 +1288,7 @@ int main(int argc, char **argv) {
 
     parse_command_line(argc, argv);
 
-    errno = 0;
+    errno_clear();
 
     if(freq >= update_every)
         update_every = freq;

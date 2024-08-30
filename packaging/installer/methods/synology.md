@@ -18,7 +18,7 @@ learn_rel_path: "Installation/Install on specific environments"
 
 
 The good news is that our 
-[one-line installation script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md) 
+[one-line installation script](/packaging/installer/methods/kickstart.md) 
 works fine if your NAS is one that uses the amd64 architecture. It
 will install the content into `/opt/netdata`, making future removal safe and simple.
 

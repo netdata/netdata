@@ -57,7 +57,7 @@ command to run (`/bin/bash`) and then chooses the base container images (`centos
 be sitting inside the shell of the container.
 
 After we have entered the shell we can install Netdata. This process could not be easier. If you take a look at [this
-link](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md), the Netdata devs give us several one-liners to install Netdata. I have not had
+link](/packaging/installer/README.md), the Netdata devs give us several one-liners to install Netdata. I have not had
 any issues with these one liners and their bootstrapping scripts so far (If you guys run into anything do share). Run
 the following command in your container.
 
@@ -217,7 +217,7 @@ the `chart` dimension. If you'd like you can combine the `chart` and `instance` 
 Let's give this a try: `netdata_system_cpu_percentage_average{chart="system.cpu", instance="netdata:19999"}`
 
 This is the basics of using Prometheus to query Netdata. I'd advise everyone at this point to read [this
-page](https://github.com/netdata/netdata/blob/master/src/exporting/prometheus/README.md#using-netdata-with-prometheus). The key point here is that Netdata can export metrics from
+page](/src/exporting/prometheus/README.md#using-netdata-with-prometheus). The key point here is that Netdata can export metrics from
 its internal DB or can send metrics _as-collected_ by specifying the `source=as-collected` URL parameter like so.
 <http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes&types=yes&source=as-collected> If you choose to use
 this method you will need to use Prometheus's set of functions here: <https://prometheus.io/docs/querying/functions/> to

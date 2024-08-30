@@ -9,6 +9,8 @@
 #define MAX_LISTEN_FDS 50
 #endif
 
+#define ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS 100
+
 typedef struct listen_sockets {
     struct config *config;              // the config file to use
     const char *config_section;         // the netdata configuration section to read settings from
@@ -37,13 +39,9 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
 int connect_to_one_of_urls(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
 
 
-#ifdef ENABLE_HTTPS
 ssize_t recv_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
 ssize_t send_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
-#else
-ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
-ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
-#endif
+int wait_on_socket_or_cancel_with_timeout(NETDATA_SSL *ssl, int fd, int timeout_ms, short int poll_events, short int *revents);
 
 bool fd_is_socket(int fd);
 bool sock_has_output_error(int fd);

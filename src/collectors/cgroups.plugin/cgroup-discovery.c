@@ -110,7 +110,7 @@ static inline void cgroup_free(struct cgroup *cg) {
 
     freez(cg->io_merged.filename);
     freez(cg->io_queued.filename);
-    freez(cg->pids.pids_current_filename);
+    freez(cg->pids_current.filename);
 
     free_pressure(&cg->cpu_pressure);
     free_pressure(&cg->io_pressure);
@@ -178,11 +178,9 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
 
     netdata_log_debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s'", cg->id, cg->chart_id);
     netdata_log_debug(D_CGROUP, "executing command %s \"%s\" for cgroup '%s'", cgroups_rename_script, cg->intermediate_id, cg->chart_id);
-    pid_t cgroup_pid;
 
-    FILE *fp_child_input, *fp_child_output;
-    (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp_child_input, &fp_child_output, cgroups_rename_script, cg->id, cg->intermediate_id);
-    if (!fp_child_output) {
+    POPEN_INSTANCE *instance = spawn_popen_run_variadic(cgroups_rename_script, cg->id, cg->intermediate_id, NULL);
+    if (!instance) {
         collector_error("CGROUP: cannot popen(%s \"%s\", \"r\").", cgroups_rename_script, cg->intermediate_id);
         cg->pending_renames = 0;
         cg->processed = 1;
@@ -190,8 +188,8 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     }
 
     char buffer[CGROUP_CHARTID_LINE_MAX + 1];
-    char *new_name = fgets(buffer, CGROUP_CHARTID_LINE_MAX, fp_child_output);
-    int exit_code = netdata_pclose(fp_child_input, fp_child_output, cgroup_pid);
+    char *new_name = fgets(buffer, CGROUP_CHARTID_LINE_MAX, spawn_popen_stdout(instance));
+    int exit_code = spawn_popen_wait(instance);
 
     switch (exit_code) {
         case 0:
@@ -245,11 +243,6 @@ static void is_cgroup_procs_exist(netdata_ebpf_cgroup_shm_body_t *out, char *id)
     }
 
     snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_memory_base, id);
-    if (likely(stat(out->path, &buf) == 0)) {
-        return;
-    }
-
-    snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_devices_base, id);
     if (likely(stat(out->path, &buf) == 0)) {
         return;
     }
@@ -351,12 +344,10 @@ static int calc_cgroup_depth(const char *id) {
     return depth;
 }
 
-static inline void discovery_find_cgroup_in_dir_callback(const char *dir) {
+static inline void discovery_find_cgroup_in_dir(const char *dir) {
     if (!dir || !*dir) {
         dir = "/";
     }
-
-    netdata_log_debug(D_CGROUP, "examining cgroup dir '%s'", dir);
 
     struct cgroup *cg = discovery_cgroup_find(dir);
     if (cg) {
@@ -385,40 +376,41 @@ static inline void discovery_find_cgroup_in_dir_callback(const char *dir) {
     cgroup_root_count++;
 }
 
-static inline int discovery_find_dir_in_subdirs(const char *base, const char *this, void (*callback)(const char *)) {
-    if(!this) this = base;
-    netdata_log_debug(D_CGROUP, "searching for directories in '%s' (base '%s')", this?this:"", base);
+static inline int discovery_find_walkdir(const char *base, const char *dirpath) {
+    if (!dirpath)
+        dirpath = base;
 
-    size_t dirlen = strlen(this), baselen = strlen(base);
+    netdata_log_debug(D_CGROUP, "searching for directories in '%s' (base '%s')", dirpath ? dirpath : "", base);
+
+    size_t dirlen = strlen(dirpath), baselen = strlen(base);
 
     int ret = -1;
     int enabled = -1;
 
-    const char *relative_path = &this[baselen];
-    if(!*relative_path) relative_path = "/";
+    const char *relative_path = &dirpath[baselen];
+    if (!*relative_path)
+        relative_path = "/";
 
-    DIR *dir = opendir(this);
+    DIR *dir = opendir(dirpath);
     if(!dir) {
-        collector_error("CGROUP: cannot read directory '%s'", base);
+        collector_error("CGROUP: cannot open directory '%s'", base);
         return ret;
     }
     ret = 1;
 
-    callback(relative_path);
+    discovery_find_cgroup_in_dir(relative_path);
 
     struct dirent *de = NULL;
     while((de = readdir(dir))) {
-        if(de->d_type == DT_DIR
-           && (
-                   (de->d_name[0] == '.' && de->d_name[1] == '\0')
-                   || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-           ))
+        if (de->d_type == DT_DIR && ((de->d_name[0] == '.' && de->d_name[1] == '\0') ||
+                                     (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')))
             continue;
 
         if(de->d_type == DT_DIR) {
             if(enabled == -1) {
                 const char *r = relative_path;
-                if(*r == '\0') r = "/";
+                if (*r == '\0')
+                    r = "/";
 
                 // do not decent in directories we are not interested
                 enabled = matches_search_cgroup_paths(r);
@@ -426,11 +418,12 @@ static inline int discovery_find_dir_in_subdirs(const char *base, const char *th
 
             if(enabled) {
                 char *s = mallocz(dirlen + strlen(de->d_name) + 2);
-                strcpy(s, this);
+                strcpy(s, dirpath);
                 strcat(s, "/");
                 strcat(s, de->d_name);
-                int ret2 = discovery_find_dir_in_subdirs(base, s, callback);
-                if(ret2 > 0) ret += ret2;
+                int ret2 = discovery_find_walkdir(base, s);
+                if (ret2 > 0)
+                    ret += ret2;
                 freez(s);
             }
         }
@@ -451,290 +444,277 @@ static inline void discovery_update_filenames_cgroup_v1(struct cgroup *cg) {
     struct stat buf;
 
     // CPU
-    if (unlikely(cgroup_enable_cpuacct_stat && !cg->cpuacct_stat.filename)) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.stat", cgroup_cpuacct_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
-            cg->cpuacct_stat.filename = strdupz(filename);
-            cg->cpuacct_stat.enabled = cgroup_enable_cpuacct_stat;
-            snprintfz(filename, FILENAME_MAX, "%s%s/cpuset.cpus", cgroup_cpuset_base, cg->id);
-            cg->filename_cpuset_cpus = strdupz(filename);
-            snprintfz(filename, FILENAME_MAX, "%s%s/cpu.cfs_period_us", cgroup_cpuacct_base, cg->id);
-            cg->filename_cpu_cfs_period = strdupz(filename);
-            snprintfz(filename, FILENAME_MAX, "%s%s/cpu.cfs_quota_us", cgroup_cpuacct_base, cg->id);
-            cg->filename_cpu_cfs_quota = strdupz(filename);
+    if (likely(cgroup_enable_cpuacct)) {
+        if (unlikely(!cg->cpuacct_stat.staterr && !cg->cpuacct_stat.filename)) {
+            snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.stat", cgroup_cpuacct_base, cg->id);
+            if (!(cg->cpuacct_stat.staterr = stat(filename, &buf) != 0)) {
+                cg->cpuacct_stat.filename = strdupz(filename);
+
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpuset.cpus", cgroup_cpuset_base, cg->id);
+                cg->filename_cpuset_cpus = strdupz(filename);
+
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpu.cfs_period_us", cgroup_cpuacct_base, cg->id);
+                cg->filename_cpu_cfs_period = strdupz(filename);
+
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpu.cfs_quota_us", cgroup_cpuacct_base, cg->id);
+                cg->filename_cpu_cfs_quota = strdupz(filename);
+            }
         }
-    }
-    // FIXME: remove usage_percpu
-    if (unlikely(cgroup_enable_cpuacct_usage && !cg->cpuacct_usage.filename && !is_cgroup_systemd_service(cg))) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.usage_percpu", cgroup_cpuacct_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
-            cg->cpuacct_usage.filename = strdupz(filename);
-            cg->cpuacct_usage.enabled = cgroup_enable_cpuacct_usage;
-        }
-    }
-    if (unlikely(
-            cgroup_enable_cpuacct_cpu_throttling && !cg->cpuacct_cpu_throttling.filename &&
-            !is_cgroup_systemd_service(cg))) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/cpu.stat", cgroup_cpuacct_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
-            cg->cpuacct_cpu_throttling.filename = strdupz(filename);
-            cg->cpuacct_cpu_throttling.enabled = cgroup_enable_cpuacct_cpu_throttling;
-        }
-    }
-    if (unlikely(
-            cgroup_enable_cpuacct_cpu_shares && !cg->cpuacct_cpu_shares.filename && !is_cgroup_systemd_service(cg))) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/cpu.shares", cgroup_cpuacct_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
-            cg->cpuacct_cpu_shares.filename = strdupz(filename);
-            cg->cpuacct_cpu_shares.enabled = cgroup_enable_cpuacct_cpu_shares;
+        if (!is_cgroup_systemd_service(cg)) {
+            if (unlikely(!cg->cpuacct_cpu_throttling.staterr && !cg->cpuacct_cpu_throttling.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpu.stat", cgroup_cpuacct_base, cg->id);
+                if (!(cg->cpuacct_cpu_throttling.staterr = stat(filename, &buf) != 0)) {
+                    cg->cpuacct_cpu_throttling.filename = strdupz(filename);
+                }
+            }
+
+            if (cgroup_enable_cpuacct_cpu_shares) {
+                if (unlikely(!cg->cpuacct_cpu_shares.staterr && !cg->cpuacct_cpu_shares.filename)) {
+                    snprintfz(filename, FILENAME_MAX, "%s%s/cpu.shares", cgroup_cpuacct_base, cg->id);
+
+                    if (!(cg->cpuacct_cpu_shares.staterr = stat(filename, &buf) != 0)) {
+                        cg->cpuacct_cpu_shares.filename = strdupz(filename);
+                    }
+                }
+            }
         }
     }
 
     // Memory
-    if (unlikely(
-            (cgroup_enable_detailed_memory || cgroup_used_memory) && !cg->memory.filename_detailed &&
-            (cgroup_used_memory || cgroup_enable_systemd_services_detailed_memory || !is_cgroup_systemd_service(cg)))) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
-            cg->memory.filename_detailed = strdupz(filename);
-            cg->memory.enabled_detailed =
-                (cgroup_enable_detailed_memory == CONFIG_BOOLEAN_YES) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_AUTO;
+    if (likely(cgroup_enable_memory)) {
+        if (unlikely(!cg->memory.staterr_mem_current && !cg->memory.filename_usage_in_bytes)) {
+            snprintfz(filename, FILENAME_MAX, "%s%s/memory.usage_in_bytes", cgroup_memory_base, cg->id);
+            if (!(cg->memory.staterr_mem_current = stat(filename, &buf) != 0)) {
+                cg->memory.filename_usage_in_bytes = strdupz(filename);
+
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.limit_in_bytes", cgroup_memory_base, cg->id);
+                cg->filename_memory_limit = strdupz(filename);
+            }
         }
-    }
-    if (unlikely(cgroup_enable_memory && !cg->memory.filename_usage_in_bytes)) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/memory.usage_in_bytes", cgroup_memory_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
-            cg->memory.filename_usage_in_bytes = strdupz(filename);
-            cg->memory.enabled_usage_in_bytes = cgroup_enable_memory;
-            snprintfz(filename, FILENAME_MAX, "%s%s/memory.limit_in_bytes", cgroup_memory_base, cg->id);
-            cg->filename_memory_limit = strdupz(filename);
+
+        if (unlikely(!cg->memory.staterr_mem_stat && !cg->memory.filename_detailed)) {
+            snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
+            if (!(cg->memory.staterr_mem_stat = stat(filename, &buf) != 0)) {
+                cg->memory.filename_detailed = strdupz(filename);
+            }
         }
-    }
-    if (unlikely(cgroup_enable_swap && !cg->memory.filename_msw_usage_in_bytes)) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.usage_in_bytes", cgroup_memory_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
-            cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
-            cg->memory.enabled_msw_usage_in_bytes = cgroup_enable_swap;
-            snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.limit_in_bytes", cgroup_memory_base, cg->id);
-            cg->filename_memoryswap_limit = strdupz(filename);
+
+        if (unlikely(!cg->memory.staterr_swap && !cg->memory.filename_msw_usage_in_bytes)) {
+            snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.usage_in_bytes", cgroup_memory_base, cg->id);
+            if (!(cg->memory.staterr_swap = stat(filename, &buf) != 0)) {
+                cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
+
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.limit_in_bytes", cgroup_memory_base, cg->id);
+                cg->filename_memoryswap_limit = strdupz(filename);
+            }
         }
-    }
-    if (unlikely(cgroup_enable_memory_failcnt && !cg->memory.filename_failcnt)) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/memory.failcnt", cgroup_memory_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
-            cg->memory.filename_failcnt = strdupz(filename);
-            cg->memory.enabled_failcnt = cgroup_enable_memory_failcnt;
+
+        if (unlikely(!cg->memory.staterr_failcnt && !cg->memory.filename_failcnt)) {
+            snprintfz(filename, FILENAME_MAX, "%s%s/memory.failcnt", cgroup_memory_base, cg->id);
+            if (!(cg->memory.staterr_failcnt = stat(filename, &buf) != 0)) {
+                cg->memory.filename_failcnt = strdupz(filename);
+            }
         }
     }
 
     // Blkio
-    if (unlikely(cgroup_enable_blkio_io && !cg->io_service_bytes.filename)) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_service_bytes_recursive", cgroup_blkio_base, cg->id);
-        if (unlikely(stat(filename, &buf) != -1)) {
-            cg->io_service_bytes.filename = strdupz(filename);
-            cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
-        } else {
-            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_service_bytes", cgroup_blkio_base, cg->id);
-            if (likely(stat(filename, &buf) != -1)) {
+    if (likely(cgroup_enable_blkio)) {
+        if (unlikely(!cg->io_service_bytes.staterr && !cg->io_service_bytes.filename)) {
+            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_service_bytes_recursive", cgroup_blkio_base, cg->id);
+            if (!(cg->io_service_bytes.staterr = stat(filename, &buf) != 0)) {
                 cg->io_service_bytes.filename = strdupz(filename);
-                cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
+            } else {
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_service_bytes", cgroup_blkio_base, cg->id);
+                if (!(cg->io_service_bytes.staterr = stat(filename, &buf) != 0)) {
+                    cg->io_service_bytes.filename = strdupz(filename);
+                }
             }
         }
-    }
-    if (unlikely(cgroup_enable_blkio_ops && !cg->io_serviced.filename)) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_serviced_recursive", cgroup_blkio_base, cg->id);
-        if (unlikely(stat(filename, &buf) != -1)) {
-            cg->io_serviced.filename = strdupz(filename);
-            cg->io_serviced.enabled = cgroup_enable_blkio_ops;
-        } else {
-            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_serviced", cgroup_blkio_base, cg->id);
-            if (likely(stat(filename, &buf) != -1)) {
+
+        if (unlikely(!cg->io_serviced.staterr && !cg->io_serviced.filename)) {
+            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_serviced_recursive", cgroup_blkio_base, cg->id);
+            if (!(cg->io_serviced.staterr = stat(filename, &buf) != 0)) {
                 cg->io_serviced.filename = strdupz(filename);
-                cg->io_serviced.enabled = cgroup_enable_blkio_ops;
+            } else {
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_serviced", cgroup_blkio_base, cg->id);
+                if (!(cg->io_serviced.staterr = stat(filename, &buf) != 0)) {
+                    cg->io_serviced.filename = strdupz(filename);
+                }
             }
         }
-    }
-    if (unlikely(cgroup_enable_blkio_throttle_io && !cg->throttle_io_service_bytes.filename)) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes_recursive", cgroup_blkio_base, cg->id);
-        if (unlikely(stat(filename, &buf) != -1)) {
-            cg->throttle_io_service_bytes.filename = strdupz(filename);
-            cg->throttle_io_service_bytes.enabled = cgroup_enable_blkio_throttle_io;
-        } else {
-            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes", cgroup_blkio_base, cg->id);
-            if (likely(stat(filename, &buf) != -1)) {
+
+        if (unlikely(!cg->throttle_io_service_bytes.staterr && !cg->throttle_io_service_bytes.filename)) {
+            snprintfz(
+                filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes_recursive", cgroup_blkio_base, cg->id);
+            if (!(cg->throttle_io_service_bytes.staterr = stat(filename, &buf) != 0)) {
                 cg->throttle_io_service_bytes.filename = strdupz(filename);
-                cg->throttle_io_service_bytes.enabled = cgroup_enable_blkio_throttle_io;
+            } else {
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes", cgroup_blkio_base, cg->id);
+                if (!(cg->throttle_io_service_bytes.staterr = stat(filename, &buf) != 0)) {
+                    cg->throttle_io_service_bytes.filename = strdupz(filename);
+                }
             }
         }
-    }
-    if (unlikely(cgroup_enable_blkio_throttle_ops && !cg->throttle_io_serviced.filename)) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced_recursive", cgroup_blkio_base, cg->id);
-        if (unlikely(stat(filename, &buf) != -1)) {
-            cg->throttle_io_serviced.filename = strdupz(filename);
-            cg->throttle_io_serviced.enabled = cgroup_enable_blkio_throttle_ops;
-        } else {
-            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced", cgroup_blkio_base, cg->id);
-            if (likely(stat(filename, &buf) != -1)) {
+
+        if (unlikely(!cg->throttle_io_serviced.staterr && !cg->throttle_io_serviced.filename)) {
+            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced_recursive", cgroup_blkio_base, cg->id);
+            if(!(cg->throttle_io_serviced.staterr = stat(filename, &buf) != 0)) {
                 cg->throttle_io_serviced.filename = strdupz(filename);
-                cg->throttle_io_serviced.enabled = cgroup_enable_blkio_throttle_ops;
+            } else {
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced", cgroup_blkio_base, cg->id);
+                if (!(cg->throttle_io_serviced.staterr = stat(filename, &buf) != 0)) {
+                    cg->throttle_io_serviced.filename = strdupz(filename);
+                }
             }
         }
-    }
-    if (unlikely(cgroup_enable_blkio_merged_ops && !cg->io_merged.filename)) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_merged_recursive", cgroup_blkio_base, cg->id);
-        if (unlikely(stat(filename, &buf) != -1)) {
-            cg->io_merged.filename = strdupz(filename);
-            cg->io_merged.enabled = cgroup_enable_blkio_merged_ops;
-        } else {
-            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_merged", cgroup_blkio_base, cg->id);
-            if (likely(stat(filename, &buf) != -1)) {
+
+        if (unlikely(!cg->io_merged.staterr && !cg->io_merged.filename)) {
+            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_merged_recursive", cgroup_blkio_base, cg->id);
+            if (!(cg->io_merged.staterr = stat(filename, &buf) != 0)) {
                 cg->io_merged.filename = strdupz(filename);
-                cg->io_merged.enabled = cgroup_enable_blkio_merged_ops;
+            } else {
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_merged", cgroup_blkio_base, cg->id);
+                if (!(cg->io_merged.staterr = stat(filename, &buf) != 0)) {
+                    cg->io_merged.filename = strdupz(filename);
+                }
             }
         }
-    }
-    if (unlikely(cgroup_enable_blkio_queued_ops && !cg->io_queued.filename)) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_queued_recursive", cgroup_blkio_base, cg->id);
-        if (unlikely(stat(filename, &buf) != -1)) {
-            cg->io_queued.filename = strdupz(filename);
-            cg->io_queued.enabled = cgroup_enable_blkio_queued_ops;
-        } else {
-            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_queued", cgroup_blkio_base, cg->id);
-            if (likely(stat(filename, &buf) != -1)) {
+
+        if (unlikely(!cg->io_queued.staterr && !cg->io_queued.filename)) {
+            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_queued_recursive", cgroup_blkio_base, cg->id);
+            if (!(cg->io_queued.staterr = stat(filename, &buf) != 0)) {
                 cg->io_queued.filename = strdupz(filename);
-                cg->io_queued.enabled = cgroup_enable_blkio_queued_ops;
+            } else {
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_queued", cgroup_blkio_base, cg->id);
+                if (!(cg->io_queued.staterr = stat(filename, &buf) != 0)) {
+                    cg->io_queued.filename = strdupz(filename);
+                }
             }
         }
     }
 
     // Pids
-    if (unlikely(!cg->pids.pids_current_filename)) {
+    if (unlikely(!cg->pids_current.staterr && !cg->pids_current.filename)) {
         snprintfz(filename, FILENAME_MAX, "%s%s/pids.current", cgroup_pids_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
-            cg->pids.pids_current_filename = strdupz(filename);
+        if (!(cg->pids_current.staterr = stat(filename, &buf) != 0)) {
+            cg->pids_current.filename = strdupz(filename);
         }
     }
 }
 
 static inline void discovery_update_filenames_cgroup_v2(struct cgroup *cg) {
+    if (!cgroup_unified_exist)
+        return;
+
     char filename[FILENAME_MAX + 1];
     struct stat buf;
 
     // CPU
-    if (unlikely((cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_cpu_throttling) && !cg->cpuacct_stat.filename)) {
+    if (unlikely((!cg->cpuacct_stat.staterr && !cg->cpuacct_stat.filename))) {
         snprintfz(filename, FILENAME_MAX, "%s%s/cpu.stat", cgroup_unified_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
+        if (!(cg->cpuacct_stat.staterr = stat(filename, &buf) != 0)) {
             cg->cpuacct_stat.filename = strdupz(filename);
-            cg->cpuacct_stat.enabled = cgroup_enable_cpuacct_stat;
-            cg->cpuacct_cpu_throttling.enabled = cgroup_enable_cpuacct_cpu_throttling;
             cg->filename_cpuset_cpus = NULL;
             cg->filename_cpu_cfs_period = NULL;
+
             snprintfz(filename, FILENAME_MAX, "%s%s/cpu.max", cgroup_unified_base, cg->id);
             cg->filename_cpu_cfs_quota = strdupz(filename);
         }
     }
-    if (unlikely(cgroup_enable_cpuacct_cpu_shares && !cg->cpuacct_cpu_shares.filename)) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/cpu.weight", cgroup_unified_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
-            cg->cpuacct_cpu_shares.filename = strdupz(filename);
-            cg->cpuacct_cpu_shares.enabled = cgroup_enable_cpuacct_cpu_shares;
+    if (cgroup_enable_cpuacct_cpu_shares) {
+        if (unlikely(!cg->cpuacct_cpu_shares.staterr && !cg->cpuacct_cpu_shares.filename)) {
+            snprintfz(filename, FILENAME_MAX, "%s%s/cpu.weight", cgroup_unified_base, cg->id);
+            if (!(cg->cpuacct_cpu_shares.staterr = stat(filename, &buf) != 0)) {
+                cg->cpuacct_cpu_shares.filename = strdupz(filename);
+            }
         }
     }
 
-    // Memory 
-    // FIXME: this if condition!
-    if (unlikely(
-            (cgroup_enable_detailed_memory || cgroup_used_memory) && !cg->memory.filename_detailed &&
-            (cgroup_used_memory || cgroup_enable_systemd_services_detailed_memory || !is_cgroup_systemd_service(cg)))) {
-        snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_unified_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
-            cg->memory.filename_detailed = strdupz(filename);
-            cg->memory.enabled_detailed =
-                (cgroup_enable_detailed_memory == CONFIG_BOOLEAN_YES) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_AUTO;
-        }
-    }
-
-    if (unlikely(cgroup_enable_memory && !cg->memory.filename_usage_in_bytes)) {
+    // Memory
+    if (unlikely(!cg->memory.staterr_mem_current && !cg->memory.filename_usage_in_bytes)) {
         snprintfz(filename, FILENAME_MAX, "%s%s/memory.current", cgroup_unified_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
+        if (!(cg->memory.staterr_mem_current = stat(filename, &buf) != 0)) {
             cg->memory.filename_usage_in_bytes = strdupz(filename);
-            cg->memory.enabled_usage_in_bytes = cgroup_enable_memory;
+
             snprintfz(filename, FILENAME_MAX, "%s%s/memory.max", cgroup_unified_base, cg->id);
             cg->filename_memory_limit = strdupz(filename);
         }
     }
 
-    if (unlikely(cgroup_enable_swap && !cg->memory.filename_msw_usage_in_bytes)) {
+    if (unlikely(!cg->memory.staterr_mem_stat && !cg->memory.filename_detailed)) {
+        snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_unified_base, cg->id);
+        if (!(cg->memory.staterr_mem_stat = stat(filename, &buf) != 0)) {
+            cg->memory.filename_detailed = strdupz(filename);
+        }
+    }
+
+    if (unlikely(!cg->memory.staterr_swap && !cg->memory.filename_msw_usage_in_bytes)) {
         snprintfz(filename, FILENAME_MAX, "%s%s/memory.swap.current", cgroup_unified_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
+        if (!(cg->memory.staterr_swap = stat(filename, &buf) != 0)) {
             cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
-            cg->memory.enabled_msw_usage_in_bytes = cgroup_enable_swap;
+
             snprintfz(filename, FILENAME_MAX, "%s%s/memory.swap.max", cgroup_unified_base, cg->id);
             cg->filename_memoryswap_limit = strdupz(filename);
         }
     }
 
     // Blkio
-    if (unlikely(cgroup_enable_blkio_io && !cg->io_service_bytes.filename)) {
+    if (unlikely(!cg->io_service_bytes.staterr && !cg->io_service_bytes.filename)) {
         snprintfz(filename, FILENAME_MAX, "%s%s/io.stat", cgroup_unified_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
+        if (!(cg->io_service_bytes.staterr = stat(filename, &buf) != 0)) {
             cg->io_service_bytes.filename = strdupz(filename);
-            cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
         }
     }
 
-    if (unlikely(cgroup_enable_blkio_ops && !cg->io_serviced.filename)) {
+    if (unlikely(!cg->io_serviced.staterr && !cg->io_serviced.filename)) {
         snprintfz(filename, FILENAME_MAX, "%s%s/io.stat", cgroup_unified_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
+        if (!(cg->io_serviced.staterr = stat(filename, &buf) != 0)) {
             cg->io_serviced.filename = strdupz(filename);
-            cg->io_serviced.enabled = cgroup_enable_blkio_ops;
         }
     }
 
     // PSI
-    if (unlikely(cgroup_enable_pressure_cpu && !cg->cpu_pressure.filename)) {
+    if (unlikely(!cg->cpu_pressure.staterr && !cg->cpu_pressure.filename)) {
         snprintfz(filename, FILENAME_MAX, "%s%s/cpu.pressure", cgroup_unified_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
+        if (!(cg->cpu_pressure.staterr = stat(filename, &buf) != 0)) {
             cg->cpu_pressure.filename = strdupz(filename);
-            cg->cpu_pressure.some.enabled = cgroup_enable_pressure_cpu;
-            cg->cpu_pressure.full.enabled = CONFIG_BOOLEAN_NO;
+            cg->cpu_pressure.some.enabled = CONFIG_BOOLEAN_YES;
+            cg->cpu_pressure.full.enabled = CONFIG_BOOLEAN_YES;
         }
     }
 
-    if (unlikely((cgroup_enable_pressure_io_some || cgroup_enable_pressure_io_full) && !cg->io_pressure.filename)) {
+    if (unlikely(!cg->io_pressure.staterr && !cg->io_pressure.filename)) {
         snprintfz(filename, FILENAME_MAX, "%s%s/io.pressure", cgroup_unified_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
+        if (!(cg->io_pressure.staterr = stat(filename, &buf) != 0)) {
             cg->io_pressure.filename = strdupz(filename);
-            cg->io_pressure.some.enabled = cgroup_enable_pressure_io_some;
-            cg->io_pressure.full.enabled = cgroup_enable_pressure_io_full;
+            cg->io_pressure.some.enabled = CONFIG_BOOLEAN_YES;
+            cg->io_pressure.full.enabled = CONFIG_BOOLEAN_YES;
         }
     }
 
-    if (unlikely(
-            (cgroup_enable_pressure_memory_some || cgroup_enable_pressure_memory_full) &&
-            !cg->memory_pressure.filename)) {
+    if (unlikely(!cg->memory_pressure.staterr && !cg->memory_pressure.filename)) {
         snprintfz(filename, FILENAME_MAX, "%s%s/memory.pressure", cgroup_unified_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
+        if (!(cg->memory_pressure.staterr = stat(filename, &buf) != 0)) {
             cg->memory_pressure.filename = strdupz(filename);
-            cg->memory_pressure.some.enabled = cgroup_enable_pressure_memory_some;
-            cg->memory_pressure.full.enabled = cgroup_enable_pressure_memory_full;
+            cg->memory_pressure.some.enabled = CONFIG_BOOLEAN_YES;
+            cg->memory_pressure.full.enabled = CONFIG_BOOLEAN_YES;
         }
     }
 
-    if (unlikely((cgroup_enable_pressure_irq_some || cgroup_enable_pressure_irq_full) && !cg->irq_pressure.filename)) {
+    if (unlikely(!cg->irq_pressure.staterr && !cg->irq_pressure.filename)) {
         snprintfz(filename, FILENAME_MAX, "%s%s/irq.pressure", cgroup_unified_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
+        if (!(cg->irq_pressure.staterr = stat(filename, &buf) != 0)) {
             cg->irq_pressure.filename = strdupz(filename);
-            cg->irq_pressure.some.enabled = cgroup_enable_pressure_irq_some;
-            cg->irq_pressure.full.enabled = cgroup_enable_pressure_irq_full;
+            cg->irq_pressure.some.enabled = CONFIG_BOOLEAN_YES;
+            cg->irq_pressure.full.enabled = CONFIG_BOOLEAN_YES;
         }
     }
 
     // Pids
-    if (unlikely(!cg->pids.pids_current_filename)) {
+    if (unlikely(!cg->pids_current.staterr && !cg->pids_current.filename)) {
         snprintfz(filename, FILENAME_MAX, "%s%s/pids.current", cgroup_unified_base, cg->id);
-        if (likely(stat(filename, &buf) != -1)) {
-            cg->pids.pids_current_filename = strdupz(filename);
+        if (!(cg->pids_current.staterr = stat(filename, &buf) != 0)) {
+            cg->pids_current.filename = strdupz(filename);
         }
     }
 }
@@ -746,7 +726,7 @@ static inline void discovery_update_filenames_all_cgroups() {
 
         if (!cgroup_use_unified_cgroups)
             discovery_update_filenames_cgroup_v1(cg);
-        else if (likely(cgroup_unified_exist))
+        else
             discovery_update_filenames_cgroup_v2(cg);
     }
 }
@@ -837,43 +817,34 @@ static inline void discovery_share_cgroups_with_ebpf() {
 }
 
 static inline void discovery_find_all_cgroups_v1() {
-    if (cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_usage) {
-        if (discovery_find_dir_in_subdirs(cgroup_cpuacct_base, NULL, discovery_find_cgroup_in_dir_callback) == -1) {
-            cgroup_enable_cpuacct_stat = cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_NO;
+    if (cgroup_enable_cpuacct) {
+        if (discovery_find_walkdir(cgroup_cpuacct_base, NULL) == -1) {
+            cgroup_enable_cpuacct = false;
             collector_error("CGROUP: disabled cpu statistics.");
         }
     }
 
-    if (cgroup_enable_blkio_io || cgroup_enable_blkio_ops || cgroup_enable_blkio_throttle_io ||
-        cgroup_enable_blkio_throttle_ops || cgroup_enable_blkio_merged_ops || cgroup_enable_blkio_queued_ops) {
-        if (discovery_find_dir_in_subdirs(cgroup_blkio_base, NULL, discovery_find_cgroup_in_dir_callback) == -1) {
-            cgroup_enable_blkio_io = cgroup_enable_blkio_ops = cgroup_enable_blkio_throttle_io =
-            cgroup_enable_blkio_throttle_ops = cgroup_enable_blkio_merged_ops = cgroup_enable_blkio_queued_ops =
-                    CONFIG_BOOLEAN_NO;
+    if (cgroup_enable_blkio) {
+        if (discovery_find_walkdir(cgroup_blkio_base, NULL) == -1) {
+            cgroup_enable_blkio = false;
             collector_error("CGROUP: disabled blkio statistics.");
         }
     }
 
-    if (cgroup_enable_memory || cgroup_enable_detailed_memory || cgroup_enable_swap || cgroup_enable_memory_failcnt) {
-        if (discovery_find_dir_in_subdirs(cgroup_memory_base, NULL, discovery_find_cgroup_in_dir_callback) == -1) {
-            cgroup_enable_memory = cgroup_enable_detailed_memory = cgroup_enable_swap = cgroup_enable_memory_failcnt =
-                    CONFIG_BOOLEAN_NO;
+    if (cgroup_enable_memory) {
+        if (discovery_find_walkdir(cgroup_memory_base, NULL) == -1) {
+            cgroup_enable_memory = false;
             collector_error("CGROUP: disabled memory statistics.");
-        }
-    }
-
-    if (cgroup_search_in_devices) {
-        if (discovery_find_dir_in_subdirs(cgroup_devices_base, NULL, discovery_find_cgroup_in_dir_callback) == -1) {
-            cgroup_search_in_devices = 0;
-            collector_error("CGROUP: disabled devices statistics.");
         }
     }
 }
 
 static inline void discovery_find_all_cgroups_v2() {
-    if (discovery_find_dir_in_subdirs(cgroup_unified_base, NULL, discovery_find_cgroup_in_dir_callback) == -1) {
-        cgroup_unified_exist = CONFIG_BOOLEAN_NO;
-        collector_error("CGROUP: disabled unified cgroups statistics.");
+    if (cgroup_unified_exist) {
+        if (discovery_find_walkdir(cgroup_unified_base, NULL) == -1) {
+            cgroup_unified_exist = false;
+            collector_error("CGROUP: disabled unified cgroups statistics.");
+        }
     }
 }
 
@@ -995,7 +966,7 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
         }
     }
 
-    if (cgroup_enable_systemd_services && matches_systemd_services_cgroups(cg->id)) {
+    if (matches_systemd_services_cgroups(cg->id)) {
         netdata_log_debug(D_CGROUP, "cgroup '%s' (name '%s') matches 'cgroups to match as systemd services'", cg->id, cg->chart_id);
         convert_cgroup_to_systemd_service(cg);
         return;
@@ -1038,9 +1009,7 @@ static void netdata_cgroup_ebpf_set_values(size_t length)
     sem_wait(shm_mutex_cgroup_ebpf);
 
     shm_cgroup_ebpf.header->cgroup_max = cgroup_root_max;
-    shm_cgroup_ebpf.header->systemd_enabled = cgroup_enable_systemd_services |
-                                              cgroup_enable_systemd_services_detailed_memory |
-                                              cgroup_used_memory;
+    shm_cgroup_ebpf.header->systemd_enabled = CONFIG_BOOLEAN_YES;
     shm_cgroup_ebpf.header->body_length = length;
 
     sem_post(shm_mutex_cgroup_ebpf);
@@ -1114,7 +1083,6 @@ static void cgroup_cleanup_ebpf_integration()
 static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     netdata_log_debug(D_CGROUP, "looking for the network interfaces of cgroup '%s' with chart id '%s'", cg->id, cg->chart_id);
 
-    pid_t cgroup_pid;
     char cgroup_identifier[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
 
     if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
@@ -1125,16 +1093,15 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     }
 
     netdata_log_debug(D_CGROUP, "executing cgroup_identifier %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, cgroup_identifier, cg->id);
-    FILE *fp_child_input, *fp_child_output;
-    (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp_child_input, &fp_child_output, cgroups_network_interface_script, "--cgroup", cgroup_identifier);
-    if(!fp_child_output) {
+    POPEN_INSTANCE *instance = spawn_popen_run_variadic(cgroups_network_interface_script, "--cgroup", cgroup_identifier, NULL);
+    if(!instance) {
         collector_error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, cgroup_identifier);
         return;
     }
 
     char *s;
     char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
-    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp_child_output))) {
+    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, spawn_popen_stdout(instance)))) {
         trim(s);
 
         if(*s && *s != '\n') {
@@ -1174,8 +1141,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
         }
     }
 
-    netdata_pclose(fp_child_input, fp_child_output, cgroup_pid);
-    // netdata_log_debug(D_CGROUP, "closed cgroup_identifier for cgroup '%s'", cg->id);
+    spawn_popen_wait(instance);
 }
 
 static inline void discovery_process_cgroup(struct cgroup *cg) {
@@ -1261,7 +1227,7 @@ static inline void discovery_find_all_cgroups() {
         discovery_find_all_cgroups_v2();
     }
 
-    for (struct cgroup *cg = discovered_cgroup_root; cg; cg = cg->discovered_next) {
+    for (struct cgroup *cg = discovered_cgroup_root; cg && service_running(SERVICE_COLLECTORS); cg = cg->discovered_next) {
         worker_is_busy(WORKER_DISCOVERY_PROCESS);
         discovery_process_cgroup(cg);
     }
@@ -1289,6 +1255,7 @@ static inline void discovery_find_all_cgroups() {
 void cgroup_discovery_worker(void *ptr)
 {
     UNUSED(ptr);
+    uv_thread_set_name_np("P[cgroupsdisc]");
 
     worker_register("CGROUPSDISC");
     worker_register_job_name(WORKER_DISCOVERY_INIT,               "init");

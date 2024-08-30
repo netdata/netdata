@@ -45,7 +45,7 @@ Configuration for this specific integration is located in the `[[ entry.setup.co
 [% endif %]
 
 You can edit the configuration file using the `edit-config` script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory).
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -60,7 +60,7 @@ There is no configuration file.
 
 [% if entry.setup.configuration.options.list %]
 [% if entry.setup.configuration.options.folding.enabled and not clean %]
-{% details summary="[[ entry.setup.configuration.options.folding.title ]]" %}
+{% details open=true summary="[[ entry.setup.configuration.options.folding.title ]]" %}
 [% endif %]
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
@@ -92,7 +92,7 @@ There are no configuration options.
 [[ example.description ]]
 
 [% if example.folding.enabled and not clean %]
-{% details summary="[[ entry.setup.configuration.examples.folding.title ]]" %}
+{% details open=true summary="[[ entry.setup.configuration.examples.folding.title ]]" %}
 [% endif %]
 ```yaml
 [[ example.config ]]

@@ -402,7 +402,7 @@ You can set the following values for each configuration option:
 
 There are several alerts defined in `health.d/net.conf`.
 
-The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alerts can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a child or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alert with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-families) line in the alert configuration. For example, if you want to disable the `inbound packets dropped` alert for `eth0`, set `families: !eth0 *` in the alert definition for `template: inbound_packets_dropped`.
+The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alerts can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a child or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alert with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](/src/health/REFERENCE.md#alert-line-families) line in the alert configuration. For example, if you want to disable the `inbound packets dropped` alert for `eth0`, set `families: !eth0 *` in the alert definition for `template: inbound_packets_dropped`.
 
 #### configuration
 
@@ -518,6 +518,7 @@ and metrics:
   # battery capacity = yes
   # battery charge = no
   # battery energy = no
+  # battery power = yes
   # power supply voltage = no
   # keep files open = auto
   # directory to monitor = /sys/class/power_supply
@@ -609,7 +610,7 @@ The `drm` path can be configured if it differs from the default:
 ```
 
 > [!NOTE]  
-> Temperature, fan speed, voltage and power metrics for AMD GPUs can be monitored using the [Sensors](https://github.com/netdata/netdata/blob/master/src/collectors/charts.d.plugin/sensors/README.md) plugin.
+> Temperature, fan speed, voltage and power metrics for AMD GPUs can be monitored using the [Sensors](/src/go/plugin/go.d/modules/sensors/README.md) plugin.
 
 ## IPC
 

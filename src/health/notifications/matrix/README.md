@@ -27,7 +27,7 @@ Send notifications to Matrix network rooms using Netdata's Agent alert notificat
 
 - The url of the homeserver (`https://homeserver:port`).
 - Credentials for connecting to the homeserver, in the form of a valid access token for your account (or for a dedicated notification account). These tokens usually don't expire.
-- The room ids that you want to sent the notification to.
+- The Room ids that you want to sent the notification to.
 - Access to the terminal where Netdata Agent is running
 
 
@@ -40,7 +40,7 @@ The configuration file name for this integration is `health_alarm_notify.conf`.
 
 
 You can edit the configuration file using the `edit-config` script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory).
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -50,14 +50,14 @@ sudo ./edit-config health_alarm_notify.conf
 
 The following options can be defined for this notification
 
-<details><summary>Config Options</summary>
+<details open><summary>Config Options</summary>
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | SEND_MATRIX | Set `SEND_MATRIX` to YES | YES | yes |
 | MATRIX_HOMESERVER | set `MATRIX_HOMESERVER` to the URL of the Matrix homeserver. |  | yes |
 | MATRIX_ACCESSTOKEN | Set `MATRIX_ACCESSTOKEN` to the access token from your Matrix account. |  | yes |
-| DEFAULT_RECIPIENT_MATRIX | Set `DEFAULT_RECIPIENT_MATRIX`  to the rooms you want the alert notifications to be sent to. The format is `!roomid:homeservername`. |  | yes |
+| DEFAULT_RECIPIENT_MATRIX | Set `DEFAULT_RECIPIENT_MATRIX`  to the Rooms you want the alert notifications to be sent to. The format is `!roomid:homeservername`. |  | yes |
 
 ##### MATRIX_ACCESSTOKEN
 
@@ -69,13 +69,13 @@ curl -XPOST -d '{"type":"m.login.password", "user":"example", "password":"wordpa
 
 ##### DEFAULT_RECIPIENT_MATRIX
 
-The room ids are unique identifiers and can be obtained from the room settings in a Matrix client (e.g. Riot).
+The Room ids are unique identifiers and can be obtained from the Room settings in a Matrix client (e.g. Riot).
 
-You can define multiple rooms like this: `!roomid1:homeservername` `!roomid2:homeservername`.
+You can define multiple Rooms like this: `!roomid1:homeservername` `!roomid2:homeservername`.
 
 All roles will default to this variable if left unconfigured.
 
-You can have different rooms per role, by editing `DEFAULT_RECIPIENT_MATRIX` with the `!roomid:homeservername` you want, in the following entries at the bottom of the same file:
+You can have different Rooms per role, by editing `DEFAULT_RECIPIENT_MATRIX` with the `!roomid:homeservername` you want, in the following entries at the bottom of the same file:
 
 ```conf
 role_recipients_matrix[sysadmin]="!roomid1:homeservername"

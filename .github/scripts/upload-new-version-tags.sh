@@ -2,8 +2,9 @@
 
 set -e
 
-host="packages.netdata.cloud"
 user="netdatabot"
+
+host="${1}"
 
 prefix="/var/www/html/releases"
 staging="${TMPDIR:-/tmp}/staging-new-releases"

@@ -114,12 +114,10 @@ int init_prometheus_remote_write_instance(struct instance *instance)
     struct simple_connector_data *simple_connector_data = callocz(1, sizeof(struct simple_connector_data));
     instance->connector_specific_data = simple_connector_data;
 
-#ifdef ENABLE_HTTPS
     simple_connector_data->ssl = NETDATA_SSL_UNSET_CONNECTION;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
         netdata_ssl_initialize_ctx(NETDATA_SSL_EXPORTING_CTX);
     }
-#endif
 
     struct prometheus_remote_write_specific_data *connector_specific_data =
         callocz(1, sizeof(struct prometheus_remote_write_specific_data));

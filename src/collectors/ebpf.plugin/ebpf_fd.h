@@ -24,18 +24,32 @@
 #define NETDATA_FD_CONFIG_FILE "fd.conf"
 
 // Contexts
+#define NETDATA_FS_FILEDESCRIPTOR_CONTEXT "filesystem.file_descriptor"
+#define NETDATA_FS_FILEDESCRIPTOR_ERROR_CONTEXT "filesystem.file_error"
+
 #define NETDATA_CGROUP_FD_OPEN_CONTEXT "cgroup.fd_open"
 #define NETDATA_CGROUP_FD_OPEN_ERR_CONTEXT "cgroup.fd_open_error"
 #define NETDATA_CGROUP_FD_CLOSE_CONTEXT "cgroup.fd_close"
 #define NETDATA_CGROUP_FD_CLOSE_ERR_CONTEXT "cgroup.fd_close_error"
 
-#define NETDATA_SYSTEMD_FD_OPEN_CONTEXT "systemd.services.fd_open"
-#define NETDATA_SYSTEMD_FD_OPEN_ERR_CONTEXT "systemd.services.fd_open_error"
-#define NETDATA_SYSTEMD_FD_CLOSE_CONTEXT "systemd.services.fd_close"
-#define NETDATA_SYSTEMD_FD_CLOSE_ERR_CONTEXT "systemd.services.fd_close_error"
+#define NETDATA_SYSTEMD_FD_OPEN_CONTEXT "systemd.service.fd_open"
+#define NETDATA_SYSTEMD_FD_OPEN_ERR_CONTEXT "systemd.service.fd_open_error"
+#define NETDATA_SYSTEMD_FD_CLOSE_CONTEXT "systemd.service.fd_close"
+#define NETDATA_SYSTEMD_FD_CLOSE_ERR_CONTEXT "systemd.service.fd_close_error"
 
 // ARAL name
 #define NETDATA_EBPF_FD_ARAL_NAME "ebpf_fd"
+
+typedef struct __attribute__((packed)) netdata_publish_fd_stat {
+    uint64_t ct;
+
+    uint32_t open_call;                    // Open syscalls (open and openat)
+    uint32_t close_call;                   // Close syscall (close)
+
+    // Errors
+    uint32_t open_err;
+    uint32_t close_err;
+} netdata_publish_fd_stat_t;
 
 typedef struct netdata_fd_stat {
     uint64_t ct;

@@ -3,7 +3,7 @@
 #ifndef NETDATA_COMMANDS_H
 #define NETDATA_COMMANDS_H 1
 
-#define MAX_COMMAND_LENGTH 4096
+#define MAX_COMMAND_LENGTH (8192)
 #define MAX_EXIT_STATUS_LENGTH 23 /* Can't ever be bigger than "X-18446744073709551616" */
 
 typedef enum cmd {
@@ -20,6 +20,7 @@ typedef enum cmd {
     CMD_ACLK_STATE,
     CMD_VERSION,
     CMD_DUMPCONFIG,
+    CMD_REMOVE_NODE,
     CMD_TOTAL_COMMANDS
 } cmd_t;
 

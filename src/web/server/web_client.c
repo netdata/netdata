@@ -33,6 +33,7 @@ void web_client_set_conn_webrtc(struct web_client *w) {
 void web_client_reset_permissions(struct web_client *w) {
     web_client_flags_clear_auth(w);
     w->access = HTTP_ACCESS_NONE;
+    w->user_role = HTTP_USER_ROLE_NONE;
 }
 
 void web_client_set_permissions(struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, WEB_CLIENT_FLAGS auth) {
@@ -97,7 +98,6 @@ static inline int web_client_cork_socket(struct web_client *w __maybe_unused) {
     return 0;
 }
 
-#ifdef ENABLE_HTTPS
 static inline void web_client_enable_wait_from_ssl(struct web_client *w) {
     if (w->ssl.ssl_errno == SSL_ERROR_WANT_READ)
         web_client_enable_ssl_wait_receive(w);
@@ -108,7 +108,6 @@ static inline void web_client_enable_wait_from_ssl(struct web_client *w) {
         web_client_disable_ssl_wait_send(w);
     }
 }
-#endif
 
 static inline int web_client_uncork_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
@@ -130,7 +129,7 @@ static inline char *strip_control_characters(char *url) {
     if(!url) return "";
 
     for(char *s = url; *s ;s++)
-        if(iscntrl(*s)) *s = ' ';
+        if(iscntrl((uint8_t)*s)) *s = ' ';
 
     return url;
 }
@@ -211,6 +210,8 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     }
 
     memset(w->transaction, 0, sizeof(w->transaction));
+    memset(&w->auth, 0, sizeof(w->auth));
+
     web_client_reset_permissions(w);
     web_client_flag_clear(w, WEB_CLIENT_ENCODING_GZIP|WEB_CLIENT_ENCODING_DEFLATE);
     web_client_reset_path_flags(w);
@@ -479,7 +480,7 @@ static int mysendfile(struct web_client *w, char *filename) {
     // if the filename contains "strange" characters, refuse to serve it
     char *s;
     for(s = filename; *s ;s++) {
-        if( !isalnum(*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
+        if( !isalnum((uint8_t)*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_sprintf(w->response.data, "Filename contains invalid characters: ");
@@ -589,7 +590,9 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
     // get the api version
     char *tok = strsep_skip_consecutive_separators(&url_path_fragment, "/");
     if(tok && *tok) {
-        if(strcmp(tok, "v2") == 0)
+        if(strcmp(tok, "v3") == 0)
+            return web_client_api_request_v3(host, w, url_path_fragment);
+        else if(strcmp(tok, "v2") == 0)
             return web_client_api_request_v2(host, w, url_path_fragment);
         else if(strcmp(tok, "v1") == 0)
             return web_client_api_request_v1(host, w, url_path_fragment);
@@ -644,7 +647,6 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
     else if(!strncmp(s, "STREAM ", 7)) {
         s = &s[7];
 
-#ifdef ENABLE_HTTPS
         if (!SSL_connection(&w->ssl) && http_is_using_ssl_force(w)) {
             w->header_parse_tries = 0;
             w->header_parse_last_size = 0;
@@ -672,7 +674,6 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
             netdata_log_error("The server is configured to always use encrypted connections, please enable the SSL on child with hostname '%s'.",hostname);
             s = NULL;
         }
-#endif
 
         w->mode = HTTP_REQUEST_MODE_STREAM;
     }
@@ -704,11 +705,12 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
         if(last_pos > 4) last_pos -= 4; // allow searching for \r\n\r\n
         else last_pos = 0;
 
-        if(w->header_parse_last_size < last_pos)
+        if(w->header_parse_last_size <= last_pos)
             last_pos = 0;
 
-        is_it_valid =
-            url_is_request_complete_and_extract_payload(s, &s[last_pos], w->header_parse_last_size, &w->payload);
+        is_it_valid = url_is_request_complete_and_extract_payload(s, &s[last_pos],
+                                                                  w->header_parse_last_size, &w->payload);
+
         if(!is_it_valid) {
             if(w->header_parse_tries > HTTP_REQ_MAX_HEADER_FETCH_TRIES) {
                 netdata_log_info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
@@ -787,7 +789,6 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 web_client_decode_path_and_query_string(w, encoded_url);
                 *ue = c;
 
-#ifdef ENABLE_HTTPS
                 if ( (web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx) ) {
                     if (!w->ssl.conn && (http_is_using_ssl_force(w) || http_is_using_ssl_default(w)) && (w->mode != HTTP_REQUEST_MODE_STREAM)) {
                         w->header_parse_tries = 0;
@@ -796,7 +797,6 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
                         return HTTP_VALIDATION_REDIRECT;
                     }
                 }
-#endif
 
                 w->header_parse_tries = 0;
                 w->header_parse_last_size = 0;
@@ -817,7 +817,6 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,size_t len, int flags)
 {
     ssize_t bytes;
-#ifdef ENABLE_HTTPS
     if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
         if (SSL_connection(&w->ssl)) {
             bytes = netdata_ssl_write(&w->ssl, buf, len) ;
@@ -830,12 +829,6 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
         bytes = send(w->ofd,buf, len , flags);
     else
         bytes = -999;
-#else
-    if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w))
-        bytes = send(w->ofd, buf, len, flags);
-    else
-        bytes = -999;
-#endif
 
     return bytes;
 }
@@ -882,7 +875,7 @@ void web_client_build_http_header(struct web_client *w) {
                        w->response.code,
                        code_msg,
                        web_client_has_keepalive(w)?"keep-alive":"close",
-                       VERSION,
+                       NETDATA_VERSION,
                        w->origin ? w->origin : "*",
                        rfc7231_date);
 
@@ -967,7 +960,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
 
     size_t count = 0;
     ssize_t bytes;
-#ifdef ENABLE_HTTPS
+
     if ( (web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx) ) {
         if (SSL_connection(&w->ssl)) {
             bytes = netdata_ssl_write(&w->ssl, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output));
@@ -996,20 +989,6 @@ static inline void web_client_send_http_header(struct web_client *w) {
     }
     else
         bytes = -999;
-#else
-    if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w)) {
-        while ((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
-            count++;
-
-            if (count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
-                netdata_log_error("Cannot send HTTP headers to web client.");
-                break;
-            }
-        }
-    }
-    else
-        bytes = -999;
-#endif
 
     if(bytes != (ssize_t) buffer_strlen(w->response.header_output)) {
         if(bytes > 0)
@@ -1065,7 +1044,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         if(!host) {
             // we didn't find it, but it may be a uuid case mismatch for MACHINE_GUID
             // so, recreate the machine guid in lower-case.
-            uuid_t uuid;
+            nd_uuid_t uuid;
             char txt[UUID_STR_LEN];
             if (uuid_parse(tok, uuid) == 0) {
                 uuid_unparse_lower(uuid, txt);
@@ -1224,7 +1203,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: generating netdata.conf ...", w->id);
             w->response.data->content_type = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
-            config_generate(w->response.data, 0);
+            netdata_conf_generate(w->response.data, 0);
             return HTTP_RESP_OK;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1310,11 +1289,7 @@ static bool web_server_log_transport(BUFFER *wb, void *ptr) {
     if(!w)
         return false;
 
-#ifdef ENABLE_HTTPS
     buffer_strcat(wb, SSL_connection(&w->ssl) ? "https" : "http");
-#else
-    buffer_strcat(wb, "http");
-#endif
     return true;
 }
 
@@ -1457,7 +1432,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 return;
             }
             break;
-#ifdef ENABLE_HTTPS
+
         case HTTP_VALIDATION_REDIRECT:
         {
             buffer_flush(w->response.data);
@@ -1473,7 +1448,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             w->response.code = HTTP_RESP_HTTPS_UPGRADE;
             break;
         }
-#endif
+
         case HTTP_VALIDATION_MALFORMED_URL:
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Malformed URL '%s'.", w->id, w->response.data->buffer);
 
@@ -1850,14 +1825,14 @@ ssize_t web_client_receive(struct web_client *w)
         return web_client_read_file(w);
 
     ssize_t bytes;
-    ssize_t left = (ssize_t)(w->response.data->size - w->response.data->len);
 
     // do we have any space for more data?
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_INITIAL_SIZE);
 
-    errno = 0;
+    ssize_t left = (ssize_t)(w->response.data->size - w->response.data->len);
 
-#ifdef ENABLE_HTTPS
+    errno_clear();
+
     if ( (web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx) ) {
         if (SSL_connection(&w->ssl)) {
             bytes = netdata_ssl_read(&w->ssl, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
@@ -1872,12 +1847,6 @@ ssize_t web_client_receive(struct web_client *w)
     }
     else // other connection methods
         bytes = -1;
-#else
-    if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w))
-        bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
-    else
-        bytes = -1;
-#endif
 
     if(likely(bytes > 0)) {
         w->statistics.received_bytes += bytes;
@@ -1960,9 +1929,7 @@ void web_client_reuse_from_cache(struct web_client *w) {
     BUFFER *b6 = w->url_query_string_decoded;
     BUFFER *b7 = w->payload;
 
-#ifdef ENABLE_HTTPS
     NETDATA_SSL ssl = w->ssl;
-#endif
 
     size_t use_count = w->use_count;
     size_t *statistics_memory_accounting = w->statistics.memory_accounting;
@@ -1974,9 +1941,7 @@ void web_client_reuse_from_cache(struct web_client *w) {
     w->statistics.memory_accounting = statistics_memory_accounting;
     w->use_count = use_count;
 
-#ifdef ENABLE_HTTPS
     w->ssl = ssl;
-#endif
 
     // restore the pointers of the buffers
     w->response.data = b1;
@@ -1991,9 +1956,7 @@ void web_client_reuse_from_cache(struct web_client *w) {
 struct web_client *web_client_create(size_t *statistics_memory_accounting) {
     struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
 
-#ifdef ENABLE_HTTPS
     w->ssl = NETDATA_SSL_UNSET_CONNECTION;
-#endif
 
     w->use_count = 1;
     w->statistics.memory_accounting = statistics_memory_accounting;
@@ -2011,9 +1974,7 @@ struct web_client *web_client_create(size_t *statistics_memory_accounting) {
 }
 
 void web_client_free(struct web_client *w) {
-#ifdef ENABLE_HTTPS
     netdata_ssl_close(&w->ssl);
-#endif
 
     web_client_reset_allocations(w, true);
 

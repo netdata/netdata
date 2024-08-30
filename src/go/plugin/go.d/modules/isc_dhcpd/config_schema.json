@@ -1,0 +1,70 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "ISC DHCP collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "leases_path": {
+        "title": "Leases file",
+        "description": "File path to the ISC DHCP server's lease database.",
+        "type": "string",
+        "default": "/var/lib/dhcp/dhcpd.leases",
+        "pattern": "^$|^/"
+      },
+      "pools": {
+        "title": "IP pools",
+        "description": "A list of IP pools to monitor. Each pool consists of a descriptive name and corresponding IP ranges.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "IP pool",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "name": {
+              "title": "Name",
+              "description": "A descriptive name for the IP pool.",
+              "type": "string"
+            },
+            "networks": {
+              "title": "Networks",
+              "description": "A space-separated list of [IP ranges](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/iprange#supported-formats) for the pool.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "networks"
+          ]
+        },
+        "minItems": 1,
+        "uniqueItems": true,
+        "additionalItems": false
+      }
+    },
+    "required": [
+      "leases_path",
+      "pools"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    }
+  }
+}

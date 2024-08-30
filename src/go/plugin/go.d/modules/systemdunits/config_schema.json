@@ -1,0 +1,122 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Systemdunits collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "The timeout, in seconds, for connecting and querying systemd's D-Bus endpoint.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 2
+      },
+      "skip_transient": {
+        "title": "Skip transient units",
+        "description": "If set, skip data collection for systemd transient units.",
+        "type": "boolean",
+        "default": false
+      },
+      "include": {
+        "title": "Include",
+        "description": "Configuration for monitoring specific systemd units. Include systemd units whose names match any of the specified [patterns](https://golang.org/pkg/path/filepath/#Match).",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "Unit pattern",
+          "type": "string"
+        },
+        "default": [
+          "*.service"
+        ]
+      },
+      "collect_unit_files": {
+        "title": "Collect unit files",
+        "description": "If set, collect the state of installed unit files. **Enabling this may increase system overhead**, particularly if the pattern matches a large number of unit files.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_unit_files_every": {
+        "title": "Unit files polling interval",
+        "description": "Interval for querying systemd about unit files and their enablement state, measured in seconds. Data is cached for this interval to reduce system overhead.",
+        "type": "number",
+        "minimum": 1,
+        "default": 300
+      },
+      "include_unit_files": {
+        "title": "Include unit files",
+        "description": "Configuration for monitoring specific systemd unit files. Include systemd unit files whose names match any of the specified [patterns](https://golang.org/pkg/path/filepath/#Match).",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "Unit file name pattern",
+          "type": "string"
+        },
+        "default": [
+          "*.service"
+        ]
+      }
+    },
+    "required": [
+      "include"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "timeout",
+            "skip_transient",
+            "include"
+          ]
+        },
+        {
+          "title": "Unit Files",
+          "fields": [
+            "collect_unit_files",
+            "collect_unit_files_every",
+            "include_unit_files"
+          ]
+        }
+      ]
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "skip_transient": {
+      "ui:help": "A systemd transient unit is a temporary unit created on-the-fly, typically used for ad-hoc tasks or testing purposes. They are created using the `systemd-run` command, which allows you to specify unit properties directly on the command line."
+    },
+    "include": {
+      "ui:listFlavour": "list"
+    },
+    "include_unit_files": {
+      "ui:listFlavour": "list"
+    }
+  }
+}

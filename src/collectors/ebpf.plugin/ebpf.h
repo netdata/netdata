@@ -37,20 +37,21 @@
 #define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
 #define NETDATA_EBPF_CONFIG_FILE "ebpf.d.conf"
 
+extern size_t ebpf_hash_table_pids_count;
 #ifdef LIBBPF_MAJOR_VERSION // BTF code
-#include "libnetdata/ebpf/includes/cachestat.skel.h"
-#include "libnetdata/ebpf/includes/dc.skel.h"
-#include "libnetdata/ebpf/includes/disk.skel.h"
-#include "libnetdata/ebpf/includes/fd.skel.h"
-#include "libnetdata/ebpf/includes/filesystem.skel.h"
-#include "libnetdata/ebpf/includes/hardirq.skel.h"
-#include "libnetdata/ebpf/includes/mdflush.skel.h"
-#include "libnetdata/ebpf/includes/mount.skel.h"
-#include "libnetdata/ebpf/includes/shm.skel.h"
-#include "libnetdata/ebpf/includes/sync.skel.h"
-#include "libnetdata/ebpf/includes/socket.skel.h"
-#include "libnetdata/ebpf/includes/swap.skel.h"
-#include "libnetdata/ebpf/includes/vfs.skel.h"
+#include "cachestat.skel.h"
+#include "dc.skel.h"
+#include "disk.skel.h"
+#include "fd.skel.h"
+#include "filesystem.skel.h"
+#include "hardirq.skel.h"
+#include "mdflush.skel.h"
+#include "mount.skel.h"
+#include "shm.skel.h"
+#include "sync.skel.h"
+#include "socket.skel.h"
+#include "swap.skel.h"
+#include "vfs.skel.h"
 
 extern struct cachestat_bpf *cachestat_bpf_obj;
 extern struct dc_bpf *dc_bpf_obj;
@@ -122,34 +123,6 @@ typedef struct netdata_ebpf_judy_pid_stats {
 } netdata_ebpf_judy_pid_stats_t;
 
 extern ebpf_module_t ebpf_modules[];
-enum ebpf_main_index {
-    EBPF_MODULE_PROCESS_IDX,
-    EBPF_MODULE_SOCKET_IDX,
-    EBPF_MODULE_CACHESTAT_IDX,
-    EBPF_MODULE_SYNC_IDX,
-    EBPF_MODULE_DCSTAT_IDX,
-    EBPF_MODULE_SWAP_IDX,
-    EBPF_MODULE_VFS_IDX,
-    EBPF_MODULE_FILESYSTEM_IDX,
-    EBPF_MODULE_DISK_IDX,
-    EBPF_MODULE_MOUNT_IDX,
-    EBPF_MODULE_FD_IDX,
-    EBPF_MODULE_HARDIRQ_IDX,
-    EBPF_MODULE_SOFTIRQ_IDX,
-    EBPF_MODULE_OOMKILL_IDX,
-    EBPF_MODULE_SHM_IDX,
-    EBPF_MODULE_MDFLUSH_IDX,
-    EBPF_MODULE_FUNCTION_IDX,
-    /* THREADS MUST BE INCLUDED BEFORE THIS COMMENT */
-    EBPF_OPTION_ALL_CHARTS,
-    EBPF_OPTION_VERSION,
-    EBPF_OPTION_HELP,
-    EBPF_OPTION_GLOBAL_CHART,
-    EBPF_OPTION_RETURN_MODE,
-    EBPF_OPTION_LEGACY,
-    EBPF_OPTION_CORE,
-    EBPF_OPTION_UNITTEST
-};
 
 typedef struct ebpf_tracepoint {
     bool enabled;
@@ -326,19 +299,10 @@ void ebpf_pid_file(char *filename, size_t length);
 
 #define EBPF_PROGRAMS_SECTION "ebpf programs"
 
-#define EBPF_COMMON_DIMENSION_PERCENTAGE "%"
-#define EBPF_PROGRAMS_SECTION "ebpf programs"
-
-#define EBPF_COMMON_DIMENSION_PERCENTAGE "%"
-#define EBPF_COMMON_DIMENSION_CALL "calls/s"
-#define EBPF_COMMON_DIMENSION_CONNECTIONS "connections/s"
-#define EBPF_COMMON_DIMENSION_BITS "kilobits/s"
-#define EBPF_COMMON_DIMENSION_BYTES "bytes/s"
-#define EBPF_COMMON_DIMENSION_DIFFERENCE "difference"
-#define EBPF_COMMON_DIMENSION_PACKETS "packets"
-#define EBPF_COMMON_DIMENSION_FILES "files"
-#define EBPF_COMMON_DIMENSION_MILLISECONDS "milliseconds"
-#define EBPF_COMMON_DIMENSION_KILLS "kills"
+#define EBPF_COMMON_UNITS_PERCENTAGE "%"
+#define EBPF_COMMON_UNITS_CALLS_PER_SEC "calls/s"
+#define EBPF_COMMON_UNITS_CALLS "calls"
+#define EBPF_COMMON_UNITS_MILLISECONDS "milliseconds"
 
 #define EBPF_CHART_ALGORITHM_ABSOLUTE "absolute"
 #define EBPF_CHART_ALGORITHM_INCREMENTAL "incremental"
@@ -389,6 +353,12 @@ void ebpf_read_local_addresses_unsafe();
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
 extern bool ebpf_plugin_exit;
+extern uint64_t collect_pids;
+
+static inline bool ebpf_plugin_stop(void) {
+    return ebpf_plugin_exit || nd_thread_signaled_to_cancel();
+}
+
 void ebpf_stop_threads(int sig);
 extern netdata_ebpf_judy_pid_t ebpf_judy_pid;
 

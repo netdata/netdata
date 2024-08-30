@@ -183,7 +183,7 @@ jobs:
     strategy:
       matrix:
         tree:
-          - src/go/collectors/go.d.plugin
+          - src/go
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

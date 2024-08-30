@@ -9,8 +9,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
 void get_netdata_execution_path(void);
 
-extern char pidfile[];
-extern char netdata_exe_file[];
-extern char netdata_exe_path[];
+extern char *pidfile;
+extern char *netdata_exe_path;
 
 #endif /* NETDATA_DAEMON_H */

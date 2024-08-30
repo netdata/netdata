@@ -1,0 +1,213 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-hpssa
+      plugin_name: go.d.plugin
+      module_name: hpssa
+      monitored_instance:
+        name: HPE Smart Arrays
+        link: "https://buy.hpe.com/us/en/options/controller-controller-options/smart-array-controllers-smart-host-bus-adapters/c/7109730"
+        icon_filename: "hp.svg"
+        categories:
+          - data-collection.storage-mount-points-and-filesystems
+      keywords:
+        - storage
+        - raid-controller
+        - hp
+        - hpssa
+        - array
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitors the health of HPE Smart Arrays by tracking the status of controllers, arrays, logical and physical drives in your storage system.
+          It relies on the `ssacli` CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+
+          Executed commands:
+          -  `ssacli ctrl all show config detail`
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Install ssacli
+            description: |
+              See [official installation instructions](https://support.hpe.com/connect/s/softwaredetails?language=en_US&collectionId=MTX-0cb3f808e2514d3d).
+      configuration:
+        file:
+          name: go.d/ssacli.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: timeout
+              description: ssacli binary execution timeout.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
+              config: |
+                jobs:
+                  - name: hpssa
+                    update_every: 5  # Collect HPE Smart Array statistics every 5 seconds
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: controller
+          description: These metrics refer to the Controller.
+          labels:
+            - name: slot
+              description: Slot number
+            - name: model
+              description: Controller model
+          metrics:
+            - name: hpssa.controller_status
+              description: Controller status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: nok
+            - name: hpssa.controller_temperature
+              description: Controller temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: hpssa.controller_cache_module_presence_status
+              description: Controller cache module presence
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: present
+                - name: not_present
+            - name: hpssa.controller_cache_module_status
+              description: Controller cache module status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: nok
+            - name: hpssa.controller_cache_module_temperature
+              description: Controller cache module temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: hpssa.controller_cache_module_battery_status
+              description: Controller cache module battery status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: nok
+        - name: array
+          description: These metrics refer to the Array.
+          labels:
+            - name: slot
+              description: Slot number
+            - name: array_id
+              description: Array id
+            - name: interface_type
+              description: Array interface type (e.g. SATA)
+            - name: array_type
+              description: Array type (e.g. Data)
+          metrics:
+            - name: hpssa.array_status
+              description: Array status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: nok
+        - name: logical drive
+          description: These metrics refer to the Logical Drive.
+          labels:
+            - name: slot
+              description: Slot number
+            - name: array_id
+              description: Array id
+            - name: logical_drive_id
+              description: Logical Drive id (number)
+            - name: disk_name
+              description: Disk name (e.g. /dev/sda)
+            - name: drive_type
+              description: Drive type (e.g. Data)
+          metrics:
+            - name: hpssa.logical_drive_status
+              description: Logical Drive status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: nok
+        - name: physical drive
+          description: These metrics refer to the Physical Drive.
+          labels:
+            - name: slot
+              description: Slot number
+            - name: array_id
+              description: Array id or "na" if unassigned
+            - name: logical_drive_id
+              description: Logical Drive id or "na" if unassigned
+            - name: location
+              description: Drive location in port:box:bay format (e.g. 1I:1:1)
+            - name: interface_type
+              description: Drive interface type (e.g. SATA)
+            - name: drive_type
+              description: Drive type (e.g. Data Drive, Unassigned Drive)
+            - name: model
+              description: Drive model
+          metrics:
+            - name: hpssa.physical_drive_status
+              description: Physical Drive status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: nok
+            - name: hpssa.physical_drive_temperature
+              description: Physical Drive temperature
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: temperature

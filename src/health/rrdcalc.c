@@ -60,13 +60,13 @@ inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     }
 }
 
-uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id) {
+uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, nd_uuid_t *config_hash_id) {
     rw_spinlock_read_lock(&host->health_log.spinlock);
 
     // re-use old IDs, by looking them up in the alarm log
     ALARM_ENTRY *ae = NULL;
     for(ae = host->health_log.alarms; ae ;ae = ae->next) {
-        if(unlikely(name == ae->name && chart == ae->chart && !uuid_memcmp(&ae->config_hash_id, config_hash_id))) {
+        if(unlikely(name == ae->name && chart == ae->chart && uuid_eq(ae->config_hash_id, *config_hash_id))) {
             if(next_event_id) *next_event_id = ae->alarm_event_id + 1;
             break;
         }
@@ -241,6 +241,7 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
         0,
         rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
+    health_log_alert(host, ae);
     health_alarm_log_add_entry(host, ae);
     rrdset_flag_set(st, RRDSET_FLAG_HAS_RRDCALC_LINKED);
 
@@ -273,6 +274,7 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
             0,
             0);
 
+        health_log_alert(host, ae);
         health_alarm_log_add_entry(host, ae);
     }
 
@@ -461,6 +463,17 @@ void rrdcalc_unlink_and_delete_all_rrdset_alerts(RRDSET *st) {
 
 void rrdcalc_delete_all(RRDHOST *host) {
     dictionary_flush(host->rrdcalc_root_index);
+}
+
+void rrdcalc_child_disconnected(RRDHOST *host) {
+    rrdcalc_delete_all(host);
+
+    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    RRDSET *st;
+    rrdset_foreach_read(st, host) {
+        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+    }
+    rrdset_foreach_done(st);
 }
 
 void rrd_alert_match_cleanup(struct rrd_alert_match *am) {

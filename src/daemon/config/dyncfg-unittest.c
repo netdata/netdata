@@ -165,8 +165,8 @@ static int dyncfg_unittest_action(struct dyncfg_unittest_action *a) {
     return rc;
 }
 
-static void *dyncfg_unittest_thread_action(void *ptr __maybe_unused) {
-    while(1) {
+static void *dyncfg_unittest_thread_action(void *ptr) {
+    while(!nd_thread_signaled_to_cancel()) {
         struct dyncfg_unittest_action *a = NULL;
         spinlock_lock(&dyncfg_unittest_data.spinlock);
         a = dyncfg_unittest_data.queue;
@@ -179,6 +179,8 @@ static void *dyncfg_unittest_thread_action(void *ptr __maybe_unused) {
         else
             sleep_usec(10 * USEC_PER_MS);
     }
+
+    return ptr;
 }
 
 static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *data) {
@@ -300,8 +302,7 @@ static bool dyncfg_unittest_check(TEST *t, DYNCFG_CMDS c, const char *cmd, bool 
 
     usec_t give_up_ut = now_monotonic_usec() + 2 * USEC_PER_SEC;
     while(!__atomic_load_n(&t->finished, __ATOMIC_RELAXED)) {
-        static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
-        nanosleep(&ns, NULL);
+        tinysleep();
 
         if(now_monotonic_usec() > give_up_ut) {
             fprintf(stderr, "\n  - gave up waiting for the plugin to process this!");
@@ -472,7 +473,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
                               NULL, NULL,
                               NULL, NULL,
                               NULL, NULL,
-                              pld, source);
+                              pld, source, false);
     if(!DYNCFG_RESP_SUCCESS(rc)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run: %s; returned code %d", cmd, rc);
         dyncfg_unittest_register_error(NULL, NULL);
@@ -579,9 +580,7 @@ int dyncfg_unittest(void) {
     // ------------------------------------------------------------------------
     // create the thread for testing async communication
 
-    netdata_thread_t thread;
-    netdata_thread_create(&thread, "unittest", NETDATA_THREAD_OPTION_JOINABLE,
-                          dyncfg_unittest_thread_action, NULL);
+    ND_THREAD *thread = nd_thread_create("unittest", NETDATA_THREAD_OPTION_JOINABLE, dyncfg_unittest_thread_action, NULL);
 
     // ------------------------------------------------------------------------
     // single
@@ -791,9 +790,8 @@ int dyncfg_unittest(void) {
 //    if(rc == HTTP_RESP_OK)
 //        fprintf(stderr, "%s\n", buffer_tostring(wb));
 
-    void *ptr;
-    netdata_thread_cancel(thread);
-    netdata_thread_join(thread, &ptr);
+    nd_thread_signal_cancel(thread);
+    nd_thread_join(thread);
     dyncfg_unittest_cleanup_files();
     dictionary_destroy(dyncfg_unittest_data.nodes);
     buffer_free(wb);

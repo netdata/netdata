@@ -47,6 +47,5 @@ sudo tcpdump -i <interface_name>
 
 1. [Top 20 Netstat Command Examples in Linux](https://www.tecmint.com/20-netstat-commands-for-linux-network-management/)
 2. [iftop command in Linux to monitor network traffic](https://www.tecmint.com/iftop-linux-network-bandwidth-monitoring-tool/)
-3. [An Overview of Packet Sniffing using Tcpdump](https://www.ubuntupit.com/tcpdump-useful-unix-packet-sniffer-command/)
 
 Remember to replace `<interface_name>` with the actual name of the WiFi network interface causing the alert.

@@ -1,0 +1,459 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-coredns
+      plugin_name: go.d.plugin
+      module_name: coredns
+      monitored_instance:
+        name: CoreDNS
+        link: https://coredns.io/
+        icon_filename: coredns.svg
+        categories:
+          - data-collection.dns-and-dhcp-servers
+      keywords:
+        - coredns
+        - dns
+        - kubernetes
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors CoreDNS instances.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/coredns.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: All options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:9153/metrics
+              required: true
+            - name: per_server_stats
+              description: Server filter.
+              default_value: ""
+              required: false
+              detailed_description: |
+                Metrics of servers matching the selector will be collected.
+                - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
+                - Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format).
+                - Syntax:
+
+                ```yaml
+                per_server_stats:
+                  includes:
+                    - pattern1
+                    - pattern2
+                  excludes:
+                    - pattern3
+                    - pattern4
+                ```
+            - name: per_zone_stats
+              description: Zone filter.
+              default_value: ""
+              required: false
+              detailed_description: |
+                Metrics of zones matching the selector will be collected.
+                - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
+                - Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format).
+                - Syntax:
+
+                ```yaml
+                per_zone_stats:
+                  includes:
+                    - pattern1
+                    - pattern2
+                  excludes:
+                    - pattern3
+                    - pattern4
+                ```
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 2
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client tls certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client tls key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9153/metrics
+            - name: Basic HTTP auth
+              description: Local server with basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9153/metrics
+                    username: foo
+                    password: bar
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9153/metrics
+                
+                  - name: remote
+                    url: http://203.0.113.10:9153/metrics
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: coredns.dns_request_count_total
+              description: Number Of DNS Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: coredns.dns_responses_count_total
+              description: Number Of DNS Responses
+              unit: responses/s
+              chart_type: line
+              dimensions:
+                - name: responses
+            - name: coredns.dns_request_count_total_per_status
+              description: Number Of Processed And Dropped DNS Requests
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: processed
+                - name: dropped
+            - name: coredns.dns_no_matching_zone_dropped_total
+              description: Number Of Dropped DNS Requests Because Of No Matching Zone
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: dropped
+            - name: coredns.dns_panic_count_total
+              description: Number Of Panics
+              unit: panics/s
+              chart_type: line
+              dimensions:
+                - name: panics
+            - name: coredns.dns_requests_count_total_per_proto
+              description: Number Of DNS Requests Per Transport Protocol
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: udp
+                - name: tcp
+            - name: coredns.dns_requests_count_total_per_ip_family
+              description: Number Of DNS Requests Per IP Family
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: v4
+                - name: v6
+            - name: coredns.dns_requests_count_total_per_per_type
+              description: Number Of DNS Requests Per Type
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: a
+                - name: aaaa
+                - name: mx
+                - name: soa
+                - name: cname
+                - name: ptr
+                - name: txt
+                - name: ns
+                - name: ds
+                - name: dnskey
+                - name: rrsig
+                - name: nsec
+                - name: nsec3
+                - name: ixfr
+                - name: any
+                - name: other
+            - name: coredns.dns_responses_count_total_per_rcode
+              description: Number Of DNS Responses Per Rcode
+              unit: responses/s
+              chart_type: stacked
+              dimensions:
+                - name: noerror
+                - name: formerr
+                - name: servfail
+                - name: nxdomain
+                - name: notimp
+                - name: refused
+                - name: yxdomain
+                - name: yxrrset
+                - name: nxrrset
+                - name: notauth
+                - name: notzone
+                - name: badsig
+                - name: badkey
+                - name: badtime
+                - name: badmode
+                - name: badname
+                - name: badalg
+                - name: badtrunc
+                - name: badcookie
+                - name: other
+        - name: server
+          description: These metrics refer to the DNS server.
+          labels:
+            - name: server_name
+              description: Server name.
+          metrics:
+            - name: coredns.server_dns_request_count_total
+              description: Number Of DNS Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: coredns.server_dns_responses_count_total
+              description: Number Of DNS Responses
+              unit: responses/s
+              chart_type: line
+              dimensions:
+                - name: responses
+            - name: coredns.server_request_count_total_per_status
+              description: Number Of Processed And Dropped DNS Requests
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: processed
+                - name: dropped
+            - name: coredns.server_requests_count_total_per_proto
+              description: Number Of DNS Requests Per Transport Protocol
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: udp
+                - name: tcp
+            - name: coredns.server_requests_count_total_per_ip_family
+              description: Number Of DNS Requests Per IP Family
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: v4
+                - name: v6
+            - name: coredns.server_requests_count_total_per_per_type
+              description: Number Of DNS Requests Per Type
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: a
+                - name: aaaa
+                - name: mx
+                - name: soa
+                - name: cname
+                - name: ptr
+                - name: txt
+                - name: ns
+                - name: ds
+                - name: dnskey
+                - name: rrsig
+                - name: nsec
+                - name: nsec3
+                - name: ixfr
+                - name: any
+                - name: other
+            - name: coredns.server_responses_count_total_per_rcode
+              description: Number Of DNS Responses Per Rcode
+              unit: responses/s
+              chart_type: stacked
+              dimensions:
+                - name: noerror
+                - name: formerr
+                - name: servfail
+                - name: nxdomain
+                - name: notimp
+                - name: refused
+                - name: yxdomain
+                - name: yxrrset
+                - name: nxrrset
+                - name: notauth
+                - name: notzone
+                - name: badsig
+                - name: badkey
+                - name: badtime
+                - name: badmode
+                - name: badname
+                - name: badalg
+                - name: badtrunc
+                - name: badcookie
+                - name: other
+        - name: zone
+          description: These metrics refer to the DNS zone.
+          labels:
+            - name: zone_name
+              description: Zone name.
+          metrics:
+            - name: coredns.zone_dns_request_count_total
+              description: Number Of DNS Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: coredns.zone_dns_responses_count_total
+              description: Number Of DNS Responses
+              unit: responses/s
+              chart_type: line
+              dimensions:
+                - name: responses
+            - name: coredns.zone_requests_count_total_per_proto
+              description: Number Of DNS Requests Per Transport Protocol
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: udp
+                - name: tcp
+            - name: coredns.zone_requests_count_total_per_ip_family
+              description: Number Of DNS Requests Per IP Family
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: v4
+                - name: v6
+            - name: coredns.zone_requests_count_total_per_per_type
+              description: Number Of DNS Requests Per Type
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: a
+                - name: aaaa
+                - name: mx
+                - name: soa
+                - name: cname
+                - name: ptr
+                - name: txt
+                - name: ns
+                - name: ds
+                - name: dnskey
+                - name: rrsig
+                - name: nsec
+                - name: nsec3
+                - name: ixfr
+                - name: any
+                - name: other
+            - name: coredns.zone_responses_count_total_per_rcode
+              description: Number Of DNS Responses Per Rcode
+              unit: responses/s
+              chart_type: stacked
+              dimensions:
+                - name: noerror
+                - name: formerr
+                - name: servfail
+                - name: nxdomain
+                - name: notimp
+                - name: refused
+                - name: yxdomain
+                - name: yxrrset
+                - name: nxrrset
+                - name: notauth
+                - name: notzone
+                - name: badsig
+                - name: badkey
+                - name: badtime
+                - name: badmode
+                - name: badname
+                - name: badalg
+                - name: badtrunc
+                - name: badcookie
+                - name: other

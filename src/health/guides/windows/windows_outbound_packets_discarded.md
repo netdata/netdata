@@ -44,5 +44,4 @@ If your network is congested, it can cause an increase in discarded packets. Con
 ### Useful resources
 
 1. [Using Performance Monitor to monitor network performance](https://techcommunity.microsoft.com/t5/ask-the-performance-team/using-perfmon-to-monitor-your-servers-network-performance/ba-p/373944)
-2. [Monitoring Network Performance with Resource Monitor](https://www.online-tech-tips.com/computer-tips/monitoring-network-performance-with-resource-monitor/)
-3. [Event Viewer in Windows](https://www.dummies.com/computers/operating-systems/windows-10/how-to-use-event-viewer-in-windows-10/)
+2. [Event Viewer in Windows](https://www.dummies.com/computers/operating-systems/windows-10/how-to-use-event-viewer-in-windows-10/)

@@ -76,9 +76,8 @@ struct analytics_data {
     bool exporting_enabled;
 };
 
-void set_late_global_environment(struct rrdhost_system_info *system_info);
+void set_late_analytics_variables(struct rrdhost_system_info *system_info);
 void analytics_free_data(void);
-void set_global_environment(void);
 void analytics_log_shell(void);
 void analytics_log_json(void);
 void analytics_log_prometheus(void);
@@ -86,6 +85,8 @@ void analytics_log_dashboard(void);
 void analytics_gather_mutable_meta_data(void);
 void analytics_report_oom_score(long long int score);
 void get_system_timezone(void);
+void analytics_reset(void);
+void analytics_init(void);
 
 typedef struct {
     const char *action;

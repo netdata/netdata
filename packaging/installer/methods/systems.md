@@ -11,8 +11,8 @@ learn_rel_path: "Installation/Install on specific environments"
 
 This category contains specific instructions for some popular environments. 
 If you have a standard environment that is not yet listed here, just use the 
-[one line installer kickstart.sh](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md)
+[one line installer kickstart.sh](/packaging/installer/methods/kickstart.md)
 
 If your environment is somewhat old or unusual, check our 
-[platform support policy](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/versions-and-platforms.md).
+[platform support policy](/docs/netdata-agent/versions-and-platforms.md).
 

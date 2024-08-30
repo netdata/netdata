@@ -18,7 +18,7 @@ except ImportError:
 from bases.collection import on_try_except_finally, unicode_str
 
 LOGGING_LEVELS = {
-    'CRITICAL': 50,
+    'DISABLE': 99,
     'ERROR': 40,
     'WARNING': 30,
     'INFO': 20,

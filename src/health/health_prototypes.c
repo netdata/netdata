@@ -176,6 +176,21 @@ void alert_action_options_to_buffer_json_array(BUFFER *wb, const char *key, ALER
     buffer_json_array_close(wb);
 }
 
+void alert_action_options_to_buffer(BUFFER *wb, ALERT_ACTION_OPTIONS options) {
+    RRDR_OPTIONS used = 0; // to prevent adding duplicates
+    for(int i = 0; alert_action_options[i].name ; i++) {
+        if (unlikely((alert_action_options[i].value & options) && !(alert_action_options[i].value & used))) {
+            if(used != 0)
+                buffer_strcat(wb, " ");
+
+            const char *name = alert_action_options[i].name;
+            used |= alert_action_options[i].value;
+
+            buffer_strcat(wb, name);
+        }
+    }
+}
+
 static void alert_action_options_init(void) {
     for(int i = 0; alert_action_options[i].name ; i++)
         alert_action_options[i].hash = simple_hash(alert_action_options[i].name);
@@ -374,18 +389,20 @@ static void health_prototype_activate_match_patterns(struct rrd_alert_match *am)
 void health_prototype_hash_id(RRD_ALERT_PROTOTYPE *ap) {
     CLEAN_BUFFER *wb = buffer_create(100, NULL);
     health_prototype_to_json(wb, ap, true);
-    UUID uuid = UUID_generate_from_hash(buffer_tostring(wb), buffer_strlen(wb));
+    ND_UUID uuid = UUID_generate_from_hash(buffer_tostring(wb), buffer_strlen(wb));
     uuid_copy(ap->config.hash_id, uuid.uuid);
 
-    (void) sql_alert_store_config(ap);
+    sql_alert_store_config(ap);
 }
 
-bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
+bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, char **msg) {
     if(!ap->match.is_template) {
         if(!ap->match.on.chart) {
             netdata_log_error(
                 "HEALTH: alert '%s' does not define a instance (parameter 'on'). Source: %s",
                 string2str(ap->config.name), string2str(ap->config.source));
+            if(msg)
+                *msg = "missing match 'on' parameter for instance";
             return false;
         }
     }
@@ -394,6 +411,8 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
             netdata_log_error(
                 "HEALTH: alert '%s' does not define a context (parameter 'on'). Source: %s",
                 string2str(ap->config.name), string2str(ap->config.source));
+            if(msg)
+                *msg = "missing match 'on' parameter for context";
             return false;
         }
     }
@@ -402,6 +421,8 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
         netdata_log_error(
             "HEALTH: alert '%s' has no frequency (parameter 'every'). Source: %s",
             string2str(ap->config.name), string2str(ap->config.source));
+        if(msg)
+            *msg = "missing update frequency";
         return false;
     }
 
@@ -409,6 +430,8 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
         netdata_log_error(
             "HEALTH: alert '%s' is useless (no db lookup, no calculation, no warning and no critical expressions). Source: %s",
             string2str(ap->config.name), string2str(ap->config.source));
+        if(msg)
+            *msg = "no db lookup, calculation and warning/critical conditions";
         return false;
     }
 
@@ -664,15 +687,6 @@ void health_apply_prototypes_to_host(RRDHOST *host) {
         health_prototype_reset_alerts_for_rrdset(st);
     }
     rrdset_foreach_done(st);
-
-#ifdef ENABLE_ACLK
-    if (netdata_cloud_enabled) {
-        struct aclk_sync_cfg_t *wc = host->aclk_config;
-        if (likely(wc)) {
-            wc->alert_queue_removed = SEND_REMOVED_AFTER_HEALTH_LOOPS;
-        }
-    }
-#endif
 }
 
 void health_apply_prototypes_to_all_hosts(void) {

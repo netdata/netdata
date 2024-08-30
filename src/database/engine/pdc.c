@@ -651,7 +651,7 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
     }
 
     return validate_page(
-            (uuid_t *)descr->uuid,
+            (nd_uuid_t *)descr->uuid,
             start_time_s,
             end_time_s,
             0,
@@ -665,7 +665,7 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
 }
 
 VALIDATED_PAGE_DESCRIPTOR validate_page(
-        uuid_t *uuid,
+        nd_uuid_t *uuid,
         time_t start_time_s,
         time_t end_time_s,
         uint32_t update_every_s,                // can be zero, if unknown
@@ -898,7 +898,7 @@ static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *
                 start_time_s = pd->first_time_s;
                 end_time_s = pd->last_time_s;
                 METRIC *metric = (METRIC *)pd->metric_id;
-                uuid_t *u = mrg_metric_uuid(main_mrg, metric);
+                nd_uuid_t *u = mrg_metric_uuid(main_mrg, metric);
                 uuid_unparse_lower(*u, uuid);
                 used_epdl = true;
             }
@@ -1179,7 +1179,7 @@ static bool epdl_populate_pages_from_extent_data(
 
 static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file file, unsigned pos, unsigned size_bytes)
 {
-    void *buffer;
+    void *buffer = NULL;
     uv_fs_t request;
 
     unsigned real_io_size = ALIGN_BYTES_CEILING(size_bytes);

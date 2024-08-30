@@ -1,0 +1,125 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-whoisquery
+      plugin_name: go.d.plugin
+      module_name: whoisquery
+      monitored_instance:
+        name: Domain expiration date
+        link: ""
+        icon_filename: globe.svg
+        categories:
+          - data-collection.synthetic-checks
+      keywords:
+        - whois
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the remaining time before the domain expires.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/whoisquery.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 60
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: source
+              description: Domain address.
+              default_value: ""
+              required: true
+            - name: days_until_expiration_warning
+              description: Number of days before the alarm status is warning.
+              default_value: 30
+              required: false
+            - name: days_until_expiration_critical
+              description: Number of days before the alarm status is critical.
+              default_value: 15
+              required: false
+            - name: timeout
+              description: The query timeout in seconds.
+              default_value: 5
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: Basic configuration example
+              config: |
+                jobs:
+                  - name: my_site
+                    source: my_site.com
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define more than one job, their names must be unique.
+                
+                Check the expiration status of the multiple domains.
+              config: |
+                jobs:
+                  - name: my_site1
+                    source: my_site1.com
+                
+                  - name: my_site2
+                    source: my_site2.com
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: whoisquery_days_until_expiration
+        metric: whoisquery.time_until_expiration
+        info: time until the domain name registration expires
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/whoisquery.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: domain
+          description: These metrics refer to the configured source.
+          labels:
+            - name: domain
+              description: Configured source
+          metrics:
+            - name: whoisquery.time_until_expiration
+              description: Time Until Domain Expiration
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: expiry

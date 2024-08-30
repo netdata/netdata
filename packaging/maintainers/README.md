@@ -33,7 +33,7 @@ This page tracks the package maintainers for Netdata, for various operating syst
 
 | System | URL | Core Developer | Package Maintainer
 |:-:|:-:|:-:|:-:|
-| macOS Homebrew Formula|[link](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb)|@vlvkobal|@rickard-von-essen
+| macOS Homebrew Formula|[link](https://github.com/Homebrew/homebrew-core/blob/master/Formula/n/netdata.rb)|@vlvkobal|@rickard-von-essen
 
 ---
 
@@ -48,7 +48,6 @@ This page tracks the package maintainers for Netdata, for various operating syst
 
 | Embedded Linux | Netdata Version | Maintainer | Related URL |
 | :-: | :-: | :-: | :-- |
-| ASUSTOR NAS | ? | William Lin | https://www.asustor.com/apps/app_detail?id=532 |
 | OpenWRT | Release | @nitroshift | [openwrt package](https://github.com/openwrt/packages/tree/master/admin/netdata) |
 | ReadyNAS | Release | @NAStools | https://github.com/nastools/netdata |
 | QNAP | Release | QNAP_Stephane | https://forum.qnap.com/viewtopic.php?t=121518 |

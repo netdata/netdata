@@ -474,6 +474,7 @@ declare -A charts_enable_keyword=(
 )
 
 declare -A obsolete_charts=(
+  ['ap']="go.d/ap"
 	['apache']="python.d.plugin module"
 	['cpu_apps']="apps.plugin"
 	['cpufreq']="proc plugin"

@@ -1,0 +1,135 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-isc_dhcpd
+      plugin_name: go.d.plugin
+      module_name: isc_dhcpd
+      monitored_instance:
+        name: ISC DHCP
+        link: https://www.isc.org/dhcp/
+        categories:
+          - data-collection.dns-and-dhcp-servers
+        icon_filename: isc.png
+      keywords:
+        - dhcpd
+        - dhcp
+      most_popular: false
+      info_provided_to_referring_integrations:
+        description: ""
+      related_resources:
+        integrations:
+          list: []
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors ISC DHCP lease usage by reading the DHCP client lease database (dhcpd.leases).
+        method_description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/isc_dhcpd.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: leases_path
+              description: Path to DHCP client lease database.
+              default_value: /var/lib/dhcp/dhcpd.leases
+              required: false
+            - name: pools
+              description: List of IP pools to monitor.
+              default_value: ""
+              required: true
+              detailed_description: |
+                List of IP pools to monitor.
+
+                - IP range syntax: see [supported formats](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/iprange#supported-formats).
+                - Syntax:
+
+                ```yaml
+                pools:
+                  - name: "POOL_NAME1"
+                    networks: "SPACE SEPARATED LIST OF IP RANGES"
+                  - name: "POOL_NAME2"
+                    networks: "SPACE SEPARATED LIST OF IP RANGES"
+                ```
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    pools:
+                      - name: lan
+                        networks: "192.168.0.0/24 192.168.1.0/24 192.168.2.0/24"
+                      - name: wifi
+                        networks: "10.0.0.0/24"
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: isc_dhcpd.active_leases_total
+              description: Active Leases Total
+              unit: leases
+              chart_type: line
+              dimensions:
+                - name: active
+        - name: global
+          description: These metrics refer to the DHCP pool.
+          labels:
+            - name: dhcp_pool_name
+              description: The DHCP pool name defined in the collector configuration.
+          metrics:
+            - name: isc_dhcpd.dhcp_pool_utilization
+              description: DHCP Pool Utilization
+              unit: percent
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: isc_dhcpd.dhcp_pool_active_leases
+              description: Active Leases Total
+              unit: leases
+              chart_type: line
+              dimensions:
+                - name: active

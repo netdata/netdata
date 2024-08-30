@@ -15,7 +15,7 @@ This script works on all Linux distributions and macOS environments, by detectin
 
 > :bulb: Tip
 >
-> If you are unsure whether you want nightly or stable releases, read the [related section](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#nightly-vs-stable-releases) of our Documentation, detailing the pros and cons of each release type.
+> If you are unsure whether you want nightly or stable releases, read the [related section](/packaging/installer/README.md#nightly-vs-stable-releases) of our Documentation, detailing the pros and cons of each release type.
 
 To install Netdata, run the following as your normal user:
 
@@ -35,7 +35,7 @@ To install Netdata, run the following as your normal user:
 > :bookmark_tabs: Note
 >
 > If you plan to also connect the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-> and `YOUR_ROOM_ID` with the ID of the room you are willing to connect the node to.
+> and `YOUR_ROOM_ID` with the ID of the Room you are willing to connect the node to.
 
 ## Verify script integrity
 
@@ -70,7 +70,7 @@ You will most often need to _restart_ the Agent to load new or edited configurat
 > **Note**  
 > Stopping or restarting the Netdata Agent will cause gaps in stored metrics until the `netdata` process initiates collectors and the database engine.
 >
-> You do not need to restart the Netdata Agent between changes to health configuration files, see the relevant section on [reloading health configuration](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#reload-health-configuration).
+> You do not need to restart the Netdata Agent between changes to health configuration files, see the relevant section on [reloading health configuration](/src/health/REFERENCE.md#reload-health-configuration).
 
 ### Using `systemctl` or `service`
 
@@ -98,7 +98,7 @@ If you start the daemon this way, close it with `sudo killall netdata`.
 
 ### Shutdown using `netdatacli`
 
-The Netdata Agent also comes with a [CLI tool](https://github.com/netdata/netdata/blob/master/src/cli/README.md) capable of performing shutdowns. Start the Agent back up using your preferred method listed above.
+The Netdata Agent also comes with a [CLI tool](/src/cli/README.md) capable of performing shutdowns. Start the Agent back up using your preferred method listed above.
 
 ```bash
 sudo netdatacli shutdown-agent
@@ -240,15 +240,11 @@ By default, the kickstart script will provide a Netdata agent installation that 
 - `--claim-url`
   Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`. Use this option to change the Netdata Cloud URL to point to your Netdata Cloud installation.
 - `--claim-rooms`
-  Specify a comma-separated list of tokens for each War Room this node should appear in.
+  Specify a comma-separated list of tokens for each Room this node should appear in.
 - `--claim-proxy`
-  Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/src/claim/README.md#connect-through-a-proxy) for details.
+  Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [connecting through a proxy](/src/claim/README.md#connect-through-a-proxy) for details.
 - `--claim-only`
   If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
-- `--require-cloud`
-  Only install if Netdata Cloud can be enabled.
-- `--disable-cloud`
-  For local builds, don’t build any of the Netdata Cloud code at all. For native packages and static builds, use runtime configuration to disable Netdata Cloud support.
 
 ### anonymous telemetry
 
@@ -285,7 +281,7 @@ The following options are mutually exclusive and specify special operations othe
 - `--repositories-only`
   Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
 - `--prepare-offline-install-source`
-  Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md) for more info.
+  Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](/packaging/installer/methods/offline.md) for more info.
 
 ### environment variables
 
@@ -302,7 +298,7 @@ should not need to use special values for any of these):
 
 ## Native packages
 
-We publish [official DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md) for a number of common Linux distributions as part of our releases and nightly
+We publish [official DEB/RPM packages](/packaging/installer/methods/packages.md) for a number of common Linux distributions as part of our releases and nightly
 builds. These packages are available for 64-bit x86 systems. Depending on the distribution and release they may
 also be available for 32-bit x86, ARMv7, and AArch64 systems. If a native package is available, it will be used as the
 default installation method. This allows you to handle Netdata updates as part of your usual system update procedure.
@@ -312,7 +308,7 @@ you can do so by adding `--native-only` to the options you pass to the installer
 
 ## Static builds
 
-We publish pre-built [static builds](https://github.com/netdata/netdata/blob/master/packaging/makeself/README.md) of Netdata for Linux systems. Currently, these are published for 64-bit x86, ARMv7,
+We publish pre-built [static builds](/packaging/makeself/README.md) of Netdata for Linux systems. Currently, these are published for 64-bit x86, ARMv7,
 AArch64, and POWER8+ hardware. These static builds are able to operate in a mostly self-contained manner and only
 require a POSIX compliant shell and a supported init system. These static builds install under `/opt/netdata`. If
 you are on a platform which we provide static builds for but do not provide native packages for, a static build

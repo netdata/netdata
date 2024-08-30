@@ -101,8 +101,8 @@ int registry_init(void) {
     registry.enable_cookies_samesite_secure = config_get_boolean(CONFIG_SECTION_REGISTRY, "enable cookies SameSite and Secure", 1);
 
     registry_update_cloud_base_url();
-    setenv("NETDATA_REGISTRY_HOSTNAME", registry.hostname, 1);
-    setenv("NETDATA_REGISTRY_URL", registry.registry_to_announce, 1);
+    nd_setenv("NETDATA_REGISTRY_HOSTNAME", registry.hostname, 1);
+    nd_setenv("NETDATA_REGISTRY_URL", registry.registry_to_announce, 1);
 
     registry.max_url_length = (size_t)config_get_number(CONFIG_SECTION_REGISTRY, "max URL length", 1024);
     if(registry.max_url_length < 10) {
@@ -172,9 +172,6 @@ int registry_init(void) {
                                                  &netdata_configured_cache_dir,
                                                  use_mmap, true);
 
-        // disable cancelability to avoid enable/disable per item in the dictionary locks
-        netdata_thread_disable_cancelability();
-
         registry_log_open();
         registry_db_load();
         registry_log_load();
@@ -185,8 +182,6 @@ int registry_init(void) {
 //        registry_db_stats();
 //        registry_generate_curl_urls();
 //        exit(0);
-
-        netdata_thread_enable_cancelability();
     }
 
     return 0;

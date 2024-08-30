@@ -661,21 +661,18 @@ int string_unittest(size_t entries) {
             threads_to_create,
             (long long)seconds_to_run);
         // check string concurrency
-        netdata_thread_t threads[threads_to_create];
+        ND_THREAD *threads[threads_to_create];
         tu.join = 0;
         for (int i = 0; i < threads_to_create; i++) {
             char buf[100 + 1];
             snprintf(buf, 100, "string%d", i);
-            netdata_thread_create(
-                &threads[i], buf, NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE, string_thread, &tu);
+            threads[i] = nd_thread_create(buf, NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE, string_thread, &tu);
         }
         sleep_usec(seconds_to_run * USEC_PER_SEC);
 
         __atomic_store_n(&tu.join, 1, __ATOMIC_RELAXED);
-        for (int i = 0; i < threads_to_create; i++) {
-            void *retval;
-            netdata_thread_join(threads[i], &retval);
-        }
+        for (int i = 0; i < threads_to_create; i++)
+            nd_thread_join(threads[i]);
 
         size_t inserts, deletes, searches, sentries, references, memory, duplications, releases;
         string_statistics(&inserts, &deletes, &searches, &sentries, &references, &memory, &duplications, &releases);
@@ -704,4 +701,9 @@ int string_unittest(size_t entries) {
 
     fprintf(stderr, "\n%zu errors found\n", errors);
     return  errors ? 1 : 0;
+}
+
+void string_init(void) {
+    for (size_t i = 0; i != STRING_PARTITIONS; i++)
+        rw_spinlock_init(&string_base[i].spinlock);
 }

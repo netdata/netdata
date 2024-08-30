@@ -1,5 +1,5 @@
 # This collector will not appear in documentation, as the go version is preferred,
-# https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/traefik/README.md
+# /src/go/plugin/go.d/modules/traefik/README.md
 #
 # meta:
 #   plugin_name: python.d.plugin

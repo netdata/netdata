@@ -26,7 +26,7 @@ typedef enum {
     BUFFERED_READER_READ_POLLNVAL = -5,
     BUFFERED_READER_READ_POLL_UNKNOWN = -6,
     BUFFERED_READER_READ_POLL_TIMEOUT = -7,
-    BUFFERED_READER_READ_POLL_FAILED = -8,
+    BUFFERED_READER_READ_POLL_CANCELLED = -8,
 } buffered_reader_ret_t;
 
 
@@ -53,48 +53,45 @@ static inline buffered_reader_ret_t buffered_reader_read(struct buffered_reader 
 }
 
 static inline buffered_reader_ret_t buffered_reader_read_timeout(struct buffered_reader *reader, int fd, int timeout_ms, bool log_error) {
-    errno = 0;
-    struct pollfd fds[1];
+    short int revents = 0;
+    switch(wait_on_socket_or_cancel_with_timeout(
+        NULL,
+        fd, timeout_ms, POLLIN, &revents)) {
 
-    fds[0].fd = fd;
-    fds[0].events = POLLIN;
-
-    int ret = poll(fds, 1, timeout_ms);
-
-    if (ret > 0) {
-        /* There is data to read */
-        if (fds[0].revents & POLLIN)
+        case 0: // data are waiting
             return buffered_reader_read(reader, fd);
 
-        else if(fds[0].revents & POLLERR) {
+        case 1: // timeout reached
             if(log_error)
-                netdata_log_error("PARSER: read failed: POLLERR.");
-            return BUFFERED_READER_READ_POLLERR;
-        }
-        else if(fds[0].revents & POLLHUP) {
-            if(log_error)
-                netdata_log_error("PARSER: read failed: POLLHUP.");
-            return BUFFERED_READER_READ_POLLHUP;
-        }
-        else if(fds[0].revents & POLLNVAL) {
-            if(log_error)
-                netdata_log_error("PARSER: read failed: POLLNVAL.");
-            return BUFFERED_READER_READ_POLLNVAL;
-        }
+                netdata_log_error("PARSER: timeout while waiting for data.");
+            return BUFFERED_READER_READ_POLL_TIMEOUT;
 
-        if(log_error)
-            netdata_log_error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
-        return BUFFERED_READER_READ_POLL_UNKNOWN;
-    }
-    else if (ret == 0) {
-        if(log_error)
-            netdata_log_error("PARSER: timeout while waiting for data.");
-        return BUFFERED_READER_READ_POLL_TIMEOUT;
+        case -1: // thread cancelled
+            netdata_log_error("PARSER: thread cancelled while waiting for data.");
+            return BUFFERED_READER_READ_POLL_CANCELLED;
+
+        default:
+        case 2: // error on socket
+            if(revents & POLLERR) {
+                if(log_error)
+                    netdata_log_error("PARSER: read failed: POLLERR.");
+                return BUFFERED_READER_READ_POLLERR;
+            }
+            if(revents & POLLHUP) {
+                if(log_error)
+                    netdata_log_error("PARSER: read failed: POLLHUP.");
+                return BUFFERED_READER_READ_POLLHUP;
+            }
+            if(revents & POLLNVAL) {
+                if(log_error)
+                    netdata_log_error("PARSER: read failed: POLLNVAL.");
+                return BUFFERED_READER_READ_POLLNVAL;
+            }
     }
 
     if(log_error)
-        netdata_log_error("PARSER: poll() failed with code %d.", ret);
-    return BUFFERED_READER_READ_POLL_FAILED;
+        netdata_log_error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
+    return BUFFERED_READER_READ_POLL_UNKNOWN;
 }
 
 /* Produce a full line if one exists, statefully return where we start next time.

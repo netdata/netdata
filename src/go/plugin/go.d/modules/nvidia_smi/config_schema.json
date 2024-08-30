@@ -1,0 +1,56 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "NVIDIA SMI collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "binary_path": {
+        "title": "Binary path",
+        "description": "Path to the `nvidia-smi` binary.",
+        "type": "string",
+        "default": "nvidia-smi"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for executing the binary, specified in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 10
+      },
+      "loop_mode": {
+        "title": "Loop Mode",
+        "description": "When enabled, `nvidia-smi` is executed continuously in a separate thread using the `-l` option.",
+        "type": "boolean",
+        "default": true
+      }
+    },
+    "required": [
+      "binary_path"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "binary_path": {
+      "ui:help": "If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable."
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "loop_mode": {
+      "ui:help": "In loop mode, `nvidia-smi` will repeatedly query GPU data at specified intervals, defined by the `-l SEC` or `--loop=SEC` parameter, rather than just running the query once. This enables ongoing performance tracking by putting the application to sleep between queries."
+    }
+  }
+}

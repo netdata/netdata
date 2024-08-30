@@ -21,7 +21,8 @@ for item in data['include']:
         entries.append({
             'distro': distro,
             'release': item['version'],
-            'full_name': f'{ item["distro"] } { item["version"] }'
+            'full_name': f'{ item["distro"] } { item["version"] }',
+            'lts': 1 if 'eol_lts' in item and item['eol_lts'] else 0,
         })
 
 entries.sort(key=lambda k: (k['distro'], k['release']))

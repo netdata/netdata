@@ -54,6 +54,6 @@ target system. This can be done in any manner you like, as long as filenames are
 
 After copying the files, simply run the `install.sh` script located in the
 offline install source directory. It accepts all the [same options as the kickstart
-script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) for further
+script](/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) for further
 customization of the installation, though it will default to not enabling automatic updates (as they are not
 supported on offline installs).

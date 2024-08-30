@@ -573,7 +573,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
     uv_fs_t req;
     uv_file file;
     int ret, fd;
-    struct rrdeng_jf_sb *superblock;
+    struct rrdeng_jf_sb *superblock = NULL;
     uv_buf_t iov;
     char path[RRDENG_PATH_MAX];
 
@@ -619,7 +619,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
 static int journalfile_check_superblock(uv_file file)
 {
     int ret;
-    struct rrdeng_jf_sb *superblock;
+    struct rrdeng_jf_sb *superblock = NULL;
     uv_buf_t iov;
     uv_fs_t req;
 
@@ -669,8 +669,9 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
     }
 
     time_t now_s = max_acceptable_collected_time();
+    time_t extent_first_time_s = journalfile->v2.first_time_s ? journalfile->v2.first_time_s : LONG_MAX;
     for (i = 0; i < count ; ++i) {
-        uuid_t *temp_id;
+        nd_uuid_t *temp_id;
         uint8_t page_type = jf_metric_data->descr[i].type;
 
         if (page_type > RRDENG_PAGE_TYPE_MAX) {
@@ -681,7 +682,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
             continue;
         }
 
-        temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
+        temp_id = (nd_uuid_t *)jf_metric_data->descr[i].uuid;
         METRIC *metric = mrg_metric_get_and_acquire(main_mrg, temp_id, (Word_t) ctx);
 
         struct rrdeng_extent_page_descr *descr = &jf_metric_data->descr[i];
@@ -728,8 +729,18 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
                 journalfile->datafile,
                 jf_metric_data->extent_offset, jf_metric_data->extent_size, jf_metric_data->descr[i].page_length);
 
+        extent_first_time_s = MIN(extent_first_time_s, vd.start_time_s);
+
         mrg_metric_release(main_mrg, metric);
     }
+
+    journalfile->v2.first_time_s = extent_first_time_s;
+
+    time_t old = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);;
+    do {
+        if(old <= extent_first_time_s)
+            break;
+    } while(!__atomic_compare_exchange_n(&ctx->atomic.first_time_s, &old, extent_first_time_s, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
 /*
@@ -800,7 +811,7 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
     int ret;
     uint64_t pos, pos_i, max_id, id;
     unsigned size_bytes;
-    void *buf;
+    void *buf = NULL;
     uv_buf_t iov;
     uv_fs_t req;
 
@@ -1145,7 +1156,7 @@ static int journalfile_metric_compare (const void *item1, const void *item2)
     const struct jv2_metrics_info *metric1 = ((struct journal_metric_list_to_sort *) item1)->metric_info;
     const struct jv2_metrics_info *metric2 = ((struct journal_metric_list_to_sort *) item2)->metric_info;
 
-    return memcmp(metric1->uuid, metric2->uuid, sizeof(uuid_t));
+    return memcmp(metric1->uuid, metric2->uuid, sizeof(nd_uuid_t));
 }
 
 

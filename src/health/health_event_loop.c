@@ -101,26 +101,10 @@ static void health_sleep(time_t next_run, unsigned int loop __maybe_unused) {
     }
 }
 
-static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
-#ifdef ENABLE_ACLK
-    if (netdata_cloud_enabled) {
-        struct aclk_sync_cfg_t *wc = host->aclk_config;
-        if (unlikely(!wc)) {
-            return;
-        }
-
-        if (wc->alert_queue_removed >= 1) {
-            wc->alert_queue_removed+=6;
-        }
-    }
-#endif
-}
-
 static void health_execute_delayed_initializations(RRDHOST *host) {
     health_plugin_init();
 
     RRDSET *st;
-    bool must_postpone = false;
 
     if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)) return;
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
@@ -131,11 +115,8 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
         health_prototype_alerts_for_rrdset_incrementally(st);
-        must_postpone = true;
     }
     rrdset_foreach_done(st);
-    if (must_postpone)
-        sql_health_postpone_queue_removed(host);
 }
 
 static void health_initialize_rrdhost(RRDHOST *host) {
@@ -179,6 +160,50 @@ static inline int check_if_resumed_from_suspension(void) {
     return ret;
 }
 
+static void do_eval_expression(
+    RRDCALC *rc,
+    EVAL_EXPRESSION *expression,
+    const char *expression_type __maybe_unused,
+    size_t job_type,
+    RRDCALC_FLAGS error_type,
+    RRDCALC_STATUS *calc_status,
+    NETDATA_DOUBLE *result)
+{
+    if (!expression || (!calc_status && !result))
+        return;
+
+    worker_is_busy(job_type);
+
+    if (unlikely(!expression_evaluate(expression))) {
+        // calculation failed
+        rc->run_flags |= error_type;
+        if (result)
+            *result = NAN;
+
+        netdata_log_debug(D_HEALTH,
+                          "Health on host '%s', alarm '%s.%s': %s expression failed with error: %s",
+                          rrdhost_hostname(rc->rrdset->rrdhost), rrdcalc_chart_name(rc), rrdcalc_name(rc), expression_type,
+                          expression_error_msg(expression)
+        );
+        return;
+    }
+    rc->run_flags &= ~error_type;
+    netdata_log_debug(D_HEALTH,
+                      "Health on host '%s', alarm '%s.%s': %s expression gave value "
+                      NETDATA_DOUBLE_FORMAT ": %s (source: %s)",
+                      rrdhost_hostname(rc->rrdset->rrdhost),
+                      rrdcalc_chart_name(rc),
+                      rrdcalc_name(rc),
+                      expression_type,
+                      expression_result(expression),
+                      expression_error_msg(expression),
+                      rrdcalc_source(rc));
+    if (calc_status)
+        *calc_status = rrdcalc_value2status(expression_result(expression));
+    else
+        *result = expression_result(expression);
+}
+
 static void health_event_loop(void) {
     bool health_running_logged = false;
 
@@ -201,6 +226,7 @@ static void health_event_loop(void) {
                    "Postponing alarm checks for %"PRId32" seconds, "
                    "because it seems that the system was just resumed from suspension.",
                    (int32_t)health_globals.config.postpone_alarms_during_hibernation_for_seconds);
+            schedule_node_info_update(localhost);
         }
 
         if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {
@@ -269,6 +295,11 @@ static void health_event_loop(void) {
             }
 
             worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
+            {
+                struct aclk_sync_cfg_t *wc = host->aclk_config;
+                if (wc && wc->send_snapshot == 2)
+                    continue;
+            }
 
             // the first loop is to lookup values from the db
             foreach_rrdcalc_in_rrdhost_read(host, rc) {
@@ -286,6 +317,7 @@ static void health_event_loop(void) {
                 if (unlikely(rc->rrdset && rc->status != RRDCALC_STATUS_REMOVED &&
                              rrdset_flag_check(rc->rrdset, RRDSET_FLAG_OBSOLETE) &&
                              now > (rc->rrdset->last_collected_time.tv_sec + 60))) {
+
                     if (!rrdcalc_isrepeating(rc)) {
                         worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                         time_t now_tmp = now_realtime_sec();
@@ -312,11 +344,6 @@ static void health_event_loop(void) {
                             rc->last_status_change_value = rc->value;
                             rc->last_updated = now_tmp;
                             rc->value = NAN;
-
-#ifdef ENABLE_ACLK
-                            if (netdata_cloud_enabled)
-                                sql_queue_alarm_to_aclk(host, ae, true);
-#endif
                         }
                     }
                 }
@@ -402,36 +429,7 @@ static void health_event_loop(void) {
                 // ------------------------------------------------------------
                 // if there is calculation expression, run it
 
-                if (unlikely(rc->config.calculation)) {
-                    worker_is_busy(WORKER_HEALTH_JOB_CALC_EVAL);
-
-                    if (unlikely(!expression_evaluate(rc->config.calculation))) {
-                        // calculation failed
-                        rc->value = NAN;
-                        rc->run_flags |= RRDCALC_FLAG_CALC_ERROR;
-
-                        netdata_log_debug(
-                            D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' failed: %s",
-                            rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                            expression_parsed_as(rc->config.calculation), expression_error_msg(rc->config.calculation)
-                        );
-                    }
-                    else {
-                        rc->run_flags &= ~RRDCALC_FLAG_CALC_ERROR;
-
-                        netdata_log_debug(
-                            D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' gave value "
-                            NETDATA_DOUBLE_FORMAT": %s (source: %s)",
-                            rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                            expression_parsed_as(rc->config.calculation),
-                            expression_result(rc->config.calculation),
-                            expression_error_msg(rc->config.calculation),
-                            rrdcalc_source(rc)
-                        );
-
-                        rc->value = expression_result(rc->config.calculation);
-                    }
-                }
+                do_eval_expression(rc, rc->config.calculation, "calculation", WORKER_HEALTH_JOB_CALC_EVAL, RRDCALC_FLAG_CALC_ERROR, NULL, &rc->value);
             }
             foreach_rrdcalc_in_rrdhost_done(rc);
 
@@ -451,65 +449,8 @@ static void health_event_loop(void) {
                     RRDCALC_STATUS warning_status = RRDCALC_STATUS_UNDEFINED;
                     RRDCALC_STATUS critical_status = RRDCALC_STATUS_UNDEFINED;
 
-                    // --------------------------------------------------------
-                    // check the warning expression
-
-                    if (likely(rc->config.warning)) {
-                        worker_is_busy(WORKER_HEALTH_JOB_WARNING_EVAL);
-
-                        if (unlikely(!expression_evaluate(rc->config.warning))) {
-                            // calculation failed
-                            rc->run_flags |= RRDCALC_FLAG_WARN_ERROR;
-
-                            netdata_log_debug(D_HEALTH,
-                                              "Health on host '%s', alarm '%s.%s': warning expression failed with error: %s",
-                                              rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                                              expression_error_msg(rc->config.warning)
-                            );
-                        } else {
-                            rc->run_flags &= ~RRDCALC_FLAG_WARN_ERROR;
-                            netdata_log_debug(D_HEALTH,
-                                              "Health on host '%s', alarm '%s.%s': warning expression gave value "
-                                              NETDATA_DOUBLE_FORMAT ": %s (source: %s)",
-                                              rrdhost_hostname(host),
-                                              rrdcalc_chart_name(rc),
-                                              rrdcalc_name(rc),
-                                              expression_result(rc->config.warning),
-                                              expression_error_msg(rc->config.warning),
-                                              rrdcalc_source(rc)
-                            );
-                            warning_status = rrdcalc_value2status(expression_result(rc->config.warning));
-                        }
-                    }
-
-                    // --------------------------------------------------------
-                    // check the critical expression
-
-                    if (likely(rc->config.critical)) {
-                        worker_is_busy(WORKER_HEALTH_JOB_CRITICAL_EVAL);
-
-                        if (unlikely(!expression_evaluate(rc->config.critical))) {
-                            // calculation failed
-                            rc->run_flags |= RRDCALC_FLAG_CRIT_ERROR;
-
-                            netdata_log_debug(D_HEALTH,
-                                              "Health on host '%s', alarm '%s.%s': critical expression failed with error: %s",
-                                              rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                                              expression_error_msg(rc->config.critical)
-                            );
-                        } else {
-                            rc->run_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
-                            netdata_log_debug(D_HEALTH,
-                                              "Health on host '%s', alarm '%s.%s': critical expression gave value "
-                                              NETDATA_DOUBLE_FORMAT ": %s (source: %s)",
-                                              rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                                              expression_result(rc->config.critical),
-                                              expression_error_msg(rc->config.critical),
-                                              rrdcalc_source(rc)
-                            );
-                            critical_status = rrdcalc_value2status(expression_result(rc->config.critical));
-                        }
-                    }
+                    do_eval_expression(rc, rc->config.warning, "warning", WORKER_HEALTH_JOB_WARNING_EVAL, RRDCALC_FLAG_WARN_ERROR, &warning_status, NULL);
+                    do_eval_expression(rc, rc->config.critical, "critical", WORKER_HEALTH_JOB_CRITICAL_EVAL, RRDCALC_FLAG_CRIT_ERROR, &critical_status, NULL);
 
                     // --------------------------------------------------------
                     // decide the final alarm status
@@ -704,26 +645,16 @@ static void health_event_loop(void) {
                 wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up();
                 break;
             }
-#ifdef ENABLE_ACLK
-            if (netdata_cloud_enabled) {
-                struct aclk_sync_cfg_t *wc = host->aclk_config;
-                if (unlikely(!wc))
-                    continue;
-
-                if (wc->alert_queue_removed == 1) {
-                    sql_queue_removed_alerts_to_aclk(host);
-                } else if (wc->alert_queue_removed > 1) {
-                    wc->alert_queue_removed--;
-                }
-
-                if (wc->alert_checkpoint_req == 1) {
-                    aclk_push_alarm_checkpoint(host);
-                } else if (wc->alert_checkpoint_req > 1) {
-                    wc->alert_checkpoint_req--;
-                }
-            }
-#endif
         }
+        struct aclk_sync_cfg_t *wc = host->aclk_config;
+        if (wc && wc->send_snapshot == 1) {
+            wc->send_snapshot = 2;
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+        }
+        else
+            if (process_alert_pending_queue(host))
+                rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+
         dfe_done(host);
 
         // wait for all notifications to finish before allowing health to be cleaned up
@@ -738,16 +669,16 @@ static void health_event_loop(void) {
 }
 
 
-static void health_main_cleanup(void *ptr) {
-    worker_unregister();
+static void health_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    worker_unregister();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
     netdata_log_info("cleaning up...");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "Health thread ended.");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Health thread ended.");
 }
 
 void *health_main(void *ptr) {
@@ -763,10 +694,7 @@ void *health_main(void *ptr) {
     worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET, "rrdset init");
     worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM, "rrddim init");
 
-    netdata_thread_cleanup_push(health_main_cleanup, ptr);
-    {
-        health_event_loop();
-    }
-    netdata_thread_cleanup_pop(1);
+    CLEANUP_FUNCTION_REGISTER(health_main_cleanup) cleanup_ptr = ptr;
+    health_event_loop();
     return NULL;
 }

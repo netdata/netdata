@@ -9,7 +9,6 @@ typedef enum signal_action {
     NETDATA_SIGNAL_REOPEN_LOGS,
     NETDATA_SIGNAL_RELOAD_HEALTH,
     NETDATA_SIGNAL_FATAL,
-    NETDATA_SIGNAL_CHILD,
 } SIGNAL_ACTION;
 
 static struct {
@@ -25,7 +24,6 @@ static struct {
         { SIGHUP,  "SIGHUP",  0, NETDATA_SIGNAL_REOPEN_LOGS   },
         { SIGUSR2, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH },
         { SIGBUS,  "SIGBUS",  0, NETDATA_SIGNAL_FATAL         },
-        { SIGCHLD, "SIGCHLD", 0, NETDATA_SIGNAL_CHILD         },
 
         // terminator
         { 0,       "NONE",    0, NETDATA_SIGNAL_END_OF_LIST   }
@@ -52,24 +50,33 @@ static void signal_handler(int signo) {
     }
 }
 
-void signals_block(void) {
+// Mask all signals, to ensure they will only be unmasked at the threads that can handle them.
+// This means that all third party libraries (including libuv) cannot use signals anymore.
+// The signals they are interested must be unblocked at their corresponding event loops.
+static void posix_mask_all_signals(void) {
     sigset_t sigset;
     sigfillset(&sigset);
 
-    if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) == -1)
-        netdata_log_error("SIGNAL: Could not block signals for threads");
+    if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) != 0)
+        netdata_log_error("SIGNAL: cannot mask all signals");
 }
 
-void signals_unblock(void) {
+// Unmask all signals the netdata main signal handler uses.
+// All other signals remain masked.
+static void posix_unmask_my_signals(void) {
     sigset_t sigset;
-    sigfillset(&sigset);
+    sigemptyset(&sigset);
 
-    if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) == -1) {
-        netdata_log_error("SIGNAL: Could not unblock signals for threads");
-    }
+    for (int i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST; i++)
+        sigaddset(&sigset, signals_waiting[i].signo);
+
+    if (pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) != 0)
+        netdata_log_error("SIGNAL: cannot unmask netdata signals");
 }
 
-void signals_init(void) {
+void nd_initialize_signals(void) {
+    posix_mask_all_signals(); // block all signals for all threads
+
     // Catch signals which we want to use
     struct sigaction sa;
     sa.sa_flags = 0;
@@ -93,96 +100,15 @@ void signals_init(void) {
     }
 }
 
-void signals_restore_SIGCHLD(void)
-{
-    struct sigaction sa;
-
-    sa.sa_flags = 0;
-    sigfillset(&sa.sa_mask);
-    sa.sa_handler = signal_handler;
-
-    if(sigaction(SIGCHLD, &sa, NULL) == -1)
-        netdata_log_error("SIGNAL: Failed to change signal handler for: SIGCHLD");
-}
-
-void signals_reset(void) {
-    struct sigaction sa;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_handler = SIG_DFL;
-    sa.sa_flags = 0;
-
-    int i;
-    for (i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST; i++) {
-        if(sigaction(signals_waiting[i].signo, &sa, NULL) == -1)
-            netdata_log_error("SIGNAL: Failed to reset signal handler for: %s", signals_waiting[i].name);
-    }
-}
-
-// reap_child reaps the child identified by pid.
-static void reap_child(pid_t pid) {
-    siginfo_t i;
-
-    errno = 0;
-    netdata_log_debug(D_CHILDS, "SIGNAL: reap_child(%d)...", pid);
-    if (netdata_waitid(P_PID, (id_t)pid, &i, WEXITED|WNOHANG) == -1) {
-        if (errno != ECHILD)
-            netdata_log_error("SIGNAL: waitid(%d): failed to wait for child", pid);
-        else
-            netdata_log_info("SIGNAL: waitid(%d): failed - it seems the child is already reaped", pid);
-        return;
-    }
-    else if (i.si_pid == 0) {
-        // Process didn't exit, this shouldn't happen.
-        netdata_log_error("SIGNAL: waitid(%d): reports pid 0 - child has not exited", pid);
-        return;
-    }
-
-    switch (i.si_code) {
-        case CLD_EXITED:
-            netdata_log_info("SIGNAL: reap_child(%d) exited with code: %d", pid, i.si_status);
-            break;
-        case CLD_KILLED:
-            netdata_log_info("SIGNAL: reap_child(%d) killed by signal: %d", pid, i.si_status);
-            break;
-        case CLD_DUMPED:
-            netdata_log_info("SIGNAL: reap_child(%d) dumped core by signal: %d", pid, i.si_status);
-            break;
-        case CLD_STOPPED:
-            netdata_log_info("SIGNAL: reap_child(%d) stopped by signal: %d", pid, i.si_status);
-            break;
-        case CLD_TRAPPED:
-            netdata_log_info("SIGNAL: reap_child(%d) trapped by signal: %d", pid, i.si_status);
-            break;
-        case CLD_CONTINUED:
-            netdata_log_info("SIGNAL: reap_child(%d) continued by signal: %d", pid, i.si_status);
-            break;
-        default:
-            netdata_log_info("SIGNAL: reap_child(%d) gave us a SIGCHLD with code %d and status %d.", pid, i.si_code, i.si_status);
-            break;
-    }
-}
-
-// reap_children reaps all pending children which are not managed by myp.
-static void reap_children() {
-    siginfo_t i;
+void nd_process_signals(void) {
+    posix_unmask_my_signals();
 
     while(1) {
-        i.si_pid = 0;
-        if (netdata_waitid(P_ALL, (id_t)0, &i, WEXITED|WNOHANG|WNOWAIT) == -1 || i.si_pid == 0)
-            // nothing to do
-            return;
-
-        reap_child(i.si_pid);
-    }
-}
-
-void signals_handle(void) {
-    while(1) {
-
         // pause()  causes  the calling process (or thread) to sleep until a signal
         // is delivered that either terminates the process or causes the invocation
         // of a signal-catching function.
         if(pause() == -1 && errno == EINTR) {
+            errno_clear();
 
             // loop once, but keep looping while signals are coming in
             // this is needed because a few operations may take some time
@@ -224,10 +150,6 @@ void signals_handle(void) {
 
                             case NETDATA_SIGNAL_FATAL:
                                 fatal("SIGNAL: Received %s. netdata now exits.", name);
-                                break;
-
-                            case NETDATA_SIGNAL_CHILD:
-                                reap_children();
                                 break;
 
                             default:

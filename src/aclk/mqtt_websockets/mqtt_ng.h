@@ -1,10 +1,5 @@
-// Copyright: SPDX-License-Identifier:  GPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <stdint.h>
-#include <sys/types.h>
-#include <time.h>
-
-#include "c-rbuf/cringbuffer.h"
 #include "common_public.h"
 
 #define MQTT_NG_MSGGEN_OK         0

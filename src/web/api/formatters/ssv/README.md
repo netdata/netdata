@@ -9,7 +9,7 @@ learn_rel_path: "Developers/Web/Api/Formatters"
 
 # SSV formatter
 
-The SSV formatter sums all dimensions in [results of database queries](https://github.com/netdata/netdata/blob/master/src/web/api/queries/README.md)
+The SSV formatter sums all dimensions in [results of database queries](/src/web/api/queries/README.md)
 to a single value and returns a list of such values showing how it changes through time.
 
 It supports the following formats:

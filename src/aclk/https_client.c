@@ -23,9 +23,9 @@ static const char *http_req_type_to_str(http_req_type_t req) {
 
 #define TRANSFER_ENCODING_CHUNKED (-2)
 
-void http_parse_ctx_create(http_parse_ctx *ctx)
+void http_parse_ctx_create(http_parse_ctx *ctx, enum http_parse_state parse_state)
 {
-    ctx->state = HTTP_PARSE_INITIAL;
+    ctx->state = parse_state;
     ctx->content_length = -1;
     ctx->http_code = 0;
     ctx->headers = c_rhash_new(0);
@@ -51,6 +51,7 @@ void http_parse_ctx_destroy(http_parse_ctx *ctx)
 
 #define HTTP_LINE_TERM "\x0D\x0A"
 #define RESP_PROTO "HTTP/1.1 "
+#define RESP_PROTO10 "HTTP/1.0 "
 #define HTTP_KEYVAL_SEPARATOR ": "
 #define HTTP_HDR_BUFFER_SIZE 1024
 #define PORT_STR_MAX_BYTES 12
@@ -104,7 +105,8 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     int idx, idx_end;
     char buf_key[HTTP_HDR_BUFFER_SIZE];
     char buf_val[HTTP_HDR_BUFFER_SIZE];
-    char *ptr = buf_key;
+    char *ptr;
+
     if (!rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx_end)) {
         netdata_log_error("CRLF expected");
         return 1;
@@ -244,10 +246,20 @@ http_parse_rc parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
         if (parse_ctx->state != HTTP_PARSE_CONTENT && !rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx))
             return HTTP_PARSE_NEED_MORE_DATA;
         switch (parse_ctx->state) {
+            case HTTP_PARSE_PROXY_CONNECT:
             case HTTP_PARSE_INITIAL:
                 if (rbuf_memcmp_n(buf, RESP_PROTO, strlen(RESP_PROTO))) {
-                    netdata_log_error("Expected response to start with \"%s\"", RESP_PROTO);
-                    return HTTP_PARSE_ERROR;
+                    if (parse_ctx->state == HTTP_PARSE_PROXY_CONNECT) {
+                        if (rbuf_memcmp_n(buf, RESP_PROTO10, strlen(RESP_PROTO10))) {
+                            netdata_log_error(
+                                "Expected response to start with \"%s\" or \"%s\"", RESP_PROTO, RESP_PROTO10);
+                            return HTTP_PARSE_ERROR;
+                        }
+                    }
+                    else {
+                        netdata_log_error("Expected response to start with \"%s\"", RESP_PROTO);
+                        return HTTP_PARSE_ERROR;
+                    }
                 }
                 rbuf_bump_tail(buf, strlen(RESP_PROTO));
                 if (rbuf_pop(buf, rc, 4) != 4) {
@@ -489,47 +501,45 @@ static int read_parse_response(https_req_ctx_t *ctx) {
     return 0;
 }
 
+static const char *http_methods[] = {
+    [HTTP_REQ_GET] = "GET ",
+    [HTTP_REQ_POST] = "POST ",
+    [HTTP_REQ_CONNECT] = "CONNECT ",
+};
+
+
 #define TX_BUFFER_SIZE 8192
 #define RX_BUFFER_SIZE (TX_BUFFER_SIZE*2)
 static int handle_http_request(https_req_ctx_t *ctx) {
     BUFFER *hdr = buffer_create(TX_BUFFER_SIZE, &netdata_buffers_statistics.buffers_aclk);
     int rc = 0;
 
-    http_parse_ctx_create(&ctx->parse_ctx);
+    http_req_type_t req_type = ctx->request->request_type;
 
-    // Prepare data to send
-    switch (ctx->request->request_type) {
-        case HTTP_REQ_CONNECT:
-            buffer_strcat(hdr, "CONNECT ");
-            break;
-        case HTTP_REQ_GET:
-            buffer_strcat(hdr, "GET ");
-            break;
-        case HTTP_REQ_POST:
-            buffer_strcat(hdr, "POST ");
-            break;
-        default:
-            netdata_log_error("Unknown HTTPS request type!");
-            rc = 1;
-            goto err_exit;
+    if (req_type >= HTTP_REQ_INVALID) {
+        netdata_log_error("Unknown HTTPS request type!");
+        rc = 1;
+        goto err_exit;
     }
+    buffer_strcat(hdr, http_methods[req_type]);
 
-    if (ctx->request->request_type == HTTP_REQ_CONNECT) {
+    if (req_type == HTTP_REQ_CONNECT) {
         buffer_strcat(hdr, ctx->request->host);
         buffer_sprintf(hdr, ":%d", ctx->request->port);
-    } else {
+        http_parse_ctx_create(&ctx->parse_ctx, HTTP_PARSE_PROXY_CONNECT);
+    }
+    else {
         buffer_strcat(hdr, ctx->request->url);
+        http_parse_ctx_create(&ctx->parse_ctx, HTTP_PARSE_INITIAL);
     }
 
     buffer_strcat(hdr, HTTP_1_1 HTTP_ENDL);
 
     //TODO Headers!
-    if (ctx->request->request_type != HTTP_REQ_CONNECT) {
-        buffer_sprintf(hdr, "Host: %s\x0D\x0A", ctx->request->host);
-    }
+    buffer_sprintf(hdr, "Host: %s\x0D\x0A", ctx->request->host);
     buffer_strcat(hdr, "User-Agent: Netdata/rocks newhttpclient\x0D\x0A");
 
-    if (ctx->request->request_type == HTTP_REQ_POST && ctx->request->payload && ctx->request->payload_size) {
+    if (req_type == HTTP_REQ_POST && ctx->request->payload && ctx->request->payload_size) {
         buffer_sprintf(hdr, "Content-Length: %zu\x0D\x0A", ctx->request->payload_size);
     }
     if (ctx->request->proxy_username) {
@@ -560,7 +570,7 @@ static int handle_http_request(https_req_ctx_t *ctx) {
         goto err_exit;
     }
 
-    if (ctx->request->request_type == HTTP_REQ_POST && ctx->request->payload && ctx->request->payload_size) {
+    if (req_type == HTTP_REQ_POST && ctx->request->payload && ctx->request->payload_size) {
         if (https_client_write_all(ctx, ctx->request->payload, ctx->request->payload_size)) {
             netdata_log_error("Couldn't write payload into SSL connection");
             rc = 3;
@@ -687,7 +697,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         goto exit_CTX;
     }
 
-    if (!SSL_set_tlsext_host_name(ctx->ssl, connect_host)) {
+    if (!SSL_set_tlsext_host_name(ctx->ssl, request->host)) {
         netdata_log_error("Error setting TLS SNI host");
         goto exit_CTX;
     }

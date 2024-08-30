@@ -487,10 +487,10 @@ static void ebpf_obsolete_disk_global(ebpf_module_t *em)
                                       ned->family,
                                       "",
                                       "Disk latency",
-                                      EBPF_COMMON_DIMENSION_CALL,
+                                      EBPF_COMMON_UNITS_CALLS_PER_SEC,
                                       ned->family,
                                       NETDATA_EBPF_CHART_TYPE_STACKED,
-                                      NULL,
+                                      NETDATA_EBPF_DISK_LATENCY_CONTEXT,
                                       ned->histogram.order,
                                       em->update_every);
         }
@@ -506,9 +506,10 @@ static void ebpf_obsolete_disk_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
-static void ebpf_disk_exit(void *ptr)
+static void ebpf_disk_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -656,11 +657,11 @@ static void read_hard_disk_tables(int table, int maps_per_core)
  */
 static void ebpf_obsolete_hd_charts(netdata_ebpf_disks_t *w, int update_every)
 {
-    ebpf_write_chart_obsolete(w->histogram.name, w->family, "", w->histogram.title, EBPF_COMMON_DIMENSION_CALL,
-                              w->family, NETDATA_EBPF_CHART_TYPE_STACKED, "disk.latency_io",
+    ebpf_write_chart_obsolete(w->histogram.name, w->family, "", "Disk latency", EBPF_COMMON_UNITS_CALLS_PER_SEC,
+                              w->family, NETDATA_EBPF_CHART_TYPE_STACKED, NETDATA_EBPF_DISK_LATENCY_CONTEXT,
                               w->histogram.order, update_every);
 
-    w->flags = 0;
+    w->flags = NETDATA_DISK_NONE;
 }
 
 /**
@@ -680,8 +681,8 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w, int update_every)
     w->histogram.title = NULL;
     w->histogram.order = order;
 
-    ebpf_create_chart(w->histogram.name, family, "Disk latency", EBPF_COMMON_DIMENSION_CALL,
-                      family, "disk.latency_io", NETDATA_EBPF_CHART_TYPE_STACKED, order,
+    ebpf_create_chart(w->histogram.name, family, "Disk latency", EBPF_COMMON_UNITS_CALLS_PER_SEC,
+                      family, NETDATA_EBPF_DISK_LATENCY_CONTEXT, NETDATA_EBPF_CHART_TYPE_STACKED, order,
                       ebpf_create_global_dimension, disk_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
                       update_every, NETDATA_EBPF_MODULE_NAME_DISK);
     order++;
@@ -779,10 +780,10 @@ static void disk_collector(ebpf_module_t *em)
     int maps_per_core = em->maps_per_core;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
         counter = 0;
@@ -890,9 +891,10 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_disk_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_disk_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(ebpf_disk_exit) cleanup_ptr = em;
+
     em->maps = disk_maps;
 
     if (ebpf_disk_enable_tracepoints()) {
@@ -933,8 +935,6 @@ void *ebpf_disk_thread(void *ptr)
 
 enddisk:
     ebpf_update_disabled_plugin_stats(em);
-
-    netdata_thread_cleanup_pop(1);
 
     return NULL;
 }

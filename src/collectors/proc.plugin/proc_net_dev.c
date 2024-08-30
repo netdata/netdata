@@ -473,7 +473,7 @@ static void netdev_rename_this_device(struct netdev *d) {
 
 // ----------------------------------------------------------------------------
 
-int netdev_function_net_interfaces(BUFFER *wb, const char *function __maybe_unused) {
+static int netdev_function_net_interfaces(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload __maybe_unused, const char *source __maybe_unused) {
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
@@ -892,41 +892,33 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         char filename[FILENAME_MAX + 1];
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, (*netdata_configured_host_prefix)?"/proc/1/net/dev":"/proc/net/dev");
-        proc_net_dev_filename = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "filename to monitor", filename);
+        proc_net_dev_filename = strdupz(filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/virtual/net/%s");
-        path_to_sys_devices_virtual_net = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get virtual interfaces", filename);
+        path_to_sys_devices_virtual_net = strdupz(filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/speed");
-        path_to_sys_class_net_speed = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device speed", filename);
+        path_to_sys_class_net_speed = strdupz(filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/duplex");
-        path_to_sys_class_net_duplex = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device duplex", filename);
+        path_to_sys_class_net_duplex = strdupz(filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/operstate");
-        path_to_sys_class_net_operstate = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device operstate", filename);
+        path_to_sys_class_net_operstate = strdupz(filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/carrier");
-        path_to_sys_class_net_carrier = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device carrier", filename);
+        path_to_sys_class_net_carrier = strdupz(filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/mtu");
-        path_to_sys_class_net_mtu = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device mtu", filename);
+        path_to_sys_class_net_mtu = strdupz(filename);
 
+        enable_new_interfaces = CONFIG_BOOLEAN_YES;
 
-        enable_new_interfaces = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "enable new interfaces detected at runtime", CONFIG_BOOLEAN_AUTO);
+        do_bandwidth = do_packets = do_errors = do_drops = do_fifo = do_events = do_speed = do_duplex = do_operstate =
+            do_carrier = do_mtu = CONFIG_BOOLEAN_YES;
 
-        do_bandwidth    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "bandwidth for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_packets      = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "packets for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_errors       = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "errors for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_drops        = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "drops for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_fifo         = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "fifo for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_compressed   = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "compressed packets for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_events       = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "frames, collisions, carrier counters for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_speed        = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "speed for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_duplex       = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "duplex for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_operstate    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "operstate for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_carrier      = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "carrier for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_mtu          = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "mtu for all interfaces", CONFIG_BOOLEAN_AUTO);
+        // only CSLIP, PPP
+        do_compressed   = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "compressed packets for all interfaces", CONFIG_BOOLEAN_NO);
 
         disabled_list = simple_pattern_create(
                 config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "disable by default interfaces matching",
@@ -1197,11 +1189,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         //        , d->rframe, d->tcollisions, d->tcarrier
         //        );
 
-        if(unlikely(d->do_bandwidth == CONFIG_BOOLEAN_AUTO &&
-                    (d->rbytes || d->tbytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_bandwidth = CONFIG_BOOLEAN_YES;
-
-        if(d->do_bandwidth == CONFIG_BOOLEAN_YES) {
+        if (d->do_bandwidth == CONFIG_BOOLEAN_YES || d->do_bandwidth == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_bandwidth)) {
 
                 d->st_bandwidth = rrdset_create_localhost(
@@ -1443,11 +1431,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_mtu);
         }
 
-        if(unlikely(d->do_packets == CONFIG_BOOLEAN_AUTO &&
-           (d->rpackets || d->tpackets || d->rmulticast || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_packets = CONFIG_BOOLEAN_YES;
-
-        if(d->do_packets == CONFIG_BOOLEAN_YES) {
+        if (d->do_packets == CONFIG_BOOLEAN_YES || d->do_packets == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_packets)) {
 
                 d->st_packets = rrdset_create_localhost(
@@ -1488,11 +1472,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_packets);
         }
 
-        if(unlikely(d->do_errors == CONFIG_BOOLEAN_AUTO &&
-                    (d->rerrors || d->terrors || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_errors = CONFIG_BOOLEAN_YES;
-
-        if(d->do_errors == CONFIG_BOOLEAN_YES) {
+        if (d->do_errors == CONFIG_BOOLEAN_YES || d->do_errors == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_errors)) {
 
                 d->st_errors = rrdset_create_localhost(
@@ -1531,11 +1511,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_errors);
         }
 
-        if(unlikely(d->do_drops == CONFIG_BOOLEAN_AUTO &&
-                    (d->rdrops || d->tdrops || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_drops = CONFIG_BOOLEAN_YES;
-
-        if(d->do_drops == CONFIG_BOOLEAN_YES) {
+        if (d->do_drops == CONFIG_BOOLEAN_YES || d->do_drops == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_drops)) {
 
                 d->st_drops = rrdset_create_localhost(
@@ -1574,11 +1550,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_drops);
         }
 
-        if(unlikely(d->do_fifo == CONFIG_BOOLEAN_AUTO &&
-                    (d->rfifo || d->tfifo || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_fifo = CONFIG_BOOLEAN_YES;
-
-        if(d->do_fifo == CONFIG_BOOLEAN_YES) {
+        if (d->do_fifo == CONFIG_BOOLEAN_YES || d->do_fifo == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_fifo)) {
 
                 d->st_fifo = rrdset_create_localhost(
@@ -1617,11 +1589,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_fifo);
         }
 
-        if(unlikely(d->do_compressed == CONFIG_BOOLEAN_AUTO &&
-                    (d->rcompressed || d->tcompressed || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_compressed = CONFIG_BOOLEAN_YES;
-
-        if(d->do_compressed == CONFIG_BOOLEAN_YES) {
+        if (d->do_compressed == CONFIG_BOOLEAN_YES || d->do_compressed == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_compressed)) {
 
                 d->st_compressed = rrdset_create_localhost(
@@ -1660,11 +1628,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_compressed);
         }
 
-        if(unlikely(d->do_events == CONFIG_BOOLEAN_AUTO &&
-                    (d->rframe || d->tcollisions || d->tcarrier || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
-            d->do_events = CONFIG_BOOLEAN_YES;
-
-        if(d->do_events == CONFIG_BOOLEAN_YES) {
+        if (d->do_events == CONFIG_BOOLEAN_YES || d->do_events == CONFIG_BOOLEAN_AUTO) {
             if(unlikely(!d->st_events)) {
 
                 d->st_events = rrdset_create_localhost(
@@ -1700,9 +1664,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         d->function_ready = true;
     }
 
-    if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO &&
-                                              (system_rbytes || system_tbytes ||
-                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (do_bandwidth == CONFIG_BOOLEAN_YES || do_bandwidth == CONFIG_BOOLEAN_AUTO) {
         do_bandwidth = CONFIG_BOOLEAN_YES;
         static RRDSET *st_system_net = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
@@ -1738,17 +1700,19 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     return 0;
 }
 
-static void netdev_main_cleanup(void *ptr)
-{
-    UNUSED(ptr);
+static void netdev_main_cleanup(void *pptr) {
+    if(CLEANUP_FUNCTION_GET_PTR(pptr) != (void *)0x01)
+        return;
 
     collector_info("cleaning up...");
 
     worker_unregister();
 }
 
-void *netdev_main(void *ptr)
+void *netdev_main(void *ptr_is_null __maybe_unused)
 {
+    CLEANUP_FUNCTION_REGISTER(netdev_main_cleanup) cleanup_ptr = (void *)0x01;
+
     worker_register("NETDEV");
     worker_register_job_name(0, "netdev");
 
@@ -1760,29 +1724,26 @@ void *netdev_main(void *ptr)
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
                             netdev_function_net_interfaces);
 
-    netdata_thread_cleanup_push(netdev_main_cleanup, ptr) {
-        usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
-        heartbeat_t hb;
-        heartbeat_init(&hb);
+    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
 
-        while (service_running(SERVICE_COLLECTORS)) {
-            worker_is_idle();
-            usec_t hb_dt = heartbeat_next(&hb, step);
+    while (service_running(SERVICE_COLLECTORS)) {
+        worker_is_idle();
+        usec_t hb_dt = heartbeat_next(&hb, step);
 
-            if (unlikely(!service_running(SERVICE_COLLECTORS)))
-                break;
+        if (unlikely(!service_running(SERVICE_COLLECTORS)))
+            break;
 
-            cgroup_netdev_reset_all();
+        cgroup_netdev_reset_all();
 
-            worker_is_busy(0);
+        worker_is_busy(0);
 
-            netdata_mutex_lock(&netdev_mutex);
-            if (do_proc_net_dev(localhost->rrd_update_every, hb_dt))
-                break;
-            netdata_mutex_unlock(&netdev_mutex);
-        }
+        netdata_mutex_lock(&netdev_mutex);
+        if (do_proc_net_dev(localhost->rrd_update_every, hb_dt))
+            break;
+        netdata_mutex_unlock(&netdev_mutex);
     }
-    netdata_thread_cleanup_pop(1);
 
     return NULL;
 }

@@ -28,7 +28,7 @@ Netdata Children need to maintain a retention only for the time required to swit
 
 ## Restoring a Netdata Parent after maintenance
 
-Given the [replication limitations](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/metrics-centralization-points/replication-of-past-samples.md#replication-limitations), special care is needed when restoring a Netdata Parent after some long maintenance work on it.
+Given the [replication limitations](/docs/observability-centralization-points/metrics-centralization-points/replication-of-past-samples.md#replication-limitations), special care is needed when restoring a Netdata Parent after some long maintenance work on it.
 
 If the Netdata Children do not have enough retention to replicate the missing data on this Netdata Parent, it is preferable to block access to this Netdata Parent from the Netdata Children, until it replicates the missing data from the other Netdata Parents.
 

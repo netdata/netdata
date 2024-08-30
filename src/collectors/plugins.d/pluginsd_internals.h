@@ -13,7 +13,7 @@
 
 PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const char *msg);
 
-ssize_t send_to_plugin(const char *txt, void *data);
+ssize_t send_to_plugin(const char *txt, PARSER *parser);
 
 static inline RRDHOST *pluginsd_require_scope_host(PARSER *parser, const char *cmd) {
     RRDHOST *host = parser->user.host;
@@ -88,7 +88,7 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
 static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
     RRDSET *old_st = parser->user.st;
     pid_t old_collector_tid = (old_st) ? old_st->pluginsd.collector_tid : 0;
-    pid_t my_collector_tid = gettid();
+    pid_t my_collector_tid = gettid_cached();
 
     if(unlikely(old_collector_tid)) {
         if(old_collector_tid != my_collector_tid) {

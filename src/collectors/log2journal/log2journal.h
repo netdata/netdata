@@ -18,10 +18,33 @@
 #include <assert.h>
 
 // ----------------------------------------------------------------------------
+// compatibility
+
+#ifndef HAVE_STRNDUP
+// strndup() is not available on Windows
+static inline char *os_strndup( const char *s1, size_t n)
+{
+    char *copy= (char*)malloc( n+1 );
+    memcpy( copy, s1, n );
+    copy[n] = 0;
+    return copy;
+};
+#define strndup(s, n) os_strndup(s, n)
+#endif
+
+#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF)
+#define PRINTFLIKE(f, a) __attribute__ ((format(gnu_printf, f, a)))
+#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF)
+#define PRINTFLIKE(f, a) __attribute__ ((format(printf, f, a)))
+#else
+#define PRINTFLIKE(f, a)
+#endif
+
+// ----------------------------------------------------------------------------
 // logging
 
 // enable the compiler to check for printf like errors on our log2stderr() function
-static inline void log2stderr(const char *format, ...) __attribute__ ((format(__printf__, 1, 2)));
+static inline void log2stderr(const char *format, ...) PRINTFLIKE(1, 2);
 static inline void log2stderr(const char *format, ...) {
     va_list args;
     va_start(args, format);

@@ -22,7 +22,7 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
 
 ### Prerequisites
 - A Netdata Cloud account
-- Access to the Netdata Space as an **administrator**
+- Access to the Netdata Space as an **Admin**
 - You need to have a Discord server able to receive webhooks integrations.
 
 ### Discord Server Configuration

@@ -6,7 +6,7 @@ watcher_step_t *watcher_steps;
 
 static struct completion shutdown_begin_completion;
 static struct completion shutdown_end_completion;
-static netdata_thread_t watcher_thread;
+static ND_THREAD *watcher_thread;
 
 void watcher_shutdown_begin(void) {
     completion_mark_complete(&shutdown_begin_completion);
@@ -39,13 +39,13 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id)
 
     if (ok) {
         netdata_log_info("shutdown step: [%d/%d] - '%s' finished in %llu milliseconds",
-                         step_id + 1, WATCHER_STEP_ID_MAX,
+                         (int)step_id + 1, (int)WATCHER_STEP_ID_MAX,
                          watcher_steps[step_id].msg, step_duration / USEC_PER_MS);
     } else {
         // Do not call fatal() because it will try to execute the exit
         // sequence twice.
         netdata_log_error("shutdown step: [%d/%d] - '%s' took more than %u seconds (ie. %llu milliseconds)",
-              step_id + 1, WATCHER_STEP_ID_MAX, watcher_steps[step_id].msg,
+              (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, watcher_steps[step_id].msg,
               timeout, step_duration / USEC_PER_MS);
 
         abort();
@@ -65,6 +65,7 @@ void *watcher_main(void *arg)
     usec_t shutdown_start_time = now_monotonic_usec();
 
     watcher_wait_for_step(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
+    watcher_wait_for_step(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER);
     watcher_wait_for_step(WATCHER_STEP_ID_DBENGINE_EXIT_MODE);
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
     watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK);
@@ -105,6 +106,8 @@ void watcher_thread_start() {
 
     watcher_steps[WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE].msg =
         "create shutdown file";
+    watcher_steps[WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER].msg =
+        "destroy main spawn server";
     watcher_steps[WATCHER_STEP_ID_DBENGINE_EXIT_MODE].msg =
         "dbengine exit mode";
     watcher_steps[WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS].msg =
@@ -161,11 +164,11 @@ void watcher_thread_start() {
     completion_init(&shutdown_begin_completion);
     completion_init(&shutdown_end_completion);
 
-    netdata_thread_create(&watcher_thread, "P[WATCHER]", NETDATA_THREAD_OPTION_JOINABLE, watcher_main, NULL);
+    watcher_thread = nd_thread_create("P[WATCHER]", NETDATA_THREAD_OPTION_JOINABLE, watcher_main, NULL);
 }
 
 void watcher_thread_stop() {
-    netdata_thread_join(watcher_thread, NULL);
+    nd_thread_join(watcher_thread);
 
     for (size_t i = 0; i != WATCHER_STEP_ID_MAX; i++) {
         completion_destroy(&watcher_steps[i].p);

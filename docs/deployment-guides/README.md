@@ -1,6 +1,6 @@
 # Deployment Guides
 
-Netdata can be used to monitor all kinds of infrastructure, from stand-alone tiny IoT devices to complex hybrid setups combining on-premise and cloud infrastructure, mixing bare-metal servers, virtual machines and containers.
+Netdata can be used to monitor all kinds of infrastructure, from tiny stand-alone IoT devices to complex hybrid setups combining on-premise and cloud infrastructure, mixing bare-metal servers, virtual machines and containers.
 
 There are 3 components to structure your Netdata ecosystem:
 
@@ -12,7 +12,7 @@ There are 3 components to structure your Netdata ecosystem:
 
 2. **Netdata Parents**
 
-   To create [observability centralization points](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md) within your infrastructure, to offload Netdata Agents functions from your production systems, to provide high-availability of your data, increased data retention and isolation of your nodes.
+   To create [observability centralization points](/docs/observability-centralization-points/README.md) within your infrastructure, to offload Netdata Agents functions from your production systems, to provide high-availability of your data, increased data retention and isolation of your nodes.
 
    Netdata Parents are implemented using the Netdata Agent software. Any Netdata Agent can be an Agent for a node and a Parent  for other Agents, at the same time.
 

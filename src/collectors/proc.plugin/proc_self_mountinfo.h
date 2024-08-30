@@ -24,7 +24,8 @@ struct mountinfo {
     char *root;             // root: root of the mount within the filesystem.
     uint32_t root_hash;
 
-    char *mount_point;      // mount point: mount point relative to the process's root.
+    char *mount_point_stat_path; // the actual pathname of the mount point (may differ in Docker)
+    char *mount_point;           // mount point: mount point relative to the process's root.
     uint32_t mount_point_hash;
 
     char *mount_options;    // mount options: per-mount options.

@@ -84,7 +84,7 @@ struct journal_page_header {
     };
     uint32_t uuid_offset;    // Points back to the UUID list which should point here (UUIDs should much)
     uint32_t entries;        // Entries
-    uuid_t   uuid;           // Which UUID this is
+    nd_uuid_t   uuid;           // Which UUID this is
 };
 
 // 20 bytes
@@ -100,7 +100,7 @@ struct journal_page_list {
 // UUID_LIST
 // 36 bytes
 struct journal_metric_list {
-    uuid_t uuid;
+    nd_uuid_t uuid;
     uint32_t entries;           // Number of entries
     uint32_t page_offset;       // OFFSET that contains entries * struct( journal_page_list )
     uint32_t delta_start_s;     // Min time of metric

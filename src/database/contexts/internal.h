@@ -198,7 +198,7 @@ rrd_flag_add_remove_atomic(RRD_FLAGS *flags, RRD_FLAGS check, RRD_FLAGS conditio
 
 
 typedef struct rrdmetric {
-    uuid_t uuid;
+    nd_uuid_t uuid;
 
     STRING *id;
     STRING *name;
@@ -213,7 +213,7 @@ typedef struct rrdmetric {
 } RRDMETRIC;
 
 typedef struct rrdinstance {
-    uuid_t uuid;
+    nd_uuid_t uuid;
 
     STRING *id;
     STRING *name;

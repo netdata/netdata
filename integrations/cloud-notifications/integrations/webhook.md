@@ -23,8 +23,8 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
 ### Prerequisites
 
 - A Netdata Cloud account
-- Access to the Netdata Space as an **administrator**
-- The Netdata Space needs to be on **Pro** plan or higher
+- Access to the Netdata Space as an **Admin**
+- The Netdata Space needs to be on a paid plan
 - You need to have an app that allows you to receive webhooks following a predefined schema.
 
 ### Netdata Configuration Steps
@@ -67,7 +67,7 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
   | chart | string | The chart associated with the alert. |
   | context | string | The chart context. |
   | space | string | The space where the node that raised the alert is assigned. |
-  | rooms | object[object(string,string)] | Object with list of rooms names and urls where the node belongs to. |
+  | Rooms | object[object(string,string)] | Object with list of Rooms names and urls where the node belongs to. |
   | family | string | Context family. |
   | class | string | Classification of the alert, e.g. "Error". |
   | severity | string | Alert severity, can be one of "warning", "critical" or "clear". |

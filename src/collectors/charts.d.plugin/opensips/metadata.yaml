@@ -43,7 +43,7 @@ modules:
         list:
           - title: "Install charts.d plugin"
             description: |
-              If [using our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md#determine-which-installation-method-you-used), make sure `netdata-plugin-chartsd` is installed.
+              If [using our official native DEB/RPM packages](/packaging/installer/UPDATE.md#determine-which-installation-method-you-used), make sure `netdata-plugin-chartsd` is installed.
           - title: "Required software"
             description: "The collector requires the `opensipsctl` to be installed."
       configuration:

@@ -14,10 +14,148 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "smbstatus-profile",
+        .params = "-P",
+        .search =
+            {
+                [0] = "smbstatus",
+                [1] = NULL,
+            },
+    },
+    {
+        .name = "exim-bpc",
+        .params = "-bpc",
+        .search =
+            {
+                [0] = "exim",
+                [1] = NULL,
+            },
+    },
+    {
+        .name = "nsd-control-stats",
+        .params = "stats_noreset",
+        .search = {
+            [0] = "nsd-control",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "chronyc-serverstats",
+        .params = "serverstats",
+        .search = {
+            [0] = "chronyc",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "dmsetup-status-cache",
+        .params = "status --target cache --noflush",
+        .search = {
+            [0] = "dmsetup",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "ssacli-controllers-info",
+        .params = "ctrl all show config detail",
+        .search = {
+            [0] = "ssacli",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "smartctl-json-scan",
+        .params = "--json --scan",
+        .search = {
+            [0] = "smartctl",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "smartctl-json-scan-open",
+        .params = "--json --scan-open",
+        .search = {
+            [0] = "smartctl",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "smartctl-json-device-info",
+        .params = "--json --all {{deviceName}} --device {{deviceType}} --nocheck {{powerMode}}",
+        .search = {
+            [0] = "smartctl",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "fail2ban-client-status",
+        .params = "status",
+        .search = {
+            [0] = "fail2ban-client",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "fail2ban-client-status-socket",
+        .params = "-s {{socket_path}} status",
+        .search = {
+            [0] = "fail2ban-client",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "fail2ban-client-status-jail",
+        .params = "status {{jail}}",
+        .search = {
+            [0] = "fail2ban-client",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "fail2ban-client-status-jail-socket",
+        .params = "-s {{socket_path}} status {{jail}}",
+        .search = {
+            [0] = "fail2ban-client",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "storcli-controllers-info",
+        .params = "/cALL show all J nolog",
+        .search = {
+            [0] = "storcli",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "storcli-drives-info",
+        .params = "/cALL/eALL/sALL show all J nolog",
+        .search = {
+            [0] = "storcli",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "lvs-report-json",
         .params = "--reportformat json --units b --nosuffix -o {{options}}",
         .search = {
             [0] = "lvs",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "igt-list-gpus",
+        .params = "-L",
+        .search = {
+            [0] = "intel_gpu_top",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "igt-device-json",
+        .params = "-d {{device}} -J -s {{interval}}",
+        .search = {
+            [0] = "intel_gpu_top",
             [1] = NULL,
         },
     },
@@ -125,7 +263,8 @@ bool check_string(const char *str, size_t index, char *err, size_t err_size) {
         if(!((c >= 'A' && c <= 'Z') ||
              (c >= 'a' && c <= 'z') ||
              (c >= '0' && c <= '9') ||
-              c == ' ' || c == '_' || c == '-' || c == '/' || c == '.' || c == ',')) {
+              c == ' ' || c == '_' || c == '-' || c == '/' || 
+              c == '.' || c == ',' || c == ':' || c == '=')) {
             snprintf(err, err_size, "command line argument No %zu includes invalid character '%c'", index, c);
             return false;
         }
@@ -276,8 +415,12 @@ int main(int argc, char *argv[]) {
         return 3;
     }
 
-    char new_path[] = "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
-    setenv("PATH", new_path, 1);
+    char new_path[] = "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
+    putenv(new_path);
+
+    setuid(0);
+    setgid(0);
+    setegid(0);
 
     bool found = false;
     char filename[FILENAME_MAX];

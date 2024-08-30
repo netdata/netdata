@@ -9,9 +9,10 @@
 #cmakedefine SIZEOF_VOID_P ${SIZEOF_VOID_P}
 
 // platform
-#cmakedefine COMPILED_FOR_FREEBSD
-#cmakedefine COMPILED_FOR_LINUX
-#cmakedefine COMPILED_FOR_MACOS
+#cmakedefine OS_FREEBSD
+#cmakedefine OS_LINUX
+#cmakedefine OS_MACOS
+#cmakedefine OS_WINDOWS
 
 // checked headers
 
@@ -28,6 +29,20 @@
 #cmakedefine HAVE_INTTYPES_H
 #cmakedefine HAVE_STDINT_H
 #cmakedefine HAVE_SYS_CAPABILITY_H
+#cmakedefine HAVE_ARPA_INET_H
+#cmakedefine HAVE_NETINET_TCP_H
+#cmakedefine HAVE_SYS_IOCTL_H
+#cmakedefine HAVE_GRP_H
+#cmakedefine HAVE_PWD_H
+#cmakedefine HAVE_NET_IF_H
+#cmakedefine HAVE_POLL_H
+#cmakedefine HAVE_SYSLOG_H
+#cmakedefine HAVE_SYS_MMAN_H
+#cmakedefine HAVE_SYS_RESOURCE_H
+#cmakedefine HAVE_SYS_SOCKET_H
+#cmakedefine HAVE_SYS_WAIT_H
+#cmakedefine HAVE_SYS_UN_H
+#cmakedefine HAVE_SPAWN_H
 
 #cmakedefine HAVE_CAPABILITY
 #cmakedefine HAVE_PROTOBUF
@@ -44,9 +59,15 @@
 #cmakedefine HAVE_FINITE
 #cmakedefine HAVE_ISFINITE
 #cmakedefine HAVE_RECVMMSG
+#cmakedefine HAVE_PTHREAD_GETTHREADID_NP
+#cmakedefine HAVE_PTHREAD_THREADID_NP
+#cmakedefine HAVE_GETTID
+#cmakedefine HAVE_WAITID
 #cmakedefine HAVE_NICE
 #cmakedefine HAVE_GETPRIORITY
+#cmakedefine HAVE_SETENV
 #cmakedefine HAVE_DLSYM
+#cmakedefine HAVE_LIBCURL
 
 #cmakedefine HAVE_BACKTRACE
 #cmakedefine HAVE_CLOSE_RANGE
@@ -70,8 +91,11 @@
 #cmakedefine HAVE_C__GENERIC
 #cmakedefine HAVE_C_MALLOPT
 #cmakedefine HAVE_SETNS
+#cmakedefine HAVE_STRNDUP
+#cmakedefine SSL_HAS_PENDING
 
-#cmakedefine HAVE_FUNC_ATTRIBUTE_FORMAT
+#cmakedefine HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF
+#cmakedefine HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF
 #cmakedefine HAVE_FUNC_ATTRIBUTE_MALLOC
 #cmakedefine HAVE_FUNC_ATTRIBUTE_NOINLINE
 #cmakedefine HAVE_FUNC_ATTRIBUTE_NORETURN
@@ -80,14 +104,10 @@
 
 // enabled features
 
-#cmakedefine ENABLE_OPENSSL
-#cmakedefine ENABLE_CLOUD
-#cmakedefine ENABLE_ACLK
 #cmakedefine ENABLE_ML
 #cmakedefine ENABLE_EXPORTING_MONGODB
 #cmakedefine ENABLE_H2O
 #cmakedefine ENABLE_DBENGINE
-#cmakedefine ENABLE_HTTPS
 #cmakedefine ENABLE_LZ4
 #cmakedefine ENABLE_ZSTD
 #cmakedefine ENABLE_BROTLI
@@ -113,7 +133,6 @@
 
 #cmakedefine ENABLE_SENTRY
 #cmakedefine NETDATA_SENTRY_ENVIRONMENT "@NETDATA_SENTRY_ENVIRONMENT@"
-#cmakedefine NETDATA_SENTRY_RELEASE "@NETDATA_SENTRY_RELEASE@"
 #cmakedefine NETDATA_SENTRY_DIST "@NETDATA_SENTRY_DIST@"
 #cmakedefine NETDATA_SENTRY_DSN "@NETDATA_SENTRY_DSN@"
 // enabled bundling
@@ -137,7 +156,13 @@
 #cmakedefine CONFIGURE_COMMAND "@CONFIGURE_COMMAND@"
 #cmakedefine NETDATA_USER "@NETDATA_USER@"
 
-#cmakedefine VERSION "@GIT_DESCRIBE_OUTPUT@"
+#define NETDATA_VERSION_MAJOR "@NETDATA_VERSION_MAJOR@"
+#define NETDATA_VERSION_MINOR "@NETDATA_VERSION_MINOR@"
+#define NETDATA_VERSION_PATCH "@NETDATA_VERSION_PATCH@"
+#define NETDATA_VERSION_TWEAK "@NETDATA_VERSION_TWEAK@"
+#define NETDATA_VERSION_DESCR "@NETDATA_VERSION_DESCR@"
+
+#define NETDATA_VERSION "@NETDATA_VERSION_STRING@"
 
 #define ENABLE_JSONC 1
 
@@ -154,7 +179,6 @@
 // #cmakedefine ENABLE_PROMETHEUS_REMOTE_WRITE
 
 // /* NSA spy stuff */
-// #define ENABLE_HTTPS 1
 // #cmakedefine01 HAVE_X509_VERIFY_PARAM_set1_host
 
 #define HAVE_CRYPTO

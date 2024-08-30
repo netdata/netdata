@@ -1,0 +1,106 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      plugin_name: go.d.plugin
+      module_name: postfix
+      monitored_instance:
+        name: Postfix
+        link: https://www.postfix.org/
+        categories:
+          - data-collection.mail-servers
+        icon_filename: "postfix.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - postfix
+        - mail
+        - mail server
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: >
+          This collector retrieves statistics about the Postfix mail queue using the [postqueue](https://www.postfix.org/postqueue.1.html) command-line tool.
+        method_description: >
+          It periodically executes the `postqueue -p` command. The collection interval is set to 10 seconds by default, but this can be configurable.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: >
+          Postfix has internal access controls for the mail queue. By default, all users can view the queue. If your system has stricter controls, grant the `netdata` user access by adding it to `authorized_mailq_users` in the `/etc/postfix/main.cf `file.
+          For more details, refer to the `authorized_mailq_users` setting in the [Postfix documentation](https://www.postfix.org/postconf.5.html).
+      default_behavior:
+        auto_detection:
+          description: "The collector executes  `postqueue -p` to get Postfix queue statistics."
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "go.d/postfix.conf"
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: binary_path
+              description: Path to the `postqueue` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable.
+              default_value: /usr/sbin/postqueue
+              required: true
+            - name: timeout
+              description: Timeout for executing the binary, specified in seconds.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list:
+            - name: Custom binary path
+              description: The executable is not in the directories specified in the PATH environment variable.
+              config: |
+                jobs:
+                  - name: custom_path
+                    binary_path: /usr/local/sbin/postqueue
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: |
+            These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: postfix.qemails
+              description: Postfix Queue Emails
+              unit: emails
+              chart_type: line
+              dimensions:
+                - name: emails
+            - name: postfix.qsize
+              description: Postfix Queue Emails Size
+              unit: KiB
+              chart_type: area
+              dimensions:
+                - name: size

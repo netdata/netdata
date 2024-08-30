@@ -83,8 +83,7 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
         hash_numa_miss      = simple_hash("numa_miss");
     }
 
-    if(do_numastat == CONFIG_BOOLEAN_YES || (do_numastat == CONFIG_BOOLEAN_AUTO &&
-                                             (numa_node_count >= 2 || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+    if (do_numastat == CONFIG_BOOLEAN_YES || (do_numastat == CONFIG_BOOLEAN_AUTO && numa_node_count >= 2)) {
         for(m = numa_root; m; m = m->next) {
             if(m->numastat_filename) {
 

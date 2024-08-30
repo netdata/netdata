@@ -25,5 +25,5 @@ In MQTT, the PUBCOMP packet is used when QoS (Quality of Service) 2 is applied. 
 
 ### Useful resources
 
-1. [VerneMQ Documentation](https://vernemq.com/documentation/)
+1. [VerneMQ Documentation](https://docs.vernemq.com/)
 2. [MQTT Specification - MQTT Control Packets](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901046)

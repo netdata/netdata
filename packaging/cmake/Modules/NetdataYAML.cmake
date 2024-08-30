@@ -19,11 +19,23 @@ function(netdata_bundle_libyaml)
         endif()
 
         set(FETCHCONTENT_FULLY_DISCONNECTED Off)
+        set(repo https://github.com/yaml/libyaml)
+        set(tag 2c891fc7a770e8ba2fec34fc6b545c672beb37e6) # v0.2.5
 
-        FetchContent_Declare(yaml
-                GIT_REPOSITORY https://github.com/yaml/libyaml
-                GIT_TAG 2c891fc7a770e8ba2fec34fc6b545c672beb37e6 # v0.2.5
-        )
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+                FetchContent_Declare(yaml
+                        GIT_REPOSITORY ${repo}
+                        GIT_TAG ${tag}
+                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
+                        EXCLUDE_FROM_ALL
+                )
+        else()
+                FetchContent_Declare(yaml
+                        GIT_REPOSITORY ${repo}
+                        GIT_TAG ${tag}
+                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
+                )
+        endif()
 
         FetchContent_MakeAvailable_NoInstall(yaml)
 endfunction()
@@ -44,6 +56,7 @@ macro(netdata_detect_libyaml)
 
         if(ENABLE_BUNDLED_LIBYAML OR NOT YAML_FOUND)
                 netdata_bundle_libyaml()
+                set(ENABLE_BUNDLED_LIBYAML True PARENT_SCOPE)
                 set(NETDATA_YAML_LDFLAGS yaml)
                 get_target_property(NETDATA_YAML_INCLUDE_DIRS yaml INTERFACE_INCLUDE_DIRECTORIES)
                 get_target_property(NETDATA_YAML_CFLAGS_OTHER yaml INTERFACE_COMPILE_DEFINITIONS)
@@ -59,7 +72,11 @@ endmacro()
 # The specified target must already exist, and the netdata_detect_libyaml
 # macro must have already been run at least once for this to work correctly.
 function(netdata_add_libyaml_to_target _target)
-        target_include_directories(${_target} PUBLIC ${NETDATA_YAML_INCLUDE_DIRS})
-        target_compile_definitions(${_target} PUBLIC ${NETDATA_YAML_CFLAGS_OTHER})
+        if(ENABLE_BUNDLED_LIBYAML)
+                target_include_directories(${_target} BEFORE PUBLIC ${NETDATA_YAML_INCLUDE_DIRS})
+        else()
+                target_include_directories(${_target} PUBLIC ${NETDATA_YAML_INCLUDE_DIRS})
+        endif()
+        target_compile_options(${_target} PUBLIC ${NETDATA_YAML_CFLAGS_OTHER})
         target_link_libraries(${_target} PUBLIC ${NETDATA_YAML_LDFLAGS})
 endfunction()

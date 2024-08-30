@@ -6,19 +6,34 @@
 #include "../libnetdata.h"
 #include "../clocks/clocks.h"
 
+// #ifdef OS_WINDOWS
+// #define SPINLOCK_IMPL_WITH_MUTEX
+// #endif
+
 typedef pthread_mutex_t netdata_mutex_t;
 #define NETDATA_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 
-typedef struct netdata_spinlock {
-    bool locked;
-#ifdef NETDATA_INTERNAL_CHECKS
-    pid_t locker_pid;
-    size_t spins;
+#ifdef SPINLOCK_IMPL_WITH_MUTEX
+    typedef struct netdata_spinlock
+    {
+        netdata_mutex_t inner;
+    } SPINLOCK;
+#else
+    typedef struct netdata_spinlock
+    {
+        bool locked;
+    #ifdef NETDATA_INTERNAL_CHECKS
+        pid_t locker_pid;
+        size_t spins;
+    #endif
+    } SPINLOCK;
 #endif
-} SPINLOCK;
 
-#define NETDATA_SPINLOCK_INITIALIZER \
-    { .locked = false }
+#ifdef SPINLOCK_IMPL_WITH_MUTEX
+#define NETDATA_SPINLOCK_INITIALIZER { .inner = PTHREAD_MUTEX_INITIALIZER }
+#else
+#define NETDATA_SPINLOCK_INITIALIZER { .locked = false }
+#endif
 
 void spinlock_init(SPINLOCK *spinlock);
 void spinlock_lock(SPINLOCK *spinlock);
@@ -106,12 +121,10 @@ int __netdata_rwlock_destroy(netdata_rwlock_t *rwlock);
 int __netdata_rwlock_init(netdata_rwlock_t *rwlock);
 int __netdata_rwlock_rdlock(netdata_rwlock_t *rwlock);
 int __netdata_rwlock_wrlock(netdata_rwlock_t *rwlock);
-int __netdata_rwlock_unlock(netdata_rwlock_t *rwlock);
+int __netdata_rwlock_rdunlock(netdata_rwlock_t *rwlock);
+int __netdata_rwlock_wrunlock(netdata_rwlock_t *rwlock);
 int __netdata_rwlock_tryrdlock(netdata_rwlock_t *rwlock);
 int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock);
-
-void netdata_thread_disable_cancelability(void);
-void netdata_thread_enable_cancelability(void);
 
 #ifdef NETDATA_TRACE_RWLOCKS
 
@@ -125,7 +138,8 @@ int netdata_rwlock_destroy_debug( const char *file, const char *function, const 
 int netdata_rwlock_init_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
 int netdata_rwlock_rdlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
 int netdata_rwlock_wrlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
-int netdata_rwlock_unlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
+int netdata_rwlock_rdunlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
+int netdata_rwlock_wrunlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
 int netdata_rwlock_tryrdlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
 int netdata_rwlock_trywrlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
 
@@ -139,7 +153,8 @@ int netdata_rwlock_trywrlock_debug( const char *file, const char *function, cons
 #define netdata_rwlock_init(rwlock)      netdata_rwlock_init_debug(__FILE__, __FUNCTION__, __LINE__, rwlock)
 #define netdata_rwlock_rdlock(rwlock)    netdata_rwlock_rdlock_debug(__FILE__, __FUNCTION__, __LINE__, rwlock)
 #define netdata_rwlock_wrlock(rwlock)    netdata_rwlock_wrlock_debug(__FILE__, __FUNCTION__, __LINE__, rwlock)
-#define netdata_rwlock_unlock(rwlock)    netdata_rwlock_unlock_debug(__FILE__, __FUNCTION__, __LINE__, rwlock)
+#define netdata_rwlock_rdunlock(rwlock)  netdata_rwlock_rdunlock_debug(__FILE__, __FUNCTION__, __LINE__, rwlock)
+#define netdata_rwlock_wrunlock(rwlock)  netdata_rwlock_wrunlock_debug(__FILE__, __FUNCTION__, __LINE__, rwlock)
 #define netdata_rwlock_tryrdlock(rwlock) netdata_rwlock_tryrdlock_debug(__FILE__, __FUNCTION__, __LINE__, rwlock)
 #define netdata_rwlock_trywrlock(rwlock) netdata_rwlock_trywrlock_debug(__FILE__, __FUNCTION__, __LINE__, rwlock)
 
@@ -155,7 +170,8 @@ int netdata_rwlock_trywrlock_debug( const char *file, const char *function, cons
 #define netdata_rwlock_init(rwlock)       __netdata_rwlock_init(rwlock)
 #define netdata_rwlock_rdlock(rwlock)     __netdata_rwlock_rdlock(rwlock)
 #define netdata_rwlock_wrlock(rwlock)     __netdata_rwlock_wrlock(rwlock)
-#define netdata_rwlock_unlock(rwlock)     __netdata_rwlock_unlock(rwlock)
+#define netdata_rwlock_rdunlock(rwlock)     __netdata_rwlock_rdunlock(rwlock)
+#define netdata_rwlock_wrunlock(rwlock)     __netdata_rwlock_wrunlock(rwlock)
 #define netdata_rwlock_tryrdlock(rwlock)  __netdata_rwlock_tryrdlock(rwlock)
 #define netdata_rwlock_trywrlock(rwlock)  __netdata_rwlock_trywrlock(rwlock)
 

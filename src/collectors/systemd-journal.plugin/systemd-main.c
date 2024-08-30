@@ -19,7 +19,7 @@ static bool journal_data_directories_exist() {
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
     clocks_init();
-    netdata_thread_set_tag("sd-jrnl.plugin");
+    nd_thread_tag_set("sd-jrnl.plugin");
     nd_log_initialize_for_external_plugins("systemd-journal.plugin");
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
@@ -46,7 +46,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
         bool cancelled = false;
         usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
-        char buf[] = "systemd-journal after:-8640000 before:0 direction:backward last:200 data_only:false slice:true source:all";
+        // char buf[] = "systemd-journal after:-8640000 before:0 direction:backward last:200 data_only:false slice:true source:all";
+        char buf[] = "systemd-journal after:-8640000 before:0 direction:backward last:200 data_only:false slice:true facets: source:all";
         // char buf[] = "systemd-journal after:1695332964 before:1695937764 direction:backward last:100 slice:true source:all DHKucpqUoe1:PtVoyIuX.MU";
         // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
         function_systemd_journal("123", buf, &stop_monotonic_ut, &cancelled,
@@ -67,9 +68,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ------------------------------------------------------------------------
     // watcher thread
 
-    netdata_thread_t watcher_thread;
-    netdata_thread_create(&watcher_thread, "SDWATCH",
-                          NETDATA_THREAD_OPTION_DONT_LOG, journal_watcher_main, NULL);
+    nd_thread_create("SDWATCH", NETDATA_THREAD_OPTION_DONT_LOG, journal_watcher_main, NULL);
 
     // ------------------------------------------------------------------------
     // the event loop for functions

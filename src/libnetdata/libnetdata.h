@@ -9,10 +9,6 @@ extern "C" {
 
 #include "config.h"
 
-#ifdef ENABLE_OPENSSL
-#define ENABLE_HTTPS 1
-#endif
-
 #ifdef HAVE_LIBDATACHANNEL
 #define ENABLE_WEBRTC 1
 #endif
@@ -76,6 +72,8 @@ extern "C" {
 #define NETDATA_OS_TYPE "freebsd"
 #elif defined(__APPLE__)
 #define NETDATA_OS_TYPE "macos"
+#elif defined(OS_WINDOWS)
+#define NETDATA_OS_TYPE "windows"
 #else
 #define NETDATA_OS_TYPE "linux"
 #endif /* __FreeBSD__, __APPLE__*/
@@ -90,40 +88,112 @@ extern "C" {
 #include <ctype.h>
 #include <string.h>
 #include <strings.h>
-#include <arpa/inet.h>
-#include <netinet/tcp.h>
-#include <sys/ioctl.h>
 #include <libgen.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <getopt.h>
-#include <grp.h>
-#include <pwd.h>
 #include <limits.h>
 #include <locale.h>
-#include <net/if.h>
-#include <poll.h>
 #include <signal.h>
-#include <syslog.h>
-#include <sys/mman.h>
-#include <sys/resource.h>
-#include <sys/socket.h>
-#include <sys/syscall.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/wait.h>
-#include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
-#include <uuid/uuid.h>
-#include <spawn.h>
 #include <uv.h>
 #include <assert.h>
 
-// CentOS 7 has older version that doesn't define this
-// same goes for MacOS
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN (37)
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
+
+#ifdef HAVE_NETINET_TCP_H
+#include <netinet/tcp.h>
+#endif
+
+#ifdef HAVE_SYS_IOCTL_H
+#include <sys/ioctl.h>
+#endif
+
+#ifdef HAVE_GRP_H
+#include <grp.h>
+#else
+typedef uint32_t gid_t;
+#endif
+
+#ifdef HAVE_PWD_H
+#include <pwd.h>
+#else
+typedef uint32_t uid_t;
+#endif
+
+#ifdef HAVE_NET_IF_H
+#include <net/if.h>
+#endif
+
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
+
+#ifdef HAVE_SYSLOG_H
+#include <syslog.h>
+#else
+/* priorities */
+#define	LOG_EMERG	0	/* system is unusable */
+#define	LOG_ALERT	1	/* action must be taken immediately */
+#define	LOG_CRIT	2	/* critical conditions */
+#define	LOG_ERR		3	/* error conditions */
+#define	LOG_WARNING	4	/* warning conditions */
+#define	LOG_NOTICE	5	/* normal but significant condition */
+#define	LOG_INFO	6	/* informational */
+#define	LOG_DEBUG	7	/* debug-level messages */
+
+/* facility codes */
+#define	LOG_KERN	(0<<3)	/* kernel messages */
+#define	LOG_USER	(1<<3)	/* random user-level messages */
+#define	LOG_MAIL	(2<<3)	/* mail system */
+#define	LOG_DAEMON	(3<<3)	/* system daemons */
+#define	LOG_AUTH	(4<<3)	/* security/authorization messages */
+#define	LOG_SYSLOG	(5<<3)	/* messages generated internally by syslogd */
+#define	LOG_LPR		(6<<3)	/* line printer subsystem */
+#define	LOG_NEWS	(7<<3)	/* network news subsystem */
+#define	LOG_UUCP	(8<<3)	/* UUCP subsystem */
+#define	LOG_CRON	(9<<3)	/* clock daemon */
+#define	LOG_AUTHPRIV	(10<<3)	/* security/authorization messages (private) */
+#define	LOG_FTP		(11<<3)	/* ftp daemon */
+
+/* other codes through 15 reserved for system use */
+#define	LOG_LOCAL0	(16<<3)	/* reserved for local use */
+#define	LOG_LOCAL1	(17<<3)	/* reserved for local use */
+#define	LOG_LOCAL2	(18<<3)	/* reserved for local use */
+#define	LOG_LOCAL3	(19<<3)	/* reserved for local use */
+#define	LOG_LOCAL4	(20<<3)	/* reserved for local use */
+#define	LOG_LOCAL5	(21<<3)	/* reserved for local use */
+#define	LOG_LOCAL6	(22<<3)	/* reserved for local use */
+#define	LOG_LOCAL7	(23<<3)	/* reserved for local use */
+#endif
+
+#ifdef HAVE_SYS_MMAN_H
+#include <sys/mman.h>
+#endif
+
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
+
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+
+#ifdef HAVE_SYS_WAIT_H
+#include <sys/wait.h>
+#endif
+
+#ifdef HAVE_SYS_UN_H
+#include <sys/un.h>
+#endif
+
+#ifdef HAVE_SPAWN_H
+#include <spawn.h>
 #endif
 
 #ifdef HAVE_NETINET_IN_H
@@ -190,6 +260,10 @@ extern "C" {
 #endif
 
 
+#ifndef O_CLOEXEC
+#define O_CLOEXEC (0)
+#endif
+
 // ----------------------------------------------------------------------------
 // netdata common definitions
 
@@ -213,8 +287,10 @@ extern "C" {
 #define MALLOCLIKE
 #endif
 
-#ifdef HAVE_FUNC_ATTRIBUTE_FORMAT
-#define PRINTFLIKE(f, a) __attribute__ ((format(__printf__, f, a)))
+#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF)
+#define PRINTFLIKE(f, a) __attribute__ ((format(gnu_printf, f, a)))
+#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF)
+#define PRINTFLIKE(f, a) __attribute__ ((format(printf, f, a)))
 #else
 #define PRINTFLIKE(f, a)
 #endif
@@ -246,8 +322,12 @@ size_t judy_aral_structures(void);
 
 #define GUID_LEN 36
 
+#define PIPE_READ 0
+#define PIPE_WRITE 1
+
 #include "linked-lists.h"
 #include "storage-point.h"
+#include "paths/paths.h"
 
 void netdata_fix_chart_id(char *s);
 void netdata_fix_chart_name(char *s);
@@ -311,19 +391,6 @@ int verify_netdata_host_prefix(bool log_msg);
 
 extern volatile sig_atomic_t netdata_exit;
 
-extern const char *program_version;
-
-char *strdupz_path_subpath(const char *path, const char *subpath);
-int path_is_dir(const char *path, const char *subpath);
-int path_is_file(const char *path, const char *subpath);
-void recursive_config_double_dir_load(
-        const char *user_path
-        , const char *stock_path
-        , const char *subpath
-        , int (*callback)(const char *filename, void *data, bool stock_config)
-        , void *data
-        , size_t depth
-);
 char *read_by_filename(const char *filename, long *file_size);
 char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
 
@@ -347,7 +414,7 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 #define UNUSED_FUNCTION(x) UNUSED_##x
 #endif
 
-#define error_report(x, args...) do { errno = 0; netdata_log_error(x, ##args); } while(0)
+#define error_report(x, args...) do { errno_clear(); netdata_log_error(x, ##args); } while(0)
 
 // Taken from linux kernel
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
@@ -362,19 +429,15 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int max_line_length);
 
-typedef enum {
-    OPEN_FD_ACTION_CLOSE,
-    OPEN_FD_ACTION_FD_CLOEXEC
-} OPEN_FD_ACTION;
-typedef enum {
-    OPEN_FD_EXCLUDE_STDIN   = 0x01,
-    OPEN_FD_EXCLUDE_STDOUT  = 0x02,
-    OPEN_FD_EXCLUDE_STDERR  = 0x04
-} OPEN_FD_EXCLUDE;
-void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds);
-
+#ifdef OS_WINDOWS
+void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data);
+#else
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) NORETURN;
+#endif
+
 extern char *netdata_configured_host_prefix;
+
+#include "os/os.h"
 
 #define XXH_INLINE_ALL
 #include "xxhash.h"
@@ -386,9 +449,10 @@ extern char *netdata_configured_host_prefix;
 #include "config/dyncfg.h"
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
-#include "os.h"
 #include "threads/threads.h"
 #include "buffer/buffer.h"
+#include "ringbuffer/ringbuffer.h"
+#include "c_rhash/c_rhash.h"
 #include "locks/locks.h"
 #include "circular_buffer/circular_buffer.h"
 #include "avl/avl.h"
@@ -400,15 +464,14 @@ extern char *netdata_configured_host_prefix;
 #include "datetime/rfc3339.h"
 #include "datetime/rfc7231.h"
 #include "completion/completion.h"
-#include "popen/popen.h"
+#include "log/log.h"
+#include "spawn_server/spawn_server.h"
+#include "spawn_server/spawn_popen.h"
 #include "simple_pattern/simple_pattern.h"
-#ifdef ENABLE_HTTPS
-# include "socket/security.h"
-#endif
+#include "socket/security.h"
 #include "socket/socket.h"
 #include "config/appconfig.h"
 #include "log/journal.h"
-#include "log/log.h"
 #include "buffered_reader/buffered_reader.h"
 #include "procfile/procfile.h"
 #include "string/string.h"
@@ -593,6 +656,33 @@ static inline void freez_const_charp(const char **p) {
 
 #define CLEAN_CONST_CHAR_P _cleanup_(freez_const_charp) const char
 #define CLEAN_CHAR_P _cleanup_(freez_charp) char
+
+// --------------------------------------------------------------------------------------------------------------------
+// automatic cleanup function, instead of pthread pop/push
+
+// volatile: Tells the compiler that the variable defined might be accessed in unexpected ways
+// (e.g., by the cleanup function). This prevents it from being optimized out.
+#define CLEANUP_FUNCTION_REGISTER(func) volatile void * __attribute__((cleanup(func)))
+
+static inline void *CLEANUP_FUNCTION_GET_PTR(void *pptr) {
+    void *ret;
+    void **p = (void **)pptr;
+    if(p) {
+        ret = *p;
+        *p = NULL; // use it only once - this will prevent using it again
+
+        if(!ret)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "cleanup function called multiple times!");
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "cleanup function called with NULL pptr!");
+        ret = NULL;
+    }
+
+    return ret;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 
 # ifdef __cplusplus
 }

@@ -1,0 +1,225 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-nvme
+      plugin_name: go.d.plugin
+      module_name: nvme
+      monitored_instance:
+        name: NVMe devices
+        link: ""
+        icon_filename: nvme.svg
+        categories:
+          - data-collection.storage-mount-points-and-filesystems
+      keywords:
+        - nvme
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: >
+          This collector monitors the health of NVMe devices.
+          It relies on the [`nvme`](https://github.com/linux-nvme/nvme-cli#nvme-cli) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Install nvme-cli
+            description: |
+              See [Distro Support](https://github.com/linux-nvme/nvme-cli#distro-support). Install `nvme-cli` using your distribution's package manager.
+          - title: "For Netdata running in a Docker container: grant NVMe device access"
+            description: |
+              Your NVMe devices need to be accessible within the Docker container for Netdata to monitor them.
+
+              Include the following option in your `docker run` command or add the device mapping in your `docker-compose.yml` file:
+
+              - `docker run`
+
+                ```bash
+                --device '/dev/nvme0n1:/dev/nvme0n1'
+                ```
+
+              - `docker-compose.yml`
+
+                ```yaml
+                services:
+                  netdata:
+                    devices:
+                      - "/dev/nvme0n1:/dev/nvme0n1"
+                ```
+
+              **Note**: Replace `/dev/nvme0n1` with your actual NVMe device name.
+      configuration:
+        file:
+          name: go.d/nvme.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: timeout
+              description: nvme binary execution timeout.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
+              config: |
+                jobs:
+                  - name: nvme
+                    update_every: 5  # Collect NVMe metrics every 5 seconds
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: nvme_device_critical_warnings_state
+        metric: nvme.device_critical_warnings_state
+        info: "NVMe device ${label:device} has critical warnings"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/nvme.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: device
+          description: These metrics refer to the NVME device.
+          labels:
+            - name: device
+              description: NVMe device name
+          metrics:
+            - name: nvme.device_estimated_endurance_perc
+              description: Estimated endurance
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: nvme.device_available_spare_perc
+              description: Remaining spare capacity
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: spare
+            - name: nvme.device_composite_temperature
+              description: Composite temperature
+              unit: celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: nvme.device_io_transferred_count
+              description: Amount of data transferred to and from device
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: written
+            - name: nvme.device_power_cycles_count
+              description: Power cycles
+              unit: cycles
+              chart_type: line
+              dimensions:
+                - name: power
+            - name: nvme.device_power_on_time
+              description: Power-on time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: power-on
+            - name: nvme.device_critical_warnings_state
+              description: Critical warnings state
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: available_spare
+                - name: temp_threshold
+                - name: nvm_subsystem_reliability
+                - name: read_only
+                - name: volatile_mem_backup_failed
+                - name: persistent_memory_read_only
+            - name: nvme.device_unsafe_shutdowns_count
+              description: Unsafe shutdowns
+              unit: shutdowns
+              chart_type: line
+              dimensions:
+                - name: unsafe
+            - name: nvme.device_media_errors_rate
+              description: Media and data integrity errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: media
+            - name: nvme.device_error_log_entries_rate
+              description: Error log entries
+              unit: entries/s
+              chart_type: line
+              dimensions:
+                - name: error_log
+            - name: nvme.device_warning_composite_temperature_time
+              description: Warning composite temperature time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: wctemp
+            - name: nvme.device_critical_composite_temperature_time
+              description: Critical composite temperature time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: cctemp
+            - name: nvme.device_thermal_mgmt_temp1_transitions_rate
+              description: Thermal management temp1 transitions
+              unit: transitions/s
+              chart_type: line
+              dimensions:
+                - name: temp1
+            - name: nvme.device_thermal_mgmt_temp2_transitions_rate
+              description: Thermal management temp2 transitions
+              unit: transitions/s
+              chart_type: line
+              dimensions:
+                - name: temp2
+            - name: nvme.device_thermal_mgmt_temp1_time
+              description: Thermal management temp1 time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: temp1
+            - name: nvme.device_thermal_mgmt_temp2_time
+              description: Thermal management temp2 time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: temp2

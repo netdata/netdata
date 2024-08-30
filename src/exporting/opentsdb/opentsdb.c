@@ -20,12 +20,10 @@ int init_opentsdb_telnet_instance(struct instance *instance)
     struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
     instance->connector_specific_data = connector_specific_data;
 
-#ifdef ENABLE_HTTPS
     connector_specific_data->ssl = NETDATA_SSL_UNSET_CONNECTION;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
         netdata_ssl_initialize_ctx(NETDATA_SSL_EXPORTING_CTX);
     }
-#endif
 
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_opentsdb_telnet;
@@ -75,12 +73,10 @@ int init_opentsdb_http_instance(struct instance *instance)
     connector_specific_config->default_port = 4242;
 
     struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
-#ifdef ENABLE_HTTPS
     connector_specific_data->ssl = NETDATA_SSL_UNSET_CONNECTION;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
         netdata_ssl_initialize_ctx(NETDATA_SSL_EXPORTING_CTX);
     }
-#endif
     instance->connector_specific_data = connector_specific_data;
 
     instance->start_batch_formatting = open_batch_json_http;
@@ -127,7 +123,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
 {
     while (*src != '\0' && len) {
-        if (isalpha(*src) || isdigit(*src) || *src == '-' || *src == '.' || *src == '/' || IS_UTF8_BYTE(*src))
+        if (isalpha((uint8_t)*src) || isdigit((uint8_t)*src) || *src == '-' || *src == '.' || *src == '/' || IS_UTF8_BYTE(*src))
             *dst++ = *src;
         else
             *dst++ = '_';

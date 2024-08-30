@@ -6,8 +6,9 @@
 #define PRESSURE_NUM_RESOURCES 4
 
 struct pressure {
-    int updated;
     char *filename;
+    bool staterr;
+    int updated;
 
     struct pressure_charts {
         bool available;

@@ -208,9 +208,7 @@ static int do_migration_v3_v4(sqlite3 *database)
          freez(table);
     }
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement when altering health_log tables, rc = %d", rc);
+    SQLITE_FINALIZE(res);
 
     return 0;
 }
@@ -249,9 +247,7 @@ static int do_migration_v6_v7(sqlite3 *database)
          freez(table);
     }
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement when altering aclk_alert tables, rc = %d", rc);
+    SQLITE_FINALIZE(res);
 
     return 0;
 }
@@ -278,9 +274,7 @@ static int do_migration_v7_v8(sqlite3 *database)
          freez(table);
     }
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement when altering health_log tables, rc = %d", rc);
+    SQLITE_FINALIZE(res);
 
     return 0;
 }
@@ -340,9 +334,7 @@ static int do_migration_v8_v9(sqlite3 *database)
         freez(table);
     }
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement when copying health_log tables, rc = %d", rc);
+    SQLITE_FINALIZE(res);
 
     char *table = NULL;
     dfe_start_read(dict_tables, table) {
@@ -407,9 +399,7 @@ static int do_migration_v14_v15(sqlite3 *database)
         count++;
     }
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement when dropping unused indices, rc = %d", rc);
+    SQLITE_FINALIZE(res);
 
     if (count)
         (void) db_execute(database, buffer_tostring(wb));
@@ -438,9 +428,7 @@ static int do_migration_v15_v16(sqlite3 *database)
         count++;
     }
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement when running ANALYZE on aclk_alert_tables, rc = %d", rc);
+    SQLITE_FINALIZE(res);
 
     if (count)
         (void) db_execute(database, buffer_tostring(wb));
@@ -530,6 +518,7 @@ static int migrate_database(sqlite3 *database, int target_version, char *db_name
     }
 
     if (likely(user_version == target_version)) {
+        errno_clear();
         netdata_log_info("%s database version is %d (no migration needed)", db_name, target_version);
         return target_version;
     }

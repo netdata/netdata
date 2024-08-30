@@ -9,7 +9,7 @@ learn_rel_path: "Configuration"
 
 # Collectors configuration reference
 
-The list of supported collectors can be found in [the documentation](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md), 
+The list of supported collectors can be found in [the documentation](/src/collectors/COLLECTORS.md), 
 and on [our website](https://www.netdata.cloud/integrations). The documentation of each collector provides all the 
 necessary configuration options and prerequisites for that collector. In most cases, either the charts are automatically generated 
 without any configuration, or you just fulfil those prerequisites and [configure the collector](#configure-a-collector).
@@ -67,7 +67,7 @@ You can enable/disable of the collection modules supported by `go.d`, `python.d`
 configuration file of that orchestrator. For example, you can change the behavior of the Go orchestrator, or any of its 
 collectors, by editing `go.d.conf`.
 
-Use `edit-config` from your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory) 
+Use `edit-config` from your [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory) 
 to open the orchestrator primary configuration file:
 
 ```bash
@@ -80,7 +80,7 @@ enable/disable it with `yes` and `no` settings. Uncomment any line you change to
 start.
 
 After you make your changes, restart the Agent with `sudo systemctl restart netdata`, or the [appropriate
-method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
+method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
 
 ## Configure a collector
 
@@ -93,19 +93,19 @@ metrics, will automatically enable data collection for the application in questi
 
 When Netdata starts up, each collector searches for exposed metrics on the default endpoint established by that service
 or application's standard installation procedure. For example, 
-the [Nginx collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/nginx/README.md) searches at
+the [Nginx collector](/src/go/plugin/go.d/modules/nginx/README.md) searches at
 `http://127.0.0.1/stub_status` for exposed metrics in the correct format. If an Nginx web server is running and exposes
 metrics on that endpoint, the collector begins gathering them.
 
 However, not every node or infrastructure uses standard ports, paths, files, or naming conventions. You may need to
 enable or configure a collector to gather all available metrics from your systems, containers, or applications.
 
-First, [find the collector](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md) you want to edit 
+First, [find the collector](/src/collectors/COLLECTORS.md) you want to edit 
 and open its documentation. Some software has collectors written in multiple languages. In these cases, you should always 
 pick the collector written in Go.
 
 Use `edit-config` from your 
-[Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory) 
+[Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory) 
 to open a collector's configuration file. For example, edit the Nginx collector with the following:
 
 ```bash
@@ -118,7 +118,7 @@ configure that collector. Uncomment any line you change to ensure the collector'
 read it on start.
 
 After you make your changes, restart the Agent with `sudo systemctl restart netdata`, or the [appropriate
-method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
+method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
 
 ## Troubleshoot a collector
 
@@ -145,5 +145,5 @@ The next step is based on the collector's orchestrator.
 ```
 
 The output from the relevant command will provide valuable troubleshooting information. If you can't figure out how to
-enable the collector using the details from this output, feel free to [join our Discord server](https://discord.com/invite/mPZ6WZKKG2), 
+enable the collector using the details from this output, feel free to [join our Discord server](https://discord.com/invite/2mEmfW735j), 
 to get help from our experts.

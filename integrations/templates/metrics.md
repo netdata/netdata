@@ -2,7 +2,7 @@
 ## Metrics
 
 [% if entry.metrics.folding.enabled and not clean %]
-{% details summary="[[ entry.metrics.folding.title ]]" %}
+{% details open=true summary="[[ entry.metrics.folding.title ]]" %}
 [% endif %]
 Metrics grouped by *scope*.
 

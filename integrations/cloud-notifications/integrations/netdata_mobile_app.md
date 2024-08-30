@@ -30,7 +30,7 @@ Steps to login to the Netdata Mobile Application to receive alert and reachabili
 2. Open the App and Choose the Sign In Option
   - Sign In with Email Address: Enter the Email Address of your registered Netdata Cloud Account and Click on the Verification link received by Email on your mobile device.
   - Sign In with QR Code: Scan the QR Code from your `Netdata Cloud` UI under **User Settings** --> **Notifications** --> **Mobile App Notifications** --> **Show QR Code**
-3. Start receiving alert and reachability notifications for your **Space(s)** on a **Paid Business Subscription**
+3. Start receiving alert and reachability notifications for your **Space(s)** on a **Paid Subscription plan**
 
 ### Netdata Configuration Steps
 1. Click on the **User settings** on the bottom left of your screen (your profile icon)

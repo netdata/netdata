@@ -4,29 +4,32 @@
 #define NETDATA_CLAIM_H 1
 
 #include "daemon/common.h"
+#include "cloud-status.h"
+#include "claim_id.h"
 
-extern char *claiming_pending_arguments;
+const char *claim_agent_failure_reason_get(void);
+void claim_agent_failure_reason_set(const char *format, ...) PRINTFLIKE(1, 2);
+
 extern struct config cloud_config;
 
-typedef enum __attribute__((packed)) {
-    CLAIM_AGENT_OK,
-    CLAIM_AGENT_CLOUD_DISABLED,
-    CLAIM_AGENT_NO_CLOUD_URL,
-    CLAIM_AGENT_CANNOT_EXECUTE_CLAIM_SCRIPT,
-    CLAIM_AGENT_CLAIM_SCRIPT_FAILED,
-    CLAIM_AGENT_CLAIM_SCRIPT_RETURNED_INVALID_CODE,
-    CLAIM_AGENT_FAILED_WITH_MESSAGE,
-} CLAIM_AGENT_RESPONSE;
+bool claim_agent(const char *url, const char *token, const char *rooms, const char *proxy, bool insecure);
+bool claim_agent_automatically(void);
 
-CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, const char **msg);
-char *get_agent_claimid(void);
-void load_claiming_state(void);
-void load_cloud_conf(int silent);
-void claim_reload_all(void);
+bool claimed_id_save_to_file(const char *claimed_id_str);
 
-bool netdata_random_session_id_generate(void);
-const char *netdata_random_session_id_get_filename(void);
-bool netdata_random_session_id_matches(const char *guid);
-int api_v2_claim(struct web_client *w, char *url);
+bool is_agent_claimed(void);
+bool claim_id_matches(const char *claim_id);
+bool claim_id_matches_any(const char *claim_id);
+bool load_claiming_state(void);
+void cloud_conf_load(int silent);
+void cloud_conf_init_after_registry(void);
+bool cloud_conf_save(void);
+bool cloud_conf_regenerate(const char *claimed_id_str, const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, int insecure);
+CLOUD_STATUS claim_reload_and_wait_online(void);
+
+const char *cloud_config_url_get(void);
+void cloud_config_url_set(const char *url);
+const char *cloud_config_proxy_get(void);
+bool cloud_config_insecure_get(void);
 
 #endif //NETDATA_CLAIM_H

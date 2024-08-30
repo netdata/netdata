@@ -88,7 +88,6 @@ system/systemd/netdata-updater.service
 !system/systemd/netdata.service.*.in
 
 src/health/notifications/alarm-notify.sh
-claim/netdata-claim.sh
 src/collectors/cgroups.plugin/cgroup-name.sh
 src/collectors/cgroups.plugin/cgroup-network-helper.sh
 src/collectors/tc.plugin/tc-qos-helper.sh
@@ -97,8 +96,6 @@ src/collectors/python.d.plugin/python.d.plugin
 src/collectors/ioping.plugin/ioping.plugin
 src/collectors/go.d.plugin
 src/web/netdata-switch-dashboard.sh
-
-src/logsmanagement/stress_test/stress_test
 
 # installer generated files
 /netdata-uninstaller.sh
@@ -127,6 +124,7 @@ docs/diagrams/plantuml.jar
 
 # python virtual environment
 venv/
+.python-version
 
 # debugging / profiling
 makeself/debug/
@@ -194,8 +192,8 @@ src/libnetdata/gorilla/fuzz-*.log
 build/
 
 # ignore rules for go plugin code
-src/go/collectors/go.d.plugin/bin/
-src/go/collectors/go.d.plugin/mocks/springboot2/.gradle/
-src/go/collectors/go.d.plugin/mocks/tmp/*
-!src/go/collectors/go.d.plugin/mocks/tmp/.gitkeep
-src/go/collectors/go.d.plugin/vendor
+src/go/plugin/go.d/bin/
+src/go/plugin/go.d/vendor
+
+# ignore nsis installer
+packaging/utils/netdata-installer.exe

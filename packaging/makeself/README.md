@@ -26,7 +26,7 @@ you can do so by adding `--static-only` to the options you pass to the installer
 ## Building a static binary package
 
 Before you begin, make sure that your repo and the repo's submodules are clean from any previous builds and up to date.
-Otherwise, [perform a cleanup](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
+Otherwise, [perform a cleanup](/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
 
 
 To build the static binary 64-bit distribution package, into the root folder on the netdata repo, run:

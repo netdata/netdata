@@ -100,6 +100,10 @@ void aws_kinesis_connector_worker(void *instance_p)
     struct aws_kinesis_specific_config *connector_specific_config = instance->config.connector_specific_config;
     struct aws_kinesis_specific_data *connector_specific_data = instance->connector_specific_data;
 
+    char threadname[ND_THREAD_TAG_MAX + 1];
+    snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPKNSS[%zu]", instance->index);
+    uv_thread_set_name_np(threadname);
+
     while (!instance->engine->exit) {
         unsigned long long partition_key_seq = 0;
         struct stats *stats = &instance->stats;

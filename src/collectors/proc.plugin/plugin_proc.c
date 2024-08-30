@@ -62,7 +62,6 @@ static struct proc_module {
 
     // ZFS metrics
     {.name = "/proc/spl/kstat/zfs/arcstats", .dim = "zfs_arcstats", .func = do_proc_spl_kstat_zfs_arcstats},
-    {.name = "/proc/spl/kstat/zfs/pool/state",.dim = "zfs_pool_state",.func = do_proc_spl_kstat_zfs_pool_state},
 
     // BTRFS metrics
     {.name = "/sys/fs/btrfs",                .dim = "btrfs",        .func = do_sys_fs_btrfs},
@@ -84,26 +83,27 @@ static struct proc_module {
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 36
 #endif
 
-static netdata_thread_t *netdev_thread = NULL;
+static ND_THREAD *netdev_thread = NULL;
 
-static void proc_main_cleanup(void *ptr)
+static void proc_main_cleanup(void *pptr)
 {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
 
-    if (netdev_thread) {
-        netdata_thread_join(*netdev_thread, NULL);
-        freez(netdev_thread);
-    }
+    nd_thread_join(netdev_thread);
+    worker_unregister();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-
-    worker_unregister();
 }
 
 bool inside_lxc_container = false;
+bool is_mem_swap_enabled = false;
+bool is_mem_zswap_enabled = false;
+bool is_mem_ksm_enabled = false;
 
 static bool is_lxcfs_proc_mounted() {
     procfile *ff = NULL;
@@ -138,6 +138,61 @@ static bool is_lxcfs_proc_mounted() {
     return false;
 }
 
+static bool is_ksm_enabled() {
+    unsigned long long ksm_run = 0;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/sys/kernel/mm/ksm/run", netdata_configured_host_prefix);
+
+    return !read_single_number_file(filename, &ksm_run) && ksm_run == 1;
+}
+
+static bool is_zswap_enabled() {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "/sys/module/zswap/parameters/enabled"); // host prefix is not needed here
+    char state[1 + 1];                                                         // Y or N
+
+    int ret = read_txt_file(filename, state, sizeof(state));
+
+    return !ret && !strcmp(state, "Y");
+}
+
+static bool is_swap_enabled() {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/proc/meminfo", netdata_configured_host_prefix);
+
+    procfile *ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
+    if (!ff) {
+        return false;
+    }
+
+    ff = procfile_readall(ff);
+    if (!ff) {
+        procfile_close(ff);
+        return false;
+    }
+
+    unsigned long long swap_total = 0;
+
+    size_t lines = procfile_lines(ff), l;
+
+    for (l = 0; l < lines; l++) {
+        size_t words = procfile_linewords(ff, l);
+        if (words < 2)
+            continue;
+
+        const char *key = procfile_lineword(ff, l, 0);
+        if (strcmp(key, "SwapTotal") == 0) {
+            swap_total = str2ull(procfile_lineword(ff, l, 1), NULL);
+            break;
+        }
+    }
+
+    procfile_close(ff);
+
+    return swap_total > 0;
+}
+
 static bool log_proc_module(BUFFER *wb, void *data) {
     struct proc_module *pm = data;
     buffer_sprintf(wb, "proc.plugin[%s]", pm->name);
@@ -146,70 +201,70 @@ static bool log_proc_module(BUFFER *wb, void *data) {
 
 void *proc_main(void *ptr)
 {
+    CLEANUP_FUNCTION_REGISTER(proc_main_cleanup) cleanup_ptr = ptr;
+
     worker_register("PROC");
 
     rrd_collector_started();
 
     if (config_get_boolean("plugin:proc", "/proc/net/dev", CONFIG_BOOLEAN_YES)) {
-        netdev_thread = mallocz(sizeof(netdata_thread_t));
         netdata_log_debug(D_SYSTEM, "Starting thread %s.", THREAD_NETDEV_NAME);
-        netdata_thread_create(
-            netdev_thread, THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_JOINABLE, netdev_main, netdev_thread);
+        netdev_thread = nd_thread_create(THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_JOINABLE, netdev_main, NULL);
     }
 
-    netdata_thread_cleanup_push(proc_main_cleanup, ptr)
-    {
-        config_get_boolean("plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);
-        config_get_boolean("plugin:proc", "/proc/spl/kstat/zfs/pool/state", CONFIG_BOOLEAN_NO);
+    config_get_boolean("plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);
+    config_get_boolean("plugin:proc", "/proc/spl/kstat/zfs/pool/state", CONFIG_BOOLEAN_NO);
 
-        // check the enabled status for each module
-        int i;
-        for(i = 0; proc_modules[i].name; i++) {
-            struct proc_module *pm = &proc_modules[i];
+    // check the enabled status for each module
+    int i;
+    for(i = 0; proc_modules[i].name; i++) {
+        struct proc_module *pm = &proc_modules[i];
 
-            pm->enabled = config_get_boolean("plugin:proc", pm->name, CONFIG_BOOLEAN_YES);
-            pm->rd = NULL;
+        pm->enabled = config_get_boolean("plugin:proc", pm->name, CONFIG_BOOLEAN_YES);
+        pm->rd = NULL;
 
-            worker_register_job_name(i, proc_modules[i].dim);
-        }
+        worker_register_job_name(i, proc_modules[i].dim);
+    }
 
-        usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
-        heartbeat_t hb;
-        heartbeat_init(&hb);
+    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
 
-        inside_lxc_container = is_lxcfs_proc_mounted();
+    inside_lxc_container = is_lxcfs_proc_mounted();
+    is_mem_swap_enabled = is_swap_enabled();
+    is_mem_zswap_enabled = is_zswap_enabled();
+    is_mem_ksm_enabled = is_ksm_enabled();
 
 #define LGS_MODULE_ID 0
 
-        ND_LOG_STACK lgs[] = {
-                [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "proc.plugin"),
-                ND_LOG_FIELD_END(),
-        };
-        ND_LOG_STACK_PUSH(lgs);
+    ND_LOG_STACK lgs[] = {
+            [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "proc.plugin"),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
-        while(service_running(SERVICE_COLLECTORS)) {
-            worker_is_idle();
-            usec_t hb_dt = heartbeat_next(&hb, step);
+    while(service_running(SERVICE_COLLECTORS)) {
+        worker_is_idle();
+        usec_t hb_dt = heartbeat_next(&hb, step);
 
+        if(unlikely(!service_running(SERVICE_COLLECTORS)))
+            break;
+
+        for(i = 0; proc_modules[i].name; i++) {
             if(unlikely(!service_running(SERVICE_COLLECTORS)))
                 break;
 
-            for(i = 0; proc_modules[i].name; i++) {
-                if(unlikely(!service_running(SERVICE_COLLECTORS)))
-                    break;
+            struct proc_module *pm = &proc_modules[i];
+            if(unlikely(!pm->enabled))
+                continue;
 
-                struct proc_module *pm = &proc_modules[i];
-                if(unlikely(!pm->enabled))
-                    continue;
-
-                worker_is_busy(i);
-                lgs[LGS_MODULE_ID] = ND_LOG_FIELD_CB(NDF_MODULE, log_proc_module, pm);
-                pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
-                lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "proc.plugin");
-            }
+            worker_is_busy(i);
+            lgs[LGS_MODULE_ID] = ND_LOG_FIELD_CB(NDF_MODULE, log_proc_module, pm);
+            pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
+            lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "proc.plugin");
         }
     }
-    netdata_thread_cleanup_pop(1);
+
     return NULL;
 }
 

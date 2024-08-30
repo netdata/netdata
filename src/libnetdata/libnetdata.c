@@ -2,24 +2,23 @@
 
 #include "libnetdata.h"
 
-#ifdef __APPLE__
-#define INHERIT_NONE 0
-#endif /* __APPLE__ */
-#if defined(__FreeBSD__) || defined(__APPLE__)
-#    define O_NOATIME     0
-#    define MADV_DONTFORK INHERIT_NONE
-#endif /* __FreeBSD__ || __APPLE__*/
+#if !defined(MADV_DONTFORK)
+#define MADV_DONTFORK 0
+#endif
+
+#if !defined(O_NOATIME)
+#define O_NOATIME 0
+#endif
 
 struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
 
-#ifdef MADV_MERGEABLE
+#if defined(MADV_MERGEABLE)
 int enable_ksm = 1;
 #else
 int enable_ksm = 0;
 #endif
 
 volatile sig_atomic_t netdata_exit = 0;
-const char *program_version = VERSION;
 
 #define MAX_JUDY_SIZE_TO_ARAL 24
 static bool judy_sizes_config[MAX_JUDY_SIZE_TO_ARAL + 1] = {
@@ -494,7 +493,7 @@ char *strndupz(const char *s, size_t len) {
 
 // If ptr is NULL, no operation is performed.
 void freez(void *ptr) {
-    free(ptr);
+    if(likely(ptr)) free(ptr);
 }
 
 void *mallocz(size_t size) {
@@ -1249,7 +1248,7 @@ cleanup:
             close(fd);
     }
     if(mem == MAP_FAILED) return NULL;
-    errno = 0;
+    errno_clear();
     return mem;
 }
 
@@ -1303,315 +1302,6 @@ int snprintfz(char *dst, size_t n, const char *fmt, ...) {
     return ret;
 }
 
-static int is_procfs(const char *path, char **reason) {
-#if defined(__APPLE__) || defined(__FreeBSD__)
-    (void)path;
-    (void)reason;
-#else
-    struct statfs stat;
-
-    if (statfs(path, &stat) == -1) {
-        if (reason)
-            *reason = "failed to statfs()";
-        return -1;
-    }
-
-#if defined PROC_SUPER_MAGIC
-    if (stat.f_type != PROC_SUPER_MAGIC) {
-        if (reason)
-            *reason = "type is not procfs";
-        return -1;
-    }
-#endif
-
-#endif
-
-    return 0;
-}
-
-static int is_sysfs(const char *path, char **reason) {
-#if defined(__APPLE__) || defined(__FreeBSD__)
-    (void)path;
-    (void)reason;
-#else
-    struct statfs stat;
-
-    if (statfs(path, &stat) == -1) {
-        if (reason)
-            *reason = "failed to statfs()";
-        return -1;
-    }
-
-#if defined SYSFS_MAGIC
-    if (stat.f_type != SYSFS_MAGIC) {
-        if (reason)
-            *reason = "type is not sysfs";
-        return -1;
-    }
-#endif
-
-#endif
-
-    return 0;
-}
-
-int verify_netdata_host_prefix(bool log_msg) {
-    if(!netdata_configured_host_prefix)
-        netdata_configured_host_prefix = "";
-
-    if(!*netdata_configured_host_prefix)
-        return 0;
-
-    char buffer[FILENAME_MAX + 1];
-    char *path = netdata_configured_host_prefix;
-    char *reason = "unknown reason";
-    errno = 0;
-
-    struct stat sb;
-    if (stat(path, &sb) == -1) {
-        reason = "failed to stat()";
-        goto failed;
-    }
-
-    if((sb.st_mode & S_IFMT) != S_IFDIR) {
-        errno = EINVAL;
-        reason = "is not a directory";
-        goto failed;
-    }
-
-    path = buffer;
-    snprintfz(path, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
-    if(is_procfs(path, &reason) == -1)
-        goto failed;
-
-    snprintfz(path, FILENAME_MAX, "%s/sys", netdata_configured_host_prefix);
-    if(is_sysfs(path, &reason) == -1)
-        goto failed;
-
-    if (netdata_configured_host_prefix && *netdata_configured_host_prefix) {
-        if (log_msg)
-            netdata_log_info("Using host prefix directory '%s'", netdata_configured_host_prefix);
-    }
-
-    return 0;
-
-failed:
-    if (log_msg)
-        netdata_log_error("Ignoring host prefix '%s': path '%s' %s", netdata_configured_host_prefix, path, reason);
-    netdata_configured_host_prefix = "";
-    return -1;
-}
-
-char *strdupz_path_subpath(const char *path, const char *subpath) {
-    if(unlikely(!path || !*path)) path = ".";
-    if(unlikely(!subpath)) subpath = "";
-
-    // skip trailing slashes in path
-    size_t len = strlen(path);
-    while(len > 0 && path[len - 1] == '/') len--;
-
-    // skip leading slashes in subpath
-    while(subpath[0] == '/') subpath++;
-
-    // if the last character in path is / and (there is a subpath or path is now empty)
-    // keep the trailing slash in path and remove the additional slash
-    char *slash = "/";
-    if(path[len] == '/' && (*subpath || len == 0)) {
-        slash = "";
-        len++;
-    }
-    else if(!*subpath) {
-        // there is no subpath
-        // no need for trailing slash
-        slash = "";
-    }
-
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%.*s%s%s", (int)len, path, slash, subpath);
-    return strdupz(buffer);
-}
-
-int path_is_dir(const char *path, const char *subpath) {
-    char *s = strdupz_path_subpath(path, subpath);
-
-    size_t max_links = 100;
-
-    int is_dir = 0;
-    struct stat statbuf;
-    while(max_links-- && stat(s, &statbuf) == 0) {
-        if((statbuf.st_mode & S_IFMT) == S_IFDIR) {
-            is_dir = 1;
-            break;
-        }
-        else if((statbuf.st_mode & S_IFMT) == S_IFLNK) {
-            char buffer[FILENAME_MAX + 1];
-            ssize_t l = readlink(s, buffer, FILENAME_MAX);
-            if(l > 0) {
-                buffer[l] = '\0';
-                freez(s);
-                s = strdupz(buffer);
-                continue;
-            }
-            else {
-                is_dir = 0;
-                break;
-            }
-        }
-        else {
-            is_dir = 0;
-            break;
-        }
-    }
-
-    freez(s);
-    return is_dir;
-}
-
-int path_is_file(const char *path, const char *subpath) {
-    char *s = strdupz_path_subpath(path, subpath);
-
-    size_t max_links = 100;
-
-    int is_file = 0;
-    struct stat statbuf;
-    while(max_links-- && stat(s, &statbuf) == 0) {
-        if((statbuf.st_mode & S_IFMT) == S_IFREG) {
-            is_file = 1;
-            break;
-        }
-        else if((statbuf.st_mode & S_IFMT) == S_IFLNK) {
-            char buffer[FILENAME_MAX + 1];
-            ssize_t l = readlink(s, buffer, FILENAME_MAX);
-            if(l > 0) {
-                buffer[l] = '\0';
-                freez(s);
-                s = strdupz(buffer);
-                continue;
-            }
-            else {
-                is_file = 0;
-                break;
-            }
-        }
-        else {
-            is_file = 0;
-            break;
-        }
-    }
-
-    freez(s);
-    return is_file;
-}
-
-void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *subpath, int (*callback)(const char *filename, void *data, bool stock_config), void *data, size_t depth) {
-    if(depth > 3) {
-        netdata_log_error("CONFIG: Max directory depth reached while reading user path '%s', stock path '%s', subpath '%s'", user_path, stock_path, subpath);
-        return;
-    }
-
-    if(!stock_path)
-        stock_path = user_path;
-
-    char *udir = strdupz_path_subpath(user_path, subpath);
-    char *sdir = strdupz_path_subpath(stock_path, subpath);
-
-    netdata_log_debug(D_HEALTH, "CONFIG traversing user-config directory '%s', stock config directory '%s'", udir, sdir);
-
-    DIR *dir = opendir(udir);
-    if (!dir) {
-        netdata_log_error("CONFIG cannot open user-config directory '%s'.", udir);
-    }
-    else {
-        struct dirent *de = NULL;
-        while((de = readdir(dir))) {
-            if(de->d_type == DT_DIR || de->d_type == DT_LNK) {
-                if( !de->d_name[0] ||
-                    (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
-                    (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-                        ) {
-                    netdata_log_debug(D_HEALTH, "CONFIG ignoring user-config directory '%s/%s'", udir, de->d_name);
-                    continue;
-                }
-
-                if(path_is_dir(udir, de->d_name)) {
-                    recursive_config_double_dir_load(udir, sdir, de->d_name, callback, data, depth + 1);
-                    continue;
-                }
-            }
-
-            if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
-                size_t len = strlen(de->d_name);
-                if(path_is_file(udir, de->d_name) &&
-                   len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
-                    char *filename = strdupz_path_subpath(udir, de->d_name);
-                    netdata_log_debug(D_HEALTH, "CONFIG calling callback for user file '%s'", filename);
-                    callback(filename, data, false);
-                    freez(filename);
-                    continue;
-                }
-            }
-
-            netdata_log_debug(D_HEALTH, "CONFIG ignoring user-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
-        }
-
-        closedir(dir);
-    }
-
-    netdata_log_debug(D_HEALTH, "CONFIG traversing stock config directory '%s', user config directory '%s'", sdir, udir);
-
-    dir = opendir(sdir);
-    if (!dir) {
-        netdata_log_error("CONFIG cannot open stock config directory '%s'.", sdir);
-    }
-    else {
-        if (strcmp(udir, sdir)) {
-            struct dirent *de = NULL;
-            while((de = readdir(dir))) {
-                if(de->d_type == DT_DIR || de->d_type == DT_LNK) {
-                    if( !de->d_name[0] ||
-                        (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
-                        (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-                        ) {
-                        netdata_log_debug(D_HEALTH, "CONFIG ignoring stock config directory '%s/%s'", sdir, de->d_name);
-                        continue;
-                    }
-
-                    if(path_is_dir(sdir, de->d_name)) {
-                        // we recurse in stock subdirectory, only when there is no corresponding
-                        // user subdirectory - to avoid reading the files twice
-
-                        if(!path_is_dir(udir, de->d_name))
-                            recursive_config_double_dir_load(udir, sdir, de->d_name, callback, data, depth + 1);
-
-                        continue;
-                    }
-                }
-
-                if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
-                    size_t len = strlen(de->d_name);
-                    if(path_is_file(sdir, de->d_name) && !path_is_file(udir, de->d_name) &&
-                        len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
-                        char *filename = strdupz_path_subpath(sdir, de->d_name);
-                        netdata_log_debug(D_HEALTH, "CONFIG calling callback for stock file '%s'", filename);
-                        callback(filename, data, true);
-                        freez(filename);
-                        continue;
-                    }
-
-                }
-
-                netdata_log_debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
-            }
-        }
-        closedir(dir);
-    }
-
-    netdata_log_debug(D_HEALTH, "CONFIG done traversing user-config directory '%s', stock config directory '%s'", udir, sdir);
-
-    freez(udir);
-    freez(sdir);
-}
-
 // Returns the number of bytes read from the file if file_size is not NULL.
 // The actual buffer has an extra byte set to zero (not included in the count).
 char *read_by_filename(const char *filename, long *file_size)
@@ -1619,34 +1309,37 @@ char *read_by_filename(const char *filename, long *file_size)
     FILE *f = fopen(filename, "r");
     if (!f)
         return NULL;
+
     if (fseek(f, 0, SEEK_END) < 0) {
         fclose(f);
         return NULL;
     }
+
     long size = ftell(f);
     if (size <= 0 || fseek(f, 0, SEEK_END) < 0) {
         fclose(f);
         return NULL;
     }
+
     char *contents = callocz(size + 1, 1);
-    if (!contents) {
-        fclose(f);
-        return NULL;
-    }
     if (fseek(f, 0, SEEK_SET) < 0) {
         fclose(f);
         freez(contents);
         return NULL;
     }
+
     size_t res = fread(contents, 1, size, f);
     if ( res != (size_t)size) {
         freez(contents);
         fclose(f);
         return NULL;
     }
+
     fclose(f);
+
     if (file_size)
         *file_size = size;
+
     return contents;
 }
 
@@ -1680,19 +1373,17 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
     return value;
 }
 
-
 BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_length) {
     BUFFER *wb = buffer_create(0, NULL);
 
-    pid_t pid;
-    FILE *fp = netdata_popen(command, &pid, NULL);
-
-    if(fp) {
+    POPEN_INSTANCE *pi = spawn_popen_run(command);
+    if(pi) {
         char buffer[max_line_length + 1];
-        while (fgets(buffer, max_line_length, fp)) {
+        while (fgets(buffer, max_line_length, spawn_popen_stdout(pi))) {
             buffer[max_line_length] = '\0';
             buffer_strcat(wb, buffer);
         }
+        spawn_popen_kill(pi);
     }
     else {
         buffer_free(wb);
@@ -1700,101 +1391,25 @@ BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_l
         return NULL;
     }
 
-    netdata_pclose(NULL, fp, pid);
     return wb;
 }
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {
-    pid_t pid;
-    FILE *fp = netdata_popen(command, &pid, NULL);
-
-    if(fp) {
+    POPEN_INSTANCE *pi = spawn_popen_run(command);
+    if(pi) {
         char buffer[max_line_length + 1];
-        while (fgets(buffer, max_line_length, fp))
+
+        while (fgets(buffer, max_line_length, spawn_popen_stdout(pi)))
             fprintf(stdout, "%s", buffer);
+
+        spawn_popen_kill(pi);
     }
     else {
         netdata_log_error("Failed to execute command '%s'.", command);
         return false;
     }
 
-    netdata_pclose(NULL, fp, pid);
     return true;
-}
-
-
-static int fd_is_valid(int fd) {
-    return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
-}
-
-void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds){
-    int fd;
-
-    switch(action){
-        case OPEN_FD_ACTION_CLOSE:
-            if(!(excluded_fds & OPEN_FD_EXCLUDE_STDIN))  (void)close(STDIN_FILENO);
-            if(!(excluded_fds & OPEN_FD_EXCLUDE_STDOUT)) (void)close(STDOUT_FILENO);
-            if(!(excluded_fds & OPEN_FD_EXCLUDE_STDERR)) (void)close(STDERR_FILENO);
-#if defined(HAVE_CLOSE_RANGE)
-            if(close_range(STDERR_FILENO + 1, ~0U, 0) == 0) return;
-            netdata_log_error("close_range() failed, will try to close fds one by one");
-#endif
-            break;
-        case OPEN_FD_ACTION_FD_CLOEXEC:
-            if(!(excluded_fds & OPEN_FD_EXCLUDE_STDIN))  (void)fcntl(STDIN_FILENO, F_SETFD, FD_CLOEXEC);
-            if(!(excluded_fds & OPEN_FD_EXCLUDE_STDOUT)) (void)fcntl(STDOUT_FILENO, F_SETFD, FD_CLOEXEC);
-            if(!(excluded_fds & OPEN_FD_EXCLUDE_STDERR)) (void)fcntl(STDERR_FILENO, F_SETFD, FD_CLOEXEC);
-#if defined(HAVE_CLOSE_RANGE) && defined(CLOSE_RANGE_CLOEXEC) // Linux >= 5.11, FreeBSD >= 13.1
-            if(close_range(STDERR_FILENO + 1, ~0U, CLOSE_RANGE_CLOEXEC) == 0) return;
-            netdata_log_error("close_range() failed, will try to mark fds for closing one by one");
-#endif
-            break;
-        default:
-            break; // do nothing
-    }
-
-    DIR *dir = opendir("/proc/self/fd");
-    if (dir == NULL) {
-        struct rlimit rl;
-        int open_max = -1;
-
-        if(getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_max != RLIM_INFINITY) open_max = rl.rlim_max;
-#ifdef _SC_OPEN_MAX
-        else open_max = sysconf(_SC_OPEN_MAX);
-#endif
-
-        if (open_max == -1) open_max = 65535; // 65535 arbitrary default if everything else fails
-
-        for (fd = STDERR_FILENO + 1; fd < open_max; fd++) {
-            switch(action){
-                case OPEN_FD_ACTION_CLOSE:
-                    if(fd_is_valid(fd)) (void)close(fd);
-                    break;
-                case OPEN_FD_ACTION_FD_CLOEXEC:
-                    (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
-                    break;
-                default:
-                    break; // do nothing
-            }
-        }
-    } else {
-        struct dirent *entry;
-        while ((entry = readdir(dir)) != NULL) {
-            fd = str2i(entry->d_name);
-            if(unlikely((fd == STDIN_FILENO ) || (fd == STDOUT_FILENO) || (fd == STDERR_FILENO) )) continue;
-            switch(action){
-                case OPEN_FD_ACTION_CLOSE:
-                    if(fd_is_valid(fd)) (void)close(fd);
-                    break;
-                case OPEN_FD_ACTION_FD_CLOEXEC:
-                    (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
-                    break;
-                default:
-                    break; // do nothing
-            }
-        }
-        closedir(dir);
-    }
 }
 
 struct timing_steps {
@@ -1910,7 +1525,6 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step) {
     }
 }
 
-#ifdef ENABLE_HTTPS
 int hash256_string(const unsigned char *string, size_t size, char *hash) {
     EVP_MD_CTX *ctx;
     ctx = EVP_MD_CTX_create();
@@ -1935,7 +1549,6 @@ int hash256_string(const unsigned char *string, size_t size, char *hash) {
     EVP_MD_CTX_destroy(ctx);
     return 1;
 }
-#endif
 
 
 bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now) {

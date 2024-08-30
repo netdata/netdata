@@ -28,7 +28,7 @@ Please respond in the affirmative for any relevant prompts during the installati
 
 ## Install Netdata
 
-The simplest method is to use the single line [kickstart script](https://learn.netdata.cloud/docs/agent/packaging/installer/methods/kickstart)
+The simplest method is to use the single line [kickstart script](/packaging/installer/methods/kickstart.md)
 
 If you have a Netdata cloud account then clicking on the **Connect Nodes** button will generate the kickstart command you should use. Use the command from the "Linux" tab, it should look something like this:
 
@@ -38,8 +38,6 @@ wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /
 Please respond in the affirmative for any relevant prompts during the installation process. 
 
 Once the installation is completed, you should be able to start monitoring the FreeBSD server using Netdata. 
-
-![image](https://user-images.githubusercontent.com/24860547/202489210-3c5a3346-8f53-4b7b-9832-f9383b34d864.png)
 
 Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net-mgmt/netdata).
 
@@ -69,7 +67,7 @@ gunzip netdata*.tar.gz && tar xf netdata*.tar && rm -rf netdata*.tar
 Install Netdata in `/opt/netdata`. If you want to enable automatic updates, add `--auto-update` or `-u` to install `netdata-updater` in `cron` (**need root permission**):
 
 ```sh
-cd netdata-v* && ./netdata-installer.sh --install-prefix /opt && cp /opt/netdata/usr/sbin/netdata-claim.sh /usr/sbin/
+cd netdata-v* && ./netdata-installer.sh --install-prefix /opt
 ```
 
 You also need to enable the `netdata` service in `/etc/rc.conf`:
@@ -86,11 +84,9 @@ cd /opt/netdata/usr/libexec/netdata/ && ./netdata-updater.sh
 
 You can now access the Netdata dashboard by navigating to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your system.
 
-![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
-
 Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self hosted PostHog instance within the Netdata infrastructure. To read
 more about the information collected and how to opt-out, check the [anonymous statistics
-page](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md).
+page](/docs/netdata-agent/configuration/anonymous-telemetry-events.md).
 
 ## Updating the Agent on FreeBSD
 If you have not passed the `--auto-update` or `-u` parameter for the installer to enable automatic updating, repeat the last step to update Netdata whenever a new version becomes available. 
@@ -117,9 +113,6 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--native-only`: Only install if native binary packages are available.
 - `--static-only`: Only install if a static build is available.
 - `--build-only`: Only install using a local build.
-- `--disable-cloud`: For local builds, don’t build any of the cloud code at all. For native packages and static builds,
-    use runtime configuration to disable cloud support.
-- `--require-cloud`: Only install if Netdata Cloud can be enabled. Overrides `--disable-cloud`.
 - `--install-prefix`: Specify an installation prefix for local builds (by default, we use a sane prefix based on the type of system).
 - `--install-version`: Specify the version of Netdata to install.
 - `--old-install-prefix`: Specify the custom local build's installation prefix that should be removed.
@@ -134,7 +127,7 @@ The following options are mutually exclusive and specifiy special operations oth
 - `--uninstall`: Uninstall an existing installation of Netdata. Fails if there is no existing install.
 - `--claim-only`: If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
 - `--repositories-only`: Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
-- `--prepare-offline-install-source`: Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md) for more info.
+- `--prepare-offline-install-source`: Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](/packaging/installer/methods/offline.md) for more info.
 
 Additionally, the following environment variables may be used to further customize how the script runs (most users
 should not need to use special values for any of these):

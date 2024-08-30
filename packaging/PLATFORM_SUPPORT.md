@@ -64,13 +64,11 @@ to work on these platforms with minimal user effort.
 | Amazon Linux             | 2023           | x86\_64, AArch64                       |                                                                                                                                                    |
 | Amazon Linux             | 2              | x86\_64, AArch64                       |                                                                                                                                                    |
 | CentOS                   | 7.x            | x86\_64                                |                                                                                                                                                    |
-| Docker                   | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md) for more info on using Netdata on Docker |
+| Docker                   | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker |
 | Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 | Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
-| Debian                   | 10.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 | Fedora                   | 40             | x86\_64, AArch64                       |                                                                                                                                                    |
 | Fedora                   | 39             | x86\_64, AArch64                       |                                                                                                                                                    |
-| Fedora                   | 38             | x86\_64, AArch64                       |                                                                                                                                                    |
 | openSUSE                 | Leap 15.5      | x86\_64, AArch64                       |                                                                                                                                                    |
 | openSUSE                 | Leap 15.4      | x86\_64, AArch64                       |                                                                                                                                                    |
 | Oracle Linux             | 9.x            | x86\_64, AArch64                       |                                                                                                                                                    |
@@ -79,7 +77,6 @@ to work on these platforms with minimal user effort.
 | Red Hat Enterprise Linux | 8.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 7.x            | x86\_64                                |                                                                                                                                                    |
 | Ubuntu                   | 24.04          | x86\_64, AArch64, ARMv7                |                                                                                                                                                    |
-| Ubuntu                   | 23.10          | x86\_64, AArch64, ARMv7                |                                                                                                                                                    |
 | Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 
@@ -97,7 +94,6 @@ with minimal user effort.
 |---------------|------------|--------------------------|------------------------------------------------------------------------------------------------------|
 | Alpine Linux  | Edge       | No                       |                                                                                                      |
 | Alpine Linux  | 3.17       | No                       |                                                                                                      |
-| Alpine Linux  | 3.16       | No                       |                                                                                                      |
 | Arch Linux    | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
 | Manjaro Linux | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
 | openSUSE      | Tumbleweed | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.41.0 of the Netdata Agent |
@@ -156,17 +152,17 @@ This is a list of platforms that we have supported in the recent past but no lon
 
 | Platform     | Version   | Notes                |
 |--------------|-----------|----------------------|
+| Alpine Linux | 3.16      | EOL as of 2024-05-23 |
+| Alpine Linux | 3.15      | EOL as of 2023-11-01 |
 | Alpine Linux | 3.14      | EOL as of 2023-05-01 |
-| Alpine Linux | 3.13      | EOL as of 2022-11-01 |
-| Debian       | 9.x       | EOL as of 2022-06-30 |
+| Debian       | 10.x      | EOL as of 2024-07-01 |
+| Fedora       | 38        | EOL as of 2024-05-14 |
 | Fedora       | 37        | EOL as of 2023-12-05 |
-| Fedora       | 36        | EOL as of 2023-05-18 |
-| Fedora       | 35        | EOL as of 2022-12-13 |
 | openSUSE     | Leap 15.4 | EOL as of 2023-12-07 |
 | openSUSE     | Leap 15.3 | EOL as of 2022-12-01 |
+| Ubuntu       | 23.10     | EOL as of 2024-07-01 |
 | Ubuntu       | 23.04     | EOL as of 2024-01-20 |
 | Ubuntu       | 22.10     | EOL as of 2023-07-20 |
-| Ubuntu       | 21.10     | EOL as of 2022-07-31 |
 | Ubuntu       | 18.04     | EOL as of 2023-04-02 |
 
 ## Static builds

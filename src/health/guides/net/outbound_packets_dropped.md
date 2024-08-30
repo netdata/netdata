@@ -14,7 +14,7 @@ Check the alert message for the `${label:device}` placeholder. It indicates the 
 
 2. Verify network congestion or excessive traffic:
 
-Excessive traffic or network congestion can lead to dropped packets. To check network traffic, use the `nload` tool. If it isn't installed, you can follow the instructions given [here](https://www.howtoforge.com/tutorial/install-nload-on-linux/).
+Excessive traffic or network congestion can lead to dropped packets. To check network traffic, use the `nload` tool.
 
 ```bash
 nload ${label:device}
@@ -22,7 +22,7 @@ nload ${label:device}
 
 This will display the current network bandwidth usage on the specified interface. Look for unusually high or fluctuating usage patterns, which could indicate congestion or excessive traffic.
 
-3. Verify hardware issues:
+1. Verify hardware issues:
 
 Check the network interface and related hardware components (such as the network card, cables, and switches) for visible damage, loose connections, or other issues. Replace any defective components as needed.
 

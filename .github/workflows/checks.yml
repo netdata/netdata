@@ -16,7 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-run.outputs.run }}
-      skip-go: ${{ steps.check-go.outputs.skip-go }}
     steps:
       - name: Checkout
         id: checkout
@@ -26,7 +25,7 @@ jobs:
           submodules: recursive
       - name: Check source files
         id: check-source-files
-        uses: tj-actions/changed-files@v44
+        uses: tj-actions/changed-files@v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -45,7 +44,7 @@ jobs:
             **/*.md
       - name: Check build files
         id: check-build-files
-        uses: tj-actions/changed-files@v43
+        uses: tj-actions/changed-files@v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -59,6 +58,7 @@ jobs:
             packaging/*.checksums
           files_ignore: |
             **/*.md
+            packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
         env:
@@ -75,20 +75,6 @@ jobs:
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
-          fi
-      - name: Check Go
-        id: check-go
-        env:
-          OTHER_CHANGED_FILES: ${{ steps.check-source-files.outputs.other_changed_files }}
-        run: |
-          if [ '${{ github.event_name }}' == 'pull_request' ]; then
-            if echo "${OTHER_CHANGED_FILES}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
-              echo 'skip-go=' >> "${GITHUB_OUTPUT}"
-            else
-              echo 'skip-go=--disable-go' >> "${GITHUB_OUTPUT}"
-            fi
-          else
-            echo 'skip-go=' >> "${GITHUB_OUTPUT}"
           fi
 
   libressl-checks:
@@ -134,33 +120,3 @@ jobs:
       - name: Build
         if: needs.file-check.outputs.run == 'true'
         run: docker build -f .github/dockerfiles/Dockerfile.clang .
-
-  gitignore-check:
-    name: .gitignore
-    needs:
-      - file-check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
-      - name: Checkout
-        if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - name: Prepare environment
-        if: needs.file-check.outputs.run == 'true'
-        run: ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
-      - name: Build netdata
-        if: needs.file-check.outputs.run == 'true'
-        run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install-prefix /tmp/install --one-time-build ${{ needs.file-check.outputs.skip-go }}
-      - name: Check that repo is clean
-        if: needs.file-check.outputs.run == 'true'
-        run: |
-          git status --porcelain=v1 > /tmp/porcelain
-          if [ -s /tmp/porcelain ]; then
-            cat /tmp/porcelain
-            exit 1
-          fi

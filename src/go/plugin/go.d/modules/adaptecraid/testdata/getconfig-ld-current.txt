@@ -1,0 +1,30 @@
+Logical device information
+----------------------------------------------------------------------
+Logical Device number 0
+   Logical Device name                      : LogicalDrv 0
+   Block Size of member drives              : 512 Bytes
+   RAID level                               : 10
+   Unique Identifier                        : 488046B2
+   Status of Logical Device                 : Optimal
+   Additional details                       : Quick initialized
+   Size                                     : 915446 MB
+   Parity space                             : 915456 MB
+   Stripe-unit size                         : 256 KB
+   Interface Type                           : Serial ATA
+   Device Type                              : HDD
+   Read-cache setting                       : Enabled
+   Read-cache status                        : On
+   Write-cache setting                      : Enabled
+   Write-cache status                       : On
+   Partitioned                              : Yes
+   Protected by Hot-Spare                   : No
+   Bootable                                 : Yes
+   Failed stripes                           : No
+   Power settings                           : Disabled
+   --------------------------------------------------------
+   Logical Device segment information
+   --------------------------------------------------------
+   Group 0, Segment 0                       : Present (457862MB, SATA, SSD, Connector:0, Device:0) 7CS009RP
+   Group 0, Segment 1                       : Present (457862MB, SATA, SSD, Connector:0, Device:1) 7CS009RQ
+   Group 1, Segment 0                       : Present (457862MB, SATA, SSD, Connector:0, Device:2) 7CS00AAD
+   Group 1, Segment 1                       : Present (457862MB, SATA, SSD, Connector:0, Device:3) 7CS00AAH

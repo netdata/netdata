@@ -2,13 +2,13 @@
 
 #include "common.h"
 
-extern void *cgroups_main(void *ptr);
-extern void *proc_main(void *ptr);
-extern void *diskspace_main(void *ptr);
-extern void *tc_main(void *ptr);
-extern void *timex_main(void *ptr);
+void *cgroups_main(void *ptr);
+void *proc_main(void *ptr);
+void *diskspace_main(void *ptr);
+void *tc_main(void *ptr);
+void *timex_main(void *ptr);
 
-const struct netdata_static_thread static_threads_linux[] = {
+static const struct netdata_static_thread static_threads_linux[] = {
     {
         .name = "P[tc]",
         .config_section = CONFIG_SECTION_PLUGINS,
@@ -45,35 +45,16 @@ const struct netdata_static_thread static_threads_linux[] = {
         .init_routine = NULL,
         .start_routine = cgroups_main
     },
-
-    // terminator
     {
-        .name = NULL,
-        .config_section = NULL,
-        .config_name = NULL,
-        .env_name = NULL,
-        .enabled = 0,
+        .name = "P[timex]",
+        .config_section = CONFIG_SECTION_PLUGINS,
+        .config_name = "timex",
+        .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = NULL
-    }
-};
+        .start_routine = timex_main
+    },
 
-const struct netdata_static_thread static_threads_freebsd[] = {
-    // terminator
-    {
-        .name = NULL,
-        .config_section = NULL,
-        .config_name = NULL,
-        .env_name = NULL,
-        .enabled = 0,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = NULL
-    }
-};
-
-const struct netdata_static_thread static_threads_macos[] = {
     // terminator
     {
         .name = NULL,

@@ -51,7 +51,7 @@ void health_plugin_reload(void);
 
 void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* context, RRDCALC_STATUS status);
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
-void health_alert2json_conf(RRDHOST *host, BUFFER *wb, CONTEXTS_V2_OPTIONS all);
+void health_alert2json_conf(RRDHOST *host, BUFFER *wb, CONTEXTS_OPTIONS all);
 void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all);
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb);
@@ -89,7 +89,7 @@ void health_string2json(BUFFER *wb, const char *prefix, const char *label, const
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function);
 #define health_log_alert(host, ae) health_log_alert_transition_with_trace(host, ae, __LINE__, __FILE__, __FUNCTION__)
-bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, uuid_t *transitions_id);
+bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, nd_uuid_t *transitions_id);
 
 int alert_variable_lookup_trace(RRDHOST *host, RRDSET *st, const char *variable, BUFFER *wb);
 

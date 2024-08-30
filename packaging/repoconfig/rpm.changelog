@@ -1,0 +1,18 @@
+* Mon Aug 19 2024 Austin Hemmelgarn <austin@netdata.cloud
+- Version bump to stay in sync with DEB packages.
+* Fri Aug 9 2024 Austin Hemmelgarn <austin@netdata.cloud> 3-3
+- Use system certificate config for Yum/DNF repos.
+* Mon Jun 24 2024 Austin Hemmelgarn <austin@netdata.cloud> 3-2
+- Fix package file names.
+* Fri Jun 14 2024 Austin Hemmelgarn <austin@netdata.cloud> 3-1
+- Migrate package build infrastructure to CPack.
+* Wed Apr 10 2024 Paul Szymanski <mail@pszy.de> 2-3
+- Fix repo specification for Amazon Linux 2023.
+* Mon Nov 13 2023 Austin Hemmelgarn <austin@netdata.cloud> 2-2
+- Add EPEL requirement for RHEL packages.
+* Wed Dec 7 2022 Austin Hemmelgarn <austin@netdata.cloud> 2-1
+- Switch to new hosting at repo.netdata.cloud.
+* Mon Jun 6 2022 Austin Hemmelgarn <austin@netdata.cloud> 1-2
+- Bump release to keep in sync with DEB package.
+* Mon Jun 14 2021 Austin Hemmelgarn <austin@netdata.cloud> 1-1
+- Initial revision

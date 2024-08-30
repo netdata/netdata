@@ -412,32 +412,6 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
         label_names_char_map[i] = label_values_char_map[i];
 
     // apply overrides to the label names map
-    label_names_char_map['A'] = 'a';
-    label_names_char_map['B'] = 'b';
-    label_names_char_map['C'] = 'c';
-    label_names_char_map['D'] = 'd';
-    label_names_char_map['E'] = 'e';
-    label_names_char_map['F'] = 'f';
-    label_names_char_map['G'] = 'g';
-    label_names_char_map['H'] = 'h';
-    label_names_char_map['I'] = 'i';
-    label_names_char_map['J'] = 'j';
-    label_names_char_map['K'] = 'k';
-    label_names_char_map['L'] = 'l';
-    label_names_char_map['M'] = 'm';
-    label_names_char_map['N'] = 'n';
-    label_names_char_map['O'] = 'o';
-    label_names_char_map['P'] = 'p';
-    label_names_char_map['Q'] = 'q';
-    label_names_char_map['R'] = 'r';
-    label_names_char_map['S'] = 's';
-    label_names_char_map['T'] = 't';
-    label_names_char_map['U'] = 'u';
-    label_names_char_map['V'] = 'v';
-    label_names_char_map['W'] = 'w';
-    label_names_char_map['X'] = 'x';
-    label_names_char_map['Y'] = 'y';
-    label_names_char_map['Z'] = 'z';
     label_names_char_map['='] = '_';
     label_names_char_map[':'] = '_';
     label_names_char_map['+'] = '_';
@@ -849,6 +823,18 @@ void rrdlabels_value_to_buffer_array_item_or_null(RRDLABELS *labels, BUFFER *wb,
     string_freez(this_key);
 }
 
+void rrdlabels_key_to_buffer_array_item(RRDLABELS *labels, BUFFER *wb)
+{
+    if(!labels) return;
+
+    RRDLABEL *lb;
+    RRDLABEL_SRC ls;
+    lfe_start_read(labels, lb, ls) {
+        buffer_json_add_array_item_string(wb, string2str(lb->index.key));
+    }
+    lfe_done(labels);
+}
+
 // ----------------------------------------------------------------------------
 
 void rrdlabels_get_value_strcpyz(RRDLABELS *labels, char *dst, size_t dst_len, const char *key) {
@@ -1144,7 +1130,10 @@ static SIMPLE_PATTERN_RESULT simple_pattern_match_name_only_callback(const char 
 
     // we return -1 to stop the walkthrough on first match
     t->searches++;
-    return simple_pattern_matches_extract(t->pattern, name, NULL, 0);
+    SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_extract(t->pattern, name, NULL, 0);
+    if (ret == SP_MATCHED_NEGATIVE)
+        ret = SP_NOT_MATCHED;
+    return ret;
 }
 
 static SIMPLE_PATTERN_RESULT simple_pattern_match_name_and_value_callback(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
@@ -1637,13 +1626,13 @@ static int rrdlabels_unittest_add_pairs() {
     errors += rrdlabels_unittest_add_a_pair("\"tag=1\": country:\"Gre\\\"ece\"", "tag_1", "country:Gre_ece");
     errors += rrdlabels_unittest_add_a_pair("\"tag=1\" = country:\"Gre\\\"ece\"", "tag_1", "country:Gre_ece");
 
-    errors += rrdlabels_unittest_add_a_pair("\t'LABE=L'\t=\t\"World\" peace", "labe_l", "World peace");
-    errors += rrdlabels_unittest_add_a_pair("\t'LA\\'B:EL'\t=\tcountry:\"World\":\"Europe\":\"Greece\"", "la_b_el", "country:World:Europe:Greece");
-    errors += rrdlabels_unittest_add_a_pair("\t'LA\\'B:EL'\t=\tcountry\\\"World\"\\\"Europe\"\\\"Greece\"", "la_b_el", "country/World/Europe/Greece");
+    errors += rrdlabels_unittest_add_a_pair("\t'LABE=L'\t=\t\"World\" peace", "LABE_L", "World peace");
+    errors += rrdlabels_unittest_add_a_pair("\t'LA\\'B:EL'\t=\tcountry:\"World\":\"Europe\":\"Greece\"", "LA_B_EL", "country:World:Europe:Greece");
+    errors += rrdlabels_unittest_add_a_pair("\t'LA\\'B:EL'\t=\tcountry\\\"World\"\\\"Europe\"\\\"Greece\"", "LA_B_EL", "country/World/Europe/Greece");
 
-    errors += rrdlabels_unittest_add_a_pair("NAME=\"VALUE\"", "name", "VALUE");
-    errors += rrdlabels_unittest_add_a_pair("\"NAME\" : \"VALUE\"", "name", "VALUE");
-    errors += rrdlabels_unittest_add_a_pair("NAME: \"VALUE\"", "name", "VALUE");
+    errors += rrdlabels_unittest_add_a_pair("NAME=\"VALUE\"", "NAME", "VALUE");
+    errors += rrdlabels_unittest_add_a_pair("\"NAME\" : \"VALUE\"", "NAME", "VALUE");
+    errors += rrdlabels_unittest_add_a_pair("NAME: \"VALUE\"", "NAME", "VALUE");
 
     return errors;
 }

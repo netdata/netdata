@@ -23,14 +23,14 @@ modules:
     overview:
       data_collection:
         metrics_description: "This collector monitors CPU performance metrics about cycles, instructions, migrations, cache operations and more."
-        method_description: "It uses syscall (2) to open a file descriptior to monitor the perf events."
+        method_description: "It uses syscall (2) to open a file descriptor to monitor the perf events."
       supported_platforms:
         include:
           - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "It needs setuid to use necessary syscall to collect perf events. Netada sets the permission during installation time."
+        description: "It needs setuid to use the necessary syscall to collect perf events. Netdata sets the permission during installation time."
       default_behavior:
         auto_detection:
           description: ""
@@ -43,19 +43,19 @@ modules:
         list:
           - title: Install perf plugin
             description: |
-              If you are [using our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md#determine-which-installation-method-you-used), make sure the `netdata-plugin-perf` package is installed.
-          - title: Enable the pref plugin
+              If you are [using our official native DEB/RPM packages](/packaging/installer/UPDATE.md#determine-which-installation-method-you-used), make sure the `netdata-plugin-perf` package is installed.
+          - title: Enable the perf plugin
             description: |
               The plugin is disabled by default because the number of PMUs is usually quite limited and it is not desired to allow Netdata to struggle silently for PMUs, interfering with other performance monitoring software.
 
-              To enable it, use `edit-config` from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md), which is typically at `/etc/netdata`, to edit the `netdata.conf` file.
+              To enable it, use `edit-config` from the Netdata [config directory](/docs/netdata-agent/configuration/README.md), which is typically at `/etc/netdata`, to edit the `netdata.conf` file.
 
               ```bash
               cd /etc/netdata   # Replace this path with your Netdata config directory, if different
               sudo ./edit-config netdata.conf
               ```
 
-              Change the value of the `perf` setting to `yes` in the `[plugins]` section. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
+              Change the value of the `perf` setting to `yes` in the `[plugins]` section. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
       configuration:
         file:
           name: "netdata.conf"
@@ -77,7 +77,7 @@ modules:
               default_value: 1
               required: false
             - name: command options
-              description: Command options that specify charts shown by plugin. `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alignment`, `emulation`, `L1D`, `L1D-prefetch`, `L1I`, `LL`, `DTLB`, `ITLB`, `PBU`.
+              description: Command options that specify charts shown by the plugin. `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alignment`, `emulation`, `L1D`, `L1D-prefetch`, `L1I`, `LL`, `DTLB`, `ITLB`, `PBU`.
               default_value: 1
               required: true
         examples:
@@ -102,7 +102,7 @@ modules:
         list:
           - name: Debug Mode
             description: |
-              You can run `perf.plugin` with the debug option enabled, to troubleshoot issues with it. The output should give you clues as to why the collector isn't working.
+              You can run `perf.plugin` with the debug option enabled to troubleshoot issues with it. The output should give you clues as to why the collector isn't working.
 
               - Navigate to the `plugins.d` directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on your system, open `netdata.conf` and look for the `plugins` setting under `[directories]`.
 

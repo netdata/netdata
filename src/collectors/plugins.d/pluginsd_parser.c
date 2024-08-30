@@ -121,7 +121,7 @@ static void pluginsd_host_define_cleanup(PARSER *parser) {
     parser->user.host_define.parsing_host = false;
 }
 
-static inline bool pluginsd_validate_machine_guid(const char *guid, uuid_t *uuid, char *output) {
+static inline bool pluginsd_validate_machine_guid(const char *guid, nd_uuid_t *uuid, char *output) {
     if(uuid_parse(guid, *uuid))
         return false;
 
@@ -185,7 +185,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         netdata_configured_abbrev_timezone,
         netdata_configured_utc_offset,
         program_name,
-        program_version,
+        NETDATA_VERSION,
         default_rrd_update_every,
         default_rrd_history_entries,
         default_rrd_memory_mode,
@@ -231,7 +231,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
         return PARSER_RC_OK;
     }
 
-    uuid_t uuid;
+    nd_uuid_t uuid;
     char uuid_str[UUID_STR_LEN];
     if(!pluginsd_validate_machine_guid(guid, &uuid, uuid_str))
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST, "cannot parse MACHINE_GUID - is it a valid UUID?");
@@ -433,7 +433,7 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_DIMENSION, PLUGINSD_KEYWORD_CHART);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    if (unlikely(!id))
+    if (unlikely(!id || !*id))
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DIMENSION, "missing dimension id");
 
     long multiplier = 1;
@@ -461,6 +461,9 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
             options ? options : "");
 
     RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
+    if (unlikely(!rd))
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DIMENSION, "failed to create dimension");
+
     int unhide_dimension = 1;
 
     rrddim_option_clear(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
@@ -646,10 +649,12 @@ static inline PARSER_RC pluginsd_label(char **words, size_t num_words, PARSER *p
 
     if (strcmp(name,HOST_LABEL_IS_EPHEMERAL) == 0) {
         int is_ephemeral = appconfig_test_boolean_value((char *) value);
-        if (is_ephemeral) {
-            RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_LABEL);
-            if (likely(host))
+        RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_LABEL);
+        if (host) {
+            if (is_ephemeral)
                 rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+            else
+                rrdhost_option_clear(host, RRDHOST_OPTION_EPHEMERAL_HOST);
         }
     }
 
@@ -1076,52 +1081,36 @@ static inline PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_wo
     return PARSER_RC_STOP;
 }
 
-static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PARSER *parser)
-{
-    const char *host_uuid_str = get_word(words, num_words, 1);
-    const char *claim_id_str = get_word(words, num_words, 2);
+static void pluginsd_json_stream_paths(PARSER *parser, void *action_data __maybe_unused) {
+    stream_path_set_from_json(parser->user.host, buffer_tostring(parser->defer.response), false);
+    buffer_free(parser->defer.response);
+}
 
-    if (!host_uuid_str || !claim_id_str) {
-        netdata_log_error("Command CLAIMED_ID came malformed, uuid = '%s', claim_id = '%s'",
-              host_uuid_str ? host_uuid_str : "[unset]",
-              claim_id_str ? claim_id_str : "[unset]");
-        return PARSER_RC_ERROR;
-    }
+static void pluginsd_json_dev_null(PARSER *parser, void *action_data __maybe_unused) {
+    buffer_free(parser->defer.response);
+}
 
-    uuid_t uuid;
-    RRDHOST *host = parser->user.host;
+static PARSER_RC pluginsd_json(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
+    RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_JSON);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    // We don't need the parsed UUID
-    // just do it to check the format
-    if(uuid_parse(host_uuid_str, uuid)) {
-        netdata_log_error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", host_uuid_str);
-        return PARSER_RC_ERROR;
-    }
-    if(uuid_parse(claim_id_str, uuid) && strcmp(claim_id_str, "NULL") != 0) {
-        netdata_log_error("2nd parameter (Claim ID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", claim_id_str);
-        return PARSER_RC_ERROR;
-    }
+    char *keyword = get_word(words, num_words, 1);
 
-    if(strcmp(host_uuid_str, host->machine_guid) != 0) {
-        netdata_log_error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", host_uuid_str, host->machine_guid);
-        return PARSER_RC_OK; //the message is OK problem must be somewhere else
-    }
+    parser->defer.response = buffer_create(0, NULL);
+    parser->defer.end_keyword = PLUGINSD_KEYWORD_JSON_END;
+    parser->defer.action = pluginsd_json_dev_null;
+    parser->defer.action_data = NULL;
+    parser->flags |= PARSER_DEFER_UNTIL_KEYWORD;
 
-    rrdhost_aclk_state_lock(host);
-
-    if (host->aclk_state.claimed_id)
-        freez(host->aclk_state.claimed_id);
-
-    host->aclk_state.claimed_id = strcmp(claim_id_str, "NULL") ? strdupz(claim_id_str) : NULL;
-
-    rrdhost_aclk_state_unlock(host);
-
-    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID |RRDHOST_FLAG_METADATA_UPDATE);
-
-    rrdpush_send_claimed_id(host);
+    if(strcmp(keyword, PLUGINSD_KEYWORD_STREAM_PATH) == 0)
+        parser->defer.action = pluginsd_json_stream_paths;
+    else
+        netdata_log_error("PLUGINSD: invalid JSON payload keyword '%s'", keyword);
 
     return PARSER_RC_OK;
 }
+
+PARSER_RC rrdpush_receiver_pluginsd_claimed_id(char **words, size_t num_words, PARSER *parser);
 
 // ----------------------------------------------------------------------------
 
@@ -1130,8 +1119,8 @@ void pluginsd_cleanup_v2(PARSER *parser) {
     pluginsd_clear_scope_chart(parser, "THREAD CLEANUP");
 }
 
-void pluginsd_process_thread_cleanup(void *ptr) {
-    PARSER *parser = (PARSER *)ptr;
+void pluginsd_process_cleanup(PARSER *parser) {
+    if(!parser) return;
 
     pluginsd_cleanup_v2(parser);
     pluginsd_host_define_cleanup(parser);
@@ -1146,6 +1135,11 @@ void pluginsd_process_thread_cleanup(void *ptr) {
 #endif
 
     parser_destroy(parser);
+}
+
+void pluginsd_process_thread_cleanup(void *pptr) {
+    PARSER *parser = CLEANUP_FUNCTION_GET_PTR(pptr);
+    pluginsd_process_cleanup(parser);
 }
 
 bool parser_reconstruct_node(BUFFER *wb, void *ptr) {
@@ -1175,29 +1169,14 @@ bool parser_reconstruct_context(BUFFER *wb, void *ptr) {
     return true;
 }
 
-inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations)
+inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations)
 {
     int enabled = cd->unsafe.enabled;
 
-    if (!fp_plugin_input || !fp_plugin_output || !enabled) {
+    if (fd_input == -1 || fd_output == -1 || !enabled) {
         cd->unsafe.enabled = 0;
         return 0;
     }
-
-    if (unlikely(fileno(fp_plugin_input) == -1)) {
-        netdata_log_error("input file descriptor given is not a valid stream");
-        cd->serial_failures++;
-        return 0;
-    }
-
-    if (unlikely(fileno(fp_plugin_output) == -1)) {
-        netdata_log_error("output file descriptor given is not a valid stream");
-        cd->serial_failures++;
-        return 0;
-    }
-
-    clearerr(fp_plugin_input);
-    clearerr(fp_plugin_output);
 
     PARSER *parser;
     {
@@ -1208,8 +1187,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
                 .trust_durations = trust_durations
         };
 
-        // fp_plugin_output = our input; fp_plugin_input = our output
-        parser = parser_init(&user, fp_plugin_output, fp_plugin_input, -1, PARSER_INPUT_SPLIT, NULL);
+        parser = parser_init(&user, fd_input, fd_output, PARSER_INPUT_SPLIT, NULL);
     }
 
     pluginsd_keywords_init(parser, PARSER_INIT_PLUGINSD);
@@ -1218,54 +1196,47 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
 
     size_t count = 0;
 
-    // this keeps the parser with its current value
-    // so, parser needs to be allocated before pushing it
-    netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser)
-    {
-        ND_LOG_STACK lgs[] = {
-                ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
-                ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
-                ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
-                ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
-                ND_LOG_FIELD_END(),
-        };
-        ND_LOG_STACK_PUSH(lgs);
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
+            ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
+            ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
+            ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
-        buffered_reader_init(&parser->reader);
-        CLEAN_BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
-        while(likely(service_running(SERVICE_COLLECTORS))) {
+    CLEANUP_FUNCTION_REGISTER(pluginsd_process_thread_cleanup) cleanup_parser = parser;
+    buffered_reader_init(&parser->reader);
+    CLEAN_BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
+    while(likely(service_running(SERVICE_COLLECTORS))) {
 
-            if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
-                buffered_reader_ret_t ret = buffered_reader_read_timeout(
-                        &parser->reader,
-                        fileno((FILE *) parser->fp_input),
-                        2 * 60 * MSEC_PER_SEC, true
-                                                                        );
+        if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
+            buffered_reader_ret_t ret = buffered_reader_read_timeout(
+                    &parser->reader, parser->fd_input,
+                    2 * 60 * MSEC_PER_SEC, true);
 
-                if(unlikely(ret != BUFFERED_READER_READ_OK))
-                    break;
-
-                continue;
-            }
-
-            if(unlikely(parser_action(parser, buffer->buffer)))
+            if(unlikely(ret != BUFFERED_READER_READ_OK))
                 break;
 
-            buffer->len = 0;
-            buffer->buffer[0] = '\0';
+            continue;
         }
 
-        cd->unsafe.enabled = parser->user.enabled;
-        count = parser->user.data_collections_count;
+        if(unlikely(parser_action(parser, buffer->buffer)))
+            break;
 
-        if(likely(count)) {
-            cd->successful_collections += count;
-            cd->serial_failures = 0;
-        }
-        else
-            cd->serial_failures++;
+        buffer->len = 0;
+        buffer->buffer[0] = '\0';
     }
-    netdata_thread_cleanup_pop(1); // free parser with the pop function
+
+    cd->unsafe.enabled = parser->user.enabled;
+    count = parser->user.data_collections_count;
+
+    if(likely(count)) {
+        cd->successful_collections += count;
+        cd->serial_failures = 0;
+    }
+    else
+        cd->serial_failures++;
 
     return count;
 }
@@ -1273,6 +1244,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
 #include "gperf-hashtable.h"
 
 PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **words, size_t num_words) {
+    // put all the keywords ordered by the frequency they are used
+
     switch(keyword->id) {
         case PLUGINSD_KEYWORD_ID_SET2:
             return pluginsd_set_v2(words, num_words, parser);
@@ -1312,6 +1285,8 @@ PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **w
             return pluginsd_function_result_begin(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_FUNCTION_PROGRESS:
             return pluginsd_function_progress(words, num_words, parser);
+        case PLUGINSD_KEYWORD_ID_JSON:
+            return pluginsd_json(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_LABEL:
             return pluginsd_label(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_OVERWRITE:
@@ -1319,7 +1294,7 @@ PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **w
         case PLUGINSD_KEYWORD_ID_VARIABLE:
             return pluginsd_variable(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_CLAIMED_ID:
-            return streaming_claimed_id(words, num_words, parser);
+            return rrdpush_receiver_pluginsd_claimed_id(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_HOST:
             return pluginsd_host(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_HOST_DEFINE:
@@ -1361,7 +1336,7 @@ void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire) {
 }
 
 int pluginsd_parser_unittest(void) {
-    PARSER *p = parser_init(NULL, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
+    PARSER *p = parser_init(NULL, -1, -1, PARSER_INPUT_SPLIT, NULL);
     pluginsd_keywords_init(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING);
 
     char *lines[] = {

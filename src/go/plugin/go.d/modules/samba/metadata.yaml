@@ -1,0 +1,153 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-samba
+      plugin_name: go.d.plugin
+      module_name: samba
+      monitored_instance:
+        name: Samba
+        link: "https://www.samba.org/samba/"
+        icon_filename: 'samba.svg'
+        categories:
+          - data-collection.storage-mount-points-and-filesystems
+      keywords:
+        - samba
+        - smb
+        - file sharing
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: >
+          This collector monitors Samba syscalls and SMB2 calls.
+          It relies on the [`smbstatus`](https://www.samba.org/samba/docs/current/man-html/smbstatus.1.html) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+
+          Executed commands:
+
+          - `smbstatus -P`
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: "Verifying and Enabling Profiling for SMBd"
+            description: |
+              1. **Check for Profiling Support**
+
+                  Before enabling profiling, it's important to verify if `smbd` was compiled with profiling capabilities. Run the following command as root user (using `sudo`) to check:
+
+                  ```bash
+                  $ sudo smbd --build-options | grep WITH_PROFILE
+                  WITH_PROFILE
+                  ```
+
+                  If the command outputs `WITH_PROFILE`, profiling is supported. If not, you'll need to recompile `smbd` with profiling enabled (refer to Samba documentation for specific instructions).
+
+              2. **Enable Profiling**
+
+                  Once you've confirmed profiling support, you can enable it using one of the following methods:
+
+                  - **Command-Line Option**
+                      Start smbd with the `-P 1` option when invoking it directly from the command line.
+                  - **Configuration File**
+                      Modify the `smb.conf` configuration file located at `/etc/samba/smb.conf` (the path might vary slightly depending on your system). Add the following line to the `[global]` section:
+
+                      ```bash
+                      smbd profiling level = count
+                      ```
+              3. **Restart the Samba service**
+      configuration:
+        file:
+          name: go.d/samba.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: timeout
+              description: smbstatus binary execution timeout.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
+              config: |
+                jobs:
+                  - name: samba
+                    update_every: 5  # Collect statistics every 5 seconds
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: syscall
+          description: These metrics refer to the the Syscall.
+          labels:
+            - name: syscall
+              description: Syscall name
+          metrics:
+            - name: samba.syscall_calls
+              description: Syscalls Count
+              unit: calls/s
+              chart_type: line
+              dimensions:
+                - name: syscalls
+            - name: samba.syscall_transferred_data
+              description: Syscalls Transferred Data
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: transferred
+        - name: smb2call
+          description: These metrics refer to the the SMB2 Call.
+          labels:
+            - name: smb2call
+              description: SMB2 call name
+          metrics:
+            - name: samba.smb2_call_calls
+              description: SMB2 Calls Count
+              unit: calls/s
+              chart_type: line
+              dimensions:
+                - name: smb2
+            - name: samba.smb2_call_transferred_data
+              description: SMB2 Call Transferred Data
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out

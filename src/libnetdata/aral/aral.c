@@ -720,6 +720,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
     ar->config.mmap.enabled = mmap;
     strncpyz(ar->config.name, name, ARAL_MAX_NAME);
     spinlock_init(&ar->aral_lock.spinlock);
+    spinlock_init(&ar->adders.spinlock);
 
     if(stats) {
         ar->stats = stats;
@@ -1018,14 +1019,16 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
     };
 
     usec_t started_ut = now_monotonic_usec();
-    netdata_thread_t thread_ptrs[threads];
+    ND_THREAD *thread_ptrs[threads];
 
     for(size_t i = 0; i < threads ; i++) {
-        char tag[NETDATA_THREAD_NAME_MAX + 1];
-        snprintfz(tag, NETDATA_THREAD_NAME_MAX, "TH[%zu]", i);
-        netdata_thread_create(&thread_ptrs[i], tag,
-                              NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
-                              aral_test_thread, &auc);
+        char tag[ND_THREAD_TAG_MAX + 1];
+        snprintfz(tag, ND_THREAD_TAG_MAX, "TH[%zu]", i);
+        thread_ptrs[i] = nd_thread_create(
+            tag,
+            NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
+            aral_test_thread,
+            &auc);
     }
 
     size_t malloc_done = 0;
@@ -1047,12 +1050,12 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
 
 //    fprintf(stderr, "Cancelling the threads...\n");
 //    for(size_t i = 0; i < threads ; i++) {
-//        netdata_thread_cancel(thread_ptrs[i]);
+//        nd_thread_signal_cancel(thread_ptrs[i]);
 //    }
 
     fprintf(stderr, "Waiting the threads to finish...\n");
     for(size_t i = 0; i < threads ; i++) {
-        netdata_thread_join(thread_ptrs[i], NULL);
+        nd_thread_join(thread_ptrs[i]);
     }
 
     usec_t ended_ut = now_monotonic_usec();

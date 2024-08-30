@@ -1190,7 +1190,7 @@ static int recoverWriteSchema1(sqlite3_recover *p){
         if( bTable && !bVirtual ){
           if( SQLITE_ROW==sqlite3_step(pTblname) ){
             const char *zTbl = (const char*)sqlite3_column_text(pTblname, 0);
-            recoverAddTable(p, zTbl, iRoot);
+            if( zTbl ) recoverAddTable(p, zTbl, iRoot);
           }
           recoverReset(p, pTblname);
         }

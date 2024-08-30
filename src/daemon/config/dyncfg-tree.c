@@ -71,12 +71,10 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
     if(id && *id)
         template = string_strdupz(id);
 
-    UUID host_uuid = uuid2UUID(host->host_uuid);
-
     size_t path_len = strlen(path);
     DYNCFG *df;
     dfe_start_read(dyncfg_globals.nodes, df) {
-        if(!UUIDeq(df->host_uuid, host_uuid))
+        if(!UUIDeq(df->host_uuid, host->host_id))
             continue;
 
         if(strncmp(string2str(df->path), path, path_len) != 0)
@@ -200,14 +198,22 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
         dyncfg_tree_for_host(host, rfe->result.wb, path, id);
     }
     else {
+        const char *name = id;
         id = action;
         action = path;
         path = NULL;
 
         DYNCFG_CMDS cmd = dyncfg_cmds2id(action);
         const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
-        if(!item)
+        if(!item) {
             item = dyncfg_get_template_of_new_job(id);
+
+            if(item && (!name || !*name)) {
+                const char *n = dictionary_acquired_item_name(item);
+                if(strncmp(id, n, strlen(n)) == 0 && id[strlen(n)] == ':')
+                    name = &id[strlen(n) + 1];
+            }
+        }
 
         if(item) {
             DYNCFG *df = dictionary_acquired_item_value(item);
@@ -234,10 +240,10 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
                     goto cleanup;
                 }
             }
-            else if(cmd == DYNCFG_CMD_TEST && df->type == DYNCFG_TYPE_TEMPLATE && df->current.status != DYNCFG_STATUS_ORPHAN) {
+            else if((cmd == DYNCFG_CMD_USERCONFIG || cmd == DYNCFG_CMD_TEST) && df->current.status != DYNCFG_STATUS_ORPHAN)  {
                 const char *old_rfe_function = rfe->function;
                 char buf2[2048];
-                snprintfz(buf2, sizeof(buf2), "config %s %s", dictionary_acquired_item_name(item), action);
+                snprintfz(buf2, sizeof(buf2), "config %s %s %s", dictionary_acquired_item_name(item), action, name?name:"");
                 rfe->function = buf2;
                 dictionary_acquired_item_release(dyncfg_globals.nodes, item);
                 item = NULL;

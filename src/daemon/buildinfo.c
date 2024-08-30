@@ -75,6 +75,7 @@ typedef enum __attribute__((packed)) {
     BIB_LIB_LIBCAP,
     BIB_LIB_LIBCRYPTO,
     BIB_LIB_LIBYAML,
+    BIB_LIB_LIBMNL,
     BIB_PLUGIN_APPS,
     BIB_PLUGIN_LINUX_CGROUPS,
     BIB_PLUGIN_LINUX_CGROUP_NETWORK,
@@ -96,7 +97,6 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_SLABINFO,
     BIB_PLUGIN_XEN,
     BIB_PLUGIN_XEN_VBD_ERROR,
-    BIB_PLUGIN_LOGS_MANAGEMENT,
     BIB_EXPORT_AWS_KINESIS,
     BIB_EXPORT_GCP_PUBSUB,
     BIB_EXPORT_MONGOC,
@@ -698,6 +698,14 @@ static struct {
             .json = "libyaml",
             .value = NULL,
         },
+        [BIB_LIB_LIBMNL] = {
+            .category = BIC_LIBS,
+            .type = BIT_BOOLEAN,
+            .analytics = "libmnl",
+            .print = "libmnl (library for working with netfilter)",
+            .json = "libmnl",
+            .value = NULL,
+        },
         [BIB_PLUGIN_APPS] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
@@ -866,14 +874,6 @@ static struct {
                 .json = "xen-vbd-error",
                 .value = NULL,
         },
-        [BIB_PLUGIN_LOGS_MANAGEMENT] = {
-                .category = BIC_PLUGINS,
-                .type = BIT_BOOLEAN,
-                .analytics = "Logs Management",
-                .print = "Logs Management",
-                .json = "logs-management",
-                .value = NULL,
-        },
         [BIB_EXPORT_MONGOC] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
@@ -1037,10 +1037,10 @@ static void build_info_set_status(BUILD_INFO_SLOT slot, bool status) {
 }
 
 __attribute__((constructor)) void initialize_build_info(void) {
-    build_info_set_value(BIB_PACKAGING_NETDATA_VERSION, program_version);
+    build_info_set_value(BIB_PACKAGING_NETDATA_VERSION, NETDATA_VERSION);
     build_info_set_value(BIB_PACKAGING_CONFIGURE_OPTIONS, CONFIGURE_COMMAND);
 
-#ifdef COMPILED_FOR_LINUX
+#ifdef OS_LINUX
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "Linux");
     build_info_set_status(BIB_PLUGIN_LINUX_CGROUPS, true);
@@ -1048,29 +1048,29 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_PLUGIN_LINUX_DISKSPACE, true);
     build_info_set_status(BIB_PLUGIN_LINUX_TC, true);
 #endif
-#ifdef COMPILED_FOR_FREEBSD
+#ifdef OS_FREEBSD
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "FreeBSD");
     build_info_set_status(BIB_PLUGIN_FREEBSD, true);
 #endif
-#ifdef COMPILED_FOR_MACOS
+#ifdef OS_MACOS
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "MacOS");
     build_info_set_status(BIB_PLUGIN_MACOS, true);
 #endif
+#ifdef OS_WINDOWS
+    build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
+#if defined(__CYGWIN__) && defined(__MSYS__)
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "Windows (MSYS)");
+#elif defined(__CYGWIN__)
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "Windows (CYGWIN)");
+#else
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "Windows");
+#endif
+#endif
 
-#ifdef ENABLE_ACLK
     build_info_set_status(BIB_FEATURE_CLOUD, true);
     build_info_set_status(BIB_CONNECTIVITY_ACLK, true);
-#else
-    build_info_set_status(BIB_FEATURE_CLOUD, false);
-#ifdef DISABLE_CLOUD
-    build_info_set_value(BIB_FEATURE_CLOUD, "disabled");
-#else
-    build_info_set_value(BIB_FEATURE_CLOUD, "unavailable");
-#endif
-#endif
-
     build_info_set_status(BIB_FEATURE_HEALTH, true);
     build_info_set_status(BIB_FEATURE_STREAMING, true);
     build_info_set_status(BIB_FEATURE_BACKFILLING, true);
@@ -1116,9 +1116,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef ENABLE_WEBRTC
     build_info_set_status(BIB_CONNECTIVITY_WEBRTC, true);
 #endif
-#ifdef ENABLE_HTTPS
     build_info_set_status(BIB_CONNECTIVITY_NATIVE_HTTPS, true);
-#endif
 #if defined(HAVE_X509_VERIFY_PARAM_set1_host) && HAVE_X509_VERIFY_PARAM_set1_host == 1
     build_info_set_status(BIB_CONNECTIVITY_TLS_HOST_VERIFY, true);
 #endif
@@ -1152,9 +1150,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef HAVE_LIBDATACHANNEL
     build_info_set_status(BIB_LIB_LIBDATACHANNEL, true);
 #endif
-#ifdef ENABLE_OPENSSL
     build_info_set_status(BIB_LIB_OPENSSL, true);
-#endif
 #ifdef ENABLE_JSONC
     build_info_set_status(BIB_LIB_JSONC, true);
 #endif
@@ -1166,6 +1162,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef HAVE_LIBYAML
     build_info_set_status(BIB_LIB_LIBYAML, true);
+#endif
+#ifdef HAVE_LIBMNL
+    build_info_set_status(BIB_LIB_LIBMNL, true);
 #endif
 
 #ifdef ENABLE_PLUGIN_APPS
@@ -1206,9 +1205,6 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef HAVE_XENSTAT_VBD_ERROR
     build_info_set_status(BIB_PLUGIN_XEN_VBD_ERROR, true);
-#endif
-#ifdef ENABLE_LOGSMANAGEMENT
-    build_info_set_status(BIB_PLUGIN_LOGS_MANAGEMENT, true);
 #endif
 
     build_info_set_status(BIB_EXPORT_PROMETHEUS_EXPORTER, true);
@@ -1268,9 +1264,18 @@ static void populate_system_info(void) {
         system_info = localhost->system_info;
     }
     else {
+        bool started_spawn_server = false;
+        if(!netdata_main_spawn_server) {
+            started_spawn_server = true;
+            netdata_main_spawn_server_init(NULL, 0, NULL);
+        }
+
         system_info = callocz(1, sizeof(struct rrdhost_system_info));
         get_system_info(system_info);
         free_system_info = true;
+
+        if(started_spawn_server)
+            netdata_main_spawn_server_cleanup();
     }
 
     build_info_set_value_strdupz(BIB_OS_KERNEL_NAME, system_info->kernel_name);

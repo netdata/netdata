@@ -16,7 +16,7 @@ typedef enum  __attribute__((__packed__)) {
     NDLS_UNSET = 0,   // internal use only
     NDLS_ACCESS,      // access.log
     NDLS_ACLK,        // aclk.log
-    NDLS_COLLECTORS,  // collectors.log
+    NDLS_COLLECTORS,  // collector.log
     NDLS_DAEMON,      // error.log
     NDLS_HEALTH,      // health.log
     NDLS_DEBUG,       // debug.log
@@ -46,6 +46,9 @@ typedef enum __attribute__((__packed__)) {
     NDF_LOG_SOURCE,                             // DAEMON, COLLECTORS, HEALTH, ACCESS, ACLK - set at the log call
     NDF_PRIORITY,                               // the syslog priority (severity) - set at the log call
     NDF_ERRNO,                                  // the ERRNO at the time of the log call - added automatically
+#if defined(OS_WINDOWS)
+    NDF_WINERROR,                               // Windows GetLastError()
+#endif
     NDF_INVOCATION_ID,                          // the INVOCATION_ID of Netdata - added automatically
     NDF_LINE,                                   // the source code file line number - added automatically
     NDF_FILE,                                   // the source code filename - added automatically
@@ -141,15 +144,17 @@ typedef enum __attribute__((__packed__)) {
     NDFT_CALLBACK,
 } ND_LOG_STACK_FIELD_TYPE;
 
+void errno_clear(void);
 void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting);
 void nd_log_set_facility(const char *facility);
 void nd_log_set_priority_level(const char *setting);
 void nd_log_initialize(void);
-void nd_log_reopen_log_files(void);
+void nd_log_reopen_log_files(bool log);
 void chown_open_file(int fd, uid_t uid, gid_t gid);
 void nd_log_chown_log_files(uid_t uid, gid_t gid);
 void nd_log_set_flood_protection(size_t logs, time_t period);
 void nd_log_initialize_for_external_plugins(const char *name);
+void nd_log_reopen_log_files_for_spawn_server(void);
 bool nd_log_journal_socket_available(void);
 ND_LOG_FIELD_ID nd_log_field_id_by_name(const char *field, size_t len);
 int nd_log_priority2id(const char *priority);
@@ -157,6 +162,7 @@ const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority);
 const char *nd_log_method_for_external_plugins(const char *s);
 
 int nd_log_health_fd(void);
+int nd_log_collectors_fd(void);
 typedef bool (*log_formatter_callback_t)(BUFFER *wb, void *data);
 
 struct log_stack_entry {
@@ -170,7 +176,7 @@ struct log_stack_entry {
         uint64_t u64;
         int64_t i64;
         double dbl;
-        const uuid_t *uuid;
+        const nd_uuid_t *uuid;
         struct {
             log_formatter_callback_t formatter;
             void *formatter_data;
@@ -232,12 +238,8 @@ void log_stack_push(struct log_stack_entry *lgs);
 #define D_SYSTEM            0x8000000000000000
 
 extern uint64_t debug_flags;
-
 extern const char *program_name;
-
-#ifdef ENABLE_ACLK
 extern int aclklog_enabled;
-#endif
 
 #define LOG_DATE_LENGTH 26
 void log_date(char *buffer, size_t len, time_t now);

@@ -27,7 +27,7 @@ modules:
         metrics_description: |
           By using smoothed, rolling [Z-Scores](https://en.wikipedia.org/wiki/Standard_score) for selected metrics or charts you can narrow down your focus and shorten root cause analysis.
         method_description: |
-          This collector uses the [Netdata rest api](https://github.com/netdata/netdata/blob/master/src/web/api/README.md) to get the `mean` and `stddev`
+          This collector uses the [Netdata rest api](/src/web/api/README.md) to get the `mean` and `stddev`
           for each dimension on specified charts over a time range (defined by `train_secs` and `offset_secs`).
           
           For each dimension it will calculate a Z-Score as `z = (x - mean) / stddev` (clipped at `z_clip`). Scores are then smoothed over

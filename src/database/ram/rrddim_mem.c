@@ -9,7 +9,7 @@ static netdata_rwlock_t rrddim_JudyHS_rwlock = NETDATA_RWLOCK_INITIALIZER;
 // ----------------------------------------------------------------------------
 // metrics groups
 
-STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, uuid_t *uuid __maybe_unused) {
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid __maybe_unused) {
     return NULL;
 }
 
@@ -52,7 +52,7 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si __maybe_unused) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)rrddim_metric_get(si, &rd->metric_uuid);
     while(!mh) {
         netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
-        Pvoid_t *PValue = JudyHSIns(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(uuid_t), PJE0);
+        Pvoid_t *PValue = JudyHSIns(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(nd_uuid_t), PJE0);
         mh = *PValue;
         if(!mh) {
             mh = callocz(1, sizeof(struct mem_metric_handle));
@@ -60,13 +60,13 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si __maybe_unused) {
             mh->refcount = 1;
             update_metric_handle_from_rrddim(mh, rd);
             *PValue = mh;
-            __atomic_add_fetch(&rrddim_db_memory_size, sizeof(struct mem_metric_handle) + JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(uuid_t)), __ATOMIC_RELAXED);
+            __atomic_add_fetch(&rrddim_db_memory_size, sizeof(struct mem_metric_handle) + JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(nd_uuid_t)), __ATOMIC_RELAXED);
         }
         else {
             if(__atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) <= 0)
                 mh = NULL;
         }
-        netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
+        netdata_rwlock_wrunlock(&rrddim_JudyHS_rwlock);
     }
 
     internal_fatal(mh->rd != rd, "RRDDIM_MEM: incorrect pointer returned from index.");
@@ -75,16 +75,16 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si __maybe_unused) {
 }
 
 STORAGE_METRIC_HANDLE *
-rrddim_metric_get(STORAGE_INSTANCE *si __maybe_unused, uuid_t *uuid) {
+rrddim_metric_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid) {
     struct mem_metric_handle *mh = NULL;
     netdata_rwlock_rdlock(&rrddim_JudyHS_rwlock);
-    Pvoid_t *PValue = JudyHSGet(rrddim_JudyHS_array, uuid, sizeof(uuid_t));
+    Pvoid_t *PValue = JudyHSGet(rrddim_JudyHS_array, uuid, sizeof(nd_uuid_t));
     if (likely(NULL != PValue)) {
         mh = *PValue;
         if(__atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) <= 0)
             mh = NULL;
     }
-    netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
+    netdata_rwlock_rdunlock(&rrddim_JudyHS_rwlock);
 
     return (STORAGE_METRIC_HANDLE *)mh;
 }
@@ -107,16 +107,16 @@ void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh __maybe_unused) {
 
             RRDDIM *rd = mh->rd;
             netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
-            JudyHSDel(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(uuid_t), PJE0);
-            netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
+            JudyHSDel(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(nd_uuid_t), PJE0);
+            netdata_rwlock_wrunlock(&rrddim_JudyHS_rwlock);
 
             freez(mh);
-            __atomic_sub_fetch(&rrddim_db_memory_size, sizeof(struct mem_metric_handle) + JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(uuid_t)), __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&rrddim_db_memory_size, sizeof(struct mem_metric_handle) + JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(nd_uuid_t)), __ATOMIC_RELAXED);
         }
     }
 }
 
-bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si __maybe_unused, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s) {
+bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s) {
     STORAGE_METRIC_HANDLE *smh = rrddim_metric_get(si, uuid);
     if(!smh)
         return false;

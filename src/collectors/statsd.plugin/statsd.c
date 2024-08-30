@@ -237,7 +237,7 @@ struct collection_thread_status {
     bool running;
     uint32_t max_sockets;
 
-    netdata_thread_t thread;
+    ND_THREAD *thread;
 };
 
 static struct statsd {
@@ -1078,8 +1078,10 @@ static int statsd_snd_callback(POLLINFO *pi, short int *events) {
 // --------------------------------------------------------------------------------------------------------------------
 // statsd child thread to collect metrics from network
 
-void statsd_collector_thread_cleanup(void *data) {
-    struct statsd_udp *d = data;
+void statsd_collector_thread_cleanup(void *pptr) {
+    struct statsd_udp *d = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!d) return;
+
     spinlock_lock(&d->status->spinlock);
     d->status->running = false;
     spinlock_unlock(&d->status->spinlock);
@@ -1115,12 +1117,12 @@ void *statsd_collector_thread(void *ptr) {
     worker_register_job_name(WORKER_JOB_TYPE_RCV_DATA, "receive");
     worker_register_job_name(WORKER_JOB_TYPE_SND_DATA, "send");
 
-    collector_info("STATSD collector thread started with taskid %d", gettid());
+    collector_info("STATSD collector thread started with taskid %d", gettid_cached());
 
     struct statsd_udp *d = callocz(sizeof(struct statsd_udp), 1);
     d->status = status;
 
-    netdata_thread_cleanup_push(statsd_collector_thread_cleanup, d);
+    CLEANUP_FUNCTION_REGISTER(statsd_collector_thread_cleanup) cleanup_ptr = d;
 
 #ifdef HAVE_RECVMMSG
     d->type = STATSD_SOCKET_DATA_TYPE_UDP;
@@ -1154,7 +1156,6 @@ void *statsd_collector_thread(void *ptr) {
             , status->max_sockets
     );
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1282,7 +1283,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     // find the directory name from the file we already read
                     char *filename2 = strdupz(filename); // copy filename, since dirname() will change it
                     char *dir = dirname(filename2);      // find the directory part of the filename
-                    tmp = strdupz_path_subpath(dir, s);  // compose the new filename to read;
+                    tmp = filename_from_path_entry_strdupz(dir, s);  // compose the new filename to read;
                     freez(filename2);                    // free the filename we copied
                 }
                 statsd_readfile(tmp, app, chart, dict);
@@ -2393,8 +2394,10 @@ static int statsd_listen_sockets_setup(void) {
     return listen_sockets_setup(&statsd.sockets);
 }
 
-static void statsd_main_cleanup(void *data) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
+static void statsd_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
     collector_info("cleaning up...");
 
@@ -2402,13 +2405,14 @@ static void statsd_main_cleanup(void *data) {
         int i;
         for (i = 0; i < statsd.threads; i++) {
             spinlock_lock(&statsd.collection_threads_status[i].spinlock);
+
             if(statsd.collection_threads_status[i].running) {
-                collector_info("STATSD: stopping data collection thread %d...", i + 1);
-                netdata_thread_cancel(statsd.collection_threads_status[i].thread);
+                collector_info("STATSD: signalling data collection thread %d to stop...", i + 1);
+                nd_thread_signal_cancel(statsd.collection_threads_status[i].thread);
             }
-            else {
+            else
                 collector_info("STATSD: data collection thread %d found stopped.", i + 1);
-            }
+
             spinlock_unlock(&statsd.collection_threads_status[i].spinlock);
         }
     }
@@ -2445,6 +2449,8 @@ static void statsd_main_cleanup(void *data) {
 #endif
 
 void *statsd_main(void *ptr) {
+    CLEANUP_FUNCTION_REGISTER(statsd_main_cleanup) cleanup_ptr = ptr;
+
     worker_register("STATSDFLUSH");
     worker_register_job_name(WORKER_STATSD_FLUSH_GAUGES, "gauges");
     worker_register_job_name(WORKER_STATSD_FLUSH_COUNTERS, "counters");
@@ -2454,8 +2460,6 @@ void *statsd_main(void *ptr) {
     worker_register_job_name(WORKER_STATSD_FLUSH_SETS, "sets");
     worker_register_job_name(WORKER_STATSD_FLUSH_DICTIONARIES, "dictionaries");
     worker_register_job_name(WORKER_STATSD_FLUSH_STATS, "statistics");
-
-    netdata_thread_cleanup_push(statsd_main_cleanup, ptr);
 
     statsd.gauges.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
     statsd.meters.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
@@ -2585,7 +2589,8 @@ void *statsd_main(void *ptr) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_IN[%d]", i + 1);
         spinlock_init(&statsd.collection_threads_status[i].spinlock);
-        netdata_thread_create(&statsd.collection_threads_status[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &statsd.collection_threads_status[i]);
+        statsd.collection_threads_status[i].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
+                                                                      statsd_collector_thread, &statsd.collection_threads_status[i]);
     }
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -2887,6 +2892,5 @@ void *statsd_main(void *ptr) {
     }
 
 cleanup: ; // added semi-colon to prevent older gcc error: label at end of compound statement
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

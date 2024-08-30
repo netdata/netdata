@@ -10,7 +10,7 @@ learn_rel_path: "Installation/Install on specific environments"
 
 # Deploy Netdata with Ansible
 
-Netdata's [one-line kickstart](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#install-on-linux-with-one-line-installer) is zero-configuration, highly adaptable, and compatible with tons
+Netdata's [one-line kickstart](/packaging/installer/README.md#install-on-linux-with-one-line-installer) is zero-configuration, highly adaptable, and compatible with tons
 of different operating systems and Linux distributions. You can use it on bare metal, VMs, containers, and everything
 in-between.
 
@@ -105,7 +105,7 @@ two different SSH keys supplied by AWS.
 
 In order to connect your node(s) to your Space in Netdata Cloud, and see all their metrics in real-time in composite
 charts or perform [Metric
-Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md), you need to set the `claim_token`
+Correlations](/docs/metric-correlations.md), you need to set the `claim_token`
 and `claim_room` variables.
 
 To find your `claim_token` and `claim_room`, go to Netdata Cloud, then click on your Space's name in the top navigation,
@@ -130,7 +130,7 @@ hostname of the node, the playbook disables that local dashboard by setting `web
 security boost by not allowing any unwanted access to the local dashboard.
 
 You can read more about this decision, or other ways you might lock down the local dashboard, in our [node security
-doc](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md).
+doc](/docs/security-and-privacy-design/README.md).
 
 > Curious about why Netdata's dashboard is open by default? Read our [blog
 > post](https://www.netdata.cloud/blog/netdata-agent-dashboard/) on that zero-configuration design decision.

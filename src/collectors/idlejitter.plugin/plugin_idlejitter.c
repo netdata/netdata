@@ -4,22 +4,23 @@
 
 #define CPU_IDLEJITTER_SLEEP_TIME_MS 20
 
-static void cpuidlejitter_main_cleanup(void *ptr) {
-    worker_unregister();
+static void cpuidlejitter_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
+    worker_unregister();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *cpuidlejitter_main(void *ptr) {
+    CLEANUP_FUNCTION_REGISTER(cpuidlejitter_main_cleanup) cleanup_ptr = ptr;
+
     worker_register("IDLEJITTER");
     worker_register_job_name(0, "measurements");
-
-    netdata_thread_cleanup_push(cpuidlejitter_main_cleanup, ptr);
 
     usec_t sleep_ut = config_get_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS) * USEC_PER_MS;
     if(sleep_ut <= 0) {
@@ -85,7 +86,6 @@ void *cpuidlejitter_main(void *ptr) {
         }
     }
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 

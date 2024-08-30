@@ -31,7 +31,7 @@ const char* get_release_channel() {
             }
         }
         if (use_stable == -1)
-            use_stable = strchr(program_version, '-') ? 0 : 1;
+            use_stable = strchr(NETDATA_VERSION, '-') ? 0 : 1;
     }
     return (use_stable)?"stable":"nightly";
 }
@@ -96,7 +96,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
                 buffer_json_object_close(wb);
             }
         }
-        rrd_unlock();
+        rrd_rdunlock();
     }
     buffer_json_array_close(wb);
 

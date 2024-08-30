@@ -16,18 +16,18 @@ from external processes, thus allowing Netdata to use **external plugins**.
 
 |                                                 plugin                                                 | language |      O/S       | description                                                                                                                             |
 |:------------------------------------------------------------------------------------------------------:|:--------:|:--------------:|:----------------------------------------------------------------------------------------------------------------------------------------|
-|     [apps.plugin](https://github.com/netdata/netdata/blob/master/src/collectors/apps.plugin/README.md)     |   `C`    | linux, freebsd | monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**. |
-| [charts.d.plugin](https://github.com/netdata/netdata/blob/master/src/collectors/charts.d.plugin/README.md) |  `BASH`  |      all       | a **plugin orchestrator** for data collection modules written in `BASH` v4+.                                                            |
-|     [cups.plugin](https://github.com/netdata/netdata/blob/master/src/collectors/cups.plugin/README.md)     |   `C`    |      all       | monitors **CUPS**                                                                                                                       |
-|     [ebpf.plugin](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/README.md)     |   `C`    |     linux      | monitors different metrics on environments using kernel internal functions.                                                             |
-|              [go.d.plugin](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/README.md)               |   `GO`   |      all       | collects metrics from the system, applications, or third-party APIs.                                                                    |
-|   [ioping.plugin](https://github.com/netdata/netdata/blob/master/src/collectors/ioping.plugin/README.md)   |   `C`    |      all       | measures disk latency.                                                                                                                  |
-| [freeipmi.plugin](https://github.com/netdata/netdata/blob/master/src/collectors/freeipmi.plugin/README.md) |   `C`    |     linux      | collects metrics from enterprise hardware sensors, on Linux servers.                                                                    |
-|   [nfacct.plugin](https://github.com/netdata/netdata/blob/master/src/collectors/nfacct.plugin/README.md)   |   `C`    |     linux      | collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.                          |
-|  [xenstat.plugin](https://github.com/netdata/netdata/blob/master/src/collectors/xenstat.plugin/README.md)  |   `C`    |     linux      | collects XenServer and XCP-ng metrics using `lxenstat`.                                                                                 |
-|     [perf.plugin](https://github.com/netdata/netdata/blob/master/src/collectors/perf.plugin/README.md)     |   `C`    |     linux      | collects CPU performance metrics using performance monitoring units (PMU).                                                              |
-| [python.d.plugin](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/README.md) | `python` |      all       | a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).                                |
-| [slabinfo.plugin](https://github.com/netdata/netdata/blob/master/src/collectors/slabinfo.plugin/README.md) |   `C`    |     linux      | collects kernel internal cache objects (SLAB) metrics.                                                                                  |
+|     [apps.plugin](/src/collectors/apps.plugin/README.md)     |   `C`    | linux, freebsd | monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**. |
+| [charts.d.plugin](/src/collectors/charts.d.plugin/README.md) |  `BASH`  |      all       | a **plugin orchestrator** for data collection modules written in `BASH` v4+.                                                            |
+|     [cups.plugin](/src/collectors/cups.plugin/README.md)     |   `C`    |      all       | monitors **CUPS**                                                                                                                       |
+|     [ebpf.plugin](/src/collectors/ebpf.plugin/README.md)     |   `C`    |     linux      | monitors different metrics on environments using kernel internal functions.                                                             |
+|              [go.d.plugin](/src/go/plugin/go.d/README.md)               |   `GO`   |      all       | collects metrics from the system, applications, or third-party APIs.                                                                    |
+|   [ioping.plugin](/src/collectors/ioping.plugin/README.md)   |   `C`    |      all       | measures disk latency.                                                                                                                  |
+| [freeipmi.plugin](/src/collectors/freeipmi.plugin/README.md) |   `C`    |     linux      | collects metrics from enterprise hardware sensors, on Linux servers.                                                                    |
+|   [nfacct.plugin](/src/collectors/nfacct.plugin/README.md)   |   `C`    |     linux      | collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.                          |
+|  [xenstat.plugin](/src/collectors/xenstat.plugin/README.md)  |   `C`    |     linux      | collects XenServer and XCP-ng metrics using `lxenstat`.                                                                                 |
+|     [perf.plugin](/src/collectors/perf.plugin/README.md)     |   `C`    |     linux      | collects CPU performance metrics using performance monitoring units (PMU).                                                              |
+| [python.d.plugin](/src/collectors/python.d.plugin/README.md) | `python` |      all       | a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).                                |
+| [slabinfo.plugin](/src/collectors/slabinfo.plugin/README.md) |   `C`    |     linux      | collects kernel internal cache objects (SLAB) metrics.                                                                                  |
 
 Plugin orchestrators may also be described as **modular plugins**. They are modular since they accept custom made modules to be included. Writing modules for these plugins is easier than accessing the native Netdata API directly. You will find modules already available for each orchestrator under the directory of the particular modular plugin (e.g. under python.d.plugin for the python orchestrator).
 Each of these modular plugins has each own methods for defining modules. Please check the examples and their documentation.
@@ -780,12 +780,12 @@ or do not output the line at all.
 ## Modular Plugins
 
 1.  **python**, use `python.d.plugin`, there are many examples in the [python.d
-    directory](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/README.md)
+    directory](/src/collectors/python.d.plugin/README.md)
 
     python is ideal for Netdata plugins. It is a simple, yet powerful way to collect data, it has a very small memory footprint, although it is not the most CPU efficient way to do it.
 
 2.  **BASH**, use `charts.d.plugin`, there are many examples in the [charts.d
-    directory](https://github.com/netdata/netdata/blob/master/src/collectors/charts.d.plugin/README.md)
+    directory](/src/collectors/charts.d.plugin/README.md)
 
     BASH is the simplest scripting language for collecting values. It is the less efficient though in terms of CPU resources. You can use it to collect data quickly, but extensive use of it might use a lot of system resources.
 

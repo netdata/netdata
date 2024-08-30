@@ -10,7 +10,7 @@ typedef struct metric METRIC;
 typedef struct mrg MRG;
 
 typedef struct mrg_entry {
-    uuid_t *uuid;
+    nd_uuid_t *uuid;
     Word_t section;
     time_t first_time_s;
     time_t last_time_s;
@@ -55,11 +55,11 @@ METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric);
 void mrg_metric_release(MRG *mrg, METRIC *metric);
 
 METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret);
-METRIC *mrg_metric_get_and_acquire(MRG *mrg, uuid_t *uuid, Word_t section);
+METRIC *mrg_metric_get_and_acquire(MRG *mrg, nd_uuid_t *uuid, Word_t section);
 bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric);
 
 Word_t mrg_metric_id(MRG *mrg, METRIC *metric);
-uuid_t *mrg_metric_uuid(MRG *mrg, METRIC *metric);
+nd_uuid_t *mrg_metric_uuid(MRG *mrg, METRIC *metric);
 Word_t mrg_metric_section(MRG *mrg, METRIC *metric);
 
 bool mrg_metric_set_first_time_s(MRG *mrg, METRIC *metric, time_t first_time_s);
@@ -88,7 +88,7 @@ size_t mrg_aral_overhead(void);
 
 
 void mrg_update_metric_retention_and_granularity_by_uuid(
-        MRG *mrg, Word_t section, uuid_t *uuid,
+        MRG *mrg, Word_t section, nd_uuid_t *uuid,
         time_t first_time_s, time_t last_time_s,
         uint32_t update_every_s, time_t now_s);
 

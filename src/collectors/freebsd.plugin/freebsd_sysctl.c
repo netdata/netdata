@@ -24,6 +24,10 @@
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
+#define _COMMON_PLUGIN_NAME "freebsd.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "freebsd"
+#include "../common-contexts/common-contexts.h"
+
 // --------------------------------------------------------------------------------------------------------------------
 // common definitions and variables
 
@@ -574,28 +578,7 @@ int do_hw_intcnt(int update_every, usec_t dt) {
             static RRDSET *st_intr = NULL;
             static RRDDIM *rd_intr = NULL;
 
-            if (unlikely(!st_intr)) {
-                st_intr = rrdset_create_localhost(
-                        "system",
-                        "intr",
-                        NULL,
-                        "interrupts",
-                        NULL,
-                        "Total Hardware Interrupts",
-                        "interrupts/s",
-                        "freebsd.plugin",
-                        "hw.intrcnt",
-                        NETDATA_CHART_PRIO_SYSTEM_INTR,
-                        update_every,
-                        RRDSET_TYPE_LINE
-                );
-                rrdset_flag_set(st_intr, RRDSET_FLAG_DETAIL);
-
-                rd_intr = rrddim_add(st_intr, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
-
-            rrddim_set_by_pointer(st_intr, rd_intr, totalintr);
-            rrdset_done(st_intr);
+            common_interrupts(totalintr, update_every, "hw.intrcnt");
 
             size_t size;
             static int mib_hw_intrnames[2] = {0, 0};
@@ -1159,30 +1142,10 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
                 }
             }
 
-            static RRDSET *st_semaphores = NULL, *st_semaphore_arrays = NULL;
-            static RRDDIM *rd_semaphores = NULL, *rd_semaphore_arrays = NULL;
+            static RRDSET *st_semaphore_arrays = NULL;
+            static RRDDIM *rd_semaphore_arrays = NULL;
 
-            if (unlikely(!st_semaphores)) {
-                st_semaphores = rrdset_create_localhost(
-                        "system",
-                        "ipc_semaphores",
-                        NULL,
-                        "ipc semaphores",
-                        NULL,
-                        "IPC Semaphores",
-                        "semaphores",
-                        "freebsd.plugin",
-                        "kern.ipc.sem",
-                        NETDATA_CHART_PRIO_SYSTEM_IPC_SEMAPHORES,
-                        update_every,
-                        RRDSET_TYPE_AREA
-                );
-
-                rd_semaphores = rrddim_add(st_semaphores, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            }
-
-            rrddim_set_by_pointer(st_semaphores, rd_semaphores, ipc_sem.semaphores);
-            rrdset_done(st_semaphores);
+            common_semaphore_ipc(ipc_sem.semaphores, 0.0, "kern.ipc.sem", update_every);
 
             if (unlikely(!st_semaphore_arrays)) {
                 st_semaphore_arrays = rrdset_create_localhost(
@@ -1847,13 +1810,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (do_tcpext_connaborts == CONFIG_BOOLEAN_YES || (do_tcpext_connaborts == CONFIG_BOOLEAN_AUTO &&
-                                                               (tcpstat.tcps_rcvpackafterwin ||
-                                                                tcpstat.tcps_rcvafterclose ||
-                                                                tcpstat.tcps_rcvmemdrop ||
-                                                                tcpstat.tcps_persistdrop ||
-                                                                tcpstat.tcps_finwait2_drops ||
-                                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_tcpext_connaborts == CONFIG_BOOLEAN_YES || do_tcpext_connaborts == CONFIG_BOOLEAN_AUTO) {
                 do_tcpext_connaborts = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -1891,9 +1848,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (do_tcpext_ofo == CONFIG_BOOLEAN_YES || (do_tcpext_ofo == CONFIG_BOOLEAN_AUTO &&
-                                                        (tcpstat.tcps_rcvoopack ||
-                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_tcpext_ofo == CONFIG_BOOLEAN_YES || do_tcpext_ofo == CONFIG_BOOLEAN_AUTO) {
                 do_tcpext_ofo = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -1922,11 +1877,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (do_tcpext_syncookies == CONFIG_BOOLEAN_YES || (do_tcpext_syncookies == CONFIG_BOOLEAN_AUTO &&
-                                                               (tcpstat.tcps_sc_sendcookie ||
-                                                                tcpstat.tcps_sc_recvcookie ||
-                                                                tcpstat.tcps_sc_zonefail ||
-                                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_tcpext_syncookies == CONFIG_BOOLEAN_YES || do_tcpext_syncookies == CONFIG_BOOLEAN_AUTO) {
                 do_tcpext_syncookies = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -1959,9 +1910,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if(do_tcpext_listen == CONFIG_BOOLEAN_YES || (do_tcpext_listen == CONFIG_BOOLEAN_AUTO &&
-                                                          (tcpstat.tcps_listendrop ||
-                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_tcpext_listen == CONFIG_BOOLEAN_YES || do_tcpext_listen == CONFIG_BOOLEAN_AUTO) {
                 do_tcpext_listen = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_listen = NULL;
@@ -1991,21 +1940,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrdset_done(st_listen);
             }
 
-            if (do_ecn == CONFIG_BOOLEAN_YES || ( do_ecn == CONFIG_BOOLEAN_AUTO &&
-                                                ( netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES ||
-#if __FreeBSD_version < 1400074
-// See https://github.com/freebsd/freebsd-src/commit/1a70101a870015304d5b2446b480d8677d8aad36
-                                                  tcpstat.tcps_ecn_ce ||
-                                                  tcpstat.tcps_ecn_ect0 ||
-                                                  tcpstat.tcps_ecn_ect1
-#else
-                                                  tcpstat.tcps_ecn_rcvce ||
-                                                  tcpstat.tcps_ecn_rcvect0 ||
-                                                  tcpstat.tcps_ecn_rcvect1 ||
-                                                  tcpstat.tcps_ecn_sndect0 ||
-                                                  tcpstat.tcps_ecn_sndect1
-#endif                                                  
-                                                  ))) {
+            if (do_ecn == CONFIG_BOOLEAN_YES || do_ecn == CONFIG_BOOLEAN_AUTO) {
                 do_ecn = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -2527,12 +2462,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
             collector_error("DISABLED: net.inet6.ip6.stats module");
             return 1;
         } else {
-            if (do_ip6_packets == CONFIG_BOOLEAN_YES || (do_ip6_packets == CONFIG_BOOLEAN_AUTO &&
-                                                         (ip6stat.ip6s_localout ||
-                                                          ip6stat.ip6s_total ||
-                                                          ip6stat.ip6s_forward ||
-                                                          ip6stat.ip6s_delivered ||
-                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_ip6_packets == CONFIG_BOOLEAN_YES || do_ip6_packets == CONFIG_BOOLEAN_AUTO) {
                 do_ip6_packets = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -2567,11 +2497,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (do_ip6_fragsout == CONFIG_BOOLEAN_YES || (do_ip6_fragsout == CONFIG_BOOLEAN_AUTO &&
-                                                          (ip6stat.ip6s_fragmented ||
-                                                           ip6stat.ip6s_cantfrag ||
-                                                           ip6stat.ip6s_ofragments ||
-                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_ip6_fragsout == CONFIG_BOOLEAN_YES || do_ip6_fragsout == CONFIG_BOOLEAN_AUTO) {
                 do_ip6_fragsout = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -2606,12 +2532,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (do_ip6_fragsin == CONFIG_BOOLEAN_YES || (do_ip6_fragsin == CONFIG_BOOLEAN_AUTO &&
-                                                         (ip6stat.ip6s_reassembled ||
-                                                          ip6stat.ip6s_fragdropped ||
-                                                          ip6stat.ip6s_fragtimeout ||
-                                                          ip6stat.ip6s_fragments ||
-                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_ip6_fragsin == CONFIG_BOOLEAN_YES || do_ip6_fragsin == CONFIG_BOOLEAN_AUTO) {
                 do_ip6_fragsin = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -2648,17 +2569,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (do_ip6_errors == CONFIG_BOOLEAN_YES || (do_ip6_errors == CONFIG_BOOLEAN_AUTO &&
-                                                        (ip6stat.ip6s_toosmall ||
-                                                         ip6stat.ip6s_odropped ||
-                                                         ip6stat.ip6s_badoptions ||
-                                                         ip6stat.ip6s_badvers ||
-                                                         ip6stat.ip6s_exthdrtoolong ||
-                                                         ip6stat.ip6s_sources_none ||
-                                                         ip6stat.ip6s_tooshort ||
-                                                         ip6stat.ip6s_cantforward ||
-                                                         ip6stat.ip6s_noroute ||
-                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_ip6_errors == CONFIG_BOOLEAN_YES || do_ip6_errors == CONFIG_BOOLEAN_AUTO) {
                 do_ip6_errors = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -2772,10 +2683,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (do_icmp6 == CONFIG_BOOLEAN_YES || (do_icmp6 == CONFIG_BOOLEAN_AUTO &&
-                                                   (icmp6_total.msgs_in ||
-                                                    icmp6_total.msgs_out ||
-                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_icmp6 == CONFIG_BOOLEAN_YES || do_icmp6 == CONFIG_BOOLEAN_AUTO) {
                 do_icmp6 = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -2806,10 +2714,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (do_icmp6_redir == CONFIG_BOOLEAN_YES || (do_icmp6_redir == CONFIG_BOOLEAN_AUTO &&
-                                                         (icmp6stat.icp6s_inhist[ND_REDIRECT] ||
-                                                          icmp6stat.icp6s_outhist[ND_REDIRECT] ||
-                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_icmp6_redir == CONFIG_BOOLEAN_YES || do_icmp6_redir == CONFIG_BOOLEAN_AUTO) {
                 do_icmp6_redir = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -2840,19 +2745,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (do_icmp6_errors == CONFIG_BOOLEAN_YES || (do_icmp6_errors == CONFIG_BOOLEAN_AUTO &&
-                                                          (icmp6stat.icp6s_badcode ||
-                                                           icmp6stat.icp6s_badlen ||
-                                                           icmp6stat.icp6s_checksum ||
-                                                           icmp6stat.icp6s_tooshort ||
-                                                           icmp6stat.icp6s_error ||
-                                                           icmp6stat.icp6s_inhist[ICMP6_DST_UNREACH] ||
-                                                           icmp6stat.icp6s_inhist[ICMP6_TIME_EXCEEDED] ||
-                                                           icmp6stat.icp6s_inhist[ICMP6_PARAM_PROB] ||
-                                                           icmp6stat.icp6s_outhist[ICMP6_DST_UNREACH] ||
-                                                           icmp6stat.icp6s_outhist[ICMP6_TIME_EXCEEDED] ||
-                                                           icmp6stat.icp6s_outhist[ICMP6_PARAM_PROB] ||
-                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_icmp6_errors == CONFIG_BOOLEAN_YES || do_icmp6_errors == CONFIG_BOOLEAN_AUTO) {
                 do_icmp6_errors = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -2902,12 +2795,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (do_icmp6_echos == CONFIG_BOOLEAN_YES || (do_icmp6_echos == CONFIG_BOOLEAN_AUTO &&
-                                                         (icmp6stat.icp6s_inhist[ICMP6_ECHO_REQUEST] ||
-                                                          icmp6stat.icp6s_outhist[ICMP6_ECHO_REQUEST] ||
-                                                          icmp6stat.icp6s_inhist[ICMP6_ECHO_REPLY] ||
-                                                          icmp6stat.icp6s_outhist[ICMP6_ECHO_REPLY] ||
-                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_icmp6_echos == CONFIG_BOOLEAN_YES || do_icmp6_echos == CONFIG_BOOLEAN_AUTO) {
                 do_icmp6_echos = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -2942,12 +2830,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (do_icmp6_router == CONFIG_BOOLEAN_YES || (do_icmp6_router == CONFIG_BOOLEAN_AUTO &&
-                                                          (icmp6stat.icp6s_inhist[ND_ROUTER_SOLICIT] ||
-                                                           icmp6stat.icp6s_outhist[ND_ROUTER_SOLICIT] ||
-                                                           icmp6stat.icp6s_inhist[ND_ROUTER_ADVERT] ||
-                                                           icmp6stat.icp6s_outhist[ND_ROUTER_ADVERT] ||
-                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_icmp6_router == CONFIG_BOOLEAN_YES || do_icmp6_router == CONFIG_BOOLEAN_AUTO) {
                 do_icmp6_router = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -2983,12 +2866,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (do_icmp6_neighbor == CONFIG_BOOLEAN_YES || (do_icmp6_neighbor == CONFIG_BOOLEAN_AUTO &&
-                                                            (icmp6stat.icp6s_inhist[ND_NEIGHBOR_SOLICIT] ||
-                                                             icmp6stat.icp6s_outhist[ND_NEIGHBOR_SOLICIT] ||
-                                                             icmp6stat.icp6s_inhist[ND_NEIGHBOR_ADVERT] ||
-                                                             icmp6stat.icp6s_outhist[ND_NEIGHBOR_ADVERT] ||
-                                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_icmp6_neighbor == CONFIG_BOOLEAN_YES || do_icmp6_neighbor == CONFIG_BOOLEAN_AUTO) {
                 do_icmp6_neighbor = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -3024,18 +2902,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (do_icmp6_types == CONFIG_BOOLEAN_YES || (do_icmp6_types == CONFIG_BOOLEAN_AUTO &&
-                                                         (icmp6stat.icp6s_inhist[1] ||
-                                                          icmp6stat.icp6s_inhist[128] ||
-                                                          icmp6stat.icp6s_inhist[129] ||
-                                                          icmp6stat.icp6s_inhist[136] ||
-                                                          icmp6stat.icp6s_outhist[1] ||
-                                                          icmp6stat.icp6s_outhist[128] ||
-                                                          icmp6stat.icp6s_outhist[129] ||
-                                                          icmp6stat.icp6s_outhist[133] ||
-                                                          icmp6stat.icp6s_outhist[135] ||
-                                                          icmp6stat.icp6s_outhist[136] ||
-                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+            if (do_icmp6_types == CONFIG_BOOLEAN_YES || do_icmp6_types == CONFIG_BOOLEAN_AUTO) {
                 do_icmp6_types = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;

@@ -10,24 +10,21 @@
 #endif
 
 struct blkio {
-    int updated;
-    int enabled; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
-    int delay_counter;
-
     char *filename;
+    bool staterr;
+
+    int updated;
 
     unsigned long long Read;
     unsigned long long Write;
-/*
-    unsigned long long Sync;
-    unsigned long long Async;
-    unsigned long long Total;
-*/
 };
 
 struct pids {
-    char *pids_current_filename;
-    int pids_current_updated;
+    char *filename;
+    bool staterr;
+
+    int updated;
+
     unsigned long long pids_current;
 };
 
@@ -37,57 +34,29 @@ struct memory {
     ARL_ENTRY *arl_dirty;
     ARL_ENTRY *arl_swap;
 
-    int updated_detailed;
-    int updated_usage_in_bytes;
-    int updated_msw_usage_in_bytes;
-    int updated_failcnt;
-
-    int enabled_detailed;           // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
-    int enabled_usage_in_bytes;     // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
-    int enabled_msw_usage_in_bytes; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
-    int enabled_failcnt;            // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
-
-    int delay_counter_detailed;
-    int delay_counter_failcnt;
-
-    char *filename_detailed;
     char *filename_usage_in_bytes;
+    char *filename_detailed;
     char *filename_msw_usage_in_bytes;
     char *filename_failcnt;
+
+    bool staterr_mem_current;
+    bool staterr_mem_stat;
+    bool staterr_failcnt;
+    bool staterr_swap;
+
+    int updated_usage_in_bytes;
+    int updated_detailed;
+    int updated_msw_usage_in_bytes;
+    int updated_failcnt;
 
     int detailed_has_dirty;
     int detailed_has_swap;
 
-    // detailed metrics
-/*
-    unsigned long long cache;
-    unsigned long long rss;
-    unsigned long long rss_huge;
-    unsigned long long mapped_file;
-    unsigned long long writeback;
-    unsigned long long dirty;
-    unsigned long long swap;
-    unsigned long long pgpgin;
-    unsigned long long pgpgout;
-    unsigned long long pgfault;
-    unsigned long long pgmajfault;
-    unsigned long long inactive_anon;
-    unsigned long long active_anon;
-    unsigned long long inactive_file;
-    unsigned long long active_file;
-    unsigned long long unevictable;
-    unsigned long long hierarchical_memory_limit;
-*/
-    //unified cgroups metrics
     unsigned long long anon;
     unsigned long long kernel_stack;
     unsigned long long slab;
     unsigned long long sock;
-    // unsigned long long shmem;
     unsigned long long anon_thp;
-    //unsigned long long file_writeback;
-    //unsigned long long file_dirty;
-    //unsigned long long file;
 
     unsigned long long total_cache;
     unsigned long long total_rss;
@@ -100,17 +69,8 @@ struct memory {
     unsigned long long total_pgpgout;
     unsigned long long total_pgfault;
     unsigned long long total_pgmajfault;
-/*
-    unsigned long long total_inactive_anon;
-    unsigned long long total_active_anon;
-*/
 
     unsigned long long total_inactive_file;
-
-/*
-    unsigned long long total_active_file;
-    unsigned long long total_unevictable;
-*/
 
     // single file metrics
     unsigned long long usage_in_bytes;
@@ -120,10 +80,10 @@ struct memory {
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cpuacct.txt
 struct cpuacct_stat {
-    int updated;
-    int enabled;            // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
-
     char *filename;
+    bool staterr;
+
+    int updated;
 
     unsigned long long user;           // v1, v2(user_usec)
     unsigned long long system;         // v1, v2(system_usec)
@@ -131,10 +91,9 @@ struct cpuacct_stat {
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cpuacct.txt
 struct cpuacct_usage {
-    int updated;
-    int enabled; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
-
     char *filename;
+    bool disabled;
+    int updated;
 
     unsigned int cpus;
     unsigned long long *cpu_percpu;
@@ -142,10 +101,10 @@ struct cpuacct_usage {
 
 // represents cpuacct/cpu.stat, for v2 'cpuacct_stat' is used for 'user_usec', 'system_usec'
 struct cpuacct_cpu_throttling {
-    int updated;
-    int enabled; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
-
     char *filename;
+    bool staterr;
+
+    int updated;
 
     unsigned long long nr_periods;
     unsigned long long nr_throttled;
@@ -157,10 +116,10 @@ struct cpuacct_cpu_throttling {
 // https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/resource_management_guide/sec-cpu#sect-cfs
 // https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/managing_monitoring_and_updating_the_kernel/using-cgroups-v2-to-control-distribution-of-cpu-time-for-applications_managing-monitoring-and-updating-the-kernel#proc_controlling-distribution-of-cpu-time-for-applications-by-adjusting-cpu-weight_using-cgroups-v2-to-control-distribution-of-cpu-time-for-applications
 struct cpuacct_cpu_shares {
-    int updated;
-    int enabled; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
-
     char *filename;
+    bool staterr;
+
+    int updated;
 
     unsigned long long shares;
 };
@@ -224,7 +183,7 @@ struct cgroup {
     struct blkio io_merged;                     // operations
     struct blkio io_queued;                     // operations
 
-    struct pids pids;
+    struct pids pids_current;
 
     struct cgroup_network_interface *interfaces;
 
@@ -321,59 +280,43 @@ extern uv_mutex_t cgroup_root_mutex;
 
 void cgroup_discovery_worker(void *ptr);
 
-extern int is_inside_k8s;
+extern bool is_inside_k8s;
 extern long system_page_size;
-extern int cgroup_enable_cpuacct_stat;
-extern int cgroup_enable_cpuacct_usage;
-extern int cgroup_enable_cpuacct_cpu_throttling;
-extern int cgroup_enable_cpuacct_cpu_shares;
-extern int cgroup_enable_memory;
-extern int cgroup_enable_detailed_memory;
-extern int cgroup_enable_memory_failcnt;
-extern int cgroup_enable_swap;
-extern int cgroup_enable_blkio_io;
-extern int cgroup_enable_blkio_ops;
-extern int cgroup_enable_blkio_throttle_io;
-extern int cgroup_enable_blkio_throttle_ops;
-extern int cgroup_enable_blkio_merged_ops;
-extern int cgroup_enable_blkio_queued_ops;
-extern int cgroup_enable_pressure_cpu;
-extern int cgroup_enable_pressure_io_some;
-extern int cgroup_enable_pressure_io_full;
-extern int cgroup_enable_pressure_memory_some;
-extern int cgroup_enable_pressure_memory_full;
-extern int cgroup_enable_pressure_irq_some;
-extern int cgroup_enable_pressure_irq_full;
-extern int cgroup_enable_systemd_services;
-extern int cgroup_enable_systemd_services_detailed_memory;
-extern int cgroup_used_memory;
+
 extern int cgroup_use_unified_cgroups;
-extern int cgroup_unified_exist;
-extern int cgroup_search_in_devices;
+extern bool cgroup_unified_exist;
+
+extern bool cgroup_enable_cpuacct;
+extern bool cgroup_enable_memory;
+extern bool cgroup_enable_blkio;
+extern bool cgroup_enable_pressure;
+extern bool cgroup_enable_cpuacct_cpu_shares;
+
 extern int cgroup_check_for_new_every;
 extern int cgroup_update_every;
-extern int cgroup_containers_chart_priority;
-extern int cgroup_recheck_zero_blkio_every_iterations;
-extern int cgroup_recheck_zero_mem_failcnt_every_iterations;
-extern int cgroup_recheck_zero_mem_detailed_every_iterations;
+
 extern char *cgroup_cpuacct_base;
 extern char *cgroup_cpuset_base;
 extern char *cgroup_blkio_base;
 extern char *cgroup_memory_base;
 extern char *cgroup_pids_base;
-extern char *cgroup_devices_base;
 extern char *cgroup_unified_base;
+
 extern int cgroup_root_count;
 extern int cgroup_root_max;
 extern int cgroup_max_depth;
+
 extern SIMPLE_PATTERN *enabled_cgroup_paths;
 extern SIMPLE_PATTERN *enabled_cgroup_names;
 extern SIMPLE_PATTERN *search_cgroup_paths;
 extern SIMPLE_PATTERN *enabled_cgroup_renames;
 extern SIMPLE_PATTERN *systemd_services_cgroups;
 extern SIMPLE_PATTERN *entrypoint_parent_process_comm;
+
 extern char *cgroups_network_interface_script;
+
 extern int cgroups_check;
+
 extern uint32_t Read_hash;
 extern uint32_t Write_hash;
 extern uint32_t user_hash;
@@ -384,6 +327,7 @@ extern uint32_t nr_periods_hash;
 extern uint32_t nr_throttled_hash;
 extern uint32_t throttled_time_hash;
 extern uint32_t throttled_usec_hash;
+
 extern struct cgroup *cgroup_root;
 
 enum cgroups_type { CGROUPS_AUTODETECT_FAIL, CGROUPS_V1, CGROUPS_V2 };
@@ -450,8 +394,8 @@ static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
 #define RRDFUNCTIONS_CGTOP_HELP "View running containers"
 #define RRDFUNCTIONS_SYSTEMD_SERVICES_HELP "View systemd services"
 
-int cgroup_function_cgroup_top(BUFFER *wb, const char *function);
-int cgroup_function_systemd_top(BUFFER *wb, const char *function);
+int cgroup_function_cgroup_top(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
+int cgroup_function_systemd_top(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
 
 void cgroup_netdev_link_init(void);
 const DICTIONARY_ITEM *cgroup_netdev_get(struct cgroup *cg);

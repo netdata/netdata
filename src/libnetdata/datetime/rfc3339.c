@@ -102,8 +102,8 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
     if (*s == '+' || *s == '-') {
         // Parse the hours:mins part of the timezone
 
-        if (!isdigit(s[1]) || !isdigit(s[2]) || s[3] != ':' ||
-            !isdigit(s[4]) || !isdigit(s[5]))
+        if (!isdigit((uint8_t)s[1]) || !isdigit((uint8_t)s[2]) || s[3] != ':' ||
+            !isdigit((uint8_t)s[4]) || !isdigit((uint8_t)s[5]))
             return 0; // Parsing error
 
         char tz_sign = *s;

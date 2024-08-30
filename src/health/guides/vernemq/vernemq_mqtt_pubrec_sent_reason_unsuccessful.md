@@ -25,6 +25,6 @@ In the MQTT protocol, when a client sends a PUBLISH message with Quality of Serv
 
 ### Useful resources
 
-1. [VerneMQ Documentation](https://vernemq.com/documentation.html)
+1. [VerneMQ Documentation](https://docs.vernemq.com/)
 2. [MQTT Essentials – All Core MQTT Concepts explained](https://www.hivemq.com/mqtt-essentials/)
 3. [Understanding QoS Levels in MQTT](https://www.hivemq.com/blog/mqtt-essentials-part-6-mqtt-quality-of-service-levels/)

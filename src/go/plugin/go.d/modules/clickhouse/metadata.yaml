@@ -1,0 +1,624 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-clickhouse
+      plugin_name: go.d.plugin
+      module_name: clickhouse
+      monitored_instance:
+        name: ClickHouse
+        link: https://clickhouse.com/
+        icon_filename: clickhouse.svg
+        categories:
+          - data-collection.database-servers
+      keywords:
+        - database
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector retrieves performance data from ClickHouse for connections, queries, resources, replication, IO, and data operations (inserts, selects, merges) using HTTP requests and ClickHouse system tables. It monitors your ClickHouse server's health and activity.
+        method_description: |
+          It sends HTTP requests to the ClickHouse [HTTP interface](https://clickhouse.com/docs/en/interfaces/http), executing SELECT queries to retrieve data from various system tables.
+          Specifically, it collects metrics from the following tables:
+
+          - system.metrics
+          - system.async_metrics
+          - system.events
+          - system.disks
+          - system.parts
+          - system.processes
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects ClickHouse instances running on localhost that are listening on port 8123.
+            On startup, it tries to collect metrics from:
+
+            - http://127.0.0.1:8123
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/clickhouse.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:8123
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: "GET"
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8123
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8123
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: ClickHouse with enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:8123
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8123
+
+                  - name: remote
+                    url: http://192.0.2.1:8123
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: clickhouse_restarted
+        metric: clickhouse.uptime
+        info: ClickHouse has recently been restarted
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf
+      - name: clickhouse_queries_preempted
+        metric: clickhouse.queries_preempted
+        info: ClickHouse has queries that are stopped and waiting due to priority setting
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf
+      - name: clickhouse_long_running_query
+        metric: clickhouse.longest_running_query_time
+        info: ClickHouse has a long-running query exceeding the threshold
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf
+      - name: clickhouse_rejected_inserts
+        metric: clickhouse.rejected_inserts
+        info: ClickHouse has INSERT queries that are rejected due to high number of active data parts for partition in a MergeTree
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf
+      - name: clickhouse_delayed_inserts
+        metric: clickhouse.delayed_inserts
+        info: ClickHouse has INSERT queries that are throttled due to high number of active data parts for partition in a MergeTree
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf
+      - name: clickhouse_replication_lag
+        metric: clickhouse.replicas_max_absolute_delay
+        info: ClickHouse is experiencing replication lag greater than 5 minutes
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf
+      - name: clickhouse_replicated_readonly_tables
+        metric: clickhouse.replicated_readonly_tables
+        info: ClickHouse has replicated tables in readonly state due to ZooKeeper session loss/startup without ZooKeeper configured
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf
+      - name: clickhouse_max_part_count_for_partition
+        metric: clickhouse.max_part_count_for_partition
+        info: ClickHouse high number of parts per partition
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf
+      - name: clickhouse_distributed_connections_failures
+        metric: clickhouse.distributed_connections_fail_exhausted_retries
+        info: ClickHouse has failed distributed connections after exhausting all retry attempts
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf
+      - name: clickhouse_distributed_files_to_insert
+        metric: clickhouse.distributed_files_to_insert
+        info: ClickHouse high number of pending files to process for asynchronous insertion into Distributed tables
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: clickhouse.connections
+              description: Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: tcp
+                - name: http
+                - name: mysql
+                - name: postgresql
+                - name: interserver
+            - name: clickhouse.slow_reads
+              description: Slow reads from a file
+              unit: reads/s
+              chart_type: line
+              dimensions:
+                - name: slow
+            - name: clickhouse.read_backoff
+              description: Read backoff events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: read_backoff
+            - name: clickhouse.memory_usage
+              description: Memory usage
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: clickhouse.running_queries
+              description: Running queries
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: running
+            - name: clickhouse.queries_preempted
+              description: Queries waiting due to priority
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: preempted
+            - name: clickhouse.queries
+              description: Queries
+              unit: queries/s
+              chart_type: stacked
+              dimensions:
+                - name: successful
+                - name: failed
+            - name: clickhouse.select_queries
+              description: Select queries
+              unit: selects/s
+              chart_type: stacked
+              dimensions:
+                - name: successful
+                - name: failed
+            - name: clickhouse.insert_queries
+              description: Insert queries
+              unit: inserts/s
+              chart_type: stacked
+              dimensions:
+                - name: successful
+                - name: failed
+            - name: clickhouse.queries_memory_limit_exceeded
+              description: Memory limit exceeded for query
+              unit: queries/s
+              chart_type: line
+              dimensions:
+                - name: mem_limit_exceeded
+            - name: clickhouse.longest_running_query_time
+              description: Longest running query time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: longest_query_time
+            - name: clickhouse.queries_latency
+              description: Queries latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: queries_time
+            - name: clickhouse.select_queries_latency
+              description: Select queries latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: selects_time
+            - name: clickhouse.insert_queries_latency
+              description: Insert queries latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: inserts_time
+            - name: clickhouse.io
+              description: Read and written data
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: clickhouse.iops
+              description: Read and write operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: clickhouse.io_errors
+              description: Read and write errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: clickhouse.io_seeks
+              description: lseek function calls
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: lseek
+            - name: clickhouse.io_file_opens
+              description: File opens
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: file_open
+            - name: clickhouse.replicated_parts_current_activity
+              description: Replicated parts current activity
+              unit: parts
+              chart_type: line
+              dimensions:
+                - name: fetch
+                - name: send
+                - name: check
+            - name: clickhouse.replicas_max_absolute_dela
+              description: Replicas max absolute delay
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: replication_delay
+            - name: clickhouse.replicated_readonly_tables
+              description: Replicated tables in readonly state
+              unit: tables
+              chart_type: line
+              dimensions:
+                - name: read_only
+            - name: clickhouse.replicated_data_loss
+              description: Replicated data loss
+              unit: events
+              chart_type: line
+              dimensions:
+                - name: data_loss
+            - name: clickhouse.replicated_part_fetches
+              description: Replicated part fetches
+              unit: fetches/s
+              chart_type: line
+              dimensions:
+                - name: successful
+                - name: failed
+            - name: clickhouse.inserted_rows
+              description: Inserted rows
+              unit: rows/s
+              chart_type: line
+              dimensions:
+                - name: inserted
+            - name: clickhouse.inserted_bytes
+              description: Inserted data
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: inserted
+            - name: clickhouse.rejected_inserts
+              description: Rejected inserts
+              unit: inserts/s
+              chart_type: line
+              dimensions:
+                - name: rejected
+            - name: clickhouse.delayed_inserts
+              description: Delayed inserts
+              unit: inserts/s
+              chart_type: line
+              dimensions:
+                - name: delayed
+            - name: clickhouse.delayed_inserts_throttle_time
+              description: Delayed inserts throttle time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: delayed_inserts_throttle_time
+            - name: clickhouse.selected_bytes
+              description: Selected data
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: selected
+            - name: clickhouse.selected_rows
+              description: Selected rows
+              unit: rows/s
+              chart_type: line
+              dimensions:
+                - name: selected
+            - name: clickhouse.selected_parts
+              description: Selected parts
+              unit: parts/s
+              chart_type: line
+              dimensions:
+                - name: selected
+            - name: clickhouse.selected_ranges
+              description: Selected ranges
+              unit: ranges/s
+              chart_type: line
+              dimensions:
+                - name: selected
+            - name: clickhouse.selected_marks
+              description: Selected marks
+              unit: marks/s
+              chart_type: line
+              dimensions:
+                - name: selected
+            - name: clickhouse.merges
+              description: Merge operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: merge
+            - name: clickhouse.merges_latency
+              description: Time spent for background merges
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: merges_time
+            - name: clickhouse.merged_uncompressed_bytes
+              description: Uncompressed data read for background merges
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: merged_uncompressed
+            - name: clickhouse.merged_rows
+              description: Merged rows
+              unit: rows/s
+              chart_type: line
+              dimensions:
+                - name: merged
+            - name: clickhouse.merge_tree_data_writer_inserted_rows
+              description: Rows INSERTed to MergeTree tables
+              unit: rows/s
+              chart_type: line
+              dimensions:
+                - name: inserted
+            - name: clickhouse.merge_tree_data_writer_uncompressed_bytes
+              description: Data INSERTed to MergeTree tables
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: inserted
+            - name: clickhouse.merge_tree_data_writer_compressed_bytes
+              description: Data written to disk for data INSERTed to MergeTree tables
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: written
+            - name: clickhouse.uncompressed_cache_requests
+              description: Uncompressed cache requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: clickhouse.mark_cache_requests
+              description: Mark cache requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: clickhouse.max_part_count_for_partition
+              description: Max part count for partition
+              unit: parts
+              chart_type: line
+              dimensions:
+                - name: max_parts_partition
+            - name: clickhouse.parts_count
+              description: Parts
+              unit: parts
+              chart_type: line
+              dimensions:
+                - name: temporary
+                - name: pre_active
+                - name: active
+                - name: deleting
+                - name: delete_on_destroy
+                - name: outdated
+                - name: wide
+                - name: compact
+            - name: distributed_connections
+              description: Active distributed connection
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: distributed_connections_attempts
+              description: Distributed connection attempts
+              unit: attempts/s
+              chart_type: line
+              dimensions:
+                - name: connection
+            - name: distributed_connections_fail_retries
+              description: Distributed connection fails with retry
+              unit: fails/s
+              chart_type: line
+              dimensions:
+                - name: connection_retry
+            - name: distributed_connections_fail_exhausted_retries
+              description: Distributed connection fails after all retries finished
+              unit: fails/s
+              chart_type: line
+              dimensions:
+                - name: connection_retry_exhausted
+            - name: distributed_files_to_insert
+              description: Pending files to process for asynchronous insertion into Distributed tables
+              unit: files
+              chart_type: line
+              dimensions:
+                - name: pending_insertions
+            - name: distributed_rejected_inserts
+              description: Rejected INSERTs to a Distributed table
+              unit: inserts/s
+              chart_type: line
+              dimensions:
+                - name: rejected
+            - name: distributed_delayed_inserts
+              description: Delayed INSERTs to a Distributed table
+              unit: inserts/s
+              chart_type: line
+              dimensions:
+                - name: delayed
+            - name: distributed_delayed_inserts_latency
+              description: Time spent while the INSERT of a block to a Distributed table was throttled
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: delayed_time
+            - name: distributed_sync_insertion_timeout_exceeded
+              description: Distributed table sync insertions timeouts
+              unit: timeouts/s
+              chart_type: line
+              dimensions:
+                - name: sync_insertion
+            - name: distributed_async_insertions_failures
+              description: Distributed table async insertion failures
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: async_insertions
+            - name: clickhouse.uptime
+              description: Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: disk
+          description: These metrics refer to the Disk.
+          labels:
+            - name: disk_name
+              description: Name of the disk as defined in the [server configuration](https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#table_engine-mergetree-multiple-volumes_configure).
+          metrics:
+            - name: clickhouse.disk_space_usage
+              description: Disk space usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+        - name: table
+          description: These metrics refer to the Database Table.
+          labels:
+            - name: database
+              description: Name of the database.
+            - name: table
+              description: Name of the table.
+          metrics:
+            - name: clickhouse.database_table_size
+              description: Table size
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: size
+            - name: clickhouse.database_table_parts
+              description: Table parts
+              unit: parts
+              chart_type: line
+              dimensions:
+                - name: parts
+            - name: clickhouse.database_table_rows
+              description: Table rows
+              unit: rows
+              chart_type: line
+              dimensions:
+                - name: rows

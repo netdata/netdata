@@ -290,6 +290,9 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdset_pluginsd_receive_slots_initialize(st);
 
+    rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+    rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+
     ctr->react_action = RRDSET_REACT_NEW;
 
     ml_chart_new(st);
@@ -465,6 +468,8 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     rrdset_update_permanent_labels(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+    rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 
     return ctr->react_action != RRDSET_REACT_NONE;
 }
@@ -478,18 +483,13 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
     st->last_accessed_time_s = now_realtime_sec();
 
-    if(host->health.health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
-        rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
-    }
-
     if(ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
         if (ctr->react_action & RRDSET_REACT_NEW) {
             if(unlikely(rrdcontext_find_chart_uuid(st,  &st->chart_uuid)))
                 uuid_generate(st->chart_uuid);
         }
         rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
-        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_UPDATE);
     }
 
     rrdset_metadata_updated(st);
@@ -1081,7 +1081,7 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
                 last_time_s = now.tv_sec;
 
                 if(min_delta > permanent_min_delta) {
-                    netdata_log_info("MINIMUM MICROSECONDS DELTA of thread %d increased from %"PRIi64" to %"PRIi64" (+%"PRIi64")", gettid(), permanent_min_delta, min_delta, min_delta - permanent_min_delta);
+                    netdata_log_info("MINIMUM MICROSECONDS DELTA of thread %d increased from %"PRIi64" to %"PRIi64" (+%"PRIi64")", gettid_cached(), permanent_min_delta, min_delta, min_delta - permanent_min_delta);
                     permanent_min_delta = min_delta;
                 }
 
@@ -1313,6 +1313,7 @@ void store_metric_collection_completed() {
 struct rda_item {
     const DICTIONARY_ITEM *item;
     RRDDIM *rd;
+    bool reset_or_overflow;
 };
 
 static __thread struct rda_item *thread_rda = NULL;
@@ -1353,7 +1354,6 @@ static inline size_t rrdset_done_interpolate(
         , usec_t last_collect_ut
         , usec_t now_collect_ut
         , char store_this_entry
-        , uint32_t has_reset_value
 ) {
     RRDDIM *rd;
 
@@ -1367,11 +1367,6 @@ static inline size_t rrdset_done_interpolate(
 
     size_t counter = st->counter;
     long current_entry = st->db.current_entry;
-
-    SN_FLAGS storage_flags = SN_DEFAULT_FLAGS;
-
-    if (has_reset_value)
-        storage_flags |= SN_FLAG_RESET;
 
     for( ; next_store_ut <= now_collect_ut ; last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations-- ) {
 
@@ -1397,6 +1392,11 @@ static inline size_t rrdset_done_interpolate(
         for(dim_id = 0, rda = rda_base ; dim_id < rda_slots ; ++dim_id, ++rda) {
             rd = rda->rd;
             if(unlikely(!rd)) continue;
+
+            SN_FLAGS storage_flags = SN_DEFAULT_FLAGS;
+
+            if (rda->reset_or_overflow)
+                storage_flags |= SN_FLAG_RESET;
 
             NETDATA_DOUBLE new_value;
 
@@ -1513,9 +1513,6 @@ static inline size_t rrdset_done_interpolate(
         }
 
         ml_chart_update_end(st);
-
-        // reset the storage flags for the next point, if any;
-        storage_flags = SN_DEFAULT_FLAGS;
 
         st->counter = ++counter;
         st->db.current_entry = current_entry = ((current_entry + 1) >= st->db.entries) ? 0 : current_entry + 1;
@@ -1678,8 +1675,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     if(stream_buffer.wb && !stream_buffer.v2)
         rrdset_push_metrics_v1(&stream_buffer, st);
 
-    uint32_t has_reset_value = 0;
-
     size_t rda_slots = dictionary_entries(st->rrddim_root_index);
     struct rda_item *rda_base = rrdset_thread_rda_get(&rda_slots);
 
@@ -1697,12 +1692,14 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
             rda->item = NULL;
             rda->rd = NULL;
+            rda->reset_or_overflow = false;
             continue;
         }
 
         // store the dimension in the array
         rda->item = dictionary_acquired_item_dup(st->rrddim_root_index, rd_dfe.item);
         rda->rd = dictionary_acquired_item_value(rda->item);
+        rda->reset_or_overflow = false;
 
         // calculate totals
         if(likely(rrddim_check_updated(rd))) {
@@ -1717,7 +1714,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
                 );
 
                 if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
-                    has_reset_value = 1;
+                    rda->reset_or_overflow = true;
 
                 rd->collector.last_collected_value = rd->collector.collected_value;
             }
@@ -1820,7 +1817,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
                           , rd->collector.collected_value);
 
                     if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
-                        has_reset_value = 1;
+                        rda->reset_or_overflow = true;
 
                     uint64_t last = (uint64_t)rd->collector.last_collected_value;
                     uint64_t new = (uint64_t)rd->collector.collected_value;
@@ -1944,7 +1941,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
             , last_collect_ut
             , now_collect_ut
             , store_this_entry
-            , has_reset_value
     );
 
     for(dim_id = 0, rda = rda_base ; dim_id < rda_slots ; ++dim_id, ++rda) {

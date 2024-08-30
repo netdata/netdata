@@ -12,7 +12,7 @@ typedef struct rrdvar {
 inline int rrdvar_fix_name(char *variable) {
     int fixed = 0;
     while(*variable) {
-        if (!isalnum(*variable) && *variable != '.' && *variable != '_') {
+        if (!isalnum((uint8_t)*variable) && *variable != '.' && *variable != '_') {
             *variable++ = '_';
             fixed++;
         }

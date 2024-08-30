@@ -453,7 +453,7 @@ static inline bool sanitize_command_argument_string(char *dst, const char *src, 
         if (dst_size < 1)
             return false;
 
-        if (iscntrl(*src) || *src == '$') {
+        if (iscntrl((uint8_t)*src) || *src == '$') {
             // remove control characters and characters that are expanded by bash
             *dst++ = '_';
             dst_size--;
@@ -504,6 +504,43 @@ static inline int read_txt_file(const char *filename, char *buffer, size_t size)
 
     close(fd);
     return 0;
+}
+
+static inline bool read_txt_file_to_buffer(const char *filename, BUFFER *wb, size_t max_size) {
+    // Open the file
+    int fd = open(filename, O_RDONLY | O_CLOEXEC);
+    if (fd == -1)
+        return false;
+
+    // Get the file size
+    struct stat st;
+    if (fstat(fd, &st) == -1) {
+        close(fd);
+        return false;
+    }
+
+    size_t file_size = st.st_size;
+
+    // Check if the file size exceeds the maximum allowed size
+    if (file_size > max_size) {
+        close(fd);
+        return false; // File size too large
+    }
+
+    buffer_need_bytes(wb, file_size + 1);
+
+    // Read the file contents into the buffer
+    ssize_t r = read(fd, &wb->buffer[wb->len], file_size);
+    if (r != (ssize_t)file_size) {
+        close(fd);
+        return false; // Read error
+    }
+    wb->len = r;
+
+    // Close the file descriptor
+    close(fd);
+
+    return true; // Success
 }
 
 static inline int read_proc_cmdline(const char *filename, char *buffer, size_t size) {
@@ -597,7 +634,7 @@ static inline char *strsep_skip_consecutive_separators(char **ptr, char *s) {
 // remove leading and trailing spaces; may return NULL
 static inline char *trim(char *s) {
     // skip leading spaces
-    while (*s && isspace(*s)) s++;
+    while (*s && isspace((uint8_t)*s)) s++;
     if (!*s) return NULL;
 
     // skip tailing spaces
@@ -605,7 +642,7 @@ static inline char *trim(char *s) {
     ssize_t l = (ssize_t)strlen(s);
     if (--l >= 0) {
         char *p = s + l;
-        while (p > s && isspace(*p)) p--;
+        while (p > s && isspace((uint8_t)*p)) p--;
         *++p = '\0';
     }
 
@@ -619,27 +656,27 @@ static inline char *trim_all(char *buffer) {
     char *d = buffer, *s = buffer;
 
     // skip spaces
-    while(isspace(*s)) s++;
+    while(isspace((uint8_t)*s)) s++;
 
     while(*s) {
         // copy the non-space part
-        while(*s && !isspace(*s)) *d++ = *s++;
+        while(*s && !isspace((uint8_t)*s)) *d++ = *s++;
 
         // add a space if we have to
-        if(*s && isspace(*s)) {
+        if(*s && isspace((uint8_t)*s)) {
             *d++ = ' ';
             s++;
         }
 
         // skip spaces
-        while(isspace(*s)) s++;
+        while(isspace((uint8_t)*s)) s++;
     }
 
     *d = '\0';
 
     if(d > buffer) {
         d--;
-        if(isspace(*d)) *d = '\0';
+        if(isspace((uint8_t)*d)) *d = '\0';
     }
 
     if(!buffer[0]) return NULL;

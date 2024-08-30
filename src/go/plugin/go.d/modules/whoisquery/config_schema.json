@@ -1,0 +1,60 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "WHOIS query collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 60
+      },
+      "source": {
+        "title": "Domain",
+        "description": "The domain for which WHOIS queries will be performed.",
+        "type": "string"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "The timeout in seconds for the WHOIS query.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 5
+      },
+      "days_until_expiration_warning": {
+        "title": "Days until warning",
+        "description": "Number of days before the alarm status is set to warning.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 30
+      },
+      "days_until_expiration_critical": {
+        "title": "Days until critical",
+        "description": "Number of days before the alarm status is set to critical.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 15
+      }
+    },
+    "required": [
+      "source"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "source": {
+      "ui:placeholder": "example.com"
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    }
+  }
+}

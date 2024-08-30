@@ -1,0 +1,3 @@
+Status
+|- Number of jail:	1
+`- Jail list:	sshd, dovecot

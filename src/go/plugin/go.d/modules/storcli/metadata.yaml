@@ -1,0 +1,194 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-storcli
+      plugin_name: go.d.plugin
+      module_name: storcli
+      monitored_instance:
+        name: StoreCLI RAID
+        link: "https://docs.broadcom.com/doc/12352476"
+        icon_filename: "hard-drive.svg"
+        categories:
+          - data-collection.storage-mount-points-and-filesystems
+      keywords:
+        - storage
+        - raid-controller
+        - manage-disks
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitors the health of StoreCLI Hardware RAID by tracking the status of RAID adapters, physical drives, and backup batteries in your storage system.
+          It relies on the [`storcli`](https://docs.broadcom.com/doc/12352476) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+
+          Executed commands:
+          -  `storcli /cALL show all J nolog`
+          -  `storcli /cALL/eALL/sALL show all J nolog`
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/storcli.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: timeout
+              description: storcli binary execution timeout.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
+              config: |
+                jobs:
+                  - name: storcli
+                    update_every: 5  # Collect StorCLI RAID statistics every 5 seconds
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: storcli_controller_health_status
+        metric: storcli.controller_health_status
+        info: RAID controller ${label:controller_number} is unhealthy
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf
+      - name: storcli_controller_bbu_status
+        metric: storcli.controller_bbu_status
+        info: RAID controller ${label:controller_number} BBU is unhealthy
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf
+      - name: storcli_phys_drive_errors
+        metric: storcli.phys_drive_errors
+        info: RAID physical drive c${label:controller_number}/e${label:enclosure_number}/s${label:slot_number} errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf
+      - name: storcli_phys_drive_predictive_failures
+        metric: storcli.phys_drive_predictive_failures
+        info: RAID physical drive c${label:controller_number}/e${label:enclosure_number}/s${label:slot_number} predictive failures
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: controller
+          description: These metrics refer to the Controller.
+          labels:
+            - name: controller_number
+              description: Controller number (index)
+            - name: model
+              description: Controller model
+            - name: driver_name
+              description: Controller driver (megaraid_sas or mpt3sas)
+          metrics:
+            - name: storcli.controller_health_status
+              description: Controller health status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: healthy
+                - name: unhealthy
+            - name: storcli.controller_status
+              description: Controller status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: optimal
+                - name: degraded
+                - name: partially_degraded
+                - name: failed
+            - name: storcli.controller_bbu_status
+              description: Controller BBU status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: healthy
+                - name: unhealthy
+                - name: na
+        - name: physical drive
+          description: These metrics refer to the Physical Drive.
+          labels:
+            - name: controller_number
+              description: Controller number (index)
+            - name: enclosure_number
+              description: Enclosure number (index)
+            - name: slot_number
+              description: Slot number (index)
+            - name: media type
+              description: Media type (e.g. HDD)
+          metrics:
+            - name: storcli.phys_drive_errors
+              description: Physical Drive media errors rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: media
+                - name: other
+            - name: storcli.phys_drive_predictive_failures
+              description: Physical Drive predictive failures rate
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: predictive_failures
+            - name: storcli.phys_drive_smart_alert_status
+              description: Physical Drive SMART alert status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+            - name: storcli.phys_drive_temperature
+              description: Physical Drive temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+        - name: bbu
+          description: These metrics refer to the Backup Battery Unit.
+          labels:
+            - name: controller_number
+              description: Controller number (index)
+            - name: bbu_number
+              description: BBU number (index)
+            - name: model
+              description: BBU model
+          metrics:
+            - name: storcli.bbu_temperature
+              description: BBU temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature

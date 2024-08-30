@@ -43,4 +43,4 @@ To troubleshoot this alert, follow these steps:
 
 ### Useful resources
 
-1. [Netdata Exporting Engine documentation](https://learn.netdata.cloud/docs/exporting-data-to-other-systems/exporting-reference)
+1. [Netdata Exporting Reference](/src/exporting/README.md)

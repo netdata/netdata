@@ -137,7 +137,7 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
                    "RRDINSTANCE: '%s' cannot change id to '%s'",
                    string2str(ri->id), string2str(ri_new->id));
 
-    if(uuid_memcmp(&ri->uuid, &ri_new->uuid) != 0) {
+    if(!uuid_eq(ri->uuid, ri_new->uuid)) {
 #ifdef NETDATA_INTERNAL_CHECKS
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(ri->uuid, uuid1);
@@ -156,7 +156,7 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(ri->rrdset && uuid_memcmp(&ri->uuid, &ri->rrdset->chart_uuid) != 0) {
+    if(ri->rrdset && !uuid_eq(ri->uuid, ri->rrdset->chart_uuid)) {
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(ri->uuid, uuid1);
         uuid_unparse(ri->rrdset->chart_uuid, uuid2);

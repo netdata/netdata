@@ -24,7 +24,6 @@ AutoReqProv: yes
 %global cmake %{__cmake}
 %global cmake_build %{__cmake} --build %{__cmake_builddir} --verbose --parallel $(nproc)
 %global cmake_install DESTDIR="%{buildroot}" %{__cmake} --install %{__cmake_builddir}
-%global _have_ml 0
 %endif
 %if 0%{?amazon_linux} == 2
 %global __cmake /cmake/bin/cmake
@@ -32,7 +31,6 @@ AutoReqProv: yes
 %global cmake %{__cmake}
 %global cmake_build %{__cmake} --build %{__cmake_builddir} --verbose --parallel $(nproc)
 %global cmake_install DESTDIR="%{buildroot}" %{__cmake} --install %{__cmake_builddir}
-%global _have_ml 0
 %endif
 
 # openSUSE requires us to explicity ask for ninja for builds.
@@ -55,6 +53,8 @@ AutoReqProv: yes
 %define _localstatedir /var
 %define _libexecdir /usr/libexec
 %define _libdir /usr/lib
+
+%{!?_systemd_util_dir:%global _systemd_util_dir /usr/lib/systemd}
 
 # Fedora doesn’t define this, but other distros do
 %{!?_presetdir:%global _presetdir %{_libdir}/systemd/system-preset}
@@ -99,6 +99,17 @@ AutoReqProv: yes
 %global _have_mongo_exporter 0
 %else
 %global _have_mongo_exporter 1
+%endif
+
+# log2journal can’t build on some systems
+%if 0%{?sle_version}
+%if %{sle_version} < 150600
+%global _have_log2journal 0
+%else
+%global _have_log2journal 1
+%endif
+%else
+%global _have_log2journal 1
 %endif
 
 # If ML hasn’t been explicitly disabled or enabled yet, enable it now.
@@ -149,9 +160,7 @@ BuildRequires: pkgconfig(libcurl)
 BuildRequires: pkgconfig(liblz4)
 BuildRequires: pkgconfig(yaml-0.1)
 BuildRequires: pkgconfig(json-c)
-%if 0%{?suse_version}
-# log2journal is not available on these systems
-%else
+%if %{_have_log2journal}
 BuildRequires: pkgconfig(libpcre2-8)
 %endif
 %if 0%{?suse_version}
@@ -218,6 +227,7 @@ Requires: %{name}-plugin-systemd-journal = %{version}
 Requires: %{name}-plugin-network-viewer = %{version}
 %endif
 
+Obsoletes: %{name}-plugin-logs-management
 
 # #####################################################################
 # Functionality-dependent package dependencies
@@ -259,9 +269,9 @@ BuildRequires: cups-devel
 # distro handling of versioning).
 %if %{?_upstream_go_toolchain:0}%{!?_upstream_go_toolchain:1}
 %if 0%{?suse_version}
-BuildRequires: go >= 1.21
+BuildRequires: go >= 1.22
 %else
-BuildRequires: golang >= 1.21
+BuildRequires: golang >= 1.22
 %endif
 %endif
 # end - go.d.plugin plugin dependencies
@@ -315,20 +325,6 @@ happened, on your systems and applications.
 
 %prep
 %setup -q -n "%{name}-%{version}"
-%if 0%{?_have_ebpf}
-%if 0%{?centos_ver:1}
-%if %{centos_ver} < 8
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} centos7
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf-co-re.sh ${RPM_BUILD_DIR}/%{name}-%{version}
-%else
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} centos8
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf-co-re.sh ${RPM_BUILD_DIR}/%{name}-%{version}
-%endif
-%else
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-libbpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} other
-export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf-co-re.sh ${RPM_BUILD_DIR}/%{name}-%{version}
-%endif
-%endif
 
 %build
 # Conf step
@@ -346,6 +342,11 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 	%endif
 	%if %{_have_ebpf}
 	-DENABLE_PLUGIN_EBPF=On \
+	%if 0%{?centos_ver:1}
+	%if 0%{?centos_ver} < 8
+	-DFORCE_LEGACY_LIBBPF=On \
+	%endif
+	%endif
 	%else
 	-DENABLE_PLUGIN_EBPF=Off \
 	%endif
@@ -371,7 +372,11 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 	-DENABLE_BUNDLED_PROTOBUF=Off \
 	%endif
 	%else
+	%if 0%{?suse_version:1}
+	-DENABLE_BUNDLED_PROTOBUF=On \
+	%else
 	-DENABLE_BUNDLED_PROTOBUF=Off \
+	%endif
 	%endif
 	%if %{_have_ml}
 	-DENABLE_ML=On \
@@ -383,8 +388,6 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 	%else
 	-DENABLE_EXPORTER_MONGODB=Off \
 	%endif
-	-DENABLE_ACLK=On \
-	-DENABLE_CLOUD=On \
 	-DENABLE_DBENGINE=On \
 	-DENABLE_H2O=On \
 	-DENABLE_PLUGIN_APPS=On \
@@ -395,7 +398,6 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 	-DENABLE_PLUGIN_PERF=On \
 	-DENABLE_PLUGIN_SLABINFO=On \
 	-DENABLE_PLUGIN_SYSTEMD_JOURNAL=On \
-	-DENABLE_PLUGIN_LOGS_MANAGEMENT=On \
 	-DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=On \
 	-DENABLE_BUNDLED_JSONC=Off \
 	-DENABLE_BUNDLED_YAML=Off
@@ -410,7 +412,8 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 rm -rf "${RPM_BUILD_ROOT}"
 %{cmake_install}
 
-install -m 644 -p "system/%{name}.conf" "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
+install -m 644 -p "${RPM_BUILD_ROOT}%{_libdir}/%{name}/conf.d/%{name}.conf" "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
+install -m 644 -p "${RPM_BUILD_ROOT}%{_libdir}/%{name}/conf.d/%{name}-updater.conf" "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
 
 # ###########################################################
 # Install updater script
@@ -444,13 +447,12 @@ install -m 644 -p "%{__cmake_builddir}/system/systemd/%{name}.service" "${RPM_BU
 %else
 install -m 644 -p "%{__cmake_builddir}/system/systemd/%{name}.service.v235" "${RPM_BUILD_ROOT}%{_unitdir}/%{name}.service"
 %endif
+install -m 644 -p "system/systemd/netdata-updater.timer" "${RPM_BUILD_ROOT}%{_unitdir}/%{name}-updater.timer"
+install -m 644 -p "%{__cmake_builddir}/system/systemd/%{name}-updater.service" "${RPM_BUILD_ROOT}%{_unitdir}/%{name}-updater.service"
 install -m 755 -d "${RPM_BUILD_ROOT}%{_presetdir}"
 install -m 644 -p "system/systemd/50-%{name}.preset" "${RPM_BUILD_ROOT}%{_presetdir}/50-%{name}.preset"
-
-%if 0%{?_have_ebpf}
-${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} \
-${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d
-%endif
+install -m 755 -d "${RPM_BUILD_ROOT}%{_systemd_util_dir}/journald@%{name}.conf.d"
+install -m 644 -p "system/systemd/journald@%{name}.conf" "${RPM_BUILD_ROOT}%{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf"
 
 %pre
 
@@ -505,16 +507,17 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
-%if 0%{?suse_version}
-# log2journal is not available on these systems
-%else
+%if %{_have_log2journal}
 %{_sbindir}/log2journal
 %endif
 %{_sbindir}/systemd-cat-native
 %{_sbindir}/%{name}-claim.sh
 
 %{_unitdir}/%{name}.service
+%{_unitdir}/%{name}-updater.timer
+%{_unitdir}/%{name}-updater.service
 %{_presetdir}/50-%{name}.preset
+%{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf
 
 %dir %{_libexecdir}/%{name}
 %dir %{_libexecdir}/%{name}/plugins.d
@@ -522,22 +525,14 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libexecdir}/%{name}/install-service.sh
 %{_libexecdir}/%{name}/%{name}-updater.sh
 %{_libexecdir}/%{name}/%{name}-uninstaller.sh
-%{_libexecdir}/%{name}/plugins.d/acl.sh
-%{_libexecdir}/%{name}/plugins.d/alarm.sh
-%{_libexecdir}/%{name}/plugins.d/alarm-email.sh
 %{_libexecdir}/%{name}/plugins.d/alarm-notify.sh
-%{_libexecdir}/%{name}/plugins.d/alarm-test.sh
 %{_libexecdir}/%{name}/plugins.d/anonymous-statistics.sh
 %{_libexecdir}/%{name}/plugins.d/cgroup-name.sh
 %{_libexecdir}/%{name}/plugins.d/get-kubernetes-labels.sh
-%{_libexecdir}/%{name}/plugins.d/health-cmdapi-test.sh
 %{_libexecdir}/%{name}/plugins.d/ioping.plugin
 %{_libexecdir}/%{name}/plugins.d/loopsleepms.sh.inc
-%{_libexecdir}/%{name}/plugins.d/request.sh
 %{_libexecdir}/%{name}/plugins.d/system-info.sh
 %{_libexecdir}/%{name}/plugins.d/tc-qos-helper.sh
-%{_libexecdir}/%{name}/plugins.d/template_dim.sh
-%{_libexecdir}/%{name}/plugins.d/ebpf_thread_function.sh
 
 # cgroup-network detects the network interfaces of CGROUPs
 # it must be able to use setns() and run cgroup-network-helper.sh as root
@@ -619,11 +614,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 # xenstat belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/xenstat.plugin
-
-# logs management belongs to a different sub-package
-%exclude %{_libexecdir}/%{name}/plugins.d/logs-management.plugin
-%exclude %{_libdir}/%{name}/conf.d/logsmanagement.d.conf
-%exclude %{_libdir}/%{name}/conf.d/logsmanagement.d
 
 # Network viewer belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
@@ -815,6 +805,9 @@ Conflicts: %{name} < %{version}
 Suggests: nvme-cli
 Suggests: sudo
 %endif
+%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+Recommends: lm_sensors
+%endif
 
 %description plugin-go
  This plugin adds a selection of additional collectors written in Go to the Netdata Agent
@@ -965,29 +958,6 @@ fi
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/xenstat.plugin
 %endif
 
-%package plugin-logs-management
-Summary: The logs-management plugin for the Netdata Agent
-Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
-
-%description plugin-logs-management
- This plugin allows the Netdata Agent to collect logs from the system
- and parse them to extract metrics.
-
-%pre plugin-logs-management
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
-
-%files plugin-logs-management
-%defattr(0644,root,netdata,0755)
-%{_libdir}/%{name}/conf.d/logsmanagement.d.conf
-%{_libdir}/%{name}/conf.d/logsmanagement.d
-%defattr(0750,root,netdata,0750)
-# CAP_DAC_READ_SEARCH and CAP_SYSLOG needed for data collection.
-%caps(cap_dac_read_search,cap_syslog=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/logs-management.plugin
-
 %package plugin-network-viewer
 Summary: The network viewer plugin for the Netdata Agent
 Group: Applications/System
@@ -1016,6 +986,12 @@ fi
 %caps(cap_sys_admin,cap_sys_ptrace,cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
 
 %changelog
+* Fri Jul 19 2024 Austin Hemmelgarn <austin@netdata.cloud>
+- Fix dependency issues with old logs-management plugin
+* Tue Jul 16 2024 Austin Hemmelgarn <austin@netdata.cloud>
+- Removed logs-management plugin
+* Wed Jul 03 2024 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-26
+- Added lm_sensors as weak dependency for plugin-go package
 * Tue Feb 06 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-25
 - Add package for network-viewer plugin
 * Thu Oct 26 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-24

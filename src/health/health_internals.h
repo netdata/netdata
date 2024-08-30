@@ -44,6 +44,7 @@
 #define HEALTH_CHART_LABEL_KEY "chart labels"
 
 void alert_action_options_to_buffer_json_array(BUFFER *wb, const char *key, ALERT_ACTION_OPTIONS options);
+void alert_action_options_to_buffer(BUFFER *wb, ALERT_ACTION_OPTIONS options);
 ALERT_ACTION_OPTIONS alert_action_options_parse(char *o);
 ALERT_ACTION_OPTIONS alert_action_options_parse_one(const char *o);
 
@@ -59,7 +60,7 @@ typedef struct rrd_alert_prototype {
         struct rrd_alert_prototype *prev, *next;
     } _internal;
 } RRD_ALERT_PROTOTYPE;
-bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap);
+bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, char **msg);
 void health_prototype_cleanup(RRD_ALERT_PROTOTYPE *ap);
 void health_prototype_free(RRD_ALERT_PROTOTYPE *ap);
 

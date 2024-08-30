@@ -1,0 +1,255 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-beanstalk
+      plugin_name: go.d.plugin
+      module_name: beanstalk
+      monitored_instance:
+        name: Beanstalk
+        link: https://beanstalkd.github.io/
+        categories:
+          - data-collection.message-brokers
+        icon_filename: "beanstalk.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - beanstalk
+        - beanstalkd
+        - message
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Beanstalk server performance and provides detailed statistics for each tube.
+        method_description: |
+          Using the [beanstalkd protocol](https://github.com/beanstalkd/beanstalkd/blob/master/doc/protocol.txt), it communicates with the Beanstalk daemon to gather essential metrics that help understand the server's performance and activity.
+          Executed commands:
+
+          - [stats](https://github.com/beanstalkd/beanstalkd/blob/91c54fc05dc759ef27459ce4383934e1a4f2fb4b/doc/protocol.txt#L553).
+          - [list-tubes](https://github.com/beanstalkd/beanstalkd/blob/91c54fc05dc759ef27459ce4383934e1a4f2fb4b/doc/protocol.txt#L688).
+          - [stats-tube](https://github.com/beanstalkd/beanstalkd/blob/91c54fc05dc759ef27459ce4383934e1a4f2fb4b/doc/protocol.txt#L497).
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects Beanstalk instances running on localhost that are listening on port 11300.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/beanstalk.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: The IP address and port where the Beanstalk service listens for connections.
+              default_value: 127.0.0.1:11300
+              required: true
+            - name: timeout
+              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              default_value: 1
+              required: false
+            - name: tube_selector
+              description: "Specifies a [pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) for which Beanstalk tubes Netdata will collect statistics."
+              default_value: "*"
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:11300
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:11300
+
+                  - name: remote
+                    address: 203.0.113.0:11300
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: beanstalk_server_buried_jobs
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/beanstalkd.conf
+        metric: beanstalk.current_jobs
+        info: number of buried jobs across all tubes. You need to manually kick them so they can be processed. Presence of buried jobs in a tube does not affect new jobs.
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: beanstalk.current_jobs
+              description: Current Jobs
+              unit: "jobs"
+              chart_type: stacked
+              dimensions:
+                - name: ready
+                - name: buried
+                - name: urgent
+                - name: delayed
+                - name: reserved
+            - name: beanstalk.jobs_rate
+              description: Jobs Rate
+              unit: "jobs/s"
+              chart_type: line
+              dimensions:
+                - name: created
+            - name: beanstalk.jobs_timeouts
+              description: Timed Out Jobs
+              unit: "jobs/s"
+              chart_type: line
+              dimensions:
+                - name: timeouts
+            - name: beanstalk.current_tubes
+              description: Current Tubes
+              unit: "tubes"
+              chart_type: line
+              dimensions:
+                - name: tubes
+            - name: beanstalk.commands_rate
+              description: Commands Rate
+              unit: "commands/s"
+              chart_type: stacked
+              dimensions:
+                - name: put
+                - name: peek
+                - name: peek-ready
+                - name: peek-delayed
+                - name: peek-buried
+                - name: reserve
+                - name: reserve-with-timeout
+                - name: touch
+                - name: use
+                - name: watch
+                - name: ignore
+                - name: delete
+                - name: bury
+                - name: kick
+                - name: stats
+                - name: stats-job
+                - name: stats-tube
+                - name: list-tubes
+                - name: list-tube-used
+                - name: list-tubes-watched
+                - name: pause-tube
+            - name: beanstalk.current_connections
+              description: Current Connections
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: open
+                - name: producers
+                - name: workers
+                - name: waiting
+            - name: beanstalk.connections_rate
+              description: Connections Rate
+              unit: "connections/s"
+              chart_type: area
+              dimensions:
+                - name: created
+            - name: beanstalk.binlog_records
+              description: Binlog Records
+              unit: "records/s"
+              chart_type: line
+              dimensions:
+                - name: written
+                - name: migrated
+            - name: beanstalk.cpu_usage
+              description: Cpu Usage
+              unit: "percent"
+              chart_type: stacked
+              dimensions:
+                - name: user
+                - name: system
+            - name: beanstalk.uptime
+              description: seconds
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: tube
+          description: "Metrics related to Beanstalk tubes. This set of metrics is provided for each tube."
+          labels:
+            - name: tube_name
+              description: Tube name.
+          metrics:
+            - name: beanstalk.tube_current_jobs
+              description: Tube Current Jobs
+              unit: "jobs"
+              chart_type: stacked
+              dimensions:
+                - name: ready
+                - name: buried
+                - name: urgent
+                - name: delayed
+                - name: reserved
+            - name: beanstalk.tube_jobs_rate
+              description: Tube Jobs Rate
+              unit: "jobs/s"
+              chart_type: line
+              dimensions:
+                - name: created
+            - name: beanstalk.tube_commands_rate
+              description: Tube Commands
+              unit: "commands/s"
+              chart_type: stacked
+              dimensions:
+                - name: delete
+                - name: pause-tube
+            - name: beanstalk.tube_current_connections
+              description: Tube Current Connections
+              unit: "connections"
+              chart_type: stacked
+              dimensions:
+                - name: using
+                - name: waiting
+                - name: watching
+            - name: beanstalk.tube_pause_time
+              description: Tube Pause Time
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: since
+                - name: left

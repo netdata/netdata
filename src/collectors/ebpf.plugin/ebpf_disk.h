@@ -20,6 +20,7 @@
 #define MKDEV(ma,mi)    (((ma) << MINORBITS) | (mi))
 
 enum netdata_latency_disks_flags {
+    NETDATA_DISK_NONE = 0,
     NETDATA_DISK_ADDED_TO_PLOT_LIST = 1,
     NETDATA_DISK_CHART_CREATED = 2,
     NETDATA_DISK_IS_HERE = 4,
@@ -66,6 +67,8 @@ typedef struct netdata_ebpf_publish_disk {
     netdata_ebpf_disks_t *plot;
     struct netdata_ebpf_publish_disk *next;
 } ebpf_publish_disk_t;
+
+#define NETDATA_EBPF_DISK_LATENCY_CONTEXT "disk.latency_io"
 
 extern struct config disk_config;
 

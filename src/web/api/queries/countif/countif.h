@@ -28,7 +28,7 @@ static inline void tg_countif_create(RRDR *r, const char *options __maybe_unused
 
     if(options && *options) {
         // skip any leading spaces
-        while(isspace(*options)) options++;
+        while(isspace((uint8_t)*options)) options++;
 
         // find the comparison function
         switch(*options) {
@@ -73,7 +73,7 @@ static inline void tg_countif_create(RRDR *r, const char *options __maybe_unused
         if(*options) options++;
 
         // skip everything up to the first digit
-        while(isspace(*options)) options++;
+        while(isspace((uint8_t)*options)) options++;
 
         g->target = str2ndd(options, NULL);
     }

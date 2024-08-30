@@ -8,8 +8,8 @@
 
 // return a node list
 struct node_instance_list {
-    uuid_t  node_id;
-    uuid_t  host_id;
+    nd_uuid_t  node_id;
+    nd_uuid_t  host_id;
     char *hostname;
     int live;
     int queryable;
@@ -29,30 +29,30 @@ void metadata_sync_init(void);
 void metadata_sync_shutdown(void);
 void metadata_sync_shutdown_prepare(void);
 
-void metaqueue_delete_dimension_uuid(uuid_t *uuid);
-void metaqueue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid);
+void metaqueue_delete_dimension_uuid(nd_uuid_t *uuid);
+void metaqueue_store_claim_id(nd_uuid_t *host_uuid, nd_uuid_t *claim_uuid);
 void metaqueue_host_update_info(RRDHOST *host);
 void metaqueue_ml_load_models(RRDDIM *rd);
-void detect_machine_guid_change(uuid_t *host_uuid);
+void detect_machine_guid_change(nd_uuid_t *host_uuid);
 void metadata_queue_load_host_context(RRDHOST *host);
 void metadata_delete_host_chart_labels(char *machine_guid);
 void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc);
 
 int sql_metadata_cache_stats(int op);
 
-int get_node_id(uuid_t *host_id, uuid_t *node_id);
-int update_node_id(uuid_t *host_id, uuid_t *node_id);
+int get_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
+int sql_update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id);
 struct node_instance_list *get_node_list(void);
 void sql_load_node_id(RRDHOST *host);
 
 // Help build archived hosts in memory when agent starts
-void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info);
-void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id);
-RRDLABELS *sql_load_host_labels(uuid_t *host_id);
+void sql_build_host_system_info(nd_uuid_t *host_id, struct rrdhost_system_info *system_info);
+void invalidate_node_instances(nd_uuid_t *host_id, nd_uuid_t *claim_id);
+RRDLABELS *sql_load_host_labels(nd_uuid_t *host_id);
+bool sql_set_host_label(nd_uuid_t *host_id, const char *label_key, const char *label_value);
 
 uint64_t sqlite_get_meta_space(void);
 int sql_init_meta_database(db_check_action_type_t rebuild, int memory);
-void sql_close_meta_database(void);
 
 // UNIT TEST
 int metadata_unittest(void);

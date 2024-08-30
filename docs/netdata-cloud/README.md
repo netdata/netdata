@@ -43,7 +43,7 @@ Netdata Cloud provides the following features, on top of what the Netdata agents
 
    Netdata Cloud is a fundamental component for achieving an optimal cost structure and flexibility, in structuring observability the way that is best suited for each case.
 
-2. **Role Based Access Control (RBAC)**: Netdata Cloud has all the mechanisms for user-management and access control. It allows assigning all users a role, segmenting the infrastructure into rooms, and associating rooms with roles and users.
+2. **Role Based Access Control (RBAC)**: Netdata Cloud has all the mechanisms for user-management and access control. It allows assigning all users a role, segmenting the infrastructure into rooms, and associating Rooms with roles and users.
 
 3. **Access from anywhere**: Netdata agents are installed on-prem and this is where all your data are always stored. Netdata Cloud allows querying all the Netdata agents (Standalone, Children and Parents) in real-time when dashboards are accessed via Netdata Cloud.
 
@@ -57,7 +57,7 @@ Netdata Cloud provides the following features, on top of what the Netdata agents
 
    Custom dashboards are created directly from the UI, without the need for learning a query language. Netdata Cloud provides all the APIs to the Netdata dashboards to store, browse and retrieve custom dashboards created by all users.
 
-6. **Advanced Customization**: Netdata Cloud provides all the APIs for the dashboard to have different default settings per space, per room and per user, allowing administrators and users to customize the Netdata dashboards and charts the way they see fit.
+6. **Advanced Customization**: Netdata Cloud provides all the APIs for the dashboard to have different default settings per space, per Room and per user, allowing administrators and users to customize the Netdata dashboards and charts the way they see fit.
 
 ## Data Exposed to Netdata Cloud
 
@@ -113,9 +113,9 @@ However, when there are multiple Netdata agents involved, the queries will be fa
 
 No. Any or all Netdata agents can be connected to Netdata Cloud.
 
-We recommend to create [observability centralization points](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md), as required for operational efficiency (ephemeral nodes, teams or services isolation, central control of alerts, production systems performance), security policies (internet isolation), or cost optimization (use existing capacities before allocating new ones).
+We recommend to create [observability centralization points](/docs/observability-centralization-points/README.md), as required for operational efficiency (ephemeral nodes, teams or services isolation, central control of alerts, production systems performance), security policies (internet isolation), or cost optimization (use existing capacities before allocating new ones).
 
-We suggest to review the [Best Practices for Observability Centralization Points](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/best-practices.md).
+We suggest to review the [Best Practices for Observability Centralization Points](/docs/observability-centralization-points/best-practices.md).
 
 ## When I have Netdata Parents, do I need to connect Netdata Children to Netdata Cloud too?
 
@@ -129,6 +129,6 @@ Netdata Cloud prefers:
 
 - The most distant (from the Child) Parent available, when doing metrics visualization queries (since usually these Parents have been added for this purpose).
 
-- The closest (to the Child) Parent available, for [Top Monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) (since top-monitoring provides live data, like the processes running, the list of sockets open, etc). The streaming protocol of Netdata Parents and Children is able to forward such requests to the right child, via the Parents, to respond with live and accurate data.
+- The closest (to the Child) Parent available, for [Top Monitoring](/docs/top-monitoring-netdata-functions.md) (since top-monitoring provides live data, like the processes running, the list of sockets open, etc). The streaming protocol of Netdata Parents and Children is able to forward such requests to the right child, via the Parents, to respond with live and accurate data.
 
 Netdata Children may be connected to Netdata Cloud for high-availability, in case the Netdata Parents are unreachable.

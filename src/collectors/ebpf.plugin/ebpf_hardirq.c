@@ -228,10 +228,10 @@ static void ebpf_obsolete_hardirq_global(ebpf_module_t *em)
                               "hardirq_latency",
                               "",
                               "Hardware IRQ latency",
-                              EBPF_COMMON_DIMENSION_MILLISECONDS,
+                              EBPF_COMMON_UNITS_MILLISECONDS,
                               "interrupts",
                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
+                              NETDATA_EBPF_SYSTEM_HARDIRQ_LATENCY_CTX,
                               NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
                               em->update_every
     );
@@ -244,9 +244,10 @@ static void ebpf_obsolete_hardirq_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
-static void hardirq_exit(void *ptr)
+static void hardirq_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -499,9 +500,9 @@ static void hardirq_create_charts(int update_every)
         NETDATA_EBPF_SYSTEM_GROUP,
         "hardirq_latency",
         "Hardware IRQ latency",
-        EBPF_COMMON_DIMENSION_MILLISECONDS,
+        EBPF_COMMON_UNITS_MILLISECONDS,
         "interrupts",
-        NULL,
+        NETDATA_EBPF_SYSTEM_HARDIRQ_LATENCY_CTX,
         NETDATA_EBPF_CHART_TYPE_STACKED,
         NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
         NULL, NULL, 0, update_every,
@@ -581,10 +582,10 @@ static void hardirq_collector(ebpf_module_t *em)
     //This will be cancelled by its parent
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
         counter = 0;
@@ -658,9 +659,10 @@ static int ebpf_hardirq_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_hardirq_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(hardirq_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(hardirq_exit) cleanup_ptr = em;
+
     em->maps = hardirq_maps;
 
     if (ebpf_enable_tracepoints(hardirq_tracepoints) == 0) {
@@ -679,8 +681,6 @@ void *ebpf_hardirq_thread(void *ptr)
 
 endhardirq:
     ebpf_update_disabled_plugin_stats(em);
-
-    netdata_thread_cleanup_pop(1);
 
     return NULL;
 }

@@ -62,7 +62,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         "mem"
         , chart_name
         , chart_name
-        , name
+        , "zram"
         , "mem.zram_usage"
         , "ZRAM Memory Usage"
         , "MiB"
@@ -80,7 +80,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         "mem"
         , chart_name
         , chart_name
-        , name
+        , "zram"
         , "mem.zram_savings"
         , "ZRAM Memory Savings"
         , "MiB"
@@ -98,7 +98,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         "mem"
         , chart_name
         , chart_name
-        , name
+        , "zram"
         , "mem.zram_ratio"
         , "ZRAM Compression Ratio (original to compressed)"
         , "ratio"
@@ -115,7 +115,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         "mem"
         , chart_name
         , chart_name
-        , name
+        , "zram"
         , "mem.zram_efficiency"
         , "ZRAM Efficiency"
         , "percentage"
@@ -128,7 +128,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
     rrdlabels_add(d->st_alloc_efficiency->rrdlabels, "device", name, RRDLABEL_SRC_AUTO);
 }
 
-static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_every) {
+static int init_devices(DICTIONARY *devices, int update_every) {
     int count = 0;
     struct dirent *de;
     struct stat st;
@@ -136,36 +136,31 @@ static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_ev
     ZRAM_DEVICE device;
     char filename[FILENAME_MAX + 1];
 
-    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/dev");
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block");
     DIR *dir = opendir(filename);
 
     if (unlikely(!dir))
         return 0;
-    while ((de = readdir(dir)))
-    {
-        snprintfz(filename, FILENAME_MAX, "%s/dev/%s", netdata_configured_host_prefix, de->d_name);
-        if (unlikely(stat(filename, &st) != 0))
-        {
-            collector_error("ZRAM : Unable to stat %s: %s", filename, strerror(errno));
+
+    while ((de = readdir(dir))) {
+        snprintfz(filename, FILENAME_MAX, "%s/sys/block/%s/mm_stat", netdata_configured_host_prefix, de->d_name);
+        if (unlikely(stat(filename, &st) != 0)) {
             continue;
         }
-        if (major(st.st_rdev) == zram_id)
-        {
-            collector_info("ZRAM : Found device %s", filename);
-            snprintfz(filename, FILENAME_MAX, "%s/sys/block/%s/mm_stat", netdata_configured_host_prefix, de->d_name);
-            ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
-            if (ff == NULL)
-            {
-                collector_error("ZRAM : Failed to open %s: %s", filename, strerror(errno));
-                continue;
-            }
-            device.file = ff;
-            init_rrd(de->d_name, &device, update_every);
-            dictionary_set(devices, de->d_name, &device, sizeof(ZRAM_DEVICE));
-            count++;
+        ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
+        if (ff == NULL) {
+            collector_error("ZRAM : Failed to open %s: %s", filename, strerror(errno));
+            continue;
         }
+
+        device.file = ff;
+        init_rrd(de->d_name, &device, update_every);
+        dictionary_set(devices, de->d_name, &device, sizeof(ZRAM_DEVICE));
+        count++;
     }
+
     closedir(dir);
+
     return count;
 }
 
@@ -274,7 +269,7 @@ int do_sys_block_zram(int update_every, usec_t dt) {
         procfile_close(ff);
 
         devices = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED, &dictionary_stats_category_collectors, 0);
-        device_count = init_devices(devices, (unsigned int)zram_id, update_every);
+        device_count = init_devices(devices, update_every);
     }
 
     if (unlikely(device_count < 1))

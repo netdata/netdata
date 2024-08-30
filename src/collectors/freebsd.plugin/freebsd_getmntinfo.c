@@ -212,9 +212,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
 
                 int rendered = 0;
 
-                if (m->do_space == CONFIG_BOOLEAN_YES || (m->do_space == CONFIG_BOOLEAN_AUTO &&
-                                                          (mntbuf[i].f_blocks > 2 ||
-                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                if (m->do_space == CONFIG_BOOLEAN_YES || m->do_space == CONFIG_BOOLEAN_AUTO) {
                     if (unlikely(!m->st_space)) {
                         snprintfz(title, sizeof(title) - 1, "Disk Space Usage for %s [%s]",
                                   mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
@@ -250,9 +248,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
                     rendered++;
                 }
 
-                if (m->do_inodes == CONFIG_BOOLEAN_YES || (m->do_inodes == CONFIG_BOOLEAN_AUTO &&
-                                                           (mntbuf[i].f_files > 1 ||
-                                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                if (m->do_inodes == CONFIG_BOOLEAN_YES || m->do_inodes == CONFIG_BOOLEAN_AUTO) {
                     if (unlikely(!m->st_inodes)) {
                         snprintfz(title, sizeof(title) - 1, "Disk Files (inodes) Usage for %s [%s]",
                                   mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);

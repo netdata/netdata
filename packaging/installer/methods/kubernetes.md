@@ -3,14 +3,14 @@ import TabItem from '@theme/TabItem';
 
 # Install Netdata on Kubernetes
 
-This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and connect it to Netdata Cloud. Read our [Kubernetes visualizations](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) documentation, to see what you will get.
+This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and connect it to Netdata Cloud. Read our [Kubernetes visualizations](/docs/dashboards-and-charts/kubernetes-tab.md) documentation, to see what you will get.
 
 The [Netdata Helm chart](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) installs one `parent` pod for storing metrics and managing alert notifications, plus an additional
 `child` pod for every node in the cluster, responsible for collecting metrics from the node, Kubernetes control planes,
 pods/containers, and [supported application-specific
 metrics](https://github.com/netdata/helmchart#service-discovery-and-supported-services).
 
-### Prerequisites
+## Prerequisites
 
 To deploy Kubernetes monitoring with Netdata, you need:
 
@@ -97,7 +97,7 @@ On an existing installation, in order to connect it to Netdata Cloud you will ne
   > :bookmark_tabs: Note
   >  
   > Make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-  > and `YOUR_ROOM_ID` with the ID of the room you are willing to connect to.
+  > and `YOUR_ROOM_ID` with the ID of the Room you are willing to connect to.
 
   These settings connect your `parent`/`child` nodes to Netdata Cloud and store more metrics in the nodes' time-series databases.
 
@@ -191,10 +191,10 @@ helm upgrade netdata netdata/netdata
 
 ## What's next?
 
-[Start Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) in Netdata Cloud, which comes with meaningful visualizations out of the box.
+[Start Kubernetes monitoring](/docs/dashboards-and-charts/kubernetes-tab.md) in Netdata Cloud, which comes with meaningful visualizations out of the box.
 
 ### Related reference documentation
 
-- [Netdata Cloud · Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
+- [Netdata Cloud · Kubernetes monitoring](/docs/dashboards-and-charts/kubernetes-tab.md)
 - [Netdata Helm chart](https://github.com/netdata/helmchart)
 - [Netdata service discovery](https://github.com/netdata/agent-service-discovery/)

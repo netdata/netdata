@@ -1,0 +1,13 @@
+{
+  "update_every": 123,
+  "timeout": 123.123,
+  "include": [
+    "ok"
+  ],
+  "skip_transient": true,
+  "collect_unit_files": true,
+  "collect_unit_files_every": 123.123,
+  "include_unit_files": [
+    "ok"
+  ]
+}

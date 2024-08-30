@@ -1,6 +1,6 @@
 # Netdata Agent Versions & Platforms
 
-Netdata is evolving rapidly and new features are added at a constant pace. Therefore we have frequent release cadence to deliver all these features to use as soon as possible.
+Netdata is evolving rapidly and new features are added at a constant pace. Therefore we have a frequent release cadence to deliver all these features to use as soon as possible.
 
 Netdata Agents are available in 2 versions:
 
@@ -28,11 +28,11 @@ Binary distribution packages are provided by Netdata, via CI integration, for th
 |      Oracle Linux       |             8.x, 9.x             |               `x86_64`, `AArch64`                |     RPM      |
 | Redhat Enterprise Linux |               7.x                |                     `x86_64`                     |     RPM      |
 | Redhat Enterprise Linux |             8.x, 9.x             |               `x86_64`, `AArch64`                |     RPM      |
-|         Ubuntu          |       20.04, 22.04, 23.10        |            `x86_64`, `i386`, `ARMv7`             |     DEB      |
+|         Ubuntu          |       20.04, 22.04, 23.10        |       `x86_64`, `i386`, `ARMv7`, `AArch64`       |     DEB      |
 
-> IMPORTANT: Linux distributions frequently provide binary packages of Netdata. However, the packages you will find at the distributions' repositories may be outdated, incomplete, missing significant features or completely broken. We recommend to use the packages we provide. 
+> IMPORTANT: Linux distributions frequently provide binary packages of Netdata. However, the packages you will find in the distributions' repositories may be outdated, incomplete, missing significant features or completely broken. We recommend using the packages we provide. 
 
-## Third party Supported Binary Packages
+## Third-party Supported Binary Packages
 
 The following distributions always provide the latest stable version of Netdata:
 
@@ -67,4 +67,4 @@ Static builds usually miss certain features that require operating-system suppor
 - systemd-journal features
 - eBPF related features
 
-When platforms are removed from the [Binary Distribution Packages](https://github.com/netdata/netdata/blob/master/packaging/makeself/README.md) list, they default to install or update Netdata to a static build. This may mean that after platforms become EOL, Netdata on them may lose some of its features. We recommend to upgrade the operating system before it becomes EOL, to continue using all the features of Netdata.
+When platforms are removed from the [Binary Distribution Packages](/packaging/makeself/README.md) list, they default to install or update Netdata to a static build. This may mean that after platforms become EOL, Netdata on them may lose some of its features. We recommend upgrading the operating system before it becomes EOL, to continue using all the features of Netdata.

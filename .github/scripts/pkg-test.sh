@@ -21,7 +21,9 @@ install_debian_like() {
 ! -name '*dbgsym*' ! -name '*cups*' ! -name '*freeipmi*') || exit 3
 
   # Install testing tools
-  apt-get install -y --no-install-recommends curl "${netcat}" jq || exit 1
+  apt-get install -y --no-install-recommends curl dpkg-dev "${netcat}" jq || exit 1
+
+  dpkg-architecture --equal amd64 || NETDATA_SKIP_EBPF=1
 }
 
 install_fedora_like() {
@@ -40,6 +42,8 @@ install_fedora_like() {
 
   # Install testing tools
   "${PKGMGR}" install -y curl nc jq || exit 1
+
+  [ "$(rpm --eval '%{_build_arch}')" = "x86_64" ] || NETDATA_SKIP_EBPF=1
 }
 
 install_centos() {
@@ -62,6 +66,8 @@ install_centos() {
   # Install testing tools
   # shellcheck disable=SC2086
   "${PKGMGR}" install -y ${opts} curl nc jq || exit 1
+
+  [ "$(rpm --eval '%{_build_arch}')" = "x86_64" ] || NETDATA_SKIP_EBPF=1
 }
 
 install_amazon_linux() {
@@ -78,6 +84,8 @@ install_amazon_linux() {
   # Install testing tools
   # shellcheck disable=SC2086
   "${PKGMGR}" install -y ${opts} curl nc jq || exit 1
+
+  [ "$(rpm --eval '%{_build_arch}')" = "x86_64" ] || NETDATA_SKIP_EBPF=1
 }
 
 install_suse_like() {
@@ -90,6 +98,8 @@ install_suse_like() {
 
   # Install testing tools
   zypper install -y --allow-downgrade --no-recommends curl netcat-openbsd jq || exit 1
+
+  [ "$(rpm --eval '%{_build_arch}')" = "x86_64" ] || NETDATA_SKIP_EBPF=1
 }
 
 dump_log() {
@@ -103,7 +113,7 @@ case "${DISTRO}" in
   fedora | oraclelinux)
     install_fedora_like
     ;;
-  centos| centos-stream | rockylinux | almalinux)
+  centos | centos-stream | rockylinux | almalinux)
     install_centos
     ;;
   amazonlinux)
@@ -119,6 +129,13 @@ case "${DISTRO}" in
 esac
 
 trap dump_log EXIT
+
+export NETDATA_LIBEXEC_PREFIX=/usr/libexec/netdata
+export NETDATA_SKIP_LIBEXEC_PARTS="freeipmi|xenstat|nfacct|cups"
+
+if [ -n "${NETDATA_SKIP_EBPF}" ]; then
+    export NETDATA_SKIP_LIBEXEC_PARTS="${NETDATA_SKIP_LIBEXEC_PARTS}|ebpf"
+fi
 
 /usr/sbin/netdata -D > ./netdata.log 2>&1 &
 

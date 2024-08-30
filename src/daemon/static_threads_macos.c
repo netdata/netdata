@@ -2,9 +2,19 @@
 
 #include "common.h"
 
-extern void *macos_main(void *ptr);
+void *macos_main(void *ptr);
+void *timex_main(void *ptr);
 
-const struct netdata_static_thread static_threads_macos[] = {
+static const struct netdata_static_thread static_threads_macos[] = {
+    {
+        .name = "P[timex]",
+        .config_section = CONFIG_SECTION_PLUGINS,
+        .config_name = "timex",
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = timex_main
+    },
     {
         .name = "P[macos]",
         .config_section = CONFIG_SECTION_PLUGINS,
@@ -17,14 +27,6 @@ const struct netdata_static_thread static_threads_macos[] = {
         .global_variable = NULL,
     },
 
-    {NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL}
-};
-
-const struct netdata_static_thread static_threads_freebsd[] = {
-    {NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL}
-};
-
-const struct netdata_static_thread static_threads_linux[] = {
     {NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL}
 };
 

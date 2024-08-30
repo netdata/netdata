@@ -1,0 +1,303 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-httpcheck
+      plugin_name: go.d.plugin
+      module_name: httpcheck
+      monitored_instance:
+        name: HTTP Endpoints
+        link: ""
+        icon_filename: globe.svg
+        categories:
+          - data-collection.synthetic-checks
+      keywords:
+        - webserver
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors HTTP servers availability status and response time.
+
+          Possible statuses:
+
+          | Status        | Description                                                                                                                                                                                  |
+          |---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+          | success       | HTTP request completed successfully with a status code matching the configured `status_accepted` range (default: 200), and the response body and headers (if configured) match expectations. |
+          | timeout       | HTTP request timed out before receiving a response (default: 1 second).                                                                                                                      |
+          | no_connection | Failed to establish a connection to the target.                                                                                                                                              |
+          | redirect      | Received a redirect response (3xx status code) while `not_follow_redirects` is configured.                                                                                                   |
+          | bad_status    | HTTP request completed with a status code outside the configured `status_accepted` range (default: non-200).                                                                                 |
+          | bad_content   | HTTP request completed successfully but the response body does not match the expected content (when using `response_match`).                                                                 |
+          | bad_header    | HTTP request completed successfully but response headers do not match the expected values (when using `headers_match`).                                                                      |
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/httpcheck.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: ""
+              required: true
+            - name: status_accepted
+              description: "HTTP accepted response statuses. Anything else will result in 'bad status' in the status chart."
+              default_value: "[200]"
+              required: false
+            - name: response_match
+              description: If the status code is accepted, the content of the response will be matched against this regular expression.
+              default_value: ""
+              required: false
+            - name: headers_match
+              description: "This option defines a set of rules that check for specific key-value pairs in the HTTP headers of the response."
+              default_value: "[]"
+              required: false
+            - name: headers_match.exclude
+              description: "This option determines whether the rule should check for the presence of the specified key-value pair or the absence of it."
+              default_value: false
+              required: false
+            - name: headers_match.key
+              description: "The exact name of the HTTP header to check for."
+              default_value: ""
+              required: true
+            - name: headers_match.value
+              description: "The [pattern](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format) to match against the value of the specified header."
+              default_value: ""
+              required: false
+            - name: cookie_file
+              description: Path to cookie file. See [cookie file format](https://everything.curl.dev/http/cookies/fileformat).
+              default_value: ""
+              required: false
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: "GET"
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080
+            - name: With HTTP request headers
+              description: Configuration with HTTP request headers that will be sent by the client.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080
+                    headers:
+                      Host: localhost:8080
+                      User-Agent: netdata/go.d.plugin
+                      Accept: */*
+            - name: With `status_accepted`
+              description: A basic example configuration with non-default status_accepted.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080
+                    status_accepted:
+                      - 200
+                      - 204
+            - name: With `header_match`
+              description: Example configurations with `header_match`. See the value [pattern](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format) syntax.
+              config: |
+                jobs:
+                    # The "X-Robots-Tag" header must be present in the HTTP response header,
+                    # but the value of the header does not matter.
+                    # This config checks for the presence of the header regardless of its value.
+                  - name: local
+                    url: http://127.0.0.1:8080
+                    header_match:
+                      - key: X-Robots-Tag
+
+                    # The "X-Robots-Tag" header must be present in the HTTP response header
+                    # only if its value is equal to "noindex, nofollow".
+                    # This config checks both the presence of the header and its value.
+                  - name: local
+                    url: http://127.0.0.1:8080
+                    header_match:
+                      - key: X-Robots-Tag
+                        value: '= noindex,nofollow'
+
+                    # The "X-Robots-Tag" header must not be present in the HTTP response header
+                    # but the value of the header does not matter.
+                    # This config checks for the presence of the header regardless of its value.
+                  - name: local
+                    url: http://127.0.0.1:8080
+                    header_match:
+                      - key: X-Robots-Tag
+                        exclude: yes
+
+                    # The "X-Robots-Tag" header must not be present in the HTTP response header
+                    # only if its value is equal to "noindex, nofollow".
+                    # This config checks both the presence of the header and its value.
+                  - name: local
+                    url: http://127.0.0.1:8080
+                    header_match:
+                      - key: X-Robots-Tag
+                        exclude: yes
+                        value: '= noindex,nofollow'
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: |
+                Do not validate server certificate chain and hostname.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:8080
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080
+                
+                  - name: remote
+                    url: http://192.0.2.1:8080
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: target
+          description: The metrics refer to the monitored target.
+          labels:
+            - name: url
+              description: url value that is set in the configuration file.
+          metrics:
+            - name: httpcheck.response_time
+              description: HTTP Response Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: httpcheck.response_length
+              description: HTTP Response Body Length
+              unit: characters
+              chart_type: line
+              dimensions:
+                - name: length
+            - name: httpcheck.status
+              description: HTTP Check Status
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: timeout
+                - name: redirect
+                - name: no_connection
+                - name: bad_content
+                - name: bad_header
+                - name: bad_status
+            - name: httpcheck.in_state
+              description: HTTP Current State Duration
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: time

@@ -24,7 +24,7 @@ jobs:
           submodules: recursive
       - name: Check files
         id: check-files
-        uses: tj-actions/changed-files@v44
+        uses: tj-actions/changed-files@v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -36,6 +36,7 @@ jobs:
           files_ignore: |
             **/*.md
             src/go/**/metadata.yaml
+            packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
         env:
@@ -62,7 +63,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y python3-packaging
+        run: |
+          sudo apt-get update || true
+          sudo apt-get install -y python3-packaging
       - name: Get Go version and modules
         id: get-version
         run: .github/scripts/get-go-version.py

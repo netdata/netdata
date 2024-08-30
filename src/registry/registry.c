@@ -154,8 +154,8 @@ static inline int registry_person_url_callback_verify_machine_exists(REGISTRY_PE
 // that could make this safe, so try to be as atomic as possible.
 
 void registry_update_cloud_base_url() {
-    registry.cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
-    setenv("NETDATA_REGISTRY_CLOUD_BASE_URL", registry.cloud_base_url, 1);
+    registry.cloud_base_url = cloud_config_url_get();
+    nd_setenv("NETDATA_REGISTRY_CLOUD_BASE_URL", registry.cloud_base_url, 1);
 }
 
 // ----------------------------------------------------------------------------
@@ -164,21 +164,19 @@ void registry_update_cloud_base_url() {
 int registry_request_hello_json(RRDHOST *host, struct web_client *w, bool do_not_track) {
     registry_json_header(host, w, "hello", REGISTRY_STATUS_OK);
 
-    if(host->node_id)
-        buffer_json_member_add_uuid(w->response.data, "node_id", host->node_id);
+    if(!UUIDiszero(host->node_id))
+        buffer_json_member_add_uuid(w->response.data, "node_id", host->node_id.uuid);
 
     buffer_json_member_add_object(w->response.data, "agent");
     {
         buffer_json_member_add_string(w->response.data, "machine_guid", localhost->machine_guid);
 
-        if(localhost->node_id)
-            buffer_json_member_add_uuid(w->response.data, "node_id", localhost->node_id);
+        if(!UUIDiszero(localhost->node_id))
+            buffer_json_member_add_uuid(w->response.data, "node_id", localhost->node_id.uuid);
 
-        char *claim_id = get_agent_claimid();
-        if (claim_id) {
-            buffer_json_member_add_string(w->response.data, "claim_id", claim_id);
-            freez(claim_id);
-        }
+        CLAIM_ID claim_id = claim_id_get();
+        if (claim_id_is_set(claim_id))
+            buffer_json_member_add_string(w->response.data, "claim_id", claim_id.str);
 
         buffer_json_member_add_boolean(w->response.data, "bearer_protection", netdata_is_protected_by_bearer);
     }
@@ -198,8 +196,8 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w, bool do_not
         buffer_json_add_array_item_object(w->response.data);
         buffer_json_member_add_string(w->response.data, "machine_guid", h->machine_guid);
 
-        if(h->node_id)
-            buffer_json_member_add_uuid(w->response.data, "node_id", h->node_id);
+        if(!UUIDiszero(h->node_id))
+            buffer_json_member_add_uuid(w->response.data, "node_id", h->node_id.uuid);
 
         buffer_json_member_add_string(w->response.data, "hostname", rrdhost_registry_hostname(h));
         buffer_json_object_close(w->response.data);

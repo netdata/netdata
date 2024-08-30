@@ -1,0 +1,183 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-megacli
+      plugin_name: go.d.plugin
+      module_name: megacli
+      monitored_instance:
+        name: MegaCLI MegaRAID
+        link: "https://wikitech.wikimedia.org/wiki/MegaCli"
+        icon_filename: "hard-drive.svg"
+        categories:
+          - data-collection.storage-mount-points-and-filesystems
+      keywords:
+        - storage
+        - raid-controller
+        - manage-disks
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitors the health of MegaCLI Hardware RAID by tracking the status of RAID adapters, physical drives, and backup batteries in your storage system.
+          It relies on the `megacli` CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+
+          Executed commands:
+          -  `megacli -LDPDInfo -aAll -NoLog`
+          -  `megacli -AdpBbuCmd -aAll -NoLog`
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/megacli.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: timeout
+              description: megacli binary execution timeout.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
+              config: |
+                jobs:
+                  - name: megacli
+                    update_every: 5  # Collect MegaCli Hardware RAID statistics every 5 seconds
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: megacli_adapter_health_state
+        metric: megacli.adapter_health_state
+        info: MegaCLI adapter ${label:adapter_number} is in the degraded state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf
+      - name: megacli_phys_drive_media_errors
+        metric: megacli.phys_drive_media_errors
+        info: MegaCLI physical drive adapter ${label:adapter_number} slot ${label:slot_number} media errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf
+      - name: megacli_phys_drive_predictive_failures
+        metric: megacli.phys_drive_predictive_failures
+        info: MegaCLI physical drive (adapter ${label:adapter_number} slot ${label:slot_number}) predictive failures
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf
+      - name: megacli_bbu_charge
+        metric: megacli.bbu_charge
+        info: MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) average charge over the last minute
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf
+      - name: megacli_bbu_recharge_cycles
+        metric: megacli.bbu_recharge_cycles
+        info: MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) average charge over the last minute
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: adapter
+          description: These metrics refer to the MegaCLI Adapter.
+          labels:
+            - name: adapter_number
+              description: Adapter number
+          metrics:
+            - name: megacli.adapter_health_state
+              description: Adapter health state
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: optimal
+                - name: degraded
+                - name: partially_degraded
+                - name: failed
+        - name: physical drive
+          description: These metrics refer to the MegaCLI Physical Drive.
+          labels:
+            - name: adapter_number
+              description: Adapter number
+            - name: wwn
+              description: World Wide Name
+            - name: slot_number
+              description: Slot number
+            - name: drive_position
+              description: "Position (e.g. DiskGroup: 0, Span: 0, Arm: 2)"
+            - name: drive_type
+              description: Type (e.g. SATA)
+          metrics:
+            - name: megacli.phys_drive_media_errors_rate
+              description: Physical Drive media errors rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: media_errors
+            - name: megacli.phys_drive_predictive_failures_rate
+              description: Physical Drive predictive failures rate
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: predictive_failures
+        - name: backup battery unit
+          description: These metrics refer to the MegaCLI Backup Battery Unit.
+          labels:
+            - name: adapter_number
+              description: Adapter number
+            - name: battery_type
+              description: Battery type (e.g. BBU)
+          metrics:
+            - name: megacli.bbu_charge
+              description: BBU relative charge
+              unit: percentage
+              chart_type: area
+              dimensions:
+                - name: charge
+            - name: megacli.bbu_recharge_cycles
+              description: BBU relative charge
+              unit: cycles
+              chart_type: line
+              dimensions:
+                - name: recharge
+            - name: megacli.bbu_capacity_degradation
+              description: BBU capacity degradation
+              unit: percent
+              chart_type: area
+              dimensions:
+                - name: cap_degradation
+            - name: megacli.bbu_temperature
+              description: BBU bbu_temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
