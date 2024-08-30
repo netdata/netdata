@@ -33,7 +33,7 @@
 #define NSEC_PER_QUARTER (NSEC_PER_YEAR / 4ULL)
 
 // Define a structure to map time units to their multipliers
-const struct duration_unit {
+static const struct duration_unit {
     const char *unit;
     const bool formatter; // true when this unit should be used when formatting to string
     const uint64_t multiplier;
@@ -216,10 +216,10 @@ size_t duration_str_from_days(char *dst, size_t size, unsigned value) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-uint64_t duration_to_unit(nsec_t value, const char *unit) {
+uint64_t nsec_to_unit(nsec_t nsec, const char *unit) {
     const struct duration_unit *du = duration_find_unit(unit);
     if(du)
-        return (value + (du->multiplier / 2)) / du->multiplier;
+        return (nsec + (du->multiplier / 2)) / du->multiplier;
 
     return 0;
 }

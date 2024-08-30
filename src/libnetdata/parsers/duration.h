@@ -17,7 +17,7 @@ size_t duration_str_from_usec_t(char *dst, size_t size, usec_t value);
 size_t duration_str_from_time_t(char *dst, size_t size, time_t value);
 size_t duration_str_from_days(char *dst, size_t size, unsigned value);
 
-// found nsec_t to specific unit
-uint64_t duration_to_unit(nsec_t value, const char *unit);
+// round nsec_t to given unit
+uint64_t nsec_to_unit(nsec_t nsec, const char *unit);
 
 #endif //NETDATA_DURATION_H
