@@ -108,7 +108,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
 
                 if(!df->users.time_to_evict) {
                     // first time we did the above
-                    df->users.time_to_evict = now_s + is_shutdown ? DATAFILE_DELETE_TIMEOUT_SHORT : DATAFILE_DELETE_TIMEOUT_LONG;
+                    df->users.time_to_evict = now_s + (is_shutdown ? DATAFILE_DELETE_TIMEOUT_SHORT : DATAFILE_DELETE_TIMEOUT_LONG);
                     internal_error(true, "DBENGINE: datafile %u of tier %d is not used by any open cache pages, "
                                          "but it has %u lockers (oc:%u, pd:%u), "
                                          "%zu clean and %zu hot open cache pages "
