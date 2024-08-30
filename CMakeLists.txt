@@ -2448,13 +2448,13 @@ set(varlibdir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(netdata_user_POST "${NETDATA_USER}")
 set(netdata_group_POST "${NETDATA_USER}")
 
-configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
-install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh
-        COMPONENT netdata
-        DESTINATION "${BINDIR}")
-
-if(OS_WINDOWS)
+if(NOT OS_WINDOWS)
+        configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
+        install(PROGRAMS
+                ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh
+                COMPONENT netdata
+                DESTINATION "${BINDIR}")
+else()
         install(PROGRAMS
                 ${CMAKE_BINARY_DIR}/netdata_claim.exe
                 COMPONENT netdata
