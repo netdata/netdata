@@ -6,18 +6,30 @@
 
 **Merged pull requests:**
 
+- do not free the sender when the sender thread exits [\#18441](https://github.com/netdata/netdata/pull/18441) ([ktsaou](https://github.com/ktsaou))
+- fix receiver deadlock [\#18440](https://github.com/netdata/netdata/pull/18440) ([ktsaou](https://github.com/ktsaou))
+- fix charts.d/sensors leftovers [\#18439](https://github.com/netdata/netdata/pull/18439) ([ilyam8](https://github.com/ilyam8))
+- remove deadlock from sender [\#18438](https://github.com/netdata/netdata/pull/18438) ([ktsaou](https://github.com/ktsaou))
+- go.d remove duplicates in testing [\#18435](https://github.com/netdata/netdata/pull/18435) ([ilyam8](https://github.com/ilyam8))
+- Improve agent shutdown time [\#18434](https://github.com/netdata/netdata/pull/18434) ([stelfrag](https://github.com/stelfrag))
+- Regenerate integrations.js [\#18432](https://github.com/netdata/netdata/pull/18432) ([netdatabot](https://github.com/netdatabot))
+- go.d/sensors: add sysfs scan method to collect metrics [\#18431](https://github.com/netdata/netdata/pull/18431) ([ilyam8](https://github.com/ilyam8))
+- stream paths propagated to children and parents [\#18430](https://github.com/netdata/netdata/pull/18430) ([ktsaou](https://github.com/ktsaou))
 - go.d lmsensors improve performance [\#18429](https://github.com/netdata/netdata/pull/18429) ([ilyam8](https://github.com/ilyam8))
 - ci fix InvalidDefaultArgInFrom warn [\#18428](https://github.com/netdata/netdata/pull/18428) ([ilyam8](https://github.com/ilyam8))
 - vendor https://github.com/mdlayher/lmsensors [\#18427](https://github.com/netdata/netdata/pull/18427) ([ilyam8](https://github.com/ilyam8))
+- remove charts.d/sensors [\#18426](https://github.com/netdata/netdata/pull/18426) ([ilyam8](https://github.com/ilyam8))
 - Reset last connected when removing stale nodes with netdatacli [\#18425](https://github.com/netdata/netdata/pull/18425) ([stelfrag](https://github.com/stelfrag))
 - remove checks.plugin dir [\#18424](https://github.com/netdata/netdata/pull/18424) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18421](https://github.com/netdata/netdata/pull/18421) ([netdatabot](https://github.com/netdatabot))
 - fix hyperlink in go.d samba meta [\#18420](https://github.com/netdata/netdata/pull/18420) ([ilyam8](https://github.com/ilyam8))
 - add go.d samba [\#18418](https://github.com/netdata/netdata/pull/18418) ([ilyam8](https://github.com/ilyam8))
+- ACLK code cleanup [\#18417](https://github.com/netdata/netdata/pull/18417) ([stelfrag](https://github.com/stelfrag))
 - restore /api/v1/badge.svg [\#18416](https://github.com/netdata/netdata/pull/18416) ([ktsaou](https://github.com/ktsaou))
 - add "smbstatus -P" to ndsudo [\#18414](https://github.com/netdata/netdata/pull/18414) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/sambsa [\#18413](https://github.com/netdata/netdata/pull/18413) ([ilyam8](https://github.com/ilyam8))
 - SPAWN-SERVER: re-evaluate signals even 500ms [\#18411](https://github.com/netdata/netdata/pull/18411) ([ktsaou](https://github.com/ktsaou))
+- Claim on Windows [\#18410](https://github.com/netdata/netdata/pull/18410) ([thiagoftsm](https://github.com/thiagoftsm))
 - kickstart: fix write\_claim\_config when executed as a regular user [\#18406](https://github.com/netdata/netdata/pull/18406) ([ilyam8](https://github.com/ilyam8))
 - Fix coverity issues [\#18405](https://github.com/netdata/netdata/pull/18405) ([stelfrag](https://github.com/stelfrag))
 - remove pyyaml2 [\#18404](https://github.com/netdata/netdata/pull/18404) ([ilyam8](https://github.com/ilyam8))
@@ -334,7 +346,6 @@
 - Detect on startup if the netdata-meta.db file is not a valid database file [\#17924](https://github.com/netdata/netdata/pull/17924) ([stelfrag](https://github.com/stelfrag))
 - eBPF cgroup and mutex [\#17915](https://github.com/netdata/netdata/pull/17915) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix small typo [\#17875](https://github.com/netdata/netdata/pull/17875) ([stelfrag](https://github.com/stelfrag))
-- spawn server \(Windows support for external plugins\) [\#17866](https://github.com/netdata/netdata/pull/17866) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
@@ -411,14 +422,6 @@
 - Regenerate integrations.js [\#17877](https://github.com/netdata/netdata/pull/17877) ([netdatabot](https://github.com/netdatabot))
 - Improve filecheck module metadata. [\#17874](https://github.com/netdata/netdata/pull/17874) ([Ferroin](https://github.com/Ferroin))
 - update Telegram Cloud notification docs to include new topic ID field [\#17873](https://github.com/netdata/netdata/pull/17873) ([papazach](https://github.com/papazach))
-- go.d phpfpm add config schema [\#17872](https://github.com/netdata/netdata/pull/17872) ([ilyam8](https://github.com/ilyam8))
-- Fix updating release info when publishing nightly releases. [\#17871](https://github.com/netdata/netdata/pull/17871) ([Ferroin](https://github.com/Ferroin))
-- go.d phpfpm: debug log the response on decoding error [\#17870](https://github.com/netdata/netdata/pull/17870) ([ilyam8](https://github.com/ilyam8))
-- Improve agent shutdown [\#17868](https://github.com/netdata/netdata/pull/17868) ([stelfrag](https://github.com/stelfrag))
-- Add openSUSE 15.6 to CI. [\#17865](https://github.com/netdata/netdata/pull/17865) ([Ferroin](https://github.com/Ferroin))
-- Update CI infrastructure to publish to secondary packaging host. [\#17863](https://github.com/netdata/netdata/pull/17863) ([Ferroin](https://github.com/Ferroin))
-- Improve anacron detection in updater. [\#17862](https://github.com/netdata/netdata/pull/17862) ([Ferroin](https://github.com/Ferroin))
-- RBAC for dynamic configuration documentation [\#17861](https://github.com/netdata/netdata/pull/17861) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
