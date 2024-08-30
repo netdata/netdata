@@ -2247,6 +2247,9 @@ if(OS_WINDOWS)
 
         set(NETDATACLI_RES_FILES "packaging/windows/resources/netdatacli.rc")
         configure_file(packaging/windows/resources/netdatacli.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdatacli.manifest @ONLY)
+
+        set(NETDATA_RES_FILES "packaging/windows/resources/netdata.rc")
+        configure_file(packaging/windows/resources/netdata.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdata.manifest @ONLY)
 endif()
 
 add_executable(netdata
@@ -2255,6 +2258,7 @@ add_executable(netdata
         "$<$<BOOL:${ENABLE_H2O}>:${H2O_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGODB_EXPORTING_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES}>"
+        "$<$<BOOL:${OS_WINDOWS}>:${NETDATA_RES_FILES}>"
 )
 
 if(OS_WINDOWS)
