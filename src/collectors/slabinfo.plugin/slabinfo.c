@@ -318,6 +318,12 @@ unsigned int do_slab_stats(int update_every) {
         }
         printf("END\n");
 
+        fprintf(stdout, "\n");
+        fflush(stdout);
+        if (ferror(stdout) && errno == EPIPE) {
+            netdata_log_error("error writing to stdout: EPIPE. Exiting...");
+            return loops;
+        }
 
         loops++;
 
