@@ -22,7 +22,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/safewriter"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/multipath"
 
 	"github.com/mattn/go-isatty"
@@ -187,9 +186,7 @@ func (a *Agent) run(ctx context.Context) {
 	jobMgr.ConfigDefaults = discCfg.Registry
 	jobMgr.FnReg = fnMgr
 
-	if reg := a.setupVnodeRegistry(); reg == nil || reg.Len() == 0 {
-		vnodes.Disabled = true
-	} else {
+	if reg := a.setupVnodeRegistry(); reg != nil && reg.Len() > 0 {
 		jobMgr.Vnodes = reg
 	}
 

@@ -17,7 +17,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/netdataapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
 
 var obsoleteLock = &sync.Mutex{}
@@ -299,13 +298,11 @@ func (j *Job) Cleanup() {
 		return
 	}
 
-	if !vnodes.Disabled {
-		if !j.vnodeCreated && j.vnodeGUID != "" {
-			_ = j.api.HOSTINFO(j.vnodeGUID, j.vnodeHostname, j.vnodeLabels)
-			j.vnodeCreated = true
-		}
-		_ = j.api.HOST(j.vnodeGUID)
+	if !j.vnodeCreated && j.vnodeGUID != "" {
+		_ = j.api.HOSTINFO(j.vnodeGUID, j.vnodeHostname, j.vnodeLabels)
+		j.vnodeCreated = true
 	}
+	_ = j.api.HOST(j.vnodeGUID)
 
 	if j.runChart.created {
 		j.runChart.MarkRemove()
@@ -397,14 +394,12 @@ func (j *Job) collect() (result map[string]int64) {
 }
 
 func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinceLastRun int) bool {
-	if !vnodes.Disabled {
-		if !j.vnodeCreated && j.vnodeGUID != "" {
-			_ = j.api.HOSTINFO(j.vnodeGUID, j.vnodeHostname, j.vnodeLabels)
-			j.vnodeCreated = true
-		}
-
-		_ = j.api.HOST(j.vnodeGUID)
+	if !j.vnodeCreated && j.vnodeGUID != "" {
+		_ = j.api.HOSTINFO(j.vnodeGUID, j.vnodeHostname, j.vnodeLabels)
+		j.vnodeCreated = true
 	}
+
+	_ = j.api.HOST(j.vnodeGUID)
 
 	if !ndInternalMonitoringDisabled && !j.runChart.created {
 		j.runChart.ID = fmt.Sprintf("execution_time_of_%s", j.FullName())
