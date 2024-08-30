@@ -14,8 +14,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var Disabled = false // TODO: remove after Netdata v1.39.0. Fix for "from source" stable-channel installations.
-
 func New(confDir string) *Vnodes {
 	vn := &Vnodes{
 		Logger: logger.New().With(
