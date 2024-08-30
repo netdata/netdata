@@ -5,12 +5,6 @@
 
 include(NetdataUtil)
 
-# Add an install rule to the variable for the given source and target
-function(_nd_add_dashboard_install_rule var src target)
-  set(rule "install(install(FILES ${src} COMPONENT dashboard DESTINATION ${WEB_DEST}/${target})\n")
-  set(var "${var}${rule}" PARENT_SCOPE)
-endfunction()
-
 # Bundle the dashboard code for inclusion during install.
 #
 # This is unfortunately complicated due to how we need to handle the
@@ -49,7 +43,7 @@ function(bundle_dashboard)
   message(STATUS "  Extracting dashboard code -- Done")
 
   message(STATUS "  Generating CMakeLists.txt file for dashboard code")
-  set(cmakelists "")
+  set(rules "")
 
   subdirlist(dash_dirs "${dashboard_src_prefix}")
 
@@ -57,19 +51,19 @@ function(bundle_dashboard)
     file(GLOB files
          LIST_DIRECTORIES FALSE
          RELATIVE "${dashboard_src_dir}"
-         "${dashboard_src_prefix}/${dir}")
+         "${dashboard_src_prefix}/${dir}/*")
 
-    _nd_add_dashboard_install_rule(cmakelists "${files}" "${dir}")
+    set(rules "${rules}install(FILES ${files} COMPONENT dashboard DESTINATION ${WEB_DEST}/${dir})\n")
   endforeach()
 
   file(GLOB files
        LIST_DIRECTORIES FALSE
        RELATIVE "${dashboard_src_dir}"
-       "${dashboard_src_prefix}")
+       "${dashboard_src_prefix}/*")
 
-  _nd_add_dashboard_install_rule(cmakelists "${files}" "")
+  set(rules "${rules}install(FILES ${files} COMPONENT dashboard DESTINATION ${WEB_DEST})\n")
 
-  file(WRITE "${dashboard_src_dir}/CMakeLists.txt" "${cmakelists}")
+  file(WRITE "${dashboard_src_dir}/CMakeLists.txt" "${rules}")
   message(STATUS "  Generating CMakeLists.txt file for dashboard code -- Done")
   add_subdirectory("${dashboard_src_dir}" "${dashboard_bin_dir}")
   message(STATUS "Preparing dashboard code -- Done")
