@@ -717,7 +717,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/linked-lists.h
         src/libnetdata/storage-point.h
         src/libnetdata/parsers/parsers.h
-        src/libnetdata/parsers/time.c
+        src/libnetdata/parsers/duration.c
         src/libnetdata/bitmap64.h
         src/libnetdata/os/gettid.c
         src/libnetdata/os/gettid.h
@@ -764,6 +764,9 @@ set(LIBNETDATA_FILES
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
         src/libnetdata/json/json-c-parser-inline.c
+        src/libnetdata/parsers/duration.h
+        src/libnetdata/parsers/timeframe.c
+        src/libnetdata/parsers/timeframe.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
