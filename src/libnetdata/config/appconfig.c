@@ -651,6 +651,34 @@ time_t appconfig_set_duration_seconds(struct config *root, const char *section, 
     return value;
 }
 
+msec_t appconfig_get_duration_ms(struct config *root, const char *section, const char *name, msec_t default_value) {
+
+    char default_str[128];
+    duration_snprintf_msec_t(default_str, sizeof(default_str), default_value);
+
+    const char *s = appconfig_get(root, section, name, default_str);
+    if(!s)
+        return default_value;
+
+    smsec_t result = 0;
+    if(!duration_parse_msec_t(s, &result)) {
+        appconfig_set(root, section, name, default_str);
+        netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
+        return default_value;
+    }
+
+    return ABS(result);
+}
+
+msec_t appconfig_set_duration_ms(struct config *root, const char *section, const char *name, msec_t value) {
+    char str[128];
+    duration_snprintf_msec_t(str, sizeof(str), (smsec_t)value);
+
+    appconfig_set(root, section, name, str);
+
+    return value;
+}
+
 unsigned appconfig_get_duration_days(struct config *root, const char *section, const char *name, unsigned default_value) {
 
     char default_str[128];

@@ -177,6 +177,9 @@ int appconfig_get_boolean_by_section(struct section *co, const char *name, int v
 int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
 
+msec_t appconfig_get_duration_ms(struct config *root, const char *section, const char *name, msec_t default_value);
+msec_t appconfig_set_duration_ms(struct config *root, const char *section, const char *name, msec_t value);
+
 time_t appconfig_get_duration_seconds(struct config *root, const char *section, const char *name, time_t default_value);
 time_t appconfig_set_duration_seconds(struct config *root, const char *section, const char *name, time_t value);
 
@@ -231,6 +234,8 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct se
 #define config_get_float(section, name, value) appconfig_get_float(&netdata_config, section, name, value)
 #define config_get_boolean(section, name, value) appconfig_get_boolean(&netdata_config, section, name, value)
 #define config_get_boolean_ondemand(section, name, value) appconfig_get_boolean_ondemand(&netdata_config, section, name, value)
+
+#define config_get_duration_ms(section, name, value) appconfig_get_duration_ms(&netdata_config, section, name, value)
 #define config_get_duration_seconds(section, name, value) appconfig_get_duration_seconds(&netdata_config, section, name, value)
 #define config_get_duration_days(section, name, value) appconfig_get_duration_days(&netdata_config, section, name, value)
 
@@ -239,6 +244,8 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct se
 #define config_set_number(section, name, value) appconfig_set_number(&netdata_config, section, name, value)
 #define config_set_float(section, name, value) appconfig_set_float(&netdata_config, section, name, value)
 #define config_set_boolean(section, name, value) appconfig_set_boolean(&netdata_config, section, name, value)
+
+#define config_set_duration_ms(section, name, value) appconfig_set_duration_ms(&netdata_config, section, name, value)
 #define config_set_duration_seconds(section, name, value) appconfig_set_duration_seconds(&netdata_config, section, name, value)
 #define config_set_duration_days(section, name, value) appconfig_set_duration_days(&netdata_config, section, name, value)
 

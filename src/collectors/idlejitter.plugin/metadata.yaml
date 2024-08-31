@@ -55,10 +55,10 @@ modules:
             title: ''
             enabled: false
           list:
-            - name: loop time in ms
+            - name: loop time
               description: >
                 Specifies the target time for the data collection thread to sleep, measured in miliseconds.
-              default_value: 20
+              default_value: 20ms
               required: false
         examples:
           folding:
