@@ -170,7 +170,7 @@ You can find the configuration at `/etc/netdata/netdata.conf`:
 [statsd]
 	# enabled = yes
 	# decimal detail = 1000
-	# update every (flushInterval) = 1
+	# update every (flushInterval) = 1s
 	# udp messages to process at once = 10
 	# create private charts for metrics matching = *
 	# max private charts hard limit = 1000
@@ -204,7 +204,7 @@ You can find the configuration at `/etc/netdata/netdata.conf`:
 
      is a space separated list of IPs and ports to listen to. The format is `PROTOCOL:IP:PORT` - if `PORT` is omitted, the `default port` will be used. If `IP` is IPv6, it needs to be enclosed in `[]`. `IP` can also be `*` (to listen on all IPs) or even a hostname.
 
--   `update every (flushInterval) = 1` seconds, controls the frequency StatsD will push the collected metrics to Netdata charts.
+-   `update every (flushInterval) = 1s` controls the frequency StatsD will push the collected metrics to Netdata charts.
 
 -   `decimal detail = 1000` controls the number of fractional digits in gauges and histograms. Netdata collects metrics using signed 64-bit integers and their fractional detail is controlled using multipliers and divisors. This setting is used to multiply all collected values to convert them to integers and is also set as the divisors, so that the final data will be a floating point number with this fractional detail (1000 = X.0 - X.999, 10000 = X.0 - X.9999, etc).
 

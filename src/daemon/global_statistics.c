@@ -4221,9 +4221,11 @@ void *global_statistics_main(void *ptr)
     global_statistics_register_workers();
 
     int update_every =
-        (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
-    if (update_every < localhost->rrd_update_every)
+        (int)config_get_duration_seconds(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+    if (update_every < localhost->rrd_update_every) {
         update_every = localhost->rrd_update_every;
+        config_set_duration_seconds(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", update_every);
+    }
 
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
@@ -4277,9 +4279,11 @@ void *global_statistics_extended_main(void *ptr)
     global_statistics_register_workers();
 
     int update_every =
-        (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
-    if (update_every < localhost->rrd_update_every)
+        (int)config_get_duration_seconds(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+    if (update_every < localhost->rrd_update_every) {
         update_every = localhost->rrd_update_every;
+        config_set_duration_seconds(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", update_every);
+    }
 
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;

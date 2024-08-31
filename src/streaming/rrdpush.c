@@ -72,8 +72,18 @@ static void load_stream_conf() {
                    CONFIG_SECTION_STREAM, "reconnect delay seconds",
                    CONFIG_SECTION_STREAM, "reconnect delay");
 
+    appconfig_move_everywhere(&stream_config, "default memory mode", "db");
+    appconfig_move_everywhere(&stream_config, "memory mode", "db");
+    appconfig_move_everywhere(&stream_config, "default history", "history");
+    appconfig_move_everywhere(&stream_config, "default proxy enabled", "proxy enabled");
+    appconfig_move_everywhere(&stream_config, "default proxy destination", "proxy destination");
+    appconfig_move_everywhere(&stream_config, "default proxy api key", "proxy api key");
+    appconfig_move_everywhere(&stream_config, "default proxy send charts matching", "proxy send charts matching");
+    appconfig_move_everywhere(&stream_config, "default health log history", "health log history");
     appconfig_move_everywhere(&stream_config, "seconds to replicate", "replication period");
     appconfig_move_everywhere(&stream_config, "seconds per replication step", "replication step");
+    appconfig_move_everywhere(&stream_config, "default postpone alarms on connect seconds", "postpone alerts on connect");
+    appconfig_move_everywhere(&stream_config, "postpone alarms on connect seconds", "postpone alerts on connect");
 }
 
 bool rrdpush_receiver_needs_dbengine() {
@@ -89,11 +99,7 @@ bool rrdpush_receiver_needs_dbengine() {
         if(!s || !appconfig_test_boolean_value(s))
             continue;
 
-        s = appconfig_get_by_section(co, "default memory mode", NULL);
-        if(s && strcmp(s, "dbengine") == 0)
-            return true;
-
-        s = appconfig_get_by_section(co, "memory mode", NULL);
+        s = appconfig_get_by_section(co, "db mode", NULL);
         if(s && strcmp(s, "dbengine") == 0)
             return true;
     }

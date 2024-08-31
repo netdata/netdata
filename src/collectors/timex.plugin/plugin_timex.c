@@ -50,9 +50,11 @@ void *timex_main(void *ptr)
     worker_register("TIMEX");
     worker_register_job_name(0, "clock check");
 
-    int update_every = (int)config_get_number(CONFIG_SECTION_TIMEX, "update every", 10);
-    if (update_every < localhost->rrd_update_every)
+    int update_every = (int)config_get_duration_seconds(CONFIG_SECTION_TIMEX, "update every", 10);
+    if (update_every < localhost->rrd_update_every) {
         update_every = localhost->rrd_update_every;
+        config_set_duration_seconds(CONFIG_SECTION_TIMEX, "update every", update_every);
+    }
 
     int do_sync = config_get_boolean(CONFIG_SECTION_TIMEX, "clock synchronization state", CONFIG_BOOLEAN_YES);
     int do_offset = config_get_boolean(CONFIG_SECTION_TIMEX, "time offset", CONFIG_BOOLEAN_YES);

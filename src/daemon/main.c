@@ -896,6 +896,7 @@ static char *get_varlib_subdir_from_config(const char *prefix, const char *dir) 
 
 static void backwards_compatible_config() {
     // move [global] options to the [web] section
+
     config_move(CONFIG_SECTION_GLOBAL, "http port listen backlog",
                 CONFIG_SECTION_WEB,    "listen backlog");
 
@@ -999,7 +1000,10 @@ static void backwards_compatible_config() {
                 CONFIG_SECTION_PLUGINS, "statsd");
 
     config_move(CONFIG_SECTION_GLOBAL,  "memory mode",
-                CONFIG_SECTION_DB,      "mode");
+                CONFIG_SECTION_DB,      "db");
+
+    config_move(CONFIG_SECTION_DB,      "mode",
+                CONFIG_SECTION_DB,      "db");
 
     config_move(CONFIG_SECTION_GLOBAL,  "history",
                 CONFIG_SECTION_DB,      "retention");
@@ -1164,22 +1168,22 @@ static void get_netdata_configured_variables()
     // ------------------------------------------------------------------------
     // get default database update frequency
 
-    default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
+    default_rrd_update_every = (int) config_get_duration_seconds(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
     if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
         netdata_log_error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY);
         default_rrd_update_every = UPDATE_EVERY;
-        config_set_number(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
+        config_set_duration_seconds(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
     }
 
     // ------------------------------------------------------------------------
-    // get default memory mode for the database
+    // get the database selection
 
     {
-        const char *mode = config_get(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
+        const char *mode = config_get(CONFIG_SECTION_DB, "db", rrd_memory_mode_name(default_rrd_memory_mode));
         default_rrd_memory_mode = rrd_memory_mode_id(mode);
         if(strcmp(mode, rrd_memory_mode_name(default_rrd_memory_mode)) != 0) {
             netdata_log_error("Invalid memory mode '%s' given. Using '%s'", mode, rrd_memory_mode_name(default_rrd_memory_mode));
-            config_set(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
+            config_set(CONFIG_SECTION_DB, "db", rrd_memory_mode_name(default_rrd_memory_mode));
         }
     }
 

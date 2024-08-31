@@ -600,15 +600,15 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.rrdpush_seconds_to_replicate = default_rrdpush_seconds_to_replicate;
     rpt->config.rrdpush_replication_step = default_rrdpush_replication_step;
 
-    rpt->config.update_every = (int)appconfig_get_number(&stream_config, rpt->machine_guid, "update every", rpt->config.update_every);
+    rpt->config.update_every = (int)appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "update every", rpt->config.update_every);
     if(rpt->config.update_every < 0) rpt->config.update_every = 1;
 
-    rpt->config.history = (int)appconfig_get_number(&stream_config, rpt->key, "default history", rpt->config.history);
+    rpt->config.history = (int)appconfig_get_number(&stream_config, rpt->key, "history", rpt->config.history);
     rpt->config.history = (int)appconfig_get_number(&stream_config, rpt->machine_guid, "history", rpt->config.history);
     if(rpt->config.history < 5) rpt->config.history = 5;
 
-    rpt->config.mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->key, "default memory mode", rrd_memory_mode_name(rpt->config.mode)));
-    rpt->config.mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->machine_guid, "memory mode", rrd_memory_mode_name(rpt->config.mode)));
+    rpt->config.mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->key, "db", rrd_memory_mode_name(rpt->config.mode)));
+    rpt->config.mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->machine_guid, "db", rrd_memory_mode_name(rpt->config.mode)));
 
     if (unlikely(rpt->config.mode == RRD_MEMORY_MODE_DBENGINE && !dbengine_enabled)) {
         netdata_log_error("STREAM '%s' [receive from %s:%s]: "
@@ -623,22 +623,22 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.health_enabled = appconfig_get_boolean_ondemand(&stream_config, rpt->key, "health enabled by default", rpt->config.health_enabled);
     rpt->config.health_enabled = appconfig_get_boolean_ondemand(&stream_config, rpt->machine_guid, "health enabled", rpt->config.health_enabled);
 
-    rpt->config.alarms_delay = appconfig_get_number(&stream_config, rpt->key, "default postpone alarms on connect seconds", rpt->config.alarms_delay);
-    rpt->config.alarms_delay = appconfig_get_number(&stream_config, rpt->machine_guid, "postpone alarms on connect seconds", rpt->config.alarms_delay);
+    rpt->config.alarms_delay = appconfig_get_duration_seconds(&stream_config, rpt->key, "postpone alerts on connect", rpt->config.alarms_delay);
+    rpt->config.alarms_delay = appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "postpone alerts on connect", rpt->config.alarms_delay);
 
-    rpt->config.alarms_history = appconfig_get_duration_seconds(&stream_config, rpt->key, "default health log history", rpt->config.alarms_history);
+    rpt->config.alarms_history = appconfig_get_duration_seconds(&stream_config, rpt->key, "health log history", rpt->config.alarms_history);
     rpt->config.alarms_history = appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "health log history", rpt->config.alarms_history);
 
-    rpt->config.rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->key, "default proxy enabled", rpt->config.rrdpush_enabled);
+    rpt->config.rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->key, "proxy enabled", rpt->config.rrdpush_enabled);
     rpt->config.rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->machine_guid, "proxy enabled", rpt->config.rrdpush_enabled);
 
-    rpt->config.rrdpush_destination = appconfig_get(&stream_config, rpt->key, "default proxy destination", rpt->config.rrdpush_destination);
+    rpt->config.rrdpush_destination = appconfig_get(&stream_config, rpt->key, "proxy destination", rpt->config.rrdpush_destination);
     rpt->config.rrdpush_destination = appconfig_get(&stream_config, rpt->machine_guid, "proxy destination", rpt->config.rrdpush_destination);
 
-    rpt->config.rrdpush_api_key = appconfig_get(&stream_config, rpt->key, "default proxy api key", rpt->config.rrdpush_api_key);
+    rpt->config.rrdpush_api_key = appconfig_get(&stream_config, rpt->key, "proxy api key", rpt->config.rrdpush_api_key);
     rpt->config.rrdpush_api_key = appconfig_get(&stream_config, rpt->machine_guid, "proxy api key", rpt->config.rrdpush_api_key);
 
-    rpt->config.rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "default proxy send charts matching", rpt->config.rrdpush_send_charts_matching);
+    rpt->config.rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "proxy send charts matching", rpt->config.rrdpush_send_charts_matching);
     rpt->config.rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->machine_guid, "proxy send charts matching", rpt->config.rrdpush_send_charts_matching);
 
     rpt->config.rrdpush_enable_replication = appconfig_get_boolean(&stream_config, rpt->key, "enable replication", rpt->config.rrdpush_enable_replication);
