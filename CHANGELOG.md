@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Exit slabinfo.plugin on EPIPE [\#18448](https://github.com/netdata/netdata/pull/18448) ([teqwve](https://github.com/teqwve))
+- go.d remove vnode disable [\#18446](https://github.com/netdata/netdata/pull/18446) ([ilyam8](https://github.com/ilyam8))
+- go.d add support for symlinked vnode config files [\#18445](https://github.com/netdata/netdata/pull/18445) ([ilyam8](https://github.com/ilyam8))
+- Proper precedence when calculating time\_to\_evict [\#18444](https://github.com/netdata/netdata/pull/18444) ([stelfrag](https://github.com/stelfrag))
 - do not free the sender when the sender thread exits [\#18441](https://github.com/netdata/netdata/pull/18441) ([ktsaou](https://github.com/ktsaou))
 - fix receiver deadlock [\#18440](https://github.com/netdata/netdata/pull/18440) ([ktsaou](https://github.com/ktsaou))
 - fix charts.d/sensors leftovers [\#18439](https://github.com/netdata/netdata/pull/18439) ([ilyam8](https://github.com/ilyam8))
@@ -345,7 +349,6 @@
 - Sign DEB packages in the GHA runners that build them. [\#17949](https://github.com/netdata/netdata/pull/17949) ([Ferroin](https://github.com/Ferroin))
 - Detect on startup if the netdata-meta.db file is not a valid database file [\#17924](https://github.com/netdata/netdata/pull/17924) ([stelfrag](https://github.com/stelfrag))
 - eBPF cgroup and mutex [\#17915](https://github.com/netdata/netdata/pull/17915) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix small typo [\#17875](https://github.com/netdata/netdata/pull/17875) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
@@ -419,9 +422,6 @@
 - fix detect\_libc in installer [\#17880](https://github.com/netdata/netdata/pull/17880) ([ilyam8](https://github.com/ilyam8))
 - update bundled UI to v6.138.0 [\#17879](https://github.com/netdata/netdata/pull/17879) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17878](https://github.com/netdata/netdata/pull/17878) ([netdatabot](https://github.com/netdatabot))
-- Regenerate integrations.js [\#17877](https://github.com/netdata/netdata/pull/17877) ([netdatabot](https://github.com/netdatabot))
-- Improve filecheck module metadata. [\#17874](https://github.com/netdata/netdata/pull/17874) ([Ferroin](https://github.com/Ferroin))
-- update Telegram Cloud notification docs to include new topic ID field [\#17873](https://github.com/netdata/netdata/pull/17873) ([papazach](https://github.com/papazach))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
