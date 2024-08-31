@@ -36,7 +36,7 @@
 static const struct duration_unit {
     const char *unit;
     const bool formatter; // true when this unit should be used when formatting to string
-    const uint64_t multiplier;
+    const snsec_t multiplier;
 } units[] = {
 
     // IMPORTANT: the order of this array is crucial!
@@ -53,19 +53,19 @@ static const struct duration_unit {
     { .unit = "w",   .formatter = false, .multiplier = NSEC_PER_WEEK },     // -
     { .unit = "wk",  .formatter = false, .multiplier = NSEC_PER_WEEK },     // UCUM
     { .unit = "mo",  .formatter = true,  .multiplier = NSEC_PER_MONTH },    // UCUM
+    { .unit = "M",   .formatter = false, .multiplier = NSEC_PER_MONTH },    // compatibility
     { .unit = "q",   .formatter = false, .multiplier = NSEC_PER_QUARTER },  // -
     { .unit = "y",   .formatter = true,  .multiplier = NSEC_PER_YEAR },     // -
+    { .unit = "Y",   .formatter = false, .multiplier = NSEC_PER_YEAR },     // compatibility
     { .unit = "a",   .formatter = false, .multiplier = NSEC_PER_YEAR },     // UCUM
 };
 
 static inline const struct duration_unit *duration_find_unit(const char *unit) {
     if(!unit || !*unit) return NULL;
 
-    uint8_t first_char_lower = tolower((uint8_t)unit[0]);
-
     for (size_t i = 0; i < sizeof(units) / sizeof(units[0]); i++) {
         const struct duration_unit *du = &units[i];
-        if (first_char_lower == (uint8_t)du->unit[0] && strcasecmp(unit, du->unit) == 0)
+        if ((uint8_t)unit[0] == (uint8_t)du->unit[0] && strcmp(unit, du->unit) == 0)
             return du;
     }
 
@@ -75,36 +75,38 @@ static inline const struct duration_unit *duration_find_unit(const char *unit) {
 // -------------------------------------------------------------------------------------------------------------------
 // parse a duration string
 
-inline nsec_t duration_str_to_nsec_t(const char *duration, nsec_t default_value, const char *default_unit) {
-    if (!duration || !*duration)
-        return default_value;
+inline bool duration_str_to_nsec_t(const char *duration, snsec_t *result, const char *default_unit) {
+    if (!duration || !*duration || !default_unit || !*default_unit)
+        return false;
 
-    if (!default_unit)
-        default_unit = "ns";
+    const char *s = duration;
+    snsec_t nsec = 0;
 
-    const char *ptr = duration;
-    double value = 0;
-    nsec_t nsec = 0;
-
-    while (*ptr) {
+    while (*s) {
         // Skip leading spaces
-        while (isspace(*ptr)) ptr++;
+        while (isspace((uint8_t)*s)) s++;
+
+        if(*s == 'n' && strcmp(s, "never") == 0) {
+            *result = 0;
+            return true;
+        }
 
         // Parse the number
-        value = strtod(ptr, (char **)&ptr);
+        const char *number_start = s;
+        NETDATA_DOUBLE value = str2ndd(s, (char **)&s);
 
         // If no valid number found, return default
-        if (ptr == duration || value == 0)
-            return default_value;
+        if (s == number_start)
+            return false;
 
         // Skip spaces between number and unit
-        while (isspace(*ptr)) ptr++;
+        while (isspace((uint8_t)*s)) s++;
 
-        const char *unit_start = ptr;
-        while (isalpha(*ptr)) ptr++;
+        const char *unit_start = s;
+        while (isalpha((uint8_t)*s)) s++;
 
         char unit[4];
-        size_t unit_len = ptr - unit_start;
+        size_t unit_len = s - unit_start;
         if (unit_len == 0)
             strncpyz(unit, default_unit, sizeof(unit) - 1);
         else {
@@ -113,42 +115,56 @@ inline nsec_t duration_str_to_nsec_t(const char *duration, nsec_t default_value,
         }
 
         const struct duration_unit *du = duration_find_unit(unit);
-        if(du)
-            nsec += (nsec_t)(value * (double)du->multiplier);
-        else
-            return default_value;
+        if(!du) return false;
+        nsec += (snsec_t)(value * (double)du->multiplier);
     }
 
-    return nsec;
+    *result = nsec;
+    return true;
 }
 
-usec_t duration_str_to_usec_t(const char *duration, usec_t default_value) {
-    nsec_t nsec = duration_str_to_nsec_t(duration, default_value, "us");
+bool duration_str_to_usec_t(const char *duration, susec_t *result) {
+    snsec_t nsec;
+    if(!duration_str_to_nsec_t(duration, &nsec, "us"))
+        return false;
+
     nsec_t resolution = NSEC_PER_USEC;
-    return (usec_t)((nsec + (resolution / 2)) / resolution);
+    *result = (susec_t)((nsec + (resolution / 2)) / resolution);
+    return true;
 }
 
-time_t duration_str_to_time_t(const char *duration, time_t default_value) {
-    nsec_t nsec = duration_str_to_nsec_t(duration, default_value, "s");
+bool duration_str_to_time_t(const char *duration, time_t *result) {
+    snsec_t nsec;
+    if(!duration_str_to_nsec_t(duration, &nsec, "s"))
+        return false;
+
     nsec_t resolution = NSEC_PER_SEC;
-    return (time_t)((nsec + (resolution / 2)) / resolution);
+    *result = (time_t)((nsec + (resolution / 2)) / resolution);
+    return true;
 }
 
-unsigned duration_str_to_days(const char *duration, unsigned default_value) {
-    nsec_t nsec = duration_str_to_nsec_t(duration, default_value, "d");
+bool duration_str_to_days(const char *duration, int *result) {
+    snsec_t nsec;
+    if(!duration_str_to_nsec_t(duration, &nsec, "d"))
+        return false;
+
     nsec_t resolution = NSEC_PER_DAY;
-    return (unsigned)((nsec + (resolution / 2)) / resolution);
+    *result = (int)((nsec + (resolution / 2)) / resolution);
+    return true;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 // generate a string to represent a duration
 
-inline size_t duration_str_from_nsec_t(char *dst, size_t dst_size, nsec_t nsec, const char *minimum_unit) {
+inline size_t duration_str_from_nsec_t(char *dst, size_t dst_size, snsec_t nsec, const char *minimum_unit) {
     if (!dst || dst_size == 0) return 0;
     if (dst_size == 1) {
         dst[0] = '\0';
         return 0;
     }
+
+    if(nsec == 0)
+        return snprintfz(dst, dst_size, "never");
 
     const struct duration_unit *du_min = duration_find_unit(minimum_unit);
     size_t offset = 0;
@@ -160,18 +176,18 @@ inline size_t duration_str_from_nsec_t(char *dst, size_t dst_size, nsec_t nsec, 
             continue;
 
         // IMPORTANT:
-        // The week (7days) is not aligned to the quarter (~91days) or the year (365days).
+        // The week (7 days) is not aligned to the quarter (~91 days) or the year (365.25 days).
         // To make sure that the value returned can be parsed back without loss,
         // we have to round the value per unit (inside this loop), not globally.
-        // Otherwise, we have to make sure that all larger units, are integer multiples of the smaller ones.
+        // Otherwise, we have to make sure that all larger units are integer multiples of the smaller ones.
 
-        uint64_t multiplier = units[i].multiplier;
-        uint64_t rounded = (du == du_min) ? (((nsec + (multiplier / 2ULL)) / multiplier) * multiplier) : nsec;
+        int64_t multiplier = units[i].multiplier;
+        int64_t rounded = (du == du_min) ? (((nsec + (multiplier / 2LL)) / multiplier) * multiplier) : nsec;
 
-        uint64_t unit_count = rounded / multiplier;
+        int64_t unit_count = rounded / multiplier;
         if (unit_count > 0) {
             int written = snprintfz(dst + offset, dst_size - offset,
-                                    "%" PRIu64 "%s ", unit_count, units[i].unit);
+                                    "%" PRIu64 "%s", unit_count, units[i].unit);
 
             if (written < 0 || (size_t)written >= dst_size - offset) {
                 // buffer overflow or snprintfz() error
@@ -192,31 +208,26 @@ inline size_t duration_str_from_nsec_t(char *dst, size_t dst_size, nsec_t nsec, 
 
     if (offset == 0)
         // nothing has been written
-        offset = snprintfz(dst, dst_size, "0%s ", du_min ? du_min->unit : "");
-
-    if (offset > 0 && dst[offset - 1] == ' ') {
-        // Remove trailing space
-        dst[--offset] = '\0';
-    }
+        offset = snprintfz(dst, dst_size, "never");
 
     return offset;
 }
 
-size_t duration_str_from_usec_t(char *dst, size_t size, usec_t value) {
-    return duration_str_from_nsec_t(dst, size, value * NSEC_PER_USEC, "us");
+size_t duration_str_from_usec_t(char *dst, size_t size, susec_t value) {
+    return duration_str_from_nsec_t(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_USEC, "us");
 }
 
 size_t duration_str_from_time_t(char *dst, size_t size, time_t value) {
-    return duration_str_from_nsec_t(dst, size, value * NSEC_PER_SEC, "s");
+    return duration_str_from_nsec_t(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_SEC, "s");
 }
 
-size_t duration_str_from_days(char *dst, size_t size, unsigned value) {
-    return duration_str_from_nsec_t(dst, size, value * NSEC_PER_DAY, "d");
+size_t duration_str_from_days(char *dst, size_t size, int value) {
+    return duration_str_from_nsec_t(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_DAY, "d");
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
-uint64_t nsec_to_unit(nsec_t nsec, const char *unit) {
+int64_t nsec_to_unit(snsec_t nsec, const char *unit) {
     const struct duration_unit *du = duration_find_unit(unit);
     if(du)
         return (nsec + (du->multiplier / 2)) / du->multiplier;
