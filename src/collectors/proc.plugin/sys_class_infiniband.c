@@ -332,7 +332,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 SIMPLE_PATTERN_EXACT, true);
 
         dt_to_refresh_ports =
-            config_get_number(CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "refresh ports state every seconds", 30) *
+            config_get_duration_seconds(CONFIG_SECTION_PLUGIN_SYS_CLASS_INFINIBAND, "refresh ports state every", 30) *
             USEC_PER_SEC;
         if (dt_to_refresh_ports < 0)
             dt_to_refresh_ports = 0;

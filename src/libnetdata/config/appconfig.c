@@ -626,14 +626,14 @@ int appconfig_set_boolean(struct config *root, const char *section, const char *
 time_t appconfig_get_duration_seconds(struct config *root, const char *section, const char *name, time_t default_value) {
 
     char default_str[128];
-    duration_snprintf_from_time_t(default_str, sizeof(default_str), default_value);
+    duration_snprintf_time_t(default_str, sizeof(default_str), default_value);
 
     const char *s = appconfig_get(root, section, name, default_str);
     if(!s)
         return default_value;
 
     int result = 0;
-    if(!duration_str_to_seconds(s, &result)) {
+    if(!duration_parse_seconds(s, &result)) {
         appconfig_set(root, section, name, default_str);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
         return default_value;
@@ -644,7 +644,7 @@ time_t appconfig_get_duration_seconds(struct config *root, const char *section, 
 
 time_t appconfig_set_duration_seconds(struct config *root, const char *section, const char *name, time_t value) {
     char str[128];
-    duration_snprintf_from_time_t(str, sizeof(str), value);
+    duration_snprintf_time_t(str, sizeof(str), value);
 
     appconfig_set(root, section, name, str);
 
@@ -654,14 +654,14 @@ time_t appconfig_set_duration_seconds(struct config *root, const char *section, 
 unsigned appconfig_get_duration_days(struct config *root, const char *section, const char *name, unsigned default_value) {
 
     char default_str[128];
-    duration_snprintf_from_days(default_str, sizeof(default_str), (int)default_value);
+    duration_snprintf_days(default_str, sizeof(default_str), (int)default_value);
 
     const char *s = appconfig_get(root, section, name, default_str);
     if(!s)
         return default_value;
 
     int result = 0;
-    if(!duration_str_to_days(s, &result)) {
+    if(!duration_parse_days(s, &result)) {
         appconfig_set(root, section, name, default_str);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
         return default_value;
@@ -672,7 +672,7 @@ unsigned appconfig_get_duration_days(struct config *root, const char *section, c
 
 unsigned appconfig_set_duration_days(struct config *root, const char *section, const char *name, unsigned value) {
     char str[128];
-    duration_snprintf_from_days(str, sizeof(str), value);
+    duration_snprintf_days(str, sizeof(str), value);
 
     appconfig_set(root, section, name, str);
 

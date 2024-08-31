@@ -689,7 +689,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/fs/btrfs");
         btrfs_path = config_get("plugin:proc:/sys/fs/btrfs", "path to monitor", filename);
 
-        refresh_every = config_get_number("plugin:proc:/sys/fs/btrfs", "check for btrfs changes every", refresh_every / USEC_PER_SEC) * USEC_PER_SEC;
+        refresh_every = config_get_duration_seconds("plugin:proc:/sys/fs/btrfs", "check for btrfs changes every", refresh_every / USEC_PER_SEC) * USEC_PER_SEC;
         refresh_delta = refresh_every;
 
         do_allocation_disks = config_get_boolean_ondemand("plugin:proc:/sys/fs/btrfs", "physical disks allocation", do_allocation_disks);

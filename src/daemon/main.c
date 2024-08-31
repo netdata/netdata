@@ -1124,6 +1124,9 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after seconds",
                 CONFIG_SECTION_STATSD, "disconnect idle tcp clients after");
+
+    config_move("plugin:proc:/sys/class/infiniband", "refresh ports state every seconds",
+                "plugin:proc:/sys/class/infiniband", "refresh ports state every");
 }
 
 static int get_hostname(char *buf, size_t buf_size) {

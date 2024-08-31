@@ -133,7 +133,7 @@ Then edit `netdata.conf` and find the following section. This is the basic plugi
   # extended operations for all disks = auto
   # backlog for all disks = auto
   # bcache for all disks = auto
-  # bcache priority stats update every = 0
+  # bcache priority stats update every = off
   # remove charts of removed disks = yes
   # path to get block device = /sys/block/%s
   # path to get block device bcache = /sys/block/%s/bcache
@@ -578,7 +578,7 @@ Default configuration will monitor only enabled infiniband ports, and refresh ne
   # hardware errors counters = auto
   # monitor only ports being active = auto
   # disable by default interfaces matching = 
-  # refresh ports state every seconds = 30
+  # refresh ports state every = 30s
 ```
 
 ## AMD GPUs

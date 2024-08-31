@@ -582,7 +582,7 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
                         ls->limits.logs_per_period = ls->limits.logs_per_period_backup = str2u(value);
 
                         int period;
-                        if(!duration_str_to_seconds(slash, &period)) {
+                        if(!duration_parse_seconds(slash, &period)) {
                             nd_log(NDLS_DAEMON, NDLP_ERR, "Error while parsing period '%s'", slash);
                             period = ND_LOG_DEFAULT_THROTTLE_PERIOD;
                         }

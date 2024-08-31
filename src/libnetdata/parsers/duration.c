@@ -61,7 +61,8 @@ static const struct duration_unit {
 };
 
 static inline const struct duration_unit *duration_find_unit(const char *unit) {
-    if(!unit || !*unit) return NULL;
+    if(!unit || !*unit)
+        unit = "ns";
 
     for (size_t i = 0; i < sizeof(units) / sizeof(units[0]); i++) {
         const struct duration_unit *du = &units[i];
@@ -85,7 +86,7 @@ static inline int64_t round_to_resolution(int64_t value, int64_t resolution) {
 // -------------------------------------------------------------------------------------------------------------------
 // parse a duration string
 
-inline bool duration_str_to_nsec_t(const char *duration, snsec_t *result, const char *default_unit) {
+static inline bool duration_parse(const char *duration, snsec_t *result, const char *default_unit) {
     if (!duration || !*duration || !default_unit || !*default_unit)
         return false;
 
@@ -139,27 +140,45 @@ inline bool duration_str_to_nsec_t(const char *duration, snsec_t *result, const 
     return true;
 }
 
-bool duration_str_to_usec_t(const char *duration, susec_t *result) {
+bool duration_parse_nsec_t(const char *duration, snsec_t *result) {
     snsec_t nsec;
-    if(!duration_str_to_nsec_t(duration, &nsec, "us"))
+    if(!duration_parse(duration, &nsec, "ns"))
+        return false;
+
+    *result = nsec;
+    return true;
+}
+
+bool duration_parse_usec_t(const char *duration, susec_t *result) {
+    snsec_t nsec;
+    if(!duration_parse(duration, &nsec, "us"))
         return false;
 
     *result = (susec_t)round_to_resolution(nsec, NSEC_PER_USEC);
     return true;
 }
 
-bool duration_str_to_time_t(const char *duration, stime_t *result) {
+bool duration_parse_msec_t(const char *duration, smsec_t *result) {
     snsec_t nsec;
-    if(!duration_str_to_nsec_t(duration, &nsec, "s"))
+    if(!duration_parse(duration, &nsec, "ms"))
+        return false;
+
+    *result = (susec_t)round_to_resolution(nsec, NSEC_PER_MSEC);
+    return true;
+}
+
+bool duration_parse_time_t(const char *duration, stime_t *result) {
+    snsec_t nsec;
+    if(!duration_parse(duration, &nsec, "s"))
         return false;
 
     *result = (stime_t)round_to_resolution(nsec, NSEC_PER_SEC);
     return true;
 }
 
-bool duration_str_to_days(const char *duration, int *result) {
+bool duration_parse_days(const char *duration, int *result) {
     snsec_t nsec;
-    if(!duration_str_to_nsec_t(duration, &nsec, "d"))
+    if(!duration_parse(duration, &nsec, "d"))
         return false;
 
     *result = (int)round_to_resolution(nsec, NSEC_PER_DAY);
@@ -169,7 +188,7 @@ bool duration_str_to_days(const char *duration, int *result) {
 // --------------------------------------------------------------------------------------------------------------------
 // generate a string to represent a duration
 
-inline ssize_t duration_snprintf_from_nsec_t(char *dst, size_t dst_size, snsec_t nsec, const char *minimum_unit) {
+static inline ssize_t duration_snprintf(char *dst, size_t dst_size, snsec_t nsec, const char *minimum_unit) {
     if (!dst || dst_size == 0) return -1;
     if (dst_size == 1) {
         dst[0] = '\0';
@@ -230,16 +249,24 @@ inline ssize_t duration_snprintf_from_nsec_t(char *dst, size_t dst_size, snsec_t
     return (ssize_t)offset;
 }
 
-ssize_t duration_snprintf_from_usec_t(char *dst, size_t size, susec_t value) {
-    return duration_snprintf_from_nsec_t(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_USEC, "us");
+ssize_t duration_snprintf_nsec_t(char *dst, size_t size, snsec_t value) {
+    return duration_snprintf(dst, size, value, "ns");
 }
 
-ssize_t duration_snprintf_from_time_t(char *dst, size_t size, stime_t value) {
-    return duration_snprintf_from_nsec_t(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_SEC, "s");
+ssize_t duration_snprintf_usec_t(char *dst, size_t size, susec_t value) {
+    return duration_snprintf(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_USEC, "us");
 }
 
-ssize_t duration_snprintf_from_days(char *dst, size_t size, int value) {
-    return duration_snprintf_from_nsec_t(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_DAY, "d");
+ssize_t duration_snprintf_msec_t(char *dst, size_t size, smsec_t value) {
+    return duration_snprintf(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_MSEC, "ms");
+}
+
+ssize_t duration_snprintf_time_t(char *dst, size_t size, stime_t value) {
+    return duration_snprintf(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_SEC, "s");
+}
+
+ssize_t duration_snprintf_days(char *dst, size_t size, int value) {
+    return duration_snprintf(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_DAY, "d");
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -255,10 +282,10 @@ int64_t nsec_to_unit(snsec_t nsec, const char *unit) {
 // --------------------------------------------------------------------------------------------------------------------
 // compatibility
 
-bool duration_str_to_seconds(const char *str, int *result) {
+bool duration_parse_seconds(const char *str, int *result) {
     stime_t value;
 
-    if(duration_str_to_time_t(str, &value)) {
+    if(duration_parse_time_t(str, &value)) {
         *result = (int)value;
         return true;
     }
