@@ -626,8 +626,8 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.alarms_delay = appconfig_get_number(&stream_config, rpt->key, "default postpone alarms on connect seconds", rpt->config.alarms_delay);
     rpt->config.alarms_delay = appconfig_get_number(&stream_config, rpt->machine_guid, "postpone alarms on connect seconds", rpt->config.alarms_delay);
 
-    rpt->config.alarms_history = appconfig_get_number(&stream_config, rpt->key, "default health log history", rpt->config.alarms_history);
-    rpt->config.alarms_history = appconfig_get_number(&stream_config, rpt->machine_guid, "health log history", rpt->config.alarms_history);
+    rpt->config.alarms_history = appconfig_get_duration_seconds(&stream_config, rpt->key, "default health log history", rpt->config.alarms_history);
+    rpt->config.alarms_history = appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "health log history", rpt->config.alarms_history);
 
     rpt->config.rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->key, "default proxy enabled", rpt->config.rrdpush_enabled);
     rpt->config.rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->machine_guid, "proxy enabled", rpt->config.rrdpush_enabled);
@@ -644,11 +644,11 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.rrdpush_enable_replication = appconfig_get_boolean(&stream_config, rpt->key, "enable replication", rpt->config.rrdpush_enable_replication);
     rpt->config.rrdpush_enable_replication = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable replication", rpt->config.rrdpush_enable_replication);
 
-    rpt->config.rrdpush_seconds_to_replicate = appconfig_get_number(&stream_config, rpt->key, "seconds to replicate", rpt->config.rrdpush_seconds_to_replicate);
-    rpt->config.rrdpush_seconds_to_replicate = appconfig_get_number(&stream_config, rpt->machine_guid, "seconds to replicate", rpt->config.rrdpush_seconds_to_replicate);
+    rpt->config.rrdpush_seconds_to_replicate = appconfig_get_duration_seconds(&stream_config, rpt->key, "replication period", rpt->config.rrdpush_seconds_to_replicate);
+    rpt->config.rrdpush_seconds_to_replicate = appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "replication period", rpt->config.rrdpush_seconds_to_replicate);
 
-    rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->key, "seconds per replication step", rpt->config.rrdpush_replication_step);
-    rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->machine_guid, "seconds per replication step", rpt->config.rrdpush_replication_step);
+    rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->key, "replication step", rpt->config.rrdpush_replication_step);
+    rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->machine_guid, "replication step", rpt->config.rrdpush_replication_step);
 
     rpt->config.rrdpush_compression = default_rrdpush_compression_enabled;
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable compression", rpt->config.rrdpush_compression);

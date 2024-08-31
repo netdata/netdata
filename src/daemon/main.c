@@ -542,11 +542,13 @@ int make_dns_decision(const char *section_name, const char *config_name, const c
 void web_server_config_options(void)
 {
     web_client_timeout =
-        (int)config_get_number(CONFIG_SECTION_WEB, "disconnect idle clients after seconds", web_client_timeout);
+        (int)config_get_duration_seconds(CONFIG_SECTION_WEB, "disconnect idle clients after", web_client_timeout);
+
     web_client_first_request_timeout =
-        (int)config_get_number(CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
+        (int)config_get_duration_seconds(CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
+
     web_client_streaming_rate_t =
-        config_get_number(CONFIG_SECTION_WEB, "accept a streaming request every seconds", web_client_streaming_rate_t);
+        config_get_duration_seconds(CONFIG_SECTION_WEB, "accept a streaming request every", web_client_streaming_rate_t);
 
     respect_web_browser_do_not_track_policy =
         config_get_boolean(CONFIG_SECTION_WEB, "respect do not track policy", respect_web_browser_do_not_track_policy);
@@ -842,7 +844,7 @@ static void log_init(void) {
 
     time_t period = ND_LOG_DEFAULT_THROTTLE_PERIOD;
     size_t logs = ND_LOG_DEFAULT_THROTTLE_LOGS;
-    period = config_get_number(CONFIG_SECTION_LOGS, "logs flood protection period", period);
+    period = config_get_duration_seconds(CONFIG_SECTION_LOGS, "logs flood protection period", period);
     logs = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "logs to trigger flood protection", (long long int)logs);
     nd_log_set_flood_protection(logs, period);
 
@@ -1054,13 +1056,28 @@ static void backwards_compatible_config() {
                 CONFIG_SECTION_DB,      "dbengine pages per extent");
 
     config_move(CONFIG_SECTION_GLOBAL,  "cleanup obsolete charts after seconds",
-                CONFIG_SECTION_DB,      "cleanup obsolete charts after secs");
+                CONFIG_SECTION_DB,      "cleanup obsolete charts after");
+
+    config_move(CONFIG_SECTION_DB,      "cleanup obsolete charts after secs",
+                CONFIG_SECTION_DB,      "cleanup obsolete charts after");
 
     config_move(CONFIG_SECTION_GLOBAL,  "gap when lost iterations above",
                 CONFIG_SECTION_DB,      "gap when lost iterations above");
 
     config_move(CONFIG_SECTION_GLOBAL,  "cleanup orphan hosts after seconds",
-                CONFIG_SECTION_DB,      "cleanup orphan hosts after secs");
+                CONFIG_SECTION_DB,      "cleanup orphan hosts after");
+
+    config_move(CONFIG_SECTION_DB,      "cleanup orphan hosts after secs",
+                CONFIG_SECTION_DB,      "cleanup orphan hosts after");
+
+    config_move(CONFIG_SECTION_DB,      "cleanup ephemeral hosts after secs",
+                CONFIG_SECTION_DB,      "cleanup ephemeral hosts after");
+
+    config_move(CONFIG_SECTION_DB,      "seconds to replicate",
+                CONFIG_SECTION_DB,      "replication period");
+
+    config_move(CONFIG_SECTION_DB,      "seconds per replication step",
+                CONFIG_SECTION_DB,      "replication step");
 
     config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
                 CONFIG_SECTION_DB,      "enable zero metrics");
@@ -1076,11 +1093,33 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_LOGS,   "errors flood protection period",
                 CONFIG_SECTION_LOGS,   "logs flood protection period");
+
     config_move(CONFIG_SECTION_HEALTH, "is ephemeral",
                 CONFIG_SECTION_GLOBAL, "is ephemeral node");
 
     config_move(CONFIG_SECTION_HEALTH, "has unstable connection",
                 CONFIG_SECTION_GLOBAL, "has unstable connection");
+
+    config_move(CONFIG_SECTION_HEALTH, "run at least every seconds",
+                CONFIG_SECTION_HEALTH, "run at least every");
+
+    config_move(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds",
+                CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for");
+
+    config_move(CONFIG_SECTION_REGISTRY, "registry expire idle persons days",
+                CONFIG_SECTION_REGISTRY, "registry expire idle persons");
+
+    config_move(CONFIG_SECTION_WEB, "disconnect idle clients after seconds",
+                CONFIG_SECTION_WEB, "disconnect idle clients after");
+
+    config_move(CONFIG_SECTION_WEB, "accept a streaming request every seconds",
+                CONFIG_SECTION_WEB, "accept a streaming request every");
+
+    config_move(CONFIG_SECTION_STATSD, "set charts as obsolete after secs",
+                CONFIG_SECTION_STATSD, "set charts as obsolete after");
+
+    config_move(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after seconds",
+                CONFIG_SECTION_STATSD, "disconnect idle tcp clients after");
 }
 
 static int get_hostname(char *buf, size_t buf_size) {
@@ -1250,15 +1289,19 @@ static void get_netdata_configured_variables()
 
     // --------------------------------------------------------------------
 
-    rrdset_free_obsolete_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
-    rrdhost_free_ephemeral_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup ephemeral hosts after secs", rrdhost_free_ephemeral_time_s);
+    rrdhost_free_ephemeral_time_s =
+        config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup ephemeral hosts after", rrdhost_free_ephemeral_time_s);
+
+    rrdset_free_obsolete_time_s =
+        config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);
+
     // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
     // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
     // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
     if (rrdset_free_obsolete_time_s < 10) {
         rrdset_free_obsolete_time_s = 10;
-        netdata_log_info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds.");
-        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
+        netdata_log_info("The \"cleanup obsolete charts after\" option was set to 10 seconds.");
+        config_set_duration_seconds(CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);
     }
 
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);

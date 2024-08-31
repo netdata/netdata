@@ -27,10 +27,10 @@ void ml_config_load(ml_config_t *cfg) {
 
     unsigned max_train_samples = config_get_number(config_section_ml, "maximum num samples to train", 6 * 3600);
     unsigned min_train_samples = config_get_number(config_section_ml, "minimum num samples to train", 1 * 900);
-    unsigned train_every = config_get_number(config_section_ml, "train every", 3 * 3600);
+    unsigned train_every = config_get_duration_seconds(config_section_ml, "train every", 3 * 3600);
 
     unsigned num_models_to_use = config_get_number(config_section_ml, "number of models per dimension", 18);
-    unsigned delete_models_older_than = config_get_number(config_section_ml, "delete models older than", 60 * 60 * 24 * 7);
+    unsigned delete_models_older_than = config_get_duration_seconds(config_section_ml, "delete models older than", 60 * 60 * 24 * 7);
 
     unsigned diff_n = config_get_number(config_section_ml, "num samples to diff", 1);
     unsigned smooth_n = config_get_number(config_section_ml, "num samples to smooth", 3);
@@ -43,13 +43,16 @@ void ml_config_load(ml_config_t *cfg) {
 
     double host_anomaly_rate_threshold = config_get_float(config_section_ml, "host anomaly rate threshold", 1.0);
     std::string anomaly_detection_grouping_method = config_get(config_section_ml, "anomaly detection grouping method", "average");
-    time_t anomaly_detection_query_duration = config_get_number(config_section_ml, "anomaly detection grouping duration", 5 * 60);
+    time_t anomaly_detection_query_duration = config_get_duration_seconds(config_section_ml, "anomaly detection grouping duration", 5 * 60);
 
     size_t num_training_threads = config_get_number(config_section_ml, "num training threads", 4);
     size_t flush_models_batch_size = config_get_number(config_section_ml, "flush models batch size", 128);
 
-    size_t suppression_window = config_get_number(config_section_ml, "dimension anomaly rate suppression window", 900);
-    size_t suppression_threshold = config_get_number(config_section_ml, "dimension anomaly rate suppression threshold", suppression_window / 2);
+    size_t suppression_window =
+        config_get_duration_seconds(config_section_ml, "dimension anomaly rate suppression window", 900);
+
+    size_t suppression_threshold =
+        config_get_number(config_section_ml, "dimension anomaly rate suppression threshold", suppression_window / 2);
 
     bool enable_statistics_charts = config_get_boolean(config_section_ml, "enable statistics charts", false);
 

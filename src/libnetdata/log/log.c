@@ -580,7 +580,14 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
                         *slash = '\0';
                         slash++;
                         ls->limits.logs_per_period = ls->limits.logs_per_period_backup = str2u(value);
-                        ls->limits.throttle_period = str2u(slash);
+
+                        int period;
+                        if(!duration_str_to_seconds(slash, &period)) {
+                            nd_log(NDLS_DAEMON, NDLP_ERR, "Error while parsing period '%s'", slash);
+                            period = ND_LOG_DEFAULT_THROTTLE_PERIOD;
+                        }
+
+                        ls->limits.throttle_period = period;
                     }
                     else {
                         ls->limits.logs_per_period = ls->limits.logs_per_period_backup = str2u(value);
@@ -589,8 +596,9 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
                 }
             }
             else
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Error while parsing configuration of log source '%s'. "
-                                              "In config '%s', '%s' is not understood.",
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Error while parsing configuration of log source '%s'. "
+                       "In config '%s', '%s' is not understood.",
                        nd_log_id2source(source), setting, name);
         }
     }

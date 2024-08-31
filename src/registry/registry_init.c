@@ -93,7 +93,7 @@ int registry_init(void) {
 
     // configuration options
     registry.save_registry_every_entries = (unsigned long long)config_get_number(CONFIG_SECTION_REGISTRY, "registry save db every new entries", 1000000);
-    registry.persons_expiration = config_get_number(CONFIG_SECTION_REGISTRY, "registry expire idle persons days", 365) * 86400;
+    registry.persons_expiration = config_get_duration_days(CONFIG_SECTION_REGISTRY, "registry expire idle persons", 365) * 86400;
     registry.registry_domain = config_get(CONFIG_SECTION_REGISTRY, "registry domain", "");
     registry.registry_to_announce = config_get(CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io");
     registry.hostname = config_get(CONFIG_SECTION_REGISTRY, "registry hostname", netdata_configured_hostname);

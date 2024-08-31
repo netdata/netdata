@@ -22,6 +22,8 @@ typedef uint64_t usec_t;
 typedef int64_t  susec_t;
 typedef int64_t  snsec_t;
 
+typedef int64_t stime_t;
+
 typedef struct heartbeat {
     usec_t realtime;
     usec_t randomness;

@@ -45,13 +45,13 @@ The following `netdata.conf` configuration parameters affect replication.
 
 On the receiving side (Netdata Parent):
 
-- `[db].seconds to replicate` limits the maximum time to be replicated. The default is 1 day (86400 seconds). Keep in mind that replication is also limited by the `tier0` retention the sending side has.
+- `[db].replication period` limits the maximum time to be replicated. The default is 1 day. Keep in mind that replication is also limited by the `tier0` retention the sending side has.
 
 On the sending side (Netdata Children, or Netdata Parent when parents are clustered):
 
 - `[db].replication threads` controls how many concurrent threads will be replicating metrics. The default is 1. Usually the performance is about 2 million samples per second per thread, so increasing this number may allow replication to progress faster between Netdata Parents.
 
-- `[db].cleanup obsolete charts after secs` controls for how much time after metrics stop being collected will not be available for replication. The default is 1 hour (3600 seconds). If you plan to have scheduled maintenance on Netdata Parents of more than 1 hour, we recommend increasing this setting. Keep in mind however, that increasing this duration in highly ephemeral environments can have an impact on RAM utilization, since metrics will be considered as collected for longer durations.
+- `[db].cleanup obsolete charts after` controls for how much time after metrics stop being collected will not be available for replication. The default is 1 hour (3600 seconds). If you plan to have scheduled maintenance on Netdata Parents of more than 1 hour, we recommend increasing this setting. Keep in mind however, that increasing this duration in highly ephemeral environments can have an impact on RAM utilization, since metrics will be considered as collected for longer durations.
 
 ## Monitoring Replication Progress
 

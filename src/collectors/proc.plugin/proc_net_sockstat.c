@@ -128,7 +128,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         do_frag_sockets    = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 FRAG sockets", CONFIG_BOOLEAN_AUTO);
         do_frag_mem        = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 FRAG memory", CONFIG_BOOLEAN_AUTO);
 
-        update_constants_every = config_get_number("plugin:proc:/proc/net/sockstat", "update constants every", update_constants_every);
+        update_constants_every = config_get_duration_seconds("plugin:proc:/proc/net/sockstat", "update constants every", update_constants_every);
         update_constants_count = update_constants_every;
 
         arl_sockets = arl_create("sockstat/sockets", arl_callback_str2kernel_uint_t, 60);

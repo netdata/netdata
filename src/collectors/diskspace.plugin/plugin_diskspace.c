@@ -859,7 +859,7 @@ void *diskspace_main(void *ptr) {
     if(update_every < localhost->rrd_update_every)
         update_every = localhost->rrd_update_every;
 
-    check_for_new_mountpoints_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "check for new mount points every", check_for_new_mountpoints_every);
+    check_for_new_mountpoints_every = (int)config_get_duration_seconds(CONFIG_SECTION_DISKSPACE, "check for new mount points every", check_for_new_mountpoints_every);
     if(check_for_new_mountpoints_every < update_every)
         check_for_new_mountpoints_every = update_every;
 

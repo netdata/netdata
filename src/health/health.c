@@ -55,17 +55,17 @@ static void health_load_config_defaults(void) {
                            health_globals.config.use_summary_for_notifications);
 
     health_globals.config.default_warn_repeat_every =
-        config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
+        config_get_duration_seconds(CONFIG_SECTION_HEALTH, "default repeat warning", 0);
 
     health_globals.config.default_crit_repeat_every =
-        config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
+        config_get_duration_seconds(CONFIG_SECTION_HEALTH, "default repeat critical", 0);
 
     health_globals.config.health_log_entries_max =
         config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries",
                           health_globals.config.health_log_entries_max);
 
     health_globals.config.health_log_history =
-        config_get_number(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_DEFAULT_HISTORY);
+        config_get_duration_seconds(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_DEFAULT_HISTORY);
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     health_globals.config.default_exec =
@@ -76,14 +76,13 @@ static void health_load_config_defaults(void) {
                               NULL, SIMPLE_PATTERN_EXACT, true);
 
     health_globals.config.run_at_least_every_seconds =
-        (int)config_get_number(CONFIG_SECTION_HEALTH,
-                               "run at least every seconds",
-                               health_globals.config.run_at_least_every_seconds);
+        (int)config_get_duration_seconds(CONFIG_SECTION_HEALTH, "run at least every",
+                                         health_globals.config.run_at_least_every_seconds);
 
     health_globals.config.postpone_alarms_during_hibernation_for_seconds =
-        config_get_number(CONFIG_SECTION_HEALTH,
-                          "postpone alarms during hibernation for seconds",
-                          health_globals.config.postpone_alarms_during_hibernation_for_seconds);
+        config_get_duration_seconds(CONFIG_SECTION_HEALTH,
+                                    "postpone alarms during hibernation for",
+                                    health_globals.config.postpone_alarms_during_hibernation_for_seconds);
 
     health_globals.config.default_recipient =
         string_strdupz("root");
@@ -121,7 +120,7 @@ static void health_load_config_defaults(void) {
                health_globals.config.health_log_history, HEALTH_LOG_MINIMUM_HISTORY);
 
         health_globals.config.health_log_history = HEALTH_LOG_MINIMUM_HISTORY;
-        config_set_number(CONFIG_SECTION_HEALTH, "health log history", health_globals.config.health_log_history);
+        config_set_duration_seconds(CONFIG_SECTION_HEALTH, "health log history", health_globals.config.health_log_history);
     }
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,

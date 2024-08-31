@@ -117,6 +117,7 @@
 #define CONFIG_VALUE_USED    0x02 // has been accessed from the program
 #define CONFIG_VALUE_CHANGED 0x04 // has been changed from the loaded value or the internal default value
 #define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
+#define CONFIG_VALUE_REFORMATTED 0x10 // has been reformatted with the official formatting
 
 struct config_option {
     avl_t avl_node;         // the index entry of this entry - this has to be first!
@@ -175,7 +176,12 @@ NETDATA_DOUBLE appconfig_get_float(struct config *root, const char *section, con
 int appconfig_get_boolean_by_section(struct section *co, const char *name, int value);
 int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
-int appconfig_get_duration(struct config *root, const char *section, const char *name, const char *value);
+
+time_t appconfig_get_duration_seconds(struct config *root, const char *section, const char *name, time_t default_value);
+time_t appconfig_set_duration_seconds(struct config *root, const char *section, const char *name, time_t value);
+
+unsigned appconfig_get_duration_days(struct config *root, const char *section, const char *name, unsigned default_value);
+unsigned appconfig_set_duration_days(struct config *root, const char *section, const char *name, unsigned value);
 
 const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value);
 const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);
@@ -185,6 +191,7 @@ int appconfig_set_boolean(struct config *root, const char *section, const char *
 
 int appconfig_exists(struct config *root, const char *section, const char *name);
 int appconfig_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new);
+int appconfig_move_everywhere(struct config *root, const char *name_old, const char *name_new);
 
 void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool netdata_conf);
 
@@ -192,8 +199,6 @@ int appconfig_section_compare(void *a, void *b);
 
 void appconfig_section_destroy_non_loaded(struct config *root, const char *section);
 void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name);
-
-int config_parse_duration(const char* string, int* result);
 
 struct section *appconfig_get_section(struct config *root, const char *name);
 
@@ -216,5 +221,33 @@ typedef struct _connector_instance {
 } _CONNECTOR_INSTANCE;
 
 _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct section *instance);
+
+// ----------------------------------------------------------------------------
+// shortcuts for the default netdata configuration
+
+#define config_load(filename, overwrite_used, section) appconfig_load(&netdata_config, filename, overwrite_used, section)
+#define config_get(section, name, default_value) appconfig_get(&netdata_config, section, name, default_value)
+#define config_get_number(section, name, value) appconfig_get_number(&netdata_config, section, name, value)
+#define config_get_float(section, name, value) appconfig_get_float(&netdata_config, section, name, value)
+#define config_get_boolean(section, name, value) appconfig_get_boolean(&netdata_config, section, name, value)
+#define config_get_boolean_ondemand(section, name, value) appconfig_get_boolean_ondemand(&netdata_config, section, name, value)
+#define config_get_duration_seconds(section, name, value) appconfig_get_duration_seconds(&netdata_config, section, name, value)
+#define config_get_duration_days(section, name, value) appconfig_get_duration_days(&netdata_config, section, name, value)
+
+#define config_set(section, name, default_value) appconfig_set(&netdata_config, section, name, default_value)
+#define config_set_default(section, name, value) appconfig_set_default(&netdata_config, section, name, value)
+#define config_set_number(section, name, value) appconfig_set_number(&netdata_config, section, name, value)
+#define config_set_float(section, name, value) appconfig_set_float(&netdata_config, section, name, value)
+#define config_set_boolean(section, name, value) appconfig_set_boolean(&netdata_config, section, name, value)
+#define config_set_duration_seconds(section, name, value) appconfig_set_duration_seconds(&netdata_config, section, name, value)
+#define config_set_duration_days(section, name, value) appconfig_set_duration_days(&netdata_config, section, name, value)
+
+#define config_exists(section, name) appconfig_exists(&netdata_config, section, name)
+#define config_move(section_old, name_old, section_new, name_new) appconfig_move(&netdata_config, section_old, name_old, section_new, name_new)
+
+#define netdata_conf_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed, true)
+
+#define config_section_destroy(section) appconfig_section_destroy_non_loaded(&netdata_config, section)
+#define config_section_option_destroy(section, name) appconfig_section_option_destroy_non_loaded(&netdata_config, section, name)
 
 #endif /* NETDATA_CONFIG_H */

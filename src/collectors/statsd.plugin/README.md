@@ -174,7 +174,7 @@ You can find the configuration at `/etc/netdata/netdata.conf`:
 	# udp messages to process at once = 10
 	# create private charts for metrics matching = *
 	# max private charts hard limit = 1000
-	# cleanup obsolete charts after secs = 0
+	# cleanup obsolete charts after = 0
 	# private charts memory mode = save
 	# private charts history = 3996
 	# histograms and timers percentile (percentThreshold) = 95.00000
@@ -238,7 +238,7 @@ The default behavior is to use the same settings as the rest of the Netdata Agen
 
 For optimization reasons, Netdata imposes a hard limit on private metric charts. The limit is set via the `max private charts hard limit` setting (which defaults to 1000 charts). Metrics above this hard limit are still collected, but they can only be used in synthetic charts (once a metric is added to chart, it will be sent to backend servers too).
 
-If you have many ephemeral metrics collected (i.e. that you collect values for a certain amount of time), you can set the configuration option `set charts as obsolete after secs`. Setting a value in seconds here, means that Netdata will mark those metrics (and their private charts) as obsolete after the specified time has passed since the last sent metric value. Those charts will later be deleted according to the setting in `cleanup obsolete charts after secs`. Setting `set charts as obsolete after secs` to 0 (which is also the default value) will disable this functionality.
+If you have many ephemeral metrics collected (i.e. that you collect values for a certain amount of time), you can set the configuration option `set charts as obsolete after`. Setting a value in seconds here, means that Netdata will mark those metrics (and their private charts) as obsolete after the specified time has passed since the last sent metric value. Those charts will later be deleted according to the setting in `cleanup obsolete charts after`. Setting `set charts as obsolete after` to 0 (which is also the default value) will disable this functionality.
 
 Example private charts (automatically generated without any configuration):
 

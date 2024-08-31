@@ -409,6 +409,20 @@ cleanup:
     return ret;
 }
 
+int appconfig_move_everywhere(struct config *root, const char *name_old, const char *name_new) {
+    int ret = -1;
+    appconfig_wrlock(root);
+    struct section *co;
+    for(co = root->first_section; co ; co = co->next) {
+        appconfig_unlock(root);
+        if(appconfig_move(root, co->name, name_old, co->name, name_new) == 0)
+            ret = 0;
+        appconfig_wrlock(root);
+    }
+    appconfig_unlock(root);
+    return ret;
+}
+
 char *appconfig_get_by_section(struct section *co, const char *name, const char *default_value)
 {
     struct config_option *cv;
@@ -609,26 +623,60 @@ int appconfig_set_boolean(struct config *root, const char *section, const char *
     return value;
 }
 
-int appconfig_get_duration(struct config *root, const char *section, const char *name, const char *value)
-{
+time_t appconfig_get_duration_seconds(struct config *root, const char *section, const char *name, time_t default_value) {
+
+    char default_str[128];
+    duration_snprintf_from_time_t(default_str, sizeof(default_str), default_value);
+
+    const char *s = appconfig_get(root, section, name, default_str);
+    if(!s)
+        return default_value;
+
     int result = 0;
-    const char *s;
-
-    s = appconfig_get(root, section, name, value);
-    if(!s) goto fallback;
-
-    if(!config_parse_duration(s, &result)) {
-        netdata_log_error("config option '[%s].%s = %s' is configured with an valid duration", section, name, s);
-        goto fallback;
+    if(!duration_str_to_seconds(s, &result)) {
+        appconfig_set(root, section, name, default_str);
+        netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
+        return default_value;
     }
 
-    return result;
+    return ABS(result);
+}
 
-    fallback:
-    if(!config_parse_duration(value, &result))
-        netdata_log_error("INTERNAL ERROR: default duration supplied for option '[%s].%s = %s' is not a valid duration", section, name, value);
+time_t appconfig_set_duration_seconds(struct config *root, const char *section, const char *name, time_t value) {
+    char str[128];
+    duration_snprintf_from_time_t(str, sizeof(str), value);
 
-    return result;
+    appconfig_set(root, section, name, str);
+
+    return value;
+}
+
+unsigned appconfig_get_duration_days(struct config *root, const char *section, const char *name, unsigned default_value) {
+
+    char default_str[128];
+    duration_snprintf_from_days(default_str, sizeof(default_str), (int)default_value);
+
+    const char *s = appconfig_get(root, section, name, default_str);
+    if(!s)
+        return default_value;
+
+    int result = 0;
+    if(!duration_str_to_days(s, &result)) {
+        appconfig_set(root, section, name, default_str);
+        netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
+        return default_value;
+    }
+
+    return ABS(result);
+}
+
+unsigned appconfig_set_duration_days(struct config *root, const char *section, const char *name, unsigned value) {
+    char str[128];
+    duration_snprintf_from_days(str, sizeof(str), value);
+
+    appconfig_set(root, section, name, str);
+
+    return value;
 }
 
 // ----------------------------------------------------------------------------
@@ -900,68 +948,6 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
         }
         appconfig_unlock(root);
     }
-}
-
-/**
- * Parse Duration
- *
- * Parse the string setting the result
- *
- * @param string  the timestamp string
- * @param result the output variable
- *
- * @return It returns 1 on success and 0 otherwise
- */
-int config_parse_duration(const char* string, int* result) {
-    while(*string && isspace((uint8_t)*string)) string++;
-
-    if(unlikely(!*string)) goto fallback;
-
-    if(*string == 'n' && !strcmp(string, "never")) {
-        // this is a valid option
-        *result = 0;
-        return 1;
-    }
-
-    // make sure it is a number
-    if(!(isdigit((uint8_t)*string) || *string == '+' || *string == '-')) goto fallback;
-
-    char *e = NULL;
-    NETDATA_DOUBLE n = str2ndd(string, &e);
-    if(e && *e) {
-        switch (*e) {
-            case 'Y':
-                *result = (int) (n * 31536000);
-                break;
-            case 'M':
-                *result = (int) (n * 2592000);
-                break;
-            case 'w':
-                *result = (int) (n * 604800);
-                break;
-            case 'd':
-                *result = (int) (n * 86400);
-                break;
-            case 'h':
-                *result = (int) (n * 3600);
-                break;
-            case 'm':
-                *result = (int) (n * 60);
-                break;
-            case 's':
-            default:
-                *result = (int) (n);
-                break;
-        }
-    }
-    else
-        *result = (int)(n);
-
-    return 1;
-
-    fallback:
-    *result = 0;
-    return 0;
 }
 
 struct section *appconfig_get_section(struct config *root, const char *name)

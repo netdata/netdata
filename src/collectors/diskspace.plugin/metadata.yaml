@@ -63,7 +63,7 @@ modules:
               required: false
             - name: check for new mount points every
               description: Parse proc files frequency.
-              default_value: 15
+              default_value: 15s
               required: false
             - name: exclude space metrics on paths
               description: Do not show metrics (charts) for listed paths. This option accepts netdata simple pattern.
