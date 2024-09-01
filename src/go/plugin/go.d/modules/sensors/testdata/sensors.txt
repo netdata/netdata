@@ -70,3 +70,10 @@ PPT:
 acpitz-acpi-0
 temp1:
   temp1_input: 88.000
+nct6779-isa-0290
+intrusion0:
+  intrusion0_alarm: 1.000
+  intrusion0_beep: 0.000
+intrusion1:
+  intrusion1_alarm: 1.000
+  intrusion1_beep: 0.000

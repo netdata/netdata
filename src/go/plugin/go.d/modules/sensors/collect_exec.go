@@ -12,13 +12,14 @@ import (
 )
 
 const (
-	sensorTypeTemp     = "temperature"
-	sensorTypeVoltage  = "voltage"
-	sensorTypePower    = "power"
-	sensorTypeHumidity = "humidity"
-	sensorTypeFan      = "fan"
-	sensorTypeCurrent  = "current"
-	sensorTypeEnergy   = "energy"
+	sensorTypeTemp      = "temperature"
+	sensorTypeVoltage   = "voltage"
+	sensorTypePower     = "power"
+	sensorTypeHumidity  = "humidity"
+	sensorTypeFan       = "fan"
+	sensorTypeCurrent   = "current"
+	sensorTypeEnergy    = "energy"
+	sensorTypeIntrusion = "intrusion"
 )
 
 type execSensor struct {
@@ -36,6 +37,8 @@ func (s *execSensor) sensorType() string {
 	switch {
 	case strings.HasPrefix(s.subfeature, "temp"):
 		return sensorTypeTemp
+	case strings.HasPrefix(s.subfeature, "intrusion"):
+		return sensorTypeIntrusion
 	case strings.HasPrefix(s.subfeature, "in"):
 		return sensorTypeVoltage
 	case strings.HasPrefix(s.subfeature, "power"):
@@ -96,9 +99,18 @@ func (s *Sensors) collectExec() (map[string]int64, error) {
 	seen := make(map[string]bool)
 
 	for _, sn := range sensors {
-		sx := "_input"
-		if sn.sensorType() == sensorTypePower {
+		var sx string
+
+		switch sn.sensorType() {
+		case "":
+			s.Debugf("can not find type for sensor '%s'", sn)
+			continue
+		case sensorTypePower:
 			sx = "_average"
+		case sensorTypeIntrusion:
+			sx = "_alarm"
+		default:
+			sx = "_input"
 		}
 
 		if !strings.HasSuffix(sn.subfeature, sx) {
@@ -109,11 +121,6 @@ func (s *Sensors) collectExec() (map[string]int64, error) {
 		v, err := strconv.ParseFloat(sn.value, 64)
 		if err != nil {
 			s.Debugf("parsing value for sensor '%s': %v", sn, err)
-			continue
-		}
-
-		if sn.sensorType() == "" {
-			s.Debugf("can not find type for sensor '%s'", sn)
 			continue
 		}
 
@@ -132,7 +139,12 @@ func (s *Sensors) collectExec() (map[string]int64, error) {
 
 		seen[key] = true
 
-		mx[key] = int64(v * precision)
+		if sn.sensorType() == sensorTypeIntrusion {
+			mx[key+"_triggered"] = boolToInt(v != 0)
+			mx[key+"_clear"] = boolToInt(v == 0)
+		} else {
+			mx[key] = int64(v * precision)
+		}
 	}
 
 	for k := range s.sensors {
