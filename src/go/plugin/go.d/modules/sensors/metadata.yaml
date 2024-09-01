@@ -157,3 +157,10 @@ modules:
               chart_type: area
               dimensions:
                 - name: humidity
+            - name: sensors.sensor_intrusion
+              description: Sensor intrusion
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: alarm_clear
+                - name: alarm_triggered

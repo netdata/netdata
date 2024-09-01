@@ -50,8 +50,8 @@ func (s *Sensors) collectSysfs() (map[string]int64, error) {
 				mx[key] = int64(v.Input * precision)
 			case *lmsensors.IntrusionSensor:
 				key = snakeCase(fmt.Sprintf("sensor_chip_%s_feature_%s_subfeature_%s_alarm", dev.Name, firstNotEmpty(v.Label, v.Name), v.Name))
-				mx[key+"_on"] = boolToInt(v.Alarm)
-				mx[key+"_off"] = boolToInt(!v.Alarm)
+				mx[key+"_triggered"] = boolToInt(v.Alarm)
+				mx[key+"_clear"] = boolToInt(!v.Alarm)
 			default:
 				s.Debugf("unexpected sensor type: %T", v)
 				continue

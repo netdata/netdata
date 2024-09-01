@@ -18,8 +18,7 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataSensorsTemp, _               = os.ReadFile("testdata/sensors-temp.txt")
-	dataSensorsTempInCurrPowerFan, _ = os.ReadFile("testdata/sensors-temp-in-curr-power-fan.txt")
+	dataSensors, _ = os.ReadFile("testdata/sensors.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -27,8 +26,7 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataConfigJSON": dataConfigJSON,
 		"dataConfigYAML": dataConfigYAML,
 
-		"dataSensorsTemp":               dataSensorsTemp,
-		"dataSensorsTempInCurrPowerFan": dataSensorsTempInCurrPowerFan,
+		"dataSensors": dataSensors,
 	} {
 		require.NotNil(t, data, name)
 
@@ -84,7 +82,7 @@ func TestSensors_Cleanup(t *testing.T) {
 		"after check": {
 			prepare: func() *Sensors {
 				sensors := New()
-				sensors.exec = prepareMockExecOkOnlyTemp()
+				sensors.exec = prepareMockExecOk()
 				_ = sensors.Check()
 				return sensors
 			},
@@ -92,7 +90,7 @@ func TestSensors_Cleanup(t *testing.T) {
 		"after collect": {
 			prepare: func() *Sensors {
 				sensors := New()
-				sensors.exec = prepareMockExecOkTempInCurrPowerFan()
+				sensors.exec = prepareMockExecOk()
 				_ = sensors.Collect()
 				return sensors
 			},
@@ -119,11 +117,7 @@ func TestSensors_Check(t *testing.T) {
 	}{
 		"exec: only temperature": {
 			wantFail:    false,
-			prepareMock: prepareMockExecOkOnlyTemp,
-		},
-		"exec: temperature and voltage": {
-			wantFail:    false,
-			prepareMock: prepareMockExecOkTempInCurrPowerFan,
+			prepareMock: prepareMockExecOk,
 		},
 		"exec: error on sensors info call": {
 			wantFail:    true,
@@ -161,39 +155,9 @@ func TestSensors_Collect(t *testing.T) {
 		wantMetrics      map[string]int64
 		wantCharts       int
 	}{
-		"exec: only temperature": {
-			prepareExecMock: prepareMockExecOkOnlyTemp,
-			wantCharts:      24,
-			wantMetrics: map[string]int64{
-				"sensor_chip_bnxt_en-pci-6200_feature_temp1_subfeature_temp1_input":  80000,
-				"sensor_chip_bnxt_en-pci-6201_feature_temp1_subfeature_temp1_input":  81000,
-				"sensor_chip_k10temp-pci-00c3_feature_tccd1_subfeature_temp3_input":  58250,
-				"sensor_chip_k10temp-pci-00c3_feature_tccd2_subfeature_temp4_input":  60250,
-				"sensor_chip_k10temp-pci-00c3_feature_tccd3_subfeature_temp5_input":  57000,
-				"sensor_chip_k10temp-pci-00c3_feature_tccd4_subfeature_temp6_input":  57250,
-				"sensor_chip_k10temp-pci-00c3_feature_tccd5_subfeature_temp7_input":  57750,
-				"sensor_chip_k10temp-pci-00c3_feature_tccd6_subfeature_temp8_input":  59500,
-				"sensor_chip_k10temp-pci-00c3_feature_tccd7_subfeature_temp9_input":  58500,
-				"sensor_chip_k10temp-pci-00c3_feature_tccd8_subfeature_temp10_input": 61250,
-				"sensor_chip_k10temp-pci-00c3_feature_tctl_subfeature_temp1_input":   62000,
-				"sensor_chip_k10temp-pci-00cb_feature_tccd1_subfeature_temp3_input":  54000,
-				"sensor_chip_k10temp-pci-00cb_feature_tccd2_subfeature_temp4_input":  55500,
-				"sensor_chip_k10temp-pci-00cb_feature_tccd3_subfeature_temp5_input":  56000,
-				"sensor_chip_k10temp-pci-00cb_feature_tccd4_subfeature_temp6_input":  52750,
-				"sensor_chip_k10temp-pci-00cb_feature_tccd5_subfeature_temp7_input":  53500,
-				"sensor_chip_k10temp-pci-00cb_feature_tccd6_subfeature_temp8_input":  55250,
-				"sensor_chip_k10temp-pci-00cb_feature_tccd7_subfeature_temp9_input":  53000,
-				"sensor_chip_k10temp-pci-00cb_feature_tccd8_subfeature_temp10_input": 53750,
-				"sensor_chip_k10temp-pci-00cb_feature_tctl_subfeature_temp1_input":   57500,
-				"sensor_chip_nouveau-pci-4100_feature_temp1_subfeature_temp1_input":  51000,
-				"sensor_chip_nvme-pci-0100_feature_composite_subfeature_temp1_input": 39850,
-				"sensor_chip_nvme-pci-6100_feature_composite_subfeature_temp1_input": 48850,
-				"sensor_chip_nvme-pci-8100_feature_composite_subfeature_temp1_input": 39850,
-			},
-		},
 		"exec: multiple sensors": {
-			prepareExecMock: prepareMockExecOkTempInCurrPowerFan,
-			wantCharts:      20,
+			prepareExecMock: prepareMockExecOk,
+			wantCharts:      22,
 			wantMetrics: map[string]int64{
 				"sensor_chip_acpitz-acpi-0_feature_temp1_subfeature_temp1_input":                        88000,
 				"sensor_chip_amdgpu-pci-0300_feature_edge_subfeature_temp1_input":                       53000,
@@ -210,6 +174,10 @@ func TestSensors_Collect(t *testing.T) {
 				"sensor_chip_asus-isa-0000_feature_gpu_fan_subfeature_fan2_input":                       6600000,
 				"sensor_chip_bat0-acpi-0_feature_in0_subfeature_in0_input":                              17365,
 				"sensor_chip_k10temp-pci-00c3_feature_tctl_subfeature_temp1_input":                      90000,
+				"sensor_chip_nct6779-isa-0290_feature_intrusion0_subfeature_intrusion0_alarm_clear":     0,
+				"sensor_chip_nct6779-isa-0290_feature_intrusion0_subfeature_intrusion0_alarm_triggered": 1,
+				"sensor_chip_nct6779-isa-0290_feature_intrusion1_subfeature_intrusion1_alarm_clear":     0,
+				"sensor_chip_nct6779-isa-0290_feature_intrusion1_subfeature_intrusion1_alarm_triggered": 1,
 				"sensor_chip_nvme-pci-0600_feature_composite_subfeature_temp1_input":                    33850,
 				"sensor_chip_nvme-pci-0600_feature_sensor_1_subfeature_temp2_input":                     48850,
 				"sensor_chip_nvme-pci-0600_feature_sensor_2_subfeature_temp3_input":                     33850,
@@ -232,7 +200,7 @@ func TestSensors_Collect(t *testing.T) {
 
 		"sysfs: multiple sensors": {
 			prepareSysfsMock: prepareMockSysfsScannerOk,
-			wantCharts:       20,
+			wantCharts:       21,
 			wantMetrics: map[string]int64{
 				"sensor_chip_acpitz-acpi-0_feature_temp1_subfeature_temp1_input":                        88000,
 				"sensor_chip_amdgpu-pci-0300_feature_edge_subfeature_temp1_input":                       53000,
@@ -247,6 +215,8 @@ func TestSensors_Collect(t *testing.T) {
 				"sensor_chip_amdgpu-pci-6700_feature_vddnb_subfeature_in1_input":                        973,
 				"sensor_chip_asus-isa-0000_feature_cpu_fan_subfeature_fan1_input":                       5700000,
 				"sensor_chip_asus-isa-0000_feature_gpu_fan_subfeature_fan2_input":                       6600000,
+				"sensor_chip_asus-isa-0000_feature_intrusion0_subfeature_intrusion0_alarm_clear":        0,
+				"sensor_chip_asus-isa-0000_feature_intrusion0_subfeature_intrusion0_alarm_triggered":    1,
 				"sensor_chip_bat0-acpi-0_feature_in0_subfeature_in0_input":                              17365,
 				"sensor_chip_k10temp-pci-00c3_feature_tctl_subfeature_temp1_input":                      90000,
 				"sensor_chip_nvme-pci-0600_feature_composite_subfeature_temp1_input":                    33850,
@@ -265,6 +235,7 @@ func TestSensors_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			sensors := New()
+
 			if test.prepareExecMock != nil {
 				sensors.exec = test.prepareExecMock()
 			} else if test.prepareSysfsMock != nil {
@@ -274,6 +245,7 @@ func TestSensors_Collect(t *testing.T) {
 			}
 
 			var mx map[string]int64
+
 			for i := 0; i < 10; i++ {
 				mx = sensors.Collect()
 			}
@@ -289,15 +261,9 @@ func TestSensors_Collect(t *testing.T) {
 	}
 }
 
-func prepareMockExecOkOnlyTemp() *mockSensorsBinary {
+func prepareMockExecOk() *mockSensorsBinary {
 	return &mockSensorsBinary{
-		sensorsInfoData: dataSensorsTemp,
-	}
-}
-
-func prepareMockExecOkTempInCurrPowerFan() *mockSensorsBinary {
-	return &mockSensorsBinary{
-		sensorsInfoData: dataSensorsTempInCurrPowerFan,
+		sensorsInfoData: dataSensors,
 	}
 }
 
@@ -347,6 +313,11 @@ func prepareMockSysfsScannerOk() *mockSysfsScanner {
 					Name:  "fan2",
 					Label: "gpu_fan",
 					Input: 6600,
+				},
+				&lmsensors.IntrusionSensor{
+					Name:  "intrusion0",
+					Label: "intrusion0",
+					Alarm: true,
 				},
 			}},
 			{Name: "nvme-pci-0600", Sensors: []lmsensors.Sensor{
