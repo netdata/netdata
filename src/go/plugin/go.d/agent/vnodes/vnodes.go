@@ -14,8 +14,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var Disabled = false // TODO: remove after Netdata v1.39.0. Fix for "from source" stable-channel installations.
-
 func New(confDir string) *Vnodes {
 	vn := &Vnodes{
 		Logger: logger.New().With(
@@ -61,11 +59,39 @@ func (vn *Vnodes) readConfDir() {
 			return nil
 		}
 
-		if !d.Type().IsRegular() || !isConfigFile(path) {
+		if d.Type()&os.ModeSymlink != 0 {
+			dst, err := os.Readlink(path)
+			if err != nil {
+				vn.Warningf("failed to resolve symlink '%s': %v", path, err)
+				return nil
+			}
+
+			if !filepath.IsAbs(dst) {
+				dst = filepath.Join(filepath.Dir(path), filepath.Clean(dst))
+			}
+
+			fi, err := os.Stat(dst)
+			if err != nil {
+				vn.Warningf("failed to stat resolved path '%s': %v", dst, err)
+				return nil
+			}
+			if !fi.Mode().IsRegular() {
+				vn.Debugf("'%s' is not a regular file, skipping it", dst)
+				return nil
+			}
+			path = dst
+		} else if !d.Type().IsRegular() {
+			vn.Debugf("'%s' is not a regular file, skipping it", path)
+			return nil
+		}
+
+		if !isConfigFile(path) {
+			vn.Debugf("'%s' is not a config file (wrong extension), skipping it", path)
 			return nil
 		}
 
 		var cfg []VirtualNode
+
 		if err := loadConfigFile(&cfg, path); err != nil {
 			vn.Warning(err)
 			return nil
