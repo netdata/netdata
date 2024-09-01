@@ -3031,6 +3031,47 @@ if(OS_WINDOWS)
                       /usr/bin/whoami.exe
                 DESTINATION "${BINDIR}")
 
+        install(FILES /usr/bin/msys-2.0.dll
+                      /usr/bin/msys-asn1-8.dll
+                      /usr/bin/msys-brotlicommon-1.dll
+                      /usr/bin/msys-brotlidec-1.dll
+                      /usr/bin/msys-brotlienc-1.dll
+                      /usr/bin/msys-com_err-1.dll
+                      /usr/bin/msys-crypt-2.dll
+                      /usr/bin/msys-crypto-3.dll
+                      /usr/bin/msys-curl-4.dll
+                      /usr/bin/msys-gcc_s-seh-1.dll
+                      /usr/bin/msys-gmp-10.dll
+                      /usr/bin/msys-gssapi-3.dll
+                      /usr/bin/msys-hcrypto-4.dll
+                      /usr/bin/msys-heimbase-1.dll
+                      /usr/bin/msys-heimntlm-0.dll
+                      /usr/bin/msys-hx509-5.dll
+                      /usr/bin/msys-iconv-2.dll
+                      /usr/bin/msys-idn2-0.dll
+                      /usr/bin/msys-intl-8.dll
+                      /usr/bin/msys-krb5-26.dll
+                      /usr/bin/msys-lz4-1.dll
+                      /usr/bin/msys-mpfr-6.dll
+                      /usr/bin/msys-ncursesw6.dll
+                      /usr/bin/msys-nghttp2-14.dll
+                      /usr/bin/msys-pcre-1.dll
+                      /usr/bin/msys-protobuf-32.dll
+                      /usr/bin/msys-psl-5.dll
+                      /usr/bin/msys-readline8.dll
+                      /usr/bin/msys-roken-18.dll
+                      /usr/bin/msys-sqlite3-0.dll
+                      /usr/bin/msys-ssh2-1.dll
+                      /usr/bin/msys-ssl-3.dll
+                      /usr/bin/msys-stdc++-6.dll
+                      /usr/bin/msys-unistring-5.dll
+                      /usr/bin/msys-uuid-1.dll
+                      /usr/bin/msys-uv-1.dll
+                      /usr/bin/msys-wind-0.dll
+                      /usr/bin/msys-z.dll
+                      /usr/bin/msys-zstd-1.dll
+                DESTINATION "${BINDIR}")
+
         # Make bash & netdata happy
         install(DIRECTORY DESTINATION tmp)
 
