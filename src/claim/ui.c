@@ -5,7 +5,7 @@
 #include <windows.h>
 #include "richedit.h"
 #include "tchar.h"
-#include "netdata_claim.h"
+#include "main.h"
 
 static LPCTSTR szWindowClass = _T("DesktopApp");
 

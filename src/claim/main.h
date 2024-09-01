@@ -4,7 +4,7 @@
 # define NETDATA_CLAIM_H_ 1
 
 #include <wchar.h>
-#include "netdata_claim_window.h"
+#include "ui.h"
 
 extern LPWSTR token;
 extern LPWSTR room;

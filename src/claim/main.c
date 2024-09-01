@@ -9,7 +9,7 @@
 #include <string.h>
 #include <signal.h>
 
-#include "netdata_claim.h"
+#include "main.h"
 
 LPWSTR token = NULL;
 LPWSTR room = NULL;
