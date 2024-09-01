@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duration Converter</title>
+    <style>
+        table {
+            width: 50%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+<h1>Duration Converter</h1>
+<input type="text" id="durationInput" placeholder="Enter duration (e.g., 10d-12h)">
+<div id="errorMessage" class="error"></div>
+
+<table id="resultTable">
+    <thead>
+    <tr>
+        <th>Unit</th>
+        <th>Value</th>
+        <th>Formatted</th>
+    </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
+
+<script>
+    const NSEC_PER_USEC = 1000;
+    const USEC_PER_MS = 1000;
+    const NSEC_PER_SEC = 1000000000;
+    const NSEC_PER_MS = USEC_PER_MS * NSEC_PER_USEC;
+    const NSEC_PER_MIN = NSEC_PER_SEC * 60;
+    const NSEC_PER_HOUR = NSEC_PER_MIN * 60;
+    const NSEC_PER_DAY = NSEC_PER_HOUR * 24;
+    const NSEC_PER_WEEK = NSEC_PER_DAY * 7;
+    const NSEC_PER_YEAR = NSEC_PER_DAY * 365;
+    const NSEC_PER_MONTH = NSEC_PER_YEAR / 12;
+    const NSEC_PER_QUARTER = NSEC_PER_YEAR / 4;
+
+    const units = [
+        { unit: "ns", formatter: true, multiplier: 1 },
+        { unit: "us", formatter: true, multiplier: NSEC_PER_USEC },
+        { unit: "ms", formatter: true, multiplier: NSEC_PER_MS },
+        { unit: "s", formatter: true, multiplier: NSEC_PER_SEC },
+        { unit: "m", formatter: true, multiplier: NSEC_PER_MIN },
+        { unit: "min", formatter: false, multiplier: NSEC_PER_MIN },
+        { unit: "h", formatter: true, multiplier: NSEC_PER_HOUR },
+        { unit: "d", formatter: true, multiplier: NSEC_PER_DAY },
+        { unit: "w", formatter: false, multiplier: NSEC_PER_WEEK },
+        { unit: "wk", formatter: false, multiplier: NSEC_PER_WEEK },
+        { unit: "mo", formatter: true, multiplier: NSEC_PER_MONTH },
+        { unit: "M", formatter: false, multiplier: NSEC_PER_MONTH },
+        { unit: "q", formatter: false, multiplier: NSEC_PER_QUARTER },
+        { unit: "y", formatter: true, multiplier: NSEC_PER_YEAR },
+        { unit: "Y", formatter: false, multiplier: NSEC_PER_YEAR },
+        { unit: "a", formatter: false, multiplier: NSEC_PER_YEAR }
+    ];
+
+    function durationFindUnit(unit) {
+        if (!unit) return units[0];
+        return units.find(u => u.unit === unit) || null;
+    }
+
+    function roundToResolution(value, resolution) {
+        if (value > 0) return Math.floor((value + (resolution - 1) / 2) / resolution);
+        if (value < 0) return Math.ceil((value - (resolution - 1) / 2) / resolution);
+        return 0;
+    }
+
+    function parseDouble(str) {
+        // Trim leading whitespace
+        str = str.trim();
+
+        // Use a regular expression to match the floating-point number
+        const match = str.match(/^[-+]?\d*\.?\d+/);
+
+        if (match) {
+            // Parse the matched number
+            const number = parseFloat(match[0]);
+
+            // Get the remaining unparsed part of the string
+            const remainingStr = str.slice(match[0].length).trim();
+
+            return { number, remainingStr };
+        }
+
+        // If no valid number found, return null for the number and the original string
+        return { number: null, remainingStr: str };
+    }
+
+    function durationParse(duration, defaultUnit) {
+        if (!duration || !defaultUnit) return false;
+
+        let s = duration.trim();
+        let nsec = 0;
+
+        while (s.length > 0) {
+            s = s.trim();
+
+            if (s.startsWith("never") || s.startsWith("off"))
+                return 0;
+
+            // Parse the number using parseDouble()
+            const { number, remainingStr } = parseDouble(s);
+            if (number === null) return false;
+
+            s = remainingStr;
+
+            // Find the unit
+            const match = s.match(/^([a-zA-Z]*)/);
+            let unit = defaultUnit;
+            if (match && match[0].length > 0) {
+                unit = match[0];
+                s = s.slice(match[0].length).trim();
+            }
+
+            const du = durationFindUnit(unit);
+            if (!du) return false;
+
+            nsec += number * du.multiplier;
+        }
+
+        return nsec;
+    }
+
+    function durationSnprintf(nsec, minimumUnit) {
+        if (nsec === 0) return "off";
+
+        const isNegative = nsec < 0;
+        nsec = Math.abs(nsec);
+
+        const duMin = durationFindUnit(minimumUnit);
+        let result = isNegative ? "-" : "";
+
+        let added = 0;
+        for (let i = units.length - 1; i >= 0 && nsec !== 0; i--) {
+            const du = units[i];
+            if (!du.formatter && du !== duMin) continue;
+
+            const multiplier = du.multiplier;
+            const rounded = (du === duMin) ? roundToResolution(nsec, multiplier) * multiplier : nsec;
+            const unitCount = Math.floor(rounded / multiplier);
+
+            if (unitCount !== 0) {
+                result += `${unitCount}${du.unit}`;
+                nsec -= unitCount * multiplier;
+                added++;
+            }
+
+            if (du === duMin) break;
+        }
+
+        if(!added || !result) return "off";
+        return result;
+    }
+
+    function updateTable() {
+        const duration = document.getElementById("durationInput").value;
+        const tableBody = document.getElementById("resultTable").querySelector("tbody");
+        const errorMessage = document.getElementById("errorMessage");
+        tableBody.innerHTML = "";
+        errorMessage.textContent = "";
+
+        const nsec = durationParse(duration, "ns");
+        if (nsec === false) {
+            errorMessage.textContent = "Invalid duration format";
+            return;
+        }
+
+        units.forEach(unit => {
+            const value = roundToResolution(nsec, unit.multiplier);
+            const formatted = durationSnprintf(nsec, unit.unit);
+            const row = `<tr>
+                    <td>${unit.unit}</td>
+                    <td>${value}</td>
+                    <td>${formatted}</td>
+                </tr>`;
+            tableBody.innerHTML += row;
+        });
+    }
+
+    document.getElementById("durationInput").addEventListener("input", updateTable);
+</script>
+</body>
+</html>
