@@ -35,6 +35,7 @@
         <th>Unit</th>
         <th>Value</th>
         <th>Formatted</th>
+        <th>Check</th>
     </tr>
     </thead>
     <tbody>
@@ -85,28 +86,18 @@
     }
 
     function parseDouble(str) {
-        // Trim leading whitespace
         str = str.trim();
-
-        // Use a regular expression to match the floating-point number
         const match = str.match(/^[-+]?\d*\.?\d+/);
-
         if (match) {
-            // Parse the matched number
             const number = parseFloat(match[0]);
-
-            // Get the remaining unparsed part of the string
             const remainingStr = str.slice(match[0].length).trim();
-
             return { number, remainingStr };
         }
-
-        // If no valid number found, return null for the number and the original string
         return { number: null, remainingStr: str };
     }
 
-    function durationParse(duration, defaultUnit) {
-        if (!duration || !defaultUnit) return false;
+    function durationParse(duration, unit) {
+        if (!duration || !unit) return false;
 
         let s = duration.trim();
         let nsec = 0;
@@ -117,58 +108,56 @@
             if (s.startsWith("never") || s.startsWith("off"))
                 return 0;
 
-            // Parse the number using parseDouble()
             const { number, remainingStr } = parseDouble(s);
             if (number === null) return false;
 
             s = remainingStr;
 
-            // Find the unit
             const match = s.match(/^([a-zA-Z]*)/);
-            let unit = defaultUnit;
+            let currentUnit = unit;
             if (match && match[0].length > 0) {
-                unit = match[0];
+                currentUnit = match[0];
                 s = s.slice(match[0].length).trim();
             }
 
-            const du = durationFindUnit(unit);
+            const du = durationFindUnit(currentUnit);
             if (!du) return false;
 
             nsec += number * du.multiplier;
         }
 
-        return nsec;
+        const unitMultiplier = durationFindUnit(unit).multiplier;
+        return roundToResolution(nsec, unitMultiplier);
     }
 
-    function durationSnprintf(nsec, minimumUnit) {
-        if (nsec === 0) return "off";
+    function durationSnprintf(value, unit) {
+        if (value === 0) return "off";
+
+        const duMin = durationFindUnit(unit);
+        let nsec = value * duMin.multiplier;
 
         const isNegative = nsec < 0;
         nsec = Math.abs(nsec);
 
-        const duMin = durationFindUnit(minimumUnit);
-        let result = isNegative ? "-" : "";
+        let result = "";
 
-        let added = 0;
         for (let i = units.length - 1; i >= 0 && nsec !== 0; i--) {
             const du = units[i];
             if (!du.formatter && du !== duMin) continue;
 
             const multiplier = du.multiplier;
             const rounded = (du === duMin) ? roundToResolution(nsec, multiplier) * multiplier : nsec;
-            const unitCount = Math.floor(rounded / multiplier);
+            let unitCount = Math.floor(rounded / multiplier);
 
             if (unitCount !== 0) {
-                result += `${unitCount}${du.unit}`;
+                result += (isNegative ? "-" : "") + `${unitCount}${du.unit}`;
                 nsec -= unitCount * multiplier;
-                added++;
             }
 
             if (du === duMin) break;
         }
 
-        if(!added || !result) return "off";
-        return result;
+        return result || "off";
     }
 
     function updateTable() {
@@ -178,20 +167,27 @@
         tableBody.innerHTML = "";
         errorMessage.textContent = "";
 
-        const nsec = durationParse(duration, "ns");
-        if (nsec === false) {
-            errorMessage.textContent = "Invalid duration format";
-            return;
-        }
-
         units.forEach(unit => {
-            const value = roundToResolution(nsec, unit.multiplier);
-            const formatted = durationSnprintf(nsec, unit.unit);
+            let value = durationParse(duration, unit.unit);
+            let formatted;
+            let check;
+            if(value === false) {
+                value = "-";
+                formatted = "";
+                check = "parsing error";
+            }
+            else {
+                formatted = durationSnprintf(value, unit.unit);
+                const parsedValue = durationParse(formatted, unit.unit);
+                check = (parsedValue === value) ? "ok" : `re-parsing error (${parsedValue})`;
+            }
+
             const row = `<tr>
-                    <td>${unit.unit}</td>
-                    <td>${value}</td>
-                    <td>${formatted}</td>
-                </tr>`;
+                <td>${unit.unit}</td>
+                <td>${value}</td>
+                <td>${formatted}</td>
+                <td>${check}</td>
+            </tr>`;
             tableBody.innerHTML += row;
         });
     }
