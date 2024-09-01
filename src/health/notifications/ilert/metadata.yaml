@@ -1,0 +1,55 @@
+# yamllint disable rule:line-length
+---
+- id: "notify-ilert"
+  meta:
+    name: "ilert"
+    link: "https://www.ilert.com/"
+    categories:
+      - notify.agent
+    icon_filename: "ilert.svg"
+  keywords:
+    - ilert
+  overview:
+    notification_description: |
+      ilert is an alerting and incident management tool. It helps teams reduce response times by enhancing monitoring and ticketing tools with reliable alerts, automatic escalations, on-call schedules, and features for incident response, communication, and status updates.
+      Sending notification to ilert via Netdata's Agent alert notification feature includes links, images and resolving of corresponding alerts.
+    notification_limitations: ""
+  setup:
+    prerequisites:
+      list:
+        - title: ""
+          description: |
+            - A Netdata alert source in ilert. You can create a [Netdata alert source](https://docs.ilert.com/inbound-integrations/netdata) in [ilert](https://www.ilert.com/).
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: "health_alarm_notify.conf"
+      options:
+        description: "The following options can be defined for this notification"
+        folding:
+          title: "Config Options"
+          enabled: true
+        list:
+          - name: "SEND_ILERT"
+            default_value: "YES"
+            description: "Set `SEND_ILERT` to YES"
+            required: true
+          - name: "ILERT_ALERT_SOURCE_URL"
+            default_value: ""
+            description: "Set `ILERT_ALERT_SOURCE_URL` to your Netdata alert source url in ilert."
+            required: true
+      examples:
+        folding:
+          enabled: true
+          title: ""
+        list:
+          - name: "Basic Configuration"
+            folding:
+              enabled: false
+            description: ""
+            config: |
+              SEND_ILERT="YES"
+              ILERT_ALERT_SOURCE_URL="https://api.ilert.com/api/v1/events/netdata/{API-KEY}"
+  troubleshooting:
+    problems:
+      list: []
