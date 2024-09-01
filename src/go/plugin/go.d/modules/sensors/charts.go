@@ -121,8 +121,8 @@ var sensorIntrusionChartTmpl = module.Chart{
 	Type:     module.Line,
 	Priority: prioSensorIntrusion,
 	Dims: module.Dims{
-		{ID: "sensor_chip_%s_feature_%s_subfeature_%s_alarm_off", Name: "alarm_off"},
-		{ID: "sensor_chip_%s_feature_%s_subfeature_%s_alarm_on", Name: "alarm_on"},
+		{ID: "sensor_chip_%s_feature_%s_subfeature_%s_clear", Name: "alarm_clear"},
+		{ID: "sensor_chip_%s_feature_%s_subfeature_%s_triggered", Name: "alarm_triggered"},
 	},
 }
 
@@ -144,6 +144,8 @@ func (s *Sensors) addExecSensorChart(sn execSensor) {
 		chart = sensorCurrentChartTmpl.Copy()
 	case sensorTypeEnergy:
 		chart = sensorEnergyChartTmpl.Copy()
+	case sensorTypeIntrusion:
+		chart = sensorIntrusionChartTmpl.Copy()
 	default:
 		return
 	}
