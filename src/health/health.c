@@ -65,7 +65,7 @@ static void health_load_config_defaults(void) {
                           health_globals.config.health_log_entries_max);
 
     health_globals.config.health_log_retention_s =
-        config_get_duration_seconds(CONFIG_SECTION_HEALTH, "health log retention", HEALTH_LOG_DEFAULT_HISTORY);
+        config_get_duration_seconds(CONFIG_SECTION_HEALTH, "health log retention", HEALTH_LOG_RETENTION_DEFAULT);
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     health_globals.config.default_exec =

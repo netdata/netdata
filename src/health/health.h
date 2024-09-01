@@ -34,8 +34,8 @@ void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_
 #define HEALTH_LISTEN_BACKLOG 4096
 #endif
 
-#ifndef HEALTH_LOG_DEFAULT_HISTORY
-#define HEALTH_LOG_DEFAULT_HISTORY 432000
+#ifndef HEALTH_LOG_RETENTION_DEFAULT
+#define HEALTH_LOG_RETENTION_DEFAULT (5 * 86400)
 #endif
 
 #ifndef HEALTH_LOG_MINIMUM_HISTORY

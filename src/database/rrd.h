@@ -1096,7 +1096,7 @@ typedef struct alarm_log {
     uint32_t next_alarm_id;
     unsigned int count;
     unsigned int max;
-    uint32_t health_log_history;                   // the health log retention in seconds to be kept in db
+    uint32_t health_log_retention_s;                   // the health log retention in seconds to be kept in db
     ALARM_ENTRY *alarms;
     RW_SPINLOCK spinlock;
 } ALARM_LOG;

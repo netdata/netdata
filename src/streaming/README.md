@@ -57,7 +57,7 @@ This section defines an API key for other agents to connect to this Netdata.
 | `enabled`                    | `no`       | Whether this API KEY enabled or disabled.                                                                                                                                                                |
 | `type`                       | `api`      | This section defines an API key.                                                                                                                                                                         |
 | [`allow from`](#allow-from)  | `*`        | A space-separated list of [Netdata simple patterns](/src/libnetdata/simple_pattern/README.md) matching the IPs of nodes that will stream metrics using this API key. [Read more &rarr;](#allow-from)     |
-| `history`                    | `1h`       | The default amount of child metrics history to retain when using the `ram` memory mode.                                                                                                                  |
+| `retention`                  | `1h`       | The default amount of child metrics history to retain when using the `ram` db.                                                                                                                           |
 | [`db`](#default-memory-mode) | `dbengine` | The [database](/src/database/README.md) to use for all nodes using this `API_KEY`. Valid settings are `dbengine`, `ram`, or `none`. [Read more &rarr;](#default-memory-mode)                             |
 | `health enabled by default`  | `auto`     | Whether alerts and notifications should be enabled for nodes using this `API_KEY`. `auto` enables alerts when the child is connected. `yes` enables alerts always, and `no` disables alerts.             |
 | `postpone alerts on connect` | `1m`       | Postpone alerts and notifications for a period of time after the child connects.                                                                                                                         |
@@ -77,25 +77,25 @@ This section defines an API key for other agents to connect to this Netdata.
 
 This section is about customizing configuration for specific agents. It allows many agents to share the same API key, while providing customizability per remote agent.
 
-| Setting                               | Default   | Description                                                                                                                                                                                              |
-|---------------------------------------|-----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `enabled`                             | `no`      | Whether this MACHINE_GUID enabled or disabled.                                                                                                                                                           |
-| `type`                                | `machine` | This section defines the configuration for a specific agent.                                                                                                                                             |
-| [`allow from`](#allow-from)           | `*`       | A space-separated list of [Netdata simple patterns](/src/libnetdata/simple_pattern/README.md) matching the IPs of nodes that will stream metrics using this API key. [Read more &rarr;](#allow-from)     |
-| `history`                             | `3600`    | The default amount of child metrics history to retain when using the `ram` memory mode.                                                                                                                  |
-| [`memory mode`](#default-memory-mode) | `ram`     | The [database](/src/database/README.md) to use for all nodes using this `API_KEY`. Valid settings are `dbengine`, `ram`, or `none`. [Read more &rarr;](#default-memory-mode)                             |
-| `health enabled`                      | `auto`    | Whether alerts and notifications should be enabled for nodes using this `API_KEY`. `auto` enables alerts when the child is connected. `yes` enables alerts always, and `no` disables alerts.             |
-| `postpone alerts on connect`          | `1m`      | Postpone alerts and notifications for a period of time after the child connects.                                                                                                                         |
-| `health log retention`                | `5d`      | History of health log events (in seconds) kept in the database.                                                                                                                                          |
-| `proxy enabled`                       |           | Route metrics through a proxy.                                                                                                                                                                           |
-| `proxy destination`                   |           | Space-separated list of `IP:PORT` for proxies.                                                                                                                                                           |
-| `proxy api key`                       |           | The `API_KEY` of the proxy.                                                                                                                                                                              |
-| `send charts matching`                | `*`       | See [`send charts matching`](#send-charts-matching).                                                                                                                                                     |
-| `enable compression`                  | `yes`     | Enable/disable stream compression.                                                                                                                                                                       |
-| `enable replication`                  | `yes`     | Enable/disable replication.                                                                                                                                                                              |
-| `replication period`                  | `1d`      | Limits the maximum window that will be replicated from each child.                                                                                                                                       |
-| `replication step`                    | `10m`     | The duration we want to replicate per each replication step.                                                                                                                                             |
-| `is ephemeral node`                   | `no`      | Indicate whether this child is an ephemeral node. An ephemeral node will become unavailable after the specified duration of "cleanup ephemeral hosts after" from the time of the node's last connection. |
+| Setting                      | Default    | Description                                                                                                                                                                                              |
+|------------------------------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `enabled`                    | `no`       | Whether this MACHINE_GUID enabled or disabled.                                                                                                                                                           |
+| `type`                       | `machine`  | This section defines the configuration for a specific agent.                                                                                                                                             |
+| [`allow from`](#allow-from)  | `*`        | A space-separated list of [Netdata simple patterns](/src/libnetdata/simple_pattern/README.md) matching the IPs of nodes that will stream metrics using this API key. [Read more &rarr;](#allow-from)     |
+| `retention`                  | `3600`     | The default amount of child metrics history to retain when using the `ram` db.                                                                                                                           |
+| [`db`](#default-memory-mode) | `dbengine` | The [database](/src/database/README.md) to use for all nodes using this `API_KEY`. Valid settings are `dbengine`, `ram`, or `none`. [Read more &rarr;](#default-memory-mode)                             |
+| `health enabled`             | `auto`     | Whether alerts and notifications should be enabled for nodes using this `API_KEY`. `auto` enables alerts when the child is connected. `yes` enables alerts always, and `no` disables alerts.             |
+| `postpone alerts on connect` | `1m`       | Postpone alerts and notifications for a period of time after the child connects.                                                                                                                         |
+| `health log retention`       | `5d`       | History of health log events (in seconds) kept in the database.                                                                                                                                          |
+| `proxy enabled`              |            | Route metrics through a proxy.                                                                                                                                                                           |
+| `proxy destination`          |            | Space-separated list of `IP:PORT` for proxies.                                                                                                                                                           |
+| `proxy api key`              |            | The `API_KEY` of the proxy.                                                                                                                                                                              |
+| `send charts matching`       | `*`        | See [`send charts matching`](#send-charts-matching).                                                                                                                                                     |
+| `enable compression`         | `yes`      | Enable/disable stream compression.                                                                                                                                                                       |
+| `enable replication`         | `yes`      | Enable/disable replication.                                                                                                                                                                              |
+| `replication period`         | `1d`       | Limits the maximum window that will be replicated from each child.                                                                                                                                       |
+| `replication step`           | `10m`      | The duration we want to replicate per each replication step.                                                                                                                                             |
+| `is ephemeral node`          | `no`       | Indicate whether this child is an ephemeral node. An ephemeral node will become unavailable after the specified duration of "cleanup ephemeral hosts after" from the time of the node's last connection. |
 
 #### `destination`
 
@@ -481,9 +481,9 @@ On the child nodes, set the following in `stream.conf`:
 In addition, edit `netdata.conf` on each child node to disable the database and alerts.
 
 ```bash
-[global]
+[db]
     # disable the local database
-	  memory mode = none
+	db = none
 
 [health]
     # disable health checks
@@ -623,9 +623,9 @@ ERROR : STREAM_SENDER[CHILD HOSTNAME] : STREAM child HOSTNAME [send to PARENT HO
 ### Stream charts wrong
 
 Chart data needs to be consistent between child and parent nodes. If there are differences between chart data on
-a parent and a child, such as gaps in metrics collection, it most often means your child's `memory mode`
+a parent and a child, such as gaps in metrics collection, it most often means your child's `[db].db` setting
 does not match the parent's. To learn more about the different ways Netdata can store metrics, and thus keep chart
-data consistent, read our [memory mode documentation](/src/database/README.md).
+data consistent, read our [db documentation](/src/database/README.md).
 
 ### Forbidding access
 

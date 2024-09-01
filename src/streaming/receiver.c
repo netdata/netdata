@@ -433,7 +433,7 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
             }
         }
 
-        host->health_log.health_log_history = rpt->config.alarms_history;
+        host->health_log.health_log_retention_s = rpt->config.alarms_history;
 
 //         this is a test
 //        if(rpt->hops <= host->sender->hops)
@@ -589,7 +589,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
     rpt->config.health_enabled = health_plugin_enabled();
     rpt->config.alarms_delay = 60;
-    rpt->config.alarms_history = HEALTH_LOG_DEFAULT_HISTORY;
+    rpt->config.alarms_history = HEALTH_LOG_RETENTION_DEFAULT;
 
     rpt->config.rrdpush_enabled = (int)default_rrdpush_enabled;
     rpt->config.rrdpush_destination = default_rrdpush_destination;

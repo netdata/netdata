@@ -87,9 +87,9 @@ On an existing installation, in order to connect it to Netdata Cloud you will ne
     configs:
       netdata:
         data: |
-          [global]
-            memory mode = ram
-            history = 3600
+          [db]
+            db = ram
+            retention = 3600
           [health]
             enabled = no
   ```
@@ -103,7 +103,7 @@ On an existing installation, in order to connect it to Netdata Cloud you will ne
 
   > :bookmark_tabs: Info
   >  
-  > These override settings, along with the Helm chart's defaults, will retain an hour's worth of metrics (`history = 3600`, or `3600 seconds`) on each child node. Based on your metrics retention needs, and the resources available on your cluster, you may want to increase the `history` setting.
+  > These override settings, along with the Helm chart's defaults, will retain an hour's worth of metrics (`retention = 3600`, or `3600 seconds`) on each child node. Based on your metrics retention needs, and the resources available on your cluster, you may want to increase the `history` setting.
 
 3. To apply these new settings, run:
 

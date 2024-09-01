@@ -130,7 +130,7 @@ static void health_initialize_rrdhost(RRDHOST *host) {
     rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
 
     host->health_log.max = health_globals.config.health_log_entries_max;
-    host->health_log.health_log_history = health_globals.config.health_log_retention_s;
+    host->health_log.health_log_retention_s = health_globals.config.health_log_retention_s;
     host->health.health_default_exec = string_dup(health_globals.config.default_exec);
     host->health.health_default_recipient = string_dup(health_globals.config.default_recipient);
     host->health.use_summary_for_notifications = health_globals.config.use_summary_for_notifications;
