@@ -85,6 +85,7 @@ Metrics:
 | sensors.sensor_fan_speed | fan | RPM |
 | sensors.sensor_energy | energy | Joules |
 | sensors.sensor_humidity | humidity | percent |
+| sensors.sensor_intrusion | alarm_clear, alarm_triggered | status |
 
 
 
