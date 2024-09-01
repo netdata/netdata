@@ -22,15 +22,11 @@
 #define NSEC_PER_HOUR (NSEC_PER_MIN * 60ULL)
 #define NSEC_PER_DAY (NSEC_PER_HOUR * 24ULL)
 #define NSEC_PER_WEEK (NSEC_PER_DAY * 7ULL)
+#define NSEC_PER_MONTH (NSEC_PER_DAY * 30ULL)
+#define NSEC_PER_QUARTER (NSEC_PER_MONTH * 3ULL)
 
 // more accurate, but not an integer multiple of days, weeks, months
 #define NSEC_PER_YEAR (NSEC_PER_DAY * 365ULL)
-
-// more accurate, but not an integer multiple of days, weeks
-#define NSEC_PER_MONTH (NSEC_PER_YEAR / 12ULL)
-
-// more accurate, but not an integer multiple of days, weeks
-#define NSEC_PER_QUARTER (NSEC_PER_YEAR / 4ULL)
 
 // Define a structure to map time units to their multipliers
 static const struct duration_unit {
@@ -73,7 +69,7 @@ static inline const struct duration_unit *duration_find_unit(const char *unit) {
     return NULL;
 }
 
-static inline int64_t round_to_resolution(int64_t value, int64_t resolution) {
+inline int64_t duration_round_to_resolution(int64_t value, int64_t resolution) {
     if(value > 0)
         return (value + ((resolution - 1) / 2)) / resolution;
 
@@ -140,48 +136,66 @@ static inline bool duration_parse(const char *duration, snsec_t *result, const c
     return true;
 }
 
-bool duration_parse_nsec_t(const char *duration, snsec_t *result) {
+bool duration_parse_nsec_t(const char *duration, snsec_t *ns) {
     snsec_t nsec;
     if(!duration_parse(duration, &nsec, "ns"))
         return false;
 
-    *result = nsec;
+    *ns = nsec;
     return true;
 }
 
-bool duration_parse_usec_t(const char *duration, susec_t *result) {
+bool duration_parse_usec_t(const char *duration, susec_t *us) {
     snsec_t nsec;
     if(!duration_parse(duration, &nsec, "us"))
         return false;
 
-    *result = (susec_t)round_to_resolution(nsec, NSEC_PER_USEC);
+    *us = (susec_t)duration_round_to_resolution(nsec, NSEC_PER_USEC);
     return true;
 }
 
-bool duration_parse_msec_t(const char *duration, smsec_t *result) {
+bool duration_parse_msec_t(const char *duration, smsec_t *ms) {
     snsec_t nsec;
     if(!duration_parse(duration, &nsec, "ms"))
         return false;
 
-    *result = (susec_t)round_to_resolution(nsec, NSEC_PER_MSEC);
+    *ms = (susec_t)duration_round_to_resolution(nsec, NSEC_PER_MSEC);
     return true;
 }
 
-bool duration_parse_time_t(const char *duration, stime_t *result) {
+bool duration_parse_time_t(const char *duration, stime_t *secs) {
     snsec_t nsec;
     if(!duration_parse(duration, &nsec, "s"))
         return false;
 
-    *result = (stime_t)round_to_resolution(nsec, NSEC_PER_SEC);
+    *secs = (stime_t)duration_round_to_resolution(nsec, NSEC_PER_SEC);
     return true;
 }
 
-bool duration_parse_days(const char *duration, int *result) {
+bool duration_parse_mins(const char *duration, int *mins) {
+    snsec_t nsec;
+    if(!duration_parse(duration, &nsec, "m"))
+        return false;
+
+    *mins = (int)duration_round_to_resolution(nsec, NSEC_PER_MIN);
+    return true;
+}
+
+bool duration_parse_hours(const char *duration, int *hours) {
+    snsec_t nsec;
+    if(!duration_parse(duration, &nsec, "h"))
+        return false;
+
+    *hours = (int)duration_round_to_resolution(nsec, NSEC_PER_HOUR);
+    return true;
+}
+
+bool duration_parse_days(const char *duration, int *days) {
     snsec_t nsec;
     if(!duration_parse(duration, &nsec, "d"))
         return false;
 
-    *result = (int)round_to_resolution(nsec, NSEC_PER_DAY);
+    *days = (int)duration_round_to_resolution(nsec, NSEC_PER_DAY);
     return true;
 }
 
@@ -214,7 +228,7 @@ static inline ssize_t duration_snprintf(char *dst, size_t dst_size, snsec_t nsec
         // Otherwise, we have to make sure that all larger units are integer multiples of the smaller ones.
 
         int64_t multiplier = units[i].multiplier;
-        int64_t rounded = (du == du_min) ? ((snsec_t)round_to_resolution(nsec, multiplier) * multiplier) : nsec;
+        int64_t rounded = (du == du_min) ? ((snsec_t)duration_round_to_resolution(nsec, multiplier) * multiplier) : nsec;
 
         int64_t unit_count = rounded / multiplier;
         if (unit_count > 0) {
@@ -249,24 +263,32 @@ static inline ssize_t duration_snprintf(char *dst, size_t dst_size, snsec_t nsec
     return (ssize_t)offset;
 }
 
-ssize_t duration_snprintf_nsec_t(char *dst, size_t size, snsec_t value) {
-    return duration_snprintf(dst, size, value, "ns");
+ssize_t duration_snprintf_nsec_t(char *dst, size_t size, snsec_t ns) {
+    return duration_snprintf(dst, size, ns, "ns");
 }
 
-ssize_t duration_snprintf_usec_t(char *dst, size_t size, susec_t value) {
-    return duration_snprintf(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_USEC, "us");
+ssize_t duration_snprintf_usec_t(char *dst, size_t size, susec_t us) {
+    return duration_snprintf(dst, size, (snsec_t)us * (snsec_t)NSEC_PER_USEC, "us");
 }
 
-ssize_t duration_snprintf_msec_t(char *dst, size_t size, smsec_t value) {
-    return duration_snprintf(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_MSEC, "ms");
+ssize_t duration_snprintf_msec_t(char *dst, size_t size, smsec_t ms) {
+    return duration_snprintf(dst, size, (snsec_t)ms * (snsec_t)NSEC_PER_MSEC, "ms");
 }
 
-ssize_t duration_snprintf_time_t(char *dst, size_t size, stime_t value) {
-    return duration_snprintf(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_SEC, "s");
+ssize_t duration_snprintf_time_t(char *dst, size_t size, stime_t secs) {
+    return duration_snprintf(dst, size, (snsec_t)secs * (snsec_t)NSEC_PER_SEC, "s");
 }
 
-ssize_t duration_snprintf_days(char *dst, size_t size, int value) {
-    return duration_snprintf(dst, size, (snsec_t)value * (snsec_t)NSEC_PER_DAY, "d");
+ssize_t duration_snprintf_mins(char *dst, size_t size, int mins) {
+    return duration_snprintf(dst, size, (snsec_t)mins * (snsec_t)NSEC_PER_MIN, "m");
+}
+
+ssize_t duration_snprintf_hours(char *dst, size_t size, int hours) {
+    return duration_snprintf(dst, size, (snsec_t)hours * (snsec_t)NSEC_PER_HOUR, "h");
+}
+
+ssize_t duration_snprintf_days(char *dst, size_t size, int days) {
+    return duration_snprintf(dst, size, (snsec_t)days * (snsec_t)NSEC_PER_DAY, "d");
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -274,7 +296,7 @@ ssize_t duration_snprintf_days(char *dst, size_t size, int value) {
 int64_t nsec_to_unit(snsec_t nsec, const char *unit) {
     const struct duration_unit *du = duration_find_unit(unit);
     if(du)
-        return round_to_resolution(nsec, du->multiplier);
+        return duration_round_to_resolution(nsec, du->multiplier);
 
     return 0;
 }

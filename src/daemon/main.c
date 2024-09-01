@@ -1086,6 +1086,15 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
                 CONFIG_SECTION_DB,      "enable zero metrics");
 
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+        char old_config[128], new_config[128];
+        snprintfz(old_config, sizeof(old_config), "dbengine tier %zu retention days", tier);
+        snprintfz(new_config, sizeof(new_config), "dbengine tier %zu retention time", tier);
+
+        config_move(CONFIG_SECTION_DB, old_config,
+                    CONFIG_SECTION_DB, new_config);
+    }
+
     config_move(CONFIG_SECTION_LOGS,   "error",
                 CONFIG_SECTION_LOGS,   "daemon");
 

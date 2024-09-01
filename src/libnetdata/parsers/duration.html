@@ -52,8 +52,8 @@
     const NSEC_PER_DAY = NSEC_PER_HOUR * 24;
     const NSEC_PER_WEEK = NSEC_PER_DAY * 7;
     const NSEC_PER_YEAR = NSEC_PER_DAY * 365;
-    const NSEC_PER_MONTH = NSEC_PER_YEAR / 12;
-    const NSEC_PER_QUARTER = NSEC_PER_YEAR / 4;
+    const NSEC_PER_MONTH = NSEC_PER_DAY * 30;
+    const NSEC_PER_QUARTER = NSEC_PER_MONTH * 3;
 
     const units = [
         { unit: "ns", formatter: true, multiplier: 1 },

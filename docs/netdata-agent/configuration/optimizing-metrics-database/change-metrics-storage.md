@@ -7,9 +7,9 @@ space**. This provides greater control and helps you optimize storage usage for 
 
 | Tier |     Resolution      | Time Limit | Size Limit (min 256 MB) |
 |:----:|:-------------------:|:----------:|:-----------------------:|
-|  0   |  high (per second)  |  14 days   |          1 GiB          |
-|  1   | middle (per minute) |  3 months  |          1 GiB          |
-|  2   |   low (per hour)    |  2 years   |          1 GiB          |
+|  0   |  high (per second)  |    14d     |          1 GiB          |
+|  1   | middle (per minute) |    3mo     |          1 GiB          |
+|  2   |   low (per hour)    |     2y     |          1 GiB          |
 
 > **Note**: If a user sets a disk space size less than 256 MB for a tier, Netdata will automatically adjust it to 256 MB.
 
@@ -17,7 +17,7 @@ With these defaults, Netdata requires approximately 4 GiB of storage space (incl
 
 ## Retention Settings
 
-> **In a parent-child setup**, these settings manage the shared storage space utilized by the Netdata parent agent for
+> **In a parent-child setup**, these settings manage the shared storage space used by the Netdata parent agent for
 > storing metrics collected by both the parent and its child nodes.
 
 You can fine-tune retention for each tier by setting a time limit or size limit. Setting a limit to 0 disables it,
@@ -39,15 +39,15 @@ You can change these limits in `netdata.conf`:
 
     # Tier 0, per second data. Set to 0 for no limit.
     dbengine tier 0 disk space MB = 1024
-    dbengine tier 0 retention days = 14
+    dbengine tier 0 retention time = 14d
 
     # Tier 1, per minute data. Set to 0 for no limit.
     dbengine tier 1 disk space MB = 1024
-    dbengine tier 1 retention days = 90
+    dbengine tier 1 retention time = 3mo
 
     # Tier 2, per hour data. Set to 0 for no limit.
     dbengine tier 2 disk space MB = 1024
-    dbengine tier 2 retention days = 730
+    dbengine tier 2 retention time = 2y
 ```
 
 ## Monitoring Retention Utilization
@@ -68,7 +68,7 @@ Netdata versions prior to v1.46.0 relied on a disk space-based retention.
 |:----:|:-------------------:|:----------:|
 |  0   |  high (per second)  |   256 MB   |
 |  1   | middle (per minute) |   128 MB   |
-|  2   |   low (per hour)    |   64 GiB   |
+|  2   |   low (per hour)    |   64 MB    |
 
 You can change these limits in `netdata.conf`:
 
@@ -81,10 +81,10 @@ You can change these limits in `netdata.conf`:
     dbengine multihost disk space MB = 256
 
     # Tier 1, per minute data
-    dbengine tier 1 multihost disk space MB = 1024
+    dbengine tier 1 multihost disk space MB = 128
 
     # Tier 2, per hour data
-    dbengine tier 2 multihost disk space MB = 1024
+    dbengine tier 2 multihost disk space MB = 64
 ```
 
 ### v1.35.1 and prior

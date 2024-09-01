@@ -962,8 +962,8 @@ void dbengine_init(char *hostname) {
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu disk space MB", tier);
         disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
-        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention days", tier);
-        storage_tiers_retention_days[tier] = config_get_number(
+        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention time", tier);
+        storage_tiers_retention_days[tier] = config_get_duration_days(
             CONFIG_SECTION_DB, dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_days[tier] : 0);
 
         tiers_init[tier].disk_space_mb = (int) disk_space_mb;
