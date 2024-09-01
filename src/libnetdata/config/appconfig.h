@@ -186,6 +186,12 @@ time_t appconfig_set_duration_seconds(struct config *root, const char *section, 
 unsigned appconfig_get_duration_days(struct config *root, const char *section, const char *name, unsigned default_value);
 unsigned appconfig_set_duration_days(struct config *root, const char *section, const char *name, unsigned value);
 
+unsigned appconfig_get_size_mb(struct config *root, const char *section, const char *name, unsigned default_value);
+unsigned appconfig_set_size_mb(struct config *root, const char *section, const char *name, unsigned value);
+
+unsigned appconfig_get_size_bytes(struct config *root, const char *section, const char *name, unsigned default_value);
+unsigned appconfig_set_size_bytes(struct config *root, const char *section, const char *name, unsigned value);
+
 const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value);
 const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);
 long long appconfig_set_number(struct config *root, const char *section, const char *name, long long value);
@@ -239,6 +245,9 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct se
 #define config_get_duration_seconds(section, name, value) appconfig_get_duration_seconds(&netdata_config, section, name, value)
 #define config_get_duration_days(section, name, value) appconfig_get_duration_days(&netdata_config, section, name, value)
 
+#define config_get_size_bytes(section, name, value) appconfig_get_size_bytes(&netdata_config, section, name, value)
+#define config_get_size_mb(section, name, value) appconfig_get_size_mb(&netdata_config, section, name, value)
+
 #define config_set(section, name, default_value) appconfig_set(&netdata_config, section, name, default_value)
 #define config_set_default(section, name, value) appconfig_set_default(&netdata_config, section, name, value)
 #define config_set_number(section, name, value) appconfig_set_number(&netdata_config, section, name, value)
@@ -248,6 +257,9 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct se
 #define config_set_duration_ms(section, name, value) appconfig_set_duration_ms(&netdata_config, section, name, value)
 #define config_set_duration_seconds(section, name, value) appconfig_set_duration_seconds(&netdata_config, section, name, value)
 #define config_set_duration_days(section, name, value) appconfig_set_duration_days(&netdata_config, section, name, value)
+
+#define config_set_size_bytes(section, name, value) appconfig_set_size_bytes(&netdata_config, section, name, value)
+#define config_set_size_mb(section, name, value) appconfig_set_size_mb(&netdata_config, section, name, value)
 
 #define config_exists(section, name) appconfig_exists(&netdata_config, section, name)
 #define config_move(section_old, name_old, section_new, name_new) appconfig_move(&netdata_config, section_old, name_old, section_new, name_new)

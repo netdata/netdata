@@ -701,9 +701,59 @@ unsigned appconfig_get_duration_days(struct config *root, const char *section, c
 unsigned appconfig_set_duration_days(struct config *root, const char *section, const char *name, unsigned value) {
     char str[128];
     duration_snprintf_days(str, sizeof(str), value);
-
     appconfig_set(root, section, name, str);
+    return value;
+}
 
+unsigned appconfig_get_size_bytes(struct config *root, const char *section, const char *name, unsigned default_value) {
+
+    char default_str[128];
+    size_snprintf_bytes(default_str, sizeof(default_str), (int)default_value);
+
+    const char *s = appconfig_get(root, section, name, default_str);
+    if(!s)
+        return default_value;
+
+    uint64_t result = 0;
+    if(!size_parse_bytes(s, &result)) {
+        appconfig_set(root, section, name, default_str);
+        netdata_log_error("config option '[%s].%s = %s' is configured with an invalid size", section, name, s);
+        return default_value;
+    }
+
+    return (unsigned)result;
+}
+
+unsigned appconfig_set_size_bytes(struct config *root, const char *section, const char *name, unsigned value) {
+    char str[128];
+    size_snprintf_bytes(str, sizeof(str), value);
+    appconfig_set(root, section, name, str);
+    return value;
+}
+
+unsigned appconfig_get_size_mb(struct config *root, const char *section, const char *name, unsigned default_value) {
+
+    char default_str[128];
+    size_snprintf_mb(default_str, sizeof(default_str), (int)default_value);
+
+    const char *s = appconfig_get(root, section, name, default_str);
+    if(!s)
+        return default_value;
+
+    uint64_t result = 0;
+    if(!size_parse_mb(s, &result)) {
+        appconfig_set(root, section, name, default_str);
+        netdata_log_error("config option '[%s].%s = %s' is configured with an invalid size", section, name, s);
+        return default_value;
+    }
+
+    return (unsigned)result;
+}
+
+unsigned appconfig_set_size_mb(struct config *root, const char *section, const char *name, unsigned value) {
+    char str[128];
+    size_snprintf_mb(str, sizeof(str), value);
+    appconfig_set(root, section, name, str);
     return value;
 }
 

@@ -603,8 +603,8 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.update_every = (int)appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "update every", rpt->config.update_every);
     if(rpt->config.update_every < 0) rpt->config.update_every = 1;
 
-    rpt->config.history = (int)appconfig_get_number(&stream_config, rpt->key, "history", rpt->config.history);
-    rpt->config.history = (int)appconfig_get_number(&stream_config, rpt->machine_guid, "history", rpt->config.history);
+    rpt->config.history = (int)appconfig_get_number(&stream_config, rpt->key, "retention", rpt->config.history);
+    rpt->config.history = (int)appconfig_get_number(&stream_config, rpt->machine_guid, "retention", rpt->config.history);
     if(rpt->config.history < 5) rpt->config.history = 5;
 
     rpt->config.mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->key, "db", rrd_memory_mode_name(rpt->config.mode)));
@@ -626,8 +626,8 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.alarms_delay = appconfig_get_duration_seconds(&stream_config, rpt->key, "postpone alerts on connect", rpt->config.alarms_delay);
     rpt->config.alarms_delay = appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "postpone alerts on connect", rpt->config.alarms_delay);
 
-    rpt->config.alarms_history = appconfig_get_duration_seconds(&stream_config, rpt->key, "health log history", rpt->config.alarms_history);
-    rpt->config.alarms_history = appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "health log history", rpt->config.alarms_history);
+    rpt->config.alarms_history = appconfig_get_duration_seconds(&stream_config, rpt->key, "health log retention", rpt->config.alarms_history);
+    rpt->config.alarms_history = appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "health log retention", rpt->config.alarms_history);
 
     rpt->config.rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->key, "proxy enabled", rpt->config.rrdpush_enabled);
     rpt->config.rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->machine_guid, "proxy enabled", rpt->config.rrdpush_enabled);

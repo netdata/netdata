@@ -9,7 +9,7 @@
 #define HEALTH_LOG_ENTRIES_MAX 100000U
 #define HEALTH_LOG_ENTRIES_MIN 10U
 
-#define HEALTH_LOG_HISTORY_DEFAULT (5 * 86400)
+#define HEALTH_LOG_RETENTION_DEFAULT (5 * 86400)
 
 #define HEALTH_CONF_MAX_LINE 4096
 
@@ -76,7 +76,7 @@ struct health_plugin_globals {
         bool use_summary_for_notifications;
 
         unsigned int health_log_entries_max;
-        uint32_t health_log_history;                   // the health log history in seconds to be kept in db
+        uint32_t health_log_retention_s;        // the health log retention in seconds to be kept in db
 
         STRING *silencers_filename;
         STRING *default_exec;

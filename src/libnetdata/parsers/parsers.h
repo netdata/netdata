@@ -4,6 +4,7 @@
 #define NETDATA_PARSERS_H
 
 #include "../libnetdata.h"
+#include "size.h"
 #include "duration.h"
 #include "timeframe.h"
 

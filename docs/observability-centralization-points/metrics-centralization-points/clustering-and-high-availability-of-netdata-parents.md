@@ -45,6 +45,6 @@ The easiest way is to `rsync` the directory `/var/cache/netdata` from the existi
 
 To configure retention at the new Netdata Parent, set in `netdata.conf` the following to at least the values the old Netdata Parent has:
 
-- `[db].dbengine multihost disk space MB`, this is the max disk size for `tier0`. The default is 256MiB.
-- `[db].dbengine tier 1 multihost disk space MB`, this is the max disk space for `tier1`. The default is 50% of `tier0`.
-- `[db].dbengine tier 2 multihost disk space MB`, this is the max disk space for `tier2`. The default is 50% of `tier1`.
+- `[db].dbengine tier 0 retention size`, this is the max disk size for `tier0`. The default is 1GiB.
+- `[db].dbengine tier 1 retention size`, this is the max disk space for `tier1`. The default is 1GiB.
+- `[db].dbengine tier 2 retention size`, this is the max disk space for `tier2`. The default is 1GiB.

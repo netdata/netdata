@@ -14,7 +14,7 @@ struct health_plugin_globals health_globals = {
         .use_summary_for_notifications = true,
 
         .health_log_entries_max = HEALTH_LOG_ENTRIES_DEFAULT,
-        .health_log_history = HEALTH_LOG_HISTORY_DEFAULT,
+        .health_log_retention_s = HEALTH_LOG_RETENTION_DEFAULT,
 
         .default_warn_repeat_every = 0,
         .default_crit_repeat_every = 0,
@@ -64,8 +64,8 @@ static void health_load_config_defaults(void) {
         config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries",
                           health_globals.config.health_log_entries_max);
 
-    health_globals.config.health_log_history =
-        config_get_duration_seconds(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_DEFAULT_HISTORY);
+    health_globals.config.health_log_retention_s =
+        config_get_duration_seconds(CONFIG_SECTION_HEALTH, "health log retention", HEALTH_LOG_DEFAULT_HISTORY);
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     health_globals.config.default_exec =
@@ -114,18 +114,18 @@ static void health_load_config_defaults(void) {
                           (long)health_globals.config.health_log_entries_max);
     }
 
-    if (health_globals.config.health_log_history < HEALTH_LOG_MINIMUM_HISTORY) {
+    if (health_globals.config.health_log_retention_s < HEALTH_LOG_MINIMUM_HISTORY) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "Health configuration has invalid health log history %u. Using minimum %d",
-               health_globals.config.health_log_history, HEALTH_LOG_MINIMUM_HISTORY);
+               "Health configuration has invalid health log retention %u. Using minimum %d",
+               health_globals.config.health_log_retention_s, HEALTH_LOG_MINIMUM_HISTORY);
 
-        health_globals.config.health_log_history = HEALTH_LOG_MINIMUM_HISTORY;
-        config_set_duration_seconds(CONFIG_SECTION_HEALTH, "health log history", health_globals.config.health_log_history);
+        health_globals.config.health_log_retention_s = HEALTH_LOG_MINIMUM_HISTORY;
+        config_set_duration_seconds(CONFIG_SECTION_HEALTH, "health log retention", health_globals.config.health_log_retention_s);
     }
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "Health log history is set to %u seconds (%u days)",
-           health_globals.config.health_log_history, health_globals.config.health_log_history / 86400);
+           health_globals.config.health_log_retention_s, health_globals.config.health_log_retention_s / 86400);
 }
 
 inline char *health_user_config_dir(void) {

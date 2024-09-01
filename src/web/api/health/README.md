@@ -33,7 +33,7 @@ The size of the alert log is configured in `netdata.conf`. There are 2 settings:
 ```
 [health]
 	in memory max health log entries = 1000
-	health log history = 5d
+	health log retention = 5d
 ```
 
 The API call retrieves all entries of the alert log:

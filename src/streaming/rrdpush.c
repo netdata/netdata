@@ -74,12 +74,14 @@ static void load_stream_conf() {
 
     appconfig_move_everywhere(&stream_config, "default memory mode", "db");
     appconfig_move_everywhere(&stream_config, "memory mode", "db");
-    appconfig_move_everywhere(&stream_config, "default history", "history");
+    appconfig_move_everywhere(&stream_config, "default history", "retention");
+    appconfig_move_everywhere(&stream_config, "history", "retention");
     appconfig_move_everywhere(&stream_config, "default proxy enabled", "proxy enabled");
     appconfig_move_everywhere(&stream_config, "default proxy destination", "proxy destination");
     appconfig_move_everywhere(&stream_config, "default proxy api key", "proxy api key");
     appconfig_move_everywhere(&stream_config, "default proxy send charts matching", "proxy send charts matching");
-    appconfig_move_everywhere(&stream_config, "default health log history", "health log history");
+    appconfig_move_everywhere(&stream_config, "default health log history", "health log retention");
+    appconfig_move_everywhere(&stream_config, "health log history", "health log retention");
     appconfig_move_everywhere(&stream_config, "seconds to replicate", "replication period");
     appconfig_move_everywhere(&stream_config, "seconds per replication step", "replication step");
     appconfig_move_everywhere(&stream_config, "default postpone alarms on connect seconds", "postpone alerts on connect");

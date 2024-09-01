@@ -34,8 +34,8 @@ about 16 GiB
 
 There are 2 cache sizes that can be configured in `netdata.conf`:
 
-1. `[db].dbengine page cache size MB`: this is the main cache that keeps metrics data into memory. When data are not found in it, the extent cache is consulted, and if not found in that either, they are loaded from disk.
-2. `[db].dbengine extent cache size MB`: this is the compressed extent cache. It keeps in memory compressed data blocks, as they appear on disk, to avoid reading them again. Data found in the extend cache but not in the main cache have to be uncompressed to be queried.
+1. `[db].dbengine page cache size`: this is the main cache that keeps metrics data into memory. When data are not found in it, the extent cache is consulted, and if not found in that either, they are loaded from disk.
+2. `[db].dbengine extent cache size`: this is the compressed extent cache. It keeps in memory compressed data blocks, as they appear on disk, to avoid reading them again. Data found in the extend cache but not in the main cache have to be uncompressed to be queried.
 
 Both of them are dynamically adjusted to use some of the total memory computed above. The configuration in `netdata.conf` allows providing additional memory to them, increasing their caching efficiency.
 

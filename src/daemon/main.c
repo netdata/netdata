@@ -1012,7 +1012,13 @@ static void backwards_compatible_config() {
                 CONFIG_SECTION_DB,      "update every");
 
     config_move(CONFIG_SECTION_GLOBAL,  "page cache size",
-                CONFIG_SECTION_DB,      "dbengine page cache size MB");
+                CONFIG_SECTION_DB,      "dbengine page cache size");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine page cache size MB",
+                CONFIG_SECTION_DB,      "dbengine page cache size");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine extent cache size MB",
+                CONFIG_SECTION_DB,      "dbengine extent cache size");
 
     config_move(CONFIG_SECTION_DB,      "page cache size",
                 CONFIG_SECTION_DB,      "dbengine page cache size MB");
@@ -1022,30 +1028,6 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_DB,      "page cache with malloc",
                 CONFIG_SECTION_DB,      "dbengine page cache with malloc");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "dbengine disk space",
-                CONFIG_SECTION_DB,      "dbengine disk space MB");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "dbengine multihost disk space",
-                CONFIG_SECTION_DB,      "dbengine multihost disk space MB");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine disk space MB",
-                CONFIG_SECTION_DB,      "dbengine multihost disk space MB");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine multihost disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 0 disk space MB");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine tier 1 multihost disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 1 disk space MB");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine tier 2 multihost disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 2 disk space MB");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine tier 3 multihost disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 3 disk space MB");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine tier 4 multihost disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 4 disk space MB");
 
     config_move(CONFIG_SECTION_GLOBAL,  "memory deduplication (ksm)",
                 CONFIG_SECTION_DB,      "memory deduplication (ksm)");
@@ -1086,14 +1068,40 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
                 CONFIG_SECTION_DB,      "enable zero metrics");
 
+    // ----------------------------------------------------------------------------------------------------------------
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine disk space",
+                CONFIG_SECTION_DB,      "dbengine tier 0 retention size");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine multihost disk space",
+                CONFIG_SECTION_DB,      "dbengine tier 0 retention size");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine disk space MB",
+                CONFIG_SECTION_DB,      "dbengine tier 0 retention size");
+
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
         char old_config[128], new_config[128];
+
         snprintfz(old_config, sizeof(old_config), "dbengine tier %zu retention days", tier);
         snprintfz(new_config, sizeof(new_config), "dbengine tier %zu retention time", tier);
+        config_move(CONFIG_SECTION_DB, old_config,
+                    CONFIG_SECTION_DB, new_config);
 
+        if(tier == 0)
+            snprintfz(old_config, sizeof(old_config), "dbengine multihost disk space MB");
+        else
+            snprintfz(old_config, sizeof(old_config), "dbengine tier %zu multihost disk space MB", tier);
+        snprintfz(new_config, sizeof(new_config), "dbengine tier %zu retention size", tier);
+        config_move(CONFIG_SECTION_DB, old_config,
+                    CONFIG_SECTION_DB, new_config);
+
+        snprintfz(old_config, sizeof(old_config), "dbengine tier %zu disk space MB", tier);
+        snprintfz(new_config, sizeof(new_config), "dbengine tier %zu retention size", tier);
         config_move(CONFIG_SECTION_DB, old_config,
                     CONFIG_SECTION_DB, new_config);
     }
+
+    // ----------------------------------------------------------------------------------------------------------------
 
     config_move(CONFIG_SECTION_LOGS,   "error",
                 CONFIG_SECTION_LOGS,   "daemon");
@@ -1118,6 +1126,9 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds",
                 CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for");
+
+    config_move(CONFIG_SECTION_HEALTH, "health log history",
+                CONFIG_SECTION_HEALTH, "health log retention");
 
     config_move(CONFIG_SECTION_REGISTRY, "registry expire idle persons days",
                 CONFIG_SECTION_REGISTRY, "registry expire idle persons");
@@ -1252,17 +1263,19 @@ static void get_netdata_configured_variables()
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
-    default_rrdeng_extent_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine extent cache size MB", default_rrdeng_extent_cache_mb);
+    default_rrdeng_page_cache_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
+    default_rrdeng_extent_cache_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
     db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
 
-    if(default_rrdeng_extent_cache_mb < 0)
+    if(default_rrdeng_extent_cache_mb < 0) {
         default_rrdeng_extent_cache_mb = 0;
+        config_set_size_mb(CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
+    }
 
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
         default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-        config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
+        config_set_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
     }
 
     // ------------------------------------------------------------------------
@@ -2221,7 +2234,7 @@ int netdata_main(int argc, char **argv) {
 
     delta_startup_time("initialize threads after fork");
 
-    netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
+    netdata_threads_init_after_fork((size_t)config_get_size_bytes(CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
 
     // initialize internal registry
     delta_startup_time("initialize registry");
