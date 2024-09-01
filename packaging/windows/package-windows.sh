@@ -18,6 +18,11 @@ fi
 
 set -exu -o pipefail
 
+# Regenerate keys everytime there is an update
+if [ -d /opt/netdata/etc/pki/ ]; then
+    rm -rf /opt/netdata/etc/pki/
+fi
+
 ${GITHUB_ACTIONS+echo "::group::Installing"}
 cmake --install "${build}"
 ${GITHUB_ACTIONS+echo "::endgroup::"}
