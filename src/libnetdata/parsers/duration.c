@@ -82,12 +82,20 @@ inline int64_t duration_round_to_resolution(int64_t value, int64_t resolution) {
 // -------------------------------------------------------------------------------------------------------------------
 // parse a duration string
 
-static inline bool duration_parse(const char *duration, snsec_t *result, const char *default_unit) {
-    if (!duration || !*duration || !default_unit || !*default_unit)
+bool duration_parse(const char *duration, int64_t *result, const char *default_unit) {
+    if (!duration || !*duration) {
+        *result = 0;
         return false;
+    }
+
+    const struct duration_unit *du_def = duration_find_unit(default_unit);
+    if(!du_def) {
+        *result = 0;
+        return false;
+    }
 
     const char *s = duration;
-    snsec_t nsec = 0;
+    int64_t v = 0;
 
     while (*s) {
         // Skip leading spaces
@@ -109,8 +117,10 @@ static inline bool duration_parse(const char *duration, snsec_t *result, const c
         NETDATA_DOUBLE value = str2ndd(s, (char **)&s);
 
         // If no valid number found, return default
-        if (s == number_start)
+        if (s == number_start) {
+            *result = 0;
             return false;
+        }
 
         // Skip spaces between number and unit
         while (isspace((uint8_t)*s)) s++;
@@ -120,100 +130,47 @@ static inline bool duration_parse(const char *duration, snsec_t *result, const c
 
         char unit[4];
         size_t unit_len = s - unit_start;
+        const struct duration_unit *du;
         if (unit_len == 0)
-            strncpyz(unit, default_unit, sizeof(unit) - 1);
+            du = du_def;
         else {
             if (unit_len >= sizeof(unit)) unit_len = sizeof(unit) - 1;
             strncpyz(unit, unit_start, unit_len);
+            du = duration_find_unit(unit);
+            if(!du) {
+                *result = 0;
+                return false;
+            }
         }
 
-        const struct duration_unit *du = duration_find_unit(unit);
-        if(!du) return false;
-        nsec += (snsec_t)(value * (double)du->multiplier);
+        v += (int64_t)round(value * (NETDATA_DOUBLE)du->multiplier);
     }
 
-    *result = nsec;
-    return true;
-}
+    if(du_def->multiplier == 1)
+        *result = v;
+    else
+        *result = duration_round_to_resolution(v, du_def->multiplier);
 
-bool duration_parse_nsec_t(const char *duration, snsec_t *ns) {
-    snsec_t nsec;
-    if(!duration_parse(duration, &nsec, "ns"))
-        return false;
-
-    *ns = nsec;
-    return true;
-}
-
-bool duration_parse_usec_t(const char *duration, susec_t *us) {
-    snsec_t nsec;
-    if(!duration_parse(duration, &nsec, "us"))
-        return false;
-
-    *us = (susec_t)duration_round_to_resolution(nsec, NSEC_PER_USEC);
-    return true;
-}
-
-bool duration_parse_msec_t(const char *duration, smsec_t *ms) {
-    snsec_t nsec;
-    if(!duration_parse(duration, &nsec, "ms"))
-        return false;
-
-    *ms = (susec_t)duration_round_to_resolution(nsec, NSEC_PER_MSEC);
-    return true;
-}
-
-bool duration_parse_time_t(const char *duration, stime_t *secs) {
-    snsec_t nsec;
-    if(!duration_parse(duration, &nsec, "s"))
-        return false;
-
-    *secs = (stime_t)duration_round_to_resolution(nsec, NSEC_PER_SEC);
-    return true;
-}
-
-bool duration_parse_mins(const char *duration, int *mins) {
-    snsec_t nsec;
-    if(!duration_parse(duration, &nsec, "m"))
-        return false;
-
-    *mins = (int)duration_round_to_resolution(nsec, NSEC_PER_MIN);
-    return true;
-}
-
-bool duration_parse_hours(const char *duration, int *hours) {
-    snsec_t nsec;
-    if(!duration_parse(duration, &nsec, "h"))
-        return false;
-
-    *hours = (int)duration_round_to_resolution(nsec, NSEC_PER_HOUR);
-    return true;
-}
-
-bool duration_parse_days(const char *duration, int *days) {
-    snsec_t nsec;
-    if(!duration_parse(duration, &nsec, "d"))
-        return false;
-
-    *days = (int)duration_round_to_resolution(nsec, NSEC_PER_DAY);
     return true;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 // generate a string to represent a duration
 
-static inline ssize_t duration_snprintf(char *dst, size_t dst_size, snsec_t nsec, const char *minimum_unit) {
+ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char *unit) {
     if (!dst || dst_size == 0) return -1;
     if (dst_size == 1) {
         dst[0] = '\0';
         return -2;
     }
 
-    if(nsec == 0)
+    if(value == 0)
         return snprintfz(dst, dst_size, "off");
 
-    const struct duration_unit *du_min = duration_find_unit(minimum_unit);
+    const struct duration_unit *du_min = duration_find_unit(unit);
     size_t offset = 0;
+
+    int64_t nsec = value * du_min->multiplier;
 
     // Iterate through units from largest to smallest
     for (size_t i = sizeof(units) / sizeof(units[0]) - 1; i > 0 && nsec > 0; i--) {
@@ -228,7 +185,7 @@ static inline ssize_t duration_snprintf(char *dst, size_t dst_size, snsec_t nsec
         // Otherwise, we have to make sure that all larger units are integer multiples of the smaller ones.
 
         int64_t multiplier = units[i].multiplier;
-        int64_t rounded = (du == du_min) ? ((snsec_t)duration_round_to_resolution(nsec, multiplier) * multiplier) : nsec;
+        int64_t rounded = (du == du_min) ? (duration_round_to_resolution(nsec, multiplier) * multiplier) : nsec;
 
         int64_t unit_count = rounded / multiplier;
         if (unit_count > 0) {
@@ -263,55 +220,16 @@ static inline ssize_t duration_snprintf(char *dst, size_t dst_size, snsec_t nsec
     return (ssize_t)offset;
 }
 
-ssize_t duration_snprintf_nsec_t(char *dst, size_t size, snsec_t ns) {
-    return duration_snprintf(dst, size, ns, "ns");
-}
-
-ssize_t duration_snprintf_usec_t(char *dst, size_t size, susec_t us) {
-    return duration_snprintf(dst, size, (snsec_t)us * (snsec_t)NSEC_PER_USEC, "us");
-}
-
-ssize_t duration_snprintf_msec_t(char *dst, size_t size, smsec_t ms) {
-    return duration_snprintf(dst, size, (snsec_t)ms * (snsec_t)NSEC_PER_MSEC, "ms");
-}
-
-ssize_t duration_snprintf_time_t(char *dst, size_t size, stime_t secs) {
-    return duration_snprintf(dst, size, (snsec_t)secs * (snsec_t)NSEC_PER_SEC, "s");
-}
-
-ssize_t duration_snprintf_mins(char *dst, size_t size, int mins) {
-    return duration_snprintf(dst, size, (snsec_t)mins * (snsec_t)NSEC_PER_MIN, "m");
-}
-
-ssize_t duration_snprintf_hours(char *dst, size_t size, int hours) {
-    return duration_snprintf(dst, size, (snsec_t)hours * (snsec_t)NSEC_PER_HOUR, "h");
-}
-
-ssize_t duration_snprintf_days(char *dst, size_t size, int days) {
-    return duration_snprintf(dst, size, (snsec_t)days * (snsec_t)NSEC_PER_DAY, "d");
-}
-
 // --------------------------------------------------------------------------------------------------------------------
-
-int64_t nsec_to_unit(snsec_t nsec, const char *unit) {
-    const struct duration_unit *du = duration_find_unit(unit);
-    if(du)
-        return duration_round_to_resolution(nsec, du->multiplier);
-
-    return 0;
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-// compatibility
+// compatibility for parsing seconds in int.
 
 bool duration_parse_seconds(const char *str, int *result) {
-    stime_t value;
+    int64_t v;
 
-    if(duration_parse_time_t(str, &value)) {
-        *result = (int)value;
+    if(duration_parse_time_t(str, &v)) {
+        *result = (int)v;
         return true;
     }
 
-    *result = 0;
     return false;
 }

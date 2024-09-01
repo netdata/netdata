@@ -767,6 +767,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/parsers/duration.h
         src/libnetdata/parsers/timeframe.c
         src/libnetdata/parsers/timeframe.h
+        src/libnetdata/parsers/size.c
+        src/libnetdata/parsers/size.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

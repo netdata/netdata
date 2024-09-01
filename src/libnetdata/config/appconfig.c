@@ -688,14 +688,14 @@ unsigned appconfig_get_duration_days(struct config *root, const char *section, c
     if(!s)
         return default_value;
 
-    int result = 0;
+    int64_t result = 0;
     if(!duration_parse_days(s, &result)) {
         appconfig_set(root, section, name, default_str);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
         return default_value;
     }
 
-    return ABS(result);
+    return (unsigned)ABS(result);
 }
 
 unsigned appconfig_set_duration_days(struct config *root, const char *section, const char *name, unsigned value) {
