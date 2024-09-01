@@ -4,7 +4,7 @@
      processorArchitecture="*"
      name="netdatacli"
      type="win32"/>
-	<description>Netdata Claim!</description>
+	<description>The netdatacli executable provides a simple way to control the Netdata agent's operation.</description>
 	<!-- Identify the application security requirements. -->
 	<trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
 		<security>

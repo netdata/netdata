@@ -4,7 +4,7 @@
      processorArchitecture="*"
      name="netdata"
      type="win32"/>
-	<description>Netdata Claim!</description>
+	<description>Netdata is a high-performance, cloud-native, and on-premises observability platform designed to monitor metrics and logs with unparalleled efficiency.</description>
 	<!-- Identify the application security requirements. -->
 	<trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
 		<security>
