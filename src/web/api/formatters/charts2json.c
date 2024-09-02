@@ -37,7 +37,7 @@ const char* get_release_channel() {
 }
 
 void charts2json(RRDHOST *host, BUFFER *wb) {
-    static char *custom_dashboard_info_js_filename = NULL;
+    static const char *custom_dashboard_info_js_filename = NULL;
     size_t c = 0, dimensions = 0, memory = 0, alarms = 0;
     RRDSET *st;
 

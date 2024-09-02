@@ -11,7 +11,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     static int do_sockets = -1, do_new = -1, do_changes = -1, do_expect = -1, do_search = -1, do_errors = -1;
     static usec_t get_max_every = 10 * USEC_PER_SEC, usec_since_last_max = 0;
     static int read_full = 1;
-    static char *nf_conntrack_filename, *nf_conntrack_count_filename, *nf_conntrack_max_filename;
+    static const char *nf_conntrack_filename, *nf_conntrack_count_filename, *nf_conntrack_max_filename;
     static const RRDVAR_ACQUIRED *rrdvar_max = NULL;
 
     unsigned long long aentries = 0, asearched = 0, afound = 0, anew = 0, ainvalid = 0, aignore = 0, adelete = 0, adelete_list = 0,

@@ -232,10 +232,10 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
 // RRDHOST - add a host
 
 static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
-                                       unsigned int rrdpush_enabled,
-                                       char *rrdpush_destination,
-                                       char *rrdpush_api_key,
-                                       char *rrdpush_send_charts_matching
+                                              unsigned int rrdpush_enabled,
+                                              const char *rrdpush_destination,
+                                              const char *rrdpush_api_key,
+                                              const char *rrdpush_send_charts_matching
 ) {
     if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED)) return;
 
@@ -341,9 +341,9 @@ static RRDHOST *rrdhost_create(
         RRD_MEMORY_MODE memory_mode,
         unsigned int health_enabled,
         unsigned int rrdpush_enabled,
-        char *rrdpush_destination,
-        char *rrdpush_api_key,
-        char *rrdpush_send_charts_matching,
+        const char *rrdpush_destination,
+        const char *rrdpush_api_key,
+        const char *rrdpush_send_charts_matching,
         bool rrdpush_enable_replication,
         time_t rrdpush_seconds_to_replicate,
         time_t rrdpush_replication_step,
@@ -566,9 +566,9 @@ static void rrdhost_update(RRDHOST *host
                            , RRD_MEMORY_MODE mode
                            , unsigned int health_enabled
                            , unsigned int rrdpush_enabled
-                           , char *rrdpush_destination
-                           , char *rrdpush_api_key
-                           , char *rrdpush_send_charts_matching
+                           , const char *rrdpush_destination
+                           , const char *rrdpush_api_key
+                           , const char *rrdpush_send_charts_matching
                            , bool rrdpush_enable_replication
                            , time_t rrdpush_seconds_to_replicate
                            , time_t rrdpush_replication_step
@@ -706,9 +706,9 @@ RRDHOST *rrdhost_find_or_create(
     , RRD_MEMORY_MODE mode
     , unsigned int health_enabled
     , unsigned int rrdpush_enabled
-    , char *rrdpush_destination
-    , char *rrdpush_api_key
-    , char *rrdpush_send_charts_matching
+    , const char *rrdpush_destination
+    , const char *rrdpush_api_key
+    , const char *rrdpush_send_charts_matching
     , bool rrdpush_enable_replication
     , time_t rrdpush_seconds_to_replicate
     , time_t rrdpush_replication_step
@@ -862,7 +862,7 @@ RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
 
 #endif
 
-void dbengine_init(char *hostname) {
+static void dbengine_init(const char *hostname) {
 #ifdef ENABLE_DBENGINE
 
     use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", use_direct_io);
@@ -1026,7 +1026,7 @@ void dbengine_init(char *hostname) {
 
 void api_v1_management_init(void);
 
-int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
+int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
     rrdhost_init();
 
     if (unlikely(sql_init_meta_database(DB_CHECK_NONE, system_info ? 0 : 1))) {

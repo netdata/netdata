@@ -1014,7 +1014,7 @@ int ebpf_load_config(struct config *config, char *filename)
 }
 
 
-static netdata_run_mode_t ebpf_select_mode(char *mode)
+static netdata_run_mode_t ebpf_select_mode(const char *mode)
 {
     if (!strcasecmp(mode,EBPF_CFG_LOAD_MODE_RETURN ))
         return MODE_RETURN;
@@ -1041,7 +1041,7 @@ static void ebpf_select_mode_string(char *output, size_t len, netdata_run_mode_t
  *
  * @return It returns the value to be used.
  */
-netdata_ebpf_load_mode_t epbf_convert_string_to_load_mode(char *str)
+netdata_ebpf_load_mode_t epbf_convert_string_to_load_mode(const char *str)
 {
     if (!strcasecmp(str, EBPF_CFG_CORE_PROGRAM))
         return EBPF_LOAD_CORE;
@@ -1094,7 +1094,7 @@ static char *ebpf_convert_collect_pid_to_string(netdata_apps_level_t level)
  *
  * @return it returns the level associated to the string or default when it is a wrong value
  */
-netdata_apps_level_t ebpf_convert_string_to_apps_level(char *str)
+netdata_apps_level_t ebpf_convert_string_to_apps_level(const char *str)
 {
     if (!strcasecmp(str, EBPF_CFG_PID_REAL_PARENT))
         return NETDATA_APPS_LEVEL_REAL_PARENT;
@@ -1114,7 +1114,7 @@ netdata_apps_level_t ebpf_convert_string_to_apps_level(char *str)
  *  @param str    value read from configuration file.
  *  @param lmode  load mode used by collector.
  */
-netdata_ebpf_program_loaded_t ebpf_convert_core_type(char *str, netdata_run_mode_t lmode)
+netdata_ebpf_program_loaded_t ebpf_convert_core_type(const char *str, netdata_run_mode_t lmode)
 {
     if (!strcasecmp(str, EBPF_CFG_ATTACH_TRACEPOINT))
         return EBPF_LOAD_TRACEPOINT;
@@ -1174,7 +1174,7 @@ struct btf *ebpf_parse_btf_file(const char *filename)
  * @param path     is the fullpath
  * @param filename is the file inside BTF path.
  */
-struct btf *ebpf_load_btf_file(char *path, char *filename)
+struct btf *ebpf_load_btf_file(const char *path, const char *filename)
 {
     char fullpath[PATH_MAX + 1];
     snprintfz(fullpath, PATH_MAX, "%s/%s", path, filename);
@@ -1299,7 +1299,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
 {
     char default_value[EBPF_MAX_MODE_LENGTH + 1];
     ebpf_select_mode_string(default_value, EBPF_MAX_MODE_LENGTH, modules->mode);
-    char *load_mode = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, default_value);
+    const char *load_mode = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE, default_value);
     modules->mode = ebpf_select_mode(load_mode);
 
     modules->update_every = (int)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
@@ -1318,17 +1318,17 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
                                                         EBPF_CFG_LIFETIME, EBPF_DEFAULT_LIFETIME);
 
     char *value = ebpf_convert_load_mode_to_string(modules->load & NETDATA_EBPF_LOAD_METHODS);
-    char *type_format = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
+    const char *type_format = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(type_format);
     load = ebpf_select_load_mode(btf_file, load, kver, is_rh);
     modules->load = origin | load;
 
-    char *core_attach = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
+    const char *core_attach = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
     netdata_ebpf_program_loaded_t fill_lm = ebpf_convert_core_type(core_attach, modules->mode);
     ebpf_update_target_with_conf(modules, fill_lm);
 
     value = ebpf_convert_collect_pid_to_string(modules->apps_level);
-    char *collect_pid = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_COLLECT_PID, value);
+    const char *collect_pid = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_COLLECT_PID, value);
     modules->apps_level =  ebpf_convert_string_to_apps_level(collect_pid);
 
     modules->maps_per_core = appconfig_get_boolean(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_MAPS_PER_CORE,

@@ -1384,7 +1384,7 @@ void rrddim_index_destroy(RRDSET *st);
 extern time_t rrdhost_free_orphan_time_s;
 extern time_t rrdhost_free_ephemeral_time_s;
 
-int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest);
+int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool unittest);
 
 RRDHOST *rrdhost_find_by_hostname(const char *hostname);
 RRDHOST *rrdhost_find_by_guid(const char *guid);
@@ -1405,9 +1405,9 @@ RRDHOST *rrdhost_find_or_create(
     RRD_MEMORY_MODE mode,
     unsigned int health_enabled,
     unsigned int rrdpush_enabled,
-    char *rrdpush_destination,
-    char *rrdpush_api_key,
-    char *rrdpush_send_charts_matching,
+    const char *rrdpush_destination,
+    const char *rrdpush_api_key,
+    const char *rrdpush_send_charts_matching,
     bool rrdpush_enable_replication,
     time_t rrdpush_seconds_to_replicate,
     time_t rrdpush_replication_step,

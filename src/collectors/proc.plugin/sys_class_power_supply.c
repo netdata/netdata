@@ -199,7 +199,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
     (void)dt;
     static int do_capacity = -1, do_power = -1, do_property[3] = {-1};
     static int keep_fds_open = CONFIG_BOOLEAN_NO, keep_fds_open_config = -1;
-    static char *dirname = NULL;
+    static const char *dirname = NULL;
 
     if(unlikely(do_capacity == -1)) {
         do_capacity    = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery capacity", CONFIG_BOOLEAN_YES);

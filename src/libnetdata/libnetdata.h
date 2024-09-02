@@ -307,9 +307,7 @@ typedef uint32_t uid_t;
 #define WARNUNUSED
 #endif
 
-void aral_judy_init(void);
-size_t judy_aral_overhead(void);
-size_t judy_aral_structures(void);
+#include "libjudy/judy-malloc.h"
 
 #define ABS(x) (((x) < 0)? (-(x)) : (x))
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -435,7 +433,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) NORETURN;
 #endif
 
-extern char *netdata_configured_host_prefix;
+extern const char *netdata_configured_host_prefix;
 
 #include "os/os.h"
 

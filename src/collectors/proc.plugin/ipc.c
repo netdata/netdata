@@ -182,7 +182,7 @@ static inline int ipc_sem_get_status(struct ipc_status *st) {
     return 0;
 }
 
-int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_root) {
+static int ipc_msq_get_info(const char *msg_filename, struct message_queue **message_queue_root) {
     static procfile *ff;
     struct message_queue *msq;
 
@@ -238,7 +238,7 @@ int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_ro
     return 0;
 }
 
-int ipc_shm_get_info(char *shm_filename, struct shm_stats *shm) {
+static int ipc_shm_get_info(const char *shm_filename, struct shm_stats *shm) {
     static procfile *ff;
 
     if(unlikely(!ff)) {
@@ -287,10 +287,10 @@ int do_ipc(int update_every, usec_t dt) {
     static const RRDVAR_ACQUIRED *arrays_max = NULL, *semaphores_max = NULL;
     static RRDSET *st_arrays = NULL;
     static RRDDIM *rd_arrays = NULL;
-    static char *msg_filename = NULL;
+    static const char *msg_filename = NULL;
     static struct message_queue *message_queue_root = NULL;
     static long long dimensions_limit;
-    static char *shm_filename = NULL;
+    static const char *shm_filename = NULL;
 
     if(unlikely(do_sem == -1)) {
         do_msg = config_get_boolean("plugin:proc:ipc", "message queues", CONFIG_BOOLEAN_YES);

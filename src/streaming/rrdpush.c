@@ -30,14 +30,14 @@ struct config stream_config = APPCONFIG_INITIALIZER;
 unsigned int default_rrdpush_enabled = 0;
 
 unsigned int default_rrdpush_compression_enabled = 1;
-char *default_rrdpush_destination = NULL;
-char *default_rrdpush_api_key = NULL;
-char *default_rrdpush_send_charts_matching = "*";
+const char *default_rrdpush_destination = NULL;
+const char *default_rrdpush_api_key = NULL;
+const char *default_rrdpush_send_charts_matching = "*";
 bool default_rrdpush_enable_replication = true;
 time_t default_rrdpush_seconds_to_replicate = 86400;
 time_t default_rrdpush_replication_step = 600;
-char *netdata_ssl_ca_path = NULL;
-char *netdata_ssl_ca_file = NULL;
+const char *netdata_ssl_ca_path = NULL;
+const char *netdata_ssl_ca_file = NULL;
 
 static void load_stream_conf() {
     errno_clear();

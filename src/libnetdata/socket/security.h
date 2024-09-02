@@ -50,7 +50,7 @@ extern const char *tls_version;
 extern const char *tls_ciphers;
 extern bool netdata_ssl_validate_certificate;
 extern bool netdata_ssl_validate_certificate_sender;
-int ssl_security_location_for_context(SSL_CTX *ctx,char *file,char *path);
+int ssl_security_location_for_context(SSL_CTX *ctx, const char *file, const char *path);
 
 void netdata_ssl_initialize_openssl();
 void netdata_ssl_cleanup();

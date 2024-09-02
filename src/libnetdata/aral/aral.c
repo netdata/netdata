@@ -72,7 +72,7 @@ struct aral {
         struct {
             bool enabled;
             const char *filename;
-            char **cache_dir;
+            const char **cache_dir;
         } mmap;
     } config;
 
@@ -709,7 +709,7 @@ size_t aral_element_size(ARAL *ar) {
 }
 
 ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size,
-                  struct aral_statistics *stats, const char *filename, char **cache_dir, bool mmap, bool lockless) {
+                  struct aral_statistics *stats, const char *filename, const char **cache_dir, bool mmap, bool lockless) {
     ARAL *ar = callocz(1, sizeof(ARAL));
     ar->config.options = (lockless) ? ARAL_LOCKLESS : 0;
     ar->config.requested_element_size = element_size;
@@ -1078,7 +1078,7 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
 }
 
 int aral_unittest(size_t elements) {
-    char *cache_dir = "/tmp/";
+    const char *cache_dir = "/tmp/";
 
     struct aral_unittest_config auc = {
             .single_threaded = true,

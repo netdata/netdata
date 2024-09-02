@@ -156,7 +156,7 @@ time_t now_sec(clockid_t clk_id);
 usec_t now_usec(clockid_t clk_id);
 int now_timeval(clockid_t clk_id, struct timeval *tv);
 
-collected_number uptime_msec(char *filename);
+collected_number uptime_msec(const char *filename);
 
 extern usec_t clock_monotonic_resolution;
 extern usec_t clock_realtime_resolution;

@@ -38,8 +38,8 @@
 #endif
 
 extern struct config stream_config;
-extern char *netdata_ssl_ca_path;
-extern char *netdata_ssl_ca_file;
+extern const char *netdata_ssl_ca_path;
+extern const char *netdata_ssl_ca_file;
 
 bool attempt_to_connect(struct sender_state *state);
 void rrdpush_sender_on_connect(RRDHOST *host);

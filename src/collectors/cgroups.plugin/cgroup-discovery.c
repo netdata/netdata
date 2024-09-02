@@ -23,7 +23,7 @@ struct cgroup *discovered_cgroup_root = NULL;
 
 char cgroup_chart_id_prefix[] = "cgroup_";
 char services_chart_id_prefix[] = "systemd_";
-char *cgroups_rename_script = NULL;
+const char *cgroups_rename_script = NULL;
 
 // Shared memory with information from detected cgroups
 netdata_ebpf_cgroup_shm_t shm_cgroup_ebpf = {NULL, NULL};

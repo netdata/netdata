@@ -769,6 +769,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/parsers/timeframe.h
         src/libnetdata/parsers/size.c
         src/libnetdata/parsers/size.h
+        src/libnetdata/libjudy/judy-malloc.c
+        src/libnetdata/libjudy/judy-malloc.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

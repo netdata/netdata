@@ -208,7 +208,7 @@ int do_proc_net_wireless(int update_every, usec_t dt)
     UNUSED(dt);
     static procfile *ff = NULL;
     static int do_status, do_quality = -1, do_discarded_packets, do_beacon;
-    static char *proc_net_wireless_filename = NULL;
+    static const char *proc_net_wireless_filename = NULL;
 
     if (unlikely(do_quality == -1)) {
         char filename[FILENAME_MAX + 1];

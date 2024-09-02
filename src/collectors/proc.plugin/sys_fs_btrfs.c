@@ -678,7 +678,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         , do_error_stats = CONFIG_BOOLEAN_AUTO;
 
     static usec_t refresh_delta = 0, refresh_every = 60 * USEC_PER_SEC;
-    static char *btrfs_path = NULL;
+    static const char *btrfs_path = NULL;
 
     (void)dt;
 

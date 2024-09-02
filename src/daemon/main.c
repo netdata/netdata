@@ -516,12 +516,12 @@ void web_server_threading_selection(void) {
 
 int make_dns_decision(const char *section_name, const char *config_name, const char *default_value, SIMPLE_PATTERN *p)
 {
-    char *value = config_get(section_name,config_name,default_value);
+    const char *value = config_get(section_name,config_name,default_value);
     if(!strcmp("yes",value))
         return 1;
     if(!strcmp("no",value))
         return 0;
-    if(strcmp("heuristic",value))
+    if(strcmp("heuristic",value) != 0)
         netdata_log_error("Invalid configuration option '%s' for '%s'/'%s'. Valid options are 'yes', 'no' and 'heuristic'. Proceeding with 'heuristic'",
               value, section_name, config_name);
 
@@ -586,7 +586,7 @@ void web_server_config_options(void)
 
     web_enable_gzip = config_get_boolean(CONFIG_SECTION_WEB, "enable gzip compression", web_enable_gzip);
 
-    char *s = config_get(CONFIG_SECTION_WEB, "gzip compression strategy", "default");
+    const char *s = config_get(CONFIG_SECTION_WEB, "gzip compression strategy", "default");
     if(!strcmp(s, "default"))
         web_gzip_strategy = Z_DEFAULT_STRATEGY;
     else if(!strcmp(s, "filtered"))
@@ -877,7 +877,7 @@ static void log_init(void) {
     aclk_config_get_query_scope();
 }
 
-static char *get_varlib_subdir_from_config(const char *prefix, const char *dir) {
+static const char *get_varlib_subdir_from_config(const char *prefix, const char *dir) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/%s", prefix, dir);
     return config_get(CONFIG_SECTION_DIRECTORIES, dir, filename);
@@ -1342,7 +1342,7 @@ static void get_netdata_configured_variables()
 
 }
 
-static void post_conf_load(char **user)
+static void post_conf_load(const char **user)
 {
     // --------------------------------------------------------------------
     // get the user we should run
@@ -1357,7 +1357,7 @@ static void post_conf_load(char **user)
     }
 }
 
-static bool load_netdata_conf(char *filename, char overwrite_used, char **user) {
+static bool load_netdata_conf(char *filename, char overwrite_used, const char **user) {
     errno_clear();
 
     int ret = 0;
@@ -1470,7 +1470,7 @@ bool netdata_random_session_id_generate(void);
 int windows_perflib_dump(const char *key);
 #endif
 
-int unittest_prepare_rrd(char **user) {
+int unittest_prepare_rrd(const char **user) {
     post_conf_load(user);
     get_netdata_configured_variables();
     default_rrd_update_every = 1;
@@ -1501,7 +1501,7 @@ int netdata_main(int argc, char **argv) {
     int config_loaded = 0;
     bool close_open_fds = true;
     size_t default_stacksize;
-    char *user = NULL;
+    const char *user = NULL;
 
 #ifdef OS_WINDOWS
     int dont_fork = 1;
@@ -1986,7 +1986,7 @@ int netdata_main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialize netdata
     {
-        char *pmax = config_get(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", "1");
+        const char *pmax = config_get(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", "1");
         if(pmax && *pmax)
             setenv("MALLOC_ARENA_MAX", pmax, 1);
 
@@ -2043,7 +2043,7 @@ int netdata_main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // get the debugging flags from the configuration file
 
-        char *flags = config_get(CONFIG_SECTION_LOGS, "debug flags",  "0x0000000000000000");
+        const char *flags = config_get(CONFIG_SECTION_LOGS, "debug flags",  "0x0000000000000000");
         nd_setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
         debug_flags = strtoull(flags, NULL, 0);
@@ -2071,8 +2071,6 @@ int netdata_main(int argc, char **argv) {
         netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
 
         check_local_streaming_capabilities();
-
-        aral_judy_init();
 
         get_system_timezone();
 

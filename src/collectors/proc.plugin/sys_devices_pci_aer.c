@@ -2,7 +2,7 @@
 
 #include "plugin_proc.h"
 
-static char *pci_aer_dirname = NULL;
+static const char *pci_aer_dirname = NULL;
 
 typedef enum __attribute__((packed)) {
     AER_DEV_NONFATAL                    = (1 << 0),

@@ -339,8 +339,8 @@ extern ebpf_network_viewer_port_list_t *listen_ports;
 void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *values);
 void ebpf_fill_ip_list_unsafe(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
 void ebpf_parse_service_name_section(struct config *cfg);
-void ebpf_parse_ips_unsafe(char *ptr);
-void ebpf_parse_ports(char *ptr);
+void ebpf_parse_ips_unsafe(const char *ptr);
+void ebpf_parse_ports(const char *ptr);
 void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em);
 void ebpf_socket_fill_publish_apps(ebpf_socket_publish_apps_t *curr, netdata_socket_t *ns);
 

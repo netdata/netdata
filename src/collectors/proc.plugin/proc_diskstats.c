@@ -180,16 +180,16 @@ static struct disk {
 
 #define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete___safe_from_collector_thread(st); (st) = NULL; } } while(st)
 
-static char *path_to_sys_dev_block_major_minor_string = NULL;
-static char *path_to_sys_block_device = NULL;
-static char *path_to_sys_block_device_bcache = NULL;
-static char *path_to_sys_devices_virtual_block_device = NULL;
-static char *path_to_device_mapper = NULL;
-static char *path_to_dev_disk = NULL;
-static char *path_to_sys_block = NULL;
-static char *path_to_device_label = NULL;
-static char *path_to_device_id = NULL;
-static char *path_to_veritas_volume_groups = NULL;
+static const char *path_to_sys_dev_block_major_minor_string = NULL;
+static const char *path_to_sys_block_device = NULL;
+static const char *path_to_sys_block_device_bcache = NULL;
+static const char *path_to_sys_devices_virtual_block_device = NULL;
+static const char *path_to_device_mapper = NULL;
+static const char *path_to_dev_disk = NULL;
+static const char *path_to_sys_block = NULL;
+static const char *path_to_device_label = NULL;
+static const char *path_to_device_id = NULL;
+static const char *path_to_veritas_volume_groups = NULL;
 static int name_disks_by_id = CONFIG_BOOLEAN_NO;
 static int global_bcache_priority_stats_update_every = 0; // disabled by default
 

@@ -158,7 +158,7 @@ int do_proc_pressure(int update_every, usec_t dt) {
     int i;
 
     static usec_t next_pressure_dt = 0;
-    static char *base_path = NULL;
+    static const char *base_path = NULL;
 
     update_every = (update_every < MIN_PRESSURE_UPDATE_EVERY) ? MIN_PRESSURE_UPDATE_EVERY : update_every;
     pressure_update_every = update_every;
@@ -170,9 +170,8 @@ int do_proc_pressure(int update_every, usec_t dt) {
         return 0;
     }
 
-    if (unlikely(!base_path)) {
+    if (unlikely(!base_path))
         base_path = config_get(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, "base path of pressure metrics", "/proc/pressure");
-    }
 
     for (i = 0; i < PRESSURE_NUM_RESOURCES; i++) {
         procfile *ff = resource_info[i].pf;

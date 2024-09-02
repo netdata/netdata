@@ -30,9 +30,9 @@ struct registry {
 
     // configuration
     unsigned long long save_registry_every_entries;
-    char *registry_domain;
-    char *hostname;
-    char *registry_to_announce;
+    const char *registry_domain;
+    const char *hostname;
+    const char *registry_to_announce;
     const char *cloud_base_url;
     time_t persons_expiration; // seconds to expire idle persons
     int verify_cookies_redirects;
@@ -42,10 +42,10 @@ struct registry {
     size_t max_name_length;
 
     // file/path names
-    char *pathname;
-    char *db_filename;
-    char *log_filename;
-    char *machine_guid_filename;
+    const char *pathname;
+    const char *db_filename;
+    const char *log_filename;
+    const char *machine_guid_filename;
 
     // open files
     FILE *log_fp;

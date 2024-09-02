@@ -261,9 +261,8 @@ static cmd_status_t cmd_read_config_execute(char *args, char **message)
     const char *conf_file = temp; /* "cloud" is cloud.conf, otherwise netdata.conf */
     struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
 
-    char *value = appconfig_get(tmp_config, temp + offset + 1, temp + offset2 + 1, NULL);
-    if (value == NULL)
-    {
+    const char *value = appconfig_get(tmp_config, temp + offset + 1, temp + offset2 + 1, NULL);
+    if (value == NULL) {
         netdata_log_error("Cannot execute read-config conf_file=%s section=%s / key=%s because no value set",
                           conf_file,
                           temp + offset + 1,
@@ -271,13 +270,11 @@ static cmd_status_t cmd_read_config_execute(char *args, char **message)
         freez(temp);
         return CMD_STATUS_FAILURE;
     }
-    else
-    {
+    else {
         (*message) = strdupz(value);
         freez(temp);
         return CMD_STATUS_SUCCESS;
     }
-
 }
 
 static cmd_status_t cmd_write_config_execute(char *args, char **message)

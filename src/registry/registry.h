@@ -76,7 +76,7 @@ void registry_statistics(void);
 
 const char *registry_get_this_machine_guid(void);
 char *registry_get_mgmt_api_key(void);
-char *registry_get_this_machine_hostname(void);
+const char *registry_get_this_machine_hostname(void);
 
 int regenerate_guid(const char *guid, char *result);
 

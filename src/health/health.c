@@ -128,13 +128,13 @@ static void health_load_config_defaults(void) {
            health_globals.config.health_log_retention_s, health_globals.config.health_log_retention_s / 86400);
 }
 
-inline char *health_user_config_dir(void) {
+inline const char *health_user_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_user_config_dir);
     return config_get(CONFIG_SECTION_DIRECTORIES, "health config", buffer);
 }
 
-inline char *health_stock_config_dir(void) {
+inline const char *health_stock_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
     return config_get(CONFIG_SECTION_DIRECTORIES, "stock health config", buffer);

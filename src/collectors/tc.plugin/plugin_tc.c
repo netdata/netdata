@@ -912,7 +912,7 @@ void *tc_main(void *ptr) {
     uint32_t first_hash;
 
     snprintfz(command, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_primary_plugins_dir);
-    char *tc_script = config_get("plugin:tc", "script to run to get tc values", command);
+    const char *tc_script = config_get("plugin:tc", "script to run to get tc values", command);
 
     while(service_running(SERVICE_COLLECTORS)) {
         struct tc_device *device = NULL;

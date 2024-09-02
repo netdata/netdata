@@ -28,7 +28,7 @@ static _CONNECTOR_INSTANCE *find_instance(const char *section)
     return local_ci;
 }
 
-char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
+static const char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
     _CONNECTOR_INSTANCE *local_ci;
 
@@ -239,7 +239,7 @@ struct engine *read_exporting_config()
 
         prometheus_exporter_instance->config.options |= global_exporting_options & EXPORTING_OPTIONS_SOURCE_BITS;
 
-        char *data_source = prometheus_config_get("data source", "average");
+        const char *data_source = prometheus_config_get("data source", "average");
         prometheus_exporter_instance->config.options =
             exporting_parse_data_source(data_source, prometheus_exporter_instance->config.options);
 
@@ -374,7 +374,7 @@ struct engine *read_exporting_config()
         tmp_instance->config.hosts_pattern = simple_pattern_create(
                 exporter_get(instance_name, "send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT, true);
 
-        char *data_source = exporter_get(instance_name, "data source", "average");
+        const char *data_source = exporter_get(instance_name, "data source", "average");
 
         tmp_instance->config.options = exporting_parse_data_source(data_source, tmp_instance->config.options);
         if (EXPORTING_OPTIONS_DATA_SOURCE(tmp_instance->config.options) != EXPORTING_SOURCE_DATA_AS_COLLECTED &&

@@ -89,7 +89,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
     static int do_health = -1, do_nonredundant = -1, do_disks = -1, do_operations = -1, do_mismatch = -1,
                do_mismatch_config = -1;
     static int make_charts_obsolete = -1;
-    static char *mdstat_filename = NULL, *mismatch_cnt_filename = NULL;
+    static const char *mdstat_filename = NULL, *mismatch_cnt_filename = NULL;
     static struct raid *raids = NULL;
     static size_t raids_allocated = 0;
     size_t raids_num = 0, raid_idx = 0, redundant_num = 0;
