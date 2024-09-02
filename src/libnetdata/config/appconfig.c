@@ -40,7 +40,10 @@ static void appconfig_wrlock(struct config *root);
 static void appconfig_unlock(struct config *root);
 static void config_section_wrlock(struct section *co);
 static void config_section_unlock(struct section *co);
-const char *appconfig_get_by_section(struct section *co, const char *name, const char *default_value);
+
+typedef STRING *(*reformat_t)(STRING *value);
+static const char *appconfig_get_by_section(struct section *co, const char *name, const char *default_value, reformat_t cb);
+static int appconfig_get_boolean_by_section(struct section *co, const char *name, int value);
 
 size_t appconfig_foreach_value_in_section(struct config *root, const char *section, appconfig_foreach_value_cb_t cb, void *data) {
     size_t used = 0;
@@ -492,7 +495,7 @@ int appconfig_move_everywhere(struct config *root, const char *name_old, const c
     return ret;
 }
 
-const char *appconfig_get_by_section(struct section *co, const char *name, const char *default_value) {
+static const char *appconfig_get_by_section(struct section *co, const char *name, const char *default_value, reformat_t cb) {
     struct config_option *cv;
 
     // Only calls internal to this file check for a NULL result, and they do not supply a NULL arg.
@@ -509,16 +512,22 @@ const char *appconfig_get_by_section(struct section *co, const char *name, const
         // this is a loaded value from the config file
         // if it is different from the default, mark it
         if(!(cv->flags & CONFIG_VALUE_CHECKED)) {
-            if(default_value && string_strcmp(cv->value, default_value) != 0) cv->flags |= CONFIG_VALUE_CHANGED;
+            if(default_value && string_strcmp(cv->value, default_value) != 0)
+                cv->flags |= CONFIG_VALUE_CHANGED;
+
             cv->flags |= CONFIG_VALUE_CHECKED;
         }
+    }
+
+    if((cv->flags & CONFIG_VALUE_MIGRATED) && !(cv->flags & CONFIG_VALUE_REFORMATTED) && cb) {
+        cv->value = cb(cv->value);
+        cv->flags |= CONFIG_VALUE_REFORMATTED;
     }
 
     return string2str(cv->value);
 }
 
-
-const char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value) {
+static const char *appconfig_get_and_reformat(struct config *root, const char *section, const char *name, const char *default_value, reformat_t cb) {
     if (default_value == NULL)
         netdata_log_debug(D_CONFIG, "request to get config in section '%s', name '%s' or fail", section, name);
     else
@@ -529,7 +538,11 @@ const char *appconfig_get(struct config *root, const char *section, const char *
         return NULL;
     if(!co) co = appconfig_section_create(root, section);
 
-    return appconfig_get_by_section(co, name, default_value);
+    return appconfig_get_by_section(co, name, default_value, cb);
+}
+
+const char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value) {
+    return appconfig_get_and_reformat(root, section, name, default_value, NULL);
 }
 
 long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value)
@@ -564,8 +577,8 @@ inline int appconfig_test_boolean_value(const char *s) {
     return 0;
 }
 
-int appconfig_get_boolean_by_section(struct section *co, const char *name, int value) {
-    const char *s = appconfig_get_by_section(co, name, (!value)?"no":"yes");
+static int appconfig_get_boolean_by_section(struct section *co, const char *name, int value) {
+    const char *s = appconfig_get_by_section(co, name, (!value)?"no":"yes", NULL);
     if(!s) return value;
 
     return appconfig_test_boolean_value(s);
@@ -690,12 +703,26 @@ int appconfig_set_boolean(struct config *root, const char *section, const char *
     return value;
 }
 
+static STRING *reformat_duration_seconds(STRING *value) {
+    int result = 0;
+    if(!duration_parse_seconds(string2str(value), &result))
+        return value;
+
+    char buf[128];
+    if(duration_snprintf_time_t(buf, sizeof(buf), result) > 0 && string_strcmp(value, buf) != 0) {
+        string_freez(value);
+        return string_strdupz(buf);
+    }
+
+    return value;
+}
+
 time_t appconfig_get_duration_seconds(struct config *root, const char *section, const char *name, time_t default_value) {
 
     char default_str[128];
     duration_snprintf_time_t(default_str, sizeof(default_str), default_value);
 
-    const char *s = appconfig_get(root, section, name, default_str);
+    const char *s = appconfig_get_and_reformat(root, section, name, default_str, reformat_duration_seconds);
     if(!s)
         return default_value;
 
@@ -718,12 +745,26 @@ time_t appconfig_set_duration_seconds(struct config *root, const char *section, 
     return value;
 }
 
+static STRING *reformat_duration_ms(STRING *value) {
+    int64_t result = 0;
+    if(!duration_parse_msec_t(string2str(value), &result))
+        return value;
+
+    char buf[128];
+    if(duration_snprintf_msec_t(buf, sizeof(buf), result) > 0 && string_strcmp(value, buf) != 0) {
+        string_freez(value);
+        return string_strdupz(buf);
+    }
+
+    return value;
+}
+
 msec_t appconfig_get_duration_ms(struct config *root, const char *section, const char *name, msec_t default_value) {
 
     char default_str[128];
     duration_snprintf_msec_t(default_str, sizeof(default_str), default_value);
 
-    const char *s = appconfig_get(root, section, name, default_str);
+    const char *s = appconfig_get_and_reformat(root, section, name, default_str, reformat_duration_ms);
     if(!s)
         return default_value;
 
@@ -746,12 +787,26 @@ msec_t appconfig_set_duration_ms(struct config *root, const char *section, const
     return value;
 }
 
+static STRING *reformat_duration_days(STRING *value) {
+    int64_t result = 0;
+    if(!duration_parse_days(string2str(value), &result))
+        return value;
+
+    char buf[128];
+    if(duration_snprintf_days(buf, sizeof(buf), result) > 0 && string_strcmp(value, buf) != 0) {
+        string_freez(value);
+        return string_strdupz(buf);
+    }
+
+    return value;
+}
+
 unsigned appconfig_get_duration_days(struct config *root, const char *section, const char *name, unsigned default_value) {
 
     char default_str[128];
     duration_snprintf_days(default_str, sizeof(default_str), (int)default_value);
 
-    const char *s = appconfig_get(root, section, name, default_str);
+    const char *s = appconfig_get_and_reformat(root, section, name, default_str, reformat_duration_days);
     if(!s)
         return default_value;
 
@@ -772,12 +827,26 @@ unsigned appconfig_set_duration_days(struct config *root, const char *section, c
     return value;
 }
 
+static STRING *reformat_size_bytes(STRING *value) {
+    uint64_t result = 0;
+    if(!size_parse_bytes(string2str(value), &result))
+        return value;
+
+    char buf[128];
+    if(size_snprintf_bytes(buf, sizeof(buf), result) > 0 && string_strcmp(value, buf) != 0) {
+        string_freez(value);
+        return string_strdupz(buf);
+    }
+
+    return value;
+}
+
 unsigned appconfig_get_size_bytes(struct config *root, const char *section, const char *name, unsigned default_value) {
 
     char default_str[128];
     size_snprintf_bytes(default_str, sizeof(default_str), (int)default_value);
 
-    const char *s = appconfig_get(root, section, name, default_str);
+    const char *s = appconfig_get_and_reformat(root, section, name, default_str, reformat_size_bytes);
     if(!s)
         return default_value;
 
@@ -798,12 +867,26 @@ unsigned appconfig_set_size_bytes(struct config *root, const char *section, cons
     return value;
 }
 
+static STRING *reformat_size_mb(STRING *value) {
+    uint64_t result = 0;
+    if(!size_parse_mb(string2str(value), &result))
+        return value;
+
+    char buf[128];
+    if(size_snprintf_mb(buf, sizeof(buf), result) > 0 && string_strcmp(value, buf) != 0) {
+        string_freez(value);
+        return string_strdupz(buf);
+    }
+
+    return value;
+}
+
 unsigned appconfig_get_size_mb(struct config *root, const char *section, const char *name, unsigned default_value) {
 
     char default_str[128];
     size_snprintf_mb(default_str, sizeof(default_str), (int)default_value);
 
-    const char *s = appconfig_get(root, section, name, default_str);
+    const char *s = appconfig_get_and_reformat(root, section, name, default_str, reformat_size_mb);
     if(!s)
         return default_value;
 
@@ -1071,13 +1154,14 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
 
                 buffer_sprintf(wb, "\n[%s]\n", string2str(co->name));
 
+                size_t options_added = 0;
                 config_section_wrlock(co);
                 for(cv = co->values; cv ; cv = cv->next) {
                     bool unused = used && !(cv->flags & CONFIG_VALUE_USED);
                     bool migrated = used && (cv->flags & CONFIG_VALUE_MIGRATED);
                     bool reformatted = used && (cv->flags & CONFIG_VALUE_REFORMATTED);
 
-                    if(unused || migrated || reformatted)
+                    if((unused || migrated || reformatted) && options_added)
                         buffer_strcat(wb, "\n");
 
                     if(unused)
@@ -1101,6 +1185,8 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
                                    ) ? "# " : "",
                                    string2str(cv->name),
                                    string2str(cv->value));
+
+                    options_added++;
                 }
                 config_section_unlock(co);
             }
@@ -1125,11 +1211,11 @@ bool stream_conf_needs_dbengine(struct config *root) {
 
         const char *s;
 
-        s = appconfig_get_by_section(co, "enabled", NULL);
+        s = appconfig_get_by_section(co, "enabled", NULL, NULL);
         if(!s || !appconfig_test_boolean_value(s))
             continue;
 
-        s = appconfig_get_by_section(co, "db", NULL);
+        s = appconfig_get_by_section(co, "db", NULL, NULL);
         if(s && strcmp(s, "dbengine") == 0) {
             ret = true;
             break;

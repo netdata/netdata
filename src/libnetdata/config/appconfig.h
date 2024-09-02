@@ -152,7 +152,6 @@ size_t appconfig_foreach_value_in_section(struct config *root, const char *secti
 const char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
 long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value);
 NETDATA_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
-int appconfig_get_boolean_by_section(struct section *co, const char *name, int value);
 int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
 
