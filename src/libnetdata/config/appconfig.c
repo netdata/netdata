@@ -2,6 +2,68 @@
 
 #include "../libnetdata.h"
 
+typedef enum __attribute__((packed)) {
+    CONFIG_VALUE_LOADED = (1 << 0),         // has been loaded from the config
+    CONFIG_VALUE_USED = (1 << 1),           // has been accessed from the program
+    CONFIG_VALUE_CHANGED = (1 << 2),        // has been changed from the loaded value or the internal default value
+    CONFIG_VALUE_CHECKED = (1 << 3),        // has been checked if the value is different from the default
+    CONFIG_VALUE_MIGRATED = (1 << 4),       // has been migrated from an old config
+    CONFIG_VALUE_REFORMATTED = (1 << 5),    // has been reformatted with the official formatting
+} CONFIG_VALUE_FLAGS;
+
+struct config_option {
+    avl_t avl_node;         // the index entry of this entry - this has to be first!
+
+    CONFIG_VALUE_FLAGS flags;
+    uint32_t hash;          // a simple hash to speed up searching
+                   // we first compare hashes, and only if the hashes are equal we do string comparisons
+
+    char *name;
+    char *value;
+
+    struct config_option *next; // config->mutex protects just this
+};
+
+struct section {
+    avl_t avl_node;         // the index entry of this section - this has to be first!
+
+    uint32_t hash;          // a simple hash to speed up searching
+                    // we first compare hashes, and only if the hashes are equal we do string comparisons
+
+    char *name;
+
+    struct section *next;    // global config_mutex protects just this
+
+    struct config_option *values;
+    avl_tree_lock values_index;
+
+    netdata_mutex_t mutex;  // this locks only the writers, to ensure atomic updates
+                           // readers are protected using the rwlock in avl_tree_lock
+};
+
+static void appconfig_wrlock(struct config *root);
+static void appconfig_unlock(struct config *root);
+static void config_section_wrlock(struct section *co);
+static void config_section_unlock(struct section *co);
+
+size_t appconfig_foreach_value_in_section(struct config *root, const char *section, appconfig_foreach_value_cb_t cb, void *data) {
+    size_t used = 0;
+    struct section *co = appconfig_get_section(root, section);
+    if(co) {
+        config_section_wrlock(co);
+        struct config_option *cv;
+        for(cv = co->values; cv ; cv = cv->next) {
+            if(cb(data, cv->name, cv->value)) {
+                cv->flags |= CONFIG_VALUE_USED;
+                used++;
+            }
+        }
+        config_section_unlock(co);
+    }
+
+    return used;
+}
+
 /*
  * @Input:
  *      Connector / instance to add to an internal structure
@@ -97,19 +159,19 @@ int is_valid_connector(char *type, int check_reserved)
 // ----------------------------------------------------------------------------
 // locking
 
-inline void appconfig_wrlock(struct config *root) {
+static inline void appconfig_wrlock(struct config *root) {
     netdata_mutex_lock(&root->mutex);
 }
 
-inline void appconfig_unlock(struct config *root) {
+static inline void appconfig_unlock(struct config *root) {
     netdata_mutex_unlock(&root->mutex);
 }
 
-inline void config_section_wrlock(struct section *co) {
+static inline void config_section_wrlock(struct section *co) {
     netdata_mutex_lock(&co->mutex);
 }
 
-inline void config_section_unlock(struct section *co) {
+static inline void config_section_unlock(struct section *co) {
     netdata_mutex_unlock(&co->mutex);
 }
 
@@ -389,9 +451,15 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
             t->next = cv_old->next;
     }
 
+    nd_log(NDLS_DAEMON, NDLP_WARNING,
+           "CONFIG: option '[%s].%s' has been migrated to '[%s].%s'.",
+           section_old, name_old,
+           section_new, name_new);
+
     freez(cv_old->name);
     cv_old->name = strdupz(name_new);
     cv_old->hash = simple_hash(cv_old->name);
+    cv_old->flags |= CONFIG_VALUE_MIGRATED;
 
     cv_new = cv_old;
     cv_new->next = co_new->values;
@@ -1010,10 +1078,26 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
 
                 config_section_wrlock(co);
                 for(cv = co->values; cv ; cv = cv->next) {
+                    bool unused = used && !(cv->flags & CONFIG_VALUE_USED);
+                    bool migrated = used && (cv->flags & CONFIG_VALUE_MIGRATED);
+                    bool reformatted = used && (cv->flags & CONFIG_VALUE_REFORMATTED);
 
-                    if(used && !(cv->flags & CONFIG_VALUE_USED)) {
-                        buffer_sprintf(wb, "\n\t# option '%s' is not used.\n", cv->name);
+                    if(unused || migrated || reformatted)
+                        buffer_strcat(wb, "\n");
+
+                    if(unused)
+                        buffer_sprintf(wb, "\t# option '%s' is not used.\n", cv->name);
+
+                    if(migrated && reformatted)
+                        buffer_sprintf(wb, "\t# option '%s' has been migrated and reformatted.\n", cv->name);
+                    else {
+                        if (migrated)
+                            buffer_sprintf(wb, "\t# option '%s' has been migrated.\n", cv->name);
+
+                        if (reformatted)
+                            buffer_sprintf(wb, "\t# option '%s' has been reformatted.\n", cv->name);
                     }
+
                     buffer_sprintf(wb, "\t%s%s = %s\n",
                                    (
                                        !(cv->flags & CONFIG_VALUE_LOADED) &&
@@ -1031,4 +1115,49 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
 struct section *appconfig_get_section(struct config *root, const char *name)
 {
     return appconfig_section_find(root, name);
+}
+
+bool stream_conf_needs_dbengine(struct config *root) {
+    struct section *co;
+    bool ret = false;
+
+    appconfig_wrlock(root);
+    for(co = root->first_section; co; co = co->next) {
+        if(strcmp(co->name, "stream") == 0)
+            continue; // the first section is not relevant
+
+        char *s;
+
+        s = appconfig_get_by_section(co, "enabled", NULL);
+        if(!s || !appconfig_test_boolean_value(s))
+            continue;
+
+        s = appconfig_get_by_section(co, "db", NULL);
+        if(s && strcmp(s, "dbengine") == 0) {
+            ret = true;
+            break;
+        }
+    }
+    appconfig_unlock(root);
+
+    return ret;
+}
+
+bool stream_conf_has_uuid_section(struct config *root) {
+    struct section *section = NULL;
+    bool is_parent = false;
+
+    appconfig_wrlock(root);
+    for (section = root->first_section; section; section = section->next) {
+        nd_uuid_t uuid;
+
+        if (uuid_parse(section->name, uuid) != -1 &&
+            appconfig_get_boolean_by_section(section, "enabled", 0)) {
+            is_parent = true;
+            break;
+        }
+    }
+    appconfig_unlock(root);
+
+    return is_parent;
 }

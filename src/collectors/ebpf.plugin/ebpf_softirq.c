@@ -3,11 +3,7 @@
 #include "ebpf.h"
 #include "ebpf_softirq.h"
 
-struct config softirq_config = { .first_section = NULL,
-    .last_section = NULL,
-    .mutex = NETDATA_MUTEX_INITIALIZER,
-    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-        .rwlock = AVL_LOCK_INITIALIZER } };
+struct config softirq_config = APPCONFIG_INITIALIZER;
 
 #define SOFTIRQ_MAP_LATENCY 0
 static ebpf_local_maps_t softirq_maps[] = {

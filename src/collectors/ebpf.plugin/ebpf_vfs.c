@@ -52,11 +52,7 @@ struct netdata_static_thread ebpf_read_vfs = {
     .start_routine = NULL
 };
 
-struct config vfs_config = { .first_section = NULL,
-    .last_section = NULL,
-    .mutex = NETDATA_MUTEX_INITIALIZER,
-    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-    .rwlock = AVL_LOCK_INITIALIZER } };
+struct config vfs_config = APPCONFIG_INITIALIZER;
 
 netdata_ebpf_targets_t vfs_targets[] = { {.name = "vfs_write", .mode = EBPF_LOAD_TRAMPOLINE},
                                          {.name = "vfs_writev", .mode = EBPF_LOAD_TRAMPOLINE},

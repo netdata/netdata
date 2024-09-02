@@ -6,11 +6,7 @@
 #include "ebpf.h"
 #include "ebpf_disk.h"
 
-struct config disk_config = { .first_section = NULL,
-    .last_section = NULL,
-    .mutex = NETDATA_MUTEX_INITIALIZER,
-    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-        .rwlock = AVL_LOCK_INITIALIZER } };
+struct config disk_config = APPCONFIG_INITIALIZER;
 
 static ebpf_local_maps_t disk_maps[] = {{.name = "tbl_disk_iocall", .internal_input = NETDATA_DISK_HISTOGRAM_LENGTH,
                                          .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,

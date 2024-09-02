@@ -1445,6 +1445,11 @@ void rrdhost_set_is_parent_label(void) {
     }
 }
 
+static bool config_label_cb(void *data __maybe_unused, const char *name, const char *value) {
+    rrdlabels_add(localhost->rrdlabels, name, value, RRDLABEL_SRC_CONFIG);
+    return true;
+}
+
 static void rrdhost_load_config_labels(void) {
     int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
     if(!status) {
@@ -1454,16 +1459,7 @@ static void rrdhost_load_config_labels(void) {
                filename);
     }
 
-    struct section *co = appconfig_get_section(&netdata_config, CONFIG_SECTION_HOST_LABEL);
-    if(co) {
-        config_section_wrlock(co);
-        struct config_option *cv;
-        for(cv = co->values; cv ; cv = cv->next) {
-            rrdlabels_add(localhost->rrdlabels, cv->name, cv->value, RRDLABEL_SRC_CONFIG);
-            cv->flags |= CONFIG_VALUE_USED;
-        }
-        config_section_unlock(co);
-    }
+    appconfig_foreach_value_in_section(&netdata_config, CONFIG_SECTION_HOST_LABEL, config_label_cb, NULL);
 }
 
 static void rrdhost_load_kubernetes_labels(void) {

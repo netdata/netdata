@@ -2,11 +2,7 @@
 
 #include "ebpf_filesystem.h"
 
-struct config fs_config = { .first_section = NULL,
-    .last_section = NULL,
-    .mutex = NETDATA_MUTEX_INITIALIZER,
-    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-        .rwlock = AVL_LOCK_INITIALIZER } };
+struct config fs_config = APPCONFIG_INITIALIZER;
 
 ebpf_local_maps_t ext4_maps[] = {{.name = "tbl_ext4", .internal_input = NETDATA_KEY_CALLS_SYNC,
                                   .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,

@@ -5,11 +5,7 @@
 EXPORTING_OPTIONS global_exporting_options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_NAMES;
 const char *global_exporting_prefix = "netdata";
 
-struct config exporting_config = { .first_section = NULL,
-                                   .last_section = NULL,
-                                   .mutex = NETDATA_MUTEX_INITIALIZER,
-                                   .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-                                              .rwlock = AVL_LOCK_INITIALIZER } };
+struct config exporting_config = APPCONFIG_INITIALIZER;
 
 struct instance *prometheus_exporter_instance = NULL;
 

@@ -46,9 +46,7 @@ static ebpf_local_maps_t fd_maps[] = {{.name = "tbl_fd_pid", .internal_input = N
                                        }};
 
 
-struct config fd_config = { .first_section = NULL, .last_section = NULL, .mutex = NETDATA_MUTEX_INITIALIZER,
-                           .index = {.avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-                                     .rwlock = AVL_LOCK_INITIALIZER } };
+struct config fd_config = APPCONFIG_INITIALIZER;
 
 static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
 static netdata_idx_t *fd_values = NULL;

@@ -28,18 +28,7 @@ bool ieee754_doubles = false;
 time_t netdata_start_time = 0;
 struct netdata_static_thread *static_threads;
 
-struct config netdata_config = {
-        .first_section = NULL,
-        .last_section = NULL,
-        .mutex = NETDATA_MUTEX_INITIALIZER,
-        .index = {
-                .avl_tree = {
-                        .root = NULL,
-                        .compar = appconfig_section_compare
-                },
-                .rwlock = AVL_LOCK_INITIALIZER
-        }
-};
+struct config netdata_config = APPCONFIG_INITIALIZER;
 
 typedef struct service_thread {
     pid_t tid;

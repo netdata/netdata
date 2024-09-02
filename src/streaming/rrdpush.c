@@ -25,18 +25,7 @@
  *
  */
 
-struct config stream_config = {
-        .first_section = NULL,
-        .last_section = NULL,
-        .mutex = NETDATA_MUTEX_INITIALIZER,
-        .index = {
-                .avl_tree = {
-                        .root = NULL,
-                        .compar = appconfig_section_compare
-                },
-                .rwlock = AVL_LOCK_INITIALIZER
-        }
-};
+struct config stream_config = APPCONFIG_INITIALIZER;
 
 unsigned int default_rrdpush_enabled = 0;
 
@@ -74,6 +63,7 @@ static void load_stream_conf() {
 
     appconfig_move_everywhere(&stream_config, "default memory mode", "db");
     appconfig_move_everywhere(&stream_config, "memory mode", "db");
+    appconfig_move_everywhere(&stream_config, "db mode", "db");
     appconfig_move_everywhere(&stream_config, "default history", "retention");
     appconfig_move_everywhere(&stream_config, "history", "retention");
     appconfig_move_everywhere(&stream_config, "default proxy enabled", "proxy enabled");
@@ -88,25 +78,8 @@ static void load_stream_conf() {
     appconfig_move_everywhere(&stream_config, "postpone alarms on connect seconds", "postpone alerts on connect");
 }
 
-bool rrdpush_receiver_needs_dbengine() {
-    struct section *co;
-
-    for(co = stream_config.first_section; co; co = co->next) {
-        if(strcmp(co->name, "stream") == 0)
-            continue; // the first section is not relevant
-
-        char *s;
-
-        s = appconfig_get_by_section(co, "enabled", NULL);
-        if(!s || !appconfig_test_boolean_value(s))
-            continue;
-
-        s = appconfig_get_by_section(co, "db mode", NULL);
-        if(s && strcmp(s, "dbengine") == 0)
-            return true;
-    }
-
-    return false;
+bool rrdpush_receiver_needs_dbengine(void) {
+    return stream_conf_needs_dbengine(&stream_config);
 }
 
 int rrdpush_init() {
@@ -235,22 +208,7 @@ static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
 }
 
 int configured_as_parent() {
-    struct section *section = NULL;
-    int is_parent = 0;
-
-    appconfig_wrlock(&stream_config);
-    for (section = stream_config.first_section; section; section = section->next) {
-        nd_uuid_t uuid;
-
-        if (uuid_parse(section->name, uuid) != -1 &&
-                appconfig_get_boolean_by_section(section, "enabled", 0)) {
-            is_parent = 1;
-            break;
-        }
-    }
-    appconfig_unlock(&stream_config);
-
-    return is_parent;
+    return stream_conf_has_uuid_section(&stream_config);
 }
 
 // chart labels

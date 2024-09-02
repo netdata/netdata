@@ -19,11 +19,7 @@ char *ebpf_plugin_dir = PLUGINS_DIR;
 static char *ebpf_configured_log_dir = LOG_DIR;
 
 char *ebpf_algorithms[] = { EBPF_CHART_ALGORITHM_ABSOLUTE, EBPF_CHART_ALGORITHM_INCREMENTAL};
-struct config collector_config = { .first_section = NULL,
-                                   .last_section = NULL,
-                                   .mutex = NETDATA_MUTEX_INITIALIZER,
-                                   .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-                                              .rwlock = AVL_LOCK_INITIALIZER } };
+struct config collector_config = APPCONFIG_INITIALIZER;
 
 int running_on_kernel = 0;
 int ebpf_nprocs;

@@ -77,11 +77,7 @@ netdata_socket_t *socket_values;
 ebpf_network_viewer_port_list_t *listen_ports = NULL;
 ebpf_addresses_t tcp_v6_connect_address = {.function = "tcp_v6_connect", .hash = 0, .addr = 0, .type = 0};
 
-struct config socket_config = { .first_section = NULL,
-    .last_section = NULL,
-    .mutex = NETDATA_MUTEX_INITIALIZER,
-    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-        .rwlock = AVL_LOCK_INITIALIZER } };
+struct config socket_config = APPCONFIG_INITIALIZER;
 
 netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = EBPF_LOAD_PROBE},
                                             {.name = "tcp_retransmit_skb", .mode = EBPF_LOAD_PROBE},
@@ -2708,7 +2704,7 @@ static void ebpf_socket_initialize_global_vectors()
  * @param hash the calculated hash for the dimension name.
  * @param name the dimension name.
  */
-static void ebpf_link_dimension_name(char *port, uint32_t hash, char *value)
+static void ebpf_link_dimension_name(const char *port, uint32_t hash, const char *value)
 {
     int test = str2i(port);
     if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE){
@@ -2753,15 +2749,15 @@ static void ebpf_link_dimension_name(char *port, uint32_t hash, char *value)
  *
  * @param cfg the configuration structure
  */
+
+static bool config_service_value_cb(void *data __maybe_unused, const char *name, const char *value) {
+    ebpf_link_dimension_name(name, simple_hash(name), value);
+    return true;
+}
+
 void ebpf_parse_service_name_section(struct config *cfg)
 {
-    struct section *co = appconfig_get_section(cfg, EBPF_SERVICE_NAME_SECTION);
-    if (co) {
-        struct config_option *cv;
-        for (cv = co->values; cv ; cv = cv->next) {
-            ebpf_link_dimension_name(cv->name, cv->hash, cv->value);
-        }
-    }
+    appconfig_foreach_value_in_section(cfg, EBPF_SERVICE_NAME_SECTION, config_service_value_cb, NULL);
 
     // Always associated the default port to Netdata
     ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;

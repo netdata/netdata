@@ -113,41 +113,7 @@
 // Config definitions
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-#define CONFIG_VALUE_LOADED  0x01 // has been loaded from the config
-#define CONFIG_VALUE_USED    0x02 // has been accessed from the program
-#define CONFIG_VALUE_CHANGED 0x04 // has been changed from the loaded value or the internal default value
-#define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
-#define CONFIG_VALUE_REFORMATTED 0x10 // has been reformatted with the official formatting
-
-struct config_option {
-    avl_t avl_node;         // the index entry of this entry - this has to be first!
-
-    uint8_t flags;
-    uint32_t hash;          // a simple hash to speed up searching
-                            // we first compare hashes, and only if the hashes are equal we do string comparisons
-
-    char *name;
-    char *value;
-
-    struct config_option *next; // config->mutex protects just this
-};
-
-struct section {
-    avl_t avl_node;         // the index entry of this section - this has to be first!
-
-    uint32_t hash;          // a simple hash to speed up searching
-                            // we first compare hashes, and only if the hashes are equal we do string comparisons
-
-    char *name;
-
-    struct section *next;    // global config_mutex protects just this
-
-    struct config_option *values;
-    avl_tree_lock values_index;
-
-    netdata_mutex_t mutex;  // this locks only the writers, to ensure atomic updates
-                            // readers are protected using the rwlock in avl_tree_lock
-};
+struct section;
 
 struct config {
     struct section *first_section;
@@ -155,6 +121,19 @@ struct config {
     netdata_mutex_t mutex;
     avl_tree_lock index;
 };
+
+#define APPCONFIG_INITIALIZER (struct config) {         \
+        .first_section = NULL,                          \
+        .last_section = NULL,                           \
+        .mutex = NETDATA_MUTEX_INITIALIZER,             \
+        .index = {                                      \
+            .avl_tree = {                               \
+                .root = NULL,                           \
+                .compar = appconfig_section_compare,    \
+            },                                          \
+            .rwlock = AVL_LOCK_INITIALIZER,             \
+        },                                              \
+    }
 
 #define CONFIG_BOOLEAN_INVALID 100  // an invalid value to check for validity (used as default initialization when needed)
 
@@ -166,8 +145,9 @@ struct config {
 #endif
 
 int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name);
-void config_section_wrlock(struct section *co);
-void config_section_unlock(struct section *co);
+
+typedef bool (*appconfig_foreach_value_cb_t)(void *data, const char *name, const char *value);
+size_t appconfig_foreach_value_in_section(struct config *root, const char *section, appconfig_foreach_value_cb_t cb, void *data);
 
 char *appconfig_get_by_section(struct section *co, const char *name, const char *default_value);
 char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
@@ -210,9 +190,6 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
 void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name);
 
 struct section *appconfig_get_section(struct config *root, const char *name);
-
-void appconfig_wrlock(struct config *root);
-void appconfig_unlock(struct config *root);
 
 int appconfig_test_boolean_value(char *s);
 
@@ -268,5 +245,8 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct se
 
 #define config_section_destroy(section) appconfig_section_destroy_non_loaded(&netdata_config, section)
 #define config_section_option_destroy(section, name) appconfig_section_option_destroy_non_loaded(&netdata_config, section, name)
+
+bool stream_conf_needs_dbengine(struct config *root);
+bool stream_conf_has_uuid_section(struct config *root);
 
 #endif /* NETDATA_CONFIG_H */
