@@ -28,8 +28,8 @@ const struct capability *aclk_get_agent_capas()
     agent_capabilities[2].version = ml_capable() ? 1 : 0;
     agent_capabilities[2].enabled = ml_enabled(localhost);
 
-    agent_capabilities[3].version = enable_metric_correlations ? metric_correlations_version : 0;
-    agent_capabilities[3].enabled = enable_metric_correlations;
+    agent_capabilities[3].version = metric_correlations_version;
+    agent_capabilities[3].enabled = 1;
 
     agent_capabilities[7].enabled = localhost->health.health_enabled;
 
@@ -44,9 +44,7 @@ struct capability *aclk_get_node_instance_capas(RRDHOST *host)
     struct capability ni_caps[] = {
         { .name = "proto",       .version = 1,                     .enabled = 1 },
         { .name = "ml",          .version = ml_capable(),          .enabled = ml_enabled(host) },
-        { .name = "mc",
-          .version = enable_metric_correlations ? metric_correlations_version : 0,
-          .enabled = enable_metric_correlations },
+        { .name = "mc",          .version = metric_correlations_version, .enabled = 1 },
         { .name = "ctx",         .version = 1,                     .enabled = 1 },
         { .name = "funcs",       .version = functions ? 1 : 0,     .enabled = functions ? 1 : 0 },
         { .name = "http_api_v2", .version = HTTP_API_V2_VERSION,   .enabled = 1 },

@@ -1301,14 +1301,6 @@ static void get_netdata_configured_variables()
 #endif
 
     // --------------------------------------------------------------------
-    // metric correlations
-
-    enable_metric_correlations = config_get_boolean(CONFIG_SECTION_GLOBAL, "enable metric correlations", enable_metric_correlations);
-    default_metric_correlations_method = weights_string_to_method(config_get(
-        CONFIG_SECTION_GLOBAL, "metric correlations method",
-        weights_method_to_string(default_metric_correlations_method)));
-
-    // --------------------------------------------------------------------
 
     rrdhost_free_ephemeral_time_s =
         config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup ephemeral hosts after", rrdhost_free_ephemeral_time_s);
