@@ -23,6 +23,11 @@ if [ -d /opt/netdata/etc/pki/ ]; then
     rm -rf /opt/netdata/etc/pki/
 fi
 
+# Remove previous installation of msys2 script
+if [ -f /opt/netdata/usr/bin/bashbug ]; then
+    rm -rf /opt/netdata/usr/bin/bashbug
+fi
+
 ${GITHUB_ACTIONS+echo "::group::Installing"}
 cmake --install "${build}"
 ${GITHUB_ACTIONS+echo "::endgroup::"}
