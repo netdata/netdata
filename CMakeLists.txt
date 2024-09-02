@@ -2342,6 +2342,9 @@ if(OS_WINDOWS)
         set(NETDATACLI_RES_FILES "packaging/windows/resources/netdatacli.rc")
         configure_file(packaging/windows/resources/netdatacli.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdatacli.manifest @ONLY)
 
+        set(NETDATACLIUI_RES_FILES "packaging/windows/resources/netdatacliui.rc")
+        configure_file(packaging/windows/resources/netdatacliui.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdatacliui.manifest @ONLY)
+
         set(NETDATA_RES_FILES "packaging/windows/resources/netdata.rc")
         configure_file(packaging/windows/resources/netdata.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdata.manifest @ONLY)
 endif()
