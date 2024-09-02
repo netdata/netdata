@@ -151,7 +151,7 @@ size_t appconfig_foreach_value_in_section(struct config *root, const char *secti
 
 const char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
 long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value);
-NETDATA_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
+NETDATA_DOUBLE appconfig_get_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
 int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
 
@@ -184,11 +184,6 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
 
 int appconfig_section_compare(void *a, void *b);
 
-void appconfig_section_destroy_non_loaded(struct config *root, const char *section);
-void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name);
-
-struct section *appconfig_get_section(struct config *root, const char *name);
-
 int appconfig_test_boolean_value(const char *s);
 
 struct connector_instance {
@@ -212,7 +207,7 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct se
 #define config_load(filename, overwrite_used, section) appconfig_load(&netdata_config, filename, overwrite_used, section)
 #define config_get(section, name, default_value) appconfig_get(&netdata_config, section, name, default_value)
 #define config_get_number(section, name, value) appconfig_get_number(&netdata_config, section, name, value)
-#define config_get_float(section, name, value) appconfig_get_float(&netdata_config, section, name, value)
+#define config_get_double(section, name, value) appconfig_get_double(&netdata_config, section, name, value)
 #define config_get_boolean(section, name, value) appconfig_get_boolean(&netdata_config, section, name, value)
 #define config_get_boolean_ondemand(section, name, value) appconfig_get_boolean_ondemand(&netdata_config, section, name, value)
 

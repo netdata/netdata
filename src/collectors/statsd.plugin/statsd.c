@@ -2522,7 +2522,8 @@ void *statsd_main(void *ptr) {
         (unsigned int)config_get_boolean(CONFIG_SECTION_STATSD, "private charts hidden", statsd.private_charts_hidden);
 
     statsd.histogram_percentile =
-        (double)config_get_float(CONFIG_SECTION_STATSD, "histograms and timers percentile (percentThreshold)", statsd.histogram_percentile);
+        (double)config_get_double(
+        CONFIG_SECTION_STATSD, "histograms and timers percentile (percentThreshold)", statsd.histogram_percentile);
 
     if(isless(statsd.histogram_percentile, 0) || isgreater(statsd.histogram_percentile, 100)) {
         collector_error("STATSD: invalid histograms and timers percentile %0.5f given", statsd.histogram_percentile);

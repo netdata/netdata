@@ -771,6 +771,14 @@ set(LIBNETDATA_FILES
         src/libnetdata/parsers/size.h
         src/libnetdata/libjudy/judy-malloc.c
         src/libnetdata/libjudy/judy-malloc.h
+        src/libnetdata/config/appconfig_internals.h
+        src/libnetdata/config/appconfig_exporters.c
+        src/libnetdata/config/appconfig_conf_file.c
+        src/libnetdata/config/appconfig_cleanup.c
+        src/libnetdata/config/appconfig_sections.c
+        src/libnetdata/config/appconfig_options.c
+        src/libnetdata/config/appconfig_migrate.c
+        src/libnetdata/config/appconfig_traversal.c
 )
 
 if(ENABLE_PLUGIN_EBPF)

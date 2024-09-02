@@ -36,12 +36,12 @@ void ml_config_load(ml_config_t *cfg) {
     unsigned smooth_n = config_get_number(config_section_ml, "num samples to smooth", 3);
     unsigned lag_n = config_get_number(config_section_ml, "num samples to lag", 5);
 
-    double random_sampling_ratio = config_get_float(config_section_ml, "random sampling ratio", 1.0 / 5.0 /* default lag_n */);
+    double random_sampling_ratio = config_get_double(config_section_ml, "random sampling ratio", 1.0 / 5.0 /* default lag_n */);
     unsigned max_kmeans_iters = config_get_number(config_section_ml, "maximum number of k-means iterations", 1000);
 
-    double dimension_anomaly_rate_threshold = config_get_float(config_section_ml, "dimension anomaly score threshold", 0.99);
+    double dimension_anomaly_rate_threshold = config_get_double(config_section_ml, "dimension anomaly score threshold", 0.99);
 
-    double host_anomaly_rate_threshold = config_get_float(config_section_ml, "host anomaly rate threshold", 1.0);
+    double host_anomaly_rate_threshold = config_get_double(config_section_ml, "host anomaly rate threshold", 1.0);
     std::string anomaly_detection_grouping_method = config_get(config_section_ml, "anomaly detection grouping method", "average");
     time_t anomaly_detection_query_duration = config_get_duration_seconds(config_section_ml, "anomaly detection grouping duration", 5 * 60);
 
