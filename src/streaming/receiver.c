@@ -6,6 +6,19 @@
 extern struct config stream_config;
 
 void receiver_state_free(struct receiver_state *rpt) {
+    netdata_ssl_close(&rpt->ssl);
+
+    if(rpt->fd != -1) {
+        internal_error(true, "closing socket...");
+        close(rpt->fd);
+    }
+
+    rrdpush_decompressor_destroy(&rpt->decompressor);
+
+    if(rpt->system_info)
+        rrdhost_system_info_free(rpt->system_info);
+
+    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
 
     freez(rpt->key);
     freez(rpt->hostname);
@@ -18,21 +31,6 @@ void receiver_state_free(struct receiver_state *rpt) {
     freez(rpt->client_port);
     freez(rpt->program_name);
     freez(rpt->program_version);
-
-    netdata_ssl_close(&rpt->ssl);
-
-    if(rpt->fd != -1) {
-        internal_error(true, "closing socket...");
-        close(rpt->fd);
-    }
-
-    rrdpush_decompressor_destroy(&rpt->decompressor);
-
-    if(rpt->system_info)
-         rrdhost_system_info_free(rpt->system_info);
-
-    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
-
     freez(rpt);
 }
 
@@ -659,7 +657,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     is_ephemeral = appconfig_get_boolean(&stream_config, rpt->machine_guid, "is ephemeral node", is_ephemeral);
 
     if(rpt->config.rrdpush_compression) {
-        char *order = appconfig_get(&stream_config, rpt->key, "compression algorithms order", RRDPUSH_COMPRESSION_ALGORITHMS_ORDER);
+        const char *order = appconfig_get(&stream_config, rpt->key, "compression algorithms order", RRDPUSH_COMPRESSION_ALGORITHMS_ORDER);
         order = appconfig_get(&stream_config, rpt->machine_guid, "compression algorithms order", order);
         rrdpush_parse_compression_order(rpt, order);
     }
@@ -921,7 +919,7 @@ void *rrdpush_receiver_thread(void *ptr) {
 
     worker_unregister();
     rrdhost_clear_receiver(rpt);
-    receiver_state_free(rpt);
     rrdhost_set_is_parent_label();
+    receiver_state_free(rpt);
     return NULL;
 }
