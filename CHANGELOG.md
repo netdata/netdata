@@ -6,7 +6,14 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18454](https://github.com/netdata/netdata/pull/18454) ([netdatabot](https://github.com/netdatabot))
+- Bump github.com/Masterminds/sprig/v3 from 3.2.3 to 3.3.0 in /src/go [\#18453](https://github.com/netdata/netdata/pull/18453) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/prometheus/common from 0.55.0 to 0.57.0 in /src/go [\#18452](https://github.com/netdata/netdata/pull/18452) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/docker/docker from 27.1.2+incompatible to 27.2.0+incompatible in /src/go [\#18451](https://github.com/netdata/netdata/pull/18451) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Regenerate integrations.js [\#18450](https://github.com/netdata/netdata/pull/18450) ([netdatabot](https://github.com/netdatabot))
+- go.d sensors add parsing intrusion to exec method [\#18449](https://github.com/netdata/netdata/pull/18449) ([ilyam8](https://github.com/ilyam8))
 - Exit slabinfo.plugin on EPIPE [\#18448](https://github.com/netdata/netdata/pull/18448) ([teqwve](https://github.com/teqwve))
+- ilert Integration [\#18447](https://github.com/netdata/netdata/pull/18447) ([DaTiMy](https://github.com/DaTiMy))
 - go.d remove vnode disable [\#18446](https://github.com/netdata/netdata/pull/18446) ([ilyam8](https://github.com/ilyam8))
 - go.d add support for symlinked vnode config files [\#18445](https://github.com/netdata/netdata/pull/18445) ([ilyam8](https://github.com/ilyam8))
 - Proper precedence when calculating time\_to\_evict [\#18444](https://github.com/netdata/netdata/pull/18444) ([stelfrag](https://github.com/stelfrag))
@@ -416,12 +423,6 @@
 - Update netdata-charts.md [\#17888](https://github.com/netdata/netdata/pull/17888) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#17886](https://github.com/netdata/netdata/pull/17886) ([netdatabot](https://github.com/netdatabot))
 - Restore ML thread termination to original order [\#17885](https://github.com/netdata/netdata/pull/17885) ([stelfrag](https://github.com/stelfrag))
-- go.d intelgpu add an option to select specific GPU [\#17884](https://github.com/netdata/netdata/pull/17884) ([ilyam8](https://github.com/ilyam8))
-- ndsudo update intel\_gpu\_top [\#17883](https://github.com/netdata/netdata/pull/17883) ([ilyam8](https://github.com/ilyam8))
-- add netdata journald configuration [\#17882](https://github.com/netdata/netdata/pull/17882) ([ilyam8](https://github.com/ilyam8))
-- fix detect\_libc in installer [\#17880](https://github.com/netdata/netdata/pull/17880) ([ilyam8](https://github.com/ilyam8))
-- update bundled UI to v6.138.0 [\#17879](https://github.com/netdata/netdata/pull/17879) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17878](https://github.com/netdata/netdata/pull/17878) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
