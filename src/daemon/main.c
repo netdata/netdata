@@ -1297,7 +1297,7 @@ static void get_netdata_configured_variables()
     // get KSM settings
 
 #ifdef MADV_MERGEABLE
-    enable_ksm = config_get_boolean(CONFIG_SECTION_DB, "memory deduplication (ksm)", enable_ksm);
+    enable_ksm = config_get_boolean_ondemand(CONFIG_SECTION_DB, "memory deduplication (ksm)", enable_ksm);
 #endif
 
     // --------------------------------------------------------------------

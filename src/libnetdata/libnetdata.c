@@ -13,7 +13,7 @@
 struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
 
 #if defined(MADV_MERGEABLE)
-int enable_ksm = 1;
+int enable_ksm = CONFIG_BOOLEAN_AUTO;
 #else
 int enable_ksm = 0;
 #endif
