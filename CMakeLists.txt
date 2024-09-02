@@ -2468,6 +2468,15 @@ install(TARGETS netdatacli
         COMPONENT netdata
         DESTINATION "${BINDIR}")
 
+if(OS_WINDOWS)
+        set(NETDATACLI_UI_FILES
+                src/cli/ui.c
+                )
+
+        add_executable(NetdataCliUI ${NETDATACLI_UI_FILES})
+        target_link_libraries(NetdataCliUI shell32;gdi32;msftedit)
+endif()
+
 #
 # Build go.d.plugin
 #
@@ -2553,6 +2562,11 @@ if(NOT OS_WINDOWS)
 else()
         install(PROGRAMS
                 ${CMAKE_BINARY_DIR}/NetdataClaim.exe
+                COMPONENT netdata
+                DESTINATION "${BINDIR}")
+
+        install(PROGRAMS
+                ${CMAKE_BINARY_DIR}/NetdataCliUI.exe
                 COMPONENT netdata
                 DESTINATION "${BINDIR}")
 endif()
