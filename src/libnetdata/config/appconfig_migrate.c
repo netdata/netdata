@@ -28,18 +28,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
         netdata_log_error("INTERNAL ERROR: deletion of config '%s' from section '%s', deleted the wrong config entry.",
                           string2str(opt_old->name), string2str(sect_old->name));
 
-    if(sect_old->values == opt_old) {
-        sect_old->values = opt_old->next;
-    }
-    else {
-        struct config_option *t;
-        for(t = sect_old->values; t && t->next != opt_old;t = t->next) ;
-        if(!t || t->next != opt_old)
-            netdata_log_error("INTERNAL ERROR: cannot find variable '%s' in section '%s' of the config - but it should be there.",
-                              string2str(opt_old->name), string2str(sect_old->name));
-        else
-            t->next = opt_old->next;
-    }
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sect_old->values, opt_old, prev, next);
 
     nd_log(NDLS_DAEMON, NDLP_WARNING,
            "CONFIG: option '[%s].%s' has been migrated to '[%s].%s'.",
@@ -53,10 +42,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     opt_old->flags |= CONFIG_VALUE_MIGRATED;
 
     opt_new = opt_old;
-
-    // link it in front of the others in the new section
-    opt_new->next = sect_new->values;
-    sect_new->values = opt_new;
+    DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(sect_new->values, opt_new, prev, next);
 
     if(unlikely(appconfig_option_add(sect_new, opt_old) != opt_old))
         netdata_log_error("INTERNAL ERROR: re-indexing of config '%s' in section '%s', already exists.",

@@ -4,51 +4,50 @@
 
 void appconfig_section_destroy_non_loaded(struct config *root, const char *section)
 {
-    struct section *co;
-    struct config_option *cv, *cv_next;
+    struct section *sect;
+    struct config_option *opt;
 
     netdata_log_debug(D_CONFIG, "Destroying section '%s'.", section);
 
-    co = appconfig_section_find(root, section);
-    if(!co) {
+    sect = appconfig_section_find(root, section);
+    if(!sect) {
         netdata_log_error("Could not destroy section '%s'. Not found.", section);
         return;
     }
 
-    config_section_wrlock(co);
-    for(cv = co->values; cv ; cv = cv->next) {
-        if (cv->flags & CONFIG_VALUE_LOADED) {
-            /* Do not destroy values that were loaded from the configuration files. */
-            config_section_unlock(co);
+    config_section_wrlock(sect);
+
+    // find if there is any loaded option
+    for(opt = sect->values; opt; opt = opt->next) {
+        if (opt->flags & CONFIG_VALUE_LOADED) {
+            // do not destroy values that were loaded from the configuration files.
+            config_section_unlock(sect);
             return;
         }
     }
-    for(cv = co->values ; cv ; cv = cv_next) {
-        cv_next = cv->next;
-        if(unlikely(!appconfig_option_del(co, cv)))
-            netdata_log_error("Cannot remove config option '%s' from section '%s'.",
-                              string2str(cv->name), string2str(co->name));
-        appconfig_option_free(cv);
-    }
-    co->values = NULL;
-    config_section_unlock(co);
 
-    if (unlikely(!appconfig_section_del(root, co))) {
+    // no option is loaded, free them all
+    while(sect->values)
+        appconfig_option_remove_and_delete(sect, sect->values, true);
+
+    config_section_unlock(sect);
+
+    if (unlikely(!appconfig_section_del(root, sect))) {
         netdata_log_error("Cannot remove section '%s' from config.", section);
         return;
     }
 
     appconfig_wrlock(root);
 
-    if (root->first_section == co) {
-        root->first_section = co->next;
+    if (root->first_section == sect) {
+        root->first_section = sect->next;
 
-        if (root->last_section == co)
+        if (root->last_section == sect)
             root->last_section = root->first_section;
     } else {
         struct section *co_cur = root->first_section, *co_prev = NULL;
 
-        while(co_cur && co_cur != co) {
+        while(co_cur && co_cur != sect) {
             co_prev = co_cur;
             co_cur = co_cur->next;
         }
@@ -63,10 +62,10 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
 
     appconfig_unlock(root);
 
-    avl_destroy_lock(&co->values_index);
-    string_freez(co->name);
-    pthread_mutex_destroy(&co->mutex);
-    freez(co);
+    avl_destroy_lock(&sect->values_index);
+    string_freez(sect->name);
+    pthread_mutex_destroy(&sect->mutex);
+    freez(sect);
 }
 
 void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name)
@@ -97,18 +96,7 @@ void appconfig_section_option_destroy_non_loaded(struct config *root, const char
         return;
     }
 
-    if (co->values == cv) {
-        co->values = co->values->next;
-    } else {
-        struct config_option *cv_cur = co->values, *cv_prev = NULL;
-        while (cv_cur && cv_cur != cv) {
-            cv_prev = cv_cur;
-            cv_cur = cv_cur->next;
-        }
-        if (cv_cur) {
-            cv_prev->next = cv_cur->next;
-        }
-    }
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(co->values, cv, prev, next);
 
     appconfig_option_free(cv);
     config_section_unlock(co);

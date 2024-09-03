@@ -23,6 +23,23 @@ struct section *appconfig_section_find(struct config *root, const char *name) {
 // ----------------------------------------------------------------------------
 // config section methods
 
+void appconfig_section_remove_and_delete(struct config *root, struct section *sect, bool have_root_lock, bool have_sect_lock) {
+    if(!have_root_lock)
+        appconfig_wrlock(root);
+
+    if(!have_sect_lock)
+        config_section_wrlock(sect);
+
+    while(sect->values)
+        appconfig_option_remove_and_delete(sect, sect->values, true);
+
+    if(!have_sect_lock)
+        config_section_unlock(sect);
+
+    if(!have_root_lock)
+        appconfig_unlock(root);
+}
+
 struct section *appconfig_section_create(struct config *root, const char *section) {
     netdata_log_debug(D_CONFIG, "Creating section '%s'.", section);
 

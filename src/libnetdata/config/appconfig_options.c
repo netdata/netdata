@@ -11,14 +11,14 @@ int appconfig_option_compare(void *a, void *b) {
     else return string_cmp(((struct config_option *)a)->name, ((struct config_option *)b)->name);
 }
 
-struct config_option *appconfig_option_find(struct section *co, const char *name) {
-    struct config_option tmp = {
+struct config_option *appconfig_option_find(struct section *sect, const char *name) {
+    struct config_option opt_tmp = {
         .name = string_strdupz(name),
     };
 
-    struct config_option *rc = (struct config_option *)avl_search_lock(&(co->values_index), (avl_t *) &tmp);
+    struct config_option *rc = (struct config_option *)avl_search_lock(&(sect->values_index), (avl_t *) &opt_tmp);
 
-    appconfig_option_cleanup(&tmp);
+    appconfig_option_cleanup(&opt_tmp);
     return rc;
 }
 
@@ -42,32 +42,45 @@ void appconfig_option_free(struct config_option *opt) {
     freez(opt);
 }
 
-struct config_option *appconfig_option_create(struct section *co, const char *name, const char *value) {
-    netdata_log_debug(D_CONFIG, "Creating config entry for name '%s', value '%s', in section '%s'.", name, value, co->name);
-
+struct config_option *appconfig_option_create(struct section *sect, const char *name, const char *value) {
     struct config_option *opt = callocz(1, sizeof(struct config_option));
     opt->name = string_strdupz(name);
     opt->value = string_strdupz(value);
 
-    struct config_option *opt_found = appconfig_option_add(co, opt);
+    struct config_option *opt_found = appconfig_option_add(sect, opt);
     if(opt_found != opt) {
-        netdata_log_error("indexing of config '%s' in section '%s': already exists - using the existing one.",
-                          string2str(opt->name), string2str(co->name));
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "CONFIG: config '%s' in section '%s': already exists - using the existing one.",
+               string2str(opt->name), string2str(sect->name));
         appconfig_option_free(opt);
         return opt_found;
     }
 
-    config_section_wrlock(co);
-    struct config_option *opt2 = co->values;
-    if(opt2) {
-        while (opt2->next)
-            opt2 = opt2->next;
-        opt2->next = opt;
-    }
-    else co->values = opt;
-    config_section_unlock(co);
+    config_section_wrlock(sect);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sect->values, opt, prev, next);
+    config_section_unlock(sect);
 
     return opt;
+}
+
+void appconfig_option_remove_and_delete(struct section *sect, struct config_option *opt, bool have_sect_lock) {
+    struct config_option *opt_found = appconfig_option_del(sect, opt);
+    if(opt_found != opt) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "INTERNAL ERROR: Cannot remove '%s' from  section '%s', it was not inserted before.",
+               string2str(opt->name), string2str(sect->name));
+        return;
+    }
+
+    if(!have_sect_lock)
+        config_section_wrlock(sect);
+
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sect->values, opt, prev, next);
+
+    if(!have_sect_lock)
+        config_section_unlock(sect);
+
+    appconfig_option_free(opt);
 }
 
 const char *appconfig_get_value_and_reformat(struct config *root, const char *section, const char *option, const char *default_value, reformat_t cb) {

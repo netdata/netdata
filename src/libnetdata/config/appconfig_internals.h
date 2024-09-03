@@ -25,7 +25,7 @@ struct config_option {
     STRING *name_migrated;
     STRING *value_reformatted;
 
-    struct config_option *next; // config->mutex protects just this
+    struct config_option *prev, *next; // config->mutex protects just this
 };
 
 struct section {
@@ -62,6 +62,7 @@ static inline void config_section_unlock(struct section *co) {
 }
 
 // config sections
+void appconfig_section_remove_and_delete(struct config *root, struct section *sect, bool have_root_lock, bool have_sect_lock);
 #define appconfig_section_add(root, cfg) (struct section *)avl_insert_lock(&(root)->index, (avl_t *)(cfg))
 #define appconfig_section_del(root, cfg) (struct section *)avl_remove_lock(&(root)->index, (avl_t *)(cfg))
 struct section *appconfig_section_find(struct config *root, const char *name);
@@ -70,11 +71,12 @@ struct section *appconfig_section_create(struct config *root, const char *sectio
 // config options
 void appconfig_option_cleanup(struct config_option *opt);
 void appconfig_option_free(struct config_option *opt);
+void appconfig_option_remove_and_delete(struct section *sect, struct config_option *opt, bool have_sect_lock);
 int appconfig_option_compare(void *a, void *b);
 #define appconfig_option_add(co, cv) (struct config_option *)avl_insert_lock(&((co)->values_index), (avl_t *)(cv))
 #define appconfig_option_del(co, cv) (struct config_option *)avl_remove_lock(&((co)->values_index), (avl_t *)(cv))
-struct config_option *appconfig_option_find(struct section *co, const char *name);
-struct config_option *appconfig_option_create(struct section *co, const char *name, const char *value);
+struct config_option *appconfig_option_find(struct section *sect, const char *name);
+struct config_option *appconfig_option_create(struct section *sect, const char *name, const char *value);
 
 // lookup
 int appconfig_get_boolean_by_section(struct section *co, const char *name, int value);

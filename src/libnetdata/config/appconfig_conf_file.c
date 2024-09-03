@@ -83,18 +83,10 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
 
             if(co && section_string && overwrite_used && section_string == co->name) {
                 config_section_wrlock(co);
-                struct config_option *cv2 = co->values;
-                while (cv2) {
-                    struct config_option *save = cv2->next;
-                    struct config_option *found = appconfig_option_del(co, cv2);
-                    if(found != cv2)
-                        netdata_log_error("INTERNAL ERROR: Cannot remove '%s' from  section '%s', it was not inserted before.",
-                                          string2str(cv2->name), string2str(co->name));
 
-                    appconfig_option_free(cv2);
-                    cv2 = save;
-                }
-                co->values = NULL;
+                while(co->values)
+                    appconfig_option_remove_and_delete(co, co->values, true);
+
                 config_section_unlock(co);
             }
 
