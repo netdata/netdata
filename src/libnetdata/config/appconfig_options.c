@@ -11,7 +11,7 @@ int appconfig_option_compare(void *a, void *b) {
     else return string_cmp(((struct config_option *)a)->name, ((struct config_option *)b)->name);
 }
 
-struct config_option *appconfig_option_find(struct section *sect, const char *name) {
+struct config_option *appconfig_option_find(struct config_section *sect, const char *name) {
     struct config_option opt_tmp = {
         .name = string_strdupz(name),
     };
@@ -42,7 +42,7 @@ void appconfig_option_free(struct config_option *opt) {
     freez(opt);
 }
 
-struct config_option *appconfig_option_create(struct section *sect, const char *name, const char *value) {
+struct config_option *appconfig_option_create(struct config_section *sect, const char *name, const char *value) {
     struct config_option *opt = callocz(1, sizeof(struct config_option));
     opt->name = string_strdupz(name);
     opt->value = string_strdupz(value);
@@ -56,14 +56,14 @@ struct config_option *appconfig_option_create(struct section *sect, const char *
         return opt_found;
     }
 
-    config_section_wrlock(sect);
+    SECTION_LOCK(sect);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sect->values, opt, prev, next);
-    config_section_unlock(sect);
+    SECTION_UNLOCK(sect);
 
     return opt;
 }
 
-void appconfig_option_remove_and_delete(struct section *sect, struct config_option *opt, bool have_sect_lock) {
+void appconfig_option_remove_and_delete(struct config_section *sect, struct config_option *opt, bool have_sect_lock) {
     struct config_option *opt_found = appconfig_option_del(sect, opt);
     if(opt_found != opt) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -73,18 +73,29 @@ void appconfig_option_remove_and_delete(struct section *sect, struct config_opti
     }
 
     if(!have_sect_lock)
-        config_section_wrlock(sect);
+        SECTION_LOCK(sect);
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sect->values, opt, prev, next);
 
     if(!have_sect_lock)
-        config_section_unlock(sect);
+        SECTION_UNLOCK(sect);
 
     appconfig_option_free(opt);
 }
 
+void appconfig_option_remove_and_delete_all(struct config_section *sect, bool have_sect_lock) {
+    if(!have_sect_lock)
+        SECTION_LOCK(sect);
+
+    while(sect->values)
+        appconfig_option_remove_and_delete(sect, sect->values, true);
+
+    if(!have_sect_lock)
+        SECTION_UNLOCK(sect);
+}
+
 const char *appconfig_get_value_and_reformat(struct config *root, const char *section, const char *option, const char *default_value, reformat_t cb) {
-    struct section *sect = appconfig_section_find(root, section);
+    struct config_section *sect = appconfig_section_find(root, section);
 
     if (!sect && !default_value)
         return NULL;

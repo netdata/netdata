@@ -8,15 +8,15 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
 
     netdata_log_debug(D_CONFIG, "request to rename config in section '%s', old name '%s', to section '%s', new name '%s'", section_old, name_old, section_new, name_new);
 
-    struct section *sect_old = appconfig_section_find(root, section_old);
+    struct config_section *sect_old = appconfig_section_find(root, section_old);
     if(!sect_old) return ret;
 
-    struct section *sect_new = appconfig_section_find(root, section_new);
+    struct config_section *sect_new = appconfig_section_find(root, section_new);
     if(!sect_new) sect_new = appconfig_section_create(root, section_new);
 
-    config_section_wrlock(sect_old);
+    SECTION_LOCK(sect_old);
     if(sect_old != sect_new)
-        config_section_wrlock(sect_new);
+        SECTION_LOCK(sect_new);
 
     opt_old = appconfig_option_find(sect_old, name_old);
     if(!opt_old) goto cleanup;
@@ -52,22 +52,20 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
 
 cleanup:
     if(sect_old != sect_new)
-        config_section_unlock(sect_new);
-    config_section_unlock(sect_old);
+        SECTION_UNLOCK(sect_new);
+    SECTION_UNLOCK(sect_old);
     return ret;
 }
 
 int appconfig_move_everywhere(struct config *root, const char *name_old, const char *name_new) {
     int ret = -1;
-    appconfig_wrlock(root);
-    struct section *co;
-    for(co = root->first_section; co ; co = co->next) {
-        appconfig_unlock(root);
-        if(appconfig_move(root, string2str(co->name), name_old, string2str(co->name), name_new) == 0)
+    APPCONFIG_LOCK(root);
+    struct config_section *sect;
+    for(sect = root->sections; sect; sect = sect->next) {
+        if(appconfig_move(root, string2str(sect->name), name_old, string2str(sect->name), name_new) == 0)
             ret = 0;
-        appconfig_wrlock(root);
     }
-    appconfig_unlock(root);
+    APPCONFIG_UNLOCK(root);
     return ret;
 }
 

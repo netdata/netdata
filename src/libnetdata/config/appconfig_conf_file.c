@@ -7,12 +7,12 @@
 
 int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name) {
     int line = 0;
-    struct section *co = NULL;
+    struct config_section *co = NULL;
     int is_exporter_config = 0;
     int _connectors = 0;              // number of exporting connector sections we have
     char working_instance[CONFIG_MAX_NAME + 1];
     char working_connector[CONFIG_MAX_NAME + 1];
-    struct section *working_connector_section = NULL;
+    struct config_section *working_connector_section = NULL;
     int global_exporting_section = 0;
 
     char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
@@ -82,12 +82,12 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
             if(!co) co = appconfig_section_create(root, s);
 
             if(co && section_string && overwrite_used && section_string == co->name) {
-                config_section_wrlock(co);
+                SECTION_LOCK(co);
 
                 while(co->values)
                     appconfig_option_remove_and_delete(co, co->values, true);
 
-                config_section_unlock(co);
+                SECTION_UNLOCK(co);
             }
 
             continue;
@@ -153,13 +153,13 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
 void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool netdata_conf)
 {
     int i, pri;
-    struct section *co;
-    struct config_option *cv;
+    struct config_section *sect;
+    struct config_option *opt;
 
     {
         int found_host_labels = 0;
-        for (co = root->first_section; co; co = co->next)
-            if(!string_strcmp(co->name, CONFIG_SECTION_HOST_LABEL))
+        for (sect = root->sections; sect; sect = sect->next)
+            if(!string_strcmp(sect->name, CONFIG_SECTION_HOST_LABEL))
                 found_host_labels = 1;
 
         if(netdata_conf && !found_host_labels) {
@@ -185,26 +185,26 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
     }
 
     for(i = 0; i <= 17 ;i++) {
-        appconfig_wrlock(root);
-        for(co = root->first_section; co ; co = co->next) {
-            if(!string_strcmp(co->name, CONFIG_SECTION_GLOBAL))                 pri = 0;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_DB))                pri = 1;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_DIRECTORIES))       pri = 2;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_LOGS))              pri = 3;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_ENV_VARS))          pri = 4;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_HOST_LABEL))        pri = 5;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_SQLITE))            pri = 6;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_CLOUD))             pri = 7;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_ML))                pri = 8;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_HEALTH))            pri = 9;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_WEB))               pri = 10;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_WEBRTC))            pri = 11;
+        APPCONFIG_LOCK(root);
+        for(sect = root->sections; sect; sect = sect->next) {
+            if(!string_strcmp(sect->name, CONFIG_SECTION_GLOBAL))                 pri = 0;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_DB))                pri = 1;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_DIRECTORIES))       pri = 2;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_LOGS))              pri = 3;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_ENV_VARS))          pri = 4;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_HOST_LABEL))        pri = 5;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_SQLITE))            pri = 6;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_CLOUD))             pri = 7;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_ML))                pri = 8;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_HEALTH))            pri = 9;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_WEB))               pri = 10;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_WEBRTC))            pri = 11;
             // by default, new sections will get pri = 12 (set at the end, below)
-            else if(!string_strcmp(co->name, CONFIG_SECTION_REGISTRY))          pri = 13;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 14;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_PLUGINS))           pri = 15;
-            else if(!string_strcmp(co->name, CONFIG_SECTION_STATSD))            pri = 16;
-            else if(!string_strncmp(co->name, "plugin:", 7))                    pri = 17; // << change the loop too if you change this
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_REGISTRY))          pri = 13;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 14;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_PLUGINS))           pri = 15;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_STATSD))            pri = 16;
+            else if(!string_strncmp(sect->name, "plugin:", 7))                    pri = 17; // << change the loop too if you change this
             else pri = 12; // this is used for any new (currently unknown) sections
 
             if(i == pri) {
@@ -213,64 +213,64 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
                 int changed = 0;
                 int count = 0;
 
-                config_section_wrlock(co);
-                for(cv = co->values; cv ; cv = cv->next) {
-                    used += (cv->flags & CONFIG_VALUE_USED)?1:0;
-                    loaded += (cv->flags & CONFIG_VALUE_LOADED)?1:0;
-                    changed += (cv->flags & CONFIG_VALUE_CHANGED)?1:0;
+                SECTION_LOCK(sect);
+                for(opt = sect->values; opt; opt = opt->next) {
+                    used += (opt->flags & CONFIG_VALUE_USED)?1:0;
+                    loaded += (opt->flags & CONFIG_VALUE_LOADED)?1:0;
+                    changed += (opt->flags & CONFIG_VALUE_CHANGED)?1:0;
                     count++;
                 }
-                config_section_unlock(co);
+                SECTION_UNLOCK(sect);
 
                 if(!count) continue;
                 if(only_changed && !changed && !loaded) continue;
 
                 if(!used)
-                    buffer_sprintf(wb, "\n# section '%s' is not used.", string2str(co->name));
+                    buffer_sprintf(wb, "\n# section '%s' is not used.", string2str(sect->name));
 
-                buffer_sprintf(wb, "\n[%s]\n", string2str(co->name));
+                buffer_sprintf(wb, "\n[%s]\n", string2str(sect->name));
 
                 size_t options_added = 0;
-                config_section_wrlock(co);
-                for(cv = co->values; cv ; cv = cv->next) {
-                    bool unused = used && !(cv->flags & CONFIG_VALUE_USED);
-                    bool migrated = used && (cv->flags & CONFIG_VALUE_MIGRATED);
-                    bool reformatted = used && (cv->flags & CONFIG_VALUE_REFORMATTED);
+                SECTION_LOCK(sect);
+                for(opt = sect->values; opt; opt = opt->next) {
+                    bool unused = used && !(opt->flags & CONFIG_VALUE_USED);
+                    bool migrated = used && (opt->flags & CONFIG_VALUE_MIGRATED);
+                    bool reformatted = used && (opt->flags & CONFIG_VALUE_REFORMATTED);
 
                     if((unused || migrated || reformatted) && options_added)
                         buffer_strcat(wb, "\n");
 
                     if(unused)
-                        buffer_sprintf(wb, "\t# option '%s' is not used.\n", string2str(cv->name));
+                        buffer_sprintf(wb, "\t# option '%s' is not used.\n", string2str(opt->name));
 
                     if(migrated && reformatted)
                         buffer_sprintf(wb, "\t# option '%s' has been migrated from '%s = %s'.\n",
-                                       string2str(cv->name),
-                                       string2str(cv->name_migrated), string2str(cv->value_reformatted));
+                                       string2str(opt->name),
+                                       string2str(opt->name_migrated), string2str(opt->value_reformatted));
                     else {
                         if (migrated)
                             buffer_sprintf(wb, "\t# option '%s' has been migrated from '%s'.\n",
-                                           string2str(cv->name), string2str(cv->name_migrated));
+                                           string2str(opt->name), string2str(opt->name_migrated));
 
                         if (reformatted)
                             buffer_sprintf(wb, "\t# option '%s' has been reformatted from '%s'.\n",
-                                           string2str(cv->name), string2str(cv->value_reformatted));
+                                           string2str(opt->name), string2str(opt->value_reformatted));
                     }
 
                     buffer_sprintf(wb, "\t%s%s = %s\n",
                                    (
-                                       !(cv->flags & CONFIG_VALUE_LOADED) &&
-                                       !(cv->flags & CONFIG_VALUE_CHANGED) &&
-                                       (cv->flags & CONFIG_VALUE_USED)
+                                       !(opt->flags & CONFIG_VALUE_LOADED) &&
+                                       !(opt->flags & CONFIG_VALUE_CHANGED) &&
+                                       (opt->flags & CONFIG_VALUE_USED)
                                            ) ? "# " : "",
-                                   string2str(cv->name),
-                                   string2str(cv->value));
+                                   string2str(opt->name),
+                                   string2str(opt->value));
 
                     options_added++;
                 }
-                config_section_unlock(co);
+                SECTION_UNLOCK(sect);
             }
         }
-        appconfig_unlock(root);
+        APPCONFIG_UNLOCK(root);
     }
 }

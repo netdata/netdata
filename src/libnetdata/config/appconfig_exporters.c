@@ -10,7 +10,7 @@
  *
  */
 
-_CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct section *instance)
+_CONNECTOR_INSTANCE *add_connector_instance(struct config_section *connector, struct config_section *instance)
 {
     static struct _connector_instance *global_connector_instance = NULL;
     struct _connector_instance *local_ci, *local_ci_tmp;

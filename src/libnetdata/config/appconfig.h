@@ -113,19 +113,17 @@
 // Config definitions
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-struct section;
+struct config_section;
 
 struct config {
-    struct section *first_section;
-    struct section *last_section; // optimize inserting at the end
-    netdata_mutex_t mutex;
+    struct config_section *sections;
+    SPINLOCK spinlock;
     avl_tree_lock index;
 };
 
 #define APPCONFIG_INITIALIZER (struct config) {         \
-        .first_section = NULL,                          \
-        .last_section = NULL,                           \
-        .mutex = NETDATA_MUTEX_INITIALIZER,             \
+        .sections = NULL,                               \
+        .spinlock = NETDATA_SPINLOCK_INITIALIZER,       \
         .index = {                                      \
             .avl_tree = {                               \
                 .root = NULL,                           \
@@ -184,7 +182,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
 
 int appconfig_section_compare(void *a, void *b);
 
-int appconfig_test_boolean_value(const char *s);
+bool appconfig_test_boolean_value(const char *s);
 
 struct connector_instance {
     char instance_name[CONFIG_MAX_NAME + 1];
@@ -192,14 +190,14 @@ struct connector_instance {
 };
 
 typedef struct _connector_instance {
-    struct section *connector;        // actual connector
-    struct section *instance;         // This instance
+    struct config_section *connector;        // actual connector
+    struct config_section *instance;         // This instance
     char instance_name[CONFIG_MAX_NAME + 1];
     char connector_name[CONFIG_MAX_NAME + 1];
     struct _connector_instance *next; // Next instance
 } _CONNECTOR_INSTANCE;
 
-_CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct section *instance);
+_CONNECTOR_INSTANCE *add_connector_instance(struct config_section *connector, struct config_section *instance);
 
 // ----------------------------------------------------------------------------
 // shortcuts for the default netdata configuration

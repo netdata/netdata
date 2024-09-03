@@ -6,69 +6,82 @@
 // config sections index
 
 int appconfig_section_compare(void *a, void *b) {
-    if(((struct section *)a)->name < ((struct section *)b)->name) return -1;
-    else if(((struct section *)a)->name > ((struct section *)b)->name) return 1;
-    else return string_cmp(((struct section *)a)->name, ((struct section *)b)->name);
+    if(((struct config_section *)a)->name < ((struct config_section *)b)->name) return -1;
+    else if(((struct config_section *)a)->name > ((struct config_section *)b)->name) return 1;
+    else return string_cmp(((struct config_section *)a)->name, ((struct config_section *)b)->name);
 }
 
-struct section *appconfig_section_find(struct config *root, const char *name) {
-    struct section tmp;
-    tmp.name = string_strdupz(name);
+struct config_section *appconfig_section_find(struct config *root, const char *name) {
+    struct config_section sect_tmp = {
+        .name = string_strdupz(name),
+    };
 
-    struct section *rc = (struct section *)avl_search_lock(&root->index, (avl_t *) &tmp);
-    string_freez(tmp.name);
+    struct config_section *rc = (struct config_section *)avl_search_lock(&root->index, (avl_t *) &sect_tmp);
+    string_freez(sect_tmp.name);
     return rc;
 }
 
 // ----------------------------------------------------------------------------
 // config section methods
 
-void appconfig_section_remove_and_delete(struct config *root, struct section *sect, bool have_root_lock, bool have_sect_lock) {
-    if(!have_root_lock)
-        appconfig_wrlock(root);
-
-    if(!have_sect_lock)
-        config_section_wrlock(sect);
-
-    while(sect->values)
-        appconfig_option_remove_and_delete(sect, sect->values, true);
-
-    if(!have_sect_lock)
-        config_section_unlock(sect);
-
-    if(!have_root_lock)
-        appconfig_unlock(root);
+void appconfig_section_free(struct config_section *sect) {
+    avl_destroy_lock(&sect->values_index);
+    string_freez(sect->name);
+    freez(sect);
 }
 
-struct section *appconfig_section_create(struct config *root, const char *section) {
-    netdata_log_debug(D_CONFIG, "Creating section '%s'.", section);
-
-    struct section *co = callocz(1, sizeof(struct section));
-    co->name = string_strdupz(section);
-    netdata_mutex_init(&co->mutex);
-
-    avl_init_lock(&co->values_index, appconfig_option_compare);
-
-    if(unlikely(appconfig_section_add(root, co) != co))
-        netdata_log_error("INTERNAL ERROR: indexing of section '%s', already exists.",
-                          string2str(co->name));
-
-    appconfig_wrlock(root);
-    struct section *co2 = root->last_section;
-    if(co2) {
-        co2->next = co;
-    } else {
-        root->first_section = co;
+void appconfig_section_remove_and_delete(struct config *root, struct config_section *sect, bool have_root_lock, bool have_sect_lock) {
+    struct config_section *sect_found = appconfig_section_del(root, sect);
+    if(sect_found != sect) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "INTERNAL ERROR: Cannot remove section '%s', it was not inserted before.",
+               string2str(sect->name));
+        return;
     }
-    root->last_section = co;
-    appconfig_unlock(root);
 
-    return co;
+    appconfig_option_remove_and_delete_all(sect, have_sect_lock);
+
+    if(!have_root_lock)
+        APPCONFIG_LOCK(root);
+
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(root->sections, sect, prev, next);
+
+    if(!have_root_lock)
+        APPCONFIG_UNLOCK(root);
+
+    // if the caller has the section lock, we will unlock it, to cleanup
+    if(have_sect_lock)
+        SECTION_UNLOCK(sect);
+
+    appconfig_section_free(sect);
+}
+
+struct config_section *appconfig_section_create(struct config *root, const char *section) {
+    struct config_section *sect = callocz(1, sizeof(struct config_section));
+    sect->name = string_strdupz(section);
+    spinlock_init(&sect->spinlock);
+
+    avl_init_lock(&sect->values_index, appconfig_option_compare);
+
+    struct config_section *sect_found = appconfig_section_add(root, sect);
+    if(sect_found != sect) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "CONFIG: section '%s', already exists, using existing.",
+               string2str(sect->name));
+        appconfig_section_free(sect);
+        return sect_found;
+    }
+
+    APPCONFIG_LOCK(root);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(root->sections, sect, prev, next);
+    APPCONFIG_UNLOCK(root);
+
+    return sect;
 }
 
 // ----------------------------------------------------------------------------
 
-const char *appconfig_get_value_of_option_in_section(struct section *co, const char *option, const char *default_value, reformat_t cb) {
+const char *appconfig_get_value_of_option_in_section(struct config_section *co, const char *option, const char *default_value, reformat_t cb) {
     struct config_option *cv;
 
     // Only calls internal to this file check for a NULL result, and they do not supply a NULL arg.
