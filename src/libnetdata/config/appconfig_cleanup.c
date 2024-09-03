@@ -28,9 +28,7 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
         if(unlikely(!appconfig_option_del(co, cv)))
             netdata_log_error("Cannot remove config option '%s' from section '%s'.",
                               string2str(cv->name), string2str(co->name));
-        string_freez(cv->value);
-        string_freez(cv->name);
-        freez(cv);
+        appconfig_option_free(cv);
     }
     co->values = NULL;
     config_section_unlock(co);
@@ -112,10 +110,7 @@ void appconfig_section_option_destroy_non_loaded(struct config *root, const char
         }
     }
 
-    string_freez(cv->value);
-    string_freez(cv->name);
-    freez(cv);
-
+    appconfig_option_free(cv);
     config_section_unlock(co);
 }
 

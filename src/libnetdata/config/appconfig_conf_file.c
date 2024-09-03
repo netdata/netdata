@@ -91,9 +91,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
                         netdata_log_error("INTERNAL ERROR: Cannot remove '%s' from  section '%s', it was not inserted before.",
                                           string2str(cv2->name), string2str(co->name));
 
-                    string_freez(cv2->name);
-                    string_freez(cv2->value);
-                    freez(cv2);
+                    appconfig_option_free(cv2);
                     cv2 = save;
                 }
                 co->values = NULL;
@@ -148,18 +146,9 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
         }
         else {
             if (((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
-                netdata_log_debug(
-                    D_CONFIG, "CONFIG: line %d of file '%s', overwriting '%s/%s'.", line, filename, co->name, cv->name);
                 string_freez(cv->value);
                 cv->value = string_strdupz(value);
-            } else
-                netdata_log_debug(
-                    D_CONFIG,
-                    "CONFIG: ignoring line %d of file '%s', '%s/%s' is already present and used.",
-                    line,
-                    filename,
-                    co->name,
-                    cv->name);
+            }
         }
         cv->flags |= CONFIG_VALUE_LOADED;
     }
@@ -263,13 +252,17 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
                         buffer_sprintf(wb, "\t# option '%s' is not used.\n", string2str(cv->name));
 
                     if(migrated && reformatted)
-                        buffer_sprintf(wb, "\t# option '%s' has been migrated and reformatted.\n", string2str(cv->name));
+                        buffer_sprintf(wb, "\t# option '%s' has been migrated from '%s = %s'.\n",
+                                       string2str(cv->name),
+                                       string2str(cv->name_migrated), string2str(cv->value_reformatted));
                     else {
                         if (migrated)
-                            buffer_sprintf(wb, "\t# option '%s' has been migrated.\n", string2str(cv->name));
+                            buffer_sprintf(wb, "\t# option '%s' has been migrated from '%s'.\n",
+                                           string2str(cv->name), string2str(cv->name_migrated));
 
                         if (reformatted)
-                            buffer_sprintf(wb, "\t# option '%s' has been reformatted.\n", string2str(cv->name));
+                            buffer_sprintf(wb, "\t# option '%s' has been reformatted from '%s'.\n",
+                                           string2str(cv->name), string2str(cv->value_reformatted));
                     }
 
                     buffer_sprintf(wb, "\t%s%s = %s\n",

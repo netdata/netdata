@@ -22,6 +22,9 @@ struct config_option {
     STRING *name;
     STRING *value;
 
+    STRING *name_migrated;
+    STRING *value_reformatted;
+
     struct config_option *next; // config->mutex protects just this
 };
 
@@ -65,6 +68,8 @@ struct section *appconfig_section_find(struct config *root, const char *name);
 struct section *appconfig_section_create(struct config *root, const char *section);
 
 // config options
+void appconfig_option_cleanup(struct config_option *opt);
+void appconfig_option_free(struct config_option *opt);
 int appconfig_option_compare(void *a, void *b);
 #define appconfig_option_add(co, cv) (struct config_option *)avl_insert_lock(&((co)->values_index), (avl_t *)(cv))
 #define appconfig_option_del(co, cv) (struct config_option *)avl_remove_lock(&((co)->values_index), (avl_t *)(cv))

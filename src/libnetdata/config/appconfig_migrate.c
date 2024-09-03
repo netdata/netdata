@@ -3,42 +3,42 @@
 #include "appconfig_internals.h"
 
 int appconfig_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new) {
-    struct config_option *cv_old, *cv_new;
+    struct config_option *opt_old, *opt_new;
     int ret = -1;
 
     netdata_log_debug(D_CONFIG, "request to rename config in section '%s', old name '%s', to section '%s', new name '%s'", section_old, name_old, section_new, name_new);
 
-    struct section *co_old = appconfig_section_find(root, section_old);
-    if(!co_old) return ret;
+    struct section *sect_old = appconfig_section_find(root, section_old);
+    if(!sect_old) return ret;
 
-    struct section *co_new = appconfig_section_find(root, section_new);
-    if(!co_new) co_new = appconfig_section_create(root, section_new);
+    struct section *sect_new = appconfig_section_find(root, section_new);
+    if(!sect_new) sect_new = appconfig_section_create(root, section_new);
 
-    config_section_wrlock(co_old);
-    if(co_old != co_new)
-        config_section_wrlock(co_new);
+    config_section_wrlock(sect_old);
+    if(sect_old != sect_new)
+        config_section_wrlock(sect_new);
 
-    cv_old = appconfig_option_find(co_old, name_old);
-    if(!cv_old) goto cleanup;
+    opt_old = appconfig_option_find(sect_old, name_old);
+    if(!opt_old) goto cleanup;
 
-    cv_new = appconfig_option_find(co_new, name_new);
-    if(cv_new) goto cleanup;
+    opt_new = appconfig_option_find(sect_new, name_new);
+    if(opt_new) goto cleanup;
 
-    if(unlikely(appconfig_option_del(co_old, cv_old) != cv_old))
+    if(unlikely(appconfig_option_del(sect_old, opt_old) != opt_old))
         netdata_log_error("INTERNAL ERROR: deletion of config '%s' from section '%s', deleted the wrong config entry.",
-                          string2str(cv_old->name), string2str(co_old->name));
+                          string2str(opt_old->name), string2str(sect_old->name));
 
-    if(co_old->values == cv_old) {
-        co_old->values = cv_old->next;
+    if(sect_old->values == opt_old) {
+        sect_old->values = opt_old->next;
     }
     else {
         struct config_option *t;
-        for(t = co_old->values; t && t->next != cv_old ;t = t->next) ;
-        if(!t || t->next != cv_old)
+        for(t = sect_old->values; t && t->next != opt_old;t = t->next) ;
+        if(!t || t->next != opt_old)
             netdata_log_error("INTERNAL ERROR: cannot find variable '%s' in section '%s' of the config - but it should be there.",
-                              string2str(cv_old->name), string2str(co_old->name));
+                              string2str(opt_old->name), string2str(sect_old->name));
         else
-            t->next = cv_old->next;
+            t->next = opt_old->next;
     }
 
     nd_log(NDLS_DAEMON, NDLP_WARNING,
@@ -46,24 +46,28 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
            section_old, name_old,
            section_new, name_new);
 
-    string_freez(cv_old->name);
-    cv_old->name = string_strdupz(name_new);
-    cv_old->flags |= CONFIG_VALUE_MIGRATED;
+    if(!opt_old->name_migrated)
+        opt_old->name_migrated = opt_old->name;
 
-    cv_new = cv_old;
-    cv_new->next = co_new->values;
-    co_new->values = cv_new;
+    opt_old->name = string_strdupz(name_new);
+    opt_old->flags |= CONFIG_VALUE_MIGRATED;
 
-    if(unlikely(appconfig_option_add(co_new, cv_old) != cv_old))
+    opt_new = opt_old;
+
+    // link it in front of the others in the new section
+    opt_new->next = sect_new->values;
+    sect_new->values = opt_new;
+
+    if(unlikely(appconfig_option_add(sect_new, opt_old) != opt_old))
         netdata_log_error("INTERNAL ERROR: re-indexing of config '%s' in section '%s', already exists.",
-                          string2str(cv_old->name), string2str(co_new->name));
+                          string2str(opt_old->name), string2str(sect_new->name));
 
     ret = 0;
 
 cleanup:
-    if(co_old != co_new)
-        config_section_unlock(co_new);
-    config_section_unlock(co_old);
+    if(sect_old != sect_new)
+        config_section_unlock(sect_new);
+    config_section_unlock(sect_old);
     return ret;
 }
 

@@ -76,6 +76,9 @@ const char *appconfig_get_value_of_option_in_section(struct section *co, const c
     }
 
     if((cv->flags & CONFIG_VALUE_MIGRATED) && !(cv->flags & CONFIG_VALUE_REFORMATTED) && cb) {
+        if(!cv->value_reformatted)
+            cv->value_reformatted = string_dup(cv->value);
+
         cv->value = cb(cv->value);
         cv->flags |= CONFIG_VALUE_REFORMATTED;
     }
