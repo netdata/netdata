@@ -9,9 +9,9 @@
 #define SIZE_MULTIPLIER_GiB (SIZE_MULTIPLIER_MiB * SIZE_MULTIPLIER_BASE2)
 #define SIZE_MULTIPLIER_TiB (SIZE_MULTIPLIER_GiB * SIZE_MULTIPLIER_BASE2)
 #define SIZE_MULTIPLIER_PiB (SIZE_MULTIPLIER_TiB * SIZE_MULTIPLIER_BASE2)
-#define SIZE_MULTIPLIER_EiB (SIZE_MULTIPLIER_PiB * SIZE_MULTIPLIER_BASE2)
-#define SIZE_MULTIPLIER_ZiB (SIZE_MULTIPLIER_EiB * SIZE_MULTIPLIER_BASE2)
-#define SIZE_MULTIPLIER_YiB (SIZE_MULTIPLIER_ZiB * SIZE_MULTIPLIER_BASE2)
+//#define SIZE_MULTIPLIER_EiB (SIZE_MULTIPLIER_PiB * SIZE_MULTIPLIER_BASE2)
+//#define SIZE_MULTIPLIER_ZiB (SIZE_MULTIPLIER_EiB * SIZE_MULTIPLIER_BASE2)
+//#define SIZE_MULTIPLIER_YiB (SIZE_MULTIPLIER_ZiB * SIZE_MULTIPLIER_BASE2)
 
 // Define multipliers for base 10 (decimal) units
 #define SIZE_MULTIPLIER_BASE10 1000ULL
@@ -20,9 +20,9 @@
 #define SIZE_MULTIPLIER_G (SIZE_MULTIPLIER_M * SIZE_MULTIPLIER_BASE10)
 #define SIZE_MULTIPLIER_T (SIZE_MULTIPLIER_G * SIZE_MULTIPLIER_BASE10)
 #define SIZE_MULTIPLIER_P (SIZE_MULTIPLIER_T * SIZE_MULTIPLIER_BASE10)
-#define SIZE_MULTIPLIER_E (SIZE_MULTIPLIER_P * SIZE_MULTIPLIER_BASE10)
-#define SIZE_MULTIPLIER_Z (SIZE_MULTIPLIER_E * SIZE_MULTIPLIER_BASE10)
-#define SIZE_MULTIPLIER_Y (SIZE_MULTIPLIER_Z * SIZE_MULTIPLIER_BASE10)
+//#define SIZE_MULTIPLIER_E (SIZE_MULTIPLIER_P * SIZE_MULTIPLIER_BASE10)
+//#define SIZE_MULTIPLIER_Z (SIZE_MULTIPLIER_E * SIZE_MULTIPLIER_BASE10)
+//#define SIZE_MULTIPLIER_Y (SIZE_MULTIPLIER_Z * SIZE_MULTIPLIER_BASE10)
 
 // Define a structure to map size units to their multipliers
 static const struct size_unit {
@@ -50,15 +50,15 @@ static const struct size_unit {
     { .unit = "P",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_P },
     { .unit = "PB",  .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_P },
     { .unit = "PiB", .base = 2,  .formatter = true,  .multiplier = SIZE_MULTIPLIER_PiB },
-    { .unit = "E",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_E },
-    { .unit = "EB",  .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_E },
-    { .unit = "EiB", .base = 2,  .formatter = true,  .multiplier = SIZE_MULTIPLIER_EiB },
-    { .unit = "Z",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_Z },
-    { .unit = "ZB",  .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_Z },
-    { .unit = "ZiB", .base = 2,  .formatter = true,  .multiplier = SIZE_MULTIPLIER_ZiB },
-    { .unit = "Y",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_Y },
-    { .unit = "YB",  .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_Y },
-    { .unit = "YiB", .base = 2,  .formatter = true,  .multiplier = SIZE_MULTIPLIER_YiB },
+//    { .unit = "E",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_E },
+//    { .unit = "EB",  .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_E },
+//    { .unit = "EiB", .base = 2,  .formatter = true,  .multiplier = SIZE_MULTIPLIER_EiB },
+//    { .unit = "Z",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_Z },
+//    { .unit = "ZB",  .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_Z },
+//    { .unit = "ZiB", .base = 2,  .formatter = true,  .multiplier = SIZE_MULTIPLIER_ZiB },
+//    { .unit = "Y",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_Y },
+//    { .unit = "YB",  .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_Y },
+//    { .unit = "YiB", .base = 2,  .formatter = true,  .multiplier = SIZE_MULTIPLIER_YiB },
 };
 
 static inline const struct size_unit *size_find_unit(const char *unit) {

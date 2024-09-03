@@ -25,15 +25,6 @@ The following table lists all supported units and their corresponding values:
 |  `P`   |  Petabytes  |  `1000T`  | Base-10 |    No     |
 |  `PB`  |  Petabytes  |  `1000T`  | Base-10 |    No     |
 | `PiB`  |  Pebibytes  | `1024TiB` | Base-2  |  **Yes**  |
-|  `E`   |  Exabytes   |  `1000P`  | Base-10 |    No     |
-|  `EB`  |  Exabytes   |  `1000P`  | Base-10 |    No     |
-| `EiB`  |  Exbibytes  | `1024PiB` | Base-2  |  **Yes**  |
-|  `Z`   | Zettabytes  |  `1000E`  | Base-10 |    No     |
-|  `ZB`  | Zettabytes  |  `1000E`  | Base-10 |    No     |
-| `ZiB`  |  Zebibytes  | `1024EiB` | Base-2  |  **Yes**  |
-|  `Y`   | Yottabytes  |  `1000Z`  | Base-10 |    No     |
-|  `YB`  | Yottabytes  |  `1000Z`  | Base-10 |    No     |
-| `YiB`  |  Yobibytes  | `1024ZiB` | Base-2  |  **Yes**  |
 
 ### Size Expression Format
 
