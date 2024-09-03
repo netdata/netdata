@@ -2241,17 +2241,27 @@ endif()
 # build netdata (only Linux ATM)
 #
 
+if(OS_WINDOWS)
+        set(NETDATA_CLAIM_RES_FILES "packaging/windows/resources/netdata_claim.rc")
+        configure_file(packaging/windows/resources/netdata_claim.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdata_claim.manifest @ONLY)
+
+        set(NETDATACLI_RES_FILES "packaging/windows/resources/netdatacli.rc")
+        configure_file(packaging/windows/resources/netdatacli.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdatacli.manifest @ONLY)
+
+        set(NETDATA_RES_FILES "packaging/windows/resources/netdata.rc")
+        configure_file(packaging/windows/resources/netdata.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdata.manifest @ONLY)
+endif()
+
 add_executable(netdata
         ${NETDATA_FILES}
         "${ACLK_FILES}"
         "$<$<BOOL:${ENABLE_H2O}>:${H2O_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGODB_EXPORTING_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES}>"
+        "$<$<BOOL:${OS_WINDOWS}>:${NETDATA_RES_FILES}>"
 )
 
 if(OS_WINDOWS)
-        set(NETDATA_CLAIM_RES_FILES "packaging/windows/resources/netdata_claim.rc")
-
         add_executable(netdata_claim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
         target_link_libraries(netdata_claim shell32;gdi32;msftedit)
 endif()
@@ -2353,7 +2363,7 @@ set(NETDATACLI_FILES
         src/cli/cli.c
 )
 
-add_executable(netdatacli ${NETDATACLI_FILES})
+add_executable(netdatacli ${NETDATACLI_FILES} "$<$<BOOL:${OS_WINDOWS}>:${NETDATACLI_RES_FILES}>")
 target_link_libraries(netdatacli libnetdata)
 
 install(TARGETS netdatacli

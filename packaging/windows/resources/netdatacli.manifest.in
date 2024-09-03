@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+	<assemblyIdentity version="@CMAKE_PROJECT_VERSION@"
+     processorArchitecture="*"
+     name="netdatacli"
+     type="win32"/>
+	<description>The netdatacli executable provides a simple way to control the Netdata agent's operation.</description>
+	<!-- Identify the application security requirements. -->
+	<trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+		<security>
+			<requestedPrivileges>
+				<requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>
+			</requestedPrivileges>
+		</security>
+	</trustInfo>
+</assembly>
