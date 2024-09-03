@@ -2264,6 +2264,7 @@ add_executable(netdata
 if(OS_WINDOWS)
         add_executable(NetdataClaim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
         target_link_libraries(NetdataClaim shell32;gdi32;msftedit)
+        target_compile_options(NetdataClaim PUBLIC -mwindows)
 endif()
 
 target_compile_definitions(netdata PRIVATE
