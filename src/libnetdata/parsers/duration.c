@@ -94,7 +94,14 @@ bool duration_parse(const char *duration, int64_t *result, const char *default_u
         return false;
     }
 
+    int64_t sign = 1;
     const char *s = duration;
+    while (isspace((uint8_t)*s)) s++;
+    if(*s == '-') {
+        s++;
+        sign = -1;
+    }
+
     int64_t v = 0;
 
     while (*s) {
@@ -146,6 +153,8 @@ bool duration_parse(const char *duration, int64_t *result, const char *default_u
         v += (int64_t)round(value * (NETDATA_DOUBLE)du->multiplier);
     }
 
+    v *= sign;
+
     if(du_def->multiplier == 1)
         *result = v;
     else
@@ -166,6 +175,12 @@ ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char 
 
     if(value == 0)
         return snprintfz(dst, dst_size, "off");
+
+    const char *sign = "";
+    if(value < 0) {
+        sign = "-";
+        value = -value;
+    }
 
     const struct duration_unit *du_min = duration_find_unit(unit);
     size_t offset = 0;
@@ -190,11 +205,12 @@ ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char 
         int64_t unit_count = rounded / multiplier;
         if (unit_count > 0) {
             int written = snprintfz(dst + offset, dst_size - offset,
-                                    "%" PRIi64 "%s", unit_count, units[i].unit);
+                                    "%s%" PRIi64 "%s", sign, unit_count, units[i].unit);
 
             if (written < 0)
                 return -3;
 
+            sign = "";
             offset += written;
 
             if (offset >= dst_size) {

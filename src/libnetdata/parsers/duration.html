@@ -101,6 +101,13 @@
 
         let s = duration.trim();
         let nsec = 0;
+        let isNegative = false;
+
+        // Handle leading negative sign
+        if (s.startsWith("-")) {
+            isNegative = true;
+            s = s.slice(1).trim();
+        }
 
         while (s.length > 0) {
             s = s.trim();
@@ -127,19 +134,19 @@
         }
 
         const unitMultiplier = durationFindUnit(unit).multiplier;
-        return roundToResolution(nsec, unitMultiplier);
+        nsec = roundToResolution(nsec, unitMultiplier);
+
+        return isNegative ? -nsec : nsec;
     }
 
     function durationSnprintf(value, unit) {
         if (value === 0) return "off";
 
         const duMin = durationFindUnit(unit);
-        let nsec = value * duMin.multiplier;
+        let nsec = Math.abs(value) * duMin.multiplier;
 
-        const isNegative = nsec < 0;
-        nsec = Math.abs(nsec);
-
-        let result = "";
+        const isNegative = value < 0;
+        let result = isNegative ? "-" : "";
 
         for (let i = units.length - 1; i >= 0 && nsec !== 0; i--) {
             const du = units[i];
@@ -150,7 +157,7 @@
             let unitCount = Math.floor(rounded / multiplier);
 
             if (unitCount !== 0) {
-                result += (isNegative ? "-" : "") + `${unitCount}${du.unit}`;
+                result += `${unitCount}${du.unit}`;
                 nsec -= unitCount * multiplier;
             }
 
