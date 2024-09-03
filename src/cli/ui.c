@@ -24,7 +24,8 @@ HWND hNetdataWND = NULL;
 
 static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    HWND hwndReloadHealth, hwndReloadLabels, hwndSaveDatabase, hwndReopenLogs, hwndStopService, hwndOpenMsys;
+    HWND hwndReloadHealth, hwndReloadLabels, hwndSaveDatabase, hwndReopenLogs, hwndStopService, hwndOpenMsys,
+        hwndExit;
     static HINSTANCE hShell32 = NULL;
 
     switch (message) {
@@ -43,27 +44,33 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
 
             hwndReopenLogs = CreateWindowExW(0, L"BUTTON", L"Reopen Logs",
                                              WS_CHILD | WS_VISIBLE,
-                                             20, 100, 180, 30,
+                                             20, 100, 120, 30,
                                              hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
                                              NULL, NULL);
 
             hwndSaveDatabase = CreateWindowExW(0, L"BUTTON", L"Save Database",
                                                WS_CHILD | WS_VISIBLE,
-                                               240, 20, 120, 30,
+                                               280, 20, 120, 30,
                                                hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
                                                NULL, NULL);
 
             hwndStopService = CreateWindowExW(0, L"BUTTON", L"Stop Service",
                                               WS_CHILD | WS_VISIBLE,
-                                              240, 60, 120, 30,
+                                              280, 60, 120, 30,
                                               hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
                                               NULL, NULL);
 
             hwndOpenMsys = CreateWindowExW(0, L"BUTTON", L"Open Msys2",
                                            WS_CHILD | WS_VISIBLE,
-                                           240, 100, 120, 30,
+                                           280, 100, 120, 30,
                                            hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
                                            NULL, NULL);
+
+            hwndExit = CreateWindowExW(0, L"BUTTON", L"Exit",
+                                       WS_CHILD | WS_VISIBLE,
+                                       140, 140, 120, 30,
+                                       hNetdatawnd, (HMENU)IDC_CLOSE_WINDOW,
+                                       NULL, NULL);
             break;
         }
         case WM_COMMAND: {
@@ -120,7 +127,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                                   L"Netdata Client",
                                   WS_OVERLAPPEDWINDOW,
                                   CW_USEDEFAULT, CW_USEDEFAULT,
-                                  600, 400,
+                                  440, 250,
                                   HWND_DESKTOP,
                                   NULL,
                                   hInstance,
