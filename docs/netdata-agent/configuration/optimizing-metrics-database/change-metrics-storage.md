@@ -56,6 +56,79 @@ Netdata provides a visual representation of storage utilization for both time an
 the 'dbengine retention' subsection of the 'Netdata Monitoring' section on the dashboard. This chart shows exactly how
 your storage space (disk space limits) and time (time limits) are used for metric retention.
 
+## Legacy configuration
+
+### v1.99.0 and prior
+
+Netdata prior to v2 supports the following configuration options in  `netdata.conf`.
+They have the same defaults as the latest v2, but the unit of each value is given in the option name, not at the value.
+
+```
+storage tiers = 3
+# Tier 0, per second data. Set to 0 for no limit.
+dbengine tier 0 disk space MB = 1024
+dbengine tier 0 retention days = 14
+# Tier 1, per minute data. Set to 0 for no limit.
+dbengine tier 1 disk space MB = 1024
+dbengine tier 1 retention days = 90
+# Tier 2, per hour data. Set to 0 for no limit.
+dbengine tier 2 disk space MB = 1024
+dbengine tier 2 retention days = 730
+```
+
+### v1.45.6 and prior
+
+Netdata versions prior to v1.46.0 relied on a disk space-based retention.
+
+**Default Retention Limits**:
+
+| Tier |     Resolution      | Size Limit |
+|:----:|:-------------------:|:----------:|
+|  0   |  high (per second)  |   256 MB   |
+|  1   | middle (per minute) |   128 MB   |
+|  2   |   low (per hour)    |   64 GiB   |
+
+You can change these limits in `netdata.conf`:
+
+```
+[db]
+    mode = dbengine	
+    storage tiers = 3
+    # Tier 0, per second data
+    dbengine multihost disk space MB = 256
+    # Tier 1, per minute data
+    dbengine tier 1 multihost disk space MB = 1024
+    # Tier 2, per hour data
+    dbengine tier 2 multihost disk space MB = 1024
+```
+
+### v1.35.1 and prior
+
+These versions of the Agent do not support tiers. You could change the metric retention for the parent and
+all of its children only with the `dbengine multihost disk space MB` setting. This setting accounts the space allocation
+for the parent node and all of its children.
+
+To configure the database engine, look for the `page cache size MB` and `dbengine multihost disk space MB` settings in
+the `[db]` section of your `netdata.conf`.
+
+```conf
+[db]
+    dbengine page cache size MB = 32
+    dbengine multihost disk space MB = 256
+```
+
+### v1.23.2 and prior
+
+_For Netdata Agents earlier than v1.23.2_, the Agent on the parent node uses one dbengine instance for itself, and
+another instance for every child node it receives metrics from. If you had four streaming nodes, you would have five
+instances in total (`1 parent + 4 child nodes = 5 instances`).
+
+The Agent allocates resources for each instance separately using the `dbengine disk space MB` (**deprecated**) setting.
+If `dbengine disk space MB`(**deprecated**) is set to the default `256`, each instance is given 256 MiB in disk space,
+which means the total disk space required to store all instances is,
+roughly, `256 MiB * 1 parent * 4 child nodes = 1280 MiB`.
+
+
 #### Backward compatibility
 
 All existing metrics belonging to child nodes are automatically converted to legacy dbengine instances and the localhost
