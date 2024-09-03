@@ -2477,8 +2477,9 @@ if(OS_WINDOWS)
                 src/cli/ui.h
                 )
 
-        add_executable(NetdataCliUI ${NETDATACLI_UI_FILES})
+        add_executable(NetdataCliUI ${NETDATACLI_UI_FILES}  ${NETDATACLIUI_RES_FILES})
         target_link_libraries(NetdataCliUI shell32;gdi32;msftedit)
+        target_compile_options(NetdataCliUI PUBLIC -mwindows)
 endif()
 
 #
