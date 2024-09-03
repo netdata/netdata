@@ -9,5 +9,6 @@
 #define IDC_REOPEN_LOGS   104
 #define IDC_STOP_SERVICE  105
 #define IDC_OPEN_MSYS     106
+#define IDC_CLOSE_WINDOW  107
 
 #endif
