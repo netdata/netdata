@@ -23,18 +23,18 @@ type drivesInfoResponse struct {
 type (
 	driveInfo struct {
 		EIDSlt string `json:"EID:Slt"`
-		DID    int    `json:"DID"`
-		State  string `json:"State"`
-		DG     int    `json:"DG"`
-		Size   string `json:"Size"`
-		Intf   string `json:"Intf"`
-		Med    string `json:"Med"`
-		SED    string `json:"SED"`
-		PI     string `json:"PI"`
-		SeSz   string `json:"SeSz"`
-		Model  string `json:"Model"`
-		Sp     string `json:"Sp"`
-		Type   string `json:"Type"`
+		//DID    int    `json:"DID"`
+		//State  string `json:"State"`
+		//DG     int    `json:"DG"` // FIX: can be integer or "-"
+		//Size   string `json:"Size"`
+		//Intf   string `json:"Intf"`
+		Med string `json:"Med"`
+		//SED    string `json:"SED"`
+		//PI     string `json:"PI"`
+		//SeSz   string `json:"SeSz"`
+		//Model  string `json:"Model"`
+		//Sp     string `json:"Sp"`
+		//Type   string `json:"Type"`
 	}
 	driveState struct {
 		MediaErrorCount        storNumber `json:"Media Error Count"`
