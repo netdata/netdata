@@ -79,39 +79,4 @@ struct config_section *appconfig_section_create(struct config *root, const char 
     return sect;
 }
 
-// ----------------------------------------------------------------------------
 
-const char *appconfig_get_value_of_option_in_section(struct config_section *co, const char *option, const char *default_value, reformat_t cb) {
-    struct config_option *cv;
-
-    // Only calls internal to this file check for a NULL result, and they do not supply a NULL arg.
-    // External caller should treat NULL as an error case.
-    cv = appconfig_option_find(co, option);
-    if (!cv) {
-        if (!default_value) return NULL;
-        cv = appconfig_option_create(co, option, default_value);
-        if (!cv) return NULL;
-    }
-    cv->flags |= CONFIG_VALUE_USED;
-
-    if((cv->flags & CONFIG_VALUE_LOADED) || (cv->flags & CONFIG_VALUE_CHANGED)) {
-        // this is a loaded value from the config file
-        // if it is different from the default, mark it
-        if(!(cv->flags & CONFIG_VALUE_CHECKED)) {
-            if(default_value && string_strcmp(cv->value, default_value) != 0)
-                cv->flags |= CONFIG_VALUE_CHANGED;
-
-            cv->flags |= CONFIG_VALUE_CHECKED;
-        }
-    }
-
-    if((cv->flags & CONFIG_VALUE_MIGRATED) && !(cv->flags & CONFIG_VALUE_REFORMATTED) && cb) {
-        if(!cv->value_reformatted)
-            cv->value_reformatted = string_dup(cv->value);
-
-        cv->value = cb(cv->value);
-        cv->flags |= CONFIG_VALUE_REFORMATTED;
-    }
-
-    return string2str(cv->value);
-}

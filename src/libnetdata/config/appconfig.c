@@ -13,14 +13,14 @@ int appconfig_exists(struct config *root, const char *section, const char *name)
 }
 
 const char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value) {
-    return appconfig_get_value_and_reformat(root, section, name, default_value, NULL);
+    return appconfig_get_value_and_reformat(root, section, name, default_value, NULL, CONFIG_VALUE_TYPE_TEXT);
 }
 
 long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value) {
     char buffer[100];
     sprintf(buffer, "%lld", value);
 
-    const char *s = appconfig_get(root, section, name, buffer);
+    const char *s = appconfig_get_value_and_reformat(root, section, name, buffer, NULL, CONFIG_VALUE_TYPE_INTEGER);
     if(!s) return value;
 
     return strtoll(s, NULL, 0);
@@ -30,7 +30,7 @@ NETDATA_DOUBLE appconfig_get_double(struct config *root, const char *section, co
     char buffer[100];
     sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
 
-    const char *s = appconfig_get(root, section, name, buffer);
+    const char *s = appconfig_get_value_and_reformat(root, section, name, buffer, NULL, CONFIG_VALUE_TYPE_DOUBLE);
     if(!s) return value;
 
     return str2ndd(s, NULL);
@@ -45,7 +45,7 @@ bool appconfig_test_boolean_value(const char *s) {
 }
 
 int appconfig_get_boolean_by_section(struct config_section *co, const char *name, int value) {
-    const char *s = appconfig_get_value_of_option_in_section(co, name, (!value) ? "no" : "yes", NULL);
+    const char *s = appconfig_get_value_of_option_in_section(co, name, (!value) ? "no" : "yes", NULL, CONFIG_VALUE_TYPE_BOOLEAN);
     if(!s) return value;
 
     return appconfig_test_boolean_value(s);
@@ -56,7 +56,7 @@ int appconfig_get_boolean(struct config *root, const char *section, const char *
     if(value) s = "yes";
     else s = "no";
 
-    s = appconfig_get(root, section, name, s);
+    s = appconfig_get_value_and_reformat(root, section, name, s, NULL, CONFIG_VALUE_TYPE_BOOLEAN);
     if(!s) return value;
 
     return appconfig_test_boolean_value(s);
@@ -74,7 +74,7 @@ int appconfig_get_boolean_ondemand(struct config *root, const char *section, con
     else
         s = "yes";
 
-    s = appconfig_get(root, section, name, s);
+    s = appconfig_get_value_and_reformat(root, section, name, s, NULL, CONFIG_VALUE_TYPE_BOOLEAN_ONDEMAND);
     if(!s) return value;
 
     if(!strcmp(s, "yes") || !strcmp(s, "true") || !strcmp(s, "on"))
@@ -174,7 +174,7 @@ time_t appconfig_get_duration_seconds(struct config *root, const char *section, 
     char default_str[128];
     duration_snprintf_time_t(default_str, sizeof(default_str), default_value);
 
-    const char *s = appconfig_get_value_and_reformat(root, section, name, default_str, reformat_duration_seconds);
+    const char *s = appconfig_get_value_and_reformat(root, section, name, default_str, reformat_duration_seconds, CONFIG_VALUE_TYPE_DURATION_IN_SECS);
     if(!s)
         return default_value;
 
@@ -214,7 +214,7 @@ msec_t appconfig_get_duration_ms(struct config *root, const char *section, const
     char default_str[128];
     duration_snprintf_msec_t(default_str, sizeof(default_str), default_value);
 
-    const char *s = appconfig_get_value_and_reformat(root, section, name, default_str, reformat_duration_ms);
+    const char *s = appconfig_get_value_and_reformat(root, section, name, default_str, reformat_duration_ms, CONFIG_VALUE_TYPE_DURATION_IN_MS);
     if(!s)
         return default_value;
 
@@ -254,7 +254,7 @@ unsigned appconfig_get_duration_days(struct config *root, const char *section, c
     char default_str[128];
     duration_snprintf_days(default_str, sizeof(default_str), (int)default_value);
 
-    const char *s = appconfig_get_value_and_reformat(root, section, name, default_str, reformat_duration_days);
+    const char *s = appconfig_get_value_and_reformat(root, section, name, default_str, reformat_duration_days, CONFIG_VALUE_TYPE_DURATION_IN_DAYS);
     if(!s)
         return default_value;
 
@@ -293,7 +293,7 @@ unsigned appconfig_get_size_bytes(struct config *root, const char *section, cons
     char default_str[128];
     size_snprintf_bytes(default_str, sizeof(default_str), (int)default_value);
 
-    const char *s = appconfig_get_value_and_reformat(root, section, name, default_str, reformat_size_bytes);
+    const char *s = appconfig_get_value_and_reformat(root, section, name, default_str, reformat_size_bytes, CONFIG_VALUE_TYPE_SIZE_IN_BYTES);
     if(!s)
         return default_value;
 
@@ -332,7 +332,7 @@ unsigned appconfig_get_size_mb(struct config *root, const char *section, const c
     char default_str[128];
     size_snprintf_mb(default_str, sizeof(default_str), (int)default_value);
 
-    const char *s = appconfig_get_value_and_reformat(root, section, name, default_str, reformat_size_mb);
+    const char *s = appconfig_get_value_and_reformat(root, section, name, default_str, reformat_size_mb, CONFIG_VALUE_TYPE_SIZE_IN_MB);
     if(!s)
         return default_value;
 

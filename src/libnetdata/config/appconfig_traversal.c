@@ -31,11 +31,11 @@ bool stream_conf_needs_dbengine(struct config *root) {
 
         const char *s;
 
-        s = appconfig_get_value_of_option_in_section(sect, "enabled", NULL, NULL);
+        s = appconfig_get_value_of_option_in_section(sect, "enabled", NULL, NULL, CONFIG_VALUE_TYPE_UNKNOWN);
         if(!s || !appconfig_test_boolean_value(s))
             continue;
 
-        s = appconfig_get_value_of_option_in_section(sect, "db", NULL, NULL);
+        s = appconfig_get_value_of_option_in_section(sect, "db", NULL, NULL, CONFIG_VALUE_TYPE_UNKNOWN);
         if(s && strcmp(s, "dbengine") == 0) {
             ret = true;
             break;

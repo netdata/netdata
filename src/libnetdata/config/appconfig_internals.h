@@ -6,6 +6,28 @@
 #include "appconfig.h"
 
 typedef enum __attribute__((packed)) {
+    CONFIG_VALUE_TYPE_UNKNOWN = 0,
+    CONFIG_VALUE_TYPE_TEXT,
+    CONFIG_VALUE_TYPE_HOSTNAME,
+    CONFIG_VALUE_TYPE_USERNAME,
+    CONFIG_VALUE_TYPE_FILENAME,
+    CONFIG_VALUE_TYPE_PATH,
+    CONFIG_VALUE_TYPE_SIMPLE_PATTERN,
+    CONFIG_VALUE_TYPE_URL,
+    CONFIG_VALUE_TYPE_ENUM,
+    CONFIG_VALUE_TYPE_BITMAP,
+    CONFIG_VALUE_TYPE_INTEGER,
+    CONFIG_VALUE_TYPE_DOUBLE,
+    CONFIG_VALUE_TYPE_BOOLEAN,
+    CONFIG_VALUE_TYPE_BOOLEAN_ONDEMAND,
+    CONFIG_VALUE_TYPE_DURATION_IN_SECS,
+    CONFIG_VALUE_TYPE_DURATION_IN_MS,
+    CONFIG_VALUE_TYPE_DURATION_IN_DAYS,
+    CONFIG_VALUE_TYPE_SIZE_IN_BYTES,
+    CONFIG_VALUE_TYPE_SIZE_IN_MB,
+} CONFIG_VALUE_TYPES;
+
+typedef enum __attribute__((packed)) {
     CONFIG_VALUE_LOADED = (1 << 0),         // has been loaded from the config
     CONFIG_VALUE_USED = (1 << 1),           // has been accessed from the program
     CONFIG_VALUE_CHANGED = (1 << 2),        // has been changed from the loaded value or the internal default value
@@ -17,13 +39,16 @@ typedef enum __attribute__((packed)) {
 struct config_option {
     avl_t avl_node;         // the index entry of this entry - this has to be first!
 
+    CONFIG_VALUE_TYPES type;
     CONFIG_VALUE_FLAGS flags;
 
     STRING *name;
     STRING *value;
 
+    STRING *section_migrated;
     STRING *name_migrated;
     STRING *value_reformatted;
+    STRING *value_default;
 
     struct config_option *prev, *next; // config->mutex protects just this
 };
@@ -71,8 +96,8 @@ struct config_option *appconfig_option_create(struct config_section *sect, const
 int appconfig_get_boolean_by_section(struct config_section *co, const char *name, int value);
 
 typedef STRING *(*reformat_t)(STRING *value);
-const char *appconfig_get_value_of_option_in_section(struct config_section *co, const char *option, const char *default_value, reformat_t cb);
-const char *appconfig_get_value_and_reformat(struct config *root, const char *section, const char *option, const char *default_value, reformat_t cb);
+const char *appconfig_get_value_of_option_in_section(struct config_section *co, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type);
+const char *appconfig_get_value_and_reformat(struct config *root, const char *section, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type);
 
 // cleanup
 void appconfig_section_destroy_non_loaded(struct config *root, const char *section);

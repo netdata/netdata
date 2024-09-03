@@ -2,6 +2,31 @@
 
 #include "appconfig_internals.h"
 
+ENUM_STR_MAP_DEFINE(CONFIG_VALUE_TYPES) = {
+    { .id = CONFIG_VALUE_TYPE_UNKNOWN, .name ="unknown", },
+    { .id = CONFIG_VALUE_TYPE_TEXT, .name ="text", },
+    { .id = CONFIG_VALUE_TYPE_HOSTNAME, .name ="hostname", },
+    { .id = CONFIG_VALUE_TYPE_USERNAME, .name ="username", },
+    { .id = CONFIG_VALUE_TYPE_FILENAME, .name ="filename", },
+    { .id = CONFIG_VALUE_TYPE_PATH, .name ="path", },
+    { .id = CONFIG_VALUE_TYPE_SIMPLE_PATTERN, .name ="simple pattern", },
+    { .id = CONFIG_VALUE_TYPE_URL, .name ="url", },
+    { .id = CONFIG_VALUE_TYPE_ENUM, .name ="one of", },
+    { .id = CONFIG_VALUE_TYPE_BITMAP, .name ="any of", },
+    { .id = CONFIG_VALUE_TYPE_INTEGER, .name ="integer", },
+    { .id = CONFIG_VALUE_TYPE_DOUBLE, .name ="double", },
+    { .id = CONFIG_VALUE_TYPE_BOOLEAN, .name ="boolean", },
+    { .id = CONFIG_VALUE_TYPE_BOOLEAN_ONDEMAND, .name ="boolean with auto", },
+    { .id = CONFIG_VALUE_TYPE_DURATION_IN_SECS, .name ="duration in seconds", },
+    { .id = CONFIG_VALUE_TYPE_DURATION_IN_MS, .name ="duration is ms", },
+    { .id = CONFIG_VALUE_TYPE_DURATION_IN_DAYS, .name ="duration in days", },
+    { .id = CONFIG_VALUE_TYPE_SIZE_IN_BYTES, .name ="size in bytes", },
+    { .id = CONFIG_VALUE_TYPE_SIZE_IN_MB, .name ="size in MiB", },
+};
+
+ENUM_STR_DEFINE_FUNCTIONS(CONFIG_VALUE_TYPES, CONFIG_VALUE_TYPE_UNKNOWN, "unknown");
+
+
 // ----------------------------------------------------------------------------
 // config load/save
 
@@ -164,7 +189,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
 
         if(netdata_conf && !found_host_labels) {
             appconfig_section_create(root, CONFIG_SECTION_HOST_LABEL);
-            appconfig_get(root, CONFIG_SECTION_HOST_LABEL, "name", "value");
+            appconfig_get_value_and_reformat(root, CONFIG_SECTION_HOST_LABEL, "name", "value", NULL, CONFIG_VALUE_TYPE_TEXT);
         }
     }
 
@@ -231,31 +256,49 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
                 buffer_sprintf(wb, "\n[%s]\n", string2str(sect->name));
 
                 size_t options_added = 0;
+                bool last_had_comments = false;
                 SECTION_LOCK(sect);
                 for(opt = sect->values; opt; opt = opt->next) {
                     bool unused = used && !(opt->flags & CONFIG_VALUE_USED);
                     bool migrated = used && (opt->flags & CONFIG_VALUE_MIGRATED);
                     bool reformatted = used && (opt->flags & CONFIG_VALUE_REFORMATTED);
+                    bool show_default = used && (opt->flags & (CONFIG_VALUE_LOADED|CONFIG_VALUE_CHANGED) && opt->value_default);
 
-                    if((unused || migrated || reformatted) && options_added)
+                    if((unused || migrated || reformatted || show_default)) {
+                        if(options_added)
+                            buffer_strcat(wb, "\n");
+
+                        buffer_sprintf(wb, "\t#| >>> [%s].%s <<<\n",
+                                       string2str(sect->name), string2str(opt->name));
+
+                        last_had_comments = true;
+                    }
+                    else if(last_had_comments) {
                         buffer_strcat(wb, "\n");
+                        last_had_comments = false;
+                    }
 
                     if(unused)
-                        buffer_sprintf(wb, "\t# option '%s' is not used.\n", string2str(opt->name));
+                        buffer_sprintf(wb, "\t#| found in the config file, but is not used\n");
 
                     if(migrated && reformatted)
-                        buffer_sprintf(wb, "\t# option '%s' has been migrated from '%s = %s'.\n",
-                                       string2str(opt->name),
-                                       string2str(opt->name_migrated), string2str(opt->value_reformatted));
+                        buffer_sprintf(wb, "\t#| migrated from: [%s].%s = %s\n",
+                                       string2str(opt->section_migrated), string2str(opt->name_migrated),
+                                       string2str(opt->value_reformatted));
                     else {
                         if (migrated)
-                            buffer_sprintf(wb, "\t# option '%s' has been migrated from '%s'.\n",
-                                           string2str(opt->name), string2str(opt->name_migrated));
+                            buffer_sprintf(wb, "\t#| migrated from: [%s].%s\n",
+                                           string2str(opt->section_migrated), string2str(opt->name_migrated));
 
                         if (reformatted)
-                            buffer_sprintf(wb, "\t# option '%s' has been reformatted from '%s'.\n",
-                                           string2str(opt->name), string2str(opt->value_reformatted));
+                            buffer_sprintf(wb, "\t#| reformatted from: %s\n",
+                                           string2str(opt->value_reformatted));
                     }
+
+                    if(show_default)
+                        buffer_sprintf(wb, "\t#| datatype: %s, default value: %s\n",
+                                       CONFIG_VALUE_TYPES_2str(opt->type),
+                                       string2str(opt->value_default));
 
                     buffer_sprintf(wb, "\t%s%s = %s\n",
                                    (

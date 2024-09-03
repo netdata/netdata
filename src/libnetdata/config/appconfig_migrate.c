@@ -28,6 +28,9 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
         netdata_log_error("INTERNAL ERROR: deletion of config '%s' from section '%s', deleted the wrong config entry.",
                           string2str(opt_old->name), string2str(sect_old->name));
 
+    // remember the old position of the item
+    struct config_option *opt_old_next = (sect_old == sect_new) ? opt_old->next : NULL;
+
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sect_old->values, opt_old, prev, next);
 
     nd_log(NDLS_DAEMON, NDLP_WARNING,
@@ -35,14 +38,35 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
            section_old, name_old,
            section_new, name_new);
 
-    if(!opt_old->name_migrated)
+    if(!opt_old->name_migrated) {
+        string_freez(opt_old->section_migrated);
+        opt_old->section_migrated = string_dup(sect_old->name);
         opt_old->name_migrated = opt_old->name;
+    }
+    else
+        string_freez(opt_old->name);
 
     opt_old->name = string_strdupz(name_new);
     opt_old->flags |= CONFIG_VALUE_MIGRATED;
 
     opt_new = opt_old;
-    DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(sect_new->values, opt_new, prev, next);
+
+    // put in the list, but try to keep the order
+    if(opt_old_next && sect_old == sect_new)
+        DOUBLE_LINKED_LIST_INSERT_ITEM_BEFORE_UNSAFE(sect_new->values, opt_old_next, opt_new, prev, next);
+    else {
+        // we don't have the old next item (probably a different section?)
+        // find the last MIGRATED one
+        struct config_option *t = sect_new->values->prev;
+        for (; t != sect_new->values ; t = t->prev) {
+            if (t->flags & CONFIG_VALUE_MIGRATED)
+                break;
+        }
+        if (t == sect_new->values)
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(sect_new->values, opt_new, prev, next);
+        else
+            DOUBLE_LINKED_LIST_INSERT_ITEM_AFTER_UNSAFE(sect_new->values, t, opt_new, prev, next);
+    }
 
     if(unlikely(appconfig_option_add(sect_new, opt_old) != opt_old))
         netdata_log_error("INTERNAL ERROR: re-indexing of config '%s' in section '%s', already exists.",
