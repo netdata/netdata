@@ -16,6 +16,7 @@
 #include <signal.h>
 
 #include "tchar.h"
+#include "ui.h"
 
 static LPCTSTR szWindowClass = _T("DesktopApp");
 
@@ -23,8 +24,46 @@ HWND hNetdataWND = NULL;
 
 static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    HWND hwndReloadHealth, hwndReloadLabels, hwndSaveDatabase, hwndReopenLogs, hwndStopService, hwndOpenMsys;
+    static HINSTANCE hShell32 = NULL;
+
     switch (message) {
         case WM_CREATE: {
+            hwndReloadHealth = CreateWindowExW(0, L"BUTTON", L"Reload Health",
+                                               WS_CHILD | WS_VISIBLE,
+                                               20, 20, 120, 30,
+                                               hNetdatawnd, (HMENU)IDC_RELOAD_HEALTH,
+                                               NULL, NULL);
+
+            hwndReloadLabels = CreateWindowExW(0, L"BUTTON", L"Reload Labels",
+                                               WS_CHILD | WS_VISIBLE,
+                                               20, 60, 120, 30,
+                                               hNetdatawnd, (HMENU)IDC_RELOAD_LABELS,
+                                               NULL, NULL);
+
+            hwndReopenLogs = CreateWindowExW(0, L"BUTTON", L"Reopen Logs",
+                                             WS_CHILD | WS_VISIBLE,
+                                             20, 100, 180, 30,
+                                             hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
+                                             NULL, NULL);
+
+            hwndSaveDatabase = CreateWindowExW(0, L"BUTTON", L"Save Database",
+                                               WS_CHILD | WS_VISIBLE,
+                                               240, 20, 120, 30,
+                                               hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
+                                               NULL, NULL);
+
+            hwndStopService = CreateWindowExW(0, L"BUTTON", L"Stop Service",
+                                              WS_CHILD | WS_VISIBLE,
+                                              240, 60, 120, 30,
+                                              hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
+                                              NULL, NULL);
+
+            hwndOpenMsys = CreateWindowExW(0, L"BUTTON", L"Open Msys2",
+                                           WS_CHILD | WS_VISIBLE,
+                                           240, 100, 120, 30,
+                                           hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
+                                           NULL, NULL);
             break;
         }
         case WM_COMMAND: {
@@ -45,16 +84,16 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
     return 0;
 }
 
-static void netdata_claim_exit_callback(int signal)
+static void netdata_cli_exit_callback(int signal)
 {
     (void)signal;
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
-    signal(SIGABRT, netdata_claim_exit_callback);
-    signal(SIGINT, netdata_claim_exit_callback);
-    signal(SIGTERM, netdata_claim_exit_callback);
+    signal(SIGABRT, netdata_cli_exit_callback);
+    signal(SIGINT, netdata_cli_exit_callback);
+    signal(SIGTERM, netdata_cli_exit_callback);
 
     WNDCLASSEX wcex;
 

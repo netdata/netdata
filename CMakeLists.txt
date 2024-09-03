@@ -2474,6 +2474,7 @@ install(TARGETS netdatacli
 if(OS_WINDOWS)
         set(NETDATACLI_UI_FILES
                 src/cli/ui.c
+                src/cli/ui.h
                 )
 
         add_executable(NetdataCliUI ${NETDATACLI_UI_FILES})
