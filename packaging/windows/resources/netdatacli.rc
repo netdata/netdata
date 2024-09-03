@@ -1,0 +1,3 @@
+#include "winuser.h"
+1 RT_MANIFEST "netdatacli.manifest"
+11 ICON "../NetdataWhite.ico"

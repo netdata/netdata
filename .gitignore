@@ -179,6 +179,7 @@ Session.*.vim
 
 # Special exceptions
 !packaging/repoconfig/Makefile
+packaging/windows/resources/*.manifest
 
 # Jupyter notebook checkpoints
 .ipynb_checkpoints
