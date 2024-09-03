@@ -12,12 +12,12 @@ int appconfig_exists(struct config *root, const char *section, const char *name)
     return 1;
 }
 
-const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value) {
+const char *appconfig_set_default_raw_value(struct config *root, const char *section, const char *name, const char *value) {
     struct config_section *sect = appconfig_section_find(root, section);
-    if(!sect) return appconfig_set(root, section, name, value);
+    if(!sect) return appconfig_set_raw_value(root, section, name, value, CONFIG_VALUE_TYPE_UNKNOWN);
 
     struct config_option *opt = appconfig_option_find(sect, name);
-    if(!opt) return appconfig_set(root, section, name, value);
+    if(!opt) return appconfig_set_raw_value(root, section, name, value, CONFIG_VALUE_TYPE_UNKNOWN);
 
     opt->flags |= CONFIG_VALUE_USED;
 

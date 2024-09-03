@@ -23,13 +23,13 @@ time_t appconfig_get_duration_seconds(struct config *root, const char *section, 
     duration_snprintf_time_t(default_str, sizeof(default_str), default_value);
 
     const char *s = appconfig_get_raw_value(
-        root, section, name, default_str, reformat_duration_seconds, CONFIG_VALUE_TYPE_DURATION_IN_SECS);
+        root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_SECS, reformat_duration_seconds);
     if(!s)
         return default_value;
 
     int result = 0;
     if(!duration_parse_seconds(s, &result)) {
-        appconfig_set(root, section, name, default_str);
+        appconfig_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_SECS);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
         return default_value;
     }
@@ -41,7 +41,7 @@ time_t appconfig_set_duration_seconds(struct config *root, const char *section, 
     char str[128];
     duration_snprintf_time_t(str, sizeof(str), value);
 
-    appconfig_set(root, section, name, str);
+    appconfig_set_raw_value(root, section, name, str, CONFIG_VALUE_TYPE_DURATION_IN_SECS);
     return value;
 }
 
@@ -64,13 +64,13 @@ msec_t appconfig_get_duration_ms(struct config *root, const char *section, const
     duration_snprintf_msec_t(default_str, sizeof(default_str), default_value);
 
     const char *s = appconfig_get_raw_value(
-        root, section, name, default_str, reformat_duration_ms, CONFIG_VALUE_TYPE_DURATION_IN_MS);
+        root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_MS, reformat_duration_ms);
     if(!s)
         return default_value;
 
     smsec_t result = 0;
     if(!duration_parse_msec_t(s, &result)) {
-        appconfig_set(root, section, name, default_str);
+        appconfig_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_MS);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
         return default_value;
     }
@@ -82,7 +82,7 @@ msec_t appconfig_set_duration_ms(struct config *root, const char *section, const
     char str[128];
     duration_snprintf_msec_t(str, sizeof(str), (smsec_t)value);
 
-    appconfig_set(root, section, name, str);
+    appconfig_set_raw_value(root, section, name, str, CONFIG_VALUE_TYPE_DURATION_IN_MS);
     return value;
 }
 
@@ -105,13 +105,13 @@ unsigned appconfig_get_duration_days(struct config *root, const char *section, c
     duration_snprintf_days(default_str, sizeof(default_str), (int)default_value);
 
     const char *s = appconfig_get_raw_value(
-        root, section, name, default_str, reformat_duration_days, CONFIG_VALUE_TYPE_DURATION_IN_DAYS);
+        root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_DAYS, reformat_duration_days);
     if(!s)
         return default_value;
 
     int64_t result = 0;
     if(!duration_parse_days(s, &result)) {
-        appconfig_set(root, section, name, default_str);
+        appconfig_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_DAYS);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
         return default_value;
     }
@@ -122,7 +122,7 @@ unsigned appconfig_get_duration_days(struct config *root, const char *section, c
 unsigned appconfig_set_duration_days(struct config *root, const char *section, const char *name, unsigned value) {
     char str[128];
     duration_snprintf_days(str, sizeof(str), value);
-    appconfig_set(root, section, name, str);
+    appconfig_set_raw_value(root, section, name, str, CONFIG_VALUE_TYPE_DURATION_IN_DAYS);
     return value;
 }
 

@@ -13,10 +13,12 @@
 #endif
 
 int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
-int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
-int appconfig_set_boolean(struct config *root, const char *section, const char *name, int value);
 #define config_get_boolean(section, name, value) appconfig_get_boolean(&netdata_config, section, name, value)
+
+int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
 #define config_get_boolean_ondemand(section, name, value) appconfig_get_boolean_ondemand(&netdata_config, section, name, value)
+
+int appconfig_set_boolean(struct config *root, const char *section, const char *name, int value);
 #define config_set_boolean(section, name, value) appconfig_set_boolean(&netdata_config, section, name, value)
 
 #endif //NETDATA_APPCONFIG_API_BOOLEAN_H

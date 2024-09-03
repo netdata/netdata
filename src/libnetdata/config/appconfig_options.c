@@ -98,18 +98,6 @@ void appconfig_option_remove_and_delete_all(struct config_section *sect, bool ha
         SECTION_UNLOCK(sect);
 }
 
-const char *appconfig_get_raw_value(struct config *root, const char *section, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type) {
-    struct config_section *sect = appconfig_section_find(root, section);
-
-    if (!sect && !default_value)
-        return NULL;
-
-    if(!sect)
-        sect = appconfig_section_create(root, section);
-
-    return appconfig_get_raw_value_of_option_in_section(sect, option, default_value, cb, type);
-}
-
 const char *appconfig_get_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type) {
     // Only calls internal to this file check for a NULL result, and they do not supply a NULL arg.
     // External caller should treat NULL as an error case.
@@ -147,4 +135,40 @@ const char *appconfig_get_raw_value_of_option_in_section(struct config_section *
         opt->value_default = string_strdupz(default_value);
 
     return string2str(opt->value);
+}
+
+const char *appconfig_get_raw_value(struct config *root, const char *section, const char *option, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb) {
+    struct config_section *sect = appconfig_section_find(root, section);
+
+    if (!sect && !default_value)
+        return NULL;
+
+    if(!sect)
+        sect = appconfig_section_create(root, section);
+
+    return appconfig_get_raw_value_of_option_in_section(sect, option, default_value, cb, type);
+}
+
+const char *appconfig_set_raw_value(struct config *root, const char *section, const char *name, const char *value, CONFIG_VALUE_TYPES type) {
+    struct config_section *sect = appconfig_section_find(root, section);
+    if(!sect)
+        sect = appconfig_section_create(root, section);
+
+    struct config_option *opt = appconfig_option_find(sect, name);
+    if(!opt)
+        opt = appconfig_option_create(sect, name, value);
+
+    opt->flags |= CONFIG_VALUE_USED;
+
+    if(opt->type == CONFIG_VALUE_TYPE_UNKNOWN)
+        opt->type = type;
+
+    if(string_strcmp(opt->value, value) != 0) {
+        opt->flags |= CONFIG_VALUE_CHANGED;
+
+        string_freez(opt->value);
+        opt->value = string_strdupz(value);
+    }
+
+    return value;
 }

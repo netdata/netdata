@@ -137,7 +137,8 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
 typedef bool (*appconfig_foreach_value_cb_t)(void *data, const char *name, const char *value);
 size_t appconfig_foreach_value_in_section(struct config *root, const char *section, appconfig_foreach_value_cb_t cb, void *data);
 
-const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);
+// sets a raw value, only if it is not loaded from the config
+const char *appconfig_set_default_raw_value(struct config *root, const char *section, const char *name, const char *value);
 
 int appconfig_exists(struct config *root, const char *section, const char *name);
 int appconfig_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new);
@@ -169,7 +170,7 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct config_section *connector, st
 
 #define config_load(filename, overwrite_used, section) appconfig_load(&netdata_config, filename, overwrite_used, section)
 
-#define config_set_default(section, name, value) appconfig_set_default(&netdata_config, section, name, value)
+#define config_set_default_raw_value(section, name, value) appconfig_set_default_raw_value(&netdata_config, section, name, value)
 
 #define config_exists(section, name) appconfig_exists(&netdata_config, section, name)
 #define config_move(section_old, name_old, section_new, name_new) appconfig_move(&netdata_config, section_old, name_old, section_new, name_new)

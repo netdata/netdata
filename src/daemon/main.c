@@ -1843,7 +1843,7 @@ int netdata_main(int argc, char **argv) {
                             // so the caller can use -c netdata.conf before or
                             // after this parameter to prevent or allow overwriting
                             // variables at netdata.conf
-                            config_set_default(section, key,  value);
+                            config_set_default_raw_value(section, key, value);
 
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
                         }
@@ -1876,7 +1876,7 @@ int netdata_main(int argc, char **argv) {
                             // so the caller can use -c netdata.conf before or
                             // after this parameter to prevent or allow overwriting
                             // variables at netdata.conf
-                            appconfig_set_default(tmp_config, section, key,  value);
+                            appconfig_set_default_raw_value(tmp_config, section, key, value);
 
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
                         }

@@ -189,7 +189,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
 
         if(netdata_conf && !found_host_labels) {
             appconfig_section_create(root, CONFIG_SECTION_HOST_LABEL);
-            appconfig_get_raw_value(root, CONFIG_SECTION_HOST_LABEL, "name", "value", NULL, CONFIG_VALUE_TYPE_TEXT);
+            appconfig_get_raw_value(root, CONFIG_SECTION_HOST_LABEL, "name", "value", CONFIG_VALUE_TYPE_TEXT, NULL);
         }
     }
 

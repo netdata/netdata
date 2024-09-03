@@ -2,17 +2,27 @@
 
 #include "size.h"
 
+// Define multipliers for base 2 (binary) units
 #define SIZE_MULTIPLIER_BASE2 1024ULL
 #define SIZE_MULTIPLIER_KiB (SIZE_MULTIPLIER_BASE2)
 #define SIZE_MULTIPLIER_MiB (SIZE_MULTIPLIER_KiB * SIZE_MULTIPLIER_BASE2)
 #define SIZE_MULTIPLIER_GiB (SIZE_MULTIPLIER_MiB * SIZE_MULTIPLIER_BASE2)
 #define SIZE_MULTIPLIER_TiB (SIZE_MULTIPLIER_GiB * SIZE_MULTIPLIER_BASE2)
+#define SIZE_MULTIPLIER_PiB (SIZE_MULTIPLIER_TiB * SIZE_MULTIPLIER_BASE2)
+#define SIZE_MULTIPLIER_EiB (SIZE_MULTIPLIER_PiB * SIZE_MULTIPLIER_BASE2)
+#define SIZE_MULTIPLIER_ZiB (SIZE_MULTIPLIER_EiB * SIZE_MULTIPLIER_BASE2)
+#define SIZE_MULTIPLIER_YiB (SIZE_MULTIPLIER_ZiB * SIZE_MULTIPLIER_BASE2)
 
+// Define multipliers for base 10 (decimal) units
 #define SIZE_MULTIPLIER_BASE10 1000ULL
 #define SIZE_MULTIPLIER_K (SIZE_MULTIPLIER_BASE10)
 #define SIZE_MULTIPLIER_M (SIZE_MULTIPLIER_K * SIZE_MULTIPLIER_BASE10)
 #define SIZE_MULTIPLIER_G (SIZE_MULTIPLIER_M * SIZE_MULTIPLIER_BASE10)
 #define SIZE_MULTIPLIER_T (SIZE_MULTIPLIER_G * SIZE_MULTIPLIER_BASE10)
+#define SIZE_MULTIPLIER_P (SIZE_MULTIPLIER_T * SIZE_MULTIPLIER_BASE10)
+#define SIZE_MULTIPLIER_E (SIZE_MULTIPLIER_P * SIZE_MULTIPLIER_BASE10)
+#define SIZE_MULTIPLIER_Z (SIZE_MULTIPLIER_E * SIZE_MULTIPLIER_BASE10)
+#define SIZE_MULTIPLIER_Y (SIZE_MULTIPLIER_Z * SIZE_MULTIPLIER_BASE10)
 
 // Define a structure to map size units to their multipliers
 static const struct size_unit {
@@ -21,6 +31,8 @@ static const struct size_unit {
     const bool formatter; // true when this unit should be used when formatting to string
     const uint64_t multiplier;
 } size_units[] = {
+    // the order of this table is important: smaller to bigger units!
+
     { .unit = "B",   .base = 2,  .formatter = true,  .multiplier = 1ULL },
     { .unit = "k",   .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_K },
     { .unit = "K",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_K },
@@ -35,6 +47,18 @@ static const struct size_unit {
     { .unit = "T",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_T },
     { .unit = "TB",  .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_T },
     { .unit = "TiB", .base = 2,  .formatter = true,  .multiplier = SIZE_MULTIPLIER_TiB },
+    { .unit = "P",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_P },
+    { .unit = "PB",  .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_P },
+    { .unit = "PiB", .base = 2,  .formatter = true,  .multiplier = SIZE_MULTIPLIER_PiB },
+    { .unit = "E",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_E },
+    { .unit = "EB",  .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_E },
+    { .unit = "EiB", .base = 2,  .formatter = true,  .multiplier = SIZE_MULTIPLIER_EiB },
+    { .unit = "Z",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_Z },
+    { .unit = "ZB",  .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_Z },
+    { .unit = "ZiB", .base = 2,  .formatter = true,  .multiplier = SIZE_MULTIPLIER_ZiB },
+    { .unit = "Y",   .base = 10, .formatter = true,  .multiplier = SIZE_MULTIPLIER_Y },
+    { .unit = "YB",  .base = 10, .formatter = false, .multiplier = SIZE_MULTIPLIER_Y },
+    { .unit = "YiB", .base = 2,  .formatter = true,  .multiplier = SIZE_MULTIPLIER_YiB },
 };
 
 static inline const struct size_unit *size_find_unit(const char *unit) {
@@ -144,11 +168,13 @@ ssize_t size_snprintf(char *dst, size_t dst_size, uint64_t value, const char *un
     const struct size_unit *su_best = su_def;
     for (size_t i = 0; i < sizeof(size_units) / sizeof(size_units[0]); i++) {
         const struct size_unit *su = &size_units[i];
-        if (su->base != su_def->base || su->multiplier < su_def->multiplier || (!su->formatter && su != su_def))
+        if (su->base != su_def->base                ||  // not the right base
+            su->multiplier < su_def->multiplier     ||  // the multiplier is too small
+            (!su->formatter && su != su_def)        ||  // it is not to be used in formatting (except our unit)
+            (bytes < su->multiplier && su != su_def) )  // the converted value will be <1.0
             continue;
 
         double converted = size_round_to_resolution_dbl2(bytes, su->multiplier);
-        // if(converted < 1.0) continue;
 
         uint64_t reversed_bytes = (uint64_t)(converted * (double)su->multiplier);
 
