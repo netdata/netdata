@@ -103,7 +103,6 @@
 #define CONFIG_SECTION_GLOBAL_STATISTICS  "global statistics"
 #define CONFIG_SECTION_DB                 "db"
 
-
 // these are used to limit the configuration names and values lengths
 // they are not enforced by config.c functions (they will strdup() all strings, no matter of their length)
 #define CONFIG_MAX_NAME 1024
@@ -133,46 +132,12 @@ struct config {
         },                                              \
     }
 
-#define CONFIG_BOOLEAN_INVALID 100  // an invalid value to check for validity (used as default initialization when needed)
-
-#define CONFIG_BOOLEAN_NO   0       // disabled
-#define CONFIG_BOOLEAN_YES  1       // enabled
-
-#ifndef CONFIG_BOOLEAN_AUTO
-#define CONFIG_BOOLEAN_AUTO 2       // enabled if it has useful info when enabled
-#endif
-
 int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name);
 
 typedef bool (*appconfig_foreach_value_cb_t)(void *data, const char *name, const char *value);
 size_t appconfig_foreach_value_in_section(struct config *root, const char *section, appconfig_foreach_value_cb_t cb, void *data);
 
-const char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
-long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value);
-NETDATA_DOUBLE appconfig_get_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
-int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
-int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
-
-msec_t appconfig_get_duration_ms(struct config *root, const char *section, const char *name, msec_t default_value);
-msec_t appconfig_set_duration_ms(struct config *root, const char *section, const char *name, msec_t value);
-
-time_t appconfig_get_duration_seconds(struct config *root, const char *section, const char *name, time_t default_value);
-time_t appconfig_set_duration_seconds(struct config *root, const char *section, const char *name, time_t value);
-
-unsigned appconfig_get_duration_days(struct config *root, const char *section, const char *name, unsigned default_value);
-unsigned appconfig_set_duration_days(struct config *root, const char *section, const char *name, unsigned value);
-
-unsigned appconfig_get_size_mb(struct config *root, const char *section, const char *name, unsigned default_value);
-unsigned appconfig_set_size_mb(struct config *root, const char *section, const char *name, unsigned value);
-
-unsigned appconfig_get_size_bytes(struct config *root, const char *section, const char *name, unsigned default_value);
-unsigned appconfig_set_size_bytes(struct config *root, const char *section, const char *name, unsigned value);
-
-const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value);
 const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);
-long long appconfig_set_number(struct config *root, const char *section, const char *name, long long value);
-NETDATA_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
-int appconfig_set_boolean(struct config *root, const char *section, const char *name, int value);
 
 int appconfig_exists(struct config *root, const char *section, const char *name);
 int appconfig_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new);
@@ -203,31 +168,8 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct config_section *connector, st
 // shortcuts for the default netdata configuration
 
 #define config_load(filename, overwrite_used, section) appconfig_load(&netdata_config, filename, overwrite_used, section)
-#define config_get(section, name, default_value) appconfig_get(&netdata_config, section, name, default_value)
-#define config_get_number(section, name, value) appconfig_get_number(&netdata_config, section, name, value)
-#define config_get_double(section, name, value) appconfig_get_double(&netdata_config, section, name, value)
-#define config_get_boolean(section, name, value) appconfig_get_boolean(&netdata_config, section, name, value)
-#define config_get_boolean_ondemand(section, name, value) appconfig_get_boolean_ondemand(&netdata_config, section, name, value)
 
-#define config_get_duration_ms(section, name, value) appconfig_get_duration_ms(&netdata_config, section, name, value)
-#define config_get_duration_seconds(section, name, value) appconfig_get_duration_seconds(&netdata_config, section, name, value)
-#define config_get_duration_days(section, name, value) appconfig_get_duration_days(&netdata_config, section, name, value)
-
-#define config_get_size_bytes(section, name, value) appconfig_get_size_bytes(&netdata_config, section, name, value)
-#define config_get_size_mb(section, name, value) appconfig_get_size_mb(&netdata_config, section, name, value)
-
-#define config_set(section, name, default_value) appconfig_set(&netdata_config, section, name, default_value)
 #define config_set_default(section, name, value) appconfig_set_default(&netdata_config, section, name, value)
-#define config_set_number(section, name, value) appconfig_set_number(&netdata_config, section, name, value)
-#define config_set_float(section, name, value) appconfig_set_float(&netdata_config, section, name, value)
-#define config_set_boolean(section, name, value) appconfig_set_boolean(&netdata_config, section, name, value)
-
-#define config_set_duration_ms(section, name, value) appconfig_set_duration_ms(&netdata_config, section, name, value)
-#define config_set_duration_seconds(section, name, value) appconfig_set_duration_seconds(&netdata_config, section, name, value)
-#define config_set_duration_days(section, name, value) appconfig_set_duration_days(&netdata_config, section, name, value)
-
-#define config_set_size_bytes(section, name, value) appconfig_set_size_bytes(&netdata_config, section, name, value)
-#define config_set_size_mb(section, name, value) appconfig_set_size_mb(&netdata_config, section, name, value)
 
 #define config_exists(section, name) appconfig_exists(&netdata_config, section, name)
 #define config_move(section_old, name_old, section_new, name_new) appconfig_move(&netdata_config, section_old, name_old, section_new, name_new)
@@ -240,4 +182,10 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct config_section *connector, st
 bool stream_conf_needs_dbengine(struct config *root);
 bool stream_conf_has_uuid_section(struct config *root);
 
-#endif /* NETDATA_CONFIG_H */
+#include "appconfig_api_text.h"
+#include "appconfig_api_numbers.h"
+#include "appconfig_api_boolean.h"
+#include "appconfig_api_sizes.h"
+#include "appconfig_api_durations.h"
+
+#endif // NETDATA_CONFIG_H

@@ -84,8 +84,8 @@ static struct {
     bool enabled;
     char *iceServers[WEBRTC_MAX_ICE_SERVERS];
     int iceServersCount;
-    char *proxyServer;
-    char *bindAddress;
+    const char *proxyServer;
+    const char *bindAddress;
 
     struct {
         SPINLOCK spinlock;
@@ -142,10 +142,12 @@ static void webrtc_config_ice_servers(void) {
     webrtc_base.iceServersCount = i;
     internal_error(true, "WEBRTC: there are %d default ice servers: '%s'", webrtc_base.iceServersCount, buffer_tostring(wb));
 
-    char *servers = config_get(CONFIG_SECTION_WEBRTC, "ice servers", buffer_tostring(wb));
+    const char *servers = config_get(CONFIG_SECTION_WEBRTC, "ice servers", buffer_tostring(wb));
 
     webrtc_base.iceServersCount = 0;
-    char *s = servers, *e;
+    char tmp[strlen(servers) + 1];
+    strcpy(tmp, servers);
+    char *s = tmp, *e;
     while(*s) {
         if(isspace(*s))
             s++;

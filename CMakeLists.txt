@@ -779,6 +779,16 @@ set(LIBNETDATA_FILES
         src/libnetdata/config/appconfig_options.c
         src/libnetdata/config/appconfig_migrate.c
         src/libnetdata/config/appconfig_traversal.c
+        src/libnetdata/config/appconfig_api_sizes.c
+        src/libnetdata/config/appconfig_api_sizes.h
+        src/libnetdata/config/appconfig_api_durations.c
+        src/libnetdata/config/appconfig_api_durations.h
+        src/libnetdata/config/appconfig_api_numbers.c
+        src/libnetdata/config/appconfig_api_numbers.h
+        src/libnetdata/config/appconfig_api_text.c
+        src/libnetdata/config/appconfig_api_text.h
+        src/libnetdata/config/appconfig_api_boolean.c
+        src/libnetdata/config/appconfig_api_boolean.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

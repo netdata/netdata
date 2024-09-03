@@ -98,7 +98,7 @@ void appconfig_option_remove_and_delete_all(struct config_section *sect, bool ha
         SECTION_UNLOCK(sect);
 }
 
-const char *appconfig_get_value_and_reformat(struct config *root, const char *section, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type) {
+const char *appconfig_get_raw_value(struct config *root, const char *section, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type) {
     struct config_section *sect = appconfig_section_find(root, section);
 
     if (!sect && !default_value)
@@ -107,16 +107,16 @@ const char *appconfig_get_value_and_reformat(struct config *root, const char *se
     if(!sect)
         sect = appconfig_section_create(root, section);
 
-    return appconfig_get_value_of_option_in_section(sect, option, default_value, cb, type);
+    return appconfig_get_raw_value_of_option_in_section(sect, option, default_value, cb, type);
 }
 
-const char *appconfig_get_value_of_option_in_section(struct config_section *co, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type) {
+const char *appconfig_get_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type) {
     // Only calls internal to this file check for a NULL result, and they do not supply a NULL arg.
     // External caller should treat NULL as an error case.
-    struct config_option *opt = appconfig_option_find(co, option);
+    struct config_option *opt = appconfig_option_find(sect, option);
     if (!opt) {
         if (!default_value) return NULL;
-        opt = appconfig_option_create(co, option, default_value);
+        opt = appconfig_option_create(sect, option, default_value);
         if (!opt) return NULL;
     }
     opt->flags |= CONFIG_VALUE_USED;

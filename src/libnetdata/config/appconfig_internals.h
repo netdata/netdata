@@ -96,8 +96,8 @@ struct config_option *appconfig_option_create(struct config_section *sect, const
 int appconfig_get_boolean_by_section(struct config_section *co, const char *name, int value);
 
 typedef STRING *(*reformat_t)(STRING *value);
-const char *appconfig_get_value_of_option_in_section(struct config_section *co, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type);
-const char *appconfig_get_value_and_reformat(struct config *root, const char *section, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type);
+const char *appconfig_get_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type);
+const char *appconfig_get_raw_value(struct config *root, const char *section, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type);
 
 // cleanup
 void appconfig_section_destroy_non_loaded(struct config *root, const char *section);
