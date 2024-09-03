@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- netdata-claim.sh: fix parsing url arg [\#18460](https://github.com/netdata/netdata/pull/18460) ([ilyam8](https://github.com/ilyam8))
+- Bump github.com/likexian/whois from 1.15.4 to 1.15.5 in /src/go [\#18457](https://github.com/netdata/netdata/pull/18457) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/likexian/whois-parser from 1.24.19 to 1.24.20 in /src/go [\#18456](https://github.com/netdata/netdata/pull/18456) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations.js [\#18454](https://github.com/netdata/netdata/pull/18454) ([netdatabot](https://github.com/netdatabot))
 - Bump github.com/Masterminds/sprig/v3 from 3.2.3 to 3.3.0 in /src/go [\#18453](https://github.com/netdata/netdata/pull/18453) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/prometheus/common from 0.55.0 to 0.57.0 in /src/go [\#18452](https://github.com/netdata/netdata/pull/18452) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -419,10 +422,6 @@
 - go.d ll netlisteners add support for wildcard address [\#17896](https://github.com/netdata/netdata/pull/17896) ([ilyam8](https://github.com/ilyam8))
 - integrations make `<details>` open [\#17895](https://github.com/netdata/netdata/pull/17895) ([ilyam8](https://github.com/ilyam8))
 - allow alerts to be created without too many requirements [\#17894](https://github.com/netdata/netdata/pull/17894) ([ktsaou](https://github.com/ktsaou))
-- Improve ml thread termination during agent shutdown [\#17889](https://github.com/netdata/netdata/pull/17889) ([stelfrag](https://github.com/stelfrag))
-- Update netdata-charts.md [\#17888](https://github.com/netdata/netdata/pull/17888) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations.js [\#17886](https://github.com/netdata/netdata/pull/17886) ([netdatabot](https://github.com/netdatabot))
-- Restore ML thread termination to original order [\#17885](https://github.com/netdata/netdata/pull/17885) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
