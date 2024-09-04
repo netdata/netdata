@@ -488,10 +488,9 @@ done:
     freez(claim_id);
 }
 
-#define SQL_DELETE_PROCESSED_ROWS                                                                                      \
-    "DELETE FROM alert_queue WHERE host_id = @host_id AND rowid between @row1 AND @row2"
+#define SQL_DELETE_PROCESSED_ROWS "DELETE FROM alert_queue WHERE host_id = @host_id AND rowid = @row"
 
-static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row1, int64_t row2)
+static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row)
 {
     static __thread sqlite3_stmt *res = NULL;
 
@@ -500,8 +499,7 @@ static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row1, int64_t
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, row1));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, row2));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, row));
 
     param = 0;
     int rc = sqlite3_step_monitored(res);
@@ -571,8 +569,6 @@ bool process_alert_pending_queue(RRDHOST *host)
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
 
     param = 0;
-    int64_t start_row = 0;
-    int64_t end_row = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
 
         int64_t health_log_id = sqlite3_column_int64(res, 0);
@@ -586,15 +582,10 @@ bool process_alert_pending_queue(RRDHOST *host)
                 added++;
         }
 
-        if (!start_row)
-            start_row = row;
-        end_row = row;
+        delete_alert_from_pending_queue(host, row);
 
         count++;
     }
-
-    if (start_row)
-        delete_alert_from_pending_queue(host, start_row, end_row);
 
     if(count)
         nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK STA [%s (N/A)]: Processed %d entries, queued %d", rrdhost_hostname(host), count, added);
