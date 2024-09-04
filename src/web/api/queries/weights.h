@@ -18,9 +18,7 @@ typedef enum {
     WEIGHTS_FORMAT_MULTINODE = 3,
 } WEIGHTS_FORMAT;
 
-extern int enable_metric_correlations;
 extern int metric_correlations_version;
-extern WEIGHTS_METHOD default_metric_correlations_method;
 
 typedef bool (*weights_interrupt_callback_t)(void *data);
 

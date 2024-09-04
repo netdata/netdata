@@ -103,7 +103,6 @@
 #define CONFIG_SECTION_GLOBAL_STATISTICS  "global statistics"
 #define CONFIG_SECTION_DB                 "db"
 
-
 // these are used to limit the configuration names and values lengths
 // they are not enforced by config.c functions (they will strdup() all strings, no matter of their length)
 #define CONFIG_MAX_NAME 1024
@@ -113,94 +112,43 @@
 // Config definitions
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-#define CONFIG_VALUE_LOADED  0x01 // has been loaded from the config
-#define CONFIG_VALUE_USED    0x02 // has been accessed from the program
-#define CONFIG_VALUE_CHANGED 0x04 // has been changed from the loaded value or the internal default value
-#define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
-
-struct config_option {
-    avl_t avl_node;         // the index entry of this entry - this has to be first!
-
-    uint8_t flags;
-    uint32_t hash;          // a simple hash to speed up searching
-                            // we first compare hashes, and only if the hashes are equal we do string comparisons
-
-    char *name;
-    char *value;
-
-    struct config_option *next; // config->mutex protects just this
-};
-
-struct section {
-    avl_t avl_node;         // the index entry of this section - this has to be first!
-
-    uint32_t hash;          // a simple hash to speed up searching
-                            // we first compare hashes, and only if the hashes are equal we do string comparisons
-
-    char *name;
-
-    struct section *next;    // global config_mutex protects just this
-
-    struct config_option *values;
-    avl_tree_lock values_index;
-
-    netdata_mutex_t mutex;  // this locks only the writers, to ensure atomic updates
-                            // readers are protected using the rwlock in avl_tree_lock
-};
+struct config_section;
 
 struct config {
-    struct section *first_section;
-    struct section *last_section; // optimize inserting at the end
-    netdata_mutex_t mutex;
+    struct config_section *sections;
+    SPINLOCK spinlock;
     avl_tree_lock index;
 };
 
-#define CONFIG_BOOLEAN_INVALID 100  // an invalid value to check for validity (used as default initialization when needed)
-
-#define CONFIG_BOOLEAN_NO   0       // disabled
-#define CONFIG_BOOLEAN_YES  1       // enabled
-
-#ifndef CONFIG_BOOLEAN_AUTO
-#define CONFIG_BOOLEAN_AUTO 2       // enabled if it has useful info when enabled
-#endif
+#define APPCONFIG_INITIALIZER (struct config) {         \
+        .sections = NULL,                               \
+        .spinlock = NETDATA_SPINLOCK_INITIALIZER,       \
+        .index = {                                      \
+            .avl_tree = {                               \
+                .root = NULL,                           \
+                .compar = appconfig_section_compare,    \
+            },                                          \
+            .rwlock = AVL_LOCK_INITIALIZER,             \
+        },                                              \
+    }
 
 int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name);
-void config_section_wrlock(struct section *co);
-void config_section_unlock(struct section *co);
 
-char *appconfig_get_by_section(struct section *co, const char *name, const char *default_value);
-char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
-long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value);
-NETDATA_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
-int appconfig_get_boolean_by_section(struct section *co, const char *name, int value);
-int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
-int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
-int appconfig_get_duration(struct config *root, const char *section, const char *name, const char *value);
+typedef bool (*appconfig_foreach_value_cb_t)(void *data, const char *name, const char *value);
+size_t appconfig_foreach_value_in_section(struct config *root, const char *section, appconfig_foreach_value_cb_t cb, void *data);
 
-const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value);
-const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);
-long long appconfig_set_number(struct config *root, const char *section, const char *name, long long value);
-NETDATA_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value);
-int appconfig_set_boolean(struct config *root, const char *section, const char *name, int value);
+// sets a raw value, only if it is not loaded from the config
+void appconfig_set_default_raw_value(struct config *root, const char *section, const char *name, const char *value);
 
 int appconfig_exists(struct config *root, const char *section, const char *name);
 int appconfig_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new);
+int appconfig_move_everywhere(struct config *root, const char *name_old, const char *name_new);
 
 void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool netdata_conf);
 
 int appconfig_section_compare(void *a, void *b);
 
-void appconfig_section_destroy_non_loaded(struct config *root, const char *section);
-void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name);
-
-int config_parse_duration(const char* string, int* result);
-
-struct section *appconfig_get_section(struct config *root, const char *name);
-
-void appconfig_wrlock(struct config *root);
-void appconfig_unlock(struct config *root);
-
-int appconfig_test_boolean_value(char *s);
+bool appconfig_test_boolean_value(const char *s);
 
 struct connector_instance {
     char instance_name[CONFIG_MAX_NAME + 1];
@@ -208,13 +156,37 @@ struct connector_instance {
 };
 
 typedef struct _connector_instance {
-    struct section *connector;        // actual connector
-    struct section *instance;         // This instance
+    struct config_section *connector;        // actual connector
+    struct config_section *instance;         // This instance
     char instance_name[CONFIG_MAX_NAME + 1];
     char connector_name[CONFIG_MAX_NAME + 1];
     struct _connector_instance *next; // Next instance
 } _CONNECTOR_INSTANCE;
 
-_CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct section *instance);
+_CONNECTOR_INSTANCE *add_connector_instance(struct config_section *connector, struct config_section *instance);
 
-#endif /* NETDATA_CONFIG_H */
+// ----------------------------------------------------------------------------
+// shortcuts for the default netdata configuration
+
+#define config_load(filename, overwrite_used, section) appconfig_load(&netdata_config, filename, overwrite_used, section)
+
+#define config_set_default_raw_value(section, name, value) appconfig_set_default_raw_value(&netdata_config, section, name, value)
+
+#define config_exists(section, name) appconfig_exists(&netdata_config, section, name)
+#define config_move(section_old, name_old, section_new, name_new) appconfig_move(&netdata_config, section_old, name_old, section_new, name_new)
+
+#define netdata_conf_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed, true)
+
+#define config_section_destroy(section) appconfig_section_destroy_non_loaded(&netdata_config, section)
+#define config_section_option_destroy(section, name) appconfig_section_option_destroy_non_loaded(&netdata_config, section, name)
+
+bool stream_conf_needs_dbengine(struct config *root);
+bool stream_conf_has_uuid_section(struct config *root);
+
+#include "appconfig_api_text.h"
+#include "appconfig_api_numbers.h"
+#include "appconfig_api_boolean.h"
+#include "appconfig_api_sizes.h"
+#include "appconfig_api_durations.h"
+
+#endif // NETDATA_CONFIG_H

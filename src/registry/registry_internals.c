@@ -266,7 +266,7 @@ static inline int is_machine_guid_blacklisted(const char *guid) {
     return 0;
 }
 
-char *registry_get_this_machine_hostname(void) {
+const char *registry_get_this_machine_hostname(void) {
     return registry.hostname;
 }
 

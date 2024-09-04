@@ -39,7 +39,7 @@ SIMPLE_PATTERN *search_cgroup_paths = NULL;
 SIMPLE_PATTERN *enabled_cgroup_renames = NULL;
 SIMPLE_PATTERN *systemd_services_cgroups = NULL;
 SIMPLE_PATTERN *entrypoint_parent_process_comm = NULL;
-char *cgroups_network_interface_script = NULL;
+const char *cgroups_network_interface_script = NULL;
 int cgroups_check = 0;
 uint32_t Read_hash = 0;
 uint32_t Write_hash = 0;
@@ -229,13 +229,17 @@ void read_cgroup_plugin_configuration() {
     throttled_time_hash = simple_hash("throttled_time");
     throttled_usec_hash = simple_hash("throttled_usec");
 
-    cgroup_update_every = (int)config_get_number("plugin:cgroups", "update every", localhost->rrd_update_every);
-    if(cgroup_update_every < localhost->rrd_update_every)
+    cgroup_update_every = (int)config_get_duration_seconds("plugin:cgroups", "update every", localhost->rrd_update_every);
+    if(cgroup_update_every < localhost->rrd_update_every) {
         cgroup_update_every = localhost->rrd_update_every;
+        config_set_duration_seconds("plugin:cgroups", "update every", localhost->rrd_update_every);
+    }
 
-    cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every);
-    if(cgroup_check_for_new_every < cgroup_update_every)
+    cgroup_check_for_new_every = (int)config_get_duration_seconds("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every);
+    if(cgroup_check_for_new_every < cgroup_update_every) {
         cgroup_check_for_new_every = cgroup_update_every;
+        config_set_duration_seconds("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every);
+    }
 
     cgroup_use_unified_cgroups = config_get_boolean_ondemand("plugin:cgroups", "use unified cgroups", CONFIG_BOOLEAN_AUTO);
     if (cgroup_use_unified_cgroups == CONFIG_BOOLEAN_AUTO)

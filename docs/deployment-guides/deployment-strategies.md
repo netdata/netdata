@@ -95,23 +95,18 @@ On the Parent, edit `netdata.conf` by using the [edit-config](/docs/netdata-agen
 ```yaml
 [db]
     mode = dbengine
+    dbengine tier backfill = new
     storage tiers = 3
-    # To allow memory pressure to offload index from ram
-    dbengine page descriptors in file mapped memory = yes
+    dbengine page cache size = 1.4GiB
     # storage tier 0
     update every = 1
-    dbengine multihost disk space MB = 12000
-    dbengine page cache size MB = 1400
+    dbengine tier 0 retention space = 12GiB
     # storage tier 1
-    dbengine tier 1 page cache size MB = 512
-    dbengine tier 1 multihost disk space MB = 4096
     dbengine tier 1 update every iterations = 60
-    dbengine tier 1 backfill = new
+    dbengine tier 1 retention space = 4GiB
     # storage tier 2
-    dbengine tier 2 page cache size MB = 128
-    dbengine tier 2 multihost disk space MB = 2048
     dbengine tier 2 update every iterations = 60
-    dbengine tier 2 backfill = new
+    dbengine tier 2 retention space = 2GiB
 [ml]
     # Enabled by default
     # enabled = yes

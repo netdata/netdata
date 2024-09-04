@@ -452,7 +452,7 @@ static inline collected_number uptime_from_boottime(void) {
 }
 
 static procfile *read_proc_uptime_ff = NULL;
-static inline collected_number read_proc_uptime(char *filename) {
+static inline collected_number read_proc_uptime(const char *filename) {
     if(unlikely(!read_proc_uptime_ff)) {
         read_proc_uptime_ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!read_proc_uptime_ff)) return 0;
@@ -473,7 +473,7 @@ static inline collected_number read_proc_uptime(char *filename) {
     return (collected_number)(strtondd(procfile_lineword(read_proc_uptime_ff, 0, 0), NULL) * 1000.0);
 }
 
-inline collected_number uptime_msec(char *filename){
+inline collected_number uptime_msec(const char *filename){
     static int use_boottime = -1;
 
     if(unlikely(use_boottime == -1)) {

@@ -29,14 +29,14 @@ static inline int health_parse_delay(
         while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
         if(!strcasecmp(key, "up")) {
-            if (!config_parse_duration(value, delay_up_duration)) {
+            if (!duration_parse_seconds(value, delay_up_duration)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                                   line, filename, value, key);
             }
             else given_up = 1;
         }
         else if(!strcasecmp(key, "down")) {
-            if (!config_parse_duration(value, delay_down_duration)) {
+            if (!duration_parse_seconds(value, delay_down_duration)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                                   line, filename, value, key);
             }
@@ -51,7 +51,7 @@ static inline int health_parse_delay(
             else given_multiplier = 1;
         }
         else if(!strcasecmp(key, "max")) {
-            if (!config_parse_duration(value, delay_max_duration)) {
+            if (!duration_parse_seconds(value, delay_max_duration)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                                   line, filename, value, key);
             }
@@ -139,13 +139,13 @@ static inline int health_parse_repeat(
             return 1;
         }
         if(!strcasecmp(key, "warning")) {
-            if (!config_parse_duration(value, (int*)warn_repeat_every)) {
+            if (!duration_parse_seconds(value, (int *)warn_repeat_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                                   line, file, value, key);
             }
         }
         else if(!strcasecmp(key, "critical")) {
-            if (!config_parse_duration(value, (int*)crit_repeat_every)) {
+            if (!duration_parse_seconds(value, (int *)crit_repeat_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                                   line, file, value, key);
             }
@@ -273,7 +273,7 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
     while(*s && !isspace((uint8_t)*s)) s++;
     while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
-    if(!config_parse_duration(key, &ac->after)) {
+    if(!duration_parse_seconds(key, &ac->after)) {
         netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' after group method",
                           line, filename, key);
         return 0;
@@ -294,7 +294,7 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
             while(*s && !isspace((uint8_t)*s)) s++;
             while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
-            if (!config_parse_duration(value, &ac->before)) {
+            if (!duration_parse_seconds(value, &ac->before)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                                   line, filename, value, key);
             }
@@ -304,7 +304,7 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
             while(*s && !isspace((uint8_t)*s)) s++;
             while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
-            if (!config_parse_duration(value, &ac->update_every)) {
+            if (!duration_parse_seconds(value, &ac->update_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                                   line, filename, value, key);
             }
@@ -725,7 +725,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             health_parse_db_lookup(line, filename, value, ac);
         }
         else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
-            if(!config_parse_duration(value, &ac->update_every))
+            if(!duration_parse_seconds(value, &ac->update_every))
                 netdata_log_error(
                     "Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' "
                     "cannot parse duration: '%s'.",

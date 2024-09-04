@@ -12,7 +12,7 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 #define HTTP_REQ_MAX_HEADER_FETCH_TRIES 100
 
 extern int respect_web_browser_do_not_track_policy;
-extern char *web_x_frame_options;
+extern const char *web_x_frame_options;
 
 typedef enum __attribute__((packed)) {
     HTTP_VALIDATION_OK,

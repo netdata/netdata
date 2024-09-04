@@ -2491,10 +2491,11 @@ void *statsd_main(void *ptr) {
     statsd.enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, "statsd", statsd.enabled);
 
     statsd.update_every = default_rrd_update_every;
-    statsd.update_every = (int)config_get_number(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
+    statsd.update_every = (int)config_get_duration_seconds(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
     if(statsd.update_every < default_rrd_update_every) {
         collector_error("STATSD: minimum flush interval %d given, but the minimum is the update every of netdata. Using %d", statsd.update_every, default_rrd_update_every);
         statsd.update_every = default_rrd_update_every;
+        config_set_duration_seconds(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
     }
 
 #ifdef HAVE_RECVMMSG
@@ -2504,13 +2505,26 @@ void *statsd_main(void *ptr) {
     statsd.charts_for = simple_pattern_create(
             config_get(CONFIG_SECTION_STATSD, "create private charts for metrics matching", "*"), NULL,
             SIMPLE_PATTERN_EXACT, true);
-    statsd.max_private_charts_hard = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts_hard);
-    statsd.set_obsolete_after = (size_t)config_get_number(CONFIG_SECTION_STATSD, "set charts as obsolete after secs", (long long)statsd.set_obsolete_after);
-    statsd.decimal_detail = (collected_number)config_get_number(CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);
-    statsd.tcp_idle_timeout = (size_t) config_get_number(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after seconds", (long long int)statsd.tcp_idle_timeout);
-    statsd.private_charts_hidden = (unsigned int)config_get_boolean(CONFIG_SECTION_STATSD, "private charts hidden", statsd.private_charts_hidden);
 
-    statsd.histogram_percentile = (double)config_get_float(CONFIG_SECTION_STATSD, "histograms and timers percentile (percentThreshold)", statsd.histogram_percentile);
+    statsd.max_private_charts_hard =
+        (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts_hard);
+
+    statsd.set_obsolete_after =
+        (size_t)config_get_duration_seconds(CONFIG_SECTION_STATSD, "set charts as obsolete after", (long long)statsd.set_obsolete_after);
+
+    statsd.decimal_detail =
+        (collected_number)config_get_number(CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);
+
+    statsd.tcp_idle_timeout =
+        (size_t) config_get_duration_seconds(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after", (long long int)statsd.tcp_idle_timeout);
+
+    statsd.private_charts_hidden =
+        (unsigned int)config_get_boolean(CONFIG_SECTION_STATSD, "private charts hidden", statsd.private_charts_hidden);
+
+    statsd.histogram_percentile =
+        (double)config_get_double(
+        CONFIG_SECTION_STATSD, "histograms and timers percentile (percentThreshold)", statsd.histogram_percentile);
+
     if(isless(statsd.histogram_percentile, 0) || isgreater(statsd.histogram_percentile, 100)) {
         collector_error("STATSD: invalid histograms and timers percentile %0.5f given", statsd.histogram_percentile);
         statsd.histogram_percentile = 95.0;
@@ -2521,7 +2535,8 @@ void *statsd_main(void *ptr) {
         statsd.histogram_percentile_str = strdupz(buffer);
     }
 
-    statsd.dictionary_max_unique = config_get_number(CONFIG_SECTION_STATSD, "dictionaries max unique dimensions", statsd.dictionary_max_unique);
+    statsd.dictionary_max_unique =
+        config_get_number(CONFIG_SECTION_STATSD, "dictionaries max unique dimensions", statsd.dictionary_max_unique);
 
     if(config_get_boolean(CONFIG_SECTION_STATSD, "add dimension for number of events received", 0)) {
         statsd.gauges.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;

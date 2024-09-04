@@ -4,9 +4,7 @@
 #include "database/KolmogorovSmirnovDist.h"
 
 #define MAX_POINTS 10000
-int enable_metric_correlations = CONFIG_BOOLEAN_YES;
 int metric_correlations_version = 1;
-WEIGHTS_METHOD default_metric_correlations_method = WEIGHTS_METHOD_MC_KS2;
 
 typedef struct weights_stats {
     NETDATA_DOUBLE max_base_high_ratio;
@@ -36,7 +34,7 @@ WEIGHTS_METHOD weights_string_to_method(const char *method) {
         if(strcmp(method, weights_methods[i].name) == 0)
             return weights_methods[i].value;
 
-    return default_metric_correlations_method;
+    return WEIGHTS_METHOD_MC_KS2;
 }
 
 const char *weights_method_to_string(WEIGHTS_METHOD method) {
@@ -44,7 +42,7 @@ const char *weights_method_to_string(WEIGHTS_METHOD method) {
         if(weights_methods[i].value == method)
             return weights_methods[i].name;
 
-    return "unknown";
+    return "ks2";
 }
 
 // ----------------------------------------------------------------------------

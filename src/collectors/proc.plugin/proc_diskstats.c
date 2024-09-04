@@ -180,16 +180,16 @@ static struct disk {
 
 #define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete___safe_from_collector_thread(st); (st) = NULL; } } while(st)
 
-static char *path_to_sys_dev_block_major_minor_string = NULL;
-static char *path_to_sys_block_device = NULL;
-static char *path_to_sys_block_device_bcache = NULL;
-static char *path_to_sys_devices_virtual_block_device = NULL;
-static char *path_to_device_mapper = NULL;
-static char *path_to_dev_disk = NULL;
-static char *path_to_sys_block = NULL;
-static char *path_to_device_label = NULL;
-static char *path_to_device_id = NULL;
-static char *path_to_veritas_volume_groups = NULL;
+static const char *path_to_sys_dev_block_major_minor_string = NULL;
+static const char *path_to_sys_block_device = NULL;
+static const char *path_to_sys_block_device_bcache = NULL;
+static const char *path_to_sys_devices_virtual_block_device = NULL;
+static const char *path_to_device_mapper = NULL;
+static const char *path_to_dev_disk = NULL;
+static const char *path_to_sys_block = NULL;
+static const char *path_to_device_label = NULL;
+static const char *path_to_device_id = NULL;
+static const char *path_to_veritas_volume_groups = NULL;
 static int name_disks_by_id = CONFIG_BOOLEAN_NO;
 static int global_bcache_priority_stats_update_every = 0; // disabled by default
 
@@ -1374,7 +1374,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         global_do_ext     = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "extended operations for all disks", global_do_ext);
         global_do_backlog = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "backlog for all disks", global_do_backlog);
         global_do_bcache  = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache for all disks", global_do_bcache);
-        global_bcache_priority_stats_update_every = (int)config_get_number(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache priority stats update every", global_bcache_priority_stats_update_every);
+        global_bcache_priority_stats_update_every = (int)config_get_duration_seconds(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache priority stats update every", global_bcache_priority_stats_update_every);
 
         global_cleanup_removed_disks = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "remove charts of removed disks" , global_cleanup_removed_disks);
 

@@ -194,9 +194,11 @@ static void profile_main_cleanup(void *pptr) {
 extern "C" void *profile_main(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(profile_main_cleanup) cleanup_ptr = ptr;
 
-    int UpdateEvery = (int) config_get_number(CONFIG_SECTION_PROFILE, "update every", 1);
-    if (UpdateEvery < localhost->rrd_update_every)
+    int UpdateEvery = (int) config_get_duration_seconds(CONFIG_SECTION_PROFILE, "update every", 1);
+    if (UpdateEvery < localhost->rrd_update_every) {
         UpdateEvery = localhost->rrd_update_every;
+        config_set_duration_seconds(CONFIG_SECTION_PROFILE, "update every", UpdateEvery);
+    }
 
     // pick low-default values, in case this plugin is ever enabled accidentaly.
     size_t NumThreads = config_get_number(CONFIG_SECTION_PROFILE, "number of threads", 2);

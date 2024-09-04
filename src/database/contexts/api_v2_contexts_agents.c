@@ -5,30 +5,6 @@
 
 void build_info_to_json_object(BUFFER *b);
 
-static void convert_seconds_to_dhms(time_t seconds, char *result, int result_size) {
-    int days, hours, minutes;
-
-    days = (int) (seconds / (24 * 3600));
-    seconds = (int) (seconds % (24 * 3600));
-    hours = (int) (seconds / 3600);
-    seconds %= 3600;
-    minutes = (int) (seconds / 60);
-    seconds %= 60;
-
-    // Format the result into the provided string buffer
-    BUFFER *buf = buffer_create(128, NULL);
-    if (days)
-        buffer_sprintf(buf,"%d day%s%s", days, days==1 ? "" : "s", hours || minutes ? ", " : "");
-    if (hours)
-        buffer_sprintf(buf,"%d hour%s%s", hours, hours==1 ? "" : "s", minutes ? ", " : "");
-    if (minutes)
-        buffer_sprintf(buf,"%d minute%s%s", minutes, minutes==1 ? "" : "s", seconds ? ", " : "");
-    if (seconds)
-        buffer_sprintf(buf,"%d second%s", (int) seconds, seconds==1 ? "" : "s");
-    strncpyz(result, buffer_tostring(buf), result_size);
-    buffer_free(buf);
-}
-
 void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info, bool array) {
     if(!now_s)
         now_s = now_realtime_sec();
@@ -117,8 +93,8 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_uint64(wb, "tier", tier);
             char human_retention[128];
-            convert_seconds_to_dhms((time_t) group_seconds, human_retention, sizeof(human_retention) - 1);
-            buffer_json_member_add_string(wb, "point_every", human_retention);
+            duration_snprintf_time_t(human_retention, sizeof(human_retention), (stime_t)group_seconds);
+            buffer_json_member_add_string(wb, "granularity", human_retention);
 
             buffer_json_member_add_uint64(wb, "metrics", storage_engine_metrics(eng->seb, localhost->db[tier].si));
             buffer_json_member_add_uint64(wb, "samples", storage_engine_samples(eng->seb, localhost->db[tier].si));
@@ -136,7 +112,9 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                 buffer_json_member_add_time_t(wb, "to", now_s);
                 buffer_json_member_add_time_t(wb, "retention", retention);
 
-                convert_seconds_to_dhms(retention, human_retention, sizeof(human_retention) - 1);
+                duration_snprintf_hours(human_retention, sizeof(human_retention),
+                                         (int)duration_round_to_resolution(retention, 3600));
+
                 buffer_json_member_add_string(wb, "retention_human", human_retention);
 
                 if(used || max) { // we have disk space information
@@ -148,12 +126,16 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                     time_t actual_retention = MIN(space_retention, time_retention ? time_retention : space_retention);
 
                     if (time_retention) {
-                        convert_seconds_to_dhms(time_retention, human_retention, sizeof(human_retention) - 1);
+                        duration_snprintf_hours(human_retention, sizeof(human_retention),
+                                                (int)duration_round_to_resolution(time_retention, 3600));
+
                         buffer_json_member_add_time_t(wb, "requested_retention", time_retention);
                         buffer_json_member_add_string(wb, "requested_retention_human", human_retention);
                     }
 
-                    convert_seconds_to_dhms(actual_retention, human_retention, sizeof(human_retention) - 1);
+                    duration_snprintf_hours(human_retention, sizeof(human_retention),
+                                            (int)duration_round_to_resolution(actual_retention, 3600));
+
                     buffer_json_member_add_time_t(wb, "expected_retention", actual_retention);
                     buffer_json_member_add_string(wb, "expected_retention_human", human_retention);
                 }

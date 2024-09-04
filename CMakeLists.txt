@@ -716,6 +716,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/dictionary/dictionary-callbacks.h
         src/libnetdata/linked-lists.h
         src/libnetdata/storage-point.h
+        src/libnetdata/parsers/parsers.h
+        src/libnetdata/parsers/duration.c
         src/libnetdata/bitmap64.h
         src/libnetdata/os/gettid.c
         src/libnetdata/os/gettid.h
@@ -762,6 +764,31 @@ set(LIBNETDATA_FILES
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
         src/libnetdata/json/json-c-parser-inline.c
+        src/libnetdata/parsers/duration.h
+        src/libnetdata/parsers/timeframe.c
+        src/libnetdata/parsers/timeframe.h
+        src/libnetdata/parsers/size.c
+        src/libnetdata/parsers/size.h
+        src/libnetdata/libjudy/judy-malloc.c
+        src/libnetdata/libjudy/judy-malloc.h
+        src/libnetdata/config/appconfig_internals.h
+        src/libnetdata/config/appconfig_exporters.c
+        src/libnetdata/config/appconfig_conf_file.c
+        src/libnetdata/config/appconfig_cleanup.c
+        src/libnetdata/config/appconfig_sections.c
+        src/libnetdata/config/appconfig_options.c
+        src/libnetdata/config/appconfig_migrate.c
+        src/libnetdata/config/appconfig_traversal.c
+        src/libnetdata/config/appconfig_api_sizes.c
+        src/libnetdata/config/appconfig_api_sizes.h
+        src/libnetdata/config/appconfig_api_durations.c
+        src/libnetdata/config/appconfig_api_durations.h
+        src/libnetdata/config/appconfig_api_numbers.c
+        src/libnetdata/config/appconfig_api_numbers.h
+        src/libnetdata/config/appconfig_api_text.c
+        src/libnetdata/config/appconfig_api_text.h
+        src/libnetdata/config/appconfig_api_boolean.c
+        src/libnetdata/config/appconfig_api_boolean.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

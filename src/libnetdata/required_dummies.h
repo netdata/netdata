@@ -20,6 +20,6 @@ void service_exits(void){}
 void rrd_collector_finished(void){}
 
 // required by get_system_cpus()
-char *netdata_configured_host_prefix = "";
+const char *netdata_configured_host_prefix = "";
 
 #endif // NETDATA_LIB_DUMMIES_H

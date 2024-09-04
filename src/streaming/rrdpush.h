@@ -297,12 +297,12 @@ struct receiver_state {
         time_t alarms_delay;
         uint32_t alarms_history;
         int rrdpush_enabled;
-        char *rrdpush_api_key; // DONT FREE - it is allocated in appconfig
-        char *rrdpush_send_charts_matching; // DONT FREE - it is allocated in appconfig
+        const char *rrdpush_api_key; // DONT FREE - it is allocated in appconfig
+        const char *rrdpush_send_charts_matching; // DONT FREE - it is allocated in appconfig
         bool rrdpush_enable_replication;
         time_t rrdpush_seconds_to_replicate;
         time_t rrdpush_replication_step;
-        char *rrdpush_destination;  // DONT FREE - it is allocated in appconfig
+        const char *rrdpush_destination;  // DONT FREE - it is allocated in appconfig
         unsigned int rrdpush_compression;
         STREAM_CAPABILITIES compression_priorities[COMPRESSION_ALGORITHM_MAX];
     } config;
@@ -349,9 +349,9 @@ struct rrdpush_destinations {
 
 extern unsigned int default_rrdpush_enabled;
 extern unsigned int default_rrdpush_compression_enabled;
-extern char *default_rrdpush_destination;
-extern char *default_rrdpush_api_key;
-extern char *default_rrdpush_send_charts_matching;
+extern const char *default_rrdpush_destination;
+extern const char *default_rrdpush_api_key;
+extern const char *default_rrdpush_send_charts_matching;
 extern bool default_rrdpush_enable_replication;
 extern time_t default_rrdpush_seconds_to_replicate;
 extern time_t default_rrdpush_replication_step;

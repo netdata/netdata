@@ -58,7 +58,7 @@ static void change_dir_ownership(const char *dir, uid_t uid, gid_t gid, bool rec
     fix_directory_file_permissions(dir, uid, gid, recursive);
 }
 
-static void clean_directory(char *dirname)
+static void clean_directory(const char *dirname)
 {
     DIR *dir = opendir(dirname);
     if(!dir) return;
@@ -188,7 +188,7 @@ static void oom_score_adj(void) {
     }
 
     // check the environment
-    char *s = getenv("OOMScoreAdjust");
+    const char *s = getenv("OOMScoreAdjust");
     if(!s || !*s) {
         snprintfz(buf, sizeof(buf) - 1, "%d", (int)wanted_score);
         s = buf;

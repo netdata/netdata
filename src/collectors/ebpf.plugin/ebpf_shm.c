@@ -12,11 +12,7 @@ netdata_ebpf_shm_t *shm_vector = NULL;
 static netdata_idx_t shm_hash_values[NETDATA_SHM_END];
 static netdata_idx_t *shm_values = NULL;
 
-struct config shm_config = { .first_section = NULL,
-    .last_section = NULL,
-    .mutex = NETDATA_MUTEX_INITIALIZER,
-    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-        .rwlock = AVL_LOCK_INITIALIZER } };
+struct config shm_config = APPCONFIG_INITIALIZER;
 
 static ebpf_local_maps_t shm_maps[] = {{.name = "tbl_pid_shm", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
                                          .user_input = 0,

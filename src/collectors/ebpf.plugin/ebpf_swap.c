@@ -12,11 +12,7 @@ static netdata_idx_t *swap_values = NULL;
 
 netdata_ebpf_swap_t *swap_vector = NULL;
 
-struct config swap_config = { .first_section = NULL,
-    .last_section = NULL,
-    .mutex = NETDATA_MUTEX_INITIALIZER,
-    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-        .rwlock = AVL_LOCK_INITIALIZER } };
+struct config swap_config = APPCONFIG_INITIALIZER;
 
 static ebpf_local_maps_t swap_maps[] = {{.name = "tbl_pid_swap", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
                                          .user_input = 0,

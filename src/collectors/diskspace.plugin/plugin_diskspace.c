@@ -855,11 +855,13 @@ void *diskspace_main(void *ptr) {
 
     cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 
-    int update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
-    if(update_every < localhost->rrd_update_every)
+    int update_every = (int)config_get_duration_seconds(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
+    if(update_every < localhost->rrd_update_every) {
         update_every = localhost->rrd_update_every;
+        config_set_duration_seconds(CONFIG_SECTION_DISKSPACE, "update every", update_every);
+    }
 
-    check_for_new_mountpoints_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "check for new mount points every", check_for_new_mountpoints_every);
+    check_for_new_mountpoints_every = (int)config_get_duration_seconds(CONFIG_SECTION_DISKSPACE, "check for new mount points every", check_for_new_mountpoints_every);
     if(check_for_new_mountpoints_every < update_every)
         check_for_new_mountpoints_every = update_every;
 

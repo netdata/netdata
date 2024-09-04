@@ -401,18 +401,7 @@ bool claim_agent_from_environment(void) {
 }
 
 bool claim_agent_from_claim_conf(void) {
-    static struct config claim_config = {
-        .first_section = NULL,
-        .last_section = NULL,
-        .mutex = NETDATA_MUTEX_INITIALIZER,
-        .index = {
-            .avl_tree = {
-                .root = NULL,
-                .compar = appconfig_section_compare
-            },
-            .rwlock = AVL_LOCK_INITIALIZER
-        }
-    };
+    static struct config claim_config = APPCONFIG_INITIALIZER;
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
     bool ret = false;
 

@@ -3,11 +3,7 @@
 #include "ebpf.h"
 #include "ebpf_mdflush.h"
 
-struct config mdflush_config = { .first_section = NULL,
-    .last_section = NULL,
-    .mutex = NETDATA_MUTEX_INITIALIZER,
-    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-        .rwlock = AVL_LOCK_INITIALIZER } };
+struct config mdflush_config = APPCONFIG_INITIALIZER;
 
 #define MDFLUSH_MAP_COUNT 0
 static ebpf_local_maps_t mdflush_maps[] = {

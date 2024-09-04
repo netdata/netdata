@@ -18,7 +18,12 @@ struct timespec {
 typedef uint64_t nsec_t;
 typedef uint64_t msec_t;
 typedef uint64_t usec_t;
+
+typedef int64_t  snsec_t;
 typedef int64_t  susec_t;
+typedef int64_t  smsec_t;
+
+typedef int64_t stime_t;
 
 typedef struct heartbeat {
     usec_t realtime;
@@ -151,7 +156,7 @@ time_t now_sec(clockid_t clk_id);
 usec_t now_usec(clockid_t clk_id);
 int now_timeval(clockid_t clk_id, struct timeval *tv);
 
-collected_number uptime_msec(char *filename);
+collected_number uptime_msec(const char *filename);
 
 extern usec_t clock_monotonic_resolution;
 extern usec_t clock_realtime_resolution;

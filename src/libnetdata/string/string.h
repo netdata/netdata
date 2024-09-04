@@ -30,6 +30,10 @@ static inline int string_strcmp(STRING *string, const char *s) {
     return strcmp(string2str(string), s);
 }
 
+static inline int string_strncmp(STRING *string, const char *s, size_t n) {
+    return strncmp(string2str(string), s, n);
+}
+
 void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory, size_t *duplications, size_t *releases);
 
 int string_unittest(size_t entries);

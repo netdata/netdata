@@ -22,9 +22,7 @@ static char *mount_dimension_name[NETDATA_EBPF_MOUNT_SYSCALL] = { "mount", "umou
 static netdata_syscall_stat_t mount_aggregated_data[NETDATA_EBPF_MOUNT_SYSCALL];
 static netdata_publish_syscall_t mount_publish_aggregated[NETDATA_EBPF_MOUNT_SYSCALL];
 
-struct config mount_config = { .first_section = NULL, .last_section = NULL, .mutex = NETDATA_MUTEX_INITIALIZER,
-                               .index = {.avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-                                         .rwlock = AVL_LOCK_INITIALIZER } };
+struct config mount_config = APPCONFIG_INITIALIZER;
 
 static netdata_idx_t mount_hash_values[NETDATA_MOUNT_END];
 

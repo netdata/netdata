@@ -34,8 +34,8 @@ void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_
 #define HEALTH_LISTEN_BACKLOG 4096
 #endif
 
-#ifndef HEALTH_LOG_DEFAULT_HISTORY
-#define HEALTH_LOG_DEFAULT_HISTORY 432000
+#ifndef HEALTH_LOG_RETENTION_DEFAULT
+#define HEALTH_LOG_RETENTION_DEFAULT (5 * 86400)
 #endif
 
 #ifndef HEALTH_LOG_MINIMUM_HISTORY
@@ -75,8 +75,8 @@ ALARM_ENTRY* health_create_alarm_entry(
 
 void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
 
-char *health_user_config_dir(void);
-char *health_stock_config_dir(void);
+const char *health_user_config_dir(void);
+const char *health_stock_config_dir(void);
 void health_alarm_log_free(RRDHOST *host);
 
 void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);

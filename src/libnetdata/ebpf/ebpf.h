@@ -470,13 +470,13 @@ int ebpf_disable_tracing_values(char *subsys, char *eventname);
 // BTF helpers
 #define NETDATA_EBPF_MAX_SYSCALL_LENGTH 255
 
-netdata_ebpf_load_mode_t epbf_convert_string_to_load_mode(char *str);
-netdata_ebpf_program_loaded_t ebpf_convert_core_type(char *str, netdata_run_mode_t lmode);
+netdata_ebpf_load_mode_t epbf_convert_string_to_load_mode(const char *str);
+netdata_ebpf_program_loaded_t ebpf_convert_core_type(const char *str, netdata_run_mode_t lmode);
 void ebpf_select_host_prefix(char *output, size_t length, char *syscall, int kver);
 #ifdef LIBBPF_MAJOR_VERSION
 void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file);
 struct btf *ebpf_parse_btf_file(const char *filename);
-struct btf *ebpf_load_btf_file(char *path, char *filename);
+struct btf *ebpf_load_btf_file(const char *path, const char *filename);
 int ebpf_is_function_inside_btf(struct btf *file, char *function);
 void ebpf_update_map_type(struct bpf_map *map, ebpf_local_maps_t *w);
 void ebpf_define_map_type(ebpf_local_maps_t *maps, int maps_per_core, int kver);

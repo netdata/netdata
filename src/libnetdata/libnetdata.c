@@ -13,87 +13,12 @@
 struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
 
 #if defined(MADV_MERGEABLE)
-int enable_ksm = 1;
+int enable_ksm = CONFIG_BOOLEAN_AUTO;
 #else
 int enable_ksm = 0;
 #endif
 
 volatile sig_atomic_t netdata_exit = 0;
-
-#define MAX_JUDY_SIZE_TO_ARAL 24
-static bool judy_sizes_config[MAX_JUDY_SIZE_TO_ARAL + 1] = {
-        [3] = true,
-        [4] = true,
-        [5] = true,
-        [6] = true,
-        [7] = true,
-        [8] = true,
-        [10] = true,
-        [11] = true,
-        [15] = true,
-        [23] = true,
-};
-static ARAL *judy_sizes_aral[MAX_JUDY_SIZE_TO_ARAL + 1] = {};
-
-struct aral_statistics judy_sizes_aral_statistics = {};
-
-void aral_judy_init(void) {
-    for(size_t Words = 0; Words <= MAX_JUDY_SIZE_TO_ARAL; Words++)
-        if(judy_sizes_config[Words]) {
-            char buf[30+1];
-            snprintfz(buf, sizeof(buf) - 1, "judy-%zu", Words * sizeof(Word_t));
-            judy_sizes_aral[Words] = aral_create(
-                    buf,
-                    Words * sizeof(Word_t),
-                    0,
-                    65536,
-                    &judy_sizes_aral_statistics,
-                    NULL, NULL, false, false);
-        }
-}
-
-size_t judy_aral_overhead(void) {
-    return aral_overhead_from_stats(&judy_sizes_aral_statistics);
-}
-
-size_t judy_aral_structures(void) {
-    return aral_structures_from_stats(&judy_sizes_aral_statistics);
-}
-
-static ARAL *judy_size_aral(Word_t Words) {
-    if(Words <= MAX_JUDY_SIZE_TO_ARAL && judy_sizes_aral[Words])
-        return judy_sizes_aral[Words];
-
-    return NULL;
-}
-
-inline Word_t JudyMalloc(Word_t Words) {
-    Word_t Addr;
-
-    ARAL *ar = judy_size_aral(Words);
-    if(ar)
-        Addr = (Word_t) aral_mallocz(ar);
-    else
-        Addr = (Word_t) mallocz(Words * sizeof(Word_t));
-
-    return(Addr);
-}
-
-inline void JudyFree(void * PWord, Word_t Words) {
-    ARAL *ar = judy_size_aral(Words);
-    if(ar)
-        aral_freez(ar, PWord);
-    else
-        freez(PWord);
-}
-
-Word_t JudyMallocVirtual(Word_t Words) {
-    return JudyMalloc(Words);
-}
-
-void JudyFreeVirtual(void * PWord, Word_t Words) {
-    JudyFree(PWord, Words);
-}
 
 // ----------------------------------------------------------------------------
 // memory allocation functions that handle failures

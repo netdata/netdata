@@ -69,7 +69,7 @@ void set_environment_for_plugins_and_scripts(void) {
         buffer_free(user_plugins_dirs);
     }
 
-    char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
+    const char *default_port = appconfig_get(&netdata_config, CONFIG_SECTION_WEB, "default port", NULL);
     int clean = 0;
     if (!default_port) {
         default_port = strdupz("19999");
@@ -78,7 +78,7 @@ void set_environment_for_plugins_and_scripts(void) {
 
     nd_setenv("NETDATA_LISTEN_PORT", default_port, 1);
     if (clean)
-        freez(default_port);
+        freez((char *)default_port);
 
     // set the path we need
     char path[4096], *p = getenv("PATH");

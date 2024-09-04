@@ -398,7 +398,7 @@ This is what you should expect:
 
   - For production systems, each Netdata Agent with default settings (everything enabled, ML, Health, DB) should consume about 5% CPU utilization of one core and about 150 MiB or RAM.
 
-    By using a Netdata parent and streaming all metrics to that parent, you can disable ML & health and use an ephemeral DB mode (like `alloc`) on the children, leading to utilization of about 1% CPU of a single core and 100 MiB of RAM. Of course, these depend on how many metrics are collected.
+    By using a Netdata parent and streaming all metrics to that parent, you can disable ML & health and use an ephemeral DB (like `alloc`) on the children, leading to utilization of about 1% CPU of a single core and 100 MiB of RAM. Of course, these depend on how many metrics are collected.
     
   - For Netdata Parents, for about 1 to 2 million metrics, all collected every second, we suggest a server with 16 cores and 32GB RAM. Less than half of it will be used for data collection and ML. The rest will be available for queries.
 

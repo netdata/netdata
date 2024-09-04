@@ -748,9 +748,9 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
     }
     else sockets->default_port = (uint16_t)new_port;
 
-    char *s = appconfig_get(sockets->config, sockets->config_section, "bind to", sockets->default_bind_to);
+    const char *s = appconfig_get(sockets->config, sockets->config_section, "bind to", sockets->default_bind_to);
     while(*s) {
-        char *e = s;
+        const char *e = s;
 
         // skip separators, moving both s(tart) and e(nd)
         while(isspace((uint8_t)*e) || *e == ',') s = ++e;

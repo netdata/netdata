@@ -5,7 +5,7 @@
 int do_proc_uptime(int update_every, usec_t dt) {
     (void)dt;
 
-    static char *uptime_filename = NULL;
+    static const char *uptime_filename = NULL;
     if(!uptime_filename) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/uptime");

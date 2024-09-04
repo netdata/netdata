@@ -321,7 +321,7 @@ void *pluginsd_main(void *ptr) {
                     cd->unsafe.enabled = enabled;
                     cd->unsafe.running = false;
 
-                    cd->update_every = (int)config_get_number(cd->id, "update every", localhost->rrd_update_every);
+                    cd->update_every = (int)config_get_duration_seconds(cd->id, "update every", localhost->rrd_update_every);
                     cd->started_t = now_realtime_sec();
 
                     char *def = "";

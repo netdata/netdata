@@ -273,7 +273,7 @@ struct discovery_thread {
 
 extern struct discovery_thread discovery_thread;
 
-extern char *cgroups_rename_script;
+extern const char *cgroups_rename_script;
 extern char cgroup_chart_id_prefix[];
 extern char services_chart_id_prefix[];
 extern uv_mutex_t cgroup_root_mutex;
@@ -313,7 +313,7 @@ extern SIMPLE_PATTERN *enabled_cgroup_renames;
 extern SIMPLE_PATTERN *systemd_services_cgroups;
 extern SIMPLE_PATTERN *entrypoint_parent_process_comm;
 
-extern char *cgroups_network_interface_script;
+extern const char *cgroups_network_interface_script;
 
 extern int cgroups_check;
 

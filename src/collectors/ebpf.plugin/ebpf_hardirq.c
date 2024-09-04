@@ -3,11 +3,7 @@
 #include "ebpf.h"
 #include "ebpf_hardirq.h"
 
-struct config hardirq_config = { .first_section = NULL,
-    .last_section = NULL,
-    .mutex = NETDATA_MUTEX_INITIALIZER,
-    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-        .rwlock = AVL_LOCK_INITIALIZER } };
+struct config hardirq_config = APPCONFIG_INITIALIZER;
 
 static ebpf_local_maps_t hardirq_maps[] = {
     {

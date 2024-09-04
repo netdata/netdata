@@ -7,7 +7,7 @@ char *api_secret;
 static char *get_mgmt_api_key(void) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/netdata.api.key", netdata_configured_varlib_dir);
-    char *api_key_filename=config_get(CONFIG_SECTION_REGISTRY, "netdata management api key file", filename);
+    const char *api_key_filename = config_get(CONFIG_SECTION_REGISTRY, "netdata management api key file", filename);
     static char guid[GUID_LEN + 1] = "";
 
     if(likely(guid[0]))

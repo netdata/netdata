@@ -6,7 +6,7 @@
 // it is used by all netdata web servers
 
 int respect_web_browser_do_not_track_policy = 0;
-char *web_x_frame_options = NULL;
+const char *web_x_frame_options = NULL;
 
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
 

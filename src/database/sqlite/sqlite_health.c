@@ -311,7 +311,7 @@ void sql_health_alarm_log_cleanup(RRDHOST *host)
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)host->health_log.health_log_history));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)host->health_log.health_log_retention_s));
 
     param = 0;
     rc = sqlite3_step_monitored(res);

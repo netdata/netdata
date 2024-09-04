@@ -37,7 +37,7 @@ struct mc {
 };
 
 static struct mc *mc_root = NULL;
-static char *mc_dirname = NULL;
+static const char *mc_dirname = NULL;
 
 static void find_all_mc() {
     char name[FILENAME_MAX + 1];

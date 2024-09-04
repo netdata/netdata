@@ -307,9 +307,7 @@ typedef uint32_t uid_t;
 #define WARNUNUSED
 #endif
 
-void aral_judy_init(void);
-size_t judy_aral_overhead(void);
-size_t judy_aral_structures(void);
+#include "libjudy/judy-malloc.h"
 
 #define ABS(x) (((x) < 0)? (-(x)) : (x))
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -435,7 +433,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) NORETURN;
 #endif
 
-extern char *netdata_configured_host_prefix;
+extern const char *netdata_configured_host_prefix;
 
 #include "os/os.h"
 
@@ -459,6 +457,7 @@ extern char *netdata_configured_host_prefix;
 #include "inlined.h"
 #include "line_splitter/line_splitter.h"
 #include "clocks/clocks.h"
+#include "parsers/parsers.h"
 #include "datetime/iso8601.h"
 #include "datetime/rfc3339.h"
 #include "datetime/rfc7231.h"
@@ -639,7 +638,6 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step);
 int hash256_string(const unsigned char *string, size_t size, char *hash);
 
 extern bool unittest_running;
-#define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
 
 bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now);
 bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest);

@@ -25,30 +25,19 @@
  *
  */
 
-struct config stream_config = {
-        .first_section = NULL,
-        .last_section = NULL,
-        .mutex = NETDATA_MUTEX_INITIALIZER,
-        .index = {
-                .avl_tree = {
-                        .root = NULL,
-                        .compar = appconfig_section_compare
-                },
-                .rwlock = AVL_LOCK_INITIALIZER
-        }
-};
+struct config stream_config = APPCONFIG_INITIALIZER;
 
 unsigned int default_rrdpush_enabled = 0;
 
 unsigned int default_rrdpush_compression_enabled = 1;
-char *default_rrdpush_destination = NULL;
-char *default_rrdpush_api_key = NULL;
-char *default_rrdpush_send_charts_matching = "*";
+const char *default_rrdpush_destination = NULL;
+const char *default_rrdpush_api_key = NULL;
+const char *default_rrdpush_send_charts_matching = "*";
 bool default_rrdpush_enable_replication = true;
 time_t default_rrdpush_seconds_to_replicate = 86400;
 time_t default_rrdpush_replication_step = 600;
-char *netdata_ssl_ca_path = NULL;
-char *netdata_ssl_ca_file = NULL;
+const char *netdata_ssl_ca_path = NULL;
+const char *netdata_ssl_ca_file = NULL;
 
 static void load_stream_conf() {
     errno_clear();
@@ -61,32 +50,36 @@ static void load_stream_conf() {
         if(!appconfig_load(&stream_config, filename, 0, NULL))
             nd_log_daemon(NDLP_NOTICE, "CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
+
     freez(filename);
+
+    appconfig_move(&stream_config,
+                   CONFIG_SECTION_STREAM, "timeout seconds",
+                   CONFIG_SECTION_STREAM, "timeout");
+
+    appconfig_move(&stream_config,
+                   CONFIG_SECTION_STREAM, "reconnect delay seconds",
+                   CONFIG_SECTION_STREAM, "reconnect delay");
+
+    appconfig_move_everywhere(&stream_config, "default memory mode", "db");
+    appconfig_move_everywhere(&stream_config, "memory mode", "db");
+    appconfig_move_everywhere(&stream_config, "db mode", "db");
+    appconfig_move_everywhere(&stream_config, "default history", "retention");
+    appconfig_move_everywhere(&stream_config, "history", "retention");
+    appconfig_move_everywhere(&stream_config, "default proxy enabled", "proxy enabled");
+    appconfig_move_everywhere(&stream_config, "default proxy destination", "proxy destination");
+    appconfig_move_everywhere(&stream_config, "default proxy api key", "proxy api key");
+    appconfig_move_everywhere(&stream_config, "default proxy send charts matching", "proxy send charts matching");
+    appconfig_move_everywhere(&stream_config, "default health log history", "health log retention");
+    appconfig_move_everywhere(&stream_config, "health log history", "health log retention");
+    appconfig_move_everywhere(&stream_config, "seconds to replicate", "replication period");
+    appconfig_move_everywhere(&stream_config, "seconds per replication step", "replication step");
+    appconfig_move_everywhere(&stream_config, "default postpone alarms on connect seconds", "postpone alerts on connect");
+    appconfig_move_everywhere(&stream_config, "postpone alarms on connect seconds", "postpone alerts on connect");
 }
 
-bool rrdpush_receiver_needs_dbengine() {
-    struct section *co;
-
-    for(co = stream_config.first_section; co; co = co->next) {
-        if(strcmp(co->name, "stream") == 0)
-            continue; // the first section is not relevant
-
-        char *s;
-
-        s = appconfig_get_by_section(co, "enabled", NULL);
-        if(!s || !appconfig_test_boolean_value(s))
-            continue;
-
-        s = appconfig_get_by_section(co, "default memory mode", NULL);
-        if(s && strcmp(s, "dbengine") == 0)
-            return true;
-
-        s = appconfig_get_by_section(co, "memory mode", NULL);
-        if(s && strcmp(s, "dbengine") == 0)
-            return true;
-    }
-
-    return false;
+bool rrdpush_receiver_needs_dbengine(void) {
+    return stream_conf_needs_dbengine(&stream_config);
 }
 
 int rrdpush_init() {
@@ -94,19 +87,33 @@ int rrdpush_init() {
     // load stream.conf
     load_stream_conf();
 
-    default_rrdpush_enabled     = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
-    default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
-    default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
-    default_rrdpush_send_charts_matching = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", default_rrdpush_send_charts_matching);
+    default_rrdpush_enabled =
+        (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
 
-    default_rrdpush_enable_replication = config_get_boolean(CONFIG_SECTION_DB, "enable replication", default_rrdpush_enable_replication);
-    default_rrdpush_seconds_to_replicate = config_get_number(CONFIG_SECTION_DB, "seconds to replicate", default_rrdpush_seconds_to_replicate);
-    default_rrdpush_replication_step = config_get_number(CONFIG_SECTION_DB, "seconds per replication step", default_rrdpush_replication_step);
+    default_rrdpush_destination =
+        appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
 
-    rrdhost_free_orphan_time_s    = config_get_number(CONFIG_SECTION_DB, "cleanup orphan hosts after secs", rrdhost_free_orphan_time_s);
+    default_rrdpush_api_key =
+        appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
 
-    default_rrdpush_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
-                                                                              "enable compression", default_rrdpush_compression_enabled);
+    default_rrdpush_send_charts_matching =
+        appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", default_rrdpush_send_charts_matching);
+
+    default_rrdpush_enable_replication =
+        config_get_boolean(CONFIG_SECTION_DB, "enable replication", default_rrdpush_enable_replication);
+
+    default_rrdpush_seconds_to_replicate =
+        config_get_duration_seconds(CONFIG_SECTION_DB, "replication period", default_rrdpush_seconds_to_replicate);
+
+    default_rrdpush_replication_step =
+        config_get_duration_seconds(CONFIG_SECTION_DB, "replication step", default_rrdpush_replication_step);
+
+    rrdhost_free_orphan_time_s =
+        config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup orphan hosts after", rrdhost_free_orphan_time_s);
+
+    default_rrdpush_compression_enabled =
+        (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
+                                            "enable compression", default_rrdpush_compression_enabled);
 
     rrdpush_compression_levels[COMPRESSION_ALGORITHM_BROTLI] = (int)appconfig_get_number(
             &stream_config, CONFIG_SECTION_STREAM, "brotli compression level",
@@ -201,22 +208,7 @@ static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
 }
 
 int configured_as_parent() {
-    struct section *section = NULL;
-    int is_parent = 0;
-
-    appconfig_wrlock(&stream_config);
-    for (section = stream_config.first_section; section; section = section->next) {
-        nd_uuid_t uuid;
-
-        if (uuid_parse(section->name, uuid) != -1 &&
-                appconfig_get_boolean_by_section(section, "enabled", 0)) {
-            is_parent = 1;
-            break;
-        }
-    }
-    appconfig_unlock(&stream_config);
-
-    return is_parent;
+    return stream_conf_has_uuid_section(&stream_config);
 }
 
 // chart labels

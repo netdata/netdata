@@ -28,7 +28,7 @@ struct aral_statistics {
 };
 
 ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size,
-                  struct aral_statistics *stats, const char *filename, char **cache_dir, bool mmap, bool lockless);
+                  struct aral_statistics *stats, const char *filename, const char **cache_dir, bool mmap, bool lockless);
 size_t aral_element_size(ARAL *ar);
 size_t aral_overhead(ARAL *ar);
 size_t aral_structures(ARAL *ar);

@@ -28,18 +28,7 @@ bool ieee754_doubles = false;
 time_t netdata_start_time = 0;
 struct netdata_static_thread *static_threads;
 
-struct config netdata_config = {
-        .first_section = NULL,
-        .last_section = NULL,
-        .mutex = NETDATA_MUTEX_INITIALIZER,
-        .index = {
-                .avl_tree = {
-                        .root = NULL,
-                        .compar = appconfig_section_compare
-                },
-                .rwlock = AVL_LOCK_INITIALIZER
-        }
-};
+struct config netdata_config = APPCONFIG_INITIALIZER;
 
 typedef struct service_thread {
     pid_t tid;
@@ -527,12 +516,12 @@ void web_server_threading_selection(void) {
 
 int make_dns_decision(const char *section_name, const char *config_name, const char *default_value, SIMPLE_PATTERN *p)
 {
-    char *value = config_get(section_name,config_name,default_value);
+    const char *value = config_get(section_name,config_name,default_value);
     if(!strcmp("yes",value))
         return 1;
     if(!strcmp("no",value))
         return 0;
-    if(strcmp("heuristic",value))
+    if(strcmp("heuristic",value) != 0)
         netdata_log_error("Invalid configuration option '%s' for '%s'/'%s'. Valid options are 'yes', 'no' and 'heuristic'. Proceeding with 'heuristic'",
               value, section_name, config_name);
 
@@ -542,11 +531,13 @@ int make_dns_decision(const char *section_name, const char *config_name, const c
 void web_server_config_options(void)
 {
     web_client_timeout =
-        (int)config_get_number(CONFIG_SECTION_WEB, "disconnect idle clients after seconds", web_client_timeout);
+        (int)config_get_duration_seconds(CONFIG_SECTION_WEB, "disconnect idle clients after", web_client_timeout);
+
     web_client_first_request_timeout =
-        (int)config_get_number(CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
+        (int)config_get_duration_seconds(CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
+
     web_client_streaming_rate_t =
-        config_get_number(CONFIG_SECTION_WEB, "accept a streaming request every seconds", web_client_streaming_rate_t);
+        config_get_duration_seconds(CONFIG_SECTION_WEB, "accept a streaming request every", web_client_streaming_rate_t);
 
     respect_web_browser_do_not_track_policy =
         config_get_boolean(CONFIG_SECTION_WEB, "respect do not track policy", respect_web_browser_do_not_track_policy);
@@ -595,7 +586,7 @@ void web_server_config_options(void)
 
     web_enable_gzip = config_get_boolean(CONFIG_SECTION_WEB, "enable gzip compression", web_enable_gzip);
 
-    char *s = config_get(CONFIG_SECTION_WEB, "gzip compression strategy", "default");
+    const char *s = config_get(CONFIG_SECTION_WEB, "gzip compression strategy", "default");
     if(!strcmp(s, "default"))
         web_gzip_strategy = Z_DEFAULT_STRATEGY;
     else if(!strcmp(s, "filtered"))
@@ -842,7 +833,7 @@ static void log_init(void) {
 
     time_t period = ND_LOG_DEFAULT_THROTTLE_PERIOD;
     size_t logs = ND_LOG_DEFAULT_THROTTLE_LOGS;
-    period = config_get_number(CONFIG_SECTION_LOGS, "logs flood protection period", period);
+    period = config_get_duration_seconds(CONFIG_SECTION_LOGS, "logs flood protection period", period);
     logs = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "logs to trigger flood protection", (long long int)logs);
     nd_log_set_flood_protection(logs, period);
 
@@ -886,7 +877,7 @@ static void log_init(void) {
     aclk_config_get_query_scope();
 }
 
-static char *get_varlib_subdir_from_config(const char *prefix, const char *dir) {
+static const char *get_varlib_subdir_from_config(const char *prefix, const char *dir) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/%s", prefix, dir);
     return config_get(CONFIG_SECTION_DIRECTORIES, dir, filename);
@@ -894,6 +885,7 @@ static char *get_varlib_subdir_from_config(const char *prefix, const char *dir) 
 
 static void backwards_compatible_config() {
     // move [global] options to the [web] section
+
     config_move(CONFIG_SECTION_GLOBAL, "http port listen backlog",
                 CONFIG_SECTION_WEB,    "listen backlog");
 
@@ -997,7 +989,10 @@ static void backwards_compatible_config() {
                 CONFIG_SECTION_PLUGINS, "statsd");
 
     config_move(CONFIG_SECTION_GLOBAL,  "memory mode",
-                CONFIG_SECTION_DB,      "mode");
+                CONFIG_SECTION_DB,      "db");
+
+    config_move(CONFIG_SECTION_DB,      "mode",
+                CONFIG_SECTION_DB,      "db");
 
     config_move(CONFIG_SECTION_GLOBAL,  "history",
                 CONFIG_SECTION_DB,      "retention");
@@ -1006,7 +1001,13 @@ static void backwards_compatible_config() {
                 CONFIG_SECTION_DB,      "update every");
 
     config_move(CONFIG_SECTION_GLOBAL,  "page cache size",
-                CONFIG_SECTION_DB,      "dbengine page cache size MB");
+                CONFIG_SECTION_DB,      "dbengine page cache size");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine page cache size MB",
+                CONFIG_SECTION_DB,      "dbengine page cache size");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine extent cache size MB",
+                CONFIG_SECTION_DB,      "dbengine extent cache size");
 
     config_move(CONFIG_SECTION_DB,      "page cache size",
                 CONFIG_SECTION_DB,      "dbengine page cache size MB");
@@ -1016,30 +1017,6 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_DB,      "page cache with malloc",
                 CONFIG_SECTION_DB,      "dbengine page cache with malloc");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "dbengine disk space",
-                CONFIG_SECTION_DB,      "dbengine disk space MB");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "dbengine multihost disk space",
-                CONFIG_SECTION_DB,      "dbengine multihost disk space MB");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine disk space MB",
-                CONFIG_SECTION_DB,      "dbengine multihost disk space MB");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine multihost disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 0 disk space MB");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine tier 1 multihost disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 1 disk space MB");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine tier 2 multihost disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 2 disk space MB");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine tier 3 multihost disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 3 disk space MB");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine tier 4 multihost disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 4 disk space MB");
 
     config_move(CONFIG_SECTION_GLOBAL,  "memory deduplication (ksm)",
                 CONFIG_SECTION_DB,      "memory deduplication (ksm)");
@@ -1054,16 +1031,66 @@ static void backwards_compatible_config() {
                 CONFIG_SECTION_DB,      "dbengine pages per extent");
 
     config_move(CONFIG_SECTION_GLOBAL,  "cleanup obsolete charts after seconds",
-                CONFIG_SECTION_DB,      "cleanup obsolete charts after secs");
+                CONFIG_SECTION_DB,      "cleanup obsolete charts after");
+
+    config_move(CONFIG_SECTION_DB,      "cleanup obsolete charts after secs",
+                CONFIG_SECTION_DB,      "cleanup obsolete charts after");
 
     config_move(CONFIG_SECTION_GLOBAL,  "gap when lost iterations above",
                 CONFIG_SECTION_DB,      "gap when lost iterations above");
 
     config_move(CONFIG_SECTION_GLOBAL,  "cleanup orphan hosts after seconds",
-                CONFIG_SECTION_DB,      "cleanup orphan hosts after secs");
+                CONFIG_SECTION_DB,      "cleanup orphan hosts after");
+
+    config_move(CONFIG_SECTION_DB,      "cleanup orphan hosts after secs",
+                CONFIG_SECTION_DB,      "cleanup orphan hosts after");
+
+    config_move(CONFIG_SECTION_DB,      "cleanup ephemeral hosts after secs",
+                CONFIG_SECTION_DB,      "cleanup ephemeral hosts after");
+
+    config_move(CONFIG_SECTION_DB,      "seconds to replicate",
+                CONFIG_SECTION_DB,      "replication period");
+
+    config_move(CONFIG_SECTION_DB,      "seconds per replication step",
+                CONFIG_SECTION_DB,      "replication step");
 
     config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
                 CONFIG_SECTION_DB,      "enable zero metrics");
+
+    // ----------------------------------------------------------------------------------------------------------------
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine disk space",
+                CONFIG_SECTION_DB,      "dbengine tier 0 retention size");
+
+    config_move(CONFIG_SECTION_GLOBAL,  "dbengine multihost disk space",
+                CONFIG_SECTION_DB,      "dbengine tier 0 retention size");
+
+    config_move(CONFIG_SECTION_DB,      "dbengine disk space MB",
+                CONFIG_SECTION_DB,      "dbengine tier 0 retention size");
+
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
+        char old_config[128], new_config[128];
+
+        snprintfz(old_config, sizeof(old_config), "dbengine tier %zu retention days", tier);
+        snprintfz(new_config, sizeof(new_config), "dbengine tier %zu retention time", tier);
+        config_move(CONFIG_SECTION_DB, old_config,
+                    CONFIG_SECTION_DB, new_config);
+
+        if(tier == 0)
+            snprintfz(old_config, sizeof(old_config), "dbengine multihost disk space MB");
+        else
+            snprintfz(old_config, sizeof(old_config), "dbengine tier %zu multihost disk space MB", tier);
+        snprintfz(new_config, sizeof(new_config), "dbengine tier %zu retention size", tier);
+        config_move(CONFIG_SECTION_DB, old_config,
+                    CONFIG_SECTION_DB, new_config);
+
+        snprintfz(old_config, sizeof(old_config), "dbengine tier %zu disk space MB", tier);
+        snprintfz(new_config, sizeof(new_config), "dbengine tier %zu retention size", tier);
+        config_move(CONFIG_SECTION_DB, old_config,
+                    CONFIG_SECTION_DB, new_config);
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------
 
     config_move(CONFIG_SECTION_LOGS,   "error",
                 CONFIG_SECTION_LOGS,   "daemon");
@@ -1076,11 +1103,42 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_LOGS,   "errors flood protection period",
                 CONFIG_SECTION_LOGS,   "logs flood protection period");
+
     config_move(CONFIG_SECTION_HEALTH, "is ephemeral",
                 CONFIG_SECTION_GLOBAL, "is ephemeral node");
 
     config_move(CONFIG_SECTION_HEALTH, "has unstable connection",
                 CONFIG_SECTION_GLOBAL, "has unstable connection");
+
+    config_move(CONFIG_SECTION_HEALTH, "run at least every seconds",
+                CONFIG_SECTION_HEALTH, "run at least every");
+
+    config_move(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds",
+                CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for");
+
+    config_move(CONFIG_SECTION_HEALTH, "health log history",
+                CONFIG_SECTION_HEALTH, "health log retention");
+
+    config_move(CONFIG_SECTION_REGISTRY, "registry expire idle persons days",
+                CONFIG_SECTION_REGISTRY, "registry expire idle persons");
+
+    config_move(CONFIG_SECTION_WEB, "disconnect idle clients after seconds",
+                CONFIG_SECTION_WEB, "disconnect idle clients after");
+
+    config_move(CONFIG_SECTION_WEB, "accept a streaming request every seconds",
+                CONFIG_SECTION_WEB, "accept a streaming request every");
+
+    config_move(CONFIG_SECTION_STATSD, "set charts as obsolete after secs",
+                CONFIG_SECTION_STATSD, "set charts as obsolete after");
+
+    config_move(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after seconds",
+                CONFIG_SECTION_STATSD, "disconnect idle tcp clients after");
+
+    config_move("plugin:idlejitter", "loop time in ms",
+                "plugin:idlejitter", "loop time");
+
+    config_move("plugin:proc:/sys/class/infiniband", "refresh ports state every seconds",
+                "plugin:proc:/sys/class/infiniband", "refresh ports state every");
 }
 
 static int get_hostname(char *buf, size_t buf_size) {
@@ -1125,22 +1183,22 @@ static void get_netdata_configured_variables()
     // ------------------------------------------------------------------------
     // get default database update frequency
 
-    default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
+    default_rrd_update_every = (int) config_get_duration_seconds(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
     if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
         netdata_log_error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY);
         default_rrd_update_every = UPDATE_EVERY;
-        config_set_number(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
+        config_set_duration_seconds(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
     }
 
     // ------------------------------------------------------------------------
-    // get default memory mode for the database
+    // get the database selection
 
     {
-        const char *mode = config_get(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
+        const char *mode = config_get(CONFIG_SECTION_DB, "db", rrd_memory_mode_name(default_rrd_memory_mode));
         default_rrd_memory_mode = rrd_memory_mode_id(mode);
         if(strcmp(mode, rrd_memory_mode_name(default_rrd_memory_mode)) != 0) {
             netdata_log_error("Invalid memory mode '%s' given. Using '%s'", mode, rrd_memory_mode_name(default_rrd_memory_mode));
-            config_set(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
+            config_set(CONFIG_SECTION_DB, "db", rrd_memory_mode_name(default_rrd_memory_mode));
         }
     }
 
@@ -1194,17 +1252,19 @@ static void get_netdata_configured_variables()
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
-    default_rrdeng_extent_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine extent cache size MB", default_rrdeng_extent_cache_mb);
+    default_rrdeng_page_cache_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
+    default_rrdeng_extent_cache_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
     db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
 
-    if(default_rrdeng_extent_cache_mb < 0)
+    if(default_rrdeng_extent_cache_mb < 0) {
         default_rrdeng_extent_cache_mb = 0;
+        config_set_size_mb(CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
+    }
 
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
         default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-        config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
+        config_set_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
     }
 
     // ------------------------------------------------------------------------
@@ -1237,28 +1297,24 @@ static void get_netdata_configured_variables()
     // get KSM settings
 
 #ifdef MADV_MERGEABLE
-    enable_ksm = config_get_boolean(CONFIG_SECTION_DB, "memory deduplication (ksm)", enable_ksm);
+    enable_ksm = config_get_boolean_ondemand(CONFIG_SECTION_DB, "memory deduplication (ksm)", enable_ksm);
 #endif
 
     // --------------------------------------------------------------------
-    // metric correlations
 
-    enable_metric_correlations = config_get_boolean(CONFIG_SECTION_GLOBAL, "enable metric correlations", enable_metric_correlations);
-    default_metric_correlations_method = weights_string_to_method(config_get(
-        CONFIG_SECTION_GLOBAL, "metric correlations method",
-        weights_method_to_string(default_metric_correlations_method)));
+    rrdhost_free_ephemeral_time_s =
+        config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup ephemeral hosts after", rrdhost_free_ephemeral_time_s);
 
-    // --------------------------------------------------------------------
+    rrdset_free_obsolete_time_s =
+        config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);
 
-    rrdset_free_obsolete_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
-    rrdhost_free_ephemeral_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup ephemeral hosts after secs", rrdhost_free_ephemeral_time_s);
     // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
     // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
     // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
     if (rrdset_free_obsolete_time_s < 10) {
         rrdset_free_obsolete_time_s = 10;
-        netdata_log_info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds.");
-        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
+        netdata_log_info("The \"cleanup obsolete charts after\" option was set to 10 seconds.");
+        config_set_duration_seconds(CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);
     }
 
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
@@ -1278,7 +1334,7 @@ static void get_netdata_configured_variables()
 
 }
 
-static void post_conf_load(char **user)
+static void post_conf_load(const char **user)
 {
     // --------------------------------------------------------------------
     // get the user we should run
@@ -1293,7 +1349,7 @@ static void post_conf_load(char **user)
     }
 }
 
-static bool load_netdata_conf(char *filename, char overwrite_used, char **user) {
+static bool load_netdata_conf(char *filename, char overwrite_used, const char **user) {
     errno_clear();
 
     int ret = 0;
@@ -1406,7 +1462,7 @@ bool netdata_random_session_id_generate(void);
 int windows_perflib_dump(const char *key);
 #endif
 
-int unittest_prepare_rrd(char **user) {
+int unittest_prepare_rrd(const char **user) {
     post_conf_load(user);
     get_netdata_configured_variables();
     default_rrd_update_every = 1;
@@ -1437,7 +1493,7 @@ int netdata_main(int argc, char **argv) {
     int config_loaded = 0;
     bool close_open_fds = true;
     size_t default_stacksize;
-    char *user = NULL;
+    const char *user = NULL;
 
 #ifdef OS_WINDOWS
     int dont_fork = 1;
@@ -1787,7 +1843,7 @@ int netdata_main(int argc, char **argv) {
                             // so the caller can use -c netdata.conf before or
                             // after this parameter to prevent or allow overwriting
                             // variables at netdata.conf
-                            config_set_default(section, key,  value);
+                            config_set_default_raw_value(section, key, value);
 
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
                         }
@@ -1820,7 +1876,7 @@ int netdata_main(int argc, char **argv) {
                             // so the caller can use -c netdata.conf before or
                             // after this parameter to prevent or allow overwriting
                             // variables at netdata.conf
-                            appconfig_set_default(tmp_config, section, key,  value);
+                            appconfig_set_default_raw_value(tmp_config, section, key, value);
 
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
                         }
@@ -1922,7 +1978,7 @@ int netdata_main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialize netdata
     {
-        char *pmax = config_get(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", "1");
+        const char *pmax = config_get(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", "1");
         if(pmax && *pmax)
             setenv("MALLOC_ARENA_MAX", pmax, 1);
 
@@ -1979,7 +2035,7 @@ int netdata_main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // get the debugging flags from the configuration file
 
-        char *flags = config_get(CONFIG_SECTION_LOGS, "debug flags",  "0x0000000000000000");
+        const char *flags = config_get(CONFIG_SECTION_LOGS, "debug flags",  "0x0000000000000000");
         nd_setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
         debug_flags = strtoull(flags, NULL, 0);
@@ -2007,8 +2063,6 @@ int netdata_main(int argc, char **argv) {
         netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
 
         check_local_streaming_capabilities();
-
-        aral_judy_init();
 
         get_system_timezone();
 
@@ -2159,7 +2213,7 @@ int netdata_main(int argc, char **argv) {
 
     delta_startup_time("initialize threads after fork");
 
-    netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
+    netdata_threads_init_after_fork((size_t)config_get_size_bytes(CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
 
     // initialize internal registry
     delta_startup_time("initialize registry");

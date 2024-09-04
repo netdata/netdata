@@ -57,11 +57,7 @@ ebpf_process_stat_t *process_stat_vector = NULL;
 static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
 static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
 
-struct config process_config = { .first_section = NULL,
-    .last_section = NULL,
-    .mutex = NETDATA_MUTEX_INITIALIZER,
-    .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
-        .rwlock = AVL_LOCK_INITIALIZER } };
+struct config process_config = APPCONFIG_INITIALIZER;
 
 /*****************************************************************
  *

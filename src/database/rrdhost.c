@@ -232,10 +232,10 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
 // RRDHOST - add a host
 
 static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
-                                       unsigned int rrdpush_enabled,
-                                       char *rrdpush_destination,
-                                       char *rrdpush_api_key,
-                                       char *rrdpush_send_charts_matching
+                                              unsigned int rrdpush_enabled,
+                                              const char *rrdpush_destination,
+                                              const char *rrdpush_api_key,
+                                              const char *rrdpush_send_charts_matching
 ) {
     if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED)) return;
 
@@ -341,9 +341,9 @@ static RRDHOST *rrdhost_create(
         RRD_MEMORY_MODE memory_mode,
         unsigned int health_enabled,
         unsigned int rrdpush_enabled,
-        char *rrdpush_destination,
-        char *rrdpush_api_key,
-        char *rrdpush_send_charts_matching,
+        const char *rrdpush_destination,
+        const char *rrdpush_api_key,
+        const char *rrdpush_send_charts_matching,
         bool rrdpush_enable_replication,
         time_t rrdpush_seconds_to_replicate,
         time_t rrdpush_replication_step,
@@ -474,7 +474,7 @@ static RRDHOST *rrdhost_create(
     if (is_localhost && host->system_info) {
         host->system_info->ml_capable = ml_capable();
         host->system_info->ml_enabled = ml_enabled(host);
-        host->system_info->mc_version = enable_metric_correlations ? metric_correlations_version : 0;
+        host->system_info->mc_version = metric_correlations_version;
     }
 
     // ------------------------------------------------------------------------
@@ -566,9 +566,9 @@ static void rrdhost_update(RRDHOST *host
                            , RRD_MEMORY_MODE mode
                            , unsigned int health_enabled
                            , unsigned int rrdpush_enabled
-                           , char *rrdpush_destination
-                           , char *rrdpush_api_key
-                           , char *rrdpush_send_charts_matching
+                           , const char *rrdpush_destination
+                           , const char *rrdpush_api_key
+                           , const char *rrdpush_send_charts_matching
                            , bool rrdpush_enable_replication
                            , time_t rrdpush_seconds_to_replicate
                            , time_t rrdpush_replication_step
@@ -706,9 +706,9 @@ RRDHOST *rrdhost_find_or_create(
     , RRD_MEMORY_MODE mode
     , unsigned int health_enabled
     , unsigned int rrdpush_enabled
-    , char *rrdpush_destination
-    , char *rrdpush_api_key
-    , char *rrdpush_send_charts_matching
+    , const char *rrdpush_destination
+    , const char *rrdpush_api_key
+    , const char *rrdpush_send_charts_matching
     , bool rrdpush_enable_replication
     , time_t rrdpush_seconds_to_replicate
     , time_t rrdpush_replication_step
@@ -862,7 +862,7 @@ RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
 
 #endif
 
-void dbengine_init(char *hostname) {
+static void dbengine_init(const char *hostname) {
 #ifdef ENABLE_DBENGINE
 
     use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", use_direct_io);
@@ -900,10 +900,10 @@ void dbengine_init(char *hostname) {
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 update every iterations") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 update every iterations") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 disk space MB") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 disk space MB") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 disk space MB") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 disk space MB"));
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 retention size") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 retention size") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 retention size") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 retention size"));
 
     default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
     char dbengineconfig[200 + 1];
@@ -925,11 +925,11 @@ void dbengine_init(char *hostname) {
         storage_tiers_grouping_iterations[tier] = grouping_iterations;
     }
 
-    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine tier 0 disk space MB", RRDENG_DEFAULT_TIER_DISK_SPACE_MB);
+    default_multidb_disk_quota_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine tier 0 retention size", RRDENG_DEFAULT_TIER_DISK_SPACE_MB);
     if(default_multidb_disk_quota_mb && default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
         netdata_log_error("Invalid disk space %d for tier 0 given. Defaulting to %d.", default_multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
         default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-        config_set_number(CONFIG_SECTION_DB, "dbengine tier 0 disk space MB", default_multidb_disk_quota_mb);
+        config_set_size_mb(CONFIG_SECTION_DB, "dbengine tier 0 retention size", default_multidb_disk_quota_mb);
     }
 
 #ifdef OS_WINDOWS
@@ -959,11 +959,11 @@ void dbengine_init(char *hostname) {
         }
 
         int disk_space_mb = tier ? RRDENG_DEFAULT_TIER_DISK_SPACE_MB : default_multidb_disk_quota_mb;
-        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu disk space MB", tier);
-        disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
+        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention size", tier);
+        disk_space_mb = config_get_size_mb(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
-        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention days", tier);
-        storage_tiers_retention_days[tier] = config_get_number(
+        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention time", tier);
+        storage_tiers_retention_days[tier] = config_get_duration_days(
             CONFIG_SECTION_DB, dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_days[tier] : 0);
 
         tiers_init[tier].disk_space_mb = (int) disk_space_mb;
@@ -1026,7 +1026,7 @@ void dbengine_init(char *hostname) {
 
 void api_v1_management_init(void);
 
-int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
+int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
     rrdhost_init();
 
     if (unlikely(sql_init_meta_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
@@ -1445,6 +1445,11 @@ void rrdhost_set_is_parent_label(void) {
     }
 }
 
+static bool config_label_cb(void *data __maybe_unused, const char *name, const char *value) {
+    rrdlabels_add(localhost->rrdlabels, name, value, RRDLABEL_SRC_CONFIG);
+    return true;
+}
+
 static void rrdhost_load_config_labels(void) {
     int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
     if(!status) {
@@ -1454,16 +1459,7 @@ static void rrdhost_load_config_labels(void) {
                filename);
     }
 
-    struct section *co = appconfig_get_section(&netdata_config, CONFIG_SECTION_HOST_LABEL);
-    if(co) {
-        config_section_wrlock(co);
-        struct config_option *cv;
-        for(cv = co->values; cv ; cv = cv->next) {
-            rrdlabels_add(localhost->rrdlabels, cv->name, cv->value, RRDLABEL_SRC_CONFIG);
-            cv->flags |= CONFIG_VALUE_USED;
-        }
-        config_section_unlock(co);
-    }
+    appconfig_foreach_value_in_section(&netdata_config, CONFIG_SECTION_HOST_LABEL, config_label_cb, NULL);
 }
 
 static void rrdhost_load_kubernetes_labels(void) {

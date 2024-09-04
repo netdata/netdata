@@ -2,18 +2,7 @@
 
 #include "claim.h"
 
-struct config cloud_config = {
-    .first_section = NULL,
-    .last_section = NULL,
-    .mutex = NETDATA_MUTEX_INITIALIZER,
-    .index = {
-        .avl_tree = {
-            .root = NULL,
-            .compar = appconfig_section_compare
-        },
-        .rwlock = AVL_LOCK_INITIALIZER
-    }
-};
+struct config cloud_config = APPCONFIG_INITIALIZER;
 
 const char *cloud_config_url_get(void) {
     return appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
