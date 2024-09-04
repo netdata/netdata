@@ -74,6 +74,13 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
             break;
         }
         case WM_COMMAND: {
+            if (HIWORD(wParam) == BN_CLICKED) {
+                switch(LOWORD(wParam)) {
+                    case IDC_CLOSE_WINDOW: {
+                        ExitProcess(0);
+                    }
+                }
+            }
             break;
         }
         case WM_DRAWITEM: {
