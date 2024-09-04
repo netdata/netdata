@@ -138,7 +138,7 @@ bool gorilla_writer_write(gorilla_writer_t *gw, uint32_t number)
 
     // write true/false based on whether we got the same number or not.
     if (number == gw->prev_number) {
-        if (hdr->nbits + 1 + bit_size<uint32_t>() >= gw->capacity)
+        if (hdr->nbits + 1 >= gw->capacity)
             return false;
 
         bit_buffer_write(data, hdr->nbits, static_cast<uint32_t>(1), 1);
@@ -147,7 +147,7 @@ bool gorilla_writer_write(gorilla_writer_t *gw, uint32_t number)
         return true;
     }
 
-    if (hdr->nbits + 1 + bit_size<uint32_t>() >= gw->capacity)
+    if (hdr->nbits + 1 >= gw->capacity)
         return false;
     bit_buffer_write(data, hdr->nbits, static_cast<uint32_t>(0), 1);
     __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELAXED);
@@ -156,20 +156,20 @@ bool gorilla_writer_write(gorilla_writer_t *gw, uint32_t number)
     uint32_t xor_lzc = (bit_size<uint32_t>() == 32) ? __builtin_clz(xor_value) : __builtin_clzll(xor_value);
     uint32_t is_xor_lzc_same = (xor_lzc == gw->prev_xor_lzc) ? 1 : 0;
 
-    if (hdr->nbits + 1 + bit_size<uint32_t>() >= gw->capacity)
+    if (hdr->nbits + 1 >= gw->capacity)
         return false;
     bit_buffer_write(data, hdr->nbits, is_xor_lzc_same, 1);
     __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELAXED);
     
     if (!is_xor_lzc_same) {
-        if (hdr->nbits + 1 + bit_size<uint32_t>() >= gw->capacity)
+        if (hdr->nbits + 1 >= gw->capacity)
             return false;
         bit_buffer_write(data, hdr->nbits, xor_lzc, (bit_size<uint32_t>() == 32) ? 5 : 6);
         __atomic_fetch_add(&hdr->nbits, (bit_size<uint32_t>() == 32) ? 5 : 6, __ATOMIC_RELAXED);
     }
 
     // write the bits of the XOR'd value without the LZC prefix
-    if (hdr->nbits + (bit_size<uint32_t>() - xor_lzc) + bit_size<uint32_t>() >= gw->capacity)
+    if (hdr->nbits + (bit_size<uint32_t>() - xor_lzc) >= gw->capacity)
         return false;
     bit_buffer_write(data, hdr->nbits, xor_value, bit_size<uint32_t>() - xor_lzc);
     __atomic_fetch_add(&hdr->nbits, bit_size<uint32_t>() - xor_lzc, __ATOMIC_RELAXED);
