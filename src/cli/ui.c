@@ -22,6 +22,33 @@ static LPCTSTR szWindowClass = _T("DesktopApp");
 
 HWND hNetdataWND = NULL;
 
+static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root)
+{
+    wchar_t localPath[MAX_PATH + 1] = { };
+    DWORD length = GetCurrentDirectoryW(MAX_PATH, localPath);
+    if (!length) {
+        MessageBoxW(NULL, L"Cannot find binary.", L"Error", MB_OK|MB_ICONERROR);
+        return;
+    }
+    if (root) {
+        // Remove usr\bin
+        length -= 7;
+        wcscpy(&localPath[length], cmd);
+    }
+
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+
+    ZeroMemory( &si, sizeof(si) );
+    si.cb = sizeof(si);
+    ZeroMemory( &pi, sizeof(pi) );
+
+    if(!CreateProcess(NULL, localPath, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi )) {
+        MessageBoxW(NULL, L"Cannot start process.", L"Error", MB_OK|MB_ICONERROR);
+        return;
+    }
+}
+
 static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     HWND hwndReloadHealth, hwndReloadLabels, hwndSaveDatabase, hwndReopenLogs, hwndStopService, hwndOpenMsys,
@@ -63,7 +90,7 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
             hwndOpenMsys = CreateWindowExW(0, L"BUTTON", L"Open Msys2",
                                            WS_CHILD | WS_VISIBLE,
                                            280, 100, 120, 30,
-                                           hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
+                                           hNetdatawnd, (HMENU)IDC_OPEN_MSYS,
                                            NULL, NULL);
 
             hwndExit = CreateWindowExW(0, L"BUTTON", L"Exit",
@@ -76,6 +103,10 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
         case WM_COMMAND: {
             if (HIWORD(wParam) == BN_CLICKED) {
                 switch(LOWORD(wParam)) {
+                    case IDC_OPEN_MSYS: {
+                        netdata_cli_run_specific_command(L"msys2.exe", TRUE);
+                        break;
+                    }
                     case IDC_CLOSE_WINDOW: {
                         ExitProcess(0);
                     }
