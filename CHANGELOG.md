@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- go.d storcli: fix unmarshal driveInfo [\#18466](https://github.com/netdata/netdata/pull/18466) ([ilyam8](https://github.com/ilyam8))
 - netdata-claim.sh: fix parsing url arg [\#18460](https://github.com/netdata/netdata/pull/18460) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/likexian/whois from 1.15.4 to 1.15.5 in /src/go [\#18457](https://github.com/netdata/netdata/pull/18457) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/likexian/whois-parser from 1.24.19 to 1.24.20 in /src/go [\#18456](https://github.com/netdata/netdata/pull/18456) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -20,6 +21,7 @@
 - go.d remove vnode disable [\#18446](https://github.com/netdata/netdata/pull/18446) ([ilyam8](https://github.com/ilyam8))
 - go.d add support for symlinked vnode config files [\#18445](https://github.com/netdata/netdata/pull/18445) ([ilyam8](https://github.com/ilyam8))
 - Proper precedence when calculating time\_to\_evict [\#18444](https://github.com/netdata/netdata/pull/18444) ([stelfrag](https://github.com/stelfrag))
+- Windows Permissions [\#18443](https://github.com/netdata/netdata/pull/18443) ([thiagoftsm](https://github.com/thiagoftsm))
 - do not free the sender when the sender thread exits [\#18441](https://github.com/netdata/netdata/pull/18441) ([ktsaou](https://github.com/ktsaou))
 - fix receiver deadlock [\#18440](https://github.com/netdata/netdata/pull/18440) ([ktsaou](https://github.com/ktsaou))
 - fix charts.d/sensors leftovers [\#18439](https://github.com/netdata/netdata/pull/18439) ([ilyam8](https://github.com/ilyam8))
