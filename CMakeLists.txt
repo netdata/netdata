@@ -789,6 +789,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/config/appconfig_api_text.h
         src/libnetdata/config/appconfig_api_boolean.c
         src/libnetdata/config/appconfig_api_boolean.h
+        src/libnetdata/facets/logs_query_status.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1271,6 +1272,7 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/libnetdata/maps/system-users.h
         src/libnetdata/maps/system-groups.h
         src/libnetdata/maps/system-services.h
+        src/collectors/systemd-journal.plugin/systemd-journal-sampling.h
 )
 
 set(STREAMING_PLUGIN_FILES
