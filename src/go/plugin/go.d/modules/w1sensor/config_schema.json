@@ -16,13 +16,6 @@
         "description": "Path with the sensor directories that contain the w1_slave files.",
         "type": "string",
         "default": "/sys/bus/w1/devices"
-      },
-      "timeout": {
-        "title": "Timeout",
-        "description": "Timeout for executing the binary, specified in seconds.",
-        "type": "number",
-        "minimum": 0.5,
-        "default": 2
       }
     },
     "required": [],
@@ -34,12 +27,6 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
-    },
-    "sensors_path": {
-      "ui:help": "Default is `/sys/bus/w1/devices`. You can change this in case you want to monitor virtual sensors that log their files in another directory."
-    },
-    "timeout": {
-      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     }
   }
 }

@@ -10,20 +10,20 @@ import (
 )
 
 const (
-	prioTmp = module.Priority + iota
+	prioTemperature = module.Priority + iota
 )
 
 var (
 	sensorChartTmpl = module.Chart{
-		ID:       "temp_%s",
+		ID:       "w1sensor_%s_temperature",
 		Title:    "1-Wire Temperature Sensor",
 		Units:    "Celsius",
 		Fam:      "Temperature",
-		Ctx:      "w1sensor.temp",
+		Ctx:      "w1sensor.temperature",
 		Type:     module.Line,
-		Priority: prioTmp,
+		Priority: prioTemperature,
 		Dims: module.Dims{
-			{ID: "w1sensor_temp_%s", Div: 1000},
+			{ID: "w1sensor_%s_temperature", Div: precision},
 		},
 	}
 )
@@ -32,6 +32,9 @@ func (w *W1sensor) addSensorChart(id string) {
 	chart := sensorChartTmpl.Copy()
 
 	chart.ID = fmt.Sprintf(chart.ID, id)
+	chart.Labels = []module.Label{
+		{Key: "sensor_id", Value: id},
+	}
 
 	for _, dim := range chart.Dims {
 		dim.ID = fmt.Sprintf(dim.ID, id)
@@ -44,7 +47,7 @@ func (w *W1sensor) addSensorChart(id string) {
 }
 
 func (w *W1sensor) removeSensorChart(id string) {
-	px := fmt.Sprintf("temp_%s", id)
+	px := fmt.Sprintf("w1sensor_%s", id)
 	for _, chart := range *w.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()

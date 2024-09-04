@@ -15,15 +15,12 @@ import (
 var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
-
-	dataW1Slave, _ = os.ReadFile("testdata/w1_slave")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
 		"dataConfigJSON": dataConfigJSON,
 		"dataConfigYAML": dataConfigYAML,
-		"dataW1Slave":    dataW1Slave,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -48,13 +45,13 @@ func TestW1sensor_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pf := New()
-			pf.Config = test.config
+			w1 := New()
+			w1.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, pf.Init())
+				assert.Error(t, w1.Init())
 			} else {
-				assert.NoError(t, pf.Init())
+				assert.NoError(t, w1.Init())
 			}
 		})
 	}
@@ -71,27 +68,25 @@ func TestAP_Cleanup(t *testing.T) {
 		},
 		"after check": {
 			prepare: func() *W1sensor {
-				w := New()
-				w.SensorsPath = prepareMockOk().path
-				_ = w.Check()
-				return w
+				w1 := prepareCaseOk()
+				_ = w1.Check()
+				return w1
 			},
 		},
 		"after collect": {
 			prepare: func() *W1sensor {
-				w := New()
-				w.SensorsPath = prepareMockOk().path
-				_ = w.Collect()
-				return w
+				w1 := prepareCaseOk()
+				_ = w1.Collect()
+				return w1
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pf := test.prepare()
+			w1 := test.prepare()
 
-			assert.NotPanics(t, pf.Cleanup)
+			assert.NotPanics(t, w1.Cleanup)
 		})
 	}
 }
@@ -102,28 +97,27 @@ func TestW1sensor_Charts(t *testing.T) {
 
 func TestW1sensor_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepareMock func() *mockSensor
+		prepareMock func() *W1sensor
 		wantFail    bool
 	}{
 		"success case": {
 			wantFail:    false,
-			prepareMock: prepareMockOk,
+			prepareMock: prepareCaseOk,
 		},
-		"no sensors": {
+		"no sensors dir": {
 			wantFail:    true,
-			prepareMock: prepareMockNoSensors,
+			prepareMock: prepareCaseNoSensorsDir,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			w := New()
-			w.SensorsPath = string(test.prepareMock().path)
+			w1 := test.prepareMock()
 
 			if test.wantFail {
-				assert.Error(t, w.Check())
+				assert.Error(t, w1.Check())
 			} else {
-				assert.NoError(t, w.Check())
+				assert.NoError(t, w1.Check())
 			}
 		})
 	}
@@ -131,54 +125,49 @@ func TestW1sensor_Check(t *testing.T) {
 
 func TestW1Sensors_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepareMock func() *mockSensor
+		prepareMock func() *W1sensor
 		wantMetrics map[string]int64
 		wantCharts  int
 	}{
 		"success case": {
-			prepareMock: prepareMockOk,
+			prepareMock: prepareCaseOk,
 			wantCharts:  4,
 			wantMetrics: map[string]int64{
-				"w1sensor_temp_28-01204e9d2fa0": 12435,
-				"w1sensor_temp_28-01204e9d2fa1": 29960,
-				"w1sensor_temp_28-01204e9d2fa2": 10762,
-				"w1sensor_temp_28-01204e9d2fa3": 22926,
+				"w1sensor_28-01204e9d2fa0_temperature": 124,
+				"w1sensor_28-01204e9d2fa1_temperature": 299,
+				"w1sensor_28-01204e9d2fa2_temperature": 107,
+				"w1sensor_28-01204e9d2fa3_temperature": 229,
 			},
 		},
-		"no sensors": {
-			prepareMock: prepareMockNoSensors,
+		"no sensors dir": {
+			prepareMock: prepareCaseNoSensorsDir,
 			wantMetrics: nil,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			w := New()
-			w.SensorsPath = test.prepareMock().path
+			w1 := test.prepareMock()
 
-			mx := w.Collect()
+			mx := w1.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
-			assert.Equal(t, test.wantCharts, len(*w.Charts()), "wantCharts")
+			assert.Equal(t, test.wantCharts, len(*w1.Charts()), "wantCharts")
 
-			module.TestMetricsHasAllChartsDims(t, w.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, w1.Charts(), mx)
 		})
 	}
 }
 
-func prepareMockOk() *mockSensor {
-	return &mockSensor{
-		path: "/output",
-	}
+func prepareCaseOk() *W1sensor {
+	w1 := New()
+	w1.SensorsPath = "testdata/devices"
+	return w1
 }
 
-func prepareMockNoSensors() *mockSensor {
-	return &mockSensor{
-		path: "",
-	}
-}
-
-type mockSensor struct {
-	path string
+func prepareCaseNoSensorsDir() *W1sensor {
+	w1 := New()
+	w1.SensorsPath = "testdata/devices!"
+	return w1
 }

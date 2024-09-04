@@ -5,10 +5,8 @@ package w1sensor
 import (
 	_ "embed"
 	"errors"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -18,7 +16,7 @@ func init() {
 	module.Register("w1sensor", module.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: module.Defaults{
-			UpdateEvery: 10,
+			UpdateEvery: 1,
 		},
 		Create: func() module.Module { return New() },
 		Config: func() any { return &Config{} },
@@ -29,17 +27,15 @@ func New() *W1sensor {
 	return &W1sensor{
 		Config: Config{
 			SensorsPath: "/sys/bus/w1/devices",
-			Timeout:     web.Duration(time.Second * 2),
 		},
 		charts:      &module.Charts{},
-		seenSensors: make(map[string]string),
+		seenSensors: make(map[string]bool),
 	}
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	SensorsPath string       `yaml:"sensors_path,omitempty" json:"sensors_path"`
+	UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
+	SensorsPath string `yaml:"sensors_path,omitempty" json:"sensors_path"`
 }
 
 type (
@@ -49,27 +45,27 @@ type (
 
 		charts *module.Charts
 
-		seenSensors map[string]string
+		seenSensors map[string]bool
 	}
 )
 
-func (a *W1sensor) Configuration() any {
-	return a.Config
+func (w *W1sensor) Configuration() any {
+	return w.Config
 }
 
-func (a *W1sensor) Init() error {
-	if err := a.validateConfig(); err != nil {
-		a.Errorf("config validation: %s", err)
-		return err
+func (w *W1sensor) Init() error {
+	if w.SensorsPath == "" {
+		w.Errorf("sensors_path required but not set")
+		return errors.New("no sensors path specified")
 	}
 
 	return nil
 }
 
-func (a *W1sensor) Check() error {
-	mx, err := a.collect()
+func (w *W1sensor) Check() error {
+	mx, err := w.collect()
 	if err != nil {
-		a.Error(err)
+		w.Error(err)
 		return err
 	}
 
@@ -80,14 +76,14 @@ func (a *W1sensor) Check() error {
 	return nil
 }
 
-func (a *W1sensor) Charts() *module.Charts {
-	return a.charts
+func (w *W1sensor) Charts() *module.Charts {
+	return w.charts
 }
 
-func (a *W1sensor) Collect() map[string]int64 {
-	mx, err := a.collect()
+func (w *W1sensor) Collect() map[string]int64 {
+	mx, err := w.collect()
 	if err != nil {
-		a.Error(err)
+		w.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -97,4 +93,4 @@ func (a *W1sensor) Collect() map[string]int64 {
 	return mx
 }
 
-func (a *W1sensor) Cleanup() {}
+func (w *W1sensor) Cleanup() {}
