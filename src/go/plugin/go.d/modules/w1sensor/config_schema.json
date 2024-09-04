@@ -9,11 +9,11 @@
         "description": "Data collection interval, measured in seconds.",
         "type": "integer",
         "minimum": 1,
-        "default": 10
+        "default": 1
       },
       "sensors_path": {
         "title": "Sensors path",
-        "description": "Path with the sensor directories that contain the w1_slave files.",
+        "description": "Directory path containing sensor folders with w1_slave files.",
         "type": "string",
         "default": "/sys/bus/w1/devices"
       }

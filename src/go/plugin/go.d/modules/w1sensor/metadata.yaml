@@ -55,15 +55,11 @@ modules:
           list:
             - name: update_every
               description: Data collection frequency.
-              default_value: 10
+              default_value: 1
               required: false
             - name: sensors_path
-              description: Path with the sensor directories that contain the w1_slave files.
+              description: Directory path containing sensor folders with w1_slave files.
               default_value: /sys/bus/w1/devices
-              required: false
-            - name: timeout
-              description: Timeout for executing the binary, specified in seconds.
-              default_value: 2
               required: false
         examples:
           folding:
@@ -71,11 +67,11 @@ modules:
             enabled: false
           list:
             - name: Custom sensor device path
-              description: A virtual sensor is to be monitored, where the w1_slave file is located on a different location than default.
+              description: Monitors a virtual sensor when the w1_slave file is located in a custom directory instead of the default location.
               config: |
                 jobs:
                   - name: custom_sensors_path
-                    sensors_path: /custom/output
+                    sensors_path: /custom/path/devices
     troubleshooting:
       problems:
         list: []
@@ -88,12 +84,12 @@ modules:
       availability: []
       scopes:
         - name: sensor
-          description: "These metrics refer to a chart per sensor."
+          description: These metrics refer to the 1-Wire Sensor.
           labels: []
           metrics:
-            - name: w1sensor.temp
+            - name: w1sensor.temperature
               description: 1-Wire Temperature Sensor
               unit: "Celsius"
               chart_type: line
               dimensions:
-                - name: w1sensor_temp_$sensor_id
+                - name: temperature

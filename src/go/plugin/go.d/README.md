@@ -151,7 +151,7 @@ see the appropriate collector readme.
 | [vcsa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/vcsa)                             |   vCenter Server Appliance    |
 | [vernemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/vernemq)                       |            VerneMQ            |
 | [vsphere](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/vsphere)                       |     VMware vCenter Server     |
-| [w1sensor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/w1sensor)                       |     1-Wire Sensors     |
+| [w1sensor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/w1sensor)                     |        1-Wire Sensors         |
 | [web_log](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/weblog)                        |         Apache/NGINX          |
 | [wireguard](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/wireguard)                   |           WireGuard           |
 | [whoisquery](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/whoisquery)                 |         Domain Expiry         |

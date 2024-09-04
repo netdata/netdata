@@ -76,7 +76,7 @@ func readW1sensorTemperature(filename string) (int64, error) {
 
 	sc := bufio.NewScanner(file)
 	sc.Scan()
-	// The second line displays the retained values along with a temperature in millidegrees Centigrade after t=.
+	// The second line displays the retained values along with a temperature in milli degrees Centigrade after t=.
 	sc.Scan()
 
 	_, tempStr, ok := strings.Cut(strings.TrimSpace(sc.Text()), "t=")
