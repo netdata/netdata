@@ -1393,6 +1393,10 @@ set(FREEBSD_PLUGIN_FILES
         src/collectors/proc.plugin/zfs_common.h
 )
 
+set(WINDOWS_EVENTS_PLUGIN_FILES
+        src/collectors/windows-events.plugin/windows-events.c
+)
+
 set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/windows_plugin.c
         src/collectors/windows.plugin/windows_plugin.h
@@ -2079,6 +2083,15 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                         COMPONENT plugin-systemd-journal
                         DESTINATION usr/share/doc/netdata-plugin-systemd-journal)
         endif()
+endif()
+
+if(OS_WINDOWS)
+        add_executable(windows-events.plugin ${WINDOWS_EVENTS_PLUGIN_FILES})
+        target_link_libraries(windows-events.plugin libnetdata wevtapi)
+
+        install(TARGETS windows-events.plugin
+                COMPONENT plugin-windows-events
+                DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
