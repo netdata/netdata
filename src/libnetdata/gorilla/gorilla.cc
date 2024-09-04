@@ -162,10 +162,11 @@ bool gorilla_writer_write(gorilla_writer_t *gw, uint32_t number)
     __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELAXED);
     
     if (!is_xor_lzc_same) {
-        if (hdr->nbits + 1 >= gw->capacity)
+        size_t bits_needed = (bit_size<uint32_t>() == 32) ? 5 : 6;
+        if ((hdr->nbits + bits_needed) >= gw->capacity)
             return false;
-        bit_buffer_write(data, hdr->nbits, xor_lzc, (bit_size<uint32_t>() == 32) ? 5 : 6);
-        __atomic_fetch_add(&hdr->nbits, (bit_size<uint32_t>() == 32) ? 5 : 6, __ATOMIC_RELAXED);
+        bit_buffer_write(data, hdr->nbits, xor_lzc, bits_needed);
+        __atomic_fetch_add(&hdr->nbits, bits_needed, __ATOMIC_RELAXED);
     }
 
     // write the bits of the XOR'd value without the LZC prefix
