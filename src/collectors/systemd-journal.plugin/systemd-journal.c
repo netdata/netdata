@@ -2224,7 +2224,7 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
     int response;
 
     if(q.info) {
-        buffer_json_member_add_uint64(wb, "version", 3);
+        buffer_json_member_add_uint64(wb, "v", 3);
         facets_accepted_parameters_to_json_array(facets, wb, false);
         buffer_json_member_add_array(wb, "required_params");
         {
