@@ -108,6 +108,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vcsa"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vernemq"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/w1sensor"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/weblog"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/whoisquery"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/windows"
