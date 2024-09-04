@@ -527,7 +527,7 @@ static void rrdcontext_v2_set_transition_filter(const char *machine_guid, const 
 bool rrdcontexts_v2_init_alert_dictionaries(struct rrdcontext_to_json_v2_data *ctl, struct api_v2_contexts_request *req) {
     if(req->alerts.transition) {
         ctl->options |= CONTEXTS_OPTION_ALERTS_WITH_INSTANCES | CONTEXTS_OPTION_ALERTS_WITH_VALUES;
-        if(!sql_find_alert_transition(req->alerts.transition, rrdcontext_v2_set_transition_filter, &ctl))
+        if(!sql_find_alert_transition(req->alerts.transition, rrdcontext_v2_set_transition_filter, ctl))
             return false;
     }
 
@@ -536,9 +536,9 @@ bool rrdcontexts_v2_init_alert_dictionaries(struct rrdcontext_to_json_v2_data *c
         NULL,
         sizeof(struct alert_v2_entry));
 
-    dictionary_register_insert_callback(ctl->alerts.summary, alerts_v2_insert_callback, &ctl);
-    dictionary_register_conflict_callback(ctl->alerts.summary, alerts_v2_conflict_callback, &ctl);
-    dictionary_register_delete_callback(ctl->alerts.summary, alerts_v2_delete_callback, &ctl);
+    dictionary_register_insert_callback(ctl->alerts.summary, alerts_v2_insert_callback, ctl);
+    dictionary_register_conflict_callback(ctl->alerts.summary, alerts_v2_conflict_callback, ctl);
+    dictionary_register_delete_callback(ctl->alerts.summary, alerts_v2_delete_callback, ctl);
 
     ctl->alerts.by_type = dictionary_create_advanced(
         DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
@@ -585,9 +585,9 @@ bool rrdcontexts_v2_init_alert_dictionaries(struct rrdcontext_to_json_v2_data *c
             DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(struct sql_alert_instance_v2_entry));
 
-        dictionary_register_insert_callback(ctl->alerts.alert_instances, alert_instances_v2_insert_callback, &ctl);
-        dictionary_register_conflict_callback(ctl->alerts.alert_instances, alert_instances_v2_conflict_callback, &ctl);
-        dictionary_register_delete_callback(ctl->alerts.alert_instances, alert_instances_delete_callback, &ctl);
+        dictionary_register_insert_callback(ctl->alerts.alert_instances, alert_instances_v2_insert_callback, ctl);
+        dictionary_register_conflict_callback(ctl->alerts.alert_instances, alert_instances_v2_conflict_callback, ctl);
+        dictionary_register_delete_callback(ctl->alerts.alert_instances, alert_instances_delete_callback, ctl);
     }
 
     return true;
