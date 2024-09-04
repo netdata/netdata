@@ -459,7 +459,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 ### Hardware Devices and Sensors
 
-- [1-Wire Sensors](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/w1sensor/integrations/1-wire_sensors.md)
+- [1-Wire Sensors](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/w1sensor/integrations/1-wire_sensors.md)
 
 - [AM2320](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/am2320/integrations/am2320.md)
 

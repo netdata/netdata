@@ -1,0 +1,1 @@
+integrations/1-wire_sensors.md
