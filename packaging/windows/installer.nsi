@@ -117,7 +117,7 @@ Function NetdataConfigLeave
 
                 ${If} $0 == 135
                 ${AndIf} $1 >= 36
-                        nsExec::ExecToLog '$INSTDIR\usr\bin\netdata_claim.exe /T $cloudToken /R $cloudRooms /P $proxy /I $insecure'
+                        nsExec::ExecToLog '$INSTDIR\usr\bin\NetdataClaim.exe /T $cloudToken /R $cloudRooms /P $proxy /I $insecure'
                         pop $0
                 ${Else}
                         MessageBox MB_OK "The Cloud information does not have the expected length."

@@ -1301,10 +1301,10 @@ set(CLAIM_PLUGIN_FILES
 )
 
 set(CLAIM_WINDOWS_FILES
-        src/claim/netdata_claim.c
-        src/claim/netdata_claim.h
-        src/claim/netdata_claim_window.c
-        src/claim/netdata_claim_window.h
+        src/claim/main.c
+        src/claim/main.h
+        src/claim/ui.c
+        src/claim/ui.h
 )
 
 set(ACLK_ALWAYS_BUILD
@@ -2262,8 +2262,9 @@ add_executable(netdata
 )
 
 if(OS_WINDOWS)
-        add_executable(netdata_claim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
-        target_link_libraries(netdata_claim shell32;gdi32;msftedit)
+        add_executable(NetdataClaim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
+        target_link_libraries(NetdataClaim shell32;gdi32;msftedit)
+        target_compile_options(NetdataClaim PUBLIC -mwindows)
 endif()
 
 target_compile_definitions(netdata PRIVATE
@@ -2448,15 +2449,15 @@ set(varlibdir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(netdata_user_POST "${NETDATA_USER}")
 set(netdata_group_POST "${NETDATA_USER}")
 
-configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
-install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh
-        COMPONENT netdata
-        DESTINATION "${BINDIR}")
-
-if(OS_WINDOWS)
+if(NOT OS_WINDOWS)
+        configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
         install(PROGRAMS
-                ${CMAKE_BINARY_DIR}/netdata_claim.exe
+                ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh
+                COMPONENT netdata
+                DESTINATION "${BINDIR}")
+else()
+        install(PROGRAMS
+                ${CMAKE_BINARY_DIR}/NetdataClaim.exe
                 COMPONENT netdata
                 DESTINATION "${BINDIR}")
 endif()
@@ -3013,65 +3014,6 @@ if(NOT OS_WINDOWS)
 endif()
 
 if(OS_WINDOWS)
-        install(FILES /usr/bin/awk.exe
-                      /usr/bin/bash.exe
-                      /usr/bin/cat.exe
-                      /usr/bin/chown.exe
-                      /usr/bin/curl.exe
-                      /usr/bin/env.exe
-                      /usr/bin/grep.exe
-                      /usr/bin/mkdir.exe
-                      /usr/bin/openssl.exe
-                      /usr/bin/rm.exe
-                      /usr/bin/sed.exe
-                      /usr/bin/sh.exe
-                      /usr/bin/tail.exe
-                      /usr/bin/tr.exe
-                      /usr/bin/uuidgen.exe
-                      /usr/bin/whoami.exe
-                DESTINATION "${BINDIR}")
-
-        install(FILES /usr/bin/msys-2.0.dll
-                      /usr/bin/msys-asn1-8.dll
-                      /usr/bin/msys-brotlicommon-1.dll
-                      /usr/bin/msys-brotlidec-1.dll
-                      /usr/bin/msys-brotlienc-1.dll
-                      /usr/bin/msys-com_err-1.dll
-                      /usr/bin/msys-crypt-2.dll
-                      /usr/bin/msys-crypto-3.dll
-                      /usr/bin/msys-curl-4.dll
-                      /usr/bin/msys-gcc_s-seh-1.dll
-                      /usr/bin/msys-gmp-10.dll
-                      /usr/bin/msys-gssapi-3.dll
-                      /usr/bin/msys-hcrypto-4.dll
-                      /usr/bin/msys-heimbase-1.dll
-                      /usr/bin/msys-heimntlm-0.dll
-                      /usr/bin/msys-hx509-5.dll
-                      /usr/bin/msys-iconv-2.dll
-                      /usr/bin/msys-idn2-0.dll
-                      /usr/bin/msys-intl-8.dll
-                      /usr/bin/msys-krb5-26.dll
-                      /usr/bin/msys-lz4-1.dll
-                      /usr/bin/msys-mpfr-6.dll
-                      /usr/bin/msys-ncursesw6.dll
-                      /usr/bin/msys-nghttp2-14.dll
-                      /usr/bin/msys-pcre-1.dll
-                      /usr/bin/msys-protobuf-32.dll
-                      /usr/bin/msys-psl-5.dll
-                      /usr/bin/msys-readline8.dll
-                      /usr/bin/msys-roken-18.dll
-                      /usr/bin/msys-sqlite3-0.dll
-                      /usr/bin/msys-ssh2-1.dll
-                      /usr/bin/msys-ssl-3.dll
-                      /usr/bin/msys-stdc++-6.dll
-                      /usr/bin/msys-unistring-5.dll
-                      /usr/bin/msys-uuid-1.dll
-                      /usr/bin/msys-uv-1.dll
-                      /usr/bin/msys-wind-0.dll
-                      /usr/bin/msys-z.dll
-                      /usr/bin/msys-zstd-1.dll
-                DESTINATION "${BINDIR}")
-
         # Make bash & netdata happy
         install(DIRECTORY DESTINATION tmp)
 
