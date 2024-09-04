@@ -2876,7 +2876,6 @@ install(FILES
         src/collectors/python.d.plugin/spigotmc/spigotmc.conf
         src/collectors/python.d.plugin/traefik/traefik.conf
         src/collectors/python.d.plugin/varnish/varnish.conf
-        src/collectors/python.d.plugin/w1sensor/w1sensor.conf
         src/collectors/python.d.plugin/zscores/zscores.conf
         COMPONENT plugin-pythond
         DESTINATION usr/lib/netdata/conf.d/python.d)
@@ -2892,7 +2891,6 @@ install(FILES
         src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
         src/collectors/python.d.plugin/traefik/traefik.chart.py
         src/collectors/python.d.plugin/varnish/varnish.chart.py
-        src/collectors/python.d.plugin/w1sensor/w1sensor.chart.py
         src/collectors/python.d.plugin/zscores/zscores.chart.py
         COMPONENT plugin-pythond
         DESTINATION usr/libexec/netdata/python.d)
