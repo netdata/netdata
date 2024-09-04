@@ -57,8 +57,8 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     else {
         // we don't have the old next item (probably a different section?)
         // find the last MIGRATED one
-        struct config_option *t = sect_new->values->prev;
-        for (; t != sect_new->values ; t = t->prev) {
+        struct config_option *t = sect_new->values ? sect_new->values->prev : NULL;
+        for (; t && t != sect_new->values ; t = t->prev) {
             if (t->flags & CONFIG_VALUE_MIGRATED)
                 break;
         }
