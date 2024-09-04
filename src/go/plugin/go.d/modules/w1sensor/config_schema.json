@@ -1,0 +1,32 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Access Point collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "sensors_path": {
+        "title": "Sensors path",
+        "description": "Directory path containing sensor folders with w1_slave files.",
+        "type": "string",
+        "default": "/sys/bus/w1/devices"
+      }
+    },
+    "required": [],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    }
+  }
+}

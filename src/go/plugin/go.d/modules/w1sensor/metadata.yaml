@@ -1,0 +1,95 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      plugin_name: go.d.plugin
+      module_name: w1sensor
+      monitored_instance:
+        name: 1-Wire Sensors
+        link: "https://www.analog.com/en/product-category/1wire-temperature-sensors.html"
+        categories:
+          - data-collection.hardware-devices-and-sensors
+        icon_filename: "1-wire.png"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - temperature
+        - sensor
+        - 1-wire
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor 1-Wire Sensors metrics with Netdata for optimal environmental conditions monitoring. Enhance your environmental monitoring with real-time insights and alerts.
+        method_description: The collector uses the wire, w1_gpio, and w1_therm kernel modules. Currently temperature sensors are supported and automatically detected.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: "The collector will try to auto detect available 1-Wire devices."
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: "Required Linux kernel modules"
+            description: "Make sure `wire`, `w1_gpio`, and `w1_therm` kernel modules are loaded."
+      configuration:
+        file:
+          name: go.d/w1sensor.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: sensors_path
+              description: Directory path containing sensor folders with w1_slave files.
+              default_value: /sys/bus/w1/devices
+              required: false
+        examples:
+          folding:
+            title: ""
+            enabled: false
+          list:
+            - name: Custom sensor device path
+              description: Monitors a virtual sensor when the w1_slave file is located in a custom directory instead of the default location.
+              config: |
+                jobs:
+                  - name: custom_sensors_path
+                    sensors_path: /custom/path/devices
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: sensor
+          description: These metrics refer to the 1-Wire Sensor.
+          labels: []
+          metrics:
+            - name: w1sensor.temperature
+              description: 1-Wire Temperature Sensor
+              unit: "Celsius"
+              chart_type: line
+              dimensions:
+                - name: temperature
