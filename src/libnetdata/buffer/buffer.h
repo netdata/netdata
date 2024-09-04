@@ -39,14 +39,15 @@ typedef enum __attribute__ ((__packed__)) {
 } BUFFER_JSON_OPTIONS;
 
 typedef struct web_buffer {
-    size_t size;            // allocation size of buffer, in bytes
-    size_t len;             // current data length in buffer, in bytes
-    char *buffer;           // the buffer itself
+    uint32_t size;          // allocation size of buffer, in bytes
+    uint32_t len;           // current data length in buffer, in bytes
     HTTP_CONTENT_TYPE content_type;    // the content type of the data in the buffer
     BUFFER_OPTIONS options; // options related to the content
+    uint16_t response_code;
     time_t date;            // the timestamp this content has been generated
     time_t expires;         // the timestamp this content expires
     size_t *statistics;
+    char *buffer;           // the buffer itself
 
     struct {
         char key_quote[BUFFER_QUOTE_MAX_SIZE + 1];
@@ -62,7 +63,7 @@ typedef struct web_buffer {
 #define buffer_cacheable(wb)    do { (wb)->options |= WB_CONTENT_CACHEABLE;    if((wb)->options & WB_CONTENT_NO_CACHEABLE) (wb)->options &= ~WB_CONTENT_NO_CACHEABLE; } while(0)
 #define buffer_no_cacheable(wb) do { (wb)->options |= WB_CONTENT_NO_CACHEABLE; if((wb)->options & WB_CONTENT_CACHEABLE)    (wb)->options &= ~WB_CONTENT_CACHEABLE;  (wb)->expires = 0; } while(0)
 
-#define buffer_strlen(wb) ((wb)->len)
+#define buffer_strlen(wb) (size_t)((wb)->len)
 
 #define BUFFER_OVERFLOW_EOF "EOF"
 

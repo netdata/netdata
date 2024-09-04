@@ -1618,6 +1618,8 @@ FACETS *facets_create(uint32_t items_to_return, FACETS_OPTIONS options, const ch
 }
 
 void facets_destroy(FACETS *facets) {
+    if(!facets) return;
+
     dictionary_destroy(facets->accepted_params);
     FACETS_KEYS_INDEX_DESTROY(facets);
     simple_pattern_free(facets->visible_keys);

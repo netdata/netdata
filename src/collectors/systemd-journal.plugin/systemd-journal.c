@@ -1131,10 +1131,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
     fqs->files_matched = files_used;
 
-    if(fqs->if_modified_since && !files_are_newer) {
-        buffer_flush(wb);
-        return HTTP_RESP_NOT_MODIFIED;
-    }
+    if(fqs->if_modified_since && !files_are_newer)
+        return rrd_call_function_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
 
     // sort the files, so that they are optimal for facets
     if(files_used >= 2) {
@@ -1290,10 +1288,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
     switch (status) {
         case ND_SD_JOURNAL_OK:
-            if(fqs->if_modified_since && !fqs->rows_useful) {
-                buffer_flush(wb);
-                return HTTP_RESP_NOT_MODIFIED;
-            }
+            if(fqs->if_modified_since && !fqs->rows_useful)
+                return rrd_call_function_error(wb, "no useful logs, not modified", HTTP_RESP_NOT_MODIFIED);
             break;
 
         case ND_SD_JOURNAL_TIMED_OUT:
@@ -1301,18 +1297,19 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
             break;
 
         case ND_SD_JOURNAL_CANCELLED:
-            buffer_flush(wb);
-            return HTTP_RESP_CLIENT_CLOSED_REQUEST;
+            return rrd_call_function_error(wb, "client closed connection", HTTP_RESP_CLIENT_CLOSED_REQUEST);
 
         case ND_SD_JOURNAL_NOT_MODIFIED:
-            buffer_flush(wb);
-            return HTTP_RESP_NOT_MODIFIED;
+            return rrd_call_function_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
+
+        case ND_SD_JOURNAL_FAILED_TO_OPEN:
+            return rrd_call_function_error(wb, "failed to open journal", HTTP_RESP_INTERNAL_SERVER_ERROR);
+
+        case ND_SD_JOURNAL_FAILED_TO_SEEK:
+            return rrd_call_function_error(wb, "failed to seek in journal", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
         default:
-        case ND_SD_JOURNAL_FAILED_TO_OPEN:
-        case ND_SD_JOURNAL_FAILED_TO_SEEK:
-            buffer_flush(wb);
-            return HTTP_RESP_INTERNAL_SERVER_ERROR;
+            return rrd_call_function_error(wb, "unknown status", HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
@@ -1409,11 +1406,16 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
     buffer_json_finalize(wb);
 
-    return HTTP_RESP_OK;
+    wb->content_type = CT_APPLICATION_JSON;
+    wb->response_code = HTTP_RESP_OK;
+    return wb->response_code;
 }
 
-static void netdata_systemd_journal_function_help(const char *transaction) {
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+static void logs_function_help(BUFFER *wb, const char *transaction) {
+    buffer_reset(wb);
+    wb->content_type = CT_TEXT_PLAIN;
+    wb->response_code = HTTP_RESP_OK;
+
     buffer_sprintf(wb,
             "%s / %s\n"
             "\n"
@@ -1513,10 +1515,6 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
             , SYSTEMD_JOURNAL_DEFAULT_ITEMS_SAMPLING
             , JOURNAL_DEFAULT_DIRECTION == FACETS_ANCHOR_DIRECTION_BACKWARD ? "backward" : "forward"
     );
-
-    netdata_mutex_lock(&stdout_mutex);
-    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
-    netdata_mutex_unlock(&stdout_mutex);
 }
 
 typedef struct {
@@ -1530,7 +1528,7 @@ typedef struct {
     time_t before_s;
     usec_t anchor;
     usec_t if_modified_since;
-    size_t last;
+    size_t entries;
     FACETS_ANCHOR_DIRECTION direction;
     const char *query;
     const char *chart;
@@ -1538,7 +1536,10 @@ typedef struct {
     SD_JOURNAL_FILE_SOURCE_TYPE source_type;
     size_t filters;
     size_t sampling;
-} JOURNAL_QUERY;
+
+    time_t now_s;
+    time_t expires_s;
+} LOGS_QUERY_REQUEST;
 
 static SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value) {
     if(strcmp(value, SDJF_SOURCE_ALL_NAME) == 0)
@@ -1563,16 +1564,16 @@ static FACETS_ANCHOR_DIRECTION get_direction(const char *value) {
     return strcasecmp(value, "forward") == 0 ? FACETS_ANCHOR_DIRECTION_FORWARD : FACETS_ANCHOR_DIRECTION_BACKWARD;
 }
 
-struct post_query_data {
+struct logs_query_data {
     const char *transaction;
     FACETS *facets;
-    JOURNAL_QUERY *q;
+    LOGS_QUERY_REQUEST *q;
     BUFFER *wb;
 };
 
-static bool parse_json_payload(json_object *jobj, const char *path, void *data, BUFFER *error) {
-    struct post_query_data *qd = data;
-    JOURNAL_QUERY *q = qd->q;
+static bool logs_parse_json_payload(json_object *jobj, const char *path, void *data, BUFFER *error) {
+    struct logs_query_data *qd = data;
+    LOGS_QUERY_REQUEST *q = qd->q;
     BUFFER *wb = qd->wb;
     FACETS *facets = qd->facets;
     // const char *transaction = qd->transaction;
@@ -1589,7 +1590,7 @@ static bool parse_json_payload(json_object *jobj, const char *path, void *data, 
     JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_BEFORE, q->before_s, error, false);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_IF_MODIFIED_SINCE, q->if_modified_since, error, false);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_ANCHOR, q->anchor, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_LAST, q->last, error, false);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_LAST, q->entries, error, false);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_DIRECTION, get_direction, q->direction, error, false);
     JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_QUERY, q->query, error, false);
     JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, JOURNAL_PARAMETER_HISTOGRAM, q->chart, error, false);
@@ -1715,8 +1716,8 @@ static bool parse_json_payload(json_object *jobj, const char *path, void *data, 
     return true;
 }
 
-static bool parse_post_params(FACETS *facets, JOURNAL_QUERY *q, BUFFER *wb, BUFFER *payload, const char *transaction) {
-    struct post_query_data qd = {
+static bool logs_parse_post_params(FACETS *facets, LOGS_QUERY_REQUEST *q, BUFFER *wb, BUFFER *payload, const char *transaction) {
+    struct logs_query_data qd = {
         .transaction = transaction,
         .facets = facets,
         .q = q,
@@ -1724,18 +1725,13 @@ static bool parse_post_params(FACETS *facets, JOURNAL_QUERY *q, BUFFER *wb, BUFF
     };
 
     int code;
-    CLEAN_JSON_OBJECT *jobj = json_parse_function_payload_or_error(wb, payload, &code, parse_json_payload, &qd);
-    if(!jobj || code != HTTP_RESP_OK) {
-        netdata_mutex_lock(&stdout_mutex);
-        pluginsd_function_result_to_stdout(transaction, code, "application/json", now_realtime_sec() + 1, wb);
-        netdata_mutex_unlock(&stdout_mutex);
-        return false;
-    }
+    CLEAN_JSON_OBJECT *jobj = json_parse_function_payload_or_error(wb, payload, &code, logs_parse_json_payload, &qd);
+    wb->response_code = code;
 
-    return true;
+    return (jobj && code == HTTP_RESP_OK);
 }
 
-static bool parse_get_params(FACETS *facets, JOURNAL_QUERY *q, BUFFER *wb, char *function, const char *transaction) {
+static bool logs_parse_get_params(FACETS *facets, LOGS_QUERY_REQUEST *q, BUFFER *wb, char *function, const char *transaction) {
     buffer_json_member_add_object(wb, "_request");
 
     char *words[SYSTEMD_JOURNAL_MAX_PARAMS] = { NULL };
@@ -1745,7 +1741,7 @@ static bool parse_get_params(FACETS *facets, JOURNAL_QUERY *q, BUFFER *wb, char 
         if(!keyword) break;
 
         if(strcmp(keyword, JOURNAL_PARAMETER_HELP) == 0) {
-            netdata_systemd_journal_function_help(transaction);
+            logs_function_help(wb, transaction);
             return false;
         }
         else if(strcmp(keyword, JOURNAL_PARAMETER_INFO) == 0) {
@@ -1840,7 +1836,7 @@ static bool parse_get_params(FACETS *facets, JOURNAL_QUERY *q, BUFFER *wb, char 
             q->direction = get_direction(&keyword[sizeof(JOURNAL_PARAMETER_DIRECTION ":") - 1]);
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_LAST ":", sizeof(JOURNAL_PARAMETER_LAST ":") - 1) == 0) {
-            q->last = str2ul(&keyword[sizeof(JOURNAL_PARAMETER_LAST ":") - 1]);
+            q->entries = str2ul(&keyword[sizeof(JOURNAL_PARAMETER_LAST ":") - 1]);
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_QUERY ":", sizeof(JOURNAL_PARAMETER_QUERY ":") - 1) == 0) {
             freez((void *)q->query);
@@ -1885,9 +1881,7 @@ static bool parse_get_params(FACETS *facets, JOURNAL_QUERY *q, BUFFER *wb, char 
                         *sep++ = '\0';
 
                     facets_register_facet_filter_id(
-                        facets,
-                        keyword,
-                        value,
+                        facets, keyword, value,
                         FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_REORDER);
 
                     buffer_json_add_array_item_string(wb, value);
@@ -1904,26 +1898,51 @@ static bool parse_get_params(FACETS *facets, JOURNAL_QUERY *q, BUFFER *wb, char 
     return true;
 }
 
-void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
-                              BUFFER *payload, HTTP_ACCESS access __maybe_unused,
-                              const char *source __maybe_unused, void *data __maybe_unused) {
-    fstat_thread_calls = 0;
-    fstat_thread_cached_responses = 0;
+static void logs_info_response(BUFFER *wb, FACETS *facets) {
+    // the buffer already has the request in it
+    // DO NOT FLUSH IT
 
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_member_add_uint64(wb, "v", 3);
+    facets_accepted_parameters_to_json_array(facets, wb, false);
+    buffer_json_member_add_array(wb, "required_params");
+    {
+        buffer_json_add_array_item_object(wb);
+        {
+            buffer_json_member_add_string(wb, "id", "source");
+            buffer_json_member_add_string(wb, "name", "source");
+            buffer_json_member_add_string(wb, "help", "Select the SystemD Journal source to query");
+            buffer_json_member_add_string(wb, "type", "multiselect");
+            buffer_json_member_add_array(wb, "options");
+            {
+                available_journal_file_sources_to_json_array(wb);
+            }
+            buffer_json_array_close(wb); // options array
+        }
+        buffer_json_object_close(wb); // required params object
+    }
+    buffer_json_array_close(wb); // required_params array
+
+    facets_table_config(wb);
+
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_string(wb, "help", SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
+    buffer_json_finalize(wb);
+
+    wb->content_type = CT_APPLICATION_JSON;
+    wb->response_code = HTTP_RESP_OK;
+}
+
+static BUFFER *logs_create_output_buffer(void) {
+    BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    return wb;
+}
 
-    FUNCTION_QUERY_STATUS tmp_fqs = {
-            .cancelled = cancelled,
-            .stop_monotonic_ut = stop_monotonic_ut,
-    };
-    FUNCTION_QUERY_STATUS *fqs = NULL;
-
-    FACETS *facets = facets_create(50, FACETS_OPTION_ALL_KEYS_FTS,
-                                   SYSTEMD_ALWAYS_VISIBLE_KEYS,
-                                   SYSTEMD_KEYS_INCLUDED_IN_FACETS,
-                                   SYSTEMD_KEYS_EXCLUDED_FROM_FACETS);
+static FACETS *logs_create_facets(uint32_t items_to_return, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys, bool slice) {
+    FACETS *facets = facets_create(items_to_return, options,
+                                   visible_keys, facet_keys, non_facet_keys);
 
     facets_accepted_param(facets, JOURNAL_PARAMETER_INFO);
     facets_accepted_param(facets, JOURNAL_PARAMETER_SOURCE);
@@ -1941,14 +1960,14 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
     facets_accepted_param(facets, JOURNAL_PARAMETER_TAIL);
     facets_accepted_param(facets, JOURNAL_PARAMETER_SAMPLING);
 
-#ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
-    facets_accepted_param(facets, JOURNAL_PARAMETER_SLICE);
-#endif // HAVE_SD_JOURNAL_RESTART_FIELDS
+    if(slice)
+        facets_accepted_param(facets, JOURNAL_PARAMETER_SLICE);
 
-    // ------------------------------------------------------------------------
-    // parse the parameters
+    return facets;
+}
 
-    JOURNAL_QUERY q = {
+static bool logs_parse_request(LOGS_QUERY_REQUEST *q, BUFFER *wb, FACETS *facets, char *function, BUFFER *payload, const char *transaction) {
+    *q = (LOGS_QUERY_REQUEST) {
         .default_facet = FACET_KEY_OPTION_FACET,
         .info = false,
         .data_only = false,
@@ -1959,7 +1978,7 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
         .before_s = 0,
         .anchor = 0,
         .if_modified_since = 0,
-        .last = 0,
+        .entries = 0,
         .direction = JOURNAL_DEFAULT_DIRECTION,
         .query = NULL,
         .chart = NULL,
@@ -1969,10 +1988,56 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
         .sampling = SYSTEMD_JOURNAL_DEFAULT_ITEMS_SAMPLING,
     };
 
-    if( (payload && !parse_post_params(facets, &q, wb, payload, transaction)) ||
-        (!payload && !parse_get_params(facets, &q, wb, function, transaction)) )
-        goto cleanup;
+    if( (payload && !logs_parse_post_params(facets, q, wb, payload, transaction)) ||
+        (!payload && !logs_parse_get_params(facets, q, wb, function, transaction)) )
+        return false;
 
+    // ------------------------------------------------------------------------
+    // validate parameters
+
+    if(q->query && !*q->query) {
+        freez((void *)q->query);
+        q->query = NULL;
+    }
+
+    if(q->chart && !*q->chart) {
+        freez((void *)q->chart);
+        q->chart = NULL;
+    }
+
+    if(!q->data_only)
+        q->delta = false;
+
+    if(!q->data_only || !q->if_modified_since)
+        q->tail = false;
+
+    q->now_s = now_realtime_sec();
+    q->expires_s = q->now_s + 1;
+    wb->expires = q->expires_s;
+
+    if(!q->after_s && !q->before_s) {
+        q->before_s = q->now_s;
+        q->after_s = q->before_s - SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION;
+    }
+    else
+        rrdr_relative_window_to_absolute(&q->after_s, &q->before_s, q->now_s);
+
+    if(q->after_s > q->before_s) {
+        time_t tmp = q->after_s;
+        q->after_s = q->before_s;
+        q->before_s = tmp;
+    }
+
+    if(q->after_s == q->before_s)
+        q->after_s = q->before_s - SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION;
+
+    if(!q->entries)
+        q->entries = SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY;
+
+    return true;
+}
+
+static void systemd_journal_register_transformations(FACETS *facets, LOGS_QUERY_REQUEST *q) {
     // ----------------------------------------------------------------------------------------------------------------
     // register the fields in the order you want them on the dashboard
 
@@ -1980,7 +2045,7 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
 
     facets_register_key_name(
         facets, "_HOSTNAME",
-        q.default_facet | FACET_KEY_OPTION_VISIBLE);
+        q->default_facet | FACET_KEY_OPTION_VISIBLE);
 
     facets_register_dynamic_key_name(
         facets, JOURNAL_KEY_ND_JOURNAL_PROCESS,
@@ -2000,19 +2065,19 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
 
     facets_register_key_name_transformation(
         facets, "PRIORITY",
-        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
+        q->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
             FACET_KEY_OPTION_EXPANDED_FILTER,
         netdata_systemd_journal_transform_priority, NULL);
 
     facets_register_key_name_transformation(
         facets, "SYSLOG_FACILITY",
-        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
+        q->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
             FACET_KEY_OPTION_EXPANDED_FILTER,
         netdata_systemd_journal_transform_syslog_facility, NULL);
 
     facets_register_key_name_transformation(
         facets, "ERRNO",
-        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_errno, NULL);
 
     facets_register_key_name(
@@ -2021,55 +2086,55 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
 
     facets_register_key_name(
         facets, "SYSLOG_IDENTIFIER",
-        q.default_facet);
+        q->default_facet);
 
     facets_register_key_name(
         facets, "UNIT",
-        q.default_facet);
+        q->default_facet);
 
     facets_register_key_name(
         facets, "USER_UNIT",
-        q.default_facet);
+        q->default_facet);
 
     facets_register_key_name_transformation(
         facets, "MESSAGE_ID",
-        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
+        q->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW |
             FACET_KEY_OPTION_EXPANDED_FILTER,
         netdata_systemd_journal_transform_message_id, NULL);
 
     facets_register_key_name_transformation(
         facets, "_BOOT_ID",
-        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_boot_id, NULL);
 
     facets_register_key_name_transformation(
         facets, "_SYSTEMD_OWNER_UID",
-        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "_UID",
-        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "OBJECT_SYSTEMD_OWNER_UID",
-        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "OBJECT_UID",
-        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(
         facets, "_GID",
-        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_gid, NULL);
 
     facets_register_key_name_transformation(
         facets, "OBJECT_GID",
-        q.default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
+        q->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_gid, NULL);
 
     facets_register_key_name_transformation(
@@ -2091,36 +2156,46 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
         facets, "_SOURCE_REALTIME_TIMESTAMP",
         FACET_KEY_OPTION_TRANSFORM_VIEW,
         netdata_systemd_journal_transform_timestamp_usec, NULL);
+}
+
+void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
+                              BUFFER *payload, HTTP_ACCESS access __maybe_unused,
+                              const char *source __maybe_unused, void *data __maybe_unused) {
+    fstat_thread_calls = 0;
+    fstat_thread_cached_responses = 0;
+
+    FUNCTION_QUERY_STATUS tmp_fqs = {
+            .cancelled = cancelled,
+            .stop_monotonic_ut = stop_monotonic_ut,
+    };
+    FUNCTION_QUERY_STATUS *fqs = NULL;
+
+    CLEAN_BUFFER *wb = logs_create_output_buffer();
 
     // ------------------------------------------------------------------------
-    // put this request into the progress db
+    // create the FACETS
+
+#ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
+    bool have_slice = true;
+#else
+    bool have_slice = false;
+#endif // HAVE_SD_JOURNAL_RESTART_FIELDS
+
+    FACETS *facets = logs_create_facets(
+        50, FACETS_OPTION_ALL_KEYS_FTS,
+        SYSTEMD_ALWAYS_VISIBLE_KEYS, SYSTEMD_KEYS_INCLUDED_IN_FACETS,
+        SYSTEMD_KEYS_EXCLUDED_FROM_FACETS, have_slice);
+
+    // ------------------------------------------------------------------------
+    // parse the parameters
+
+    LOGS_QUERY_REQUEST q = { 0 };
+    if(!logs_parse_request(&q, wb, facets, function, payload, transaction))
+        goto output;
+
+    systemd_journal_register_transformations(facets, &q);
 
     fqs = &tmp_fqs;
-
-    // ------------------------------------------------------------------------
-    // validate parameters
-
-    time_t now_s = now_realtime_sec();
-    time_t expires = now_s + 1;
-
-    if(!q.after_s && !q.before_s) {
-        q.before_s = now_s;
-        q.after_s = q.before_s - SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION;
-    }
-    else
-        rrdr_relative_window_to_absolute(&q.after_s, &q.before_s, now_s);
-
-    if(q.after_s > q.before_s) {
-        time_t tmp = q.after_s;
-        q.after_s = q.before_s;
-        q.before_s = tmp;
-    }
-
-    if(q.after_s == q.before_s)
-        q.after_s = q.before_s - SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION;
-
-    if(!q.last)
-        q.last = SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY;
 
     // ------------------------------------------------------------------------
     // set query time-frame, anchors and direction
@@ -2130,15 +2205,15 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
     fqs->before_ut = (q.before_s * USEC_PER_SEC) + USEC_PER_SEC - 1;
     fqs->if_modified_since = q.if_modified_since;
     fqs->data_only = q.data_only;
-    fqs->delta = (fqs->data_only) ? q.delta : false;
-    fqs->tail = (fqs->data_only && fqs->if_modified_since) ? q.tail : false;
+    fqs->delta = q.delta;
+    fqs->tail = q.tail;
     fqs->sources = q.sources;
     fqs->source_type = q.source_type;
-    fqs->entries = q.last;
+    fqs->entries = q.entries;
     fqs->last_modified = 0;
     fqs->filters = q.filters;
-    fqs->query = (q.query && *q.query) ? q.query : NULL;
-    fqs->histogram = (q.chart && *q.chart) ? q.chart : NULL;
+    fqs->query = q.query;
+    fqs->histogram = q.chart;
     fqs->direction = q.direction;
     fqs->anchor.start_ut = q.anchor;
     fqs->anchor.stop_ut = 0;
@@ -2221,54 +2296,16 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
     // ------------------------------------------------------------------------
     // run the request
 
-    int response;
-
     if(q.info) {
-        buffer_json_member_add_uint64(wb, "v", 3);
-        facets_accepted_parameters_to_json_array(facets, wb, false);
-        buffer_json_member_add_array(wb, "required_params");
-        {
-            buffer_json_add_array_item_object(wb);
-            {
-                buffer_json_member_add_string(wb, "id", "source");
-                buffer_json_member_add_string(wb, "name", "source");
-                buffer_json_member_add_string(wb, "help", "Select the SystemD Journal source to query");
-                buffer_json_member_add_string(wb, "type", "multiselect");
-                buffer_json_member_add_array(wb, "options");
-                {
-                    available_journal_file_sources_to_json_array(wb);
-                }
-                buffer_json_array_close(wb); // options array
-            }
-            buffer_json_object_close(wb); // required params object
-        }
-        buffer_json_array_close(wb); // required_params array
-
-        facets_table_config(wb);
-
-        buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
-        buffer_json_member_add_string(wb, "type", "table");
-        buffer_json_member_add_string(wb, "help", SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
-        buffer_json_finalize(wb);
-        response = HTTP_RESP_OK;
+        logs_info_response(wb, facets);
         goto output;
     }
 
-    response = netdata_systemd_journal_query(wb, facets, fqs);
-
-    // ------------------------------------------------------------------------
-    // handle error response
-
-    if(response != HTTP_RESP_OK) {
-        netdata_mutex_lock(&stdout_mutex);
-        pluginsd_function_json_error_to_stdout(transaction, response, "failed");
-        netdata_mutex_unlock(&stdout_mutex);
-        goto cleanup;
-    }
+    netdata_systemd_journal_query(wb, facets, fqs);
 
 output:
     netdata_mutex_lock(&stdout_mutex);
-    pluginsd_function_result_to_stdout(transaction, response, "application/json", expires, wb);
+    pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
 
 cleanup:

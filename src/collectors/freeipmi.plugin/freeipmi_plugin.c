@@ -1629,7 +1629,10 @@ close_and_send:
     buffer_json_member_add_time_t(wb, "expires", now_s + update_every);
     buffer_json_finalize(wb);
 
-    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", now_s + update_every, wb);
+    wb->response_code = HTTP_RESP_OK;
+    wb->content_type = CT_APPLICATION_JSON;
+    wb->expires = now_s + update_every;
+    pluginsd_function_result_to_stdout(transaction, wb);
 
     buffer_free(wb);
 }
@@ -1637,7 +1640,6 @@ close_and_send:
 // ----------------------------------------------------------------------------
 // main, command line arguments parsing
 
-static void plugin_exit(int code) NORETURN;
 static void plugin_exit(int code) {
     fflush(stdout);
     function_plugin_should_exit = true;
@@ -2042,11 +2044,13 @@ int main (int argc, char **argv) {
                 collector_error("%s(): sensors failed to initialize. Calling DISABLE.", __FUNCTION__);
                 fprintf(stdout, "DISABLE\n");
                 plugin_exit(0);
+                break;
 
             case ICS_FAILED:
                 collector_error("%s(): sensors fails repeatedly to collect metrics. Exiting to restart.", __FUNCTION__);
                 fprintf(stdout, "EXIT\n");
                 plugin_exit(0);
+                break;
         }
 
         if(netdata_do_sel) {

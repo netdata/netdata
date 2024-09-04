@@ -13,7 +13,7 @@ struct bearer_token_request {
     STRING *client_name;
 };
 
-static bool parse_json_payload(json_object *jobj, const char *path, void *data, BUFFER *error) {
+static bool bearer_parse_json_payload(json_object *jobj, const char *path, void *data, BUFFER *error) {
     struct bearer_token_request *rq = data;
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "claim_id", rq->claim_id, error, true);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "machine_guid", rq->machine_guid, error, true);
@@ -32,7 +32,7 @@ int function_bearer_get_token(BUFFER *wb, const char *function __maybe_unused, B
 
     int code;
     struct bearer_token_request rq = { 0 };
-    CLEAN_JSON_OBJECT *jobj = json_parse_function_payload_or_error(wb, payload, &code, parse_json_payload, &rq);
+    CLEAN_JSON_OBJECT *jobj = json_parse_function_payload_or_error(wb, payload, &code, bearer_parse_json_payload, &rq);
     if(!jobj || code != HTTP_RESP_OK) {
         string_freez(rq.client_name);
         return code;
