@@ -7,9 +7,10 @@ long long appconfig_get_number(struct config *root, const char *section, const c
     char buffer[100];
     sprintf(buffer, "%lld", value);
 
-    const char *s = appconfig_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_INTEGER, NULL);
-    if(!s) return value;
+    struct config_option *opt = appconfig_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_INTEGER, NULL);
+    if(!opt) return value;
 
+    const char *s = string2str(opt->value);
     return strtoll(s, NULL, 0);
 }
 
@@ -17,9 +18,10 @@ NETDATA_DOUBLE appconfig_get_double(struct config *root, const char *section, co
     char buffer[100];
     sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
 
-    const char *s = appconfig_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_DOUBLE, NULL);
-    if(!s) return value;
+    struct config_option *opt = appconfig_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_DOUBLE, NULL);
+    if(!opt) return value;
 
+    const char *s = string2str(opt->value);
     return str2ndd(s, NULL);
 }
 

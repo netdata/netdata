@@ -38,10 +38,10 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
            section_old, name_old,
            section_new, name_new);
 
-    if(!opt_old->name_migrated) {
-        string_freez(opt_old->section_migrated);
-        opt_old->section_migrated = string_dup(sect_old->name);
-        opt_old->name_migrated = opt_old->name;
+    if(!opt_old->migrated.name) {
+        string_freez(opt_old->migrated.section);
+        opt_old->migrated.section = string_dup(sect_old->name);
+        opt_old->migrated.name = opt_old->name;
     }
     else
         string_freez(opt_old->name);

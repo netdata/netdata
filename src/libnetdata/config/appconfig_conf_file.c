@@ -32,7 +32,7 @@ ENUM_STR_DEFINE_FUNCTIONS(CONFIG_VALUE_TYPES, CONFIG_VALUE_TYPE_UNKNOWN, "unknow
 
 int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name) {
     int line = 0;
-    struct config_section *co = NULL;
+    struct config_section *sect = NULL;
     int is_exporter_config = 0;
     int _connectors = 0;              // number of exporting connector sections we have
     char working_instance[CONFIG_MAX_NAME + 1];
@@ -91,40 +91,41 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
                         working_connector_section = NULL;
                         if (unlikely(appconfig_section_find(root, working_instance))) {
                             netdata_log_error("Instance (%s) already exists", working_instance);
-                            co = NULL;
+                            sect = NULL;
                             continue;
                         }
                     }
                     else {
-                        co = NULL;
+                        sect = NULL;
                         netdata_log_error("Section (%s) does not specify a valid connector", s);
                         continue;
                     }
                 }
             }
 
-            co = appconfig_section_find(root, s);
-            if(!co) co = appconfig_section_create(root, s);
+            sect = appconfig_section_find(root, s);
+            if(!sect)
+                sect = appconfig_section_create(root, s);
 
-            if(co && section_string && overwrite_used && section_string == co->name) {
-                SECTION_LOCK(co);
+            if(sect && section_string && overwrite_used && section_string == sect->name) {
+                SECTION_LOCK(sect);
 
-                while(co->values)
-                    appconfig_option_remove_and_delete(co, co->values, true);
+                while(sect->values)
+                    appconfig_option_remove_and_delete(sect, sect->values, true);
 
-                SECTION_UNLOCK(co);
+                SECTION_UNLOCK(sect);
             }
 
             continue;
         }
 
-        if(!co) {
+        if(!sect) {
             // line outside a section
             netdata_log_error("CONFIG: ignoring line %d ('%s') of file '%s', it is outside all sections.", line, s, filename);
             continue;
         }
 
-        if(section_string && overwrite_used && section_string != co->name)
+        if(section_string && overwrite_used && section_string != sect->name)
             continue;
 
         char *name = s;
@@ -146,28 +147,28 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
 
         if(!value) value = "";
 
-        struct config_option *cv = appconfig_option_find(co, name);
+        struct config_option *opt = appconfig_option_find(sect, name);
 
-        if (!cv) {
-            cv = appconfig_option_create(co, name, value);
+        if (!opt) {
+            opt = appconfig_option_create(sect, name, value);
             if (likely(is_exporter_config) && unlikely(!global_exporting_section)) {
                 if (unlikely(!working_connector_section)) {
                     working_connector_section = appconfig_section_find(root, working_connector);
                     if (!working_connector_section)
                         working_connector_section = appconfig_section_create(root, working_connector);
                     if (likely(working_connector_section)) {
-                        add_connector_instance(working_connector_section, co);
+                        add_connector_instance(working_connector_section, sect);
                     }
                 }
             }
         }
         else {
-            if (((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
-                string_freez(cv->value);
-                cv->value = string_strdupz(value);
+            if (((opt->flags & CONFIG_VALUE_USED) && overwrite_used) || !(opt->flags & CONFIG_VALUE_USED)) {
+                string_freez(opt->value);
+                opt->value = string_strdupz(value);
             }
         }
-        cv->flags |= CONFIG_VALUE_LOADED;
+        opt->flags |= CONFIG_VALUE_LOADED;
     }
 
     fclose(fp);
@@ -283,16 +284,16 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
 
                     if(migrated && reformatted)
                         buffer_sprintf(wb, "\t#| migrated from: [%s].%s = %s\n",
-                                       string2str(opt->section_migrated), string2str(opt->name_migrated),
-                                       string2str(opt->value_reformatted));
+                                       string2str(opt->migrated.section), string2str(opt->migrated.name),
+                                       string2str(opt->value_original));
                     else {
                         if (migrated)
                             buffer_sprintf(wb, "\t#| migrated from: [%s].%s\n",
-                                           string2str(opt->section_migrated), string2str(opt->name_migrated));
+                                           string2str(opt->migrated.section), string2str(opt->migrated.name));
 
                         if (reformatted)
                             buffer_sprintf(wb, "\t#| reformatted from: %s\n",
-                                           string2str(opt->value_reformatted));
+                                           string2str(opt->value_original));
                     }
 
                     if(show_default)

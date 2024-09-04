@@ -12,11 +12,11 @@ bool appconfig_test_boolean_value(const char *s) {
 }
 
 int appconfig_get_boolean_by_section(struct config_section *sect, const char *name, int value) {
-    const char *s = appconfig_get_raw_value_of_option_in_section(
-        sect, name, (!value) ? "no" : "yes", NULL, CONFIG_VALUE_TYPE_BOOLEAN);
-    if(!s) return value;
+    struct config_option *opt = appconfig_get_raw_value_of_option_in_section(
+        sect, name, (!value) ? "no" : "yes", CONFIG_VALUE_TYPE_BOOLEAN, NULL);
+    if(!opt) return value;
 
-    return appconfig_test_boolean_value(s);
+    return appconfig_test_boolean_value(string2str(opt->value));
 }
 
 int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value) {
@@ -24,8 +24,9 @@ int appconfig_get_boolean(struct config *root, const char *section, const char *
     if(value) s = "yes";
     else s = "no";
 
-    s = appconfig_get_raw_value(root, section, name, s, CONFIG_VALUE_TYPE_BOOLEAN, NULL);
-    if(!s) return value;
+    struct config_option *opt = appconfig_get_raw_value(root, section, name, s, CONFIG_VALUE_TYPE_BOOLEAN, NULL);
+    if(!opt) return value;
+    s = string2str(opt->value);
 
     return appconfig_test_boolean_value(s);
 }
@@ -42,9 +43,10 @@ int appconfig_get_boolean_ondemand(struct config *root, const char *section, con
     else
         s = "yes";
 
-    s = appconfig_get_raw_value(root, section, name, s, CONFIG_VALUE_TYPE_BOOLEAN_ONDEMAND, NULL);
-    if(!s) return value;
+    struct config_option *opt = appconfig_get_raw_value(root, section, name, s, CONFIG_VALUE_TYPE_BOOLEAN_ONDEMAND, NULL);
+    if(!opt) return value;
 
+    s = string2str(opt->value);
     if(!strcmp(s, "yes") || !strcmp(s, "true") || !strcmp(s, "on"))
         return CONFIG_BOOLEAN_YES;
     else if(!strcmp(s, "no") || !strcmp(s, "false") || !strcmp(s, "off"))

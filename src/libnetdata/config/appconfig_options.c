@@ -28,16 +28,16 @@ struct config_option *appconfig_option_find(struct config_section *sect, const c
 void appconfig_option_cleanup(struct config_option *opt) {
     string_freez(opt->value);
     string_freez(opt->name);
-    string_freez(opt->section_migrated);
-    string_freez(opt->name_migrated);
-    string_freez(opt->value_reformatted);
+    string_freez(opt->migrated.section);
+    string_freez(opt->migrated.name);
+    string_freez(opt->value_original);
     string_freez(opt->value_default);
 
     opt->value = NULL;
     opt->name = NULL;
-    opt->section_migrated = NULL;
-    opt->name_migrated = NULL;
-    opt->value_reformatted = NULL;
+    opt->migrated.section = NULL;
+    opt->migrated.name = NULL;
+    opt->value_original = NULL;
     opt->value_default = NULL;
 }
 
@@ -50,6 +50,7 @@ struct config_option *appconfig_option_create(struct config_section *sect, const
     struct config_option *opt = callocz(1, sizeof(struct config_option));
     opt->name = string_strdupz(name);
     opt->value = string_strdupz(value);
+    opt->value_original = string_dup(opt->value);
 
     struct config_option *opt_found = appconfig_option_add(sect, opt);
     if(opt_found != opt) {
@@ -98,15 +99,7 @@ void appconfig_option_remove_and_delete_all(struct config_section *sect, bool ha
         SECTION_UNLOCK(sect);
 }
 
-const char *appconfig_get_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type) {
-    // Only calls internal to this file check for a NULL result, and they do not supply a NULL arg.
-    // External caller should treat NULL as an error case.
-    struct config_option *opt = appconfig_option_find(sect, option);
-    if (!opt) {
-        if (!default_value) return NULL;
-        opt = appconfig_option_create(sect, option, default_value);
-        if (!opt) return NULL;
-    }
+void appconfig_get_raw_value_of_option(struct config_option *opt, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb) {
     opt->flags |= CONFIG_VALUE_USED;
 
     if(type != CONFIG_VALUE_TYPE_UNKNOWN)
@@ -117,11 +110,10 @@ const char *appconfig_get_raw_value_of_option_in_section(struct config_section *
         // if it is different from the default, mark it
         if(!(opt->flags & CONFIG_VALUE_CHECKED)) {
             if(!(opt->flags & CONFIG_VALUE_REFORMATTED) && cb) {
-                if(!opt->value_reformatted)
-                    opt->value_reformatted = string_dup(opt->value);
-
+                STRING *value_old = opt->value;
                 opt->value = cb(opt->value);
-                opt->flags |= CONFIG_VALUE_REFORMATTED;
+                if(opt->value != value_old)
+                    opt->flags |= CONFIG_VALUE_REFORMATTED;
             }
 
             if(default_value && string_strcmp(opt->value, default_value) != 0)
@@ -133,31 +125,33 @@ const char *appconfig_get_raw_value_of_option_in_section(struct config_section *
 
     if(!opt->value_default)
         opt->value_default = string_strdupz(default_value);
-
-    return string2str(opt->value);
 }
 
-const char *appconfig_get_raw_value(struct config *root, const char *section, const char *option, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb) {
-    struct config_section *sect = appconfig_section_find(root, section);
+struct config_option *appconfig_get_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb) {
+    // Only calls internal to this file check for a NULL result, and they do not supply a NULL arg.
+    // External caller should treat NULL as an error case.
+    struct config_option *opt = appconfig_option_find(sect, option);
+    if (!opt) {
+        if (!default_value) return NULL;
+        opt = appconfig_option_create(sect, option, default_value);
+        if (!opt) return NULL;
+    }
 
-    if (!sect && !default_value)
-        return NULL;
-
-    if(!sect)
-        sect = appconfig_section_create(root, section);
-
-    return appconfig_get_raw_value_of_option_in_section(sect, option, default_value, cb, type);
+    appconfig_get_raw_value_of_option(opt, default_value, type, cb);
+    return opt;
 }
 
-const char *appconfig_set_raw_value(struct config *root, const char *section, const char *name, const char *value, CONFIG_VALUE_TYPES type) {
+struct config_option *appconfig_get_raw_value(struct config *root, const char *section, const char *option, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb) {
     struct config_section *sect = appconfig_section_find(root, section);
-    if(!sect)
+    if(!sect) {
+        if(!default_value) return NULL;
         sect = appconfig_section_create(root, section);
+    }
 
-    struct config_option *opt = appconfig_option_find(sect, name);
-    if(!opt)
-        opt = appconfig_option_create(sect, name, value);
+    return appconfig_get_raw_value_of_option_in_section(sect, option, default_value, type, cb);
+}
 
+void appconfig_set_raw_value_of_option(struct config_option *opt, const char *value, CONFIG_VALUE_TYPES type) {
     opt->flags |= CONFIG_VALUE_USED;
 
     if(opt->type == CONFIG_VALUE_TYPE_UNKNOWN)
@@ -169,6 +163,21 @@ const char *appconfig_set_raw_value(struct config *root, const char *section, co
         string_freez(opt->value);
         opt->value = string_strdupz(value);
     }
+}
 
-    return value;
+struct config_option *appconfig_set_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *value, CONFIG_VALUE_TYPES type) {
+    struct config_option *opt = appconfig_option_find(sect, option);
+    if(!opt)
+        opt = appconfig_option_create(sect, option, value);
+
+    appconfig_set_raw_value_of_option(opt, value, type);
+    return opt;
+}
+
+struct config_option *appconfig_set_raw_value(struct config *root, const char *section, const char *option, const char *value, CONFIG_VALUE_TYPES type) {
+    struct config_section *sect = appconfig_section_find(root, section);
+    if(!sect)
+        sect = appconfig_section_create(root, section);
+
+    return appconfig_set_raw_value_of_option_in_section(sect, option, value, type);
 }

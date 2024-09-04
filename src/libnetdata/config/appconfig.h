@@ -138,7 +138,7 @@ typedef bool (*appconfig_foreach_value_cb_t)(void *data, const char *name, const
 size_t appconfig_foreach_value_in_section(struct config *root, const char *section, appconfig_foreach_value_cb_t cb, void *data);
 
 // sets a raw value, only if it is not loaded from the config
-const char *appconfig_set_default_raw_value(struct config *root, const char *section, const char *name, const char *value);
+void appconfig_set_default_raw_value(struct config *root, const char *section, const char *name, const char *value);
 
 int appconfig_exists(struct config *root, const char *section, const char *name);
 int appconfig_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new);

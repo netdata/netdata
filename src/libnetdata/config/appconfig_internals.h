@@ -45,10 +45,15 @@ struct config_option {
     STRING *name;
     STRING *value;
 
-    STRING *section_migrated;
-    STRING *name_migrated;
-    STRING *value_reformatted;
-    STRING *value_default;
+    STRING *value_original;     // the original value of this option (the first value it got, independently on how it got it)
+    STRING *value_default;      // the internal default value of this option (the first value it got, from appconfig_get_XXX())
+
+    // when we move options around, this is where we keep the original
+    // section and name (of the first migration)
+    struct {
+        STRING *section;
+        STRING *name;
+    } migrated;
 
     struct config_option *prev, *next; // config->mutex protects just this
 };
@@ -96,9 +101,12 @@ struct config_option *appconfig_option_create(struct config_section *sect, const
 int appconfig_get_boolean_by_section(struct config_section *sect, const char *name, int value);
 
 typedef STRING *(*reformat_t)(STRING *value);
-const char *appconfig_get_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *default_value, reformat_t cb, CONFIG_VALUE_TYPES type);
-const char *appconfig_get_raw_value(struct config *root, const char *section, const char *option, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb);
-const char *appconfig_set_raw_value(struct config *root, const char *section, const char *name, const char *value, CONFIG_VALUE_TYPES type);
+struct config_option *appconfig_get_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb);
+struct config_option *appconfig_get_raw_value(struct config *root, const char *section, const char *option, const char *default_value, CONFIG_VALUE_TYPES type, reformat_t cb);
+
+void appconfig_set_raw_value_of_option(struct config_option *opt, const char *value, CONFIG_VALUE_TYPES type);
+struct config_option *appconfig_set_raw_value_of_option_in_section(struct config_section *sect, const char *option, const char *value, CONFIG_VALUE_TYPES type);
+struct config_option *appconfig_set_raw_value(struct config *root, const char *section, const char *option, const char *value, CONFIG_VALUE_TYPES type);
 
 // cleanup
 void appconfig_section_destroy_non_loaded(struct config *root, const char *section);

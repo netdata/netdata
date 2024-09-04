@@ -22,10 +22,12 @@ time_t appconfig_get_duration_seconds(struct config *root, const char *section, 
     char default_str[128];
     duration_snprintf_time_t(default_str, sizeof(default_str), default_value);
 
-    const char *s = appconfig_get_raw_value(
+    struct config_option *opt = appconfig_get_raw_value(
         root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_SECS, reformat_duration_seconds);
-    if(!s)
+    if(!opt)
         return default_value;
+
+    const char *s = string2str(opt->value);
 
     int result = 0;
     if(!duration_parse_seconds(s, &result)) {
@@ -63,10 +65,12 @@ msec_t appconfig_get_duration_ms(struct config *root, const char *section, const
     char default_str[128];
     duration_snprintf_msec_t(default_str, sizeof(default_str), default_value);
 
-    const char *s = appconfig_get_raw_value(
+    struct config_option *opt = appconfig_get_raw_value(
         root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_MS, reformat_duration_ms);
-    if(!s)
+    if(!opt)
         return default_value;
+
+    const char *s = string2str(opt->value);
 
     smsec_t result = 0;
     if(!duration_parse_msec_t(s, &result)) {
@@ -104,10 +108,12 @@ unsigned appconfig_get_duration_days(struct config *root, const char *section, c
     char default_str[128];
     duration_snprintf_days(default_str, sizeof(default_str), (int)default_value);
 
-    const char *s = appconfig_get_raw_value(
+    struct config_option *opt = appconfig_get_raw_value(
         root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_DAYS, reformat_duration_days);
-    if(!s)
+    if(!opt)
         return default_value;
+
+    const char *s = string2str(opt->value);
 
     int64_t result = 0;
     if(!duration_parse_days(s, &result)) {
