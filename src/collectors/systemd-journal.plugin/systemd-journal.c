@@ -1205,8 +1205,5 @@ output:
     pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
 
-    freez((void *)lqs->rq.query);
-    freez((void *)lqs->rq.histogram);
-    simple_pattern_free(lqs->rq.sources);
-    facets_destroy(lqs->facets);
+    lqs_cleanup(lqs);
 }

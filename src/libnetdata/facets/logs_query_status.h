@@ -837,4 +837,11 @@ static inline bool lqs_request_parse_and_validate(LOGS_QUERY_STATUS *lqs, BUFFER
     return true;
 }
 
+static inline void lqs_cleanup(LOGS_QUERY_STATUS *lqs) {
+    freez((void *)lqs->rq.query);
+    freez((void *)lqs->rq.histogram);
+    simple_pattern_free(lqs->rq.sources);
+    facets_destroy(lqs->facets);
+}
+
 #endif //NETDATA_LOGS_QUERY_STATUS_H
