@@ -155,6 +155,12 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
                                                          TRUE);
                         break;
                     }
+                    case IDC_RELOAD_LABELS: {
+                        netdata_cli_run_specific_command(L"\\bash.exe -l -c \"netdatacli reload-labels; export CURRRET=`echo $?`; exit $CURRRET\"",
+                                                         FALSE,
+                                                         TRUE);
+                        break;
+}
                     case IDC_CLOSE_WINDOW: {
                         ExitProcess(0);
                     }
