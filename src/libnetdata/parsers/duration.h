@@ -18,14 +18,14 @@ bool duration_parse(const char *duration, int64_t *result, const char *default_u
 #define duration_parse_days(duration, days_ptr) duration_parse(duration, days_ptr, "d")
 
 // duration (number to string)
-ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char *unit);
-#define duration_snprintf_nsec_t(dst, dst_size, ns) duration_snprintf(dst, dst_size, ns, "ns")
-#define duration_snprintf_usec_t(dst, dst_size, us) duration_snprintf(dst, dst_size, us, "us")
-#define duration_snprintf_msec_t(dst, dst_size, ms) duration_snprintf(dst, dst_size, ms, "ms")
-#define duration_snprintf_time_t(dst, dst_size, secs) duration_snprintf(dst, dst_size, secs, "s")
-#define duration_snprintf_mins(dst, dst_size, mins) duration_snprintf(dst, dst_size, mins, "m")
-#define duration_snprintf_hours(dst, dst_size, hours) duration_snprintf(dst, dst_size, hours, "h")
-#define duration_snprintf_days(dst, dst_size, days) duration_snprintf(dst, dst_size, days, "d")
+ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char *unit, bool add_spaces);
+#define duration_snprintf_nsec_t(dst, dst_size, ns) duration_snprintf(dst, dst_size, ns, "ns", false)
+#define duration_snprintf_usec_t(dst, dst_size, us) duration_snprintf(dst, dst_size, us, "us", false)
+#define duration_snprintf_msec_t(dst, dst_size, ms) duration_snprintf(dst, dst_size, ms, "ms", false)
+#define duration_snprintf_time_t(dst, dst_size, secs) duration_snprintf(dst, dst_size, secs, "s", false)
+#define duration_snprintf_mins(dst, dst_size, mins) duration_snprintf(dst, dst_size, mins, "m", false)
+#define duration_snprintf_hours(dst, dst_size, hours) duration_snprintf(dst, dst_size, hours, "h", false)
+#define duration_snprintf_days(dst, dst_size, days) duration_snprintf(dst, dst_size, days, "d", false)
 
 bool duration_parse_seconds(const char *str, int *result);
 
