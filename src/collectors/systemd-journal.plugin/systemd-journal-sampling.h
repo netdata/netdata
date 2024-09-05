@@ -24,18 +24,18 @@ static inline void sampling_query_init(LOGS_QUERY_STATUS *lqs, FACETS *facets) {
         return;
     }
 
-    if(!lqs->files_matched) {
+    if(!lqs->c.files_matched) {
         // no files have been matched
         // disable sampling
         lqs->rq.sampling = 0;
         return;
     }
 
-    lqs->samples.slots = facets_histogram_slots(facets);
-    if(lqs->samples.slots < 2)
-        lqs->samples.slots = 2;
-    if(lqs->samples.slots > LQS_SAMPLING_SLOTS)
-        lqs->samples.slots = LQS_SAMPLING_SLOTS;
+    lqs->c.samples.slots = facets_histogram_slots(facets);
+    if(lqs->c.samples.slots < 2)
+        lqs->c.samples.slots = 2;
+    if(lqs->c.samples.slots > SYSTEMD_JOURNAL_SAMPLING_SLOTS)
+        lqs->c.samples.slots = SYSTEMD_JOURNAL_SAMPLING_SLOTS;
 
     if(!lqs->rq.after_ut || !lqs->rq.before_ut || lqs->rq.after_ut >= lqs->rq.before_ut) {
         // we don't have enough information for sampling
@@ -47,39 +47,39 @@ static inline void sampling_query_init(LOGS_QUERY_STATUS *lqs, FACETS *facets) {
     usec_t step = delta / facets_histogram_slots(facets) - 1;
     if(step < 1) step = 1;
 
-    lqs->samples_per_time_slot.start_ut = lqs->rq.after_ut;
-    lqs->samples_per_time_slot.end_ut = lqs->rq.before_ut;
-    lqs->samples_per_time_slot.step_ut = step;
+    lqs->c.samples_per_time_slot.start_ut = lqs->rq.after_ut;
+    lqs->c.samples_per_time_slot.end_ut = lqs->rq.before_ut;
+    lqs->c.samples_per_time_slot.step_ut = step;
 
     // the minimum number of rows to enable sampling
-    lqs->samples.enable_after_samples = lqs->rq.sampling / 2;
+    lqs->c.samples.enable_after_samples = lqs->rq.sampling / 2;
 
-    size_t files_matched = lqs->files_matched;
+    size_t files_matched = lqs->c.files_matched;
     if(!files_matched)
         files_matched = 1;
 
     // the minimum number of rows per file to enable sampling
-    lqs->samples_per_file.enable_after_samples = (lqs->rq.sampling / 4) / files_matched;
-    if(lqs->samples_per_file.enable_after_samples < lqs->rq.entries)
-        lqs->samples_per_file.enable_after_samples = lqs->rq.entries;
+    lqs->c.samples_per_file.enable_after_samples = (lqs->rq.sampling / 4) / files_matched;
+    if(lqs->c.samples_per_file.enable_after_samples < lqs->rq.entries)
+        lqs->c.samples_per_file.enable_after_samples = lqs->rq.entries;
 
     // the minimum number of rows per time slot to enable sampling
-    lqs->samples_per_time_slot.enable_after_samples = (lqs->rq.sampling / 4) / lqs->samples.slots;
-    if(lqs->samples_per_time_slot.enable_after_samples < lqs->rq.entries)
-        lqs->samples_per_time_slot.enable_after_samples = lqs->rq.entries;
+    lqs->c.samples_per_time_slot.enable_after_samples = (lqs->rq.sampling / 4) / lqs->c.samples.slots;
+    if(lqs->c.samples_per_time_slot.enable_after_samples < lqs->rq.entries)
+        lqs->c.samples_per_time_slot.enable_after_samples = lqs->rq.entries;
 }
 
 static inline void sampling_file_init(LOGS_QUERY_STATUS *lqs, struct journal_file *jf __maybe_unused) {
-    lqs->samples_per_file.sampled = 0;
-    lqs->samples_per_file.unsampled = 0;
-    lqs->samples_per_file.estimated = 0;
-    lqs->samples_per_file.every = 0;
-    lqs->samples_per_file.skipped = 0;
-    lqs->samples_per_file.recalibrate = 0;
+    lqs->c.samples_per_file.sampled = 0;
+    lqs->c.samples_per_file.unsampled = 0;
+    lqs->c.samples_per_file.estimated = 0;
+    lqs->c.samples_per_file.every = 0;
+    lqs->c.samples_per_file.skipped = 0;
+    lqs->c.samples_per_file.recalibrate = 0;
 }
 
 static inline size_t sampling_file_lines_scanned_so_far(LOGS_QUERY_STATUS *lqs) {
-    size_t sampled = lqs->samples_per_file.sampled + lqs->samples_per_file.unsampled;
+    size_t sampled = lqs->c.samples_per_file.sampled + lqs->c.samples_per_file.unsampled;
     if(!sampled) sampled = 1;
     return sampled;
 }
@@ -94,28 +94,28 @@ static inline void sampling_running_file_query_overlapping_timeframe_ut(
     usec_t oldest_ut, newest_ut;
     if(direction == FACETS_ANCHOR_DIRECTION_FORWARD) {
         // the first message we know (oldest)
-        oldest_ut = lqs->query_file.first_msg_ut ? lqs->query_file.first_msg_ut : jf->msg_first_ut;
-        if(!oldest_ut) oldest_ut = lqs->query_file.start_ut;
+        oldest_ut = lqs->c.query_file.first_msg_ut ? lqs->c.query_file.first_msg_ut : jf->msg_first_ut;
+        if(!oldest_ut) oldest_ut = lqs->c.query_file.start_ut;
 
         if(jf->msg_last_ut)
-            newest_ut = MIN(lqs->query_file.stop_ut, jf->msg_last_ut);
+            newest_ut = MIN(lqs->c.query_file.stop_ut, jf->msg_last_ut);
         else if(jf->file_last_modified_ut)
-            newest_ut = MIN(lqs->query_file.stop_ut, jf->file_last_modified_ut);
+            newest_ut = MIN(lqs->c.query_file.stop_ut, jf->file_last_modified_ut);
         else
-            newest_ut = lqs->query_file.stop_ut;
+            newest_ut = lqs->c.query_file.stop_ut;
 
         if(msg_ut < oldest_ut)
             oldest_ut = msg_ut - 1;
     }
     else /* BACKWARD */ {
         // the latest message we know (newest)
-        newest_ut = lqs->query_file.first_msg_ut ? lqs->query_file.first_msg_ut : jf->msg_last_ut;
-        if(!newest_ut) newest_ut = lqs->query_file.start_ut;
+        newest_ut = lqs->c.query_file.first_msg_ut ? lqs->c.query_file.first_msg_ut : jf->msg_last_ut;
+        if(!newest_ut) newest_ut = lqs->c.query_file.start_ut;
 
         if(jf->msg_first_ut)
-            oldest_ut = MAX(lqs->query_file.stop_ut, jf->msg_first_ut);
+            oldest_ut = MAX(lqs->c.query_file.stop_ut, jf->msg_first_ut);
         else
-            oldest_ut = lqs->query_file.stop_ut;
+            oldest_ut = lqs->c.query_file.stop_ut;
 
         if(newest_ut < msg_ut)
             newest_ut = msg_ut + 1;
@@ -246,9 +246,9 @@ static inline size_t sampling_running_file_query_estimate_remaining_lines(
     double proportion_by_seqnum = 0.0;
     uint64_t current_msg_seqnum;
     sd_id128_t current_msg_writer;
-    if(!lqs->query_file.first_msg_seqnum || sd_journal_get_seqnum(j, &current_msg_seqnum, &current_msg_writer) < 0) {
-        lqs->query_file.first_msg_seqnum = 0;
-        lqs->query_file.first_msg_writer = SD_ID128_NULL;
+    if(!lqs->c.query_file.first_msg_seqnum || sd_journal_get_seqnum(j, &current_msg_seqnum, &current_msg_writer) < 0) {
+        lqs->c.query_file.first_msg_seqnum = 0;
+        lqs->c.query_file.first_msg_writer = SD_ID128_NULL;
     }
     else if(jf->messages_in_file) {
         size_t scanned_lines = sampling_file_lines_scanned_so_far(lqs);
@@ -282,17 +282,17 @@ static inline size_t sampling_running_file_query_estimate_remaining_lines(
 
 static inline void sampling_decide_file_sampling_every(sd_journal *j,
                                                        LOGS_QUERY_STATUS *lqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
-    size_t files_matched = lqs->files_matched;
+    size_t files_matched = lqs->c.files_matched;
     if(!files_matched) files_matched = 1;
 
     size_t remaining_lines = sampling_running_file_query_estimate_remaining_lines(j, lqs, jf, direction, msg_ut);
     size_t wanted_samples = (lqs->rq.sampling / 2) / files_matched;
     if(!wanted_samples) wanted_samples = 1;
 
-    lqs->samples_per_file.every = remaining_lines / wanted_samples;
+    lqs->c.samples_per_file.every = remaining_lines / wanted_samples;
 
-    if(lqs->samples_per_file.every < 1)
-        lqs->samples_per_file.every = 1;
+    if(lqs->c.samples_per_file.every < 1)
+        lqs->c.samples_per_file.every = 1;
 }
 
 typedef enum {
@@ -307,53 +307,53 @@ static inline sampling_t is_row_in_sample(
     if(!lqs->rq.sampling || candidate_to_keep)
         return SAMPLING_FULL;
 
-    if(unlikely(msg_ut < lqs->samples_per_time_slot.start_ut))
-        msg_ut = lqs->samples_per_time_slot.start_ut;
-    if(unlikely(msg_ut > lqs->samples_per_time_slot.end_ut))
-        msg_ut = lqs->samples_per_time_slot.end_ut;
+    if(unlikely(msg_ut < lqs->c.samples_per_time_slot.start_ut))
+        msg_ut = lqs->c.samples_per_time_slot.start_ut;
+    if(unlikely(msg_ut > lqs->c.samples_per_time_slot.end_ut))
+        msg_ut = lqs->c.samples_per_time_slot.end_ut;
 
-    size_t slot = (msg_ut - lqs->samples_per_time_slot.start_ut) / lqs->samples_per_time_slot.step_ut;
-    if(slot >= lqs->samples.slots)
-        slot = lqs->samples.slots - 1;
+    size_t slot = (msg_ut - lqs->c.samples_per_time_slot.start_ut) / lqs->c.samples_per_time_slot.step_ut;
+    if(slot >= lqs->c.samples.slots)
+        slot = lqs->c.samples.slots - 1;
 
     bool should_sample = false;
 
-    if(lqs->samples.sampled < lqs->samples.enable_after_samples ||
-        lqs->samples_per_file.sampled < lqs->samples_per_file.enable_after_samples ||
-        lqs->samples_per_time_slot.sampled[slot] < lqs->samples_per_time_slot.enable_after_samples)
+    if(lqs->c.samples.sampled < lqs->c.samples.enable_after_samples ||
+        lqs->c.samples_per_file.sampled < lqs->c.samples_per_file.enable_after_samples ||
+        lqs->c.samples_per_time_slot.sampled[slot] < lqs->c.samples_per_time_slot.enable_after_samples)
         should_sample = true;
 
-    else if(lqs->samples_per_file.recalibrate >= LQS_SAMPLING_RECALIBRATE || !lqs->samples_per_file.every) {
+    else if(lqs->c.samples_per_file.recalibrate >= SYSTEMD_JOURNAL_SAMPLING_RECALIBRATE || !lqs->c.samples_per_file.every) {
         // this is the first to be unsampled for this file
         sampling_decide_file_sampling_every(j, lqs, jf, direction, msg_ut);
-        lqs->samples_per_file.recalibrate = 0;
+        lqs->c.samples_per_file.recalibrate = 0;
         should_sample = true;
     }
     else {
         // we sample 1 every fqs->samples_per_file.every
-        if(lqs->samples_per_file.skipped >= lqs->samples_per_file.every) {
-            lqs->samples_per_file.skipped = 0;
+        if(lqs->c.samples_per_file.skipped >= lqs->c.samples_per_file.every) {
+            lqs->c.samples_per_file.skipped = 0;
             should_sample = true;
         }
         else
-            lqs->samples_per_file.skipped++;
+            lqs->c.samples_per_file.skipped++;
     }
 
     if(should_sample) {
-        lqs->samples.sampled++;
-        lqs->samples_per_file.sampled++;
-        lqs->samples_per_time_slot.sampled[slot]++;
+        lqs->c.samples.sampled++;
+        lqs->c.samples_per_file.sampled++;
+        lqs->c.samples_per_time_slot.sampled[slot]++;
 
         return SAMPLING_FULL;
     }
 
-    lqs->samples_per_file.recalibrate++;
+    lqs->c.samples_per_file.recalibrate++;
 
-    lqs->samples.unsampled++;
-    lqs->samples_per_file.unsampled++;
-    lqs->samples_per_time_slot.unsampled[slot]++;
+    lqs->c.samples.unsampled++;
+    lqs->c.samples_per_file.unsampled++;
+    lqs->c.samples_per_time_slot.unsampled[slot]++;
 
-    if(lqs->samples_per_file.unsampled > lqs->samples_per_file.sampled) {
+    if(lqs->c.samples_per_file.unsampled > lqs->c.samples_per_file.sampled) {
         double progress_by_time = sampling_running_file_query_progress_by_time(lqs, jf, direction, msg_ut);
 
         if(progress_by_time > SYSTEMD_JOURNAL_ENABLE_ESTIMATIONS_FILE_PERCENTAGE)
@@ -371,8 +371,8 @@ static inline void sampling_update_running_query_file_estimates(
         lqs, jf, direction, msg_ut, &total_time_ut, &remaining_start_ut, &remaining_end_ut);
     size_t remaining_lines = sampling_running_file_query_estimate_remaining_lines(j, lqs, jf, direction, msg_ut);
     facets_update_estimations(facets, remaining_start_ut, remaining_end_ut, remaining_lines);
-    lqs->samples.estimated += remaining_lines;
-    lqs->samples_per_file.estimated += remaining_lines;
+    lqs->c.samples.estimated += remaining_lines;
+    lqs->c.samples_per_file.estimated += remaining_lines;
 }
 
 #endif //NETDATA_SYSTEMD_JOURNAL_SAMPLING_H

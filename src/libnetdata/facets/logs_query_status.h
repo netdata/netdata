@@ -111,7 +111,7 @@ typedef struct {
 
     usec_t last_modified;
 
-    LQS_CUSTOM_FIELDS
+    struct lqs_extension c;
 } LOGS_QUERY_STATUS;
 
 struct logs_query_data {

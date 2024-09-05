@@ -15,6 +15,8 @@
 
 #define SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION    "View, search and analyze systemd journal entries."
 #define SYSTEMD_JOURNAL_FUNCTION_NAME           "systemd-journal"
+#define SYSTEMD_JOURNAL_SAMPLING_SLOTS 1000
+#define SYSTEMD_JOURNAL_SAMPLING_RECALIBRATE 10000
 
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
 #define LQS_DEFAULT_SLICE_MODE 1
@@ -25,66 +27,66 @@
 // functions needed by LQS
 static SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value);
 
+// structures needed by LQS
+struct lqs_extension {
+    struct {
+        usec_t start_ut;
+        usec_t stop_ut;
+        usec_t first_msg_ut;
+
+        sd_id128_t first_msg_writer;
+        uint64_t first_msg_seqnum;
+    } query_file;
+
+    struct {
+        uint32_t enable_after_samples;
+        uint32_t slots;
+        uint32_t sampled;
+        uint32_t unsampled;
+        uint32_t estimated;
+    } samples;
+
+    struct {
+        uint32_t enable_after_samples;
+        uint32_t every;
+        uint32_t skipped;
+        uint32_t recalibrate;
+        uint32_t sampled;
+        uint32_t unsampled;
+        uint32_t estimated;
+    } samples_per_file;
+
+    struct {
+        usec_t start_ut;
+        usec_t end_ut;
+        usec_t step_ut;
+        uint32_t enable_after_samples;
+        uint32_t sampled[SYSTEMD_JOURNAL_SAMPLING_SLOTS];
+        uint32_t unsampled[SYSTEMD_JOURNAL_SAMPLING_SLOTS];
+    } samples_per_time_slot;
+
+    // per file progress info
+    // size_t cached_count;
+
+    // progress statistics
+    usec_t matches_setup_ut;
+    size_t rows_useful;
+    size_t rows_read;
+    size_t bytes_read;
+    size_t files_matched;
+    size_t file_working;
+};
+
 // prepare LQS
 #define LQS_FUNCTION_NAME           SYSTEMD_JOURNAL_FUNCTION_NAME
 #define LQS_FUNCTION_DESCRIPTION    SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION
 #define LQS_DEFAULT_ITEMS_PER_QUERY 200
-#define LQS_SAMPLING_SLOTS          1000
-#define LQS_SAMPLING_RECALIBRATE    10000
 #define LQS_DEFAULT_ITEMS_SAMPLING  1000000
 #define LQS_SOURCE_TYPE             SD_JOURNAL_FILE_SOURCE_TYPE
 #define LQS_SOURCE_TYPE_ALL         SDJF_ALL
 #define LQS_SOURCE_TYPE_NONE        SDJF_NONE
 #define LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value) get_internal_source_type(value)
 #define LQS_FUNCTION_SOURCE_TO_JSON_ARRAY(wb) available_journal_file_sources_to_json_array(wb)
-#define LQS_CUSTOM_FIELDS                       \
-    struct {                                    \
-        usec_t start_ut;                        \
-        usec_t stop_ut;                         \
-        usec_t first_msg_ut;                    \
-                                                \
-        sd_id128_t first_msg_writer;            \
-        uint64_t first_msg_seqnum;              \
-    } query_file;                               \
-                                                \
-    struct {                                    \
-        uint32_t enable_after_samples;          \
-        uint32_t slots;                         \
-        uint32_t sampled;                       \
-        uint32_t unsampled;                     \
-        uint32_t estimated;                     \
-    } samples;                                  \
-                                                \
-    struct {                                    \
-        uint32_t enable_after_samples;          \
-        uint32_t every;                         \
-        uint32_t skipped;                       \
-        uint32_t recalibrate;                   \
-        uint32_t sampled;                       \
-        uint32_t unsampled;                     \
-        uint32_t estimated;                     \
-    } samples_per_file;                         \
-                                                \
-    struct {                                    \
-        usec_t start_ut;                        \
-        usec_t end_ut;                          \
-        usec_t step_ut;                         \
-        uint32_t enable_after_samples;          \
-        uint32_t sampled[LQS_SAMPLING_SLOTS];   \
-        uint32_t unsampled[LQS_SAMPLING_SLOTS]; \
-    } samples_per_time_slot;                    \
-                                                \
-    /* per file progress info */                \
-    /* size_t cached_count; */                  \
-                                                \
-    /* progress statistics */                   \
-    usec_t matches_setup_ut;                    \
-    size_t rows_useful;                         \
-    size_t rows_read;                           \
-    size_t bytes_read;                          \
-    size_t files_matched;                       \
-    size_t file_working;
-
 #include "libnetdata/facets/logs_query_status.h"
 
 #include "systemd-journal-sampling.h"
@@ -339,8 +341,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
     usec_t stop_ut = (fqs->rq.data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->rq.after_ut;
     bool stop_when_full = (fqs->rq.data_only && !fqs->anchor.stop_ut);
 
-    fqs->query_file.start_ut = start_ut;
-    fqs->query_file.stop_ut = stop_ut;
+    fqs->c.query_file.start_ut = start_ut;
+    fqs->c.query_file.stop_ut = stop_ut;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -375,12 +377,12 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
 
         if(unlikely(!first_msg_ut)) {
             first_msg_ut = msg_ut;
-            fqs->query_file.first_msg_ut = msg_ut;
+            fqs->c.query_file.first_msg_ut = msg_ut;
 
 #ifdef HAVE_SD_JOURNAL_GET_SEQNUM
-            if(sd_journal_get_seqnum(j, &fqs->query_file.first_msg_seqnum, &fqs->query_file.first_msg_writer) < 0) {
-                fqs->query_file.first_msg_seqnum = 0;
-                fqs->query_file.first_msg_writer = SD_ID128_NULL;
+            if(sd_journal_get_seqnum(j, &fqs->c.query_file.first_msg_seqnum, &fqs->c.query_file.first_msg_writer) < 0) {
+                fqs->c.query_file.first_msg_seqnum = 0;
+                fqs->c.query_file.first_msg_writer = SD_ID128_NULL;
             }
 #endif
         }
@@ -412,10 +414,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
             }
 
             if(unlikely(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0)) {
-                FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
+                FUNCTION_PROGRESS_UPDATE_ROWS(fqs->c.rows_read, row_counter - last_row_counter);
                 last_row_counter = row_counter;
 
-                FUNCTION_PROGRESS_UPDATE_BYTES(fqs->bytes_read, bytes - last_bytes);
+                FUNCTION_PROGRESS_UPDATE_BYTES(fqs->c.bytes_read, bytes - last_bytes);
                 last_bytes = bytes;
 
                 status = check_stop(fqs->cancelled, fqs->stop_monotonic_ut);
@@ -429,10 +431,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
         }
     }
 
-    FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
-    FUNCTION_PROGRESS_UPDATE_BYTES(fqs->bytes_read, bytes - last_bytes);
+    FUNCTION_PROGRESS_UPDATE_ROWS(fqs->c.rows_read, row_counter - last_row_counter);
+    FUNCTION_PROGRESS_UPDATE_BYTES(fqs->c.bytes_read, bytes - last_bytes);
 
-    fqs->rows_useful += rows_useful;
+    fqs->c.rows_useful += rows_useful;
 
     if(errors_no_timestamp)
         netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
@@ -454,8 +456,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
     usec_t stop_ut = ((fqs->rq.data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->rq.before_ut) + anchor_delta;
     bool stop_when_full = (fqs->rq.data_only && !fqs->anchor.stop_ut);
 
-    fqs->query_file.start_ut = start_ut;
-    fqs->query_file.stop_ut = stop_ut;
+    fqs->c.query_file.start_ut = start_ut;
+    fqs->c.query_file.stop_ut = stop_ut;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -490,7 +492,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
 
         if(unlikely(!first_msg_ut)) {
             first_msg_ut = msg_ut;
-            fqs->query_file.first_msg_ut = msg_ut;
+            fqs->c.query_file.first_msg_ut = msg_ut;
         }
 
         sampling_t sample = is_row_in_sample(j, fqs, jf, msg_ut,
@@ -520,10 +522,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
             }
 
             if(unlikely(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0)) {
-                FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
+                FUNCTION_PROGRESS_UPDATE_ROWS(fqs->c.rows_read, row_counter - last_row_counter);
                 last_row_counter = row_counter;
 
-                FUNCTION_PROGRESS_UPDATE_BYTES(fqs->bytes_read, bytes - last_bytes);
+                FUNCTION_PROGRESS_UPDATE_BYTES(fqs->c.bytes_read, bytes - last_bytes);
                 last_bytes = bytes;
 
                 status = check_stop(fqs->cancelled, fqs->stop_monotonic_ut);
@@ -537,10 +539,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
         }
     }
 
-    FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
-    FUNCTION_PROGRESS_UPDATE_BYTES(fqs->bytes_read, bytes - last_bytes);
+    FUNCTION_PROGRESS_UPDATE_ROWS(fqs->c.rows_read, row_counter - last_row_counter);
+    FUNCTION_PROGRESS_UPDATE_BYTES(fqs->c.bytes_read, bytes - last_bytes);
 
-    fqs->rows_useful += rows_useful;
+    fqs->c.rows_useful += rows_useful;
 
     if(errors_no_timestamp)
         netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
@@ -674,7 +676,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
         matches_filters = netdata_systemd_filtering_by_journal(j, facets, fqs) || !fqs->rq.filters;
         usec_t ended = now_monotonic_usec();
 
-        fqs->matches_setup_ut += (ended - started);
+        fqs->c.matches_setup_ut += (ended - started);
     }
 #endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
@@ -720,11 +722,11 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_NO_FILE_MATCHED;
     struct journal_file *jf;
 
-    lqs->files_matched = 0;
-    lqs->file_working = 0;
-    lqs->rows_useful = 0;
-    lqs->rows_read = 0;
-    lqs->bytes_read = 0;
+    lqs->c.files_matched = 0;
+    lqs->c.file_working = 0;
+    lqs->c.rows_useful = 0;
+    lqs->c.rows_read = 0;
+    lqs->c.bytes_read = 0;
 
     size_t files_used = 0;
     size_t files_max = dictionary_entries(journal_files_registry);
@@ -743,7 +745,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     }
     dfe_done(jf);
 
-    lqs->files_matched = files_used;
+    lqs->c.files_matched = files_used;
 
     if(lqs->rq.if_modified_since && !files_are_newer)
         return rrd_call_function_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
@@ -784,15 +786,15 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
             break;
         }
 
-        lqs->file_working++;
+        lqs->c.file_working++;
         // fqs->cached_count = 0;
 
         size_t fs_calls = fstat_thread_calls;
         size_t fs_cached = fstat_thread_cached_responses;
-        size_t rows_useful = lqs->rows_useful;
-        size_t rows_read = lqs->rows_read;
-        size_t bytes_read = lqs->bytes_read;
-        size_t matches_setup_ut = lqs->matches_setup_ut;
+        size_t rows_useful = lqs->c.rows_useful;
+        size_t rows_read = lqs->c.rows_read;
+        size_t bytes_read = lqs->c.bytes_read;
+        size_t matches_setup_ut = lqs->c.matches_setup_ut;
 
         sampling_file_init(lqs, jf);
 
@@ -810,10 +812,10 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
 //               , fqs->query_file.start_ut, fqs->query_file.stop_ut, fqs->query_file.stop_ut - fqs->query_file.start_ut
 //        );
 
-        rows_useful = lqs->rows_useful - rows_useful;
-        rows_read = lqs->rows_read - rows_read;
-        bytes_read = lqs->bytes_read - bytes_read;
-        matches_setup_ut = lqs->matches_setup_ut - matches_setup_ut;
+        rows_useful = lqs->c.rows_useful - rows_useful;
+        rows_read = lqs->c.rows_read - rows_read;
+        bytes_read = lqs->c.bytes_read - bytes_read;
+        matches_setup_ut = lqs->c.matches_setup_ut - matches_setup_ut;
         fs_calls = fstat_thread_calls - fs_calls;
         fs_cached = fstat_thread_cached_responses - fs_cached;
 
@@ -856,9 +858,9 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
             if(lqs->rq.sampling) {
                 buffer_json_member_add_object(wb, "_sampling");
                 {
-                    buffer_json_member_add_uint64(wb, "sampled", lqs->samples_per_file.sampled);
-                    buffer_json_member_add_uint64(wb, "unsampled", lqs->samples_per_file.unsampled);
-                    buffer_json_member_add_uint64(wb, "estimated", lqs->samples_per_file.estimated);
+                    buffer_json_member_add_uint64(wb, "sampled", lqs->c.samples_per_file.sampled);
+                    buffer_json_member_add_uint64(wb, "unsampled", lqs->c.samples_per_file.unsampled);
+                    buffer_json_member_add_uint64(wb, "estimated", lqs->c.samples_per_file.estimated);
                 }
                 buffer_json_object_close(wb); // _sampling
             }
@@ -902,7 +904,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
 
     switch (status) {
         case ND_SD_JOURNAL_OK:
-            if(lqs->rq.if_modified_since && !lqs->rows_useful)
+            if(lqs->rq.if_modified_since && !lqs->c.rows_useful)
                 return rrd_call_function_error(wb, "no useful logs, not modified", HTTP_RESP_NOT_MODIFIED);
             break;
 
@@ -950,17 +952,17 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
             msg_priority = NDLP_WARNING;
         }
 
-        if(lqs->samples.estimated || lqs->samples.unsampled) {
-            double percent = (double) (lqs->samples.sampled * 100.0 /
-                                       (lqs->samples.estimated + lqs->samples.unsampled + lqs->samples.sampled));
+        if(lqs->c.samples.estimated || lqs->c.samples.unsampled) {
+            double percent = (double) (lqs->c.samples.sampled * 100.0 /
+                                       (lqs->c.samples.estimated + lqs->c.samples.unsampled + lqs->c.samples.sampled));
             buffer_sprintf(msg, "%.2f%% real data", percent);
             buffer_sprintf(msg_description, "ACTUAL DATA: The filters counters reflect %0.2f%% of the data. ", percent);
             msg_priority = MIN(msg_priority, NDLP_NOTICE);
         }
 
-        if(lqs->samples.unsampled) {
-            double percent = (double) (lqs->samples.unsampled * 100.0 /
-                                       (lqs->samples.estimated + lqs->samples.unsampled + lqs->samples.sampled));
+        if(lqs->c.samples.unsampled) {
+            double percent = (double) (lqs->c.samples.unsampled * 100.0 /
+                                       (lqs->c.samples.estimated + lqs->c.samples.unsampled + lqs->c.samples.sampled));
             buffer_sprintf(msg, ", %.2f%% unsampled", percent);
             buffer_sprintf(msg_description
                            , "UNSAMPLED DATA: %0.2f%% of the events exist and have been counted, but their values have not been evaluated, so they are not included in the filters counters. "
@@ -968,9 +970,9 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
             msg_priority = MIN(msg_priority, NDLP_NOTICE);
         }
 
-        if(lqs->samples.estimated) {
-            double percent = (double) (lqs->samples.estimated * 100.0 /
-                                       (lqs->samples.estimated + lqs->samples.unsampled + lqs->samples.sampled));
+        if(lqs->c.samples.estimated) {
+            double percent = (double) (lqs->c.samples.estimated * 100.0 /
+                                       (lqs->c.samples.estimated + lqs->c.samples.unsampled + lqs->c.samples.sampled));
             buffer_sprintf(msg, ", %.2f%% estimated", percent);
             buffer_sprintf(msg_description
                            , "ESTIMATED DATA: The query selected a large amount of data, so to avoid delaying too much, the presented data are estimated by %0.2f%%. "
@@ -1011,9 +1013,9 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     if(lqs->rq.sampling) {
         buffer_json_member_add_object(wb, "_sampling");
         {
-            buffer_json_member_add_uint64(wb, "sampled", lqs->samples.sampled);
-            buffer_json_member_add_uint64(wb, "unsampled", lqs->samples.unsampled);
-            buffer_json_member_add_uint64(wb, "estimated", lqs->samples.estimated);
+            buffer_json_member_add_uint64(wb, "sampled", lqs->c.samples.sampled);
+            buffer_json_member_add_uint64(wb, "unsampled", lqs->c.samples.unsampled);
+            buffer_json_member_add_uint64(wb, "estimated", lqs->c.samples.estimated);
         }
         buffer_json_object_close(wb); // _sampling
     }
