@@ -73,57 +73,61 @@ static WEVT_SOURCE_TYPE wevts_internal_source_type(const char *value) {
 
 typedef struct {
     uint64_t id;
+    ULONGLONG filetime;
 } ND_EVT_EVENT_INFO;
+
+#define ND_EVT_EVENT_INFO_EMPTY (ND_EVT_EVENT_INFO){ .id = 0, .filetime = 0, }
 
 typedef struct {
     uint64_t entries;
+    nsec_t duration_ns;
 
     ND_EVT_EVENT_INFO first_event;
     ND_EVT_EVENT_INFO last_event;
 } ND_EVT_CHANNEL_INFO;
 
 static bool nd_evt_get_event_info(EVT_HANDLE *event_query, EVT_HANDLE *render_context, ND_EVT_EVENT_INFO *ev) {
+    static __thread EVT_VARIANT	*renderedContent = NULL;
+
     DWORD		size_required_next = 0, size_required = 0, size = 0, bookmarkedCount = 0;
-    EVT_VARIANT	*renderedContent = NULL;
     EVT_HANDLE	event_bookmark = NULL;
     bool ret = false;
 
-    if (TRUE != EvtNext(*event_query, 1, &event_bookmark, INFINITE, 0, &size_required_next)) {
-        // no data in eventlog
-        goto cleanup;
-    }
+    if (!EvtNext(*event_query, 1, &event_bookmark, INFINITE, 0, &size_required_next))
+        goto cleanup; // no data available, return failure
 
     // obtain the information from selected events
-    if (TRUE != EvtRender(*render_context, event_bookmark, EvtRenderEventValues, size, renderedContent, &size_required, &bookmarkedCount)) {
+    if (!EvtRender(*render_context, event_bookmark, EvtRenderEventValues, size, renderedContent, &size_required, &bookmarkedCount)) {
         // information exceeds the allocated space
         if (ERROR_INSUFFICIENT_BUFFER != GetLastError()) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender failed #1");
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender failed");
             goto cleanup;
         }
 
         size = size_required;
+        freez(renderedContent);
         renderedContent = (EVT_VARIANT *)mallocz(size);
 
-        if (TRUE != EvtRender(*render_context, event_bookmark, EvtRenderEventValues, size, renderedContent, &size_required, &bookmarkedCount)) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender failed #2");
+        if (!EvtRender(*render_context, event_bookmark, EvtRenderEventValues, size, renderedContent, &size_required, &bookmarkedCount)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender failed, after size increase");
             goto cleanup;
         }
     }
 
     ev->id = VAR_RECORD_NUMBER(renderedContent);
+    ev->filetime = VAR_TIME_CREATED(renderedContent);
     ret = true;
 
 cleanup:
-    if (NULL != event_bookmark)
+    if (event_bookmark)
         EvtClose(event_bookmark);
 
-    free(renderedContent);
     return ret;
 }
 
 /* opens Event Log using API 6 and returns number of records */
 static bool nd_evt_get_channel_info(const wchar_t *channel, ND_EVT_CHANNEL_INFO *ch) {
-    const wchar_t	*RENDER_ITEMS[] = {
+    const wchar_t *RENDER_ITEMS[] = {
             L"/Event/System/Provider/@Name",
             L"/Event/System/Provider/@EventSourceName",
             L"/Event/System/EventRecordID",
@@ -142,14 +146,16 @@ static bool nd_evt_get_channel_info(const wchar_t *channel, ND_EVT_CHANNEL_INFO 
     // we have to get it from the first EventRecordID
 
     // create the system render
-    if (NULL == (tmp_render_context = EvtCreateRenderContext(RENDER_ITEMS_count, RENDER_ITEMS, EvtRenderContextValues))) {
+    tmp_render_context = EvtCreateRenderContext(RENDER_ITEMS_count, RENDER_ITEMS, EvtRenderContextValues);
+    if (!tmp_render_context) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed.");
         goto cleanup;
     }
 
     // query the eventlog
-    if (NULL == (tmp_first_event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath))) {
-        if (ERROR_EVT_CHANNEL_NOT_FOUND == GetLastError())
+    tmp_first_event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath);
+    if (!tmp_first_event_query) {
+        if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery channel missed");
         else
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery failed");
@@ -162,13 +168,14 @@ static bool nd_evt_get_channel_info(const wchar_t *channel, ND_EVT_CHANNEL_INFO 
 
     if (!ch->first_event.id) {
         // no data in the event log
-        ch->first_event.id = ch->last_event.id = 0;
+        ch->first_event = ch->last_event = ND_EVT_EVENT_INFO_EMPTY;
         ret = true;
         goto cleanup;
     }
 
-    if (NULL == (tmp_last_event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath | EvtQueryReverseDirection))) {
-        if (ERROR_EVT_CHANNEL_NOT_FOUND == GetLastError())
+    tmp_last_event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath | EvtQueryReverseDirection);
+    if (!tmp_last_event_query) {
+        if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery channel missed");
         else
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery failed");
@@ -178,24 +185,27 @@ static bool nd_evt_get_channel_info(const wchar_t *channel, ND_EVT_CHANNEL_INFO 
 
     if (!nd_evt_get_event_info(&tmp_last_event_query, &tmp_render_context, &ch->last_event) || ch->last_event.id == 0) {
         // no data in eventlog
-        ch->last_event.id = ch->first_event.id;
+        ch->last_event = ch->first_event;
     }
-    else
-        ch->last_event.id += 1;	// we should read the last record
+    ch->last_event.id += 1;	// we should read the last record
 
     ret = true;
 
 cleanup:
-    if(ret)
+    if(ret) {
         ch->entries = ch->last_event.id - ch->first_event.id;
-    else
+        ch->duration_ns = (ch->last_event.filetime - ch->first_event.filetime) * 100;
+    }
+    else {
         ch->entries = 0;
+        ch->duration_ns = 0;
+    }
 
-    if (NULL != tmp_first_event_query)
+    if (tmp_first_event_query)
         EvtClose(tmp_first_event_query);
-    if (NULL != tmp_last_event_query)
+    if (tmp_last_event_query)
         EvtClose(tmp_last_event_query);
-    if (NULL != tmp_render_context)
+    if (tmp_render_context)
         EvtClose(tmp_render_context);
 
     return ret;
@@ -239,8 +249,9 @@ static void wevts_sources_to_json_array(BUFFER *wb) {
         const char *name = channel2utf8(pChannelPath);
         buffer_json_add_array_item_object(wb);
         {
-            char info[1024];
-            snprintfz(info, sizeof(info), "%"PRIu64" entries", ch.entries);
+            char info[1024], duration[128];
+            duration_snprintf(duration, sizeof(duration), ch.duration_ns / NSEC_PER_SEC, "s", true);
+            snprintfz(info, sizeof(info), "%"PRIu64" entries, covering %s", ch.entries, duration);
 
             buffer_json_member_add_string(wb, "id", name);
             buffer_json_member_add_string(wb, "name", name);
