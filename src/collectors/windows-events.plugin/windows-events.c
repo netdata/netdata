@@ -128,7 +128,7 @@ static bool nd_evt_get_log_file_size(const wchar_t *channel, uint64_t *file_size
 
     // Open the event log channel
     hLog = EvtOpenLog(NULL, channel, EvtOpenChannelPath);
-    if (NULL == hLog) {
+    if (!hLog) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtOpenLog() failed");
         goto cleanup;
     }
@@ -172,14 +172,14 @@ static bool nd_evt_get_channel_info(const wchar_t *channel, ND_EVT_CHANNEL_INFO 
 
     // create the system render
     tmp_render_context = EvtCreateRenderContext(RENDER_ITEMS_count, RENDER_ITEMS, EvtRenderContextValues);
-    if (tmp_render_context != NULL) {
+    if (!tmp_render_context) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed.");
         goto cleanup;
     }
 
     // query the eventlog
     tmp_first_event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath);
-    if (tmp_first_event_query != NULL) {
+    if (!tmp_first_event_query) {
         if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery channel missed");
         else
@@ -199,7 +199,7 @@ static bool nd_evt_get_channel_info(const wchar_t *channel, ND_EVT_CHANNEL_INFO 
     }
 
     tmp_last_event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath | EvtQueryReverseDirection);
-    if (tmp_last_event_query != NULL) {
+    if (!tmp_last_event_query) {
         if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery channel missed");
         else
@@ -249,7 +249,7 @@ static void wevts_sources_to_json_array(BUFFER *wb) {
 
     // Open a handle to enumerate the event channels
     hChannelEnum = EvtOpenChannelEnum(NULL, 0);
-    if (NULL == hChannelEnum) {
+    if (!hChannelEnum) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "WINDOWS EVENTS: EvtOpenChannelEnum() failed with %" PRIu64 "\n",
                (uint64_t)GetLastError());
         goto cleanup;
