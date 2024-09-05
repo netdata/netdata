@@ -22,7 +22,8 @@ static LPCTSTR szWindowClass = _T("DesktopApp");
 
 HWND hNetdataWND = NULL;
 
-static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root)
+// TODO: Convert to thread
+static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root, BOOL checkRet)
 {
     wchar_t localPath[MAX_PATH + 1] = { };
     DWORD length = GetCurrentDirectoryW(MAX_PATH, localPath);
@@ -33,8 +34,8 @@ static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root)
     if (root) {
         // Remove usr\bin
         length -= 7;
-        wcscpy(&localPath[length], cmd);
     }
+    wcscpy(&localPath[length], cmd);
 
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
@@ -46,6 +47,32 @@ static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root)
     if(!CreateProcess(NULL, localPath, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi )) {
         MessageBoxW(NULL, L"Cannot start process.", L"Error", MB_OK|MB_ICONERROR);
         return;
+    }
+
+    if (checkRet) {
+        WaitForSingleObject(pi.hProcess, INFINITE);
+
+        CloseHandle( pi.hProcess );
+        CloseHandle( pi.hThread );
+
+        DWORD ret;
+        GetExitCodeProcess(pi.hProcess, &ret);
+
+        wchar_t *msg;
+        wchar_t *title;
+        UINT flags;
+
+        if (ret) {
+            msg = L"Netdata returned error, check your logs.";
+            title = L"Error";
+            flags = MB_OK|MB_ICONERROR;
+        } else {
+            msg = L"Netdata ran command with success!";
+            title = L"Success";
+            flags = MB_OK|MB_ICONINFORMATION;
+        }
+
+        MessageBoxW(NULL, msg, title, flags);
     }
 }
 
@@ -100,11 +127,32 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
                                        NULL, NULL);
             break;
         }
+        case WM_PAINT: {
+            LPCTSTR screenMessages[] = {
+              L"Netdata",
+              L"Client"
+            };
+
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hNetdatawnd, &ps);;
+            int i;
+            for (i = 0; i < sizeof(screenMessages) / sizeof(LPCTSTR); i++) {
+                TextOut(hdc, 180, 40 + 20 * i, screenMessages[i], wcslen(screenMessages[i]));
+            }
+            EndPaint(hNetdatawnd, &ps);
+            break;
+        }
         case WM_COMMAND: {
             if (HIWORD(wParam) == BN_CLICKED) {
                 switch(LOWORD(wParam)) {
                     case IDC_OPEN_MSYS: {
-                        netdata_cli_run_specific_command(L"msys2.exe", TRUE);
+                        netdata_cli_run_specific_command(L"msys2.exe", TRUE, FALSE);
+                        break;
+                    }
+                    case IDC_RELOAD_HEALTH: {
+                        netdata_cli_run_specific_command(L"\\bash.exe -l -c \"netdatacli reload-health; export CURRRET=`echo $?`; exit $CURRRET\"",
+                                                         FALSE,
+                                                         TRUE);
                         break;
                     }
                     case IDC_CLOSE_WINDOW: {
