@@ -73,10 +73,10 @@ static WEVT_SOURCE_TYPE wevts_internal_source_type(const char *value) {
 
 typedef struct {
     uint64_t id;
-    ULONGLONG filetime;
+    ULONGLONG created_ft; // FILETIME
 } ND_EVT_EVENT_INFO;
 
-#define ND_EVT_EVENT_INFO_EMPTY (ND_EVT_EVENT_INFO){ .id = 0, .filetime = 0, }
+#define ND_EVT_EVENT_INFO_EMPTY (ND_EVT_EVENT_INFO){ .id = 0, .created_ft = 0, }
 
 typedef struct {
     uint64_t entries;
@@ -115,12 +115,42 @@ static bool nd_evt_get_event_info(EVT_HANDLE *event_query, EVT_HANDLE *render_co
     }
 
     ev->id = VAR_RECORD_NUMBER(renderedContent);
-    ev->filetime = VAR_TIME_CREATED(renderedContent);
+    ev->created_ft = VAR_TIME_CREATED(renderedContent);
     ret = true;
 
 cleanup:
     if (event_bookmark)
         EvtClose(event_bookmark);
+
+    return ret;
+}
+
+static bool nd_evt_get_log_file_size(const wchar_t *channel, uint64_t *file_size) {
+    EVT_HANDLE hLog = NULL;
+    EVT_VARIANT evtVariant;
+    DWORD bufferUsed = 0;
+    bool ret = false;
+
+    // Open the event log channel
+    hLog = EvtOpenLog(NULL, channel, EvtOpenChannelPath);
+    if (NULL == hLog) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtOpenLog() failed");
+        goto cleanup;
+    }
+
+    // Get the file size of the log
+    if (!EvtGetLogInfo(hLog, EvtLogFileSize, sizeof(evtVariant), &evtVariant, &bufferUsed)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetLogInfo() failed");
+        goto cleanup;
+    }
+
+    // Extract the file size from the EVT_VARIANT structure
+    *file_size = evtVariant.UInt64Val;
+    ret = true;
+
+cleanup:
+    if (hLog)
+        EvtClose(hLog);
 
     return ret;
 }
@@ -194,7 +224,7 @@ static bool nd_evt_get_channel_info(const wchar_t *channel, ND_EVT_CHANNEL_INFO 
 cleanup:
     if(ret) {
         ch->entries = ch->last_event.id - ch->first_event.id;
-        ch->duration_ns = (ch->last_event.filetime - ch->first_event.filetime) * 100;
+        ch->duration_ns = (ch->last_event.created_ft - ch->first_event.created_ft) * 100;
     }
     else {
         ch->entries = 0;
@@ -249,13 +279,20 @@ static void wevts_sources_to_json_array(BUFFER *wb) {
         const char *name = channel2utf8(pChannelPath);
         buffer_json_add_array_item_object(wb);
         {
-            char info[1024], duration[128];
+            char info[1024], duration[128], pill[128];
             duration_snprintf(duration, sizeof(duration), ch.duration_ns / NSEC_PER_SEC, "s", true);
             snprintfz(info, sizeof(info), "%"PRIu64" entries, covering %s", ch.entries, duration);
 
+            uint64_t size_bytes;
+            if(nd_evt_get_log_file_size(pChannelPath, &size_bytes)) {
+                size_snprintf(pill, sizeof(pill), size_bytes, "B", false);
+            }
+            else
+                pill[0] = '\0';
+
             buffer_json_member_add_string(wb, "id", name);
             buffer_json_member_add_string(wb, "name", name);
-            buffer_json_member_add_string(wb, "pill", "???");
+            buffer_json_member_add_string(wb, "pill", pill);
             buffer_json_member_add_string(wb, "info", info);
         }
         buffer_json_object_close(wb); // options object
