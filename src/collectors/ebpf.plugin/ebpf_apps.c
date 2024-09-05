@@ -327,7 +327,7 @@ int pids_fd[EBPF_PIDS_END_IDX];
 
 static size_t
     // global_iterations_counter = 1,
-    calls_counter = 0,
+    //calls_counter = 0,
     // file_counter = 0,
     // filenames_allocated_counter = 0,
     // inodes_changed_counter = 0,
@@ -426,7 +426,7 @@ static inline void assign_target_to_pid(ebpf_pid_data_t *p)
 static inline int read_proc_pid_cmdline(ebpf_pid_data_t *p, char *cmdline)
 {
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
+    snprintfz(filename, FILENAME_MAX, "%s/proc/%u/cmdline", netdata_configured_host_prefix, p->pid);
 
     int ret = 0;
 
@@ -490,7 +490,7 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p)
     char *comm = procfile_lineword(ff, 0, 1);
     int32_t ppid = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
 
-    if (p->ppid == ppid && p->target)
+    if (p->ppid == (uint32_t)ppid && p->target)
         goto without_cmdline_target;
 
     p->ppid = ppid;
@@ -546,7 +546,7 @@ static inline int ebpf_collect_data_for_pid(pid_t pid)
     read_proc_pid_stat(p);
 
     // check its parent pid
-    if (unlikely( p->ppid > pid_max)) {
+    if (unlikely( p->ppid > (uint32_t)pid_max)) {
         netdata_log_error("Pid %d (command '%s') states invalid parent pid %u. Using 0.", pid, p->comm, p->ppid);
         p->ppid = 0;
     }
@@ -906,9 +906,8 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
  *
  * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
  * @param maps_per_core         do I have hash maps per core?
- * @param max_period            max period to wait before remove from hash table.
  */
-void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core, uint32_t max_period)
+void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
 {
     if (tbl_pid_stats_fd == -1)
         return;

@@ -565,9 +565,8 @@ static void ebpf_update_shm_cgroup()
  * Read the apps table and store data inside the structure.
  *
  * @param maps_per_core do I need to read all cores?
- * @param max_period    limit of iterations without updates before remove data from hash table
  */
-static void ebpf_read_shm_apps_table(int maps_per_core, uint32_t max_period)
+static void ebpf_read_shm_apps_table(int maps_per_core)
 {
     netdata_ebpf_shm_t *cv = shm_vector;
     int fd = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
@@ -1075,7 +1074,6 @@ void *ebpf_read_shm_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
-    uint32_t max_period = EBPF_CLEANUP_FACTOR;
     pids_fd[EBPF_PIDS_SHM_IDX] = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
@@ -1083,7 +1081,7 @@ void *ebpf_read_shm_thread(void *ptr)
             continue;
 
         pthread_mutex_lock(&collect_data_mutex);
-        ebpf_read_shm_apps_table(maps_per_core, max_period);
+        ebpf_read_shm_apps_table(maps_per_core);
         ebpf_shm_resume_apps_data();
         pthread_mutex_unlock(&collect_data_mutex);
 
