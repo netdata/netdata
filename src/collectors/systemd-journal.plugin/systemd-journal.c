@@ -26,15 +26,65 @@
 static SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value);
 
 // prepare LQS
+#define LQS_FUNCTION_NAME           SYSTEMD_JOURNAL_FUNCTION_NAME
+#define LQS_FUNCTION_DESCRIPTION    SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION
 #define LQS_DEFAULT_ITEMS_PER_QUERY 200
 #define LQS_SAMPLING_SLOTS          1000
 #define LQS_SAMPLING_RECALIBRATE    10000
-#define LQS_SOURCE_TYPE             SD_JOURNAL_FILE_SOURCE_TYPE
 #define LQS_DEFAULT_ITEMS_SAMPLING  1000000
-#define LQS_FUNCTION_NAME           SYSTEMD_JOURNAL_FUNCTION_NAME
-#define LQS_FUNCTION_DESCRIPTION    SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION
+#define LQS_SOURCE_TYPE             SD_JOURNAL_FILE_SOURCE_TYPE
+#define LQS_SOURCE_TYPE_ALL         SDJF_ALL
+#define LQS_SOURCE_TYPE_NONE        SDJF_NONE
 #define LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value) get_internal_source_type(value)
 #define LQS_FUNCTION_SOURCE_TO_JSON_ARRAY(wb) available_journal_file_sources_to_json_array(wb)
+#define LQS_CUSTOM_FIELDS                       \
+    struct {                                    \
+        usec_t start_ut;                        \
+        usec_t stop_ut;                         \
+        usec_t first_msg_ut;                    \
+                                                \
+        sd_id128_t first_msg_writer;            \
+        uint64_t first_msg_seqnum;              \
+    } query_file;                               \
+                                                \
+    struct {                                    \
+        uint32_t enable_after_samples;          \
+        uint32_t slots;                         \
+        uint32_t sampled;                       \
+        uint32_t unsampled;                     \
+        uint32_t estimated;                     \
+    } samples;                                  \
+                                                \
+    struct {                                    \
+        uint32_t enable_after_samples;          \
+        uint32_t every;                         \
+        uint32_t skipped;                       \
+        uint32_t recalibrate;                   \
+        uint32_t sampled;                       \
+        uint32_t unsampled;                     \
+        uint32_t estimated;                     \
+    } samples_per_file;                         \
+                                                \
+    struct {                                    \
+        usec_t start_ut;                        \
+        usec_t end_ut;                          \
+        usec_t step_ut;                         \
+        uint32_t enable_after_samples;          \
+        uint32_t sampled[LQS_SAMPLING_SLOTS];   \
+        uint32_t unsampled[LQS_SAMPLING_SLOTS]; \
+    } samples_per_time_slot;                    \
+                                                \
+    /* per file progress info */                \
+    /* size_t cached_count; */                  \
+                                                \
+    /* progress statistics */                   \
+    usec_t matches_setup_ut;                    \
+    size_t rows_useful;                         \
+    size_t rows_read;                           \
+    size_t bytes_read;                          \
+    size_t files_matched;                       \
+    size_t file_working;
+
 #include "libnetdata/facets/logs_query_status.h"
 
 #include "systemd-journal-sampling.h"

@@ -91,7 +91,7 @@ typedef struct {
     .query = NULL,                                                      \
     .histogram = NULL,                                                  \
     .sources = NULL,                                                    \
-    .source_type = SDJF_ALL,                                            \
+    .source_type = LQS_SOURCE_TYPE_ALL,                                 \
     .filters = 0,                                                       \
     .sampling = LQS_DEFAULT_ITEMS_SAMPLING,                             \
 }
@@ -111,52 +111,7 @@ typedef struct {
 
     usec_t last_modified;
 
-    struct {
-        usec_t start_ut;     // the starting time of the query - we start from this
-        usec_t stop_ut;      // the ending time of the query - we stop at this
-        usec_t first_msg_ut;
-
-        sd_id128_t first_msg_writer;
-        uint64_t first_msg_seqnum;
-    } query_file;
-
-    struct {
-        uint32_t enable_after_samples;
-        uint32_t slots;
-        uint32_t sampled;
-        uint32_t unsampled;
-        uint32_t estimated;
-    } samples;
-
-    struct {
-        uint32_t enable_after_samples;
-        uint32_t every;
-        uint32_t skipped;
-        uint32_t recalibrate;
-        uint32_t sampled;
-        uint32_t unsampled;
-        uint32_t estimated;
-    } samples_per_file;
-
-    struct {
-        usec_t start_ut;
-        usec_t end_ut;
-        usec_t step_ut;
-        uint32_t enable_after_samples;
-        uint32_t sampled[LQS_SAMPLING_SLOTS];
-        uint32_t unsampled[LQS_SAMPLING_SLOTS];
-    } samples_per_time_slot;
-
-    // per file progress info
-    // size_t cached_count;
-
-    // progress statistics
-    usec_t matches_setup_ut;
-    size_t rows_useful;
-    size_t rows_read;
-    size_t bytes_read;
-    size_t files_matched;
-    size_t file_working;
+    LQS_CUSTOM_FIELDS
 } LOGS_QUERY_STATUS;
 
 struct logs_query_data {
@@ -279,7 +234,7 @@ static inline void lqs_function_help(LOGS_QUERY_STATUS *lqs, BUFFER *wb) {
     buffer_sprintf(wb,
                    "   " LQS_PARAMETER_LAST ":ITEMS\n"
                    "      The number of items to return.\n"
-                   "      The default is %d.\n"
+                   "      The default is %zu.\n"
                    "\n"
                    , lqs->rq.entries
                    );
@@ -287,7 +242,7 @@ static inline void lqs_function_help(LOGS_QUERY_STATUS *lqs, BUFFER *wb) {
     buffer_sprintf(wb,
                    "   " LQS_PARAMETER_SAMPLING ":ITEMS\n"
                    "      The number of log entries to sample to estimate facets counters and histogram.\n"
-                   "      The default is %d.\n"
+                   "      The default is %zu.\n"
                    "\n"
                    , lqs->rq.sampling
                    );
@@ -384,7 +339,7 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
 
         CLEAN_BUFFER *sources_list = buffer_create(0, NULL);
 
-        rq->source_type = SDJF_NONE;
+        rq->source_type = LQS_SOURCE_TYPE_NONE;
 
         size_t sources_len = json_object_array_length(sources);
         for (size_t i = 0; i < sources_len; i++) {
@@ -399,7 +354,7 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
             buffer_json_add_array_item_string(wb, value);
 
             LQS_SOURCE_TYPE t = LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value);
-            if(t != SDJF_NONE) {
+            if(t != LQS_SOURCE_TYPE_NONE) {
                 rq->source_type |= t;
                 value = NULL;
             }
@@ -575,7 +530,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
 
             CLEAN_BUFFER *sources_list = buffer_create(0, NULL);
 
-            rq->source_type = SDJF_NONE;
+            rq->source_type = LQS_SOURCE_TYPE_NONE;
             while(value) {
                 char *sep = strchr(value, ',');
                 if(sep)
@@ -584,7 +539,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
                 buffer_json_add_array_item_string(wb, value);
 
                 LQS_SOURCE_TYPE t = LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value);
-                if(t != SDJF_NONE) {
+                if(t != LQS_SOURCE_TYPE_NONE) {
                     rq->source_type |= t;
                     value = NULL;
                 }
@@ -853,7 +808,7 @@ static inline bool lqs_request_parse_and_validate(LOGS_QUERY_STATUS *lqs, BUFFER
         lqs->rq.slice = false;
 
     if(lqs->rq.histogram) {
-        if(lqs-rq->fields_are_ids)
+        if(lqs->rq.fields_are_ids)
             facets_set_timeframe_and_histogram_by_id(facets, lqs->rq.histogram, lqs->rq.after_ut, lqs->rq.before_ut);
         else
             facets_set_timeframe_and_histogram_by_name(facets, lqs->rq.histogram, lqs->rq.after_ut, lqs->rq.before_ut);
