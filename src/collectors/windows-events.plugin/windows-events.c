@@ -5,11 +5,6 @@
 
 #include <windows.h>
 #include <winevt.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-// Link with Wevtapi.lib
-#pragma comment(lib, "Wevtapi.lib")
 
 typedef enum {
     WEVTS_NONE               = 0,
@@ -73,10 +68,10 @@ static WEVT_SOURCE_TYPE wevts_internal_source_type(const char *value) {
 
 typedef struct {
     uint64_t id;
-    ULONGLONG created_ft; // FILETIME
+    nsec_t created_ns;
 } ND_EVT_EVENT_INFO;
 
-#define ND_EVT_EVENT_INFO_EMPTY (ND_EVT_EVENT_INFO){ .id = 0, .created_ft = 0, }
+#define ND_EVT_EVENT_INFO_EMPTY (ND_EVT_EVENT_INFO){ .id = 0, .created_ns = 0, }
 
 typedef struct {
     uint64_t entries;
@@ -115,7 +110,7 @@ static bool nd_evt_get_event_info(EVT_HANDLE *event_query, EVT_HANDLE *render_co
     }
 
     ev->id = VAR_RECORD_NUMBER(renderedContent);
-    ev->created_ft = VAR_TIME_CREATED(renderedContent);
+    ev->created_ns = os_windows_ulonglong_to_unix_epoch_ns(VAR_TIME_CREATED(renderedContent));
     ret = true;
 
 cleanup:
@@ -177,14 +172,14 @@ static bool nd_evt_get_channel_info(const wchar_t *channel, ND_EVT_CHANNEL_INFO 
 
     // create the system render
     tmp_render_context = EvtCreateRenderContext(RENDER_ITEMS_count, RENDER_ITEMS, EvtRenderContextValues);
-    if (!tmp_render_context) {
+    if (tmp_render_context != NULL) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed.");
         goto cleanup;
     }
 
     // query the eventlog
     tmp_first_event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath);
-    if (!tmp_first_event_query) {
+    if (tmp_first_event_query != NULL) {
         if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery channel missed");
         else
@@ -204,7 +199,7 @@ static bool nd_evt_get_channel_info(const wchar_t *channel, ND_EVT_CHANNEL_INFO 
     }
 
     tmp_last_event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath | EvtQueryReverseDirection);
-    if (!tmp_last_event_query) {
+    if (tmp_last_event_query != NULL) {
         if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery channel missed");
         else
@@ -224,7 +219,11 @@ static bool nd_evt_get_channel_info(const wchar_t *channel, ND_EVT_CHANNEL_INFO 
 cleanup:
     if(ret) {
         ch->entries = ch->last_event.id - ch->first_event.id;
-        ch->duration_ns = (ch->last_event.created_ft - ch->first_event.created_ft) * 100;
+
+        if(ch->last_event.created_ns >= ch->first_event.created_ns)
+            ch->duration_ns = ch->last_event.created_ns - ch->first_event.created_ns;
+        else
+            ch->duration_ns = ch->first_event.created_ns - ch->last_event.created_ns;
     }
     else {
         ch->entries = 0;

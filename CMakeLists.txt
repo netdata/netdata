@@ -790,6 +790,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/config/appconfig_api_boolean.c
         src/libnetdata/config/appconfig_api_boolean.h
         src/libnetdata/facets/logs_query_status.h
+        src/libnetdata/os/timestamps.c
+        src/libnetdata/os/timestamps.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
