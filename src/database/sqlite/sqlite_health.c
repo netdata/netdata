@@ -430,10 +430,8 @@ static void sql_inject_removed_status(
         int64_t health_log_id = sqlite3_column_int64(res, 0);
         RRDCALC_STATUS old_status = (RRDCALC_STATUS)sqlite3_column_double(res, 1);
         insert_alert_queue(
-            host, health_log_id, (int64_t)unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED);
+            host, health_log_id, (int64_t)max_unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED);
     }
-    //else
-    //   error_report("HEALTH [N/A]: Failed to execute SQL_INJECT_REMOVED, rc = %d", rc);
 
 done:
     REPORT_BIND_FAIL(res, param);
