@@ -576,7 +576,7 @@ bool netdata_systemd_journal_check_if_modified_since(sd_journal *j, usec_t seek_
 }
 
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
-static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, LOGS_QUERY_STATUS *fqs) {
+static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, LOGS_QUERY_STATUS *lqs) {
     const char *field = NULL;
     const void *data = NULL;
     size_t data_length;
@@ -587,7 +587,7 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
     SD_JOURNAL_FOREACH_FIELD(j, field) { // for each key
         bool interesting;
 
-        if(fqs->rq.data_only)
+        if(lqs->rq.data_only)
             interesting = facets_key_name_is_filter(facets, field);
         else
             interesting = facets_key_name_is_facet(facets, field);
@@ -636,7 +636,7 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
     }
 
     if(failures) {
-        lqs_log_error(fqs, "failed to setup journal filter, will run the full query.");
+        lqs_log_error(lqs, "failed to setup journal filter, will run the full query.");
         sd_journal_flush_matches(j);
         return true;
     }
@@ -1001,7 +1001,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     facets_sort_and_reorder_keys(facets);
     facets_report(facets, wb, used_hashes_registry);
 
-    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + (lqs->rq.data_only ? 3600 : 0));
+    wb->expires = now_realtime_sec() + (lqs->rq.data_only ? 3600 : 0);
+    buffer_json_member_add_time_t(wb, "expires", wb->expires);
 
     buffer_json_member_add_object(wb, "_fstat_caching");
     {
@@ -1019,8 +1020,6 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
         }
         buffer_json_object_close(wb); // _sampling
     }
-
-    buffer_json_finalize(wb);
 
     wb->content_type = CT_APPLICATION_JSON;
     wb->response_code = HTTP_RESP_OK;
@@ -1180,27 +1179,26 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
     // ------------------------------------------------------------------------
     // parse the parameters
 
-    if(!lqs_request_parse_and_validate(lqs, wb, function, payload, have_slice, "PRIORITY"))
-        goto output;
+    if(lqs_request_parse_and_validate(lqs, wb, function, payload, have_slice, "PRIORITY")) {
+        systemd_journal_register_transformations(lqs);
 
-    systemd_journal_register_transformations(lqs);
+        // ------------------------------------------------------------------------
+        // add versions to the response
 
-    // ------------------------------------------------------------------------
-    // add versions to the response
+        buffer_json_journal_versions(wb);
 
-    buffer_json_journal_versions(wb);
+        // ------------------------------------------------------------------------
+        // run the request
 
-    // ------------------------------------------------------------------------
-    // run the request
-
-    if(lqs->rq.info) {
-        lqs_info_response(wb, lqs->facets);
-        goto output;
+        if (lqs->rq.info)
+            lqs_info_response(wb, lqs->facets);
+        else {
+            netdata_systemd_journal_query(wb, lqs);
+            if (wb->response_code == HTTP_RESP_OK)
+                buffer_json_finalize(wb);
+        }
     }
 
-    netdata_systemd_journal_query(wb, lqs);
-
-output:
     netdata_mutex_lock(&stdout_mutex);
     pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
