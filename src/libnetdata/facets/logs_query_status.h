@@ -201,60 +201,105 @@ static inline void lqs_function_help(LOGS_QUERY_STATUS *lqs, BUFFER *wb) {
                    "\n"
                    "The following parameters are supported:\n"
                    "\n"
+                   , program_name
+                   , LQS_FUNCTION_NAME
+                   , LQS_FUNCTION_DESCRIPTION
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_HELP "\n"
                    "      Shows this help message.\n"
                    "\n"
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_INFO "\n"
                    "      Request initial configuration information about the plugin.\n"
                    "      The key entity returned is the required_params array, which includes\n"
                    "      all the available log sources.\n"
                    "      When `" LQS_PARAMETER_INFO "` is requested, all other parameters are ignored.\n"
                    "\n"
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_DATA_ONLY ":true or " LQS_PARAMETER_DATA_ONLY ":false\n"
                    "      Quickly respond with data requested, without generating a\n"
                    "      `histogram`, `facets` counters and `items`.\n"
                    "\n"
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_DELTA ":true or " LQS_PARAMETER_DELTA ":false\n"
                    "      When doing data only queries, include deltas for histogram, facets and items.\n"
                    "\n"
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_TAIL ":true or " LQS_PARAMETER_TAIL ":false\n"
                    "      When doing data only queries, respond with the newest messages,\n"
                    "      and up to the anchor, but calculate deltas (if requested) for\n"
                    "      the duration [anchor - before].\n"
                    "\n"
+                   );
+
 #ifdef LQS_SLICE_PARAMETER
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_SLICE ":true or " LQS_PARAMETER_SLICE ":false\n"
                    "      When it is turned on, the plugin is is slicing the logs database,\n"
                    "      utilizing the underlying available indexes.\n"
                    "      When it is off, all filtering is done by the plugin.\n"
                    "      The default is: %s\n"
-#endif
                    "\n"
+                   , lqs->rq.slice ? "true" : "false"
+                   );
+#endif
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_SOURCE ":SOURCE\n"
                    "      Query only the specified log sources.\n"
                    "      Do an `" LQS_PARAMETER_INFO "` query to find the sources.\n"
                    "\n"
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_BEFORE ":TIMESTAMP_IN_SECONDS\n"
                    "      Absolute or relative (to now) timestamp in seconds, to start the query.\n"
                    "      The query is always executed from the most recent to the oldest log entry.\n"
                    "      If not given the default is: now.\n"
                    "\n"
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_AFTER ":TIMESTAMP_IN_SECONDS\n"
                    "      Absolute or relative (to `before`) timestamp in seconds, to end the query.\n"
                    "      If not given, the default is %d.\n"
                    "\n"
+                   , -LQS_DEFAULT_QUERY_DURATION
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_LAST ":ITEMS\n"
                    "      The number of items to return.\n"
                    "      The default is %d.\n"
                    "\n"
+                   , lqs->rq.entries
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_SAMPLING ":ITEMS\n"
                    "      The number of log entries to sample to estimate facets counters and histogram.\n"
                    "      The default is %d.\n"
                    "\n"
+                   , lqs->rq.sampling
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_ANCHOR ":TIMESTAMP_IN_MICROSECONDS\n"
                    "      Return items relative to this timestamp.\n"
                    "      The exact items to be returned depend on the query `" LQS_PARAMETER_DIRECTION "`.\n"
                    "\n"
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_DIRECTION ":forward or " LQS_PARAMETER_DIRECTION ":backward\n"
                    "      When set to `backward` (default) the items returned are the newest before the\n"
                    "      `" LQS_PARAMETER_ANCHOR "`, (or `" LQS_PARAMETER_BEFORE "` if `" LQS_PARAMETER_ANCHOR "` is not set)\n"
@@ -262,38 +307,46 @@ static inline void lqs_function_help(LOGS_QUERY_STATUS *lqs, BUFFER *wb) {
                    "      `" LQS_PARAMETER_ANCHOR "`, (or `" LQS_PARAMETER_AFTER "` if `" LQS_PARAMETER_ANCHOR "` is not set)\n"
                    "      The default is: %s\n"
                    "\n"
+                   , lqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward"
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_QUERY ":SIMPLE_PATTERN\n"
                    "      Do a full text search to find the log entries matching the pattern given.\n"
                    "      The plugin is searching for matches on all fields of the database.\n"
                    "\n"
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_IF_MODIFIED_SINCE ":TIMESTAMP_IN_MICROSECONDS\n"
                    "      Each successful response, includes a `last_modified` field.\n"
                    "      By providing the timestamp to the `" LQS_PARAMETER_IF_MODIFIED_SINCE "` parameter,\n"
                    "      the plugin will return 200 with a successful response, or 304 if the source has not\n"
                    "      been modified since that timestamp.\n"
                    "\n"
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_HISTOGRAM ":facet_id\n"
                    "      Use the given `facet_id` for the histogram.\n"
                    "      This parameter is ignored in `" LQS_PARAMETER_DATA_ONLY "` mode.\n"
                    "\n"
+                   );
+
+    buffer_sprintf(wb,
                    "   " LQS_PARAMETER_FACETS ":facet_id1,facet_id2,facet_id3,...\n"
                    "      Add the given facets to the list of fields for which analysis is required.\n"
                    "      The plugin will offer both a histogram and facet value counters for its values.\n"
                    "      This parameter is ignored in `" LQS_PARAMETER_DATA_ONLY "` mode.\n"
                    "\n"
+                   );
+
+    buffer_sprintf(wb,
                    "   facet_id:value_id1,value_id2,value_id3,...\n"
                    "      Apply filters to the query, based on the facet IDs returned.\n"
                    "      Each `facet_id` can be given once, but multiple `facet_ids` can be given.\n"
                    "\n"
-                   , program_name
-                   , LQS_FUNCTION_NAME
-                   , LQS_FUNCTION_DESCRIPTION
-#ifdef LQS_SLICE_PARAMETER
-                   , lqs->rq.slice ? "true" : "false"
-#endif
-                   , -LQS_DEFAULT_QUERY_DURATION, lqs->rq.entries
-                   , lqs->rq.sampling, lqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward"
-    );
+                   );
 }
 
 static inline bool lqs_request_parse_json_payload(json_object *jobj, const char *path, void *data, BUFFER *error) {
