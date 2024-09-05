@@ -1604,7 +1604,7 @@ static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, 
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static inline int ebpf_ip2nl(uint8_t *dst, char *ip, int domain, char *source)
+static inline int ebpf_ip2nl(uint8_t *dst, const char *ip, int domain, char *source)
 {
     if (inet_pton(domain, ip, dst) <= 0) {
         netdata_log_error("The address specified (%s) is invalid ", source);
@@ -1669,7 +1669,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
     char *ipdup = strdupz(ip);
     union netdata_ip_t first = { };
     union netdata_ip_t last = { };
-    char *is_ipv6;
+    const char *is_ipv6;
     if (*ip == '*' && *(ip+1) == '\0') {
         memset(first.addr8, 0, sizeof(first.addr8));
         memset(last.addr8, 0xFF, sizeof(last.addr8));
@@ -1680,7 +1680,8 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
         goto storethisip;
     }
 
-    char *end = ip;
+    char *enddup = strdupz(ip);
+    char *end = enddup;
     // Move while I cannot find a separator
     while (*end && *end != '/' && *end != '-') end++;
 
@@ -1810,7 +1811,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
 
     ebpf_network_viewer_ip_list_t *store;
 
-    storethisip:
+storethisip:
     store = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
     store->value = ipdup;
     store->hash = simple_hash(ipdup);
@@ -1821,8 +1822,9 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
     ebpf_fill_ip_list_unsafe(list, store, "socket");
     return;
 
-    cleanipdup:
+cleanipdup:
     freez(ipdup);
+    freez(enddup);
 }
 
 /**
