@@ -1662,7 +1662,7 @@ void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
  * @param out a pointer to store the link list
  * @param ip the value given as parameter
  */
-static void ebpf_parse_ip_list_unsafe(void **out, char *ip)
+static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
 {
     ebpf_network_viewer_ip_list_t **list = (ebpf_network_viewer_ip_list_t **)out;
 
@@ -2773,7 +2773,7 @@ static inline void ebpf_set_load_mode(netdata_ebpf_load_mode_t load, netdata_ebp
  *  @param str      value read from configuration file.
  *  @param origin   specify the configuration file loaded
  */
-static inline void epbf_update_load_mode(char *str, netdata_ebpf_load_mode_t origin)
+static inline void epbf_update_load_mode(const char *str, netdata_ebpf_load_mode_t origin)
 {
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(str);
 
