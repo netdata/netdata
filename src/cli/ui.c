@@ -99,7 +99,7 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
             hwndReopenLogs = CreateWindowExW(0, L"BUTTON", L"Reopen Logs",
                                              WS_CHILD | WS_VISIBLE,
                                              20, 100, 120, 30,
-                                             hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
+                                             hNetdatawnd, (HMENU)IDC_REOPEN_LOGS,
                                              NULL, NULL);
 
             hwndSaveDatabase = CreateWindowExW(0, L"BUTTON", L"Save Database",
@@ -160,7 +160,13 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
                                                          FALSE,
                                                          TRUE);
                         break;
-}
+                    }
+                    case IDC_REOPEN_LOGS: {
+                        netdata_cli_run_specific_command(L"\\bash.exe -l -c \"netdatacli reopen-logs; export CURRRET=`echo $?`; exit $CURRRET\"",
+                                                         FALSE,
+                                                         TRUE);
+                        break;
+                    }
                     case IDC_CLOSE_WINDOW: {
                         ExitProcess(0);
                     }
