@@ -148,7 +148,7 @@ bool size_parse(const char *size_str, uint64_t *result, const char *default_unit
 // --------------------------------------------------------------------------------------------------------------------
 // generate a string to represent a size
 
-ssize_t size_snprintf(char *dst, size_t dst_size, uint64_t value, const char *unit) {
+ssize_t size_snprintf(char *dst, size_t dst_size, uint64_t value, const char *unit, bool accurate) {
     if (!dst || dst_size == 0) return -1;
     if (dst_size == 1) {
         dst[0] = '\0';
@@ -178,9 +178,16 @@ ssize_t size_snprintf(char *dst, size_t dst_size, uint64_t value, const char *un
 
         uint64_t reversed_bytes = (uint64_t)(converted * (double)su->multiplier);
 
-        if (reversed_bytes == bytes)
-            // no precision loss, this is good to use
-            su_best = su;
+        if(accurate) {
+            // no precision loss is required
+            if (reversed_bytes == bytes)
+                // no precision loss, this is good to use
+                su_best = su;
+        }
+        else {
+            if(converted > 1.0)
+                su_best = su;
+        }
     }
 
     double converted = size_round_to_resolution_dbl2(bytes, su_best->multiplier);
