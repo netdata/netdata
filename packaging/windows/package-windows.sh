@@ -52,6 +52,7 @@ ${GITHUB_ACTIONS+echo "::group::Packaging"}
 tar -xf /msys2-latest.tar.zst -C /opt/netdata/ || exit 1
 cp -R /opt/netdata/msys64/* /opt/netdata/ || exit 1
 rm -rf /opt/netdata/msys64/
+cp packaging/windows/NetdataWhite.ico /opt/netdata
 NDVERSION=$"$(grep 'CMAKE_PROJECT_VERSION:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 NDMAJORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MAJOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
 NDMINORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MINOR:STATIC' "${build}/CMakeCache.txt"| cut -d= -f2)"
