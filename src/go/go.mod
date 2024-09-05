@@ -46,7 +46,7 @@ require (
 	github.com/vmware/govmomi v0.42.0
 	go.mongodb.org/mongo-driver v1.16.1
 	golang.org/x/net v0.28.0
-	golang.org/x/text v0.17.0
+	golang.org/x/text v0.18.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20220504211119-3d4a969bb56b
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/rethinkdb/rethinkdb-go.v6 v6.2.2
