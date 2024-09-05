@@ -299,6 +299,9 @@ Section "Install Netdata"
 
 	WriteUninstaller "$INSTDIR\Uninstall.exe"
 
+        createDirectory "$SMPROGRAMS\Netdata"
+        createShortCut "$SMPROGRAMS\Netdata\NetdataClient.lnk" "$INSTDIR\usr\bin\NetdataCliUI.exe" "" "$INSTDIR\NetdataWhite.ico"
+
         Call NetdataUninstallRegistry
 
         IfSilent runcmds goodbye
@@ -353,6 +356,9 @@ Section "Uninstall"
         ${EndIf}
 
 	RMDir /r "$INSTDIR"
+
+        delete "$SMPROGRAMS\Netdata\NetdataClient.lnk"
+        rmDir "$SMPROGRAMS\Netdata"
 
         DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata"
 SectionEnd
