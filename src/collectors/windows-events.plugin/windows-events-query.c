@@ -19,59 +19,6 @@ static uint64_t wevt_log_file_size(const wchar_t *channel);
 #define	VAR_EVENT_DATA_TYPE(p)			    ((p)[10].Type)
 #define	VAR_EVENT_DATA_COUNT(p)			    ((p)[10].Count)
 
-bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len) {
-    if(!src || !src_len)
-        goto cleanup;
-
-    // Try to convert using the existing buffer (if it exists, otherwise get the required buffer size)
-    int size = WideCharToMultiByte(CP_UTF8, 0, src, src_len, utf8->data, (int)utf8->size, NULL, NULL);
-    if(size <= 0 || !utf8->data) {
-        // we have to set a buffer, or increase it
-
-        if(utf8->data) {
-            // we need to increase it the buffer size
-
-            if(GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-                nd_log(NDLS_COLLECTORS, NDLP_ERR, "WideCharToMultiByte() failed.");
-                goto cleanup;
-            }
-
-            // we have to find the required buffer size
-            size = WideCharToMultiByte(CP_UTF8, 0, src, src_len, NULL, 0, NULL, NULL);
-            if(size <= 0)
-                goto cleanup;
-        }
-
-        // Retry conversion with the new buffer
-        txt_utf8_resize(utf8, size);
-        size = WideCharToMultiByte(CP_UTF8, 0, src, src_len, utf8->data, (int)utf8->size, NULL, NULL);
-        if (size <= 0) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "WideCharToMultiByte() failed after resizing.");
-            goto cleanup;
-        }
-    }
-
-    utf8->len = (size_t)size;
-    return true;
-
-    cleanup:
-    txt_utf8_resize(utf8, 128);
-    if(src)
-        utf8->len = snprintfz(utf8->data, utf8->size, "[conv. failed]") + 1;
-    else {
-        utf8->data[0] = '\0';
-        utf8->len = 1;
-    }
-
-    return false;
-}
-
-bool wevt_str_unicode_to_utf8(TXT_UTF8 *utf8, TXT_UNICODE *unicode) {
-    assert(utf8 && ((utf8->data && utf8->size) || (!utf8->data && !utf8->size)));
-    assert(unicode && ((unicode->data && unicode->size) || (!unicode->data && !unicode->size)));
-    return wevt_str_wchar_to_utf8(utf8, unicode->data, (int)unicode->len);
-}
-
 bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle) {
     DWORD size = 0;
 
@@ -99,16 +46,7 @@ cleanup:
     return false;
 }
 
-bool wevt_convert_user_id_to_name(TXT_UTF8 *user, PSID sid) {
-    if(!sid || !IsValidSid(sid))
-        return false;
-
-    size_t size = GetLengthSid(sid);
-
-    return true;
-}
-
-static bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
+bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
     DWORD		size_required_next = 0, size = 0, bookmarkedCount = 0;
     EVT_HANDLE	tmp_event_bookmark = NULL;
     bool ret = false;
@@ -145,7 +83,7 @@ static bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
     wevt_str_wchar_to_utf8(&log->ops.provider, VAR_PROVIDER_NAME(log->ops.content.data), -1);
     wevt_str_wchar_to_utf8(&log->ops.source, VAR_SOURCE_NAME(log->ops.content.data), -1);
     wevt_str_wchar_to_utf8(&log->ops.computer, VAR_COMPUTER_NAME(log->ops.content.data), -1);
-    wevt_convert_user_id_to_name(&log->ops.user, VAR_USER_ID(log->ops.content.data));
+    wevt_convert_user_id_to_name(log, VAR_USER_ID(log->ops.content.data));
 
     GUID *ptr = VAR_CORRELATION_ACTIVITY_ID(log->ops.content.data);
     if(ptr && sizeof(GUID) == sizeof(ND_UUID))

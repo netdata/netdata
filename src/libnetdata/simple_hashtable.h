@@ -520,13 +520,13 @@ static inline SIMPLE_HASHTABLE_VALUE_TYPE *simple_hashtable_set_named(SIMPLE_HAS
     return SIMPLE_HASHTABLE_SLOT_DATA(sl);
 }
 
-static inline SIMPLE_HASHTABLE_VALUE_TYPE *simple_hashtable_get_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_KEY_TYPE *key, size_t key_len, SIMPLE_HASHTABLE_VALUE_TYPE *data) {
+static inline SIMPLE_HASHTABLE_VALUE_TYPE *simple_hashtable_get_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_KEY_TYPE *key, size_t key_len) {
     XXH64_hash_t hash = XXH3_64bits((void *)key, key_len);
     SIMPLE_HASHTABLE_SLOT_NAMED *sl = simple_hashtable_get_slot_named(ht, hash, key, true);
     return SIMPLE_HASHTABLE_SLOT_DATA(sl);
 }
 
-static inline bool simple_hashtable_del_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_KEY_TYPE *key, size_t key_len, SIMPLE_HASHTABLE_VALUE_TYPE *data) {
+static inline bool simple_hashtable_del_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_KEY_TYPE *key, size_t key_len) {
     XXH64_hash_t hash = XXH3_64bits((void *)key, key_len);
     SIMPLE_HASHTABLE_SLOT_NAMED *sl = simple_hashtable_get_slot_named(ht, hash, key, true);
     return simple_hashtable_del_slot_named(ht, sl);

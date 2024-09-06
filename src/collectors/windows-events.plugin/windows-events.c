@@ -31,20 +31,6 @@ struct lqs_extension {};
 #define LQS_FUNCTION_SOURCE_TO_JSON_ARRAY(wb) wevt_sources_to_json_array(wb)
 #include "libnetdata/facets/logs_query_status.h"
 
-// Function to convert a wide string (UTF-16) to a multibyte string (UTF-8)
-char *channel2utf8(const wchar_t *channel) {
-    static __thread char buffer[1024];
-
-    if (channel) {
-        if(WideCharToMultiByte(CP_UTF8, 0, channel, -1, buffer, sizeof(buffer), NULL, NULL) == 0)
-            strncpyz(buffer, "[failed]", sizeof(buffer) -1);
-    }
-    else
-        strncpyz(buffer, "[null]", sizeof(buffer) -1);
-
-    return buffer;
-}
-
 static WEVT_SOURCE_TYPE wevt_internal_source_type(const char *value) {
     if(strcmp(value, "all") == 0)
         return WEVTS_ALL;

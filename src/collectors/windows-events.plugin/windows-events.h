@@ -7,9 +7,9 @@
 #include <windows.h>
 #include <winevt.h>
 
+#include "windows-events-unicode.h"
 #include "windows-events-query.h"
 #include "windows-events-sources.h"
-
-char *channel2utf8(const wchar_t *channel);
+#include "windows-events-sid.h"
 
 #endif //NETDATA_WINDOWS_EVENTS_H
