@@ -1,0 +1,244 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-apcupsd
+      plugin_name: go.d.plugin
+      module_name: apcupsd
+      monitored_instance:
+        name: APC UPS
+        link: https://www.apc.com
+        icon_filename: apc.svg
+        categories:
+          - data-collection.ups
+      keywords:
+        - ups
+        - apcupsd
+        - apc
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Uninterruptible Power Supplies by polling the Apcupsd daemon.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects Apcupsd instances running on localhost that are listening on port 3551.
+            On startup, it tries to collect metrics from:
+
+            - 127.0.0.1:3551
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/apcupsd.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: Apcupsd daemon address in IP:PORT format.
+              default_value: 127.0.0.1:3551
+              required: true
+            - name: timeout
+              description: Connection/read/write timeout in seconds. The timeout includes name resolution, if required.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:3551
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:3551
+                
+                  - name: remote
+                    address: 203.0.113.0:3551
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: apcupsd_ups_load_capacity
+        metric: apcupsd.ups_load_capacity_utilization
+        info: "APC UPS average load over the last 10 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
+      - name: apcupsd_ups_battery_charge
+        metric: apcupsd.ups_battery_charge
+        info: "APC UPS average battery charge over the last minute"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
+      - name: apcupsd_last_collected_secs
+        metric: apcupsd.ups_status
+        info: "APC UPS number of seconds since the last successful data collection"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
+      - name: apcupsd_ups_selftest_warning
+        metric: apcupsd.ups_selftest
+        info: "APC UPS self-test failed due to insufficient battery capacity or due to overload"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
+      - name: apcupsd_ups_status_onbatt
+        metric: apcupsd.ups_status
+        info: "APC UPS has switched to battery power because the input power has failed"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
+      - name: apcupsd_ups_status_overload
+        metric: apcupsd.ups_status
+        info: "APC UPS is overloaded and cannot supply enough power to the load"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
+      - name: apcupsd_ups_status_lowbatt
+        metric: apcupsd.ups_status
+        info: "APC UPS battery is low and needs to be recharged"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
+      - name: apcupsd_ups_status_replacebatt
+        metric: apcupsd.ups_status
+        info: "APC UPS battery has reached the end of its lifespan and needs to be replaced"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
+      - name: apcupsd_ups_status_nobatt
+        metric: apcupsd.ups_status
+        info: "APC UPS has no battery"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
+      - name: apcupsd_ups_status_commlost
+        metric: apcupsd.ups_status
+        info: "APC UPS communication link is lost"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: ups
+          description: These metrics refer to the UPS unit.
+          labels: []
+          metrics:
+            - name: apcupsd.ups_status
+              description: UPS Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: TRIM
+                - name: BOOST
+                - name: CAL
+                - name: ONLINE
+                - name: ONBATT
+                - name: OVERLOAD
+                - name: LOWBATT
+                - name: REPLACEBATT
+                - name: NOBATT
+                - name: SLAVE
+                - name: SLAVEDOWN
+                - name: COMMLOST
+                - name: SHUTTING_DOWN
+            - name: apcupsd.ups_selftest
+              description: UPS Self-Test Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: NO
+                - name: NG
+                - name: WN
+                - name: IP
+                - name: OK
+                - name: BT
+                - name: UNK
+            - name: apcupsd.ups_battery_charge
+              description: UPS Battery Charge
+              unit: percent
+              chart_type: area
+              dimensions:
+                - name: charge
+            - name: apcupsd.ups_battery_time_remaining
+              description: UPS Estimated Runtime on Battery
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: timeleft
+            - name: apcupsd.ups_battery_time_since_replacement
+              description: UPS Time Since Battery Replacement
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: since_replacement
+            - name: apcupsd.ups_battery_voltage
+              description: UPS Battery Voltage
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: voltage
+                - name: nominal_voltage
+            - name: apcupsd.ups_load_capacity_utilization
+              description: UPS Load Capacity Utilization
+              unit: percent
+              chart_type: area
+              dimensions:
+                - name: load
+            - name: apcupsd.ups_load
+              description: UPS Load
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: load
+            - name: apcupsd.ups_temperature
+              description: UPS Internal Temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: apcupsd.ups_input_voltage
+              description: UPS Input Voltage
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: voltage
+                - name: min_voltage
+                - name: max_voltage
+            - name: apcupsd.ups_input_frequency
+              description: UPS Input Frequency
+              unit: Hz
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: apcupsd.ups_output_voltage
+              description: UPS Output Voltage
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: voltage

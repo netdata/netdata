@@ -7,6 +7,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/adaptecraid"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/ap"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/apache"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/apcupsd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/beanstalk"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/bind"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/boinc"
