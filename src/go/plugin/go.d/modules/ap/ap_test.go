@@ -193,7 +193,7 @@ func TestAP_Collect(t *testing.T) {
 			prepareMock: prepareMockErrOnDevices,
 			wantMetrics: nil,
 		},
-		"error on statis stats call": {
+		"error on station stats call": {
 			prepareMock: prepareMockErrOnStationStats,
 			wantMetrics: nil,
 		},
