@@ -1,0 +1,224 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      plugin_name: go.d.plugin
+      module_name: ap
+      monitored_instance:
+        name: Varnish
+        link: https://varnish-cache.org/
+        categories:
+          - data-collection.web-servers-and-web-proxies
+        icon_filename: "varnish.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - varnish
+        - varnishstat
+        - varnishd
+        - cache
+        - web server
+        - web cache
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Varnish metrics about HTTP accelerator global, Backends (VBE) and Storages (SMF, SMA, MSE) statistics.
+
+          Note that both, Varnish-Cache (free and open source) and Varnish-Plus (Commercial/Enterprise version), are supported.
+        method_description: |
+          It uses the `varnishstat` binary in order to collect the metrics.
+      supported_platforms:
+        include: [Linux]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: |
+          `netdata` user must be a member of the `varnish` group.
+      default_behavior:
+        auto_detection:
+          description: By default, if the permissions are satisfied, the `varnishstat` tool will be executed on the host.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Provide the necessary permissions
+            description: |
+              In order for the collector to work, you need to add the `netdata` user to the `varnish` user group, so that it can execute the `varnishstat` tool:
+
+              ```
+              usermod -aG varnish netdata
+              ```
+      configuration:
+        file:
+          name: go.d/varnish.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: binary_path
+              description: Path to the `varnishstat` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable.
+              default_value: /usr/bin/varnishstat
+              required: true
+            - name: timeout
+              description: Timeout for executing the binary, specified in seconds.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: ""
+            enabled: false
+          list:
+            - name: Custom binary path
+              description: The executable is not in the directories specified in the PATH environment variable.
+              config: |
+                jobs:
+                  - name: custom_iw
+                    binary_path: /usr/local/sbin/varnishstat
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: varnish.session_connection
+              description: Connections Statistics
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: accepted
+                - name: dropped
+            - name: varnish.client_requests
+              description: Client Requests
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: varnish.all_time_hit_rate
+              description: All History Hit Rate Ratio
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hit
+                - name: miss
+                - name: hitpass
+            - name: varnish.current_poll_hit_rate
+              description: Current Poll Hit Rate Ratio
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hit
+                - name: miss
+                - name: hitpass
+            - name: varnish.cached_objects_expired
+              description: Expired Objects
+              unit: "expired/s"
+              chart_type: line
+              dimensions:
+                - name: objects
+            - name: varnish.cached_objects_nuked
+              description: Least Recently Used Nuked Objects
+              unit: "nuked/s"
+              chart_type: line
+              dimensions:
+                - name: objects
+            - name: varnish.threads_total
+              description: Number Of Threads In All Pools
+              unit: "number"
+              chart_type: line
+              dimensions:
+                - name: None
+            - name: varnish.threads_statistics
+              description: Threads Statistics
+              unit: "threads/s"
+              chart_type: line
+              dimensions:
+                - name: created
+                - name: failed
+                - name: limited
+            - name: varnish.threads_queue_len
+              description: Current Queue Length
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: in queue
+            - name: varnish.backend_connections
+              description: Backend Connections Statistics
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: successful
+                - name: unhealthy
+                - name: busy
+                - name: failed
+                - name: reused
+                - name: recycled
+                - name: retry
+            - name: varnish.backend_requests
+              description: Requests To The Backend
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: sent
+            - name: varnish.esi_statistics
+              description: ESI Statistics
+              unit: "problems/s"
+              chart_type: line
+              dimensions:
+                - name: errors
+                - name: warnings
+            - name: varnish.uptime
+              description: Uptime
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: Backend
+          description: ""
+          labels: []
+          metrics:
+            - name: varnish.backend
+              description: Backend Response Statistics
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: header
+                - name: body
+        - name: Storage
+          description: ""
+          labels: []
+          metrics:
+            - name: varnish.storage_usage
+              description: Storage Usage
+              unit: "KiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: allocated
+            - name: varnish.storage_alloc_objs
+              description: Storage Allocated Objects
+              unit: "objects"
+              chart_type: line
+              dimensions:
+                - name: allocated
