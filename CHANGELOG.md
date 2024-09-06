@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Improve processing on removed alerts after agent restart [\#18488](https://github.com/netdata/netdata/pull/18488) ([stelfrag](https://github.com/stelfrag))
+- Bump github.com/prometheus/common from 0.57.0 to 0.58.0 in /src/go [\#18487](https://github.com/netdata/netdata/pull/18487) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump golang.org/x/text from 0.17.0 to 0.18.0 in /src/go [\#18486](https://github.com/netdata/netdata/pull/18486) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Remove Warnings \(ebpf\) [\#18484](https://github.com/netdata/netdata/pull/18484) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix win sysinfo installed ram calculation [\#18482](https://github.com/netdata/netdata/pull/18482) ([ilyam8](https://github.com/ilyam8))
 - Update LIbbpf [\#18480](https://github.com/netdata/netdata/pull/18480) ([thiagoftsm](https://github.com/thiagoftsm))
 - added missing comma in Access-Control-Allow-Headers [\#18479](https://github.com/netdata/netdata/pull/18479) ([ktsaou](https://github.com/ktsaou))
@@ -375,7 +379,6 @@
 - Tidy-up build related CI jobs. [\#17962](https://github.com/netdata/netdata/pull/17962) ([Ferroin](https://github.com/Ferroin))
 - Sign DEB packages in the GHA runners that build them. [\#17949](https://github.com/netdata/netdata/pull/17949) ([Ferroin](https://github.com/Ferroin))
 - Detect on startup if the netdata-meta.db file is not a valid database file [\#17924](https://github.com/netdata/netdata/pull/17924) ([stelfrag](https://github.com/stelfrag))
-- eBPF cgroup and mutex [\#17915](https://github.com/netdata/netdata/pull/17915) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
@@ -425,8 +428,6 @@
 - Bump k8s.io/client-go from 0.30.1 to 0.30.2 in /src/go/collectors/go.d.plugin [\#17923](https://github.com/netdata/netdata/pull/17923) ([dependabot[bot]](https://github.com/apps/dependabot))
 - go.d bump github.com/docker/docker v27.0.0+incompatible [\#17921](https://github.com/netdata/netdata/pull/17921) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/jessevdk/go-flags from 1.5.0 to 1.6.1 in /src/go/collectors/go.d.plugin [\#17919](https://github.com/netdata/netdata/pull/17919) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump go.mongodb.org/mongo-driver from 1.15.0 to 1.15.1 in /src/go/collectors/go.d.plugin [\#17917](https://github.com/netdata/netdata/pull/17917) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/miekg/dns from 1.1.59 to 1.1.61 in /src/go/collectors/go.d.plugin [\#17916](https://github.com/netdata/netdata/pull/17916) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
