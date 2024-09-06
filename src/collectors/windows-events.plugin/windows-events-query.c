@@ -14,16 +14,17 @@ static uint64_t wevt_log_file_size(const wchar_t *channel);
 #define VAR_COMPUTER_NAME(p)                ((p)[7].StringVal)
 #define VAR_USER_ID(p)                      ((p)[8].SidVal)
 #define VAR_CORRELATION_ACTIVITY_ID(p)      ((p)[9].GuidVal)
-#define	VAR_EVENT_DATA_STRING(p)		    ((p)[10].StringVal)
-#define	VAR_EVENT_DATA_STRING_ARRAY(p, i)	((p)[10].StringArr[i])
-#define	VAR_EVENT_DATA_TYPE(p)			    ((p)[10].Type)
-#define	VAR_EVENT_DATA_COUNT(p)			    ((p)[10].Count)
+#define VAR_OPCODE(p)                       ((p)[10].UInt16Val)
+#define	VAR_EVENT_DATA_STRING(p)		    ((p)[11].StringVal)
+#define	VAR_EVENT_DATA_STRING_ARRAY(p, i)	((p)[11].StringArr[i])
+#define	VAR_EVENT_DATA_TYPE(p)			    ((p)[11].Type)
+#define	VAR_EVENT_DATA_COUNT(p)			    ((p)[11].Count)
 
-bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle) {
+bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
     DWORD size = 0;
 
     // First, try to get the message using the existing buffer
-    if (!EvtFormatMessage(NULL, event_handle, 0, 0, NULL, EvtFormatMessageEvent, log->ops.unicode.size, log->ops.unicode.data, &size)) {
+    if (!EvtFormatMessage(NULL, event_handle, 0, 0, NULL, what, log->ops.unicode.size, log->ops.unicode.data, &size)) {
         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed.");
             goto cleanup;
@@ -31,18 +32,18 @@ bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle) {
 
         // Try again with the resized buffer
         txt_unicode_resize(&log->ops.unicode, size);
-        if (!EvtFormatMessage(NULL, event_handle, 0, 0, NULL, EvtFormatMessageEvent, log->ops.unicode.size, log->ops.unicode.data, &size)) {
+        if (!EvtFormatMessage(NULL, event_handle, 0, 0, NULL, what, log->ops.unicode.size, log->ops.unicode.data, &size)) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed after resizing buffer.");
             goto cleanup;
         }
     }
 
     log->ops.unicode.len = size;
-    return wevt_str_unicode_to_utf8(&log->ops.message, &log->ops.unicode);
+    return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
 
 cleanup:
-    txt_utf8_resize(&log->ops.message, 128);
-    log->ops.message.len = snprintfz(log->ops.message.data, log->ops.message.size, "[empty]") + 1;
+    txt_utf8_resize(dst, 128);
+    dst->len = snprintfz(dst->data, dst->size, "[empty]") + 1;
     return false;
 }
 
@@ -79,7 +80,11 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
     ev->level = VAR_LEVEL(log->ops.content.data);
     ev->keywords = VAR_KEYWORDS(log->ops.content.data);
     ev->created_ns = os_windows_ulonglong_to_unix_epoch_ns(VAR_TIME_CREATED(log->ops.content.data));
-    wevt_get_message_utf8(log, tmp_event_bookmark);
+    ev->opcode = VAR_OPCODE(log->ops.content.data);
+    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.message, EvtFormatMessageEvent);
+    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.opcode, EvtFormatMessageOpcode);
+    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.level, EvtFormatMessageLevel);
+    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.keyword, EvtFormatMessageKeyword);
     wevt_str_wchar_to_utf8(&log->ops.provider, VAR_PROVIDER_NAME(log->ops.content.data), -1);
     wevt_str_wchar_to_utf8(&log->ops.source, VAR_SOURCE_NAME(log->ops.content.data), -1);
     wevt_str_wchar_to_utf8(&log->ops.computer, VAR_COMPUTER_NAME(log->ops.content.data), -1);
@@ -114,6 +119,9 @@ void wevt_closelog6(WEVT_LOG *log) {
     txt_utf8_cleanup(&log->ops.source);
     txt_utf8_cleanup(&log->ops.computer);
     txt_utf8_cleanup(&log->ops.user);
+    txt_utf8_cleanup(&log->ops.opcode);
+    txt_utf8_cleanup(&log->ops.level);
+    txt_utf8_cleanup(&log->ops.keyword);
     freez(log);
 }
 
@@ -129,6 +137,7 @@ WEVT_LOG *wevt_openlog6(const wchar_t *channel, bool file_size) {
             L"/Event/System/Computer",
             L"/Event/System/Security/@UserID",
             L"/Event/System/Correlation/@ActivityID",
+            L"/Event/System/Opcode",
             L"/Event/EventData/Data"
     };
 

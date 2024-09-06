@@ -8,6 +8,7 @@
 typedef struct {
     uint64_t id;
     uint16_t event_id;
+    uint16_t opcode;
     uint8_t  level;
     uint64_t keywords;
     ND_UUID  correlation_activity_id;
@@ -50,6 +51,9 @@ typedef struct wevt_log {
         TXT_UTF8 source;
         TXT_UTF8 computer;
         TXT_UTF8 user;
+        TXT_UTF8 opcode;
+        TXT_UTF8 level;
+        TXT_UTF8 keyword;
     } ops;
 
 } WEVT_LOG;
