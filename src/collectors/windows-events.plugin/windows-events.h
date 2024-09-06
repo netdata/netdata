@@ -4,6 +4,7 @@
 #define NETDATA_WINDOWS_EVENTS_H
 
 #include "libnetdata/libnetdata.h"
+#include "collectors/all.h"
 #include <windows.h>
 #include <winevt.h>
 
