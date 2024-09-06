@@ -1399,6 +1399,11 @@ set(FREEBSD_PLUGIN_FILES
 
 set(WINDOWS_EVENTS_PLUGIN_FILES
         src/collectors/windows-events.plugin/windows-events.c
+        src/collectors/windows-events.plugin/windows-events.h
+        src/collectors/windows-events.plugin/windows-events-query.h
+        src/collectors/windows-events.plugin/windows-events-query.c
+        src/collectors/windows-events.plugin/windows-events-sources.c
+        src/collectors/windows-events.plugin/windows-events-sources.h
 )
 
 set(WINDOWS_PLUGIN_FILES

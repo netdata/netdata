@@ -3,8 +3,7 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
-#include <windows.h>
-#include <winevt.h>
+#include "windows-events.h"
 
 typedef enum {
     WEVTS_NONE               = 0,
@@ -15,8 +14,7 @@ typedef enum {
 #define WEVT_FUNCTION_NAME           "windows-events"
 
 // functions needed by LQS
-static WEVT_SOURCE_TYPE wevts_internal_source_type(const char *value);
-static void wevts_sources_to_json_array(BUFFER *wb);
+static WEVT_SOURCE_TYPE wevt_internal_source_type(const char *value);
 
 // structures needed by LQS
 struct lqs_extension {};
@@ -29,28 +27,16 @@ struct lqs_extension {};
 #define LQS_SOURCE_TYPE             WEVT_SOURCE_TYPE
 #define LQS_SOURCE_TYPE_ALL         WEVTS_ALL
 #define LQS_SOURCE_TYPE_NONE        WEVTS_NONE
-#define LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value) wevts_internal_source_type(value)
-#define LQS_FUNCTION_SOURCE_TO_JSON_ARRAY(wb) wevts_sources_to_json_array(wb)
+#define LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value) wevt_internal_source_type(value)
+#define LQS_FUNCTION_SOURCE_TO_JSON_ARRAY(wb) wevt_sources_to_json_array(wb)
 #include "libnetdata/facets/logs_query_status.h"
 
-#define	VAR_PROVIDER_NAME(p)			    (p[0].StringVal)
-#define	VAR_SOURCE_NAME(p)			        (p[1].StringVal)
-#define	VAR_RECORD_NUMBER(p)			    (p[2].UInt64Val)
-#define	VAR_EVENT_ID(p)				        (p[3].UInt16Val)
-#define	VAR_LEVEL(p)				        (p[4].ByteVal)
-#define	VAR_KEYWORDS(p)				        (p[5].UInt64Val)
-#define	VAR_TIME_CREATED(p)			        (p[6].FileTimeVal)
-#define	VAR_EVENT_DATA_STRING(p)		    (p[7].StringVal)
-#define	VAR_EVENT_DATA_STRING_ARRAY(p, i)	(p[7].StringArr[i])
-#define	VAR_EVENT_DATA_TYPE(p)			    (p[7].Type)
-#define	VAR_EVENT_DATA_COUNT(p)			    (p[7].Count)
-
 // Function to convert a wide string (UTF-16) to a multibyte string (UTF-8)
-static char *channel2utf8(LPWSTR wideStr) {
+char *channel2utf8(const wchar_t *channel) {
     static __thread char buffer[1024];
 
-    if (wideStr) {
-        if(WideCharToMultiByte(CP_UTF8, 0, wideStr, -1, buffer, sizeof(buffer), NULL, NULL) == 0)
+    if (channel) {
+        if(WideCharToMultiByte(CP_UTF8, 0, channel, -1, buffer, sizeof(buffer), NULL, NULL) == 0)
             strncpyz(buffer, "[failed]", sizeof(buffer) -1);
     }
     else
@@ -59,247 +45,11 @@ static char *channel2utf8(LPWSTR wideStr) {
     return buffer;
 }
 
-static WEVT_SOURCE_TYPE wevts_internal_source_type(const char *value) {
+static WEVT_SOURCE_TYPE wevt_internal_source_type(const char *value) {
     if(strcmp(value, "all") == 0)
         return WEVTS_ALL;
 
     return WEVTS_NONE;
-}
-
-typedef struct {
-    uint64_t id;
-    nsec_t created_ns;
-} ND_EVT_EVENT_INFO;
-
-#define ND_EVT_EVENT_INFO_EMPTY (ND_EVT_EVENT_INFO){ .id = 0, .created_ns = 0, }
-
-typedef struct {
-    uint64_t entries;
-    nsec_t duration_ns;
-
-    ND_EVT_EVENT_INFO first_event;
-    ND_EVT_EVENT_INFO last_event;
-} ND_EVT_CHANNEL_INFO;
-
-static bool nd_evt_get_event_info(EVT_HANDLE *event_query, EVT_HANDLE *render_context, ND_EVT_EVENT_INFO *ev) {
-    static __thread EVT_VARIANT	*renderedContent = NULL;
-
-    DWORD		size_required_next = 0, size_required = 0, size = 0, bookmarkedCount = 0;
-    EVT_HANDLE	event_bookmark = NULL;
-    bool ret = false;
-
-    if (!EvtNext(*event_query, 1, &event_bookmark, INFINITE, 0, &size_required_next))
-        goto cleanup; // no data available, return failure
-
-    // obtain the information from selected events
-    if (!EvtRender(*render_context, event_bookmark, EvtRenderEventValues, size, renderedContent, &size_required, &bookmarkedCount)) {
-        // information exceeds the allocated space
-        if (ERROR_INSUFFICIENT_BUFFER != GetLastError()) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender failed");
-            goto cleanup;
-        }
-
-        size = size_required;
-        freez(renderedContent);
-        renderedContent = (EVT_VARIANT *)mallocz(size);
-
-        if (!EvtRender(*render_context, event_bookmark, EvtRenderEventValues, size, renderedContent, &size_required, &bookmarkedCount)) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender failed, after size increase");
-            goto cleanup;
-        }
-    }
-
-    ev->id = VAR_RECORD_NUMBER(renderedContent);
-    ev->created_ns = os_windows_ulonglong_to_unix_epoch_ns(VAR_TIME_CREATED(renderedContent));
-    ret = true;
-
-cleanup:
-    if (event_bookmark)
-        EvtClose(event_bookmark);
-
-    return ret;
-}
-
-static bool nd_evt_get_log_file_size(const wchar_t *channel, uint64_t *file_size) {
-    EVT_HANDLE hLog = NULL;
-    EVT_VARIANT evtVariant;
-    DWORD bufferUsed = 0;
-    bool ret = false;
-
-    // Open the event log channel
-    hLog = EvtOpenLog(NULL, channel, EvtOpenChannelPath);
-    if (!hLog) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtOpenLog() failed");
-        goto cleanup;
-    }
-
-    // Get the file size of the log
-    if (!EvtGetLogInfo(hLog, EvtLogFileSize, sizeof(evtVariant), &evtVariant, &bufferUsed)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetLogInfo() failed");
-        goto cleanup;
-    }
-
-    // Extract the file size from the EVT_VARIANT structure
-    *file_size = evtVariant.UInt64Val;
-    ret = true;
-
-cleanup:
-    if (hLog)
-        EvtClose(hLog);
-
-    return ret;
-}
-
-/* opens Event Log using API 6 and returns number of records */
-static bool nd_evt_get_channel_info(const wchar_t *channel, ND_EVT_CHANNEL_INFO *ch) {
-    const wchar_t *RENDER_ITEMS[] = {
-            L"/Event/System/Provider/@Name",
-            L"/Event/System/Provider/@EventSourceName",
-            L"/Event/System/EventRecordID",
-            L"/Event/System/EventID",
-            L"/Event/System/Level",
-            L"/Event/System/Keywords",
-            L"/Event/System/TimeCreated/@SystemTime",
-            L"/Event/EventData/Data"
-    };
-    size_t RENDER_ITEMS_count = (sizeof(RENDER_ITEMS) / sizeof(const wchar_t *));
-    EVT_HANDLE tmp_render_context = NULL, tmp_first_event_query = NULL, tmp_last_event_query = NULL;
-    bool ret = false;
-
-    // get the number of the oldest record in the log
-    // "EvtGetLogInfo()" does not work properly with "EvtLogOldestRecordNumber"
-    // we have to get it from the first EventRecordID
-
-    // create the system render
-    tmp_render_context = EvtCreateRenderContext(RENDER_ITEMS_count, RENDER_ITEMS, EvtRenderContextValues);
-    if (!tmp_render_context) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed.");
-        goto cleanup;
-    }
-
-    // query the eventlog
-    tmp_first_event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath);
-    if (!tmp_first_event_query) {
-        if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery channel missed");
-        else
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery failed");
-
-        goto cleanup;
-    }
-
-    if (!nd_evt_get_event_info(&tmp_first_event_query, &tmp_render_context, &ch->first_event))
-        goto cleanup;
-
-    if (!ch->first_event.id) {
-        // no data in the event log
-        ch->first_event = ch->last_event = ND_EVT_EVENT_INFO_EMPTY;
-        ret = true;
-        goto cleanup;
-    }
-
-    tmp_last_event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath | EvtQueryReverseDirection);
-    if (!tmp_last_event_query) {
-        if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery channel missed");
-        else
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery failed");
-
-        goto cleanup;
-    }
-
-    if (!nd_evt_get_event_info(&tmp_last_event_query, &tmp_render_context, &ch->last_event) || ch->last_event.id == 0) {
-        // no data in eventlog
-        ch->last_event = ch->first_event;
-    }
-    ch->last_event.id += 1;	// we should read the last record
-
-    ret = true;
-
-cleanup:
-    if(ret) {
-        ch->entries = ch->last_event.id - ch->first_event.id;
-
-        if(ch->last_event.created_ns >= ch->first_event.created_ns)
-            ch->duration_ns = ch->last_event.created_ns - ch->first_event.created_ns;
-        else
-            ch->duration_ns = ch->first_event.created_ns - ch->last_event.created_ns;
-    }
-    else {
-        ch->entries = 0;
-        ch->duration_ns = 0;
-    }
-
-    if (tmp_first_event_query)
-        EvtClose(tmp_first_event_query);
-    if (tmp_last_event_query)
-        EvtClose(tmp_last_event_query);
-    if (tmp_render_context)
-        EvtClose(tmp_render_context);
-
-    return ret;
-}
-
-static void wevts_sources_to_json_array(BUFFER *wb) {
-    EVT_HANDLE hChannelEnum = NULL;
-    LPWSTR pChannelPath = NULL;
-    DWORD dwChannelBufferSize = 0;
-    DWORD dwChannelBufferUsed = 0;
-    DWORD status = ERROR_SUCCESS;
-
-    // Open a handle to enumerate the event channels
-    hChannelEnum = EvtOpenChannelEnum(NULL, 0);
-    if (!hChannelEnum) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "WINDOWS EVENTS: EvtOpenChannelEnum() failed with %" PRIu64 "\n",
-               (uint64_t)GetLastError());
-        goto cleanup;
-    }
-
-    while (true) {
-        if (!EvtNextChannelPath(hChannelEnum, dwChannelBufferSize, pChannelPath, &dwChannelBufferUsed)) {
-            status = GetLastError();
-            if (status == ERROR_NO_MORE_ITEMS)
-                break; // No more channels
-            else if (status == ERROR_INSUFFICIENT_BUFFER) {
-                dwChannelBufferSize = dwChannelBufferUsed;
-                pChannelPath = (LPWSTR)reallocz(pChannelPath, dwChannelBufferSize * sizeof(WCHAR));
-                continue;
-            } else {
-                nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                       "WINDOWS EVENTS: EvtNextChannelPath() failed\n");
-                goto cleanup;
-            }
-        }
-
-        ND_EVT_CHANNEL_INFO ch;
-        if(!nd_evt_get_channel_info(pChannelPath, &ch) || !ch.entries)
-            continue;
-
-        const char *name = channel2utf8(pChannelPath);
-        buffer_json_add_array_item_object(wb);
-        {
-            char info[1024], duration[128], pill[128];
-            duration_snprintf(duration, sizeof(duration), ch.duration_ns / NSEC_PER_SEC, "s", true);
-            snprintfz(info, sizeof(info), "%"PRIu64" entries, covering %s", ch.entries, duration);
-
-            uint64_t size_bytes;
-            if(nd_evt_get_log_file_size(pChannelPath, &size_bytes)) {
-                size_snprintf(pill, sizeof(pill), size_bytes, "B", false);
-            }
-            else
-                pill[0] = '\0';
-
-            buffer_json_member_add_string(wb, "id", name);
-            buffer_json_member_add_string(wb, "name", name);
-            buffer_json_member_add_string(wb, "pill", pill);
-            buffer_json_member_add_string(wb, "info", info);
-        }
-        buffer_json_object_close(wb); // options object
-    }
-
-cleanup:
-    freez(pChannelPath);
-    EvtClose(hChannelEnum);
 }
 
 int main(void) {
@@ -307,7 +57,7 @@ int main(void) {
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_array(wb, "sources");
     {
-        wevts_sources_to_json_array(wb);
+        wevt_sources_to_json_array(wb);
     }
     buffer_json_array_close(wb); // sources
     buffer_json_finalize(wb);
