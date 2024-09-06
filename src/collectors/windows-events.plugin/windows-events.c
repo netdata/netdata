@@ -7,20 +7,15 @@
 
 #define WINDOWS_EVENTS_WORKER_THREADS 5
 #define WINDOWS_EVENTS_DEFAULT_TIMEOUT 600
+#define WINDOWS_EVENTS_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
 
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
-
-typedef enum {
-    WEVTS_NONE               = 0,
-    WEVTS_ALL                = (1 << 0),
-} WEVT_SOURCE_TYPE;
 
 #define WEVT_FUNCTION_DESCRIPTION    "View, search and analyze Microsoft Windows events."
 #define WEVT_FUNCTION_NAME           "windows-events"
 
 // functions needed by LQS
-static WEVT_SOURCE_TYPE wevt_internal_source_type(const char *value);
 
 // structures needed by LQS
 struct lqs_extension {};
@@ -52,22 +47,13 @@ struct lqs_extension {};
     "|Computer"                                 \
     ""
 
-static WEVT_SOURCE_TYPE wevt_internal_source_type(const char *value) {
-    if(strcmp(value, "all") == 0)
-        return WEVTS_ALL;
-
-    return WEVTS_NONE;
-}
-
-static void buffer_json_wevt_versions(BUFFER *wb __maybe_unused) {
-    ;
-}
-
 static void wevt_register_transformations(LOGS_QUERY_STATUS *lqs __maybe_unused) {
     ;
 }
 
 static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs __maybe_unused) {
+    wevt_sources_scan();
+
     return HTTP_RESP_NOT_IMPLEMENTED;
 }
 
@@ -132,11 +118,14 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ------------------------------------------------------------------------
     // initialization
 
+    wevt_sources_init();
 
     // ------------------------------------------------------------------------
     // debug
 
     if(argc >= 2 && strcmp(argv[argc - 1], "debug") == 0) {
+        wevt_sources_scan();
+
         bool cancelled = false;
         usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
         char buf[] = "windows-events info after:-8640000 before:0 direction:backward last:200 data_only:false slice:true facets: source:all";
@@ -172,15 +161,22 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     // ------------------------------------------------------------------------
 
-    usec_t step_ut = 100 * USEC_PER_MS;
+    const usec_t step_ut = 100 * USEC_PER_MS;
     usec_t send_newline_ut = 0;
-    bool tty = isatty(fileno(stdout)) == 1;
+    usec_t since_last_scan_ut = WINDOWS_EVENTS_SCAN_EVERY_USEC * 2; // something big to trigger scanning at start
+    const bool tty = isatty(fileno(stdout)) == 1;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!plugin_should_exit) {
 
+        if(since_last_scan_ut > WINDOWS_EVENTS_SCAN_EVERY_USEC) {
+            wevt_sources_scan();
+            since_last_scan_ut = 0;
+        }
+
         usec_t dt_ut = heartbeat_next(&hb, step_ut);
+        since_last_scan_ut += dt_ut;
         send_newline_ut += dt_ut;
 
         if(!tty && send_newline_ut > USEC_PER_SEC) {

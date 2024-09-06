@@ -727,6 +727,7 @@ void journal_files_registry_update(void) {
                 dictionary_del(journal_files_registry, jf_dfe.name);
         }
         dfe_done(jf);
+        dictionary_garbage_collect(journal_files_registry);
 
         journal_files_scans++;
         spinlock_unlock(&spinlock);
