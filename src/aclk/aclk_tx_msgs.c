@@ -189,9 +189,6 @@ short aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *ms
         case HTTP_RESP_INTERNAL_SERVER_ERROR:
             aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, payload, payload_len);
             break;
-//        case HTTP_RESP_SERVICE_UNAVAILABLE:
-//            aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
-//            break;
         default:
             rc = http_code;
             break;

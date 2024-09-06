@@ -4,7 +4,6 @@
 
 #include <json-c/json.h>
 #include "libnetdata/libnetdata.h"
-#include "daemon/common.h"
 #include "mqtt_websockets/mqtt_wss_client.h"
 #include "schema-wrappers/schema_wrappers.h"
 #include "aclk_util.h"

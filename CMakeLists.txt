@@ -1339,7 +1339,6 @@ set(CLAIM_WINDOWS_FILES
 )
 
 set(ACLK_ALWAYS_BUILD
-        src/aclk/aclk_rrdhost_state.h
         src/aclk/aclk_proxy.c
         src/aclk/aclk_proxy.h
         src/aclk/aclk.c
