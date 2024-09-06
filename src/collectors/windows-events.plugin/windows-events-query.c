@@ -12,7 +12,7 @@ static uint64_t wevt_log_file_size(const wchar_t *channel);
 #define VAR_KEYWORDS(p)                     ((p)[5].UInt64Val)
 #define VAR_TIME_CREATED(p)                 ((p)[6].FileTimeVal)
 #define VAR_COMPUTER_NAME(p)                ((p)[7].StringVal)
-#define VAR_USER_ID(p)                      ((p)[8].StringVal)
+#define VAR_USER_ID(p)                      ((p)[8].SidVal)
 #define VAR_CORRELATION_ACTIVITY_ID(p)      ((p)[9].GuidVal)
 #define	VAR_EVENT_DATA_STRING(p)		    ((p)[10].StringVal)
 #define	VAR_EVENT_DATA_STRING_ARRAY(p, i)	((p)[10].StringArr[i])
@@ -20,7 +20,8 @@ static uint64_t wevt_log_file_size(const wchar_t *channel);
 #define	VAR_EVENT_DATA_COUNT(p)			    ((p)[10].Count)
 
 bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len) {
-    if(!src || !src_len) goto cleanup;
+    if(!src || !src_len)
+        goto cleanup;
 
     // Try to convert using the existing buffer (if it exists, otherwise get the required buffer size)
     int size = WideCharToMultiByte(CP_UTF8, 0, src, src_len, utf8->data, (int)utf8->size, NULL, NULL);
@@ -37,7 +38,8 @@ bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len) {
 
             // we have to find the required buffer size
             size = WideCharToMultiByte(CP_UTF8, 0, src, src_len, NULL, 0, NULL, NULL);
-            if(size <= 0) goto cleanup;
+            if(size <= 0)
+                goto cleanup;
         }
 
         // Retry conversion with the new buffer
@@ -54,7 +56,13 @@ bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len) {
 
     cleanup:
     txt_utf8_resize(utf8, 128);
-    utf8->len = snprintfz(utf8->data, utf8->size, "[failed to convert UNICODE message to UTF8]") + 1;
+    if(src)
+        utf8->len = snprintfz(utf8->data, utf8->size, "[conv. failed]") + 1;
+    else {
+        utf8->data[0] = '\0';
+        utf8->len = 1;
+    }
+
     return false;
 }
 
@@ -87,8 +95,17 @@ bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle) {
 
 cleanup:
     txt_utf8_resize(&log->ops.message, 128);
-    log->ops.message.len = snprintfz(log->ops.message.data, log->ops.message.size, "[failed to get UNICODE message for this event]") + 1;
+    log->ops.message.len = snprintfz(log->ops.message.data, log->ops.message.size, "[empty]") + 1;
     return false;
+}
+
+bool wevt_convert_user_id_to_name(TXT_UTF8 *user, PSID sid) {
+    if(!sid || !IsValidSid(sid))
+        return false;
+
+    size_t size = GetLengthSid(sid);
+
+    return true;
 }
 
 static bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
@@ -120,12 +137,22 @@ static bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
     }
 
     ev->id = VAR_RECORD_NUMBER(log->ops.content.data);
+    ev->event_id = VAR_EVENT_ID(log->ops.content.data);
+    ev->level = VAR_LEVEL(log->ops.content.data);
+    ev->keywords = VAR_KEYWORDS(log->ops.content.data);
     ev->created_ns = os_windows_ulonglong_to_unix_epoch_ns(VAR_TIME_CREATED(log->ops.content.data));
     wevt_get_message_utf8(log, tmp_event_bookmark);
     wevt_str_wchar_to_utf8(&log->ops.provider, VAR_PROVIDER_NAME(log->ops.content.data), -1);
     wevt_str_wchar_to_utf8(&log->ops.source, VAR_SOURCE_NAME(log->ops.content.data), -1);
     wevt_str_wchar_to_utf8(&log->ops.computer, VAR_COMPUTER_NAME(log->ops.content.data), -1);
-    wevt_str_wchar_to_utf8(&log->ops.user, VAR_USER_ID(log->ops.content.data), -1);
+    wevt_convert_user_id_to_name(&log->ops.user, VAR_USER_ID(log->ops.content.data));
+
+    GUID *ptr = VAR_CORRELATION_ACTIVITY_ID(log->ops.content.data);
+    if(ptr && sizeof(GUID) == sizeof(ND_UUID))
+        memcpy(ev->correlation_activity_id.uuid, ptr, sizeof(ND_UUID));
+    else
+        ev->correlation_activity_id = UUID_ZERO;
+
     ret = true;
 
 cleanup:

@@ -7,7 +7,11 @@
 
 typedef struct {
     uint64_t id;
-    nsec_t created_ns;
+    uint16_t event_id;
+    uint8_t  level;
+    uint64_t keywords;
+    ND_UUID  correlation_activity_id;
+    nsec_t   created_ns;
 } WEVT_EVENT;
 
 #define WEVT_EVENT_EMPTY (WEVT_EVENT){ .id = 0, .created_ns = 0, }
