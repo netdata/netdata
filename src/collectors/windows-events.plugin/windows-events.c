@@ -130,29 +130,30 @@ static inline WEVT_QUERY_STATUS check_stop(const bool *cancelled, const usec_t *
 #define WEVT_FIELD_OPCODEID             "OpcodeID"
 #define WEVT_FIELD_OPCODE               "Opcode"
 #define WEVT_FIELD_COMPUTERNAME         "ComputerName"
-#define WEVT_FIELD_USER                 "User"
+    #define WEVT_FIELD_USER                 "User"
 #define WEVT_FIELD_EVENT                "Event"
 
 FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused, FACET_ROW *row, void *data __maybe_unused) {
-    FACET_ROW_KEY_VALUE *levelid_rkv = dictionary_get(row->dict, WEVT_FIELD_LEVEL);
+    FACET_ROW_KEY_VALUE *levelid_rkv = dictionary_get(row->dict, WEVT_FIELD_LEVELID);
     if(!levelid_rkv || levelid_rkv->empty)
         return FACET_ROW_SEVERITY_NORMAL;
 
-    const char *s = buffer_tostring(levelid_rkv->wb);
+    int windows_event_level = str2i(buffer_tostring(levelid_rkv->wb));
 
-    if(*s == 'I' && strcmp(s, "Information") == 0)
-        return FACET_ROW_SEVERITY_NOTICE;
-
-    if(*s == 'E' && strcmp(s, "Error") == 0)
-        return FACET_ROW_SEVERITY_WARNING;
-
-    if(*s == 'C' && strcmp(s, "Critical") == 0)
-        return FACET_ROW_SEVERITY_CRITICAL;
-
-    if(*s == 'V' && strcmp(s, "Verbose") == 0)
-        return FACET_ROW_SEVERITY_DEBUG;
-
-    return FACET_ROW_SEVERITY_NORMAL;
+    switch (windows_event_level) {
+        case 5: // Verbose
+            return FACET_ROW_SEVERITY_DEBUG;
+        case 4: // Information
+            return FACET_ROW_SEVERITY_NORMAL;
+        case 3: // Warning
+            return FACET_ROW_SEVERITY_WARNING;
+        case 2: // Error
+            return FACET_ROW_SEVERITY_CRITICAL;
+        case 1: // Critical
+            return FACET_ROW_SEVERITY_CRITICAL;
+        default: // Any unhandled or special levels
+            return FACET_ROW_SEVERITY_NORMAL;
+    }
 }
 
 static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
@@ -219,7 +220,6 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 }
 
 static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUERY_SOURCE *src, usec_t *msg_ut __maybe_unused, WEVT_EVENT *e) {
-    static __thread char buf[1024];
     size_t len, bytes = log->ops.content.len;
 
     bytes += log->ops.provider.used * 2; // unicode is double
@@ -237,34 +237,38 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
                                 WEVT_FIELD_CHANNEL, sizeof(WEVT_FIELD_CHANNEL) - 1,
                                 src->fullname, src->fullname_len);
 
-    len = print_uint64(buf, e->id);
+    static __thread char id_str[24];
+    len = print_uint64(id_str, e->id);
     bytes += len;
     facets_add_key_value_length(facets,
                                 WEVT_FIELD_EVENTRECORDID, sizeof(WEVT_FIELD_EVENTRECORDID) - 1,
-                                buf, len);
+                                id_str, len);
 
-    len = print_uint64(buf, e->event_id);
+    static __thread char event_id_str[24];
+    len = print_uint64(event_id_str, e->event_id);
     bytes += len;
     facets_add_key_value_length(facets,
                                 WEVT_FIELD_EVENTID, sizeof(WEVT_FIELD_EVENTID) - 1,
-                                buf, len);
+                                event_id_str, len);
 
-    len = print_uint64(buf, e->level);
+    static __thread char level_id_str[24];
+    len = print_uint64(level_id_str, e->level);
     bytes += len;
     facets_add_key_value_length(facets,
                                 WEVT_FIELD_LEVELID, sizeof(WEVT_FIELD_LEVELID) - 1,
-                                buf, len);
+                                level_id_str, len);
 
     bytes += log->ops.level.used * 2;
     facets_add_key_value_length(facets,
                                 WEVT_FIELD_LEVEL, sizeof(WEVT_FIELD_LEVEL) - 1,
                                 log->ops.level.data, log->ops.level.used - 1);
 
-    len = print_uint64(buf, e->keyword);
+    static __thread char keyword_id_str[24];
+    len = print_uint64(keyword_id_str, e->keyword);
     bytes += len;
     facets_add_key_value_length(facets,
                                 WEVT_FIELD_KEYWORDID, sizeof(WEVT_FIELD_KEYWORDID) - 1,
-                                buf, len);
+                                keyword_id_str, len);
 
     bytes += log->ops.keyword.used * 2;
     facets_add_key_value_length(facets,
@@ -276,11 +280,12 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
                                 WEVT_FIELD_COMPUTERNAME, sizeof(WEVT_FIELD_COMPUTERNAME) - 1,
                                 log->ops.computer.data, log->ops.computer.used - 1);
 
-    len = print_uint64(buf, e->opcode);
+    static __thread char opcode_id_str[24];
+    len = print_uint64(opcode_id_str, e->opcode);
     bytes += len;
     facets_add_key_value_length(facets,
                                 WEVT_FIELD_OPCODEID, sizeof(WEVT_FIELD_OPCODEID) - 1,
-                                buf, len);
+                                opcode_id_str, len);
 
     bytes += log->ops.opcode.used * 2;
     facets_add_key_value_length(facets,
@@ -949,7 +954,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         struct {
             const char *func;
         } array[] = {
-            { "windows-events info after:1725650277 before:1725736677" },
+            { "windows-events after:1725727566 before:1725731166 direction:backward last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 data_only:false source:All" },
             { "windows-events after:1725650277 before:1725736677 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
             { "windows-events after:1725650284 before:1725736684 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
             { "windows-events after:1725650386 before:1725736786 anchor:1725652420809461 direction:forward last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 if_modified_since:1725736649011085 data_only:true delta:true tail:true source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
