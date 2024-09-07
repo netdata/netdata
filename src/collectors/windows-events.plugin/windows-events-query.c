@@ -56,12 +56,20 @@ bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst
         }
     }
 
-    log->ops.unicode.len = size;
+    // EvtFormatMessage pads it with zeros at the end
+    while(size >= 2 && log->ops.unicode.data[size - 2] == 0)
+        size--;
+
+    log->ops.unicode.used = size;
+
+    internal_fatal(wcslen(log->ops.unicode.data) + 1 != (size_t)log->ops.unicode.used,
+                   "Wrong unicode string length!");
+
     return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
 
 cleanup:
     txt_utf8_resize(dst, 128);
-    dst->len = snprintfz(dst->data, dst->size, "[empty]") + 1;
+    dst->used = snprintfz(dst->data, dst->size, "[empty]") + 1;
     return false;
 }
 
@@ -103,6 +111,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
             goto cleanup;
         }
     }
+    log->ops.content.len = size;
 
     // LogName
     // it is the same as the channel
@@ -124,7 +133,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
     // EventID (it defines the template for formatting the message)
     // This is indexed and can be queried with slicing - but not consistent across channels
     ev->event_id = VAR_EVENT_ID(log->ops.content.data);
-    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.message, EvtFormatMessageEvent);
+    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.event, EvtFormatMessageEvent);
 
     // Level (the severity / priority)
     // This is indexed and can be queried with slicing - probably consistent across channels
@@ -133,7 +142,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
 
     // Keywords (categorization of events)
     // This is indexed and can be queried with slicing - but not consistent across channels
-    ev->keywords = VAR_KEYWORDS(log->ops.content.data);
+    ev->keyword = VAR_KEYWORDS(log->ops.content.data);
     wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.keyword, EvtFormatMessageKeyword);
 
     // TimeCreated
@@ -172,7 +181,7 @@ void wevt_closelog6(WEVT_LOG *log) {
 
     freez(log->ops.content.data);
     txt_unicode_cleanup(&log->ops.unicode);
-    txt_utf8_cleanup(&log->ops.message);
+    txt_utf8_cleanup(&log->ops.event);
     txt_utf8_cleanup(&log->ops.provider);
     txt_utf8_cleanup(&log->ops.source);
     txt_utf8_cleanup(&log->ops.computer);
@@ -294,12 +303,11 @@ cleanup:
 }
 
 EVT_HANDLE wevt_query(LPCWSTR channel, usec_t seek_to, bool backward) {
-    // the query is done at millisecond resolution
-    // so, for the backward mode, we add a millisecond to the seek time.
-    if(backward) seek_to += USEC_PER_MS;
+    // Convert microseconds to nanoseconds first (correct handling of precision)
+    if(backward) seek_to += USEC_PER_MS;  // for backward mode, add a millisecond to the seek time.
 
     // Convert the microseconds since Unix epoch to FILETIME (used in Windows APIs)
-    FILETIME fileTime = os_unix_epoch_ns_to_filetime(seek_to * NSEC_PER_USEC / 100);
+    FILETIME fileTime = os_unix_epoch_ut_to_filetime(seek_to);
 
     // Convert FILETIME to SYSTEMTIME for use in XPath
     SYSTEMTIME systemTime;
@@ -310,21 +318,23 @@ EVT_HANDLE wevt_query(LPCWSTR channel, usec_t seek_to, bool backward) {
 
     // Format SYSTEMTIME into ISO 8601 format (YYYY-MM-DDTHH:MM:SS.sssZ)
     static __thread WCHAR query[4096];
-    swprintf(query, 512,
-        L"<QueryList>"
-        L"  <Query Id='0' Path='%s'>"
-        L"    <Select>*[System[TimeCreated[@SystemTime%s'%04d-%02d-%02dT%02d:%02d:%02d.%03dZ']]]</Select>"
-        L"  </Query>"
-        L"</QueryList>",
-        channel,
-        backward ? L"<=" : L">=",  // Use <= if backward, >= if forward
-        systemTime.wYear, systemTime.wMonth, systemTime.wDay,
-        systemTime.wHour, systemTime.wMinute, systemTime.wSecond, systemTime.wMilliseconds);
+    swprintf(query, 4096,
+             L"Event/System[TimeCreated[@SystemTime%ls\"%04d-%02d-%02dT%02d:%02d:%02d.%03dZ\"]]",
+             backward ? L"<=" : L">=",  // Use <= if backward, >= if forward
+             systemTime.wYear, systemTime.wMonth, systemTime.wDay,
+             systemTime.wHour, systemTime.wMinute, systemTime.wSecond, systemTime.wMilliseconds);
 
     // Execute the query
-    EVT_HANDLE hQuery = EvtQuery(NULL, NULL, query, EvtQueryChannelPath | (backward ? EvtQueryReverseDirection : 0));
-    if (!hQuery)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed");
+    EVT_HANDLE hQuery = EvtQuery(NULL, channel, query, EvtQueryChannelPath | (backward ? EvtQueryReverseDirection : EvtQueryForwardDirection));
+    if (!hQuery) {
+        wchar_t wbuf[1024];
+        DWORD wbuf_used;
+        EvtGetExtendedStatus(sizeof(wbuf), wbuf, &wbuf_used);
+
+        char buf[1024];
+        rfc3339_datetime_ut(buf, sizeof(buf), seek_to, 3, true);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, seek to '%s', query: %s | extended info: %ls", buf, query2utf8(query), wbuf);
+    }
 
     return hQuery;
 }

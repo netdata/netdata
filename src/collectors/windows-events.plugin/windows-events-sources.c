@@ -13,7 +13,7 @@ WEVT_SOURCE_TYPE wevt_internal_source_type(const char *value) {
     return WEVTS_NONE;
 }
 
-void wevt_sources_del_cb(const DICTIONARY_ITEM *item, void *value, void *data) {
+void wevt_sources_del_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     LOGS_QUERY_SOURCE *src = value;
     freez((void *)src->fullname);
     string_freez(src->source);

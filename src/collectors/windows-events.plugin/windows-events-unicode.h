@@ -10,18 +10,18 @@
 typedef struct {
     char *data;
     size_t size; // the allocated size of data buffer
-    size_t len;  // the used size of the data buffer (including null terminators, if any)
+    size_t used;  // the used size of the data buffer (including null terminators, if any)
 } TXT_UTF8;
 
 typedef struct {
     wchar_t *data;
     size_t size; // the allocated size of data buffer
-    size_t len;  // the used size of the data buffer (including null terminators, if any)
+    size_t used;  // the used size of the data buffer (including null terminators, if any)
 } TXT_UNICODE;
 
 static inline size_t compute_new_size(size_t old_size, size_t required_size) {
-    size_t size = (required_size % 4096 == 0) ? required_size : required_size + 4096;
-    size = (size / 4096) * 4096;
+    size_t size = (required_size % 2048 == 0) ? required_size : required_size + 2048;
+    size = (size / 2048) * 2048;
 
     if(size < old_size * 2)
         size = old_size * 2;
@@ -52,11 +52,11 @@ static inline void txt_unicode_resize(TXT_UNICODE *unicode, size_t required_size
 
     txt_unicode_cleanup(unicode);
     unicode->size = compute_new_size(unicode->size, required_size);
-    unicode->data = mallocz(unicode->size);
+    unicode->data = mallocz(unicode->size * sizeof(wchar_t));
 }
 
 bool wevt_str_unicode_to_utf8(TXT_UTF8 *utf8, TXT_UNICODE *unicode);
-bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len);
+bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len_with_null);
 
 void unicode2utf8(char *dst, size_t dst_size, const wchar_t *src);
 void utf82unicode(wchar_t *dst, size_t dst_size, const char *src);
@@ -66,5 +66,7 @@ char *domain2utf8(const wchar_t *domain);
 
 char *channel2utf8(const wchar_t *channel);
 wchar_t *channel2unicode(const char *utf8str);
+
+char *query2utf8(const wchar_t *query);
 
 #endif //NETDATA_WINDOWS_EVENTS_UNICODE_H

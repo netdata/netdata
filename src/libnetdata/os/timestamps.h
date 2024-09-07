@@ -18,14 +18,25 @@
     ((((uint64_t)(ft).dwHighDateTime << 32 | (ft).dwLowDateTime) - 116444736000000000ULL) * 100ULL)
 
 // Convert Unix epoch in nanoseconds to FILETIME (returns FILETIME)
-#define os_unix_epoch_ns_to_filetime(ns)                            \
-    ({                                                              \
-        uint64_t temp = ((ns) / 100ULL) + 116444736000000000ULL;    \
-        FILETIME ft;                                                \
-        ft.dwLowDateTime = (uint32_t)(temp & 0xFFFFFFFF);           \
-        ft.dwHighDateTime = (uint32_t)(temp >> 32);                 \
-        ft;                                                         \
+#define os_unix_epoch_ns_to_filetime(ns)                                        \
+    ({                                                                          \
+        uint64_t temp = ((uint64_t)(ns) / 100ULL) + 116444736000000000ULL;      \
+        FILETIME ft;                                                            \
+        ft.dwLowDateTime = (uint32_t)(temp & 0xFFFFFFFF);                       \
+        ft.dwHighDateTime = (uint32_t)(temp >> 32);                             \
+        ft;                                                                     \
     })
+
+// Convert Unix epoch in microseconds to FILETIME (returns FILETIME)
+#define os_unix_epoch_ut_to_filetime(ns)                                        \
+    ({                                                                          \
+        uint64_t temp = ((uint64_t)(ns) * 10ULL) + 116444736000000000ULL;       \
+        FILETIME ft;                                                            \
+        ft.dwLowDateTime = (uint32_t)(temp & 0xFFFFFFFF);                       \
+        ft.dwHighDateTime = (uint32_t)(temp >> 32);                             \
+        ft;                                                                     \
+    })
+
 #endif //OS_WINDOWS
 
 #endif //LIBNETDATA_OS_TIMESTAMPS_H

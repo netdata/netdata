@@ -489,28 +489,35 @@ static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
     return (int)(d - dst);
 }
 
-static inline void buffer_print_uint64(BUFFER *wb, uint64_t value) {
-    buffer_need_bytes(wb, 50);
-
-    char *s = &wb->buffer[wb->len];
+static inline size_t print_uint64(char *dst, uint64_t value) {
+    char *s = dst;
     char *d = print_uint64_reversed(s, value);
     char_array_reverse(s, d - 1);
     *d = '\0';
-    wb->len += d - s;
+    return d - s;
+}
 
+static inline size_t print_int64(char *dst, int64_t value) {
+    size_t len = 0;
+
+    if(value < 0) {
+        *dst++ = '-';
+        value = -value;
+        len++;
+    }
+
+    return print_uint64(dst, value) + len;
+}
+
+static inline void buffer_print_uint64(BUFFER *wb, uint64_t value) {
+    buffer_need_bytes(wb, 50);
+    wb->len += print_uint64(&wb->buffer[wb->len], value);
     buffer_overflow_check(wb);
 }
 
 static inline void buffer_print_int64(BUFFER *wb, int64_t value) {
     buffer_need_bytes(wb, 50);
-
-    if(value < 0) {
-        buffer_fast_strcat(wb, "-", 1);
-        value = -value;
-    }
-
-    buffer_print_uint64(wb, (uint64_t)value);
-
+    wb->len += print_int64(&wb->buffer[wb->len], value);
     buffer_overflow_check(wb);
 }
 

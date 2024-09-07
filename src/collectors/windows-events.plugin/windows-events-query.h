@@ -10,7 +10,7 @@ typedef struct {
     uint16_t event_id;                  // This is the template that defines the message to be shown
     uint16_t opcode;
     uint8_t  level;                     // The severity of event
-    uint64_t keywords;                  // Categorization of the event
+    uint64_t keyword;                  // Categorization of the event
     ND_UUID  provider;
     ND_UUID  correlation_activity_id;
     nsec_t   created_ns;
@@ -37,6 +37,7 @@ typedef struct wevt_log {
         struct {
             EVT_VARIANT	*data;
             size_t size;
+            size_t len;
         } content;
 
         // temp buffer used for fetching and converting UNICODE and UTF-8
@@ -47,7 +48,7 @@ typedef struct wevt_log {
 
         // string attributes of the current event log entry
         // valid until another event if fetched
-        TXT_UTF8 message;
+        TXT_UTF8 event;
         TXT_UTF8 provider;
         TXT_UTF8 source;
         TXT_UTF8 computer;
@@ -62,5 +63,7 @@ typedef struct wevt_log {
 void wevt_closelog6(WEVT_LOG *log);
 WEVT_LOG *wevt_openlog6(const wchar_t *channel, bool file_size);
 bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev);
+
+EVT_HANDLE wevt_query(LPCWSTR channel, usec_t seek_to, bool backward);
 
 #endif //NETDATA_WINDOWS_EVENTS_QUERY_H

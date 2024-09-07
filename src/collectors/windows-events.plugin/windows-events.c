@@ -10,10 +10,16 @@
 #define WINDOWS_EVENTS_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
 #define WINDOWS_EVENTS_PROGRESS_EVERY_UT (250 * USEC_PER_MS)
 
+#define FUNCTION_PROGRESS_UPDATE_ROWS(rows_read, rows) __atomic_fetch_add(&(rows_read), rows, __ATOMIC_RELAXED)
+#define FUNCTION_PROGRESS_UPDATE_BYTES(bytes_read, bytes) __atomic_fetch_add(&(bytes_read), bytes, __ATOMIC_RELAXED)
+#define FUNCTION_PROGRESS_EVERY_ROWS (1ULL << 13)
+#define FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS (1ULL << 7)
+#define ANCHOR_DELTA_UT (10 * USEC_PER_SEC)
+
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
 
-#define WEVT_FUNCTION_DESCRIPTION    "View, search and analyze Microsoft Windows events."
+#define WEVT_FUNCTION_DESCRIPTION    "View, search and analyze the Microsoft Windows Events log."
 #define WEVT_FUNCTION_NAME           "windows-events"
 
 // functions needed by LQS
@@ -90,28 +96,441 @@ struct lqs_extension {
 #define WEVT_KEYS_INCLUDED_IN_FACETS            \
     "|Provider"                                 \
     "|Source"                                   \
+    "|Channel"                                  \
     "|Level"                                    \
-    "|Computer"                                 \
+    "|Keyword"                                  \
+    "|Opcode"                                   \
+    "|ComputerName"                             \
+    "|User"                                     \
     ""
 
-static void wevt_register_transformations(LOGS_QUERY_STATUS *lqs __maybe_unused) {
-    ;
+static inline WEVT_QUERY_STATUS check_stop(const bool *cancelled, const usec_t *stop_monotonic_ut) {
+    if(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)) {
+        internal_error(true, "Function has been cancelled");
+        return WEVT_CANCELLED;
+    }
+
+    if(now_monotonic_usec() > __atomic_load_n(stop_monotonic_ut, __ATOMIC_RELAXED)) {
+        internal_error(true, "Function timed out");
+        return WEVT_TIMED_OUT;
+    }
+
+    return WEVT_OK;
 }
 
-WEVT_QUERY_STATUS wevt_query_forward(
-        WEVT_LOG *j, BUFFER *wb __maybe_unused, FACETS *facets,
-        LOGS_QUERY_SOURCE *jf,
-    LOGS_QUERY_STATUS *fqs)
-{
-    return WEVT_FAILED_TO_OPEN;
+#define WEVT_FIELD_PROVIDER             "Provider"
+#define WEVT_FIELD_SOURCE               "Source"
+#define WEVT_FIELD_CHANNEL              "Channel"
+#define WEVT_FIELD_EVENTRECORDID        "EventRecordID"
+#define WEVT_FIELD_EVENTID              "EventID"
+#define WEVT_FIELD_LEVELID              "LevelID"
+#define WEVT_FIELD_LEVEL                "Level"
+#define WEVT_FIELD_KEYWORDID            "KeywordID"
+#define WEVT_FIELD_KEYWORD              "Keyword"
+#define WEVT_FIELD_OPCODEID             "OpcodeID"
+#define WEVT_FIELD_OPCODE               "Opcode"
+#define WEVT_FIELD_COMPUTERNAME         "ComputerName"
+#define WEVT_FIELD_USER                 "User"
+#define WEVT_FIELD_EVENT                "Event"
+
+FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused, FACET_ROW *row, void *data __maybe_unused) {
+    FACET_ROW_KEY_VALUE *levelid_rkv = dictionary_get(row->dict, WEVT_FIELD_LEVEL);
+    if(!levelid_rkv || levelid_rkv->empty)
+        return FACET_ROW_SEVERITY_NORMAL;
+
+    const char *s = buffer_tostring(levelid_rkv->wb);
+
+    if(*s == 'I' && strcmp(s, "Information") == 0)
+        return FACET_ROW_SEVERITY_NOTICE;
+
+    if(*s == 'E' && strcmp(s, "Error") == 0)
+        return FACET_ROW_SEVERITY_WARNING;
+
+    if(*s == 'C' && strcmp(s, "Critical") == 0)
+        return FACET_ROW_SEVERITY_CRITICAL;
+
+    if(*s == 'V' && strcmp(s, "Verbose") == 0)
+        return FACET_ROW_SEVERITY_DEBUG;
+
+    return FACET_ROW_SEVERITY_NORMAL;
 }
 
-WEVT_QUERY_STATUS wevt_query_backward(
-        WEVT_LOG *j, BUFFER *wb __maybe_unused, FACETS *facets,
-        LOGS_QUERY_SOURCE *jf,
-    LOGS_QUERY_STATUS *fqs)
+static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
+    FACETS *facets = lqs->facets;
+    LOGS_QUERY_REQUEST *rq = &lqs->rq;
+
+    facets_register_row_severity(facets, wevt_levelid_to_facet_severity, NULL);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_COMPUTERNAME,
+            rq->default_facet | FACET_KEY_OPTION_VISIBLE);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_PROVIDER,
+            rq->default_facet | FACET_KEY_OPTION_MAIN_TEXT |
+            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_SOURCE,
+            rq->default_facet | FACET_KEY_OPTION_MAIN_TEXT |
+            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_CHANNEL,
+            rq->default_facet | FACET_KEY_OPTION_MAIN_TEXT |
+            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_EVENTID,
+            rq->default_facet);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_EVENT,
+            FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT |
+            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_LEVELID,
+            rq->default_facet);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_LEVEL,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_KEYWORDID,
+            rq->default_facet);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_KEYWORD,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_OPCODEID,
+            rq->default_facet);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_OPCODE,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_USER,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+}
+
+static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUERY_SOURCE *src, usec_t *msg_ut __maybe_unused, WEVT_EVENT *e) {
+    static __thread char buf[1024];
+    size_t len, bytes = log->ops.content.len;
+
+    bytes += log->ops.provider.used * 2; // unicode is double
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_PROVIDER, sizeof(WEVT_FIELD_PROVIDER) - 1,
+                                log->ops.provider.data, log->ops.provider.used - 1);
+
+    bytes += log->ops.source.used * 2;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_SOURCE, sizeof(WEVT_FIELD_SOURCE) - 1,
+                                log->ops.source.data, log->ops.source.used - 1);
+
+    bytes += src->fullname_len * 2;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_CHANNEL, sizeof(WEVT_FIELD_CHANNEL) - 1,
+                                src->fullname, src->fullname_len);
+
+    len = print_uint64(buf, e->id);
+    bytes += len;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_EVENTRECORDID, sizeof(WEVT_FIELD_EVENTRECORDID) - 1,
+                                buf, len);
+
+    len = print_uint64(buf, e->event_id);
+    bytes += len;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_EVENTID, sizeof(WEVT_FIELD_EVENTID) - 1,
+                                buf, len);
+
+    len = print_uint64(buf, e->level);
+    bytes += len;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_LEVELID, sizeof(WEVT_FIELD_LEVELID) - 1,
+                                buf, len);
+
+    bytes += log->ops.level.used * 2;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_LEVEL, sizeof(WEVT_FIELD_LEVEL) - 1,
+                                log->ops.level.data, log->ops.level.used - 1);
+
+    len = print_uint64(buf, e->keyword);
+    bytes += len;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_KEYWORDID, sizeof(WEVT_FIELD_KEYWORDID) - 1,
+                                buf, len);
+
+    bytes += log->ops.keyword.used * 2;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_KEYWORD, sizeof(WEVT_FIELD_KEYWORD) - 1,
+                                log->ops.keyword.data, log->ops.keyword.used - 1);
+
+    bytes += log->ops.computer.used * 2;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_COMPUTERNAME, sizeof(WEVT_FIELD_COMPUTERNAME) - 1,
+                                log->ops.computer.data, log->ops.computer.used - 1);
+
+    len = print_uint64(buf, e->opcode);
+    bytes += len;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_OPCODEID, sizeof(WEVT_FIELD_OPCODEID) - 1,
+                                buf, len);
+
+    bytes += log->ops.opcode.used * 2;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_OPCODE, sizeof(WEVT_FIELD_OPCODE) - 1,
+                                log->ops.opcode.data, log->ops.opcode.used - 1);
+
+    bytes += log->ops.user.used * 2;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_USER, sizeof(WEVT_FIELD_USER) - 1,
+                                log->ops.user.data, log->ops.user.used - 1);
+
+    bytes += log->ops.event.used * 2;
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_EVENT, sizeof(WEVT_FIELD_EVENT) - 1,
+                                log->ops.event.data, log->ops.event.used - 1);
+
+    return bytes;
+}
+
+static WEVT_QUERY_STATUS wevt_query_backward(
+        WEVT_LOG *log, BUFFER *wb __maybe_unused, FACETS *facets,
+        LOGS_QUERY_SOURCE *src,
+        LOGS_QUERY_STATUS *lqs)
 {
-    return WEVT_FAILED_TO_OPEN;
+
+    usec_t anchor_delta = ANCHOR_DELTA_UT;
+
+    usec_t start_ut = ((lqs->rq.data_only && lqs->anchor.start_ut) ? lqs->anchor.start_ut : lqs->rq.before_ut) + anchor_delta;
+    usec_t stop_ut = (lqs->rq.data_only && lqs->anchor.stop_ut) ? lqs->anchor.stop_ut : lqs->rq.after_ut;
+    bool stop_when_full = (lqs->rq.data_only && !lqs->anchor.stop_ut);
+
+    lqs->c.query_file.start_ut = start_ut;
+    lqs->c.query_file.stop_ut = stop_ut;
+
+    log->event_query = wevt_query(channel2unicode(src->fullname), start_ut, true);
+    if(!log->event_query)
+        return WEVT_FAILED_TO_SEEK;
+
+    size_t errors_no_timestamp = 0;
+    usec_t latest_msg_ut = 0; // the biggest timestamp we have seen so far
+    usec_t first_msg_ut = 0; // the first message we got from the db
+    size_t row_counter = 0, last_row_counter = 0, rows_useful = 0;
+    size_t bytes = 0, last_bytes = 0;
+
+    usec_t last_usec_from = 0;
+    usec_t last_usec_to = 0;
+
+    WEVT_QUERY_STATUS status = WEVT_OK;
+
+    facets_rows_begin(facets);
+    WEVT_EVENT e;
+    while (status == WEVT_OK && wevt_get_next_event(log, &e)) {
+        usec_t msg_ut = e.created_ns / NSEC_PER_USEC;
+
+        if(unlikely(!msg_ut)) {
+            errors_no_timestamp++;
+            continue;
+        }
+
+        if (unlikely(msg_ut > start_ut))
+            continue;
+
+        if (unlikely(msg_ut < stop_ut))
+            break;
+
+        if(unlikely(msg_ut > latest_msg_ut))
+            latest_msg_ut = msg_ut;
+
+        if(unlikely(!first_msg_ut)) {
+            first_msg_ut = msg_ut;
+            lqs->c.query_file.first_msg_ut = msg_ut;
+        }
+
+//        sampling_t sample = is_row_in_sample(log, lqs, src, msg_ut,
+//                                             FACETS_ANCHOR_DIRECTION_BACKWARD,
+//                                             facets_row_candidate_to_keep(facets, msg_ut));
+//
+//        if(sample == SAMPLING_FULL) {
+            bytes += wevt_process_event(log, facets, src, &msg_ut, &e);
+
+            // make sure each line gets a unique timestamp
+            if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
+                msg_ut = --last_usec_from;
+            else
+                last_usec_from = last_usec_to = msg_ut;
+
+            if(facets_row_finished(facets, msg_ut))
+                rows_useful++;
+
+            row_counter++;
+            if(unlikely((row_counter % FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS) == 0 &&
+                        stop_when_full &&
+                        facets_rows(facets) >= lqs->rq.entries)) {
+                // stop the data only query
+                usec_t oldest = facets_row_oldest_ut(facets);
+                if(oldest && msg_ut < (oldest - anchor_delta))
+                    break;
+            }
+
+            if(unlikely(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0)) {
+                FUNCTION_PROGRESS_UPDATE_ROWS(lqs->c.rows_read, row_counter - last_row_counter);
+                last_row_counter = row_counter;
+
+                FUNCTION_PROGRESS_UPDATE_BYTES(lqs->c.bytes_read, bytes - last_bytes);
+                last_bytes = bytes;
+
+                status = check_stop(lqs->cancelled, lqs->stop_monotonic_ut);
+            }
+//        }
+//        else if(sample == SAMPLING_SKIP_FIELDS)
+//            facets_row_finished_unsampled(facets, msg_ut);
+//        else {
+//            sampling_update_running_query_file_estimates(facets, log, lqs, src, msg_ut, FACETS_ANCHOR_DIRECTION_BACKWARD);
+//            break;
+//        }
+    }
+
+    FUNCTION_PROGRESS_UPDATE_ROWS(lqs->c.rows_read, row_counter - last_row_counter);
+    FUNCTION_PROGRESS_UPDATE_BYTES(lqs->c.bytes_read, bytes - last_bytes);
+
+    lqs->c.rows_useful += rows_useful;
+
+    if(errors_no_timestamp)
+        netdata_log_error("WINDOWS-EVENTS: %zu events did not have timestamps", errors_no_timestamp);
+
+    if(latest_msg_ut > lqs->last_modified)
+        lqs->last_modified = latest_msg_ut;
+
+    if(log->event_query) {
+        EvtClose(log->event_query);
+        log->event_query = NULL;
+    }
+
+    return status;
+}
+
+static WEVT_QUERY_STATUS wevt_query_forward(
+        WEVT_LOG *log, BUFFER *wb __maybe_unused, FACETS *facets,
+        LOGS_QUERY_SOURCE *src,
+        LOGS_QUERY_STATUS *lqs)
+{
+    usec_t anchor_delta = ANCHOR_DELTA_UT;
+
+    usec_t start_ut = (lqs->rq.data_only && lqs->anchor.start_ut) ? lqs->anchor.start_ut : lqs->rq.after_ut;
+    usec_t stop_ut = ((lqs->rq.data_only && lqs->anchor.stop_ut) ? lqs->anchor.stop_ut : lqs->rq.before_ut) + anchor_delta;
+    bool stop_when_full = (lqs->rq.data_only && !lqs->anchor.stop_ut);
+
+    lqs->c.query_file.start_ut = start_ut;
+    lqs->c.query_file.stop_ut = stop_ut;
+
+    log->event_query = wevt_query(channel2unicode(src->fullname), start_ut, false);
+    if(!log->event_query)
+        return WEVT_FAILED_TO_SEEK;
+
+    size_t errors_no_timestamp = 0;
+    usec_t latest_msg_ut = 0; // the biggest timestamp we have seen so far
+    usec_t first_msg_ut = 0; // the first message we got from the db
+    size_t row_counter = 0, last_row_counter = 0, rows_useful = 0;
+    size_t bytes = 0, last_bytes = 0;
+
+    usec_t last_usec_from = 0;
+    usec_t last_usec_to = 0;
+
+    WEVT_QUERY_STATUS status = WEVT_OK;
+
+    facets_rows_begin(facets);
+    WEVT_EVENT e;
+    while (status == WEVT_OK && wevt_get_next_event(log, &e)) {
+        usec_t msg_ut = e.created_ns / NSEC_PER_USEC;
+
+        if(unlikely(!msg_ut)) {
+            errors_no_timestamp++;
+            continue;
+        }
+
+        if (unlikely(msg_ut < start_ut))
+            continue;
+
+        if (unlikely(msg_ut > stop_ut))
+            break;
+
+        if(likely(msg_ut > latest_msg_ut))
+            latest_msg_ut = msg_ut;
+
+        if(unlikely(!first_msg_ut)) {
+            first_msg_ut = msg_ut;
+            lqs->c.query_file.first_msg_ut = msg_ut;
+        }
+
+//        sampling_t sample = is_row_in_sample(log, lqs, src, msg_ut,
+//                                             FACETS_ANCHOR_DIRECTION_FORWARD,
+//                                             facets_row_candidate_to_keep(facets, msg_ut));
+//
+//        if(sample == SAMPLING_FULL) {
+            bytes += wevt_process_event(log, facets, src, &msg_ut, &e);
+
+            // make sure each line gets a unique timestamp
+            if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
+                msg_ut = ++last_usec_to;
+            else
+                last_usec_from = last_usec_to = msg_ut;
+
+            if(facets_row_finished(facets, msg_ut))
+                rows_useful++;
+
+            row_counter++;
+            if(unlikely((row_counter % FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS) == 0 &&
+                        stop_when_full &&
+                        facets_rows(facets) >= lqs->rq.entries)) {
+                // stop the data only query
+                usec_t newest = facets_row_newest_ut(facets);
+                if(newest && msg_ut > (newest + anchor_delta))
+                    break;
+            }
+
+            if(unlikely(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0)) {
+                FUNCTION_PROGRESS_UPDATE_ROWS(lqs->c.rows_read, row_counter - last_row_counter);
+                last_row_counter = row_counter;
+
+                FUNCTION_PROGRESS_UPDATE_BYTES(lqs->c.bytes_read, bytes - last_bytes);
+                last_bytes = bytes;
+
+                status = check_stop(lqs->cancelled, lqs->stop_monotonic_ut);
+            }
+//        }
+//        else if(sample == SAMPLING_SKIP_FIELDS)
+//            facets_row_finished_unsampled(facets, msg_ut);
+//        else {
+//            sampling_update_running_query_file_estimates(facets, log, lqs, src, msg_ut, FACETS_ANCHOR_DIRECTION_FORWARD);
+//            break;
+//        }
+    }
+
+    FUNCTION_PROGRESS_UPDATE_ROWS(lqs->c.rows_read, row_counter - last_row_counter);
+    FUNCTION_PROGRESS_UPDATE_BYTES(lqs->c.bytes_read, bytes - last_bytes);
+
+    lqs->c.rows_useful += rows_useful;
+
+    if(errors_no_timestamp)
+        netdata_log_error("WINDOWS-EVENTS: %zu events did not have timestamps", errors_no_timestamp);
+
+    if(latest_msg_ut > lqs->last_modified)
+        lqs->last_modified = latest_msg_ut;
+
+    if(log->event_query) {
+        EvtClose(log->event_query);
+        log->event_query = NULL;
+    }
+
+    return status;
 }
 
 static WEVT_QUERY_STATUS wevt_query_one_channel(
@@ -279,7 +698,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
         buffer_json_add_array_item_object(wb); // channel source
         {
             // information about the file
-            buffer_json_member_add_string(wb, "_filename", filename);
+            buffer_json_member_add_string(wb, "_name", filename);
             buffer_json_member_add_uint64(wb, "_source_type", src->source_type);
             buffer_json_member_add_string(wb, "_source", string2str(src->source));
             buffer_json_member_add_uint64(wb, "_msg_first_ut", src->msg_first_ut);
@@ -358,10 +777,10 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
             return rrd_call_function_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
 
         case WEVT_FAILED_TO_OPEN:
-            return rrd_call_function_error(wb, "failed to open journal", HTTP_RESP_INTERNAL_SERVER_ERROR);
+            return rrd_call_function_error(wb, "failed to open event log", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
         case WEVT_FAILED_TO_SEEK:
-            return rrd_call_function_error(wb, "failed to seek in journal", HTTP_RESP_INTERNAL_SERVER_ERROR);
+            return rrd_call_function_error(wb, "failed to execute event log query", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
         default:
             return rrd_call_function_error(wb, "unknown status", HTTP_RESP_INTERNAL_SERVER_ERROR);
@@ -484,8 +903,8 @@ void function_windows_events(const char *transaction, char *function, usec_t *st
     // ------------------------------------------------------------------------
     // parse the parameters
 
-    if(lqs_request_parse_and_validate(lqs, wb, function, payload, have_slice, "PRIORITY")) {
-        wevt_register_transformations(lqs);
+    if(lqs_request_parse_and_validate(lqs, wb, function, payload, have_slice, WEVT_FIELD_LEVEL)) {
+        wevt_register_fields(lqs);
 
         // ------------------------------------------------------------------------
         // add versions to the response
@@ -529,7 +948,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
         bool cancelled = false;
         usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
-        char buf[] = "windows-events info after:-8640000 before:0 direction:backward last:200 data_only:false slice:true facets: source:all";
+        char buf[] = "windows-events after:-86400 before:0 direction:backward last:200 data_only:false slice:true source:all";
         function_windows_events("123", buf, &stop_monotonic_ut, &cancelled,
                                  NULL, HTTP_ACCESS_ALL, NULL, NULL);
         exit(1);

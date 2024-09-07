@@ -45,13 +45,13 @@ static bool update_user(WEVT_LOG *log, SID_VALUE *found) {
     if(found && found->user) {
         txt_utf8_resize(&log->ops.user, found->user_len + 1);
         memcpy(log->ops.user.data, found->user, found->user_len + 1);
-        log->ops.user.len = found->user_len + 1;
+        log->ops.user.used = found->user_len + 1;
         return true;
     }
 
     txt_utf8_resize(&log->ops.user, 1);
     log->ops.user.data[0] = '\0';
-    log->ops.user.len = 1;
+    log->ops.user.used = 1;
     return false;
 }
 
@@ -67,16 +67,16 @@ static void lookup_user(WEVT_LOG *log, PSID *sid) {
     if (LookupAccountSidW(NULL, sid, account_unicode, &account_name_size, domain_unicode, &domain_name_size, &sid_type)) {
         const char *user = account2utf8(account_unicode);
         const char *domain = domain2utf8(domain_unicode);
-        log->ops.user.len = snprintfz(log->ops.user.data, log->ops.user.size, "%s\\%s", domain, user) + 1;
+        log->ops.user.used = snprintfz(log->ops.user.data, log->ops.user.size, "%s\\%s", domain, user) + 1;
     }
     else {
         wchar_t *sid_string = NULL;
         if (ConvertSidToStringSidW(sid, &sid_string)) {
             const char *user = account2utf8(sid_string);
-            log->ops.user.len = snprintfz(log->ops.user.data, log->ops.user.size, "%s", user) + 1;
+            log->ops.user.used = snprintfz(log->ops.user.data, log->ops.user.size, "%s", user) + 1;
         }
         else
-            log->ops.user.len = snprintfz(log->ops.user.data, log->ops.user.size, "[not found]") + 1;
+            log->ops.user.used = snprintfz(log->ops.user.data, log->ops.user.size, "[not found]") + 1;
     }
 }
 
@@ -109,7 +109,7 @@ bool wevt_convert_user_id_to_name(WEVT_LOG *log, PSID sid) {
     // lookup the user
     lookup_user(log, sid);
     found->user = strdupz(log->ops.user.data);
-    found->user_len = log->ops.user.len - 1;
+    found->user_len = log->ops.user.used - 1;
 
     // add it to the cache
     spinlock_lock(&sid_globals.spinlock);
