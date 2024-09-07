@@ -89,7 +89,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
     EVT_HANDLE	tmp_event_bookmark = NULL;
     bool ret = false;
 
-    assert(log && log->event_query && log->render_context);
+    fatal_assert(log && log->event_query && log->render_context);
 
     if (!EvtNext(log->event_query, 1, &tmp_event_bookmark, INFINITE, 0, &size_required_next))
         goto cleanup; // no data available, return failure

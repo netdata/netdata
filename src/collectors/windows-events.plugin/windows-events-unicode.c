@@ -57,7 +57,7 @@ bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len_with
 
     // make sure the input is null terminated at the exact point we need it
     // (otherwise, the output will not be null terminated either)
-    assert(src_len_with_null == -1 || (src_len_with_null >= 1 && src[src_len_with_null - 1] == 0));
+    fatal_assert(src_len_with_null == -1 || (src_len_with_null >= 1 && src[src_len_with_null - 1] == 0));
 
     // Try to convert using the existing buffer (if it exists, otherwise get the required buffer size)
     int size = WideCharToMultiByte(CP_UTF8, 0, src, src_len_with_null, utf8->data, (int)utf8->size, NULL, NULL);
@@ -111,8 +111,8 @@ cleanup:
 }
 
 bool wevt_str_unicode_to_utf8(TXT_UTF8 *utf8, TXT_UNICODE *unicode) {
-    assert(utf8 && ((utf8->data && utf8->size) || (!utf8->data && !utf8->size)));
-    assert(unicode && ((unicode->data && unicode->size) || (!unicode->data && !unicode->size)));
+    fatal_assert(utf8 && ((utf8->data && utf8->size) || (!utf8->data && !utf8->size)));
+    fatal_assert(unicode && ((unicode->data && unicode->size) || (!unicode->data && !unicode->size)));
 
     // pass the entire unicode size, including the null terminator
     // so that the resulting utf8 message will be null terminated too.

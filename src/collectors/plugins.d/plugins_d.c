@@ -186,7 +186,7 @@ static void *pluginsd_worker_thread(void *arg) {
                                  spawn_popen_write_fd(cd->unsafe.pi),
                                  0);
 
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",
                rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, count);
 
@@ -229,6 +229,33 @@ static void pluginsd_main_cleanup(void *pptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
     worker_unregister();
+}
+
+static bool is_plugin(char *dst, size_t dst_size, const char *filename) {
+    size_t len = strlen(filename);
+
+    const char *suffix;
+    size_t suffix_len;
+
+    suffix = ".plugin";
+    suffix_len = strlen(suffix);
+    if (len > suffix_len &&
+        strcmp(suffix, &filename[len - suffix_len]) == 0) {
+        snprintfz(dst, dst_size, "%.*s", (int)(len - suffix_len), filename);
+        return true;
+    }
+
+#if defined(OS_WINDOWS)
+    suffix = ".plugin.exe";
+    suffix_len = strlen(suffix);
+    if (len > suffix_len &&
+        strcmp(suffix, &filename[len - suffix_len]) == 0) {
+        snprintfz(dst, dst_size, "%.*s", (int)(len - suffix_len), filename);
+        return true;
+    }
+#endif
+
+    return false;
 }
 
 void *pluginsd_main(void *ptr) {
@@ -279,18 +306,13 @@ void *pluginsd_main(void *ptr) {
                 if (unlikely(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0))
                     continue;
 
-                int len = (int)strlen(file->d_name);
-                if (unlikely(len <= (int)PLUGINSD_FILE_SUFFIX_LEN))
-                    continue;
-                if (unlikely(strcmp(PLUGINSD_FILE_SUFFIX, &file->d_name[len - (int)PLUGINSD_FILE_SUFFIX_LEN]) != 0)) {
-                    netdata_log_debug(D_PLUGINSD, "file '%s' does not end in '%s'", file->d_name, PLUGINSD_FILE_SUFFIX);
+                char pluginname[CONFIG_MAX_NAME + 1];
+                if(!is_plugin(pluginname, sizeof(pluginname), file->d_name)) {
+                    netdata_log_debug(D_PLUGINSD, "file '%s' does not look like a plugin", file->d_name);
                     continue;
                 }
 
-                char pluginname[CONFIG_MAX_NAME + 1];
-                snprintfz(pluginname, CONFIG_MAX_NAME, "%.*s", (int)(len - PLUGINSD_FILE_SUFFIX_LEN), file->d_name);
                 int enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, pluginname, automatic_run);
-
                 if (unlikely(!enabled)) {
                     netdata_log_debug(D_PLUGINSD, "plugin '%s' is not enabled", file->d_name);
                     continue;
