@@ -108,10 +108,11 @@ static void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
 {
     ULONGLONG size;
     char memSize[256];
+    // The amount of physically installed RAM, in kilobytes.
     if (!GetPhysicallyInstalledSystemMemory(&size))
         size = 0;
     else
-        (void)snprintf(memSize, 255, "%llu", size);
+        (void)snprintf(memSize, 255, "%llu", size * 1024); // to bytes
 
     (void)rrdhost_set_system_info_variable(systemInfo,
                                            "NETDATA_SYSTEM_TOTAL_RAM",

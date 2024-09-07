@@ -1604,7 +1604,7 @@ static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, 
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static inline int ebpf_ip2nl(uint8_t *dst, char *ip, int domain, char *source)
+static inline int ebpf_ip2nl(uint8_t *dst, const char *ip, int domain, char *source)
 {
     if (inet_pton(domain, ip, dst) <= 0) {
         netdata_log_error("The address specified (%s) is invalid ", source);
@@ -1662,14 +1662,14 @@ void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
  * @param out a pointer to store the link list
  * @param ip the value given as parameter
  */
-static void ebpf_parse_ip_list_unsafe(void **out, char *ip)
+static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
 {
     ebpf_network_viewer_ip_list_t **list = (ebpf_network_viewer_ip_list_t **)out;
 
     char *ipdup = strdupz(ip);
     union netdata_ip_t first = { };
     union netdata_ip_t last = { };
-    char *is_ipv6;
+    const char *is_ipv6;
     if (*ip == '*' && *(ip+1) == '\0') {
         memset(first.addr8, 0, sizeof(first.addr8));
         memset(last.addr8, 0xFF, sizeof(last.addr8));
@@ -1680,7 +1680,8 @@ static void ebpf_parse_ip_list_unsafe(void **out, char *ip)
         goto storethisip;
     }
 
-    char *end = ip;
+    char *enddup = strdupz(ip);
+    char *end = enddup;
     // Move while I cannot find a separator
     while (*end && *end != '/' && *end != '-') end++;
 
@@ -1810,7 +1811,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, char *ip)
 
     ebpf_network_viewer_ip_list_t *store;
 
-    storethisip:
+storethisip:
     store = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
     store->value = ipdup;
     store->hash = simple_hash(ipdup);
@@ -1821,8 +1822,9 @@ static void ebpf_parse_ip_list_unsafe(void **out, char *ip)
     ebpf_fill_ip_list_unsafe(list, store, "socket");
     return;
 
-    cleanipdup:
+cleanipdup:
     freez(ipdup);
+    freez(enddup);
 }
 
 /**
@@ -2773,7 +2775,7 @@ static inline void ebpf_set_load_mode(netdata_ebpf_load_mode_t load, netdata_ebp
  *  @param str      value read from configuration file.
  *  @param origin   specify the configuration file loaded
  */
-static inline void epbf_update_load_mode(char *str, netdata_ebpf_load_mode_t origin)
+static inline void epbf_update_load_mode(const char *str, netdata_ebpf_load_mode_t origin)
 {
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(str);
 
@@ -4074,7 +4076,6 @@ int main(int argc, char **argv)
     heartbeat_t hb;
     heartbeat_init(&hb);
     int update_apps_every = (int) EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
-    uint32_t max_period = EBPF_CLEANUP_FACTOR;
     int update_apps_list = update_apps_every - 1;
     int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     //Plugin will be killed when it receives a signal
@@ -4097,7 +4098,7 @@ int main(int argc, char **argv)
                 pthread_mutex_lock(&collect_data_mutex);
                 ebpf_parse_proc_files();
                 if (collect_pids & (1<<EBPF_MODULE_PROCESS_IDX)) {
-                    collect_data_for_all_processes(process_pid_fd, process_maps_per_core, max_period);
+                    collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
                 }
 
                 ebpf_create_apps_charts(apps_groups_root_target);
