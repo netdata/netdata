@@ -1416,7 +1416,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 buffer_flush(w->url_as_received);
                 buffer_strcat(w->url_as_received, "too big request");
 
-                netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zu bytes).", w->id, w->response.data->len);
+                netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zu bytes).", w->id, (size_t)w->response.data->len);
 
                 size_t len = w->response.data->len;
                 buffer_flush(w->response.data);
@@ -1496,14 +1496,18 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             break;
 
         case HTTP_REQUEST_MODE_OPTIONS:
-            netdata_log_debug(D_WEB_CLIENT, "%llu: Done preparing the OPTIONS response. Sending data (%zu bytes) to client.", w->id, w->response.data->len);
+            netdata_log_debug(D_WEB_CLIENT,
+                "%llu: Done preparing the OPTIONS response. Sending data (%zu bytes) to client.",
+                w->id, (size_t)w->response.data->len);
             break;
 
         case HTTP_REQUEST_MODE_POST:
         case HTTP_REQUEST_MODE_GET:
         case HTTP_REQUEST_MODE_PUT:
         case HTTP_REQUEST_MODE_DELETE:
-            netdata_log_debug(D_WEB_CLIENT, "%llu: Done preparing the response. Sending data (%zu bytes) to client.", w->id, w->response.data->len);
+            netdata_log_debug(D_WEB_CLIENT,
+                "%llu: Done preparing the response. Sending data (%zu bytes) to client.",
+                w->id, (size_t)w->response.data->len);
             break;
 
         case HTTP_REQUEST_MODE_FILECOPY:
@@ -1610,8 +1614,9 @@ ssize_t web_client_send_deflate(struct web_client *w)
     // when using compression,
     // w->response.sent is the amount of bytes passed through compression
 
-    netdata_log_debug(D_DEFLATE, "%llu: web_client_send_deflate(): w->response.data->len = %zu, w->response.sent = %zu, w->response.zhave = %zu, w->response.zsent = %zu, w->response.zstream.avail_in = %u, w->response.zstream.avail_out = %u, w->response.zstream.total_in = %lu, w->response.zstream.total_out = %lu.",
-        w->id, w->response.data->len, w->response.sent, w->response.zhave, w->response.zsent, w->response.zstream.avail_in, w->response.zstream.avail_out, w->response.zstream.total_in, w->response.zstream.total_out);
+    netdata_log_debug(D_DEFLATE,
+        "%llu: web_client_send_deflate(): w->response.data->len = %zu, w->response.sent = %zu, w->response.zhave = %zu, w->response.zsent = %zu, w->response.zstream.avail_in = %u, w->response.zstream.avail_out = %u, w->response.zstream.total_in = %lu, w->response.zstream.total_out = %lu.",
+        w->id, (size_t)w->response.data->len, w->response.sent, w->response.zhave, w->response.zsent, w->response.zstream.avail_in, w->response.zstream.avail_out, w->response.zstream.total_in, w->response.zstream.total_out);
 
     if(w->response.data->len - w->response.sent == 0 && w->response.zstream.avail_in == 0 && w->response.zhave == w->response.zsent && w->response.zstream.avail_out != 0) {
         // there is nothing to send
