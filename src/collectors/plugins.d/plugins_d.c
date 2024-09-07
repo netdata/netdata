@@ -187,7 +187,7 @@ static void *pluginsd_worker_thread(void *arg) {
                                  0);
 
         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-               "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",
+               "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections.",
                rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, count);
 
         int worker_ret_code = spawn_popen_kill(cd->unsafe.pi);

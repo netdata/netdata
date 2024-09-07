@@ -213,9 +213,9 @@ WEVT_LOG *wevt_openlog6(const wchar_t *channel, bool file_size) {
     log->event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath);
     if (!log->event_query) {
         if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, channel '%s' not found", channel2utf8(channel));
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, channel '%s' not found, cannot open log", channel2utf8(channel));
         else
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() on channel '%s' failed", channel2utf8(channel));
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() on channel '%s' failed, cannot open log", channel2utf8(channel));
 
         goto cleanup;
     }

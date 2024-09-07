@@ -475,8 +475,11 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
 
     buffer_json_member_add_object(wb, "_request");
 
+    char func_copy[strlen(function) + 1];
+    strcpy(func_copy, function);
+
     char *words[LQS_MAX_PARAMS] = { NULL };
-    size_t num_words = quoted_strings_splitter_pluginsd(function, words, LQS_MAX_PARAMS);
+    size_t num_words = quoted_strings_splitter_pluginsd(func_copy, words, LQS_MAX_PARAMS);
     for(int i = 1; i < LQS_MAX_PARAMS;i++) {
         char *keyword = get_word(words, num_words, i);
         if(!keyword) break;
@@ -817,7 +820,7 @@ static inline bool lqs_request_parse_and_validate(LOGS_QUERY_STATUS *lqs, BUFFER
         facets_set_timeframe_and_histogram_by_name(facets, default_histogram, lqs->rq.after_ut, lqs->rq.before_ut);
 
     // complete the request object
-    buffer_json_member_add_boolean(wb, LQS_PARAMETER_INFO, false);
+    buffer_json_member_add_boolean(wb, LQS_PARAMETER_INFO, lqs->rq.info);
     buffer_json_member_add_boolean(wb, LQS_PARAMETER_SLICE, lqs->rq.slice);
     buffer_json_member_add_boolean(wb, LQS_PARAMETER_DATA_ONLY, lqs->rq.data_only);
     buffer_json_member_add_boolean(wb, LQS_PARAMETER_DELTA, lqs->rq.delta);

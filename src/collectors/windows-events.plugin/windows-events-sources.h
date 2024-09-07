@@ -30,7 +30,7 @@ typedef struct {
 extern DICTIONARY *wevt_sources;
 extern DICTIONARY *used_hashes_registry;
 
-#define WEVT_SOURCE_ALL_NAME "all"
+#define WEVT_SOURCE_ALL_NAME "All"
 
 void wevt_sources_init(void);
 void wevt_sources_scan(void);

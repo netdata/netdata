@@ -7,7 +7,7 @@ DICTIONARY *used_hashes_registry = NULL;
 static usec_t wevt_session = 0;
 
 WEVT_SOURCE_TYPE wevt_internal_source_type(const char *value) {
-    if(strcmp(value, "all") == 0)
+    if(strcmp(value, WEVT_SOURCE_ALL_NAME) == 0)
         return WEVTS_ALL;
 
     return WEVTS_NONE;
@@ -22,13 +22,49 @@ void wevt_sources_del_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     src->source = NULL;
 }
 
+static bool wevt_sources_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+    LOGS_QUERY_SOURCE *src_old = old_value;
+    LOGS_QUERY_SOURCE *src_new = new_value;
+
+    bool ret = false;
+    if(src_new->last_scan_monotonic_ut > src_old->last_scan_monotonic_ut) {
+        src_old->last_scan_monotonic_ut = src_new->last_scan_monotonic_ut;
+
+        if (src_old->source != src_new->source) {
+            string_freez(src_old->source);
+            src_old->source = src_new->source;
+            src_new->source = NULL;
+        }
+        src_old->source_type = src_new->source_type;
+
+        src_old->msg_first_ut = src_new->msg_first_ut;
+        src_old->msg_last_ut = src_new->msg_last_ut;
+        src_old->msg_first_id = src_new->msg_first_id;
+        src_old->msg_last_id = src_new->msg_last_id;
+        src_old->entries = src_new->entries;
+        src_old->size = src_new->size;
+
+        ret = true;
+    }
+
+    freez((void *)src_new->fullname);
+    string_freez(src_new->source);
+    src_new->fullname = NULL;
+    src_new->source = NULL;
+
+    return ret;
+}
+
 void wevt_sources_init(void) {
     wevt_session = now_realtime_usec();
 
     used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 
-    wevt_sources = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, NULL, sizeof(LOGS_QUERY_SOURCE));
+    wevt_sources = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE | DICT_OPTION_DONT_OVERWRITE_VALUE,
+                                              NULL, sizeof(LOGS_QUERY_SOURCE));
+
     dictionary_register_delete_callback(wevt_sources, wevt_sources_del_cb, NULL);
+    dictionary_register_conflict_callback(wevt_sources, wevt_sources_conflict_cb, NULL);
 }
 
 void buffer_json_wevt_versions(BUFFER *wb __maybe_unused) {
