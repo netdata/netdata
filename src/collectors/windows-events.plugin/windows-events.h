@@ -7,6 +7,17 @@
 #include "collectors/all.h"
 #include <windows.h>
 #include <winevt.h>
+#include <wchar.h>
+
+typedef enum {
+    WEVT_NO_CHANNEL_MATCHED,
+    WEVT_FAILED_TO_OPEN,
+    WEVT_FAILED_TO_SEEK,
+    WEVT_TIMED_OUT,
+    WEVT_OK,
+    WEVT_NOT_MODIFIED,
+    WEVT_CANCELLED,
+} WEVT_QUERY_STATUS;
 
 #include "windows-events-unicode.h"
 #include "windows-events-query.h"

@@ -6,19 +6,37 @@ static uint64_t wevt_log_file_size(const wchar_t *channel);
 
 #define VAR_PROVIDER_NAME(p)                ((p)[0].StringVal)
 #define VAR_SOURCE_NAME(p)                  ((p)[1].StringVal)
-#define VAR_RECORD_NUMBER(p)                ((p)[2].UInt64Val)
-#define VAR_EVENT_ID(p)                     ((p)[3].UInt16Val)
-#define VAR_LEVEL(p)                        ((p)[4].ByteVal)
-#define VAR_KEYWORDS(p)                     ((p)[5].UInt64Val)
-#define VAR_TIME_CREATED(p)                 ((p)[6].FileTimeVal)
-#define VAR_COMPUTER_NAME(p)                ((p)[7].StringVal)
-#define VAR_USER_ID(p)                      ((p)[8].SidVal)
-#define VAR_CORRELATION_ACTIVITY_ID(p)      ((p)[9].GuidVal)
-#define VAR_OPCODE(p)                       ((p)[10].UInt16Val)
-#define	VAR_EVENT_DATA_STRING(p)		    ((p)[11].StringVal)
-#define	VAR_EVENT_DATA_STRING_ARRAY(p, i)	((p)[11].StringArr[i])
-#define	VAR_EVENT_DATA_TYPE(p)			    ((p)[11].Type)
-#define	VAR_EVENT_DATA_COUNT(p)			    ((p)[11].Count)
+#define VAR_PROVIDER_GUID(p)                ((p)[2].GuidVal)
+#define VAR_RECORD_NUMBER(p)                ((p)[3].UInt64Val)
+#define VAR_EVENT_ID(p)                     ((p)[4].UInt16Val)
+#define VAR_LEVEL(p)                        ((p)[5].ByteVal)
+#define VAR_KEYWORDS(p)                     ((p)[6].UInt64Val)
+#define VAR_TIME_CREATED(p)                 ((p)[7].FileTimeVal)
+#define VAR_COMPUTER_NAME(p)                ((p)[8].StringVal)
+#define VAR_USER_ID(p)                      ((p)[9].SidVal)
+#define VAR_CORRELATION_ACTIVITY_ID(p)      ((p)[10].GuidVal)
+#define VAR_OPCODE(p)                       ((p)[11].UInt16Val)
+#define	VAR_EVENT_DATA_STRING(p)		    ((p)[12].StringVal)
+#define	VAR_EVENT_DATA_STRING_ARRAY(p, i)	((p)[12].StringArr[i])
+#define	VAR_EVENT_DATA_TYPE(p)			    ((p)[12].Type)
+#define	VAR_EVENT_DATA_COUNT(p)			    ((p)[12].Count)
+
+// These are the fields we extract from the logs
+static const wchar_t *RENDER_ITEMS[] = {
+    L"/Event/System/Provider/@Name",
+    L"/Event/System/Provider/@EventSourceName",
+    L"/Event/System/Provider/@Guid",
+    L"/Event/System/EventRecordID",
+    L"/Event/System/EventID",
+    L"/Event/System/Level",
+    L"/Event/System/Keywords",
+    L"/Event/System/TimeCreated/@SystemTime",
+    L"/Event/System/Computer",
+    L"/Event/System/Security/@UserID",
+    L"/Event/System/Correlation/@ActivityID",
+    L"/Event/System/Opcode",
+    L"/Event/EventData/Data"
+};
 
 bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
     DWORD size = 0;
@@ -45,6 +63,17 @@ cleanup:
     txt_utf8_resize(dst, 128);
     dst->len = snprintfz(dst->data, dst->size, "[empty]") + 1;
     return false;
+}
+
+static bool wevt_GUID_to_ND_UUID(ND_UUID *nd_uuid, const GUID *guid) {
+    if(guid && sizeof(GUID) == sizeof(ND_UUID)) {
+        memcpy(nd_uuid->uuid, guid, sizeof(ND_UUID));
+        return true;
+    }
+    else {
+        *nd_uuid = UUID_ZERO;
+        return false;
+    }
 }
 
 bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
@@ -75,26 +104,55 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
         }
     }
 
-    ev->id = VAR_RECORD_NUMBER(log->ops.content.data);
-    ev->event_id = VAR_EVENT_ID(log->ops.content.data);
-    ev->level = VAR_LEVEL(log->ops.content.data);
-    ev->keywords = VAR_KEYWORDS(log->ops.content.data);
-    ev->created_ns = os_windows_ulonglong_to_unix_epoch_ns(VAR_TIME_CREATED(log->ops.content.data));
-    ev->opcode = VAR_OPCODE(log->ops.content.data);
-    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.message, EvtFormatMessageEvent);
-    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.opcode, EvtFormatMessageOpcode);
-    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.level, EvtFormatMessageLevel);
-    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.keyword, EvtFormatMessageKeyword);
+    // LogName
+    // it is the same as the channel
+
+    // ProviderName
     wevt_str_wchar_to_utf8(&log->ops.provider, VAR_PROVIDER_NAME(log->ops.content.data), -1);
+
+    // ProviderSourceName
     wevt_str_wchar_to_utf8(&log->ops.source, VAR_SOURCE_NAME(log->ops.content.data), -1);
+
+    // ProviderGUID
+    // we keep this in case we need to cache EventIDs, Keywords, Opcodes, per provider
+    wevt_GUID_to_ND_UUID(&ev->provider, VAR_PROVIDER_GUID(log->ops.content.data));
+
+    // EventRecordID
+    // This is indexed and can be queried with slicing - but not consistent across channels
+    ev->id = VAR_RECORD_NUMBER(log->ops.content.data);
+
+    // EventID (it defines the template for formatting the message)
+    // This is indexed and can be queried with slicing - but not consistent across channels
+    ev->event_id = VAR_EVENT_ID(log->ops.content.data);
+    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.message, EvtFormatMessageEvent);
+
+    // Level (the severity / priority)
+    // This is indexed and can be queried with slicing - probably consistent across channels
+    ev->level = VAR_LEVEL(log->ops.content.data);
+    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.level, EvtFormatMessageLevel);
+
+    // Keywords (categorization of events)
+    // This is indexed and can be queried with slicing - but not consistent across channels
+    ev->keywords = VAR_KEYWORDS(log->ops.content.data);
+    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.keyword, EvtFormatMessageKeyword);
+
+    // TimeCreated
+    // This is indexed and can be queried with slicing - it is consistent across channels
+    ev->created_ns = os_windows_ulonglong_to_unix_epoch_ns(VAR_TIME_CREATED(log->ops.content.data));
+
+    // Opcode
+    // Not indexed
+    ev->opcode = VAR_OPCODE(log->ops.content.data);
+    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.opcode, EvtFormatMessageOpcode);
+
+    // ComputerName
     wevt_str_wchar_to_utf8(&log->ops.computer, VAR_COMPUTER_NAME(log->ops.content.data), -1);
+
+    // User
     wevt_convert_user_id_to_name(log, VAR_USER_ID(log->ops.content.data));
 
-    GUID *ptr = VAR_CORRELATION_ACTIVITY_ID(log->ops.content.data);
-    if(ptr && sizeof(GUID) == sizeof(ND_UUID))
-        memcpy(ev->correlation_activity_id.uuid, ptr, sizeof(ND_UUID));
-    else
-        ev->correlation_activity_id = UUID_ZERO;
+    // CorrelationActivityID
+    wevt_GUID_to_ND_UUID(&ev->correlation_activity_id, VAR_CORRELATION_ACTIVITY_ID(log->ops.content.data));
 
     ret = true;
 
@@ -126,21 +184,6 @@ void wevt_closelog6(WEVT_LOG *log) {
 }
 
 WEVT_LOG *wevt_openlog6(const wchar_t *channel, bool file_size) {
-    static const wchar_t *RENDER_ITEMS[] = {
-            L"/Event/System/Provider/@Name",
-            L"/Event/System/Provider/@EventSourceName",
-            L"/Event/System/EventRecordID",
-            L"/Event/System/EventID",
-            L"/Event/System/Level",
-            L"/Event/System/Keywords",
-            L"/Event/System/TimeCreated/@SystemTime",
-            L"/Event/System/Computer",
-            L"/Event/System/Security/@UserID",
-            L"/Event/System/Correlation/@ActivityID",
-            L"/Event/System/Opcode",
-            L"/Event/EventData/Data"
-    };
-
     size_t RENDER_ITEMS_count = (sizeof(RENDER_ITEMS) / sizeof(const wchar_t *));
     bool ret = false;
 
@@ -248,4 +291,40 @@ cleanup:
         EvtClose(hLog);
 
     return file_size;
+}
+
+EVT_HANDLE wevt_query(LPCWSTR channel, usec_t seek_to, bool backward) {
+    // the query is done at millisecond resolution
+    // so, for the backward mode, we add a millisecond to the seek time.
+    if(backward) seek_to += USEC_PER_MS;
+
+    // Convert the microseconds since Unix epoch to FILETIME (used in Windows APIs)
+    FILETIME fileTime = os_unix_epoch_ns_to_filetime(seek_to * NSEC_PER_USEC / 100);
+
+    // Convert FILETIME to SYSTEMTIME for use in XPath
+    SYSTEMTIME systemTime;
+    if (!FileTimeToSystemTime(&fileTime, &systemTime)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "FileTimeToSystemTime() failed");
+        return NULL;
+    }
+
+    // Format SYSTEMTIME into ISO 8601 format (YYYY-MM-DDTHH:MM:SS.sssZ)
+    static __thread WCHAR query[4096];
+    swprintf(query, 512,
+        L"<QueryList>"
+        L"  <Query Id='0' Path='%s'>"
+        L"    <Select>*[System[TimeCreated[@SystemTime%s'%04d-%02d-%02dT%02d:%02d:%02d.%03dZ']]]</Select>"
+        L"  </Query>"
+        L"</QueryList>",
+        channel,
+        backward ? L"<=" : L">=",  // Use <= if backward, >= if forward
+        systemTime.wYear, systemTime.wMonth, systemTime.wDay,
+        systemTime.wHour, systemTime.wMinute, systemTime.wSecond, systemTime.wMilliseconds);
+
+    // Execute the query
+    EVT_HANDLE hQuery = EvtQuery(NULL, NULL, query, EvtQueryChannelPath | (backward ? EvtQueryReverseDirection : 0));
+    if (!hQuery)
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed");
+
+    return hQuery;
 }

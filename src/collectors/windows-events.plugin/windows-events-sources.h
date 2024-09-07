@@ -27,6 +27,9 @@ typedef struct {
     uint64_t entries;
 } LOGS_QUERY_SOURCE;
 
+extern DICTIONARY *wevt_sources;
+extern DICTIONARY *used_hashes_registry;
+
 #define WEVT_SOURCE_ALL_NAME "all"
 
 void wevt_sources_init(void);
@@ -35,5 +38,8 @@ void buffer_json_wevt_versions(BUFFER *wb);
 
 void wevt_sources_to_json_array(BUFFER *wb);
 WEVT_SOURCE_TYPE wevt_internal_source_type(const char *value);
+
+int wevt_sources_dict_items_backward_compar(const void *a, const void *b);
+int wevt_sources_dict_items_forward_compar(const void *a, const void *b);
 
 #endif //NETDATA_WINDOWS_EVENTS_SOURCES_H

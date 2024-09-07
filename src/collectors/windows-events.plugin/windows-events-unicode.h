@@ -5,6 +5,7 @@
 
 #include "libnetdata/libnetdata.h"
 #include <windows.h>
+#include <wchar.h>
 
 typedef struct {
     char *data;
@@ -58,9 +59,12 @@ bool wevt_str_unicode_to_utf8(TXT_UTF8 *utf8, TXT_UNICODE *unicode);
 bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len);
 
 void unicode2utf8(char *dst, size_t dst_size, const wchar_t *src);
+void utf82unicode(wchar_t *dst, size_t dst_size, const char *src);
 
 char *account2utf8(const wchar_t *user);
 char *domain2utf8(const wchar_t *domain);
+
 char *channel2utf8(const wchar_t *channel);
+wchar_t *channel2unicode(const char *utf8str);
 
 #endif //NETDATA_WINDOWS_EVENTS_UNICODE_H

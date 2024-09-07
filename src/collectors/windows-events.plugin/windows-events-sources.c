@@ -3,6 +3,7 @@
 #include "windows-events-sources.h"
 
 DICTIONARY *wevt_sources = NULL;
+DICTIONARY *used_hashes_registry = NULL;
 static usec_t wevt_session = 0;
 
 WEVT_SOURCE_TYPE wevt_internal_source_type(const char *value) {
@@ -24,6 +25,8 @@ void wevt_sources_del_cb(const DICTIONARY_ITEM *item, void *value, void *data) {
 void wevt_sources_init(void) {
     wevt_session = now_realtime_usec();
 
+    used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+
     wevt_sources = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, NULL, sizeof(LOGS_QUERY_SOURCE));
     dictionary_register_delete_callback(wevt_sources, wevt_sources_del_cb, NULL);
 }
@@ -36,6 +39,36 @@ void buffer_json_wevt_versions(BUFFER *wb __maybe_unused) {
     }
     buffer_json_object_close(wb);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+
+int wevt_sources_dict_items_backward_compar(const void *a, const void *b) {
+    const DICTIONARY_ITEM **da = (const DICTIONARY_ITEM **)a, **db = (const DICTIONARY_ITEM **)b;
+    LOGS_QUERY_SOURCE *sa = dictionary_acquired_item_value(*da);
+    LOGS_QUERY_SOURCE *sb = dictionary_acquired_item_value(*db);
+
+    // compare the last message timestamps
+    if(sa->msg_last_ut < sb->msg_last_ut)
+        return 1;
+
+    if(sa->msg_last_ut > sb->msg_last_ut)
+        return -1;
+
+    // compare the first message timestamps
+    if(sa->msg_first_ut < sb->msg_first_ut)
+        return 1;
+
+    if(sa->msg_first_ut > sb->msg_first_ut)
+        return -1;
+
+    return 0;
+}
+
+int wevt_sources_dict_items_forward_compar(const void *a, const void *b) {
+    return -wevt_sources_dict_items_backward_compar(a, b);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 
 struct wevt_source {
     usec_t first_ut;
@@ -60,7 +93,7 @@ static int wevt_source_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry
                           (time_t)((s->last_ut - s->first_ut) / USEC_PER_SEC), "s", true);
 
         char info[1024];
-        snprintfz(info, sizeof(info), "%zu files, with a total size of %s, covering %s",
+        snprintfz(info, sizeof(info), "%zu channels, with a total size of %s, covering %s",
                 s->count, size_for_humans, duration_for_humans);
 
         buffer_json_member_add_string(wb, "id", name);

@@ -2,6 +2,16 @@
 
 #include "windows-events-unicode.h"
 
+inline void utf82unicode(wchar_t *dst, size_t dst_size, const char *src) {
+    if (src) {
+        // Convert from UTF-8 to wide char (UTF-16)
+        if (MultiByteToWideChar(CP_UTF8, 0, src, -1, dst, (int)dst_size) == 0)
+            wcsncpy(dst, L"[failed conv.]", dst_size - 1);
+    }
+    else
+        wcsncpy(dst, L"[null]", dst_size - 1);
+}
+
 inline void unicode2utf8(char *dst, size_t dst_size, const wchar_t *src) {
     if (src) {
         if(WideCharToMultiByte(CP_UTF8, 0, src, -1, dst, (int)dst_size, NULL, NULL) == 0)
@@ -11,7 +21,12 @@ inline void unicode2utf8(char *dst, size_t dst_size, const wchar_t *src) {
         strncpyz(dst, "[null]", dst_size - 1);
 }
 
-// Function to convert a wide string (UTF-16) to a multibyte string (UTF-8)
+wchar_t *channel2unicode(const char *utf8str) {
+    static __thread wchar_t buffer[1024];
+    utf82unicode(buffer, sizeof(buffer) / sizeof(buffer[0]), utf8str);
+    return buffer;
+}
+
 char *channel2utf8(const wchar_t *channel) {
     static __thread char buffer[1024];
     unicode2utf8(buffer, sizeof(buffer), channel);

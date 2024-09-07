@@ -6,11 +6,12 @@
 #include "windows-events.h"
 
 typedef struct {
-    uint64_t id;
-    uint16_t event_id;
+    uint64_t id;                        // EventRecordId (unique and sequential per channel)
+    uint16_t event_id;                  // This is the template that defines the message to be shown
     uint16_t opcode;
-    uint8_t  level;
-    uint64_t keywords;
+    uint8_t  level;                     // The severity of event
+    uint64_t keywords;                  // Categorization of the event
+    ND_UUID  provider;
     ND_UUID  correlation_activity_id;
     nsec_t   created_ns;
 } WEVT_EVENT;
