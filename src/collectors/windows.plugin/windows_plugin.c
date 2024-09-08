@@ -26,6 +26,8 @@ static struct proc_module {
     {.name = "PerflibNetwork",      .dim = "PerflibNetwork",          .func = do_PerflibNetwork},
     {.name = "PerflibObjects",      .dim = "PerflibObjects",          .func = do_PerflibObjects},
 
+    {.name = "PerflibThermalZone",      .dim = "PerflibThermalZone",          .func = do_PerflibThermalZone},
+
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}
 };
