@@ -62,6 +62,8 @@ typedef struct wevt_log {
         TXT_UTF8 level;
         TXT_UTF8 keyword;
         TXT_UTF8 xml;
+
+        BUFFER *message;
     } ops;
 
 } WEVT_LOG;
@@ -74,6 +76,6 @@ bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, EVT_RETENTION
 EVT_HANDLE wevt_query(LPCWSTR channel, usec_t seek_to, bool backward);
 void wevt_query_done(WEVT_LOG *log);
 
-bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev);
+bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full);
 
 #endif //NETDATA_WINDOWS_EVENTS_QUERY_H

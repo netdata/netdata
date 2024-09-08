@@ -104,13 +104,14 @@ struct lqs_extension {
 #define WEVT_FIELD_PROCESSID            "ProcessID"
 #define WEVT_FIELD_THREADID             "ThreadID"
 #define WEVT_FIELD_XML                  "XML"
+#define WEVT_FIELD_MESSAGE              "Message"
 
 #define WEVT_ALWAYS_VISIBLE_KEYS                NULL
 
 #define WEVT_KEYS_EXCLUDED_FROM_FACETS          \
     "|" WEVT_FIELD_EVENT                        \
+    "|" WEVT_FIELD_MESSAGE                      \
     "|" WEVT_FIELD_XML                          \
-    "|*ID"                                      \
     ""
 
 #define WEVT_KEYS_INCLUDED_IN_FACETS            \
@@ -173,26 +174,22 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 
     facets_register_key_name(
             facets, WEVT_FIELD_CHANNEL,
-            rq->default_facet | FACET_KEY_OPTION_MAIN_TEXT |
-            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
+            rq->default_facet |
+            FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_PROVIDER,
-            rq->default_facet | FACET_KEY_OPTION_MAIN_TEXT |
+            rq->default_facet |
             FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_SOURCE,
-            rq->default_facet | FACET_KEY_OPTION_MAIN_TEXT |
-            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
+            rq->default_facet |
+            FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_EVENTID,
-            rq->default_facet | FACET_KEY_OPTION_FTS);
-
-    facets_register_key_name(
-            facets, WEVT_FIELD_EVENT,
-            FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT |
+            rq->default_facet |
             FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
@@ -234,6 +231,16 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
     facets_register_key_name(
             facets, WEVT_FIELD_THREADID,
             rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_EVENT,
+            FACET_KEY_OPTION_NEVER_FACET |
+            FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_MESSAGE,
+            FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT |
+            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
 }
 
 static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUERY_SOURCE *src, usec_t *msg_ut __maybe_unused, WEVT_EVENT *e) {
@@ -365,6 +372,10 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
                                 WEVT_FIELD_XML, sizeof(WEVT_FIELD_XML) - 1,
                                 log->ops.xml.data, log->ops.xml.used - 1);
 
+    facets_add_key_value_length(facets,
+                                WEVT_FIELD_MESSAGE, sizeof(WEVT_FIELD_MESSAGE) - 1,
+                                buffer_tostring(log->ops.message), buffer_strlen(log->ops.message));
+
     return bytes;
 }
 
@@ -400,7 +411,7 @@ static WEVT_QUERY_STATUS wevt_query_backward(
 
     facets_rows_begin(facets);
     WEVT_EVENT e;
-    while (status == WEVT_OK && wevt_get_next_event(log, &e)) {
+    while (status == WEVT_OK && wevt_get_next_event(log, &e, true)) {
         usec_t msg_ut = e.created_ns / NSEC_PER_USEC;
 
         if(unlikely(!msg_ut)) {
@@ -513,7 +524,7 @@ static WEVT_QUERY_STATUS wevt_query_forward(
 
     facets_rows_begin(facets);
     WEVT_EVENT e;
-    while (status == WEVT_OK && wevt_get_next_event(log, &e)) {
+    while (status == WEVT_OK && wevt_get_next_event(log, &e, true)) {
         usec_t msg_ut = e.created_ns / NSEC_PER_USEC;
 
         if(unlikely(!msg_ut)) {
