@@ -6,6 +6,6 @@
 #include "windows-events.h"
 
 struct wevt_log;
-bool wevt_convert_user_id_to_name(struct wevt_log *log, PSID sid);
+bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst);
 
 #endif //NETDATA_WINDOWS_EVENTS_SID_H

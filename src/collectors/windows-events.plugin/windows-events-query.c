@@ -4,39 +4,97 @@
 
 static uint64_t wevt_log_file_size(const wchar_t *channel);
 
-#define VAR_PROVIDER_NAME(p)                ((p)[0].StringVal)
-#define VAR_EVENT_SOURCE_NAME(p)            ((p)[1].StringVal)
-#define VAR_PROVIDER_GUID(p)                ((p)[2].GuidVal)
-#define VAR_RECORD_NUMBER(p)                ((p)[3].UInt64Val)
-#define VAR_EVENT_ID(p)                     ((p)[4].UInt16Val)
-#define VAR_LEVEL(p)                        ((p)[5].ByteVal)
-#define VAR_KEYWORDS(p)                     ((p)[6].UInt64Val)
-#define VAR_TIME_CREATED(p)                 ((p)[7].FileTimeVal)
-#define VAR_COMPUTER_NAME(p)                ((p)[8].StringVal)
-#define VAR_USER_ID(p)                      ((p)[9].SidVal)
-#define VAR_CORRELATION_ACTIVITY_ID(p)      ((p)[10].GuidVal)
-#define VAR_OPCODE(p)                       ((p)[11].UInt16Val)
-#define	VAR_EVENT_DATA_STRING(p)		    ((p)[12].StringVal)
-#define	VAR_EVENT_DATA_STRING_ARRAY(p, i)	((p)[12].StringArr[i])
-#define	VAR_EVENT_DATA_TYPE(p)			    ((p)[12].Type)
-#define	VAR_EVENT_DATA_COUNT(p)			    ((p)[12].Count)
+#define FIELD_CHANNEL                       (0)
+#define FIELD_PROVIDER_NAME                 (1)
+#define FIELD_EVENT_SOURCE_NAME             (2)
+#define FIELD_PROVIDER_GUID                 (3)
+#define FIELD_RECORD_NUMBER                 (4)
+#define FIELD_EVENT_ID                      (5)
+#define FIELD_LEVEL                         (6)
+#define FIELD_KEYWORDS                      (7)
+#define FIELD_TIME_CREATED                  (8)
+#define FIELD_COMPUTER_NAME                 (9)
+#define FIELD_USER_ID                       (10)
+#define FIELD_CORRELATION_ACTIVITY_ID       (11)
+#define FIELD_OPCODE                        (12)
+#define FIELD_VERSION                       (13)
+#define FIELD_TASK                          (14)
+#define FIELD_PROCESS_ID                    (15)
+#define FIELD_THREAD_ID                     (16)
+#define	FIELD_EVENT_DATA                    (17)
 
 // These are the fields we extract from the logs
 static const wchar_t *RENDER_ITEMS[] = {
-    L"/Event/System/Provider/@Name",
-    L"/Event/System/Provider/@EventSourceName",
-    L"/Event/System/Provider/@Guid",
-    L"/Event/System/EventRecordID",
-    L"/Event/System/EventID",
-    L"/Event/System/Level",
-    L"/Event/System/Keywords",
-    L"/Event/System/TimeCreated/@SystemTime",
-    L"/Event/System/Computer",
-    L"/Event/System/Security/@UserID",
-    L"/Event/System/Correlation/@ActivityID",
-    L"/Event/System/Opcode",
-    L"/Event/EventData/Data"
+        L"/Event/System/Channel",
+        L"/Event/System/Provider/@Name",
+        L"/Event/System/Provider/@EventSourceName",
+        L"/Event/System/Provider/@Guid",
+        L"/Event/System/EventRecordID",
+        L"/Event/System/EventID",
+        L"/Event/System/Level",
+        L"/Event/System/Keywords",
+        L"/Event/System/TimeCreated/@SystemTime",
+        L"/Event/System/Computer",
+        L"/Event/System/Security/@UserID",
+        L"/Event/System/Correlation/@ActivityID",
+        L"/Event/System/Opcode",
+        L"/Event/System/Version",
+        L"/Event/System/Task",
+        L"/Event/System/Execution/@ProcessID",
+        L"/Event/System/Execution/@ThreadID",
+        L"/Event/EventData/Data"
 };
+
+static bool wevt_GUID_to_ND_UUID(ND_UUID *nd_uuid, const GUID *guid) {
+    if(guid && sizeof(GUID) == sizeof(ND_UUID)) {
+        memcpy(nd_uuid->uuid, guid, sizeof(ND_UUID));
+        return true;
+    }
+    else {
+        *nd_uuid = UUID_ZERO;
+        return false;
+    }
+}
+
+uint64_t wevt_get_unsigned_by_type(WEVT_LOG *log, size_t field) {
+    switch(log->ops.content.data[field].Type) {
+        case EvtVarTypeHexInt64: return log->ops.content.data[field].UInt64Val;
+        case EvtVarTypeHexInt32: return log->ops.content.data[field].UInt32Val;
+        case EvtVarTypeUInt64: return log->ops.content.data[field].UInt64Val;
+        case EvtVarTypeUInt32: return log->ops.content.data[field].UInt32Val;
+        case EvtVarTypeUInt16: return log->ops.content.data[field].UInt16Val;
+        case EvtVarTypeInt64: return ABS(log->ops.content.data[field].Int64Val);
+        case EvtVarTypeInt32: return ABS(log->ops.content.data[field].Int32Val);
+        case EvtVarTypeByte:  return log->ops.content.data[field].ByteVal;
+        case EvtVarTypeInt16:  return ABS(log->ops.content.data[field].Int16Val);
+        case EvtVarTypeSByte: return ABS(log->ops.content.data[field].SByteVal);
+        case EvtVarTypeSingle: return ABS(log->ops.content.data[field].SingleVal);
+        case EvtVarTypeDouble: return ABS(log->ops.content.data[field].DoubleVal);
+        case EvtVarTypeBoolean: return log->ops.content.data[field].BooleanVal ? 1 : 0;
+        case EvtVarTypeSizeT: return log->ops.content.data[field].SizeTVal;
+        default: return 0;
+    }
+}
+
+uint64_t wevt_get_filetime_to_ns_by_type(WEVT_LOG *log, size_t field) {
+    switch(log->ops.content.data[field].Type) {
+        case EvtVarTypeFileTime:
+        case EvtVarTypeUInt64:
+            return os_windows_ulonglong_to_unix_epoch_ns(log->ops.content.data[field].FileTimeVal);
+
+        default: return 0;
+    }
+}
+
+bool wevt_get_uuid_by_type(WEVT_LOG *log, size_t field, ND_UUID *dst) {
+    switch(log->ops.content.data[field].Type) {
+        case EvtVarTypeGuid:
+            return wevt_GUID_to_ND_UUID(dst, log->ops.content.data[field].GuidVal);
+
+        default:
+            return wevt_GUID_to_ND_UUID(dst, NULL);
+    }
+}
 
 static void wevt_empty_utf8(TXT_UTF8 *dst) {
     txt_utf8_resize(dst, 1);
@@ -47,9 +105,18 @@ static void wevt_empty_utf8(TXT_UTF8 *dst) {
 bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
     DWORD size = 0;
 
+    if(!log->ops.unicode.data) {
+        EvtFormatMessage(NULL, event_handle, 0, 0, NULL, what, 0, NULL, &size);
+        if(!size) {
+            // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() to get message size failed.");
+            goto cleanup;
+        }
+        txt_unicode_resize(&log->ops.unicode, size);
+    }
+
     // First, try to get the message using the existing buffer
-    if (!EvtFormatMessage(NULL, event_handle, 0, 0, NULL, what, log->ops.unicode.size, log->ops.unicode.data, &size)) {
-        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+    if (!EvtFormatMessage(NULL, event_handle, 0, 0, NULL, what, log->ops.unicode.size, log->ops.unicode.data, &size) || !log->ops.unicode.data) {
+        if (log->ops.unicode.data && GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed.");
             goto cleanup;
         }
@@ -78,14 +145,25 @@ cleanup:
     return false;
 }
 
-static bool wevt_GUID_to_ND_UUID(ND_UUID *nd_uuid, const GUID *guid) {
-    if(guid && sizeof(GUID) == sizeof(ND_UUID)) {
-        memcpy(nd_uuid->uuid, guid, sizeof(ND_UUID));
-        return true;
+bool wevt_get_utf8_by_type(WEVT_LOG *log, size_t field, TXT_UTF8 *dst) {
+    switch(log->ops.content.data[field].Type) {
+        case EvtVarTypeString:
+            return wevt_str_wchar_to_utf8(dst, log->ops.content.data[field].StringVal, -1);
+
+        default:
+            wevt_empty_utf8(dst);
+            return false;
     }
-    else {
-        *nd_uuid = UUID_ZERO;
-        return false;
+}
+
+bool wevt_get_sid_by_type(WEVT_LOG *log, size_t field, TXT_UTF8 *dst) {
+    switch(log->ops.content.data[field].Type) {
+        case EvtVarTypeSid:
+            return wevt_convert_user_id_to_name(log->ops.content.data[field].SidVal, dst);
+
+        default:
+            wevt_empty_utf8(dst);
+            return false;
     }
 }
 
@@ -118,26 +196,26 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
     }
     log->ops.content.len = size;
 
-    // LogName
-    // it is the same as the channel
+    // Channel
+    wevt_get_utf8_by_type(log, FIELD_CHANNEL, &log->ops.channel);
 
     // ProviderName
-    wevt_str_wchar_to_utf8(&log->ops.provider, VAR_PROVIDER_NAME(log->ops.content.data), -1);
+    wevt_get_utf8_by_type(log, FIELD_PROVIDER_NAME, &log->ops.provider);
 
     // ProviderSourceName
-    wevt_str_wchar_to_utf8(&log->ops.source, VAR_EVENT_SOURCE_NAME(log->ops.content.data), -1);
+    wevt_get_utf8_by_type(log, FIELD_EVENT_SOURCE_NAME, &log->ops.source);
 
     // ProviderGUID
     // we keep this in case we need to cache EventIDs, Keywords, Opcodes, per provider
-    wevt_GUID_to_ND_UUID(&ev->provider, VAR_PROVIDER_GUID(log->ops.content.data));
+    wevt_get_uuid_by_type(log, FIELD_PROVIDER_GUID, &ev->provider);
 
     // EventRecordID
     // This is indexed and can be queried with slicing - but not consistent across channels
-    ev->id = VAR_RECORD_NUMBER(log->ops.content.data);
+    ev->id = wevt_get_unsigned_by_type(log, FIELD_RECORD_NUMBER);
 
     // EventID (it defines the template for formatting the message)
     // This is indexed and can be queried with slicing - but not consistent across channels
-    ev->event_id = VAR_EVENT_ID(log->ops.content.data);
+    ev->event_id = wevt_get_unsigned_by_type(log, FIELD_EVENT_ID);
     if(ev->event_id)
         wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.event, EvtFormatMessageEvent);
     else
@@ -145,12 +223,12 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
 
     // Level (the severity / priority)
     // This is indexed and can be queried with slicing - probably consistent across channels
-    ev->level = VAR_LEVEL(log->ops.content.data);
+    ev->level = wevt_get_unsigned_by_type(log, FIELD_LEVEL);
     wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.level, EvtFormatMessageLevel);
 
     // Keywords (categorization of events)
     // This is indexed and can be queried with slicing - but not consistent across channels
-    ev->keyword = VAR_KEYWORDS(log->ops.content.data);
+    ev->keyword = wevt_get_unsigned_by_type(log, FIELD_KEYWORDS);
     if(ev->keyword)
         wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.keyword, EvtFormatMessageKeyword);
     else
@@ -158,24 +236,32 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
 
     // TimeCreated
     // This is indexed and can be queried with slicing - it is consistent across channels
-    ev->created_ns = os_windows_ulonglong_to_unix_epoch_ns(VAR_TIME_CREATED(log->ops.content.data));
+    ev->created_ns = wevt_get_filetime_to_ns_by_type(log, FIELD_TIME_CREATED);
 
     // Opcode
     // Not indexed
-    ev->opcode = VAR_OPCODE(log->ops.content.data);
+    ev->opcode = wevt_get_unsigned_by_type(log, FIELD_OPCODE);
     if(ev->opcode)
         wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.opcode, EvtFormatMessageOpcode);
     else
         wevt_empty_utf8(&log->ops.keyword);
 
+    ev->version = wevt_get_unsigned_by_type(log, FIELD_VERSION);
+    ev->task = wevt_get_unsigned_by_type(log, FIELD_TASK);
+    ev->process_id = wevt_get_unsigned_by_type(log, FIELD_PROCESS_ID);
+    ev->thread_id = wevt_get_unsigned_by_type(log, FIELD_THREAD_ID);
+
     // ComputerName
-    wevt_str_wchar_to_utf8(&log->ops.computer, VAR_COMPUTER_NAME(log->ops.content.data), -1);
+    wevt_get_utf8_by_type(log, FIELD_COMPUTER_NAME, &log->ops.computer);
 
     // User
-    wevt_convert_user_id_to_name(log, VAR_USER_ID(log->ops.content.data));
+    wevt_get_sid_by_type(log, FIELD_USER_ID, &log->ops.user);
 
     // CorrelationActivityID
-    wevt_GUID_to_ND_UUID(&ev->correlation_activity_id, VAR_CORRELATION_ACTIVITY_ID(log->ops.content.data));
+    wevt_get_uuid_by_type(log, FIELD_CORRELATION_ACTIVITY_ID, &ev->correlation_activity_id);
+
+    // Full XML of the entire message
+    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.xml, EvtFormatMessageXml);
 
     ret = true;
 
@@ -195,14 +281,16 @@ void wevt_closelog6(WEVT_LOG *log) {
 
     freez(log->ops.content.data);
     txt_unicode_cleanup(&log->ops.unicode);
-    txt_utf8_cleanup(&log->ops.event);
+    txt_utf8_cleanup(&log->ops.channel);
     txt_utf8_cleanup(&log->ops.provider);
     txt_utf8_cleanup(&log->ops.source);
     txt_utf8_cleanup(&log->ops.computer);
+    txt_utf8_cleanup(&log->ops.event);
     txt_utf8_cleanup(&log->ops.user);
     txt_utf8_cleanup(&log->ops.opcode);
     txt_utf8_cleanup(&log->ops.level);
     txt_utf8_cleanup(&log->ops.keyword);
+    txt_utf8_cleanup(&log->ops.xml);
     freez(log);
 }
 

@@ -5,12 +5,16 @@
 
 #include "windows-events.h"
 
-typedef struct {
+typedef struct wevt_event {
     uint64_t id;                        // EventRecordId (unique and sequential per channel)
     uint16_t event_id;                  // This is the template that defines the message to be shown
     uint16_t opcode;
     uint8_t  level;                     // The severity of event
-    uint64_t keyword;                  // Categorization of the event
+    uint8_t  version;
+    uint16_t task;
+    uint32_t process_id;
+    uint32_t thread_id;
+    uint64_t keyword;                   // Categorization of the event
     ND_UUID  provider;
     ND_UUID  correlation_activity_id;
     nsec_t   created_ns;
@@ -48,14 +52,16 @@ typedef struct wevt_log {
 
         // string attributes of the current event log entry
         // valid until another event if fetched
-        TXT_UTF8 event;
+        TXT_UTF8 channel;
         TXT_UTF8 provider;
         TXT_UTF8 source;
         TXT_UTF8 computer;
+        TXT_UTF8 event;
         TXT_UTF8 user;
         TXT_UTF8 opcode;
         TXT_UTF8 level;
         TXT_UTF8 keyword;
+        TXT_UTF8 xml;
     } ops;
 
 } WEVT_LOG;

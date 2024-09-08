@@ -91,6 +91,7 @@ struct lqs_extension {
 #define WEVT_KEYS_EXCLUDED_FROM_FACETS          \
     "|Event"                                    \
     "|*ID"                                      \
+    "|XMLView"                                  \
     ""
 
 #define WEVT_KEYS_INCLUDED_IN_FACETS            \
@@ -132,6 +133,10 @@ static inline WEVT_QUERY_STATUS check_stop(const bool *cancelled, const usec_t *
 #define WEVT_FIELD_OPCODE               "Opcode"
 #define WEVT_FIELD_USER                 "User"
 #define WEVT_FIELD_EVENT                "Event"
+#define WEVT_FIELD_TASK                 "Task"
+#define WEVT_FIELD_PROCESSID            "ProcessID"
+#define WEVT_FIELD_THREADID             "ThreadID"
+#define WEVT_FIELD_XML_VIEW             "XMLView"
 
 FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused, FACET_ROW *row, void *data __maybe_unused) {
     FACET_ROW_KEY_VALUE *levelid_rkv = dictionary_get(row->dict, WEVT_FIELD_LEVELID);
@@ -183,7 +188,7 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 
     facets_register_key_name(
             facets, WEVT_FIELD_EVENTID,
-            rq->default_facet);
+            rq->default_facet | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_EVENT,
@@ -200,7 +205,7 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 
     facets_register_key_name(
             facets, WEVT_FIELD_KEYWORDID,
-            rq->default_facet);
+            rq->default_facet | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_KEYWORD,
@@ -208,7 +213,7 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 
     facets_register_key_name(
             facets, WEVT_FIELD_OPCODEID,
-            rq->default_facet);
+            rq->default_facet | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_OPCODE,
@@ -216,6 +221,18 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 
     facets_register_key_name(
             facets, WEVT_FIELD_USER,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_TASK,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_PROCESSID,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_THREADID,
             rq->default_facet | FACET_KEY_OPTION_FTS);
 }
 
@@ -232,10 +249,18 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
                                 WEVT_FIELD_SOURCE, sizeof(WEVT_FIELD_SOURCE) - 1,
                                 log->ops.source.data, log->ops.source.used - 1);
 
-    bytes += src->fullname_len * 2;
-    facets_add_key_value_length(facets,
-                                WEVT_FIELD_CHANNEL, sizeof(WEVT_FIELD_CHANNEL) - 1,
-                                src->fullname, src->fullname_len);
+    if(log->ops.channel.used > 1) {
+        bytes += log->ops.channel.used * 2;
+        facets_add_key_value_length(facets,
+                                    WEVT_FIELD_CHANNEL, sizeof(WEVT_FIELD_CHANNEL) - 1,
+                                    log->ops.channel.data, log->ops.channel.used - 1);
+    }
+    else {
+        bytes += src->fullname_len * 2;
+        facets_add_key_value_length(facets,
+                                    WEVT_FIELD_CHANNEL, sizeof(WEVT_FIELD_CHANNEL) - 1,
+                                    src->fullname, src->fullname_len);
+    }
 
     static __thread char id_str[24];
     len = print_uint64(id_str, e->id);
@@ -243,13 +268,6 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
     facets_add_key_value_length(facets,
                                 WEVT_FIELD_EVENTRECORDID, sizeof(WEVT_FIELD_EVENTRECORDID) - 1,
                                 id_str, len);
-
-    static __thread char event_id_str[24];
-    len = print_uint64(event_id_str, e->event_id);
-    bytes += len;
-    facets_add_key_value_length(facets,
-                                WEVT_FIELD_EVENTID, sizeof(WEVT_FIELD_EVENTID) - 1,
-                                event_id_str, len);
 
     static __thread char level_id_str[24];
     len = print_uint64(level_id_str, e->level);
@@ -263,44 +281,89 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
                                 WEVT_FIELD_LEVEL, sizeof(WEVT_FIELD_LEVEL) - 1,
                                 log->ops.level.data, log->ops.level.used - 1);
 
-    static __thread char keyword_id_str[24];
-    len = print_uint64_hex(keyword_id_str, e->keyword);
-    bytes += len;
-    facets_add_key_value_length(facets,
-                                WEVT_FIELD_KEYWORDID, sizeof(WEVT_FIELD_KEYWORDID) - 1,
-                                keyword_id_str, len);
+    if(e->keyword) {
+        static __thread char keyword_id_str[24];
+        len = print_uint64_hex(keyword_id_str, e->keyword);
+        bytes += len;
+        facets_add_key_value_length(facets,
+                                    WEVT_FIELD_KEYWORDID, sizeof(WEVT_FIELD_KEYWORDID) - 1,
+                                    keyword_id_str, len);
 
-    bytes += log->ops.keyword.used * 2;
-    facets_add_key_value_length(facets,
-                                WEVT_FIELD_KEYWORD, sizeof(WEVT_FIELD_KEYWORD) - 1,
-                                log->ops.keyword.data, log->ops.keyword.used - 1);
+        bytes += log->ops.keyword.used * 2;
+        facets_add_key_value_length(facets,
+                                    WEVT_FIELD_KEYWORD, sizeof(WEVT_FIELD_KEYWORD) - 1,
+                                    log->ops.keyword.data, log->ops.keyword.used - 1);
+    }
 
     bytes += log->ops.computer.used * 2;
     facets_add_key_value_length(facets,
                                 WEVT_FIELD_COMPUTER, sizeof(WEVT_FIELD_COMPUTER) - 1,
                                 log->ops.computer.data, log->ops.computer.used - 1);
 
-    static __thread char opcode_id_str[24];
-    len = print_uint64(opcode_id_str, e->opcode);
-    bytes += len;
-    facets_add_key_value_length(facets,
-                                WEVT_FIELD_OPCODEID, sizeof(WEVT_FIELD_OPCODEID) - 1,
-                                opcode_id_str, len);
+    if(e->opcode) {
+        static __thread char opcode_id_str[24];
+        len = print_uint64(opcode_id_str, e->opcode);
+        bytes += len;
+        facets_add_key_value_length(facets,
+                                    WEVT_FIELD_OPCODEID, sizeof(WEVT_FIELD_OPCODEID) - 1,
+                                    opcode_id_str, len);
 
-    bytes += log->ops.opcode.used * 2;
-    facets_add_key_value_length(facets,
-                                WEVT_FIELD_OPCODE, sizeof(WEVT_FIELD_OPCODE) - 1,
-                                log->ops.opcode.data, log->ops.opcode.used - 1);
+        bytes += log->ops.opcode.used * 2;
+        facets_add_key_value_length(facets,
+                                    WEVT_FIELD_OPCODE, sizeof(WEVT_FIELD_OPCODE) - 1,
+                                    log->ops.opcode.data, log->ops.opcode.used - 1);
+    }
 
     bytes += log->ops.user.used * 2;
     facets_add_key_value_length(facets,
                                 WEVT_FIELD_USER, sizeof(WEVT_FIELD_USER) - 1,
                                 log->ops.user.data, log->ops.user.used - 1);
 
-    bytes += log->ops.event.used * 2;
+    if(e->event_id) {
+        static __thread char event_id_str[24];
+        len = print_uint64(event_id_str, e->event_id);
+        bytes += len;
+        facets_add_key_value_length(facets,
+                                    WEVT_FIELD_EVENTID, sizeof(WEVT_FIELD_EVENTID) - 1,
+                                    event_id_str, len);
+
+        bytes += log->ops.event.used * 2;
+        facets_add_key_value_length(facets,
+                                    WEVT_FIELD_EVENT, sizeof(WEVT_FIELD_EVENT) - 1,
+                                    log->ops.event.data, log->ops.event.used - 1);
+    }
+
+    if(e->task) {
+        static __thread char task_str[24];
+        len = print_uint64(task_str, e->task);
+        bytes += len;
+        facets_add_key_value_length(facets,
+                                    WEVT_FIELD_TASK, sizeof(WEVT_FIELD_TASK) - 1,
+                                    task_str, len);
+    }
+
+    if(e->process_id) {
+        static __thread char process_id_str[24];
+        len = print_uint64(process_id_str, e->process_id);
+        bytes += len;
+        facets_add_key_value_length(facets,
+                                    WEVT_FIELD_PROCESSID, sizeof(WEVT_FIELD_PROCESSID) - 1,
+                                    process_id_str, len);
+    }
+
+    if(e->thread_id) {
+        static __thread char thread_id_str[24];
+        len = print_uint64(thread_id_str, e->thread_id);
+        bytes += len;
+        facets_add_key_value_length(facets,
+                                    WEVT_FIELD_THREADID, sizeof(WEVT_FIELD_THREADID) - 1,
+                                    thread_id_str, len);
+    }
+
+    bytes += log->ops.xml.used * 2;
     facets_add_key_value_length(facets,
-                                WEVT_FIELD_EVENT, sizeof(WEVT_FIELD_EVENT) - 1,
-                                log->ops.event.data, log->ops.event.used - 1);
+                                WEVT_FIELD_XML_VIEW, sizeof(WEVT_FIELD_XML_VIEW) - 1,
+                                log->ops.xml.data, log->ops.xml.used - 1);
 
     return bytes;
 }
