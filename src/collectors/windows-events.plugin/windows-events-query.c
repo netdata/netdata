@@ -272,9 +272,15 @@ cleanup:
     return ret;
 }
 
+void wevt_query_done(WEVT_LOG *log) {
+    if (!log->event_query) return;
+
+    EvtClose(log->event_query);
+    log->event_query = NULL;
+}
+
 void wevt_closelog6(WEVT_LOG *log) {
-    if (log->event_query)
-        EvtClose(log->event_query);
+    wevt_query_done(log);
 
     if (log->render_context)
         EvtClose(log->render_context);
@@ -294,22 +300,12 @@ void wevt_closelog6(WEVT_LOG *log) {
     freez(log);
 }
 
-WEVT_LOG *wevt_openlog6(const wchar_t *channel, bool file_size) {
-    size_t RENDER_ITEMS_count = (sizeof(RENDER_ITEMS) / sizeof(const wchar_t *));
+bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, EVT_RETENTION *retention) {
     bool ret = false;
-
-    WEVT_LOG *log = callocz(1, sizeof(*log));
 
     // get the number of the oldest record in the log
     // "EvtGetLogInfo()" does not work properly with "EvtLogOldestRecordNumber"
     // we have to get it from the first EventRecordID
-
-    // create the system render
-    log->render_context = EvtCreateRenderContext(RENDER_ITEMS_count, RENDER_ITEMS, EvtRenderContextValues);
-    if (!log->render_context) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed.");
-        goto cleanup;
-    }
 
     // query the eventlog
     log->event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath);
@@ -322,12 +318,12 @@ WEVT_LOG *wevt_openlog6(const wchar_t *channel, bool file_size) {
         goto cleanup;
     }
 
-    if (!wevt_get_next_event(log, &log->retention.first_event))
+    if (!wevt_get_next_event(log, &retention->first_event))
         goto cleanup;
 
-    if (!log->retention.first_event.id) {
+    if (!retention->first_event.id) {
         // no data in the event log
-        log->retention.first_event = log->retention.last_event = WEVT_EVENT_EMPTY;
+        retention->first_event = retention->last_event = WEVT_EVENT_EMPTY;
         ret = true;
         goto cleanup;
     }
@@ -343,36 +339,46 @@ WEVT_LOG *wevt_openlog6(const wchar_t *channel, bool file_size) {
         goto cleanup;
     }
 
-    if (!wevt_get_next_event(log, &log->retention.last_event) || log->retention.last_event.id == 0) {
+    if (!wevt_get_next_event(log, &retention->last_event) || retention->last_event.id == 0) {
         // no data in eventlog
-        log->retention.last_event = log->retention.first_event;
+        retention->last_event = retention->first_event;
     }
-    log->retention.last_event.id += 1;	// we should read the last record
+    retention->last_event.id += 1;	// we should read the last record
     ret = true;
 
 cleanup:
-    if(log->event_query) {
-        EvtClose(log->event_query);
-        log->event_query = NULL;
-    }
+    wevt_query_done(log);
 
     if(ret) {
-        log->retention.entries = log->retention.last_event.id - log->retention.first_event.id;
+        retention->entries = retention->last_event.id - retention->first_event.id;
 
-        if(log->retention.last_event.created_ns >= log->retention.first_event.created_ns)
-            log->retention.duration_ns = log->retention.last_event.created_ns - log->retention.first_event.created_ns;
+        if(retention->last_event.created_ns >= retention->first_event.created_ns)
+            retention->duration_ns = retention->last_event.created_ns - retention->first_event.created_ns;
         else
-            log->retention.duration_ns = log->retention.first_event.created_ns - log->retention.last_event.created_ns;
+            retention->duration_ns = retention->first_event.created_ns - retention->last_event.created_ns;
 
-        if(file_size)
-            log->retention.size_bytes = wevt_log_file_size(channel);
+        retention->size_bytes = wevt_log_file_size(channel);
+    }
+    else
+        memset(retention, 0, sizeof(*retention));
 
-        return log;
+    return ret;
+}
+
+WEVT_LOG *wevt_openlog6(void) {
+    size_t RENDER_ITEMS_count = (sizeof(RENDER_ITEMS) / sizeof(const wchar_t *));
+
+    WEVT_LOG *log = callocz(1, sizeof(*log));
+
+    // create the system render
+    log->render_context = EvtCreateRenderContext(RENDER_ITEMS_count, RENDER_ITEMS, EvtRenderContextValues);
+    if (!log->render_context) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed.");
+        goto cleanup;
     }
-    else {
-        wevt_closelog6(log);
-        return NULL;
-    }
+
+cleanup:
+    return log;
 }
 
 static uint64_t wevt_log_file_size(const wchar_t *channel) {

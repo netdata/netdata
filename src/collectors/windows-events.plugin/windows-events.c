@@ -86,39 +86,6 @@ struct lqs_extension {
 #define LQS_FUNCTION_SOURCE_TO_JSON_ARRAY(wb) wevt_sources_to_json_array(wb)
 #include "libnetdata/facets/logs_query_status.h"
 
-#define WEVT_ALWAYS_VISIBLE_KEYS                NULL
-
-#define WEVT_KEYS_EXCLUDED_FROM_FACETS          \
-    "|Event"                                    \
-    "|*ID"                                      \
-    "|XMLView"                                  \
-    ""
-
-#define WEVT_KEYS_INCLUDED_IN_FACETS            \
-    "|Provider"                                 \
-    "|Source"                                   \
-    "|Channel"                                  \
-    "|Level"                                    \
-    "|Keyword"                                  \
-    "|Opcode"                                   \
-    "|Computer"                                 \
-    "|User"                                     \
-    ""
-
-static inline WEVT_QUERY_STATUS check_stop(const bool *cancelled, const usec_t *stop_monotonic_ut) {
-    if(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)) {
-        internal_error(true, "Function has been cancelled");
-        return WEVT_CANCELLED;
-    }
-
-    if(now_monotonic_usec() > __atomic_load_n(stop_monotonic_ut, __ATOMIC_RELAXED)) {
-        internal_error(true, "Function timed out");
-        return WEVT_TIMED_OUT;
-    }
-
-    return WEVT_OK;
-}
-
 #define WEVT_FIELD_COMPUTER             "Computer"
 #define WEVT_FIELD_CHANNEL              "Channel"
 #define WEVT_FIELD_PROVIDER             "Provider"
@@ -136,7 +103,40 @@ static inline WEVT_QUERY_STATUS check_stop(const bool *cancelled, const usec_t *
 #define WEVT_FIELD_TASK                 "Task"
 #define WEVT_FIELD_PROCESSID            "ProcessID"
 #define WEVT_FIELD_THREADID             "ThreadID"
-#define WEVT_FIELD_XML_VIEW             "XMLView"
+#define WEVT_FIELD_XML                  "XML"
+
+#define WEVT_ALWAYS_VISIBLE_KEYS                NULL
+
+#define WEVT_KEYS_EXCLUDED_FROM_FACETS          \
+    "|" WEVT_FIELD_EVENT                        \
+    "|" WEVT_FIELD_XML                          \
+    "|*ID"                                      \
+    ""
+
+#define WEVT_KEYS_INCLUDED_IN_FACETS            \
+    "|" WEVT_FIELD_PROVIDER                     \
+    "|" WEVT_FIELD_SOURCE                       \
+    "|" WEVT_FIELD_CHANNEL                      \
+    "|" WEVT_FIELD_LEVEL                        \
+    "|" WEVT_FIELD_KEYWORD                      \
+    "|" WEVT_FIELD_OPCODE                       \
+    "|" WEVT_FIELD_COMPUTER                     \
+    "|" WEVT_FIELD_USER                         \
+    ""
+
+static inline WEVT_QUERY_STATUS check_stop(const bool *cancelled, const usec_t *stop_monotonic_ut) {
+    if(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)) {
+        internal_error(true, "Function has been cancelled");
+        return WEVT_CANCELLED;
+    }
+
+    if(now_monotonic_usec() > __atomic_load_n(stop_monotonic_ut, __ATOMIC_RELAXED)) {
+        internal_error(true, "Function timed out");
+        return WEVT_TIMED_OUT;
+    }
+
+    return WEVT_OK;
+}
 
 FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused, FACET_ROW *row, void *data __maybe_unused) {
     FACET_ROW_KEY_VALUE *levelid_rkv = dictionary_get(row->dict, WEVT_FIELD_LEVELID);
@@ -362,7 +362,7 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
 
     bytes += log->ops.xml.used * 2;
     facets_add_key_value_length(facets,
-                                WEVT_FIELD_XML_VIEW, sizeof(WEVT_FIELD_XML_VIEW) - 1,
+                                WEVT_FIELD_XML, sizeof(WEVT_FIELD_XML) - 1,
                                 log->ops.xml.data, log->ops.xml.used - 1);
 
     return bytes;
@@ -477,10 +477,7 @@ static WEVT_QUERY_STATUS wevt_query_backward(
     if(latest_msg_ut > lqs->last_modified)
         lqs->last_modified = latest_msg_ut;
 
-    if(log->event_query) {
-        EvtClose(log->event_query);
-        log->event_query = NULL;
-    }
+    wevt_query_done(log);
 
     return status;
 }
@@ -593,49 +590,39 @@ static WEVT_QUERY_STATUS wevt_query_forward(
     if(latest_msg_ut > lqs->last_modified)
         lqs->last_modified = latest_msg_ut;
 
-    if(log->event_query) {
-        EvtClose(log->event_query);
-        log->event_query = NULL;
-    }
+    wevt_query_done(log);
 
     return status;
 }
 
 static WEVT_QUERY_STATUS wevt_query_one_channel(
-        const char *fullname, BUFFER *wb, FACETS *facets,
-        LOGS_QUERY_SOURCE *jf,
-    LOGS_QUERY_STATUS *fqs) {
+        WEVT_LOG *log,
+        BUFFER *wb, FACETS *facets,
+        LOGS_QUERY_SOURCE *src,
+        LOGS_QUERY_STATUS *lqs) {
 
     errno_clear();
-
-    WEVT_LOG *log = wevt_openlog6(channel2unicode(fullname), false);
-    if(!log) {
-        netdata_log_error("WEVT: cannot open channel '%s' for query", fullname);
-        return WEVT_FAILED_TO_OPEN;
-    }
 
     WEVT_QUERY_STATUS status;
     bool matches_filters = true;
 
-    // if(fqs->rq.slice) {
+    // if(lqs->rq.slice) {
     //     usec_t started = now_monotonic_usec();
     //
-    //     matches_filters = netdata_systemd_filtering_by_journal(j, facets, fqs) || !fqs->rq.filters;
+    //     matches_filters = netdata_systemd_filtering_by_journal(j, facets, lqs) || !lqs->rq.filters;
     //     usec_t ended = now_monotonic_usec();
     //
-    //     fqs->c.matches_setup_ut += (ended - started);
+    //     lqs->c.matches_setup_ut += (ended - started);
     // }
 
     if(matches_filters) {
-        if(fqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD)
-            status = wevt_query_forward(log, wb, facets, jf, fqs);
+        if(lqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD)
+            status = wevt_query_forward(log, wb, facets, src, lqs);
         else
-            status = wevt_query_backward(log, wb, facets, jf, fqs);
+            status = wevt_query_backward(log, wb, facets, src, lqs);
     }
     else
         status = WEVT_NO_CHANNEL_MATCHED;
-
-    wevt_closelog6(log);
 
     return status;
 }
@@ -714,6 +701,12 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
     usec_t duration_ut = 0, max_duration_ut = 0;
     usec_t progress_duration_ut = 0;
 
+    WEVT_LOG *log = wevt_openlog6();
+    if(!log) {
+        netdata_log_error("WEVT: cannot windows event log");
+        return rrd_call_function_error(wb, "cannot open windows events log", HTTP_RESP_INTERNAL_SERVER_ERROR);
+    }
+
     // sampling_query_init(lqs, facets);
 
     buffer_json_member_add_array(wb, "_channels");
@@ -742,7 +735,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
 
         // sampling_file_init(lqs, src);
 
-        WEVT_QUERY_STATUS tmp_status = wevt_query_one_channel(filename, wb, facets, src, lqs);
+        WEVT_QUERY_STATUS tmp_status = wevt_query_one_channel(log, wb, facets, src, lqs);
 
         rows_useful = lqs->c.rows_useful - rows_useful;
         rows_read = lqs->c.rows_read - rows_read;
@@ -827,6 +820,8 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
     // release the files
     for(size_t f = 0; f < files_used ;f++)
         dictionary_acquired_item_release(wevt_sources, file_items[f]);
+
+    wevt_closelog6(log);
 
     switch (status) {
         case WEVT_OK:

@@ -201,6 +201,9 @@ void wevt_sources_scan(void) {
             goto cleanup;
         }
 
+        WEVT_LOG *log = wevt_openlog6();
+        if(!log) goto cleanup;
+
         while (true) {
             if (!EvtNextChannelPath(hChannelEnum, dwChannelBufferSize, channel, &dwChannelBufferUsed)) {
                 status = GetLastError();
@@ -214,12 +217,13 @@ void wevt_sources_scan(void) {
                 } else {
                     nd_log(NDLS_COLLECTORS, NDLP_ERR,
                            "WINDOWS EVENTS: EvtNextChannelPath() failed\n");
-                    goto cleanup;
+                    break;
                 }
             }
 
-            WEVT_LOG *log = wevt_openlog6(channel, true);
-            if(!log) continue;
+            EVT_RETENTION retention;
+            if(!wevt_channel_retention(log, channel, &retention))
+                continue;
 
             const char *name = channel2utf8(channel);
             const char *fullname = strdupz(name);
@@ -227,22 +231,23 @@ void wevt_sources_scan(void) {
             if(slash) *slash = '\0';
 
             LOGS_QUERY_SOURCE src = {
-                .entries = log->retention.entries,
+                .entries = retention.entries,
                 .fullname = fullname,
                 .fullname_len = strlen(fullname),
                 .last_scan_monotonic_ut = now_monotonic_usec(),
-                .msg_first_id = log->retention.first_event.id,
-                .msg_last_id = log->retention.last_event.id,
-                .msg_first_ut = log->retention.first_event.created_ns / NSEC_PER_USEC,
-                .msg_last_ut = log->retention.last_event.created_ns / NSEC_PER_USEC,
-                .size = log->retention.size_bytes,
+                .msg_first_id = retention.first_event.id,
+                .msg_last_id = retention.last_event.id,
+                .msg_first_ut = retention.first_event.created_ns / NSEC_PER_USEC,
+                .msg_last_ut = retention.last_event.created_ns / NSEC_PER_USEC,
+                .size = retention.size_bytes,
                 .source_type = WEVTS_ALL,
                 .source = string_strdupz(name),
             };
 
             dictionary_set(wevt_sources, src.fullname, &src, sizeof(src));
-            wevt_closelog6(log);
         }
+
+        wevt_closelog6(log);
 
         LOGS_QUERY_SOURCE *src;
         dfe_start_write(wevt_sources, src)

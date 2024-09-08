@@ -22,18 +22,18 @@ typedef struct wevt_event {
 
 #define WEVT_EVENT_EMPTY (WEVT_EVENT){ .id = 0, .created_ns = 0, }
 
+typedef struct {
+    WEVT_EVENT first_event;
+    WEVT_EVENT last_event;
+
+    uint64_t entries;
+    nsec_t duration_ns;
+    uint64_t size_bytes;
+} EVT_RETENTION;
+
 typedef struct wevt_log {
     EVT_HANDLE event_query;
     EVT_HANDLE render_context;
-
-    struct {
-        WEVT_EVENT first_event;
-        WEVT_EVENT last_event;
-
-        uint64_t entries;
-        nsec_t duration_ns;
-        uint64_t size_bytes;
-    } retention;
 
     struct {
         // temp buffer used for rendering event log messages
@@ -66,10 +66,14 @@ typedef struct wevt_log {
 
 } WEVT_LOG;
 
+WEVT_LOG *wevt_openlog6(void);
 void wevt_closelog6(WEVT_LOG *log);
-WEVT_LOG *wevt_openlog6(const wchar_t *channel, bool file_size);
-bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev);
+
+bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, EVT_RETENTION *retention);
 
 EVT_HANDLE wevt_query(LPCWSTR channel, usec_t seek_to, bool backward);
+void wevt_query_done(WEVT_LOG *log);
+
+bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev);
 
 #endif //NETDATA_WINDOWS_EVENTS_QUERY_H
