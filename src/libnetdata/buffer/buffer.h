@@ -521,17 +521,22 @@ static inline void buffer_print_int64(BUFFER *wb, int64_t value) {
     buffer_overflow_check(wb);
 }
 
+#define UINT64_HEX_LENGTH ((sizeof(HEX_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 2 + 1)
+static inline size_t print_uint64_hex(char *dst, uint64_t value) {
+    char *d = dst;
+
+    const char *s = HEX_PREFIX;
+    while(*s) *d++ = *s++;
+
+    char *e = print_uint64_hex_reversed(d, value);
+    char_array_reverse(d, e - 1);
+    *e = '\0';
+    return e - dst;
+}
+
 static inline void buffer_print_uint64_hex(BUFFER *wb, uint64_t value) {
-    buffer_need_bytes(wb, sizeof(uint64_t) * 2 + 2 + 1);
-
-    buffer_fast_strcat(wb, HEX_PREFIX, sizeof(HEX_PREFIX) - 1);
-
-    char *s = &wb->buffer[wb->len];
-    char *d = print_uint64_hex_reversed(s, value);
-    char_array_reverse(s, d - 1);
-    *d = '\0';
-    wb->len += d - s;
-
+    buffer_need_bytes(wb, UINT64_HEX_LENGTH);
+    wb->len += print_uint64_hex(&wb->buffer[wb->len], value);
     buffer_overflow_check(wb);
 }
 

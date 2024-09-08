@@ -5,7 +5,7 @@
 static uint64_t wevt_log_file_size(const wchar_t *channel);
 
 #define VAR_PROVIDER_NAME(p)                ((p)[0].StringVal)
-#define VAR_SOURCE_NAME(p)                  ((p)[1].StringVal)
+#define VAR_EVENT_SOURCE_NAME(p)            ((p)[1].StringVal)
 #define VAR_PROVIDER_GUID(p)                ((p)[2].GuidVal)
 #define VAR_RECORD_NUMBER(p)                ((p)[3].UInt64Val)
 #define VAR_EVENT_ID(p)                     ((p)[4].UInt16Val)
@@ -125,7 +125,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
     wevt_str_wchar_to_utf8(&log->ops.provider, VAR_PROVIDER_NAME(log->ops.content.data), -1);
 
     // ProviderSourceName
-    wevt_str_wchar_to_utf8(&log->ops.source, VAR_SOURCE_NAME(log->ops.content.data), -1);
+    wevt_str_wchar_to_utf8(&log->ops.source, VAR_EVENT_SOURCE_NAME(log->ops.content.data), -1);
 
     // ProviderGUID
     // we keep this in case we need to cache EventIDs, Keywords, Opcodes, per provider

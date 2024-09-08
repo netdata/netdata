@@ -264,7 +264,7 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
                                 log->ops.level.data, log->ops.level.used - 1);
 
     static __thread char keyword_id_str[24];
-    len = print_uint64(keyword_id_str, e->keyword);
+    len = print_uint64_hex(keyword_id_str, e->keyword);
     bytes += len;
     facets_add_key_value_length(facets,
                                 WEVT_FIELD_KEYWORDID, sizeof(WEVT_FIELD_KEYWORDID) - 1,
