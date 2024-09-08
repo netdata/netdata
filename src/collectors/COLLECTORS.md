@@ -1079,8 +1079,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 ### UPS
 
-- [APC UPS](https://github.com/netdata/netdata/blob/master/src/collectors/charts.d.plugin/apcupsd/integrations/apc_ups.md)
-
 - [Eaton UPS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/eaton_ups.md)
 
 - [UPS (NUT)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/upsd/integrations/ups_nut.md)
