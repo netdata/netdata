@@ -38,6 +38,12 @@ static const wchar_t *RENDER_ITEMS[] = {
     L"/Event/EventData/Data"
 };
 
+static void wevt_empty_utf8(TXT_UTF8 *dst) {
+    txt_utf8_resize(dst, 1);
+    dst->data[0] = '\0';
+    dst->used = 1;
+}
+
 bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
     DWORD size = 0;
 
@@ -68,8 +74,7 @@ bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst
     return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
 
 cleanup:
-    txt_utf8_resize(dst, 128);
-    dst->used = snprintfz(dst->data, dst->size, "[empty]") + 1;
+    wevt_empty_utf8(dst);
     return false;
 }
 
@@ -133,7 +138,10 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
     // EventID (it defines the template for formatting the message)
     // This is indexed and can be queried with slicing - but not consistent across channels
     ev->event_id = VAR_EVENT_ID(log->ops.content.data);
-    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.event, EvtFormatMessageEvent);
+    if(ev->event_id)
+        wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.event, EvtFormatMessageEvent);
+    else
+        wevt_empty_utf8(&log->ops.event);
 
     // Level (the severity / priority)
     // This is indexed and can be queried with slicing - probably consistent across channels
@@ -143,7 +151,10 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
     // Keywords (categorization of events)
     // This is indexed and can be queried with slicing - but not consistent across channels
     ev->keyword = VAR_KEYWORDS(log->ops.content.data);
-    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.keyword, EvtFormatMessageKeyword);
+    if(ev->keyword)
+        wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.keyword, EvtFormatMessageKeyword);
+    else
+        wevt_empty_utf8(&log->ops.keyword);
 
     // TimeCreated
     // This is indexed and can be queried with slicing - it is consistent across channels
@@ -152,7 +163,10 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
     // Opcode
     // Not indexed
     ev->opcode = VAR_OPCODE(log->ops.content.data);
-    wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.opcode, EvtFormatMessageOpcode);
+    if(ev->opcode)
+        wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.opcode, EvtFormatMessageOpcode);
+    else
+        wevt_empty_utf8(&log->ops.keyword);
 
     // ComputerName
     wevt_str_wchar_to_utf8(&log->ops.computer, VAR_COMPUTER_NAME(log->ops.content.data), -1);

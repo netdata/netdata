@@ -89,7 +89,7 @@ struct lqs_extension {
 #define WEVT_ALWAYS_VISIBLE_KEYS                NULL
 
 #define WEVT_KEYS_EXCLUDED_FROM_FACETS          \
-    "|*Message*"                                \
+    "|Event"                                    \
     "|*ID"                                      \
     ""
 
@@ -100,7 +100,7 @@ struct lqs_extension {
     "|Level"                                    \
     "|Keyword"                                  \
     "|Opcode"                                   \
-    "|ComputerName"                             \
+    "|Computer"                                 \
     "|User"                                     \
     ""
 
@@ -118,9 +118,10 @@ static inline WEVT_QUERY_STATUS check_stop(const bool *cancelled, const usec_t *
     return WEVT_OK;
 }
 
+#define WEVT_FIELD_COMPUTER             "Computer"
+#define WEVT_FIELD_CHANNEL              "Channel"
 #define WEVT_FIELD_PROVIDER             "Provider"
 #define WEVT_FIELD_SOURCE               "Source"
-#define WEVT_FIELD_CHANNEL              "Channel"
 #define WEVT_FIELD_EVENTRECORDID        "EventRecordID"
 #define WEVT_FIELD_EVENTID              "EventID"
 #define WEVT_FIELD_LEVELID              "LevelID"
@@ -129,8 +130,7 @@ static inline WEVT_QUERY_STATUS check_stop(const bool *cancelled, const usec_t *
 #define WEVT_FIELD_KEYWORD              "Keyword"
 #define WEVT_FIELD_OPCODEID             "OpcodeID"
 #define WEVT_FIELD_OPCODE               "Opcode"
-#define WEVT_FIELD_COMPUTERNAME         "ComputerName"
-    #define WEVT_FIELD_USER                 "User"
+#define WEVT_FIELD_USER                 "User"
 #define WEVT_FIELD_EVENT                "Event"
 
 FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused, FACET_ROW *row, void *data __maybe_unused) {
@@ -163,8 +163,13 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
     facets_register_row_severity(facets, wevt_levelid_to_facet_severity, NULL);
 
     facets_register_key_name(
-            facets, WEVT_FIELD_COMPUTERNAME,
+            facets, WEVT_FIELD_COMPUTER,
             rq->default_facet | FACET_KEY_OPTION_VISIBLE);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_CHANNEL,
+            rq->default_facet | FACET_KEY_OPTION_MAIN_TEXT |
+            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_PROVIDER,
@@ -173,11 +178,6 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 
     facets_register_key_name(
             facets, WEVT_FIELD_SOURCE,
-            rq->default_facet | FACET_KEY_OPTION_MAIN_TEXT |
-            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
-
-    facets_register_key_name(
-            facets, WEVT_FIELD_CHANNEL,
             rq->default_facet | FACET_KEY_OPTION_MAIN_TEXT |
             FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
 
@@ -277,7 +277,7 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
 
     bytes += log->ops.computer.used * 2;
     facets_add_key_value_length(facets,
-                                WEVT_FIELD_COMPUTERNAME, sizeof(WEVT_FIELD_COMPUTERNAME) - 1,
+                                WEVT_FIELD_COMPUTER, sizeof(WEVT_FIELD_COMPUTER) - 1,
                                 log->ops.computer.data, log->ops.computer.used - 1);
 
     static __thread char opcode_id_str[24];
@@ -954,13 +954,13 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         struct {
             const char *func;
         } array[] = {
-            { "windows-events after:1725727566 before:1725731166 direction:backward last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 data_only:false source:All" },
-            { "windows-events after:1725650277 before:1725736677 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
-            { "windows-events after:1725650284 before:1725736684 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
-            { "windows-events after:1725650386 before:1725736786 anchor:1725652420809461 direction:forward last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 if_modified_since:1725736649011085 data_only:true delta:true tail:true source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
-            { "windows-events info after:1725650420 before:1725736820" },
-            { "windows-events after:1725650420 before:1725736820 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
-            { "windows-events after:1725650430 before:1725736830 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
+            { "windows-events after:1725704281 before:1725790681 last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:All" },
+            //{ "windows-events after:1725650277 before:1725736677 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
+            //{ "windows-events after:1725650284 before:1725736684 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
+            //{ "windows-events after:1725650386 before:1725736786 anchor:1725652420809461 direction:forward last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 if_modified_since:1725736649011085 data_only:true delta:true tail:true source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
+            //{ "windows-events info after:1725650420 before:1725736820" },
+            //{ "windows-events after:1725650420 before:1725736820 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
+            //{ "windows-events after:1725650430 before:1725736830 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
             { NULL },
         };
 

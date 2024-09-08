@@ -1881,6 +1881,10 @@ void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
 }
 
 void facets_add_key_value_length(FACETS *facets, const char *key, size_t key_len, const char *value, size_t value_len) {
+    if(!key || !*key || !key_len || !value || !*value || !value_len)
+        // adding empty values, makes the rows unmatched
+        return;
+
     FACET_KEY *k = facets_register_key_name_length(facets, key, key_len, 0);
     k->current_value.raw = value;
     k->current_value.raw_len = value_len;
@@ -2144,6 +2148,9 @@ void facets_rows_begin(FACETS *facets) {
 }
 
 bool facets_row_finished(FACETS *facets, usec_t usec) {
+//    char buf[RFC3339_MAX_LENGTH];
+//    rfc3339_datetime_ut(buf, sizeof(buf), usec, 3, false);
+
     facets->operations.rows.evaluated++;
 
     if(unlikely((facets->query && facets->keys_filtered_by_query &&
