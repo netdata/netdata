@@ -1,0 +1,56 @@
+DATE     : Wed Sep 27 17:30:23 CEST 2000
+HOSTNAME : test
+RELEASE  : 3.7.3-20000925
+CABLE    : Custom Cable Smart
+MODEL    : SMART-UPS 1000
+UPSMODE  : Stand Alone
+STARTTIME: Wed Sep 27 10:39:23 CEST 2000
+UPSNAME  : UPS_IDEN
+STATUS   : ONLINE
+LINEV    : 235.3 Volts
+LOADPCT  :   9.3 Percent Load Capacity
+BCHARGE  : 100.0 Percent
+TIMELEFT : 130.0 Minutes
+MBATTCHG : 5 Percent
+MINTIMEL : 3 Minutes
+MAXTIME  : 0 Seconds
+MAXLINEV : 239.2 Volts
+MINLINEV : 234.0 Volts
+OUTPUTV  : 236.6 Volts
+SENSE    : High
+DWAKE    : 000 Seconds
+DSHUTD   : 020 Seconds
+DLOWBATT : 02 Minutes
+LOTRANS  : 196.0 Volts
+HITRANS  : 253.0 Volts
+RETPCT   : 000.0 Percent
+ITEMP    : 32.8 C Internal
+ALARMDEL : 5 seconds
+BATTV    : 27.9 Volts
+LINEFREQ : 50.0 Hz
+LASTXFER : Line voltage notch or spike
+NUMXFERS : 0
+XONBATT  : N/A
+TONBATT  : 0 seconds
+CUMONBATT: 0 seconds
+XOFFBATT : N/A
+SELFTEST : NO
+STESTI   : 336
+STATFLAG : 0x08 Status Flag
+DIPSW    : 0x00 Dip Switch
+REG1     : 0x00 Register 1
+REG2     : 0x00 Register 2
+REG3     : 0x00 Register 3
+MANDATE  : 07/31/99
+SERIALNO : QS9931125245
+BATTDATE : 07/31/99
+NOMOUTV  : 230
+NOMBATTV :  24.0
+NOMPOWER : 600 Watts
+HUMIDITY : N/A
+AMBTEMP  : N/A
+EXTBATTS : 0
+BADBATTS : N/A
+FIRMWARE : 60.11.I
+APCMODEL : IWI
+END APC  : Wed Sep 27 17:30:31 CEST 2000

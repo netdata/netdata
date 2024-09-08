@@ -53,6 +53,7 @@ see the appropriate collector readme.
 | [activemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/activemq)                     |           ActiveMQ            |
 | [ap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ap)                                 |          Wireless AP          |
 | [apache](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/apache)                         |            Apache             |
+| [apcupsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/apcupsd)                       |           UPS (APC)           |
 | [beanstalk](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/beanstalk)                   |           Beanstalk           |
 | [bind](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/bind)                             |           ISC Bind            |
 | [boinc](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/boinc)                           |             BOINC             |
