@@ -1,0 +1,1 @@
+integrations/apc_ups.md
