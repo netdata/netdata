@@ -485,7 +485,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
         wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.xml, EvtFormatMessageXml);
 
         // Format a text message for the users to see
-        wevt_format_summary(log, ev);
+        // wevt_format_summary(log, ev);
     }
 
     ret = true;

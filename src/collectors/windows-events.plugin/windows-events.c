@@ -162,6 +162,61 @@ FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused,
     }
 }
 
+void wevt_render_message(
+    FACETS *facets __maybe_unused,
+    BUFFER *json_array,
+    FACET_ROW_KEY_VALUE *rkv,
+    FACET_ROW *row,
+    void *data __maybe_unused) {
+
+    buffer_flush(rkv->wb);
+
+    const FACET_ROW_KEY_VALUE *event_rkv = dictionary_get(row->dict, WEVT_FIELD_EVENT);
+    if(!event_rkv || !buffer_strlen(event_rkv->wb)) {
+        const FACET_ROW_KEY_VALUE *event_id_rkv = dictionary_get(row->dict, WEVT_FIELD_EVENTID);
+        if(event_id_rkv && buffer_strlen(event_id_rkv->wb)) {
+            buffer_fast_strcat(rkv->wb, "EventID ", 8);
+            buffer_fast_strcat(rkv->wb, buffer_tostring(event_id_rkv->wb), buffer_strlen(event_id_rkv->wb));
+        }
+        else
+            buffer_strcat(rkv->wb, "Unknown EventID ");
+
+        const FACET_ROW_KEY_VALUE *provider_rkv = dictionary_get(row->dict, WEVT_FIELD_PROVIDER);
+        if(provider_rkv && buffer_strlen(provider_rkv->wb)) {
+            buffer_fast_strcat(rkv->wb, " of ", 4);
+            buffer_fast_strcat(rkv->wb, buffer_tostring(provider_rkv->wb), buffer_strlen(provider_rkv->wb));
+            buffer_putc(rkv->wb, '.');
+        }
+        else
+            buffer_strcat(rkv->wb, "of unknown Provider.");
+    }
+    else
+        buffer_fast_strcat(rkv->wb, buffer_tostring(event_rkv->wb), buffer_strlen(event_rkv->wb));
+
+    const FACET_ROW_KEY_VALUE *xml_rkv = dictionary_get(row->dict, WEVT_FIELD_XML);
+    if(xml_rkv && buffer_strlen(xml_rkv->wb)) {
+        const char *xml = buffer_tostring(xml_rkv->wb);
+
+        const char *event_data_start = strstr(xml, "<EventData>");
+        if(event_data_start) {
+            event_data_start = &event_data_start[11];
+            const char *event_data_end = strstr(event_data_start, "</EventData>");
+
+            if(event_data_start && event_data_end) {
+                buffer_fast_strcat(rkv->wb, "\n\nRelated data:\n", 16);
+                // copy the event data block
+                buffer_fast_strcat(rkv->wb, event_data_start, event_data_end - event_data_start);
+            }
+            else
+                buffer_strcat(rkv->wb, " Without related data.");
+        }
+        else
+            buffer_strcat(rkv->wb, " Without related data.");
+    }
+
+    buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
+}
+
 static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
     FACETS *facets = lqs->facets;
     LOGS_QUERY_REQUEST *rq = &lqs->rq;
@@ -238,9 +293,31 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
-            facets, WEVT_FIELD_MESSAGE,
-            FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT |
-            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
+            facets, WEVT_FIELD_TASK,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_PROCESSID,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+        facets, WEVT_FIELD_THREADID,
+        rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_XML,
+            FACET_KEY_OPTION_NEVER_FACET |
+            FACET_KEY_OPTION_FTS);
+
+    // facets_register_key_name(
+    //         facets, WEVT_FIELD_MESSAGE,
+    //         FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT |
+    //         FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
+
+    facets_register_dynamic_key_name(
+        facets, WEVT_FIELD_MESSAGE,
+        FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_VISIBLE,
+        wevt_render_message, NULL);
 }
 
 static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUERY_SOURCE *src, usec_t *msg_ut __maybe_unused, WEVT_EVENT *e) {
@@ -372,9 +449,9 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
                                 WEVT_FIELD_XML, sizeof(WEVT_FIELD_XML) - 1,
                                 log->ops.xml.data, log->ops.xml.used - 1);
 
-    facets_add_key_value_length(facets,
-                                WEVT_FIELD_MESSAGE, sizeof(WEVT_FIELD_MESSAGE) - 1,
-                                buffer_tostring(log->ops.message), buffer_strlen(log->ops.message));
+    // facets_add_key_value_length(facets,
+    //                             WEVT_FIELD_MESSAGE, sizeof(WEVT_FIELD_MESSAGE) - 1,
+    //                             buffer_tostring(log->ops.message), buffer_strlen(log->ops.message));
 
     return bytes;
 }
