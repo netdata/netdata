@@ -6,11 +6,14 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18493](https://github.com/netdata/netdata/pull/18493) ([netdatabot](https://github.com/netdatabot))
+- add go.d/apcupsd [\#18489](https://github.com/netdata/netdata/pull/18489) ([ilyam8](https://github.com/ilyam8))
 - Improve processing on removed alerts after agent restart [\#18488](https://github.com/netdata/netdata/pull/18488) ([stelfrag](https://github.com/stelfrag))
 - Bump github.com/prometheus/common from 0.57.0 to 0.58.0 in /src/go [\#18487](https://github.com/netdata/netdata/pull/18487) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump golang.org/x/text from 0.17.0 to 0.18.0 in /src/go [\#18486](https://github.com/netdata/netdata/pull/18486) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Remove Warnings \(ebpf\) [\#18484](https://github.com/netdata/netdata/pull/18484) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix win sysinfo installed ram calculation [\#18482](https://github.com/netdata/netdata/pull/18482) ([ilyam8](https://github.com/ilyam8))
+- remove charts.d/apcupsd [\#18481](https://github.com/netdata/netdata/pull/18481) ([ilyam8](https://github.com/ilyam8))
 - Update LIbbpf [\#18480](https://github.com/netdata/netdata/pull/18480) ([thiagoftsm](https://github.com/thiagoftsm))
 - added missing comma in Access-Control-Allow-Headers [\#18479](https://github.com/netdata/netdata/pull/18479) ([ktsaou](https://github.com/ktsaou))
 - add Access-Control-Allow-Headers: x-transaction-id [\#18478](https://github.com/netdata/netdata/pull/18478) ([ktsaou](https://github.com/ktsaou))
@@ -426,8 +429,6 @@
 - go.d whoisquery: use Domain.ExpirationDateInTime if provided [\#17926](https://github.com/netdata/netdata/pull/17926) ([ilyam8](https://github.com/ilyam8))
 - updater: handle json decode error in newer\_commit\_date\(\) [\#17925](https://github.com/netdata/netdata/pull/17925) ([ilyam8](https://github.com/ilyam8))
 - Bump k8s.io/client-go from 0.30.1 to 0.30.2 in /src/go/collectors/go.d.plugin [\#17923](https://github.com/netdata/netdata/pull/17923) ([dependabot[bot]](https://github.com/apps/dependabot))
-- go.d bump github.com/docker/docker v27.0.0+incompatible [\#17921](https://github.com/netdata/netdata/pull/17921) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/jessevdk/go-flags from 1.5.0 to 1.6.1 in /src/go/collectors/go.d.plugin [\#17919](https://github.com/netdata/netdata/pull/17919) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
