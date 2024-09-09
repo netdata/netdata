@@ -28,7 +28,7 @@ jobs:
           src/web/gui/bundle_dashboard_v1.py ${{ github.event.inputs.dashboard_version }}
       - name: Create Pull Request
         id: pr
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           title: 'Update dashboard to version ${{ github.event.inputs.dashboard_version }}.'
           body: 'See https://github.com/netdata/dashboard/releases/tag/${{ github.event.inputs.dashboard_version }} for changes.'
