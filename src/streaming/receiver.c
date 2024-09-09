@@ -6,19 +6,6 @@
 extern struct config stream_config;
 
 void receiver_state_free(struct receiver_state *rpt) {
-
-    freez(rpt->key);
-    freez(rpt->hostname);
-    freez(rpt->registry_hostname);
-    freez(rpt->machine_guid);
-    freez(rpt->os);
-    freez(rpt->timezone);
-    freez(rpt->abbrev_timezone);
-    freez(rpt->client_ip);
-    freez(rpt->client_port);
-    freez(rpt->program_name);
-    freez(rpt->program_version);
-
 #ifdef ENABLE_HTTPS
     netdata_ssl_close(&rpt->ssl);
 #endif
@@ -31,10 +18,21 @@ void receiver_state_free(struct receiver_state *rpt) {
     rrdpush_decompressor_destroy(&rpt->decompressor);
 
     if(rpt->system_info)
-         rrdhost_system_info_free(rpt->system_info);
+        rrdhost_system_info_free(rpt->system_info);
 
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
 
+    freez(rpt->key);
+    freez(rpt->hostname);
+    freez(rpt->registry_hostname);
+    freez(rpt->machine_guid);
+    freez(rpt->os);
+    freez(rpt->timezone);
+    freez(rpt->abbrev_timezone);
+    freez(rpt->client_ip);
+    freez(rpt->client_port);
+    freez(rpt->program_name);
+    freez(rpt->program_version);
     freez(rpt);
 }
 
