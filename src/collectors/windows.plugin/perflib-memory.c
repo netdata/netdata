@@ -133,7 +133,6 @@ static void do_memory_system_pool(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
         , "system_pool", NULL
         , "mem"
         , "mem.system_pool_size"
-
         , "System Memory Pool"
         , "bytes"
         , PLUGIN_WINDOWS_NAME
