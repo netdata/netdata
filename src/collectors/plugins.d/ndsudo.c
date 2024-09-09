@@ -24,7 +24,7 @@ struct command {
     },
     {
         .name = "varnishstat-stats",
-        .params = "-1 -t off",
+        .params = "-1 -t off -n {{instanceName}}",
         .search =
             {
                 [0] = "varnishstat",
