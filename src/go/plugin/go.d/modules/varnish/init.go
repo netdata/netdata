@@ -3,35 +3,22 @@
 package varnish
 
 import (
-	"errors"
+	"fmt"
 	"os"
-	"os/exec"
-	"strings"
+	"path/filepath"
+
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
-func (v *Varnish) validateConfig() error {
-	if v.BinaryPath == "" {
-		return errors.New("no iw binary path specified")
-	}
-	return nil
-}
+func (v *Varnish) initVarnishstatBinary() (varnishstatBinary, error) {
+	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
 
-func (v *Varnish) initIwExec() (varnishStatBinary, error) {
-	binPath := v.BinaryPath
+	if _, err := os.Stat(ndsudoPath); err != nil {
+		return nil, fmt.Errorf("ndsudo executable not found: %v", err)
 
-	if !strings.HasPrefix(binPath, "/") {
-		path, err := exec.LookPath(binPath)
-		if err != nil {
-			return nil, err
-		}
-		binPath = path
 	}
 
-	if _, err := os.Stat(binPath); err != nil {
-		return nil, err
-	}
+	varnishstat := newVarnishstatBinary(ndsudoPath, v.Config, v.Logger)
 
-	vs := newVarnishStatExec(binPath, v.Timeout.Duration())
-
-	return vs, nil
+	return varnishstat, nil
 }

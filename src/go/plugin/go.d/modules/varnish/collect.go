@@ -3,124 +3,180 @@
 package varnish
 
 import (
-	"fmt"
-	"regexp"
+	"bufio"
+	"bytes"
 	"strconv"
 	"strings"
 )
 
 func (v *Varnish) collect() (map[string]int64, error) {
-	bs, err := v.exec.varnishStatistics()
+	bs, err := v.exec.statistics()
 	if err != nil {
-		v.charts = nil
 		return nil, err
 	}
-
-	mx, err := v.parseStatistics(bs)
-
-	if err != nil {
-		return nil, fmt.Errorf("error in parsing the statistics")
-	}
-
-	return mx, nil
-}
-
-func (v *Varnish) parseStatistics(resp []byte) (map[string]int64, error) {
-	// Global regex for the metric lines
-	pattern := `([A-Z]+\.)?([\d\w_.]+)\s+(\d+)`
 
 	mx := make(map[string]int64)
-	seenB := make(map[string]bool)
-	seenS := make(map[string]bool)
 
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		fmt.Println("Failed to compile regex:", err)
+	if err := v.collectStatistics(mx, bs); err != nil {
 		return nil, err
 	}
 
-	lines := strings.Split(string(resp), "\n")
-
-	for _, line := range lines {
-		match := re.FindSubmatch([]byte(line))
-
-		if len(match) == 4 {
-			prefix := string(match[1])
-			identifier := string(match[2])
-			number := string(match[3])
-
-			if isBackendField(prefix) {
-				backendName := strings.Split(identifier, ".")[1]
-				metricName := strings.Split(identifier, ".")[2]
-
-				seenB[backendName] = true
-				if !v.seenBackends[backendName] {
-					v.addBackendCharts(backendName)
-					v.seenBackends[backendName] = true
-				}
-				mx[fmt.Sprintf("%s_%s", backendName, metricName)], err = parseInt(number)
-
-			} else if isStorageField(prefix) {
-				storageName := strings.Split(identifier, ".")[0]
-				metricName := strings.Split(identifier, ".")[1]
-
-				seenS[storageName] = true
-				if !v.seenStorages[storageName] {
-					v.addStorageCharts(storageName)
-					v.seenStorages[storageName] = true
-				}
-
-				mx[fmt.Sprintf("%s_%s", storageName, metricName)], err = parseInt(number)
-			} else {
-				mx[identifier], err = parseInt(number)
-			}
-
-			if err != nil {
-				return nil, fmt.Errorf("couldn't parse int from number")
-			}
-
-			for backend := range v.seenBackends {
-				if !seenB[backend] {
-					delete(v.seenBackends, backend)
-					v.removeBackendCharts(backend)
-				}
-			}
-
-			for storage := range v.seenStorages {
-				if !seenS[storage] {
-					delete(v.seenStorages, storage)
-					v.removeStorageCharts(storage)
-				}
-			}
-		}
-	}
 	return mx, nil
 }
 
-func isBackendField(field string) bool {
-	for _, px := range []string{
-		"VBE",
-	} {
-		if strings.Split(field, ".")[0] == px {
-			return true
+func (v *Varnish) collectStatistics(mx map[string]int64, bs []byte) error {
+	seenBackends, seenStorages := make(map[string]bool), make(map[string]bool)
+
+	sc := bufio.NewScanner(bytes.NewReader(bs))
+
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+
+		parts := strings.Fields(line)
+		if len(parts) < 4 {
+			v.Debugf("invalid line format: '%s'. Expected at least 4 fields, skipping line.", line)
+			continue
+		}
+
+		fullMetric := parts[0]
+		valueStr := parts[1]
+
+		category, metric, ok := strings.Cut(fullMetric, ".")
+		if !ok {
+			v.Debugf("invalid metric format: '%s'. Expected 'category.metric', skipping metric.", fullMetric)
+			continue
+		}
+		value, err := strconv.ParseInt(valueStr, 10, 64)
+		if err != nil {
+			v.Debugf("failed to parse metric '%s' value '%s': %v, skipping metric", fullMetric, valueStr, err)
+			continue
+		}
+
+		switch category {
+		case "MGT":
+			if mgtMetrics[metric] {
+				mx[fullMetric] = value
+			}
+		case "MAIN":
+			if mainMetrics[metric] {
+				mx[fullMetric] = value
+			}
+		case "SMA", "SMF", "MSE":
+			storage, sMetric, ok := strings.Cut(metric, ".")
+			if !ok {
+				v.Debugf("invalid metric format: '%s'. Expected 'type.storage.metric', skipping metric.", fullMetric)
+				continue
+			}
+
+			fullStorage := category + "." + storage
+
+			if storageMetrics[sMetric] {
+				seenStorages[fullStorage] = true
+				mx[fullMetric] = value
+			}
+		case "VBE":
+			// Varnish 4.0.x is not supported (values are 'VBE.default(127.0.0.1,,81).happy')
+			parts := strings.Split(metric, ".")
+			if len(parts) != 3 {
+				v.Debugf("invalid metric format: '%s'. Expected 'VBE.vcl.backend.metric', skipping metric.", fullMetric)
+				continue
+			}
+
+			vcl, backend, bMetric := parts[0], parts[1], parts[2]
+
+			if backendMetrics[bMetric] {
+				seenBackends[vcl+"."+backend] = true
+				mx[fullMetric] = value
+			}
 		}
 	}
-	return false
-}
 
-func isStorageField(field string) bool {
-	for _, px := range []string{
-		"SMF",
-		"SMA",
-		"MSE",
-	} {
-		if strings.Split(field, ".")[0] == px {
-			return true
+	if len(mx) == 0 {
+		return nil
+	}
+
+	for name := range seenStorages {
+		if !v.seenStorages[name] {
+			v.seenStorages[name] = true
+			v.addStorageCharts(name)
 		}
 	}
-	return false
+	for name := range v.seenStorages {
+		if !seenStorages[name] {
+			delete(v.seenStorages, name)
+			v.removeBackendCharts(name)
+		}
+	}
+
+	for fullName := range seenBackends {
+		if !v.seenBackends[fullName] {
+			v.seenBackends[fullName] = true
+			v.addBackendCharts(fullName)
+		}
+	}
+	for fullName := range v.seenBackends {
+		if !seenBackends[fullName] {
+			delete(v.seenBackends, fullName)
+			v.removeBackendCharts(fullName)
+		}
+	}
+
+	return nil
 }
 
-func parseInt(s string) (int64, error) {
-	return strconv.ParseInt(s, 10, 64)
+var mgtMetrics = map[string]bool{
+	"uptime":      true,
+	"child_start": true,
+	"child_exit":  true,
+	"child_stop":  true,
+	"child_died":  true,
+	"child_dump":  true,
+	"child_panic": true,
+}
+
+var mainMetrics = map[string]bool{
+	"sess_conn":         true,
+	"sess_dropped":      true,
+	"client_req":        true,
+	"cache_hit":         true,
+	"cache_hitpass":     true,
+	"cache_miss":        true,
+	"cache_hitmiss":     true,
+	"n_expired":         true,
+	"n_lru_nuked":       true,
+	"n_lru_moved":       true,
+	"n_lru_limited":     true,
+	"threads":           true,
+	"threads_limited":   true,
+	"threads_created":   true,
+	"threads_destroyed": true,
+	"threads_failed":    true,
+	"thread_queue_len":  true,
+	"backend_conn":      true,
+	"backend_unhealthy": true,
+	"backend_busy":      true,
+	"backend_fail":      true,
+	"backend_reuse":     true,
+	"backend_recycle":   true,
+	"backend_retry":     true,
+	"backend_req":       true,
+	"esi_errors":        true,
+	"esi_warnings":      true,
+	"uptime":            true,
+}
+
+var storageMetrics = map[string]bool{
+	"g_space": true,
+	"g_bytes": true,
+	"g_alloc": true,
+}
+
+var backendMetrics = map[string]bool{
+	"bereq_hdrbytes":   true,
+	"bereq_bodybytes":  true,
+	"beresp_hdrbytes":  true,
+	"beresp_bodybytes": true,
 }

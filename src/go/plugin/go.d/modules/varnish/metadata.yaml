@@ -2,7 +2,7 @@ plugin_name: go.d.plugin
 modules:
   - meta:
       plugin_name: go.d.plugin
-      module_name: ap
+      module_name: varnish
       monitored_instance:
         name: Varnish
         link: https://varnish-cache.org/
@@ -25,35 +25,30 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Varnish metrics about HTTP accelerator global, Backends (VBE) and Storages (SMF, SMA, MSE) statistics.
+          This collector monitors Varnish instances, supporting both the open-source Varnish-Cache and the commercial Varnish-Plus.
 
-          Note that both, Varnish-Cache (free and open source) and Varnish-Plus (Commercial/Enterprise version), are supported.
-        method_description: |
-          It uses the `varnishstat` binary in order to collect the metrics.
+          It tracks key performance metrics, along with detailed statistics for Backends (VBE) and Storages (SMF, SMA, MSE).
+
+          It relies on the [`varnishstat`](https://varnish-cache.org/docs/trunk/reference/varnishstat.html) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+        method_description: ""
       supported_platforms:
-        include: [Linux]
+        include: []
         exclude: []
       multi_instance: false
       additional_permissions:
-        description: |
-          `netdata` user must be a member of the `varnish` group.
+        description: ""
       default_behavior:
         auto_detection:
-          description: By default, if the permissions are satisfied, the `varnishstat` tool will be executed on the host.
+          description: ""
         limits:
           description: ""
         performance_impact:
           description: ""
     setup:
       prerequisites:
-        list:
-          - title: Provide the necessary permissions
-            description: |
-              In order for the collector to work, you need to add the `netdata` user to the `varnish` user group, so that it can execute the `varnishstat` tool:
-
-              ```
-              usermod -aG varnish netdata
-              ```
+        list: []
       configuration:
         file:
           name: go.d/varnish.conf
@@ -68,25 +63,25 @@ modules:
               description: Data collection frequency.
               default_value: 10
               required: false
-            - name: binary_path
-              description: Path to the `varnishstat` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable.
-              default_value: /usr/bin/varnishstat
-              required: true
             - name: timeout
               description: Timeout for executing the binary, specified in seconds.
               default_value: 2
+              required: false
+            - name: instance_name
+              description: "Specifies the name of the Varnish instance to collect metrics from. This corresponds to the `-n` argument used with the [varnishstat](https://varnish-cache.org/docs/trunk/reference/varnishstat.html) command."
+              default_value: ""
               required: false
         examples:
           folding:
             title: ""
             enabled: false
           list:
-            - name: Custom binary path
-              description: The executable is not in the directories specified in the PATH environment variable.
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
               config: |
                 jobs:
-                  - name: custom_iw
-                    binary_path: /usr/local/sbin/varnishstat
+                  - name: varnish
+                    update_every: 5
     troubleshooting:
       problems:
         list: []
@@ -102,7 +97,7 @@ modules:
           description: "These metrics refer to the entire monitored application."
           labels: []
           metrics:
-            - name: varnish.session_connection
+            - name: varnish.client_session_connections
               description: Connections Statistics
               unit: "connections/s"
               chart_type: line
@@ -115,108 +110,108 @@ modules:
               chart_type: line
               dimensions:
                 - name: received
-            - name: varnish.all_time_hit_rate
-              description: All History Hit Rate Ratio
-              unit: "percentage"
+            - name: varnish.cache_hit_ratio_total
+              description: Cache Hit Ratio Total
+              unit: "percent"
               chart_type: stacked
               dimensions:
                 - name: hit
                 - name: miss
                 - name: hitpass
-            - name: varnish.current_poll_hit_rate
-              description: Current Poll Hit Rate Ratio
-              unit: "percentage"
+                - name: hitmiss
+            - name: varnish.cache_hit_ratio_delta
+              description: Cache Hit Ratio Current Poll
+              unit: "percent"
               chart_type: stacked
               dimensions:
                 - name: hit
                 - name: miss
                 - name: hitpass
-            - name: varnish.cached_objects_expired
-              description: Expired Objects
-              unit: "expired/s"
+                - name: hitmiss
+            - name: varnish.cache_expired_objects
+              description: Cache Expired Objects
+              unit: "objects/s"
               chart_type: line
               dimensions:
-                - name: objects
-            - name: varnish.cached_objects_nuked
-              description: Least Recently Used Nuked Objects
-              unit: "nuked/s"
+                - name: expired
+            - name: varnish.cache_lru_activity
+              description: Cache LRU Activity
+              unit: "objects/s"
               chart_type: line
               dimensions:
-                - name: objects
-            - name: varnish.threads_total
-              description: Number Of Threads In All Pools
-              unit: "number"
+                - name: nuked
+                - name: moved
+            - name: varnish.threads
+              description: Threads In All Pools
+              unit: "threads"
               chart_type: line
               dimensions:
-                - name: None
-            - name: varnish.threads_statistics
-              description: Threads Statistics
+                - name: threads
+            - name: varnish.thread_management_activity
+              description: Thread Management Activity
               unit: "threads/s"
               chart_type: line
               dimensions:
                 - name: created
                 - name: failed
+                - name: destroyed
                 - name: limited
-            - name: varnish.threads_queue_len
-              description: Current Queue Length
-              unit: "requests"
+            - name: varnish.thread_queue_len
+              description: Session Queue Length
+              unit: "threads"
               chart_type: line
               dimensions:
-                - name: in queue
-            - name: varnish.backend_connections
-              description: Backend Connections Statistics
-              unit: "connections/s"
-              chart_type: line
-              dimensions:
-                - name: successful
-                - name: unhealthy
-                - name: busy
-                - name: failed
-                - name: reused
-                - name: recycled
-                - name: retry
-            - name: varnish.backend_requests
-              description: Requests To The Backend
+                - name: queue_length
+            - name: varnish.backends_requests
+              description: Backend Requests
               unit: "requests/s"
               chart_type: line
               dimensions:
                 - name: sent
-            - name: varnish.esi_statistics
-              description: ESI Statistics
-              unit: "problems/s"
+            - name: varnish.esi_parsing_issues
+              description: ESI Parsing Issues
+              unit: "issues/s"
               chart_type: line
               dimensions:
                 - name: errors
                 - name: warnings
-            - name: varnish.uptime
-              description: Uptime
+            - name: varnish.mgmt_process_uptime
+              description: Management Process Uptime
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: varnish.child_process_uptime
+              description: Child Process Uptime
               unit: "seconds"
               chart_type: line
               dimensions:
                 - name: uptime
         - name: Backend
-          description: ""
+          description: "These metrics refer to the Backend (VBE)."
           labels: []
           metrics:
-            - name: varnish.backend
-              description: Backend Response Statistics
-              unit: "kilobits/s"
+            - name: varnish.backend_data_transfer
+              description: Backend Data Transfer
+              unit: "bytes/s"
               chart_type: area
               dimensions:
-                - name: header
-                - name: body
+                - name: req_header
+                - name: req_body
+                - name: resp_header
+                - name: resp_body
         - name: Storage
-          description: ""
+          description: "These metrics refer to the Storage (SMA, SMF, MSE)."
           labels: []
           metrics:
-            - name: varnish.storage_usage
-              description: Storage Usage
-              unit: "KiB"
+            - name: varnish.storage_space_usage
+              description: Storage Space Usage
+              unit: "bytes"
               chart_type: stacked
               dimensions:
                 - name: free
-                - name: allocated
-            - name: varnish.storage_alloc_objs
+                - name: used
+            - name: varnish.storage_allocated_objects
               description: Storage Allocated Objects
               unit: "objects"
               chart_type: line

@@ -11,25 +11,32 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
-func newVarnishStatExec(binPath string, timeout time.Duration) *varnishStatExec {
-	return &varnishStatExec{
-		binPath: binPath,
-		timeout: timeout,
+type varnishstatBinary interface {
+	statistics() ([]byte, error)
+}
+
+func newVarnishstatBinary(binPath string, cfg Config, log *logger.Logger) varnishstatBinary {
+	return &varnishstatExec{
+		Logger:       log,
+		binPath:      binPath,
+		timeout:      cfg.Timeout.Duration(),
+		instanceName: cfg.InstanceName,
 	}
 }
 
-type varnishStatExec struct {
+type varnishstatExec struct {
 	*logger.Logger
 
-	binPath string
-	timeout time.Duration
+	binPath      string
+	timeout      time.Duration
+	instanceName string
 }
 
-func (e *varnishStatExec) varnishStatistics() ([]byte, error) {
+func (e *varnishstatExec) statistics() ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, e.binPath, "-1", "-t", "1")
+	cmd := exec.CommandContext(ctx, e.binPath, "varnishstat-stats", "--instanceName", e.instanceName)
 	e.Debugf("executing '%s'", cmd)
 
 	bs, err := cmd.Output()
