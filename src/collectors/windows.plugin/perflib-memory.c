@@ -16,20 +16,27 @@ struct swap {
     RRDDIM *rd_page_read;
     RRDDIM *rd_page_write;
 
-    //    RRDSET *st2;
-    //    RRDDIM *rd2_busy;
-
     COUNTER_DATA pageReadsTotal;
     COUNTER_DATA pageWritesTotal;
     COUNTER_DATA pageInputTotal;
     COUNTER_DATA pageOutputTotal;
 };
 
+struct system_pool {
+    RRDSET *pool;
+    RRDDIM *rd_paged;
+    RRDDIM *rd_nonpaged;
+
+    COUNTER_DATA pagedData;
+    COUNTER_DATA nonPagedData;
+};
+
 struct swap localSwap = { 0 };
+struct system_pool localPool = { 0 };
 
 void initialize_swap_keys(struct swap *p) {
     // SWAP Operations
-    p->pageReadsTotal.key = "Page Reads/sec" ;
+    p->pageReadsTotal.key = "Page Reads/sec";
     p->pageWritesTotal.key = "Page Writes/s";
 
     // Swap Pages
@@ -37,8 +44,14 @@ void initialize_swap_keys(struct swap *p) {
     p->pageOutputTotal.key = "Pages Output/s";
 }
 
+void initialize_pool_keys(struct system_pool *p) {
+    p->pagedData.key = "Pool Paged Bytes";
+    p->nonPagedData.key = "Pool Nonpaged Bytes";
+}
+
 static void initialize(void) {
     initialize_swap_keys(&localSwap);
+    initialize_pool_keys(&localPool);
 }
 
 static void do_memory_swap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
@@ -109,6 +122,42 @@ static void do_memory_swap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjec
     rrdset_done(localSwap.pages);
 }
 
+static void do_memory_system_pool(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    perflibGetObjectCounter(pDataBlock, pObjectType, &localPool.nonPagedData);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &localPool.pagedData);
+
+    if (!localPool.pool) {
+        localPool.pool = rrdset_create_localhost(
+            "mem"
+        , "system_pool", NULL
+        , "mem"
+        , "mem.system_pool"
+        , "System Memory Pool"
+        , "bytes"
+        , PLUGIN_WINDOWS_NAME
+        , "PerflibMemory"
+        , NETDATA_CHART_PRIO_MEM_SYSTEM_POOL
+        , update_every
+        , RRDSET_TYPE_STACKED
+        );
+
+        localPool.rd_paged = rrddim_add(localPool.pool, "paged", NULL,
+                                          1, 1, RRD_ALGORITHM_ABSOLUTE);
+        localPool.rd_nonpaged = rrddim_add(localPool.pool, "pool-paged", NULL,
+                                           1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(localPool.pool,
+                          localPool.rd_paged,
+                          (collected_number)localPool.pagedData.current.Data);
+
+    rrddim_set_by_pointer(localPool.pool,
+                          localPool.rd_nonpaged,
+                          (collected_number)localPool.nonPagedData.current.Data);
+    rrdset_done(localPool.pool);
+}
+
 static bool do_memory(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Memory");
     if (!pObjectType)
@@ -140,6 +189,8 @@ static bool do_memory(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     common_mem_available(available_bytes, update_every);
 
     do_memory_swap(pDataBlock, pObjectType, update_every);
+
+    do_memory_system_pool(pDataBlock, pObjectType, update_every);
 
     return true;
 }
