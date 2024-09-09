@@ -64,7 +64,10 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
 
 list(APPEND _main_deps "netdata-plugin-chartsd")
-list(APPEND _main_deps "netdata-plugin-pythond")
+
+if(ENABLE_PLUGIN_PYTHON)
+  list(APPEND _main_deps "netdata-plugin-pythond")
+endif()
 
 if(ENABLE_PLUGIN_APPS)
         list(APPEND _main_deps "netdata-plugin-apps")
@@ -465,7 +468,9 @@ endif()
 if(ENABLE_PLUGIN_PERF)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-perf")
 endif()
-list(APPEND CPACK_COMPONENTS_ALL "plugin-pythond")
+if(ENABLE_PLUGIN_PYTHON)
+  list(APPEND CPACK_COMPONENTS_ALL "plugin-pythond")
+endif()
 if(ENABLE_PLUGIN_SLABINFO)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-slabinfo")
 endif()

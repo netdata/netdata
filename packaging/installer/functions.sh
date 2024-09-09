@@ -303,6 +303,12 @@ prepare_cmake_options() {
     enable_feature PLUGIN_GO 0
   fi
 
+  if [ "${ENABLE_PYTHON:-1}" -eq 1 ]; then
+    enable_feature PLUGIN_PYTHON 1
+  else
+    enable_feature PLUGIN_PYTHON 0
+  fi
+
   if [ "${USE_SYSTEM_PROTOBUF:-0}" -eq 1 ]; then
     enable_feature BUNDLED_PROTOBUF 0
   else

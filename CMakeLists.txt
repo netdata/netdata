@@ -156,6 +156,7 @@ option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
 cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 cmake_dependent_option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
@@ -2905,52 +2906,54 @@ install(FILES
 # python.d plugin
 #
 
-configure_file(src/collectors/python.d.plugin/python.d.plugin.in src/collectors/python.d.plugin/python.d.plugin @ONLY)
-install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/python.d.plugin/python.d.plugin
-        COMPONENT plugin-pythond
-        DESTINATION usr/libexec/netdata/plugins.d)
+if(ENABLE_PLUGIN_PYTHON)
+  configure_file(src/collectors/python.d.plugin/python.d.plugin.in src/collectors/python.d.plugin/python.d.plugin @ONLY)
+  install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/python.d.plugin/python.d.plugin
+          COMPONENT plugin-pythond
+          DESTINATION usr/libexec/netdata/plugins.d)
 
-install(DIRECTORY src/collectors/python.d.plugin/python_modules
-        COMPONENT plugin-pythond
-        DESTINATION usr/libexec/netdata/python.d)
+  install(DIRECTORY src/collectors/python.d.plugin/python_modules
+          COMPONENT plugin-pythond
+          DESTINATION usr/libexec/netdata/python.d)
 
-install(FILES src/collectors/python.d.plugin/python.d.conf
-        COMPONENT plugin-pythond
-        DESTINATION usr/lib/netdata/conf.d)
+  install(FILES src/collectors/python.d.plugin/python.d.conf
+          COMPONENT plugin-pythond
+          DESTINATION usr/lib/netdata/conf.d)
 
-install(FILES
-        src/collectors/python.d.plugin/am2320/am2320.conf
-        src/collectors/python.d.plugin/ceph/ceph.conf
-        src/collectors/python.d.plugin/go_expvar/go_expvar.conf
-        src/collectors/python.d.plugin/haproxy/haproxy.conf
-        src/collectors/python.d.plugin/openldap/openldap.conf
-        src/collectors/python.d.plugin/oracledb/oracledb.conf
-        src/collectors/python.d.plugin/pandas/pandas.conf
-        src/collectors/python.d.plugin/spigotmc/spigotmc.conf
-        src/collectors/python.d.plugin/traefik/traefik.conf
-        src/collectors/python.d.plugin/zscores/zscores.conf
-        COMPONENT plugin-pythond
-        DESTINATION usr/lib/netdata/conf.d/python.d)
+  install(FILES
+          src/collectors/python.d.plugin/am2320/am2320.conf
+          src/collectors/python.d.plugin/ceph/ceph.conf
+          src/collectors/python.d.plugin/go_expvar/go_expvar.conf
+          src/collectors/python.d.plugin/haproxy/haproxy.conf
+          src/collectors/python.d.plugin/openldap/openldap.conf
+          src/collectors/python.d.plugin/oracledb/oracledb.conf
+          src/collectors/python.d.plugin/pandas/pandas.conf
+          src/collectors/python.d.plugin/spigotmc/spigotmc.conf
+          src/collectors/python.d.plugin/traefik/traefik.conf
+          src/collectors/python.d.plugin/zscores/zscores.conf
+          COMPONENT plugin-pythond
+          DESTINATION usr/lib/netdata/conf.d/python.d)
 
-install(FILES
-        src/collectors/python.d.plugin/am2320/am2320.chart.py
-        src/collectors/python.d.plugin/ceph/ceph.chart.py
-        src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
-        src/collectors/python.d.plugin/haproxy/haproxy.chart.py
-        src/collectors/python.d.plugin/openldap/openldap.chart.py
-        src/collectors/python.d.plugin/oracledb/oracledb.chart.py
-        src/collectors/python.d.plugin/pandas/pandas.chart.py
-        src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
-        src/collectors/python.d.plugin/traefik/traefik.chart.py
-        src/collectors/python.d.plugin/zscores/zscores.chart.py
-        COMPONENT plugin-pythond
-        DESTINATION usr/libexec/netdata/python.d)
+  install(FILES
+          src/collectors/python.d.plugin/am2320/am2320.chart.py
+          src/collectors/python.d.plugin/ceph/ceph.chart.py
+          src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
+          src/collectors/python.d.plugin/haproxy/haproxy.chart.py
+          src/collectors/python.d.plugin/openldap/openldap.chart.py
+          src/collectors/python.d.plugin/oracledb/oracledb.chart.py
+          src/collectors/python.d.plugin/pandas/pandas.chart.py
+          src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
+          src/collectors/python.d.plugin/traefik/traefik.chart.py
+          src/collectors/python.d.plugin/zscores/zscores.chart.py
+          COMPONENT plugin-pythond
+          DESTINATION usr/libexec/netdata/python.d)
 
-if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-pythond
-                DESTINATION usr/share/doc/netdata-plugin-pythond)
+  if(BUILD_FOR_PACKAGING)
+    install(FILES
+            ${PKG_FILES_PATH}/copyright
+            COMPONENT plugin-pythond
+            DESTINATION usr/share/doc/netdata-plugin-pythond)
+  endif()
 endif()
 
 #
