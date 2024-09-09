@@ -36,6 +36,7 @@ add_cmake_option ENABLE_PLUGIN_DEBUGFS On
 add_cmake_option ENABLE_PLUGIN_FREEIPMI On
 add_cmake_option ENABLE_PLUGIN_GO On
 add_cmake_option ENABLE_PLUGIN_PYTHON On
+add_cmake_option ENABLE_PLUGIN_CHARTS On
 add_cmake_option ENABLE_PLUGIN_LOCAL_LISTENERS On
 add_cmake_option ENABLE_PLUGIN_NFACCT On
 add_cmake_option ENABLE_PLUGIN_PERF On

@@ -254,6 +254,7 @@ NETDATA_ENABLE_ML=""
 ENABLE_DBENGINE=1
 ENABLE_GO=1
 ENABLE_PYTHON=1
+ENABLE_CHARTS=1
 ENABLE_H2O=1
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
@@ -284,6 +285,8 @@ while [ -n "${1}" ]; do
     "--disable-go") ENABLE_GO=0 ;;
     "--enable-plugin-python") ENABLE_PYTHON=1 ;;
     "--disable-plugin-python") ENABLE_PYTHON=0 ;;
+    "--enable-plugin-charts") ENABLE_CHARTS=1 ;;
+    "--disable-plugin-charts") ENABLE_CHARTS=0 ;;
     "--enable-plugin-nfacct") ENABLE_NFACCT=1 ;;
     "--disable-plugin-nfacct") ENABLE_NFACCT=0 ;;
     "--enable-plugin-xenstat") ENABLE_XENSTAT=1 ;;

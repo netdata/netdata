@@ -159,6 +159,7 @@ option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATU
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
 cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
+cmake_dependent_option(ENABLE_PLUGIN_CHARTS "Enable metric collectors written in Bash" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 cmake_dependent_option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 
 cmake_dependent_option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD" False)
@@ -2840,60 +2841,66 @@ endif()
 # charts.d plugin
 #
 
-install(DIRECTORY COMPONENT plugin-chartsd DESTINATION etc/netdata/charts.d)
+if(ENABLE_PLUGIN_CHARTS)
+  install(DIRECTORY COMPONENT plugin-chartsd DESTINATION etc/netdata/charts.d)
 
-configure_file(src/collectors/charts.d.plugin/charts.d.plugin.in src/collectors/charts.d.plugin/charts.d.plugin @ONLY)
-install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/src/collectors/charts.d.plugin/charts.d.plugin
-        COMPONENT plugin-chartsd
-        DESTINATION usr/libexec/netdata/plugins.d)
+  configure_file(src/collectors/charts.d.plugin/charts.d.plugin.in src/collectors/charts.d.plugin/charts.d.plugin @ONLY)
+  install(PROGRAMS
+          ${CMAKE_BINARY_DIR}/src/collectors/charts.d.plugin/charts.d.plugin
+          COMPONENT plugin-chartsd
+          DESTINATION usr/libexec/netdata/plugins.d)
 
-install(PROGRAMS
-        src/collectors/charts.d.plugin/charts.d.dryrun-helper.sh
-        COMPONENT plugin-chartsd
-        DESTINATION usr/libexec/netdata/plugins.d)
+  install(PROGRAMS
+          src/collectors/charts.d.plugin/charts.d.dryrun-helper.sh
+          COMPONENT plugin-chartsd
+          DESTINATION usr/libexec/netdata/plugins.d)
 
-# loopsleepms is used by the tc.plugin -> ship it in the netdata component
-install(FILES
-        src/collectors/charts.d.plugin/loopsleepms.sh.inc
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata/plugins.d)
+  install(FILES
+          src/collectors/charts.d.plugin/charts.d.conf
+          COMPONENT plugin-chartsd
+          DESTINATION usr/lib/netdata/conf.d)
 
-install(FILES
-        src/collectors/charts.d.plugin/charts.d.conf
-        COMPONENT plugin-chartsd
-        DESTINATION usr/lib/netdata/conf.d)
+  install(PROGRAMS
+          src/collectors/charts.d.plugin/example/example.chart.sh
+          src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
+          src/collectors/charts.d.plugin/opensips/opensips.chart.sh
+          COMPONENT plugin-chartsd
+          DESTINATION usr/libexec/netdata/charts.d)
 
-install(PROGRAMS
-        src/collectors/charts.d.plugin/example/example.chart.sh
-        src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
-        src/collectors/charts.d.plugin/opensips/opensips.chart.sh
-        COMPONENT plugin-chartsd
-        DESTINATION usr/libexec/netdata/charts.d)
+  install(FILES
+          src/collectors/charts.d.plugin/example/example.conf
+          src/collectors/charts.d.plugin/libreswan/libreswan.conf
+          src/collectors/charts.d.plugin/opensips/opensips.conf
+          COMPONENT plugin-chartsd
+          DESTINATION usr/lib/netdata/conf.d/charts.d)
 
-install(FILES
-        src/collectors/charts.d.plugin/example/example.conf
-        src/collectors/charts.d.plugin/libreswan/libreswan.conf
-        src/collectors/charts.d.plugin/opensips/opensips.conf
-        COMPONENT plugin-chartsd
-        DESTINATION usr/lib/netdata/conf.d/charts.d)
+  if(BUILD_FOR_PACKAGING)
+    install(FILES
+            ${PKG_FILES_PATH}/copyright
+            COMPONENT plugin-chartsd
+            DESTINATION usr/share/doc/netdata-plugin-chartsd)
+  endif()
+endif()
 
-if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-chartsd
-                DESTINATION usr/share/doc/netdata-plugin-chartsd)
+# This is needed both by the TC plugin (which only gets built on Linux) and the charts plugin.
+if(OS_LINUX OR ENABLE_PLUGIN_CHARTS)
+  install(FILES
+          src/collectors/charts.d.plugin/loopsleepms.sh.inc
+          COMPONENT netdata
+          DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
 #
 # tc-qos-helper
 #
 
-configure_file(src/collectors/tc.plugin/tc-qos-helper.sh.in src/collectors/tc.plugin/tc-qos-helper.sh @ONLY)
-install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/src/collectors/tc.plugin/tc-qos-helper.sh
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata/plugins.d)
+if(OS_LINUX)
+  configure_file(src/collectors/tc.plugin/tc-qos-helper.sh.in src/collectors/tc.plugin/tc-qos-helper.sh @ONLY)
+  install(PROGRAMS
+          ${CMAKE_BINARY_DIR}/src/collectors/tc.plugin/tc-qos-helper.sh
+          COMPONENT netdata
+          DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 
 # confs
 install(FILES
