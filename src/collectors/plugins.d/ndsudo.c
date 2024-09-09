@@ -14,6 +14,15 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "varnishstat-stats",
+        .params = "-1 -t off",
+        .search =
+            {
+                [0] = "varnishstat",
+                [1] = NULL,
+            },
+    },
+    {
         .name = "smbstatus-profile",
         .params = "-P",
         .search =
