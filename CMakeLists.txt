@@ -2484,9 +2484,7 @@ install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/cloud.d)
 install(DIRECTORY COMPONENT netdata DESTINATION var/run/netdata)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/custom-plugins.d)
-install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/go.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/health.d)
-install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/python.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/ssl)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/statsd.d)
 install(DIRECTORY COMPONENT netdata DESTINATION usr/lib/netdata/conf.d)
@@ -2914,6 +2912,8 @@ install(FILES
 #
 
 if(ENABLE_PLUGIN_PYTHON)
+  install(DIRECTORY COMPONENT plugin-pythond DESTINATION etc/netdata/python.d)
+
   configure_file(src/collectors/python.d.plugin/python.d.plugin.in src/collectors/python.d.plugin/python.d.plugin @ONLY)
   install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/python.d.plugin/python.d.plugin
           COMPONENT plugin-pythond
@@ -2976,6 +2976,8 @@ install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
 # go.d.plugin
 #
 if(ENABLE_PLUGIN_GO)
+    install(DIRECTORY COMPONENT plugin-go DESTINATION etc/netdata/go.d)
+
     install(FILES src/go/plugin/go.d/config/go.d.conf
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d)
