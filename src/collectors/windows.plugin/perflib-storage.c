@@ -30,6 +30,10 @@ struct physical_disk {
     COUNTER_DATA diskReadBytesPerSec;
     COUNTER_DATA diskWriteBytesPerSec;
 
+    ND_DISK_OPS disk_op;
+    COUNTER_DATA diskReadsPerSec;
+    COUNTER_DATA diskWritesPerSec;
+
     COUNTER_DATA percentIdleTime;
     COUNTER_DATA percentDiskTime;
     COUNTER_DATA percentDiskReadTime;
@@ -42,8 +46,6 @@ struct physical_disk {
     COUNTER_DATA averageDiskSecondsPerRead;
     COUNTER_DATA averageDiskSecondsPerWrite;
     COUNTER_DATA diskTransfersPerSec;
-    COUNTER_DATA diskReadsPerSec;
-    COUNTER_DATA diskWritesPerSec;
     COUNTER_DATA diskBytesPerSec;
     COUNTER_DATA averageDiskBytesPerTransfer;
     COUNTER_DATA averageDiskBytesPerRead;
@@ -271,6 +273,19 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                     d);
         }
 
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskReadsPerSec) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskWritesPerSec)) {
+            common_disk_ops(&d->disk_op,
+                            device,
+                            NULL,
+                            device,
+                            d->diskReadsPerSec.current.Data,
+                            d->diskWritesPerSec.current.Data,
+                            update_every,
+                            physical_disk_labels,
+                            d);
+        }
+
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime);
@@ -283,8 +298,6 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerWrite);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskTransfersPerSec);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskReadsPerSec);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskWritesPerSec);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskBytesPerSec);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerTransfer);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerRead);
