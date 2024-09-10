@@ -106,6 +106,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/unbound"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/upsd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/uwsgi"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/varnish"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vcsa"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vernemq"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere"

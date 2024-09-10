@@ -465,19 +465,7 @@ func checkID(id string) int {
 }
 
 func TestMetricsHasAllChartsDims(t *testing.T, charts *Charts, mx map[string]int64) {
-	for _, chart := range *charts {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "missing data for dimension '%s' in chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := mx[v.ID]
-			assert.Truef(t, ok, "missing data for variable '%s' in chart '%s'", v.ID, chart.ID)
-		}
-	}
+	TestMetricsHasAllChartsDimsSkip(t, charts, mx, nil)
 }
 
 func TestMetricsHasAllChartsDimsSkip(t *testing.T, charts *Charts, mx map[string]int64, skip func(chart *Chart) bool) {

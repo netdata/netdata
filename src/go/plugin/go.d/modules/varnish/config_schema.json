@@ -1,0 +1,47 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Varnish collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for executing the binary, specified in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 2
+      },
+      "instance_name": {
+        "title": "Instance name",
+        "description": "Specifies the name of the Varnish instance to collect metrics from.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "binary_path": {
+      "ui:help": "If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable."
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "instance_name": {
+      "ui:help": "This corresponds to the `-n` argument used with the [varnishstat](https://varnish-cache.org/docs/trunk/reference/varnishstat.html) command. If not provided, the hostname will be used."
+    }
+  }
+}

@@ -147,8 +147,10 @@ see the appropriate collector readme.
 | [tomcat](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/tomcat)                         |            Tomcat             |
 | [tor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/tor)                               |              Tor              |
 | [traefik](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/traefik)                       |            Traefik            |
-| [upsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/upsd)                             |          UPSd (Nut)           |
 | [unbound](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/unbound)                       |            Unbound            |
+| [upsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/upsd)                             |          UPSd (Nut)           |
+| [uwsgi](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/uwsgi)                             |          uWSGI           |
+| [varnish](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/varnish)                             |          Varnish           |
 | [vcsa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/vcsa)                             |   vCenter Server Appliance    |
 | [vernemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/vernemq)                       |            VerneMQ            |
 | [vsphere](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/vsphere)                       |     VMware vCenter Server     |
