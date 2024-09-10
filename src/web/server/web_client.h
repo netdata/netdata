@@ -56,19 +56,20 @@ typedef enum __attribute__((packed)) {
     WEB_CLIENT_FLAG_PATH_IS_V0              = (1 << 16), // v0 dashboard found on the path
     WEB_CLIENT_FLAG_PATH_IS_V1              = (1 << 17), // v1 dashboard found on the path
     WEB_CLIENT_FLAG_PATH_IS_V2              = (1 << 18), // v2 dashboard found on the path
-    WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH = (1 << 19), // the path has a trailing hash
-    WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION = (1 << 20), // the path ends with a filename extension
+    WEB_CLIENT_FLAG_PATH_IS_V3              = (1 << 19), // v3 dashboard found on the path
+    WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH = (1 << 20), // the path has a trailing hash
+    WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION = (1 << 21), // the path ends with a filename extension
 
     // authorization
-    WEB_CLIENT_FLAG_AUTH_CLOUD              = (1 << 21),
-    WEB_CLIENT_FLAG_AUTH_BEARER             = (1 << 22),
-    WEB_CLIENT_FLAG_AUTH_GOD                = (1 << 23),
+    WEB_CLIENT_FLAG_AUTH_CLOUD              = (1 << 22),
+    WEB_CLIENT_FLAG_AUTH_BEARER             = (1 << 23),
+    WEB_CLIENT_FLAG_AUTH_GOD                = (1 << 24),
 
     // transient settings
-    WEB_CLIENT_FLAG_PROGRESS_TRACKING       = (1 << 24), // flag to avoid redoing progress work
+    WEB_CLIENT_FLAG_PROGRESS_TRACKING       = (1 << 25), // flag to avoid redoing progress work
 } WEB_CLIENT_FLAGS;
 
-#define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2)
+#define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2|WEB_CLIENT_FLAG_PATH_IS_V3)
 #define web_client_reset_path_flags(w) (w)->flags &= ~(WEB_CLIENT_FLAG_PATH_WITH_VERSION|WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH|WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION)
 
 #define web_client_flag_check(w, flag) ((w)->flags & (flag))
