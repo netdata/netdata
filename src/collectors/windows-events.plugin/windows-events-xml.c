@@ -30,6 +30,7 @@ static const char *parse_node(BUFFER *buffer, const char *xml, const char *end, 
 // Helper: Parse the value (between > and <) and return the next position to parse
 const char *parse_value_and_closing_tag(BUFFER *buffer, const char *xml, const char *end, int level) {
     const char *start = xml;
+    bool has_subnodes = false;
 
     while (xml < end) {
         if(*xml == '<') {
@@ -43,6 +44,11 @@ const char *parse_value_and_closing_tag(BUFFER *buffer, const char *xml, const c
                 if(xml < end && *xml == '>')
                     xml++;
 
+                if(has_subnodes) {
+                    buffer_putc(buffer, '\n');
+                    buffer_add_xml_indent(buffer, level);
+                }
+
                 buffer_fast_strcat(buffer, start, xml - start);
                 return xml;
             }
@@ -52,6 +58,7 @@ const char *parse_value_and_closing_tag(BUFFER *buffer, const char *xml, const c
                 xml = start = parse_node(buffer, xml, end, level + 1);
                 while(xml < end && isspace(*xml))
                     xml++;
+                has_subnodes = true;
             }
         }
         else
@@ -167,9 +174,9 @@ static inline const char *parse_node(BUFFER *buffer, const char *xml, const char
         }
     }
 
-    bool closing_tag = false;
+    bool self_closing_tag = false;
     if(xml < end && *xml == '/') {
-        closing_tag = true;
+        self_closing_tag = true;
         xml++;
     }
 
@@ -177,7 +184,7 @@ static inline const char *parse_node(BUFFER *buffer, const char *xml, const char
         xml++;
         buffer_fast_strcat(buffer, start, xml - start);
 
-        if(closing_tag)
+        if(self_closing_tag)
             return xml;
 
         return parse_value_and_closing_tag(buffer, xml, end, level);
