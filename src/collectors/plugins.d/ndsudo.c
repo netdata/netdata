@@ -14,6 +14,24 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "varnishadm-backend-list",
+        .params = "backend.list",
+        .search =
+            {
+                [0] = "varnishadm",
+                [1] = NULL,
+            },
+    },
+    {
+        .name = "varnishstat-stats",
+        .params = "-1 -t off -n {{instanceName}}",
+        .search =
+            {
+                [0] = "varnishstat",
+                [1] = NULL,
+            },
+    },
+    {
         .name = "smbstatus-profile",
         .params = "-P",
         .search =

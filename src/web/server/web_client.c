@@ -381,12 +381,14 @@ static inline int dashboard_version(struct web_client *w) {
     if(!web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
         return -1;
 
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V0))
-        return 0;
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V1))
-        return 1;
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V3))
+        return 3;
     if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V2))
         return 2;
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V1))
+        return 1;
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_IS_V0))
+        return 0;
 
     return -1;
 }
@@ -1140,7 +1142,8 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             hash_node = 0,
             hash_v0 = 0,
             hash_v1 = 0,
-            hash_v2 = 0;
+            hash_v2 = 0,
+            hash_v3 = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
@@ -1154,6 +1157,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         hash_v0 = simple_hash("v0");
         hash_v1 = simple_hash("v1");
         hash_v2 = simple_hash("v2");
+        hash_v3 = simple_hash("v3");
 #ifdef NETDATA_INTERNAL_CHECKS
         hash_exit = simple_hash("exit");
         hash_debug = simple_hash("debug");
@@ -1177,6 +1181,12 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) { // host switching
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
             return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_process_url);
+        }
+        else if(unlikely(hash == hash_v3 && strcmp(tok, "v3") == 0)) {
+            if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
+                return bad_request_multiple_dashboard_versions(w);
+            web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_V3);
+            return web_client_process_url(host, w, decoded_url_path);
         }
         else if(unlikely(hash == hash_v2 && strcmp(tok, "v2") == 0)) {
             if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
