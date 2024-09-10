@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- add varnishstat and varnishadm to ndsudo [\#18503](https://github.com/netdata/netdata/pull/18503) ([ilyam8](https://github.com/ilyam8))
+- Bump github.com/docker/docker from 27.2.0+incompatible to 27.2.1+incompatible in /src/go [\#18502](https://github.com/netdata/netdata/pull/18502) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/jackc/pgx/v5 from 5.6.0 to 5.7.0 in /src/go [\#18498](https://github.com/netdata/netdata/pull/18498) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/prometheus/common from 0.58.0 to 0.59.1 in /src/go [\#18497](https://github.com/netdata/netdata/pull/18497) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump golang.org/x/net from 0.28.0 to 0.29.0 in /src/go [\#18496](https://github.com/netdata/netdata/pull/18496) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations.js [\#18493](https://github.com/netdata/netdata/pull/18493) ([netdatabot](https://github.com/netdatabot))
 - add go.d/apcupsd [\#18489](https://github.com/netdata/netdata/pull/18489) ([ilyam8](https://github.com/ilyam8))
 - Improve processing on removed alerts after agent restart [\#18488](https://github.com/netdata/netdata/pull/18488) ([stelfrag](https://github.com/stelfrag))
@@ -381,7 +386,6 @@
 - Fix space percentage calculation in dbengine retention chart [\#17963](https://github.com/netdata/netdata/pull/17963) ([stelfrag](https://github.com/stelfrag))
 - Tidy-up build related CI jobs. [\#17962](https://github.com/netdata/netdata/pull/17962) ([Ferroin](https://github.com/Ferroin))
 - Sign DEB packages in the GHA runners that build them. [\#17949](https://github.com/netdata/netdata/pull/17949) ([Ferroin](https://github.com/Ferroin))
-- Detect on startup if the netdata-meta.db file is not a valid database file [\#17924](https://github.com/netdata/netdata/pull/17924) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
@@ -426,9 +430,6 @@
 - Regenerate integrations.js [\#17933](https://github.com/netdata/netdata/pull/17933) ([netdatabot](https://github.com/netdatabot))
 - go.d whoisquery fix defaults in config\_schema [\#17932](https://github.com/netdata/netdata/pull/17932) ([ilyam8](https://github.com/ilyam8))
 - Move to using CPack for repository configuration packages. [\#17930](https://github.com/netdata/netdata/pull/17930) ([Ferroin](https://github.com/Ferroin))
-- go.d whoisquery: use Domain.ExpirationDateInTime if provided [\#17926](https://github.com/netdata/netdata/pull/17926) ([ilyam8](https://github.com/ilyam8))
-- updater: handle json decode error in newer\_commit\_date\(\) [\#17925](https://github.com/netdata/netdata/pull/17925) ([ilyam8](https://github.com/ilyam8))
-- Bump k8s.io/client-go from 0.30.1 to 0.30.2 in /src/go/collectors/go.d.plugin [\#17923](https://github.com/netdata/netdata/pull/17923) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
