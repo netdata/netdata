@@ -115,8 +115,6 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "    Reload health configuration.\n\n"
              "reload-labels\n"
              "    Reload all labels.\n\n"
-             "save-database\n"
-             "    Save internal DB to disk for memory mode save.\n\n"
              "reopen-logs\n"
              "    Close and reopen log files.\n\n"
              "shutdown-agent\n"
