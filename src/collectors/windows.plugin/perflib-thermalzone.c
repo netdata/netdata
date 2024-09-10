@@ -69,6 +69,8 @@ static bool do_thermal_zones(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                1,
                                1,
                                RRD_ALGORITHM_ABSOLUTE);
+
+            rrdlabels_add(st->rrdlabels, "thermalzone", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         // Convert to Celsius before to plot
