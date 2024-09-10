@@ -430,8 +430,6 @@
 - Regenerate integrations.js [\#17933](https://github.com/netdata/netdata/pull/17933) ([netdatabot](https://github.com/netdatabot))
 - go.d whoisquery fix defaults in config\_schema [\#17932](https://github.com/netdata/netdata/pull/17932) ([ilyam8](https://github.com/ilyam8))
 - Move to using CPack for repository configuration packages. [\#17930](https://github.com/netdata/netdata/pull/17930) ([Ferroin](https://github.com/Ferroin))
-- go.d bump github.com/docker/docker v27.0.0+incompatible [\#17921](https://github.com/netdata/netdata/pull/17921) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/jessevdk/go-flags from 1.5.0 to 1.6.1 in /src/go/collectors/go.d.plugin [\#17919](https://github.com/netdata/netdata/pull/17919) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
