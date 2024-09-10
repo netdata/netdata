@@ -3,9 +3,15 @@
 package dockerhost
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"strings"
+
+	typesContainer "github.com/docker/docker/api/types/container"
+	docker "github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 func FromEnv() string {
@@ -20,4 +26,73 @@ func FromEnv() string {
 		return fmt.Sprintf("unix://%s", addr)
 	}
 	return fmt.Sprintf("tcp://%s", addr)
+}
+
+func Exec(ctx context.Context, containerId string, cmd string, args ...string) ([]byte, error) {
+	// based on https://github.com/moby/moby/blob/8e610b2b55bfd1bfa9436ab110d311f5e8a74dcb/integration/internal/container/exec.go#L38
+
+	addr := docker.DefaultDockerHost
+	if v := FromEnv(); v != "" {
+		addr = v
+	}
+
+	cli, err := docker.NewClientWithOpts(docker.WithHost(addr))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create docker client: %v", err)
+	}
+
+	defer cli.Close()
+
+	cli.NegotiateAPIVersion(ctx)
+
+	execCreateConfig := typesContainer.ExecOptions{
+		AttachStderr: true,
+		AttachStdout: true,
+		Cmd:          append([]string{cmd}, args...),
+	}
+
+	createResp, err := cli.ContainerExecCreate(ctx, containerId, execCreateConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to container exec create ('%s'): %v", containerId, err)
+	}
+
+	attachResp, err := cli.ContainerExecAttach(ctx, createResp.ID, typesContainer.ExecAttachOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to container exec attach ('%s'): %v", containerId, err)
+	}
+	defer attachResp.Close()
+
+	var outBuf, errBuf bytes.Buffer
+	done := make(chan error)
+
+	defer close(done)
+
+	go func() {
+		_, err := stdcopy.StdCopy(&outBuf, &errBuf, attachResp.Reader)
+		select {
+		case done <- err:
+		case <-ctx.Done():
+		}
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			return nil, fmt.Errorf("failed to read response from container ('%s'): %v", containerId, err)
+		}
+	case <-ctx.Done():
+		return nil, fmt.Errorf("timed out reading response")
+	}
+
+	inspResp, err := cli.ContainerExecInspect(ctx, createResp.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to container exec inspect ('%s'): %v", containerId, err)
+	}
+
+	if inspResp.ExitCode != 0 {
+		msg := strings.ReplaceAll(errBuf.String(), "\n", " ")
+		return nil, fmt.Errorf("command returned non-zero exit code (%d), error: '%s'", inspResp.ExitCode, msg)
+	}
+
+	return outBuf.Bytes(), nil
 }
