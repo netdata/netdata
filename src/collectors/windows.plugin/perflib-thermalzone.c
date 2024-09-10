@@ -60,7 +60,7 @@ static bool do_thermal_zones(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                 , "ThermalZone"
                 , NETDATA_CHART_PRIO_WINDOWS_THERMAL_ZONES
                 , update_every
-                , RRDSET_TYPE_STACKED
+                , RRDSET_TYPE_LINE
             );
 
             p->rd  = rrddim_add(p->st,
