@@ -13,7 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 
 	"github.com/blang/semver/v4"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 //go:embed "config_schema.json"
