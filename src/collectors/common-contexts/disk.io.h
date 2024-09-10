@@ -49,7 +49,7 @@ static inline void common_disk_io(ND_DISK_IO *d, const char *id, const char *nam
 static inline void common_unified_disk_io(ND_DISK_UIO *d, const char *id, const char *name, uint64_t bytes, int update_every, instance_labels_cb_t cb, void *data) {
     if(unlikely(!d->st_uio)) {
         d->st_uio = rrdset_create_localhost(
-            "disk"
+            "disk_uio"
         , id
         , name
         , "io"

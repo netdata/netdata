@@ -29,7 +29,7 @@ static inline void common_disk_ops(ND_DISK_OPS *d, const char *id, const char *n
         );
 
         d->rd_ops_reads  = rrddim_add(d->st_ops, "reads",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-        d->rd_ops_writes = rrddim_add(d->st_ops, "writes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        d->rd_ops_writes = rrddim_add(d->st_ops, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         if(cb)
             cb(d->st_ops, data);
