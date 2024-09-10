@@ -34,14 +34,15 @@ This approach eliminates the need to use `sudo`, improving security and potentia
 
 This collector is supported on all platforms.
 
-This collector only supports collecting metrics from a single instance of this integration.
+This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 
 ### Default Behavior
 
 #### Auto-Detection
 
-This integration doesn't support auto-detection.
+Automatically detects and monitors Varnish instances running on the host or inside Docker containers.
+
 
 #### Limits
 
@@ -148,6 +149,7 @@ The following options can be defined globally: update_every.
 | update_every | Data collection frequency. | 10 | no |
 | timeout | Timeout for executing the binary, specified in seconds. | 2 | no |
 | instance_name | Specifies the name of the Varnish instance to collect metrics from. This corresponds to the `-n` argument used with the [varnishstat](https://varnish-cache.org/docs/trunk/reference/varnishstat.html) command. |  | no |
+| docker_container | Specifies the name of the Docker container where the Varnish instance is running. If set, the `varnishstat` command will be executed within this container. |  | no |
 
 </details>
 
