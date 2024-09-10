@@ -79,6 +79,14 @@ modules:
               description: Target ipv4 address.
               default_value: ""
               required: true
+            - name: create_vnode
+              description: If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata.
+              default_value: "false"
+              required: false
+            - name: vnode_guid
+              description: If set, this GUID will be used for the Netdata Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.
+              default_value: ""
+              required: false
             - name: community
               description: SNMPv1/2 community string.
               default_value: public

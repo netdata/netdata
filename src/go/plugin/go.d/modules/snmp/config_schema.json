@@ -21,6 +21,42 @@
         "type": "string",
         "default": "public"
       },
+      "create_vnode": {
+        "title": "Create",
+        "description": "If set, the collector will create a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes) for this SNMP device, which will appear as a separate Node in Netdata.",
+        "type": "boolean"
+      },
+      "vnode": {
+        "title": "Configuration",
+        "description": "",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "guid": {
+            "title": "GUID",
+            "description": "If set, this GUID will be used for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.",
+            "type": "string"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "description": "If set, this hostname will be used for the Virtual Node. If not set, the device's hostname will be used.",
+            "type": "string"
+          },
+          "labels": {
+            "title": "Labels",
+            "description": "The Virtual Node host labels.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "network_interface_filter": {
         "title": "Network interface filter",
         "description": "Configuration for filtering specific network interfaces. If left empty, no interfaces will be filtered. You can filter interfaces by name or type using [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).",
@@ -395,6 +431,13 @@
             "update_every",
             "hostname",
             "community"
+          ]
+        },
+        {
+          "title": "Vnode",
+          "fields": [
+            "create_vnode",
+            "vnode"
           ]
         },
         {

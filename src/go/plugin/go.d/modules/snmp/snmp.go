@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 
 	"github.com/gosnmp/gosnmp"
@@ -56,6 +57,8 @@ func New() *SNMP {
 type SNMP struct {
 	module.Base
 	Config `yaml:",inline" json:""`
+
+	vnode *vnodes.VirtualNode
 
 	charts *module.Charts
 
@@ -152,4 +155,8 @@ func (s *SNMP) Cleanup() {
 	if s.snmpClient != nil {
 		_ = s.snmpClient.Close()
 	}
+}
+
+func (s *SNMP) VirtualNode() *vnodes.VirtualNode {
+	return s.vnode
 }

@@ -2,10 +2,14 @@
 
 package snmp
 
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
+
 type (
 	Config struct {
 		UpdateEvery            int                    `yaml:"update_every,omitempty" json:"update_every"`
 		Hostname               string                 `yaml:"hostname" json:"hostname"`
+		CreateVnode            bool                   `yaml:"create_vnode,omitempty" json:"create_vnode"`
+		Vnode                  vnodes.VirtualNode     `yaml:"vnode,omitempty" json:"vnode"`
 		Community              string                 `yaml:"community,omitempty" json:"community"`
 		User                   User                   `yaml:"user,omitempty" json:"user"`
 		Options                Options                `yaml:"options,omitempty" json:"options"`
