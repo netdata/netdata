@@ -71,6 +71,10 @@ modules:
               description: "Specifies the name of the Varnish instance to collect metrics from. This corresponds to the `-n` argument used with the [varnishstat](https://varnish-cache.org/docs/trunk/reference/varnishstat.html) command."
               default_value: ""
               required: false
+            - name: docker_container
+              description: "Specifies the name of the Docker container where the Varnish instance is running. If set, the `varnishstat` command will be executed within this container."
+              default_value: ""
+              required: false
         examples:
           folding:
             title: ""

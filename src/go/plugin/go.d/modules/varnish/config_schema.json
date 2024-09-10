@@ -22,6 +22,11 @@
         "title": "Instance name",
         "description": "Specifies the name of the Varnish instance to collect metrics from.",
         "type": "string"
+      },
+      "docker_container": {
+        "title": "Docker container name",
+        "description": "Specifies the name of the Docker container where the Varnish instance is running. If set, the `varnishstat` command will be executed within this container.",
+        "type": "string"
       }
     },
     "required": [],

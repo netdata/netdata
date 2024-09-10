@@ -39,9 +39,10 @@ func New() *Varnish {
 }
 
 type Config struct {
-	UpdateEvery  int          `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout      web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	InstanceName string       `yaml:"instance_name,omitempty" json:"instance_name,omitempty"`
+	UpdateEvery     int          `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout         web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	InstanceName    string       `yaml:"instance_name,omitempty" json:"instance_name,omitempty"`
+	DockerContainer string       `yaml:"docker_container,omitempty" json:"docker_container,omitempty"`
 }
 
 type Varnish struct {

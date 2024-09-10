@@ -11,6 +11,10 @@ import (
 )
 
 func (v *Varnish) initVarnishstatBinary() (varnishstatBinary, error) {
+	if v.Config.DockerContainer != "" {
+		return newVarnishstatDockerExecBinary(v.Config, v.Logger), nil
+	}
+
 	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
 
 	if _, err := os.Stat(ndsudoPath); err != nil {
@@ -18,7 +22,7 @@ func (v *Varnish) initVarnishstatBinary() (varnishstatBinary, error) {
 
 	}
 
-	varnishstat := newVarnishstatBinary(ndsudoPath, v.Config, v.Logger)
+	varnishstat := newVarnishstatExecBinary(ndsudoPath, v.Config, v.Logger)
 
 	return varnishstat, nil
 }
