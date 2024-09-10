@@ -1408,6 +1408,8 @@ set(WINDOWS_EVENTS_PLUGIN_FILES
         src/collectors/windows-events.plugin/windows-events-sid.h
         src/collectors/windows-events.plugin/windows-events-unicode.c
         src/collectors/windows-events.plugin/windows-events-unicode.h
+        src/collectors/windows-events.plugin/windows-events-xml.c
+        src/collectors/windows-events.plugin/windows-events-xml.h
 )
 
 set(WINDOWS_PLUGIN_FILES

@@ -197,21 +197,36 @@ void wevt_render_message(
     if(xml_rkv && buffer_strlen(xml_rkv->wb)) {
         const char *xml = buffer_tostring(xml_rkv->wb);
 
-        const char *event_data_start = strstr(xml, "<EventData>");
-        if(event_data_start) {
-            event_data_start = &event_data_start[11];
-            const char *event_data_end = strstr(event_data_start, "</EventData>");
+        bool added_event_data = false, added_user_data = false;
 
-            if(event_data_start && event_data_end) {
-                buffer_fast_strcat(rkv->wb, "\n\nRelated data:\n", 16);
+        const char *data_start = strstr(xml, "<EventData>");
+        if(data_start) {
+            data_start = &data_start[11];
+            const char *data_end = strstr(data_start, "</EventData>");
+
+            if(data_start && data_end) {
+                buffer_fast_strcat(rkv->wb, "\n\nRelated event data:\n", 22);
                 // copy the event data block
-                buffer_fast_strcat(rkv->wb, event_data_start, event_data_end - event_data_start);
+                buffer_pretty_print_xml(rkv->wb, data_start, data_end - data_start);
+                added_event_data = true;
             }
-            else
-                buffer_strcat(rkv->wb, " Without related data.");
         }
-        else
-            buffer_strcat(rkv->wb, " Without related data.");
+
+        data_start = strstr(xml, "<UserData>");
+        if(data_start) {
+            data_start = &data_start[10];
+            const char *data_end = strstr(data_start, "</UserData>");
+
+            if(data_start && data_end) {
+                buffer_fast_strcat(rkv->wb, "\n\nRelated user data:\n", 21);
+                // copy the event data block
+                buffer_pretty_print_xml(rkv->wb, data_start, data_end - data_start);
+                added_user_data = true;
+            }
+        }
+
+        if(!added_event_data && !added_user_data)
+            buffer_strcat(rkv->wb, " Without any related data.");
     }
 
     buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
@@ -1100,7 +1115,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         struct {
             const char *func;
         } array[] = {
-            { "windows-events after:1725704281 before:1725790681 last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:All" },
+            { "windows-events after:1725866669 before:1725953069 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6,ClaDGnYSQE7,H106l8MXSSr,HREiMN.4Ahu data_only:false source:All" },
             //{ "windows-events after:1725650277 before:1725736677 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
             //{ "windows-events after:1725650284 before:1725736684 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
             //{ "windows-events after:1725650386 before:1725736786 anchor:1725652420809461 direction:forward last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 if_modified_since:1725736649011085 data_only:true delta:true tail:true source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
