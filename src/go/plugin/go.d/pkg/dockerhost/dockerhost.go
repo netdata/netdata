@@ -28,7 +28,7 @@ func FromEnv() string {
 	return fmt.Sprintf("tcp://%s", addr)
 }
 
-func Exec(ctx context.Context, containerId string, cmd string, args ...string) ([]byte, error) {
+func Exec(ctx context.Context, container string, cmd string, args ...string) ([]byte, error) {
 	// based on https://github.com/moby/moby/blob/8e610b2b55bfd1bfa9436ab110d311f5e8a74dcb/integration/internal/container/exec.go#L38
 
 	addr := docker.DefaultDockerHost
@@ -51,14 +51,14 @@ func Exec(ctx context.Context, containerId string, cmd string, args ...string) (
 		Cmd:          append([]string{cmd}, args...),
 	}
 
-	createResp, err := cli.ContainerExecCreate(ctx, containerId, execCreateConfig)
+	createResp, err := cli.ContainerExecCreate(ctx, container, execCreateConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to container exec create ('%s'): %v", containerId, err)
+		return nil, fmt.Errorf("failed to container exec create ('%s'): %v", container, err)
 	}
 
 	attachResp, err := cli.ContainerExecAttach(ctx, createResp.ID, typesContainer.ExecAttachOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to container exec attach ('%s'): %v", containerId, err)
+		return nil, fmt.Errorf("failed to container exec attach ('%s'): %v", container, err)
 	}
 	defer attachResp.Close()
 
@@ -78,7 +78,7 @@ func Exec(ctx context.Context, containerId string, cmd string, args ...string) (
 	select {
 	case err := <-done:
 		if err != nil {
-			return nil, fmt.Errorf("failed to read response from container ('%s'): %v", containerId, err)
+			return nil, fmt.Errorf("failed to read response from container ('%s'): %v", container, err)
 		}
 	case <-ctx.Done():
 		return nil, fmt.Errorf("timed out reading response")
@@ -86,7 +86,7 @@ func Exec(ctx context.Context, containerId string, cmd string, args ...string) (
 
 	inspResp, err := cli.ContainerExecInspect(ctx, createResp.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to container exec inspect ('%s'): %v", containerId, err)
+		return nil, fmt.Errorf("failed to container exec inspect ('%s'): %v", container, err)
 	}
 
 	if inspResp.ExitCode != 0 {
