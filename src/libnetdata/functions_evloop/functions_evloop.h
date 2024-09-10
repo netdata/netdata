@@ -133,9 +133,13 @@ static inline void pluginsd_function_json_error_to_stdout(const char *transactio
     fflush(stdout);
 }
 
-static inline void pluginsd_function_result_to_stdout(const char *transaction, int code, const char *content_type, time_t expires, BUFFER *result) {
-    pluginsd_function_result_begin_to_stdout(transaction, code, content_type, expires);
+static inline void pluginsd_function_result_to_stdout(const char *transaction, BUFFER *result) {
+    pluginsd_function_result_begin_to_stdout(transaction, result->response_code,
+                                             content_type_id2string(result->content_type),
+                                             result->expires);
+
     fwrite(buffer_tostring(result), buffer_strlen(result), 1, stdout);
+
     pluginsd_function_result_end_to_stdout();
     fflush(stdout);
 }

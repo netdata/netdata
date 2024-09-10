@@ -475,19 +475,6 @@ struct journal_file_source {
     uint64_t size;
 };
 
-static void human_readable_size_ib(uint64_t size, char *dst, size_t dst_len) {
-    if(size > 1024ULL * 1024 * 1024 * 1024)
-        snprintfz(dst, dst_len, "%0.2f TiB", (double)size / 1024.0 / 1024.0 / 1024.0 / 1024.0);
-    else if(size > 1024ULL * 1024 * 1024)
-        snprintfz(dst, dst_len, "%0.2f GiB", (double)size / 1024.0 / 1024.0 / 1024.0);
-    else if(size > 1024ULL * 1024)
-        snprintfz(dst, dst_len, "%0.2f MiB", (double)size / 1024.0 / 1024.0);
-    else if(size > 1024ULL)
-        snprintfz(dst, dst_len, "%0.2f KiB", (double)size / 1024.0);
-    else
-        snprintfz(dst, dst_len, "%"PRIu64" B", size);
-}
-
 #define print_duration(dst, dst_len, pos, remaining, duration, one, many, printed) do { \
     if((remaining) > (duration)) {                                                      \
         uint64_t _count = (remaining) / (duration);                                     \
@@ -498,22 +485,6 @@ static void human_readable_size_ib(uint64_t size, char *dst, size_t dst_len) {
     } \
 } while(0)
 
-static void human_readable_duration_s(time_t duration_s, char *dst, size_t dst_len) {
-    if(duration_s < 0)
-        duration_s = -duration_s;
-
-    size_t pos = 0;
-    dst[0] = 0 ;
-
-    bool printed = false;
-    print_duration(dst, dst_len, pos, duration_s, 86400 * 365, "year", "years", printed);
-    print_duration(dst, dst_len, pos, duration_s, 86400 * 30, "month", "months", printed);
-    print_duration(dst, dst_len, pos, duration_s, 86400 * 1, "day", "days", printed);
-    print_duration(dst, dst_len, pos, duration_s, 3600 * 1, "hour", "hours", printed);
-    print_duration(dst, dst_len, pos, duration_s, 60 * 1, "min", "mins", printed);
-    print_duration(dst, dst_len, pos, duration_s, 1, "sec", "secs", printed);
-}
-
 static int journal_file_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry, void *data) {
     struct journal_file_source *jfs = entry;
     BUFFER *wb = data;
@@ -522,12 +493,12 @@ static int journal_file_to_json_array_cb(const DICTIONARY_ITEM *item, void *entr
 
     buffer_json_add_array_item_object(wb);
     {
-        char size_for_humans[100];
-        human_readable_size_ib(jfs->size, size_for_humans, sizeof(size_for_humans));
+        char size_for_humans[128];
+        size_snprintf(size_for_humans, sizeof(size_for_humans), jfs->size, "B", false);
 
-        char duration_for_humans[1024];
-        human_readable_duration_s((time_t)((jfs->last_ut - jfs->first_ut) / USEC_PER_SEC),
-                duration_for_humans, sizeof(duration_for_humans));
+        char duration_for_humans[128];
+        duration_snprintf(duration_for_humans, sizeof(duration_for_humans),
+                          (time_t)((jfs->last_ut - jfs->first_ut) / USEC_PER_SEC), "s", true);
 
         char info[1024];
         snprintfz(info, sizeof(info), "%zu files, with a total size of %s, covering %s",
@@ -756,6 +727,7 @@ void journal_files_registry_update(void) {
                 dictionary_del(journal_files_registry, jf_dfe.name);
         }
         dfe_done(jf);
+        dictionary_garbage_collect(journal_files_registry);
 
         journal_files_scans++;
         spinlock_unlock(&spinlock);

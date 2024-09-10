@@ -219,6 +219,57 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si) {
     return spawn_server_exec_wait(server, si);
 }
 
+static int spawn_server_waitpid(SPAWN_INSTANCE *si) {
+    int status;
+    pid_t pid;
+
+    pid = waitpid(si->child_pid, &status, 0);
+
+    if(pid != si->child_pid) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: failed to wait for pid %d: %s",
+               si->child_pid, si->cmdline);
+
+        return -1;
+    }
+
+    errno_clear();
+
+    if(WIFEXITED(status)) {
+        if(WEXITSTATUS(status))
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                   "SPAWN SERVER: child with pid %d (request %zu) exited with exit code %d: %s",
+                   pid, si->request_id, WEXITSTATUS(status), si->cmdline);
+    }
+    else if(WIFSIGNALED(status)) {
+        if(WCOREDUMP(status))
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                   "SPAWN SERVER: child with pid %d (request %zu) coredump'd due to signal %d: %s",
+                   pid, si->request_id, WTERMSIG(status), si->cmdline);
+        else
+            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                   "SPAWN SERVER: child with pid %d (request %zu) killed by signal %d: %s",
+                   pid, si->request_id, WTERMSIG(status), si->cmdline);
+    }
+    else if(WIFSTOPPED(status)) {
+        nd_log(NDLS_COLLECTORS, NDLP_INFO,
+               "SPAWN SERVER: child with pid %d (request %zu) stopped due to signal %d: %s",
+               pid, si->request_id, WSTOPSIG(status), si->cmdline);
+    }
+    else if(WIFCONTINUED(status)) {
+        nd_log(NDLS_COLLECTORS, NDLP_INFO,
+               "SPAWN SERVER: child with pid %d (request %zu) continued due to signal %d: %s",
+               pid, si->request_id, SIGCONT, si->cmdline);
+    }
+    else {
+        nd_log(NDLS_COLLECTORS, NDLP_INFO,
+               "SPAWN SERVER: child with pid %d (request %zu) reports unhandled status: %s",
+               pid, si->request_id, si->cmdline);
+    }
+
+    return status;
+}
+
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
     if (!si) return -1;
 
@@ -229,19 +280,8 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     // Wait for the process to exit
     int status = __atomic_load_n(&si->waitpid_status, __ATOMIC_RELAXED);
     bool exited = __atomic_load_n(&si->exited, __ATOMIC_RELAXED);
-    if(!exited) {
-        if(waitpid(si->child_pid, &status, 0) != si->child_pid) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "SPAWN PARENT: failed to wait for pid %d: %s",
-                   si->child_pid, si->cmdline);
-            status = -1;
-        }
-        else {
-            nd_log(NDLS_COLLECTORS, NDLP_INFO,
-                   "SPAWN PARENT: child with pid %d exited with status %d (waitpid): %s",
-                   si->child_pid, status, si->cmdline);
-        }
-    }
+    if(!exited)
+        status = spawn_server_waitpid(si);
     else
         nd_log(NDLS_COLLECTORS, NDLP_INFO,
                "SPAWN PARENT: child with pid %d exited with status %d (sighandler): %s",

@@ -45,7 +45,10 @@ static void apps_plugin_function_processes_help(const char *transaction) {
                    "Filters can be combined. Each filter can be given only one time.\n"
     );
 
-    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
+    wb->response_code = HTTP_RESP_OK;
+    wb->content_type = CT_TEXT_PLAIN;
+    wb->expires = now_realtime_sec() + 3600;
+    pluginsd_function_result_to_stdout(transaction, wb);
     buffer_free(wb);
 }
 
@@ -922,7 +925,10 @@ close_and_send:
     buffer_json_member_add_time_t(wb, "expires", now_s + update_every);
     buffer_json_finalize(wb);
 
-    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", now_s + update_every, wb);
+    wb->response_code = HTTP_RESP_OK;
+    wb->content_type = CT_APPLICATION_JSON;
+    wb->expires = now_s + update_every;
+    pluginsd_function_result_to_stdout(transaction, wb);
 
     buffer_free(wb);
 }

@@ -166,7 +166,7 @@ bool duration_parse(const char *duration, int64_t *result, const char *default_u
 // --------------------------------------------------------------------------------------------------------------------
 // generate a string to represent a duration
 
-ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char *unit) {
+ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char *unit, bool add_spaces) {
     if (!dst || dst_size == 0) return -1;
     if (dst_size == 1) {
         dst[0] = '\0';
@@ -204,8 +204,9 @@ ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char 
 
         int64_t unit_count = rounded / multiplier;
         if (unit_count > 0) {
+            const char *space = (add_spaces && offset) ? " " : "";
             int written = snprintfz(dst + offset, dst_size - offset,
-                                    "%s%" PRIi64 "%s", sign, unit_count, units[i].unit);
+                                    "%s%s%" PRIi64 "%s", space, sign, unit_count, units[i].unit);
 
             if (written < 0)
                 return -3;

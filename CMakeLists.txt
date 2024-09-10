@@ -789,6 +789,9 @@ set(LIBNETDATA_FILES
         src/libnetdata/config/appconfig_api_text.h
         src/libnetdata/config/appconfig_api_boolean.c
         src/libnetdata/config/appconfig_api_boolean.h
+        src/libnetdata/facets/logs_query_status.h
+        src/libnetdata/os/timestamps.c
+        src/libnetdata/os/timestamps.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1271,6 +1274,7 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/libnetdata/maps/system-users.h
         src/libnetdata/maps/system-groups.h
         src/libnetdata/maps/system-services.h
+        src/collectors/systemd-journal.plugin/systemd-journal-sampling.h
 )
 
 set(STREAMING_PLUGIN_FILES
@@ -1391,6 +1395,21 @@ set(FREEBSD_PLUGIN_FILES
         src/collectors/freebsd.plugin/freebsd_ipfw.c
         src/collectors/proc.plugin/zfs_common.c
         src/collectors/proc.plugin/zfs_common.h
+)
+
+set(WINDOWS_EVENTS_PLUGIN_FILES
+        src/collectors/windows-events.plugin/windows-events.c
+        src/collectors/windows-events.plugin/windows-events.h
+        src/collectors/windows-events.plugin/windows-events-query.h
+        src/collectors/windows-events.plugin/windows-events-query.c
+        src/collectors/windows-events.plugin/windows-events-sources.c
+        src/collectors/windows-events.plugin/windows-events-sources.h
+        src/collectors/windows-events.plugin/windows-events-sid.c
+        src/collectors/windows-events.plugin/windows-events-sid.h
+        src/collectors/windows-events.plugin/windows-events-unicode.c
+        src/collectors/windows-events.plugin/windows-events-unicode.h
+        src/collectors/windows-events.plugin/windows-events-xml.c
+        src/collectors/windows-events.plugin/windows-events-xml.h
 )
 
 set(WINDOWS_PLUGIN_FILES
@@ -2079,6 +2098,15 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                         COMPONENT plugin-systemd-journal
                         DESTINATION usr/share/doc/netdata-plugin-systemd-journal)
         endif()
+endif()
+
+if(OS_WINDOWS)
+        add_executable(windows-events.plugin ${WINDOWS_EVENTS_PLUGIN_FILES})
+        target_link_libraries(windows-events.plugin libnetdata wevtapi)
+
+        install(TARGETS windows-events.plugin
+                COMPONENT plugin-windows-events
+                DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
