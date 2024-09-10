@@ -36,12 +36,13 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: false
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
         auto_detection:
-          description: ""
+          description: |
+            Automatically detects and monitors Varnish instances running on the host or inside Docker containers.
         limits:
           description: ""
         performance_impact:
