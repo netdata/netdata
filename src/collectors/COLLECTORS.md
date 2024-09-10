@@ -1147,7 +1147,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Traefik](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/traefik/integrations/traefik.md)
 
-- [Varnish](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/varnish/integrations/varnish.md)
+- [Varnish](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/varnish/integrations/varnish.md)
 
 - [Web server log files](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/weblog/integrations/web_server_log_files.md)
 
