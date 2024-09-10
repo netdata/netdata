@@ -13,20 +13,20 @@ static struct proc_module {
 } win_modules[] = {
 
     // system metrics
-    {.name = "GetSystemUptime",     .dim = "GetSystemUptime",         .func = do_GetSystemUptime},
-    {.name = "GetSystemRAM",        .dim = "GetSystemRAM",            .func = do_GetSystemRAM},
+    {.name = "GetSystemUptime",     .dim = "GetSystemUptime",    .enabled = CONFIG_BOOLEAN_YES, .func = do_GetSystemUptime},
+    {.name = "GetSystemRAM",        .dim = "GetSystemRAM",       .enabled = CONFIG_BOOLEAN_YES, .func = do_GetSystemRAM},
 
     // the same is provided by PerflibProcessor, with more detailed analysis
-    //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",            .func = do_GetSystemCPU},
+    //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",     .enabled = CONFIG_BOOLEAN_YES, .func = do_GetSystemCPU},
 
-    {.name = "PerflibProcesses",    .dim = "PerflibProcesses",        .func = do_PerflibProcesses},
-    {.name = "PerflibProcessor",    .dim = "PerflibProcessor",        .func = do_PerflibProcessor},
-    {.name = "PerflibMemory",       .dim = "PerflibMemory",           .func = do_PerflibMemory},
-    {.name = "PerflibStorage",      .dim = "PerflibStorage",          .func = do_PerflibStorage},
-    {.name = "PerflibNetwork",      .dim = "PerflibNetwork",          .func = do_PerflibNetwork},
-    {.name = "PerflibObjects",      .dim = "PerflibObjects",          .func = do_PerflibObjects},
+    {.name = "PerflibProcesses",    .dim = "PerflibProcesses",   .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibProcesses},
+    {.name = "PerflibProcessor",    .dim = "PerflibProcessor",   .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibProcessor},
+    {.name = "PerflibMemory",       .dim = "PerflibMemory",      .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibMemory},
+    {.name = "PerflibStorage",      .dim = "PerflibStorage",     .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibStorage},
+    {.name = "PerflibNetwork",      .dim = "PerflibNetwork",     .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibNetwork},
+    {.name = "PerflibObjects",      .dim = "PerflibObjects",     .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibObjects},
 
-    {.name = "PerflibThermalZone",      .dim = "PerflibThermalZone",          .func = do_PerflibThermalZone},
+    {.name = "PerflibThermalZone",  .dim = "PerflibThermalZone", .enabled = CONFIG_BOOLEAN_NO, .func = do_PerflibThermalZone},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}
@@ -68,7 +68,7 @@ void *win_plugin_main(void *ptr) {
     for(i = 0; win_modules[i].name; i++) {
         struct proc_module *pm = &win_modules[i];
 
-        pm->enabled = config_get_boolean("plugin:windows", pm->name, CONFIG_BOOLEAN_YES);
+        pm->enabled = config_get_boolean("plugin:windows", pm->name, pm->enabled);
         pm->rd = NULL;
 
         worker_register_job_name(i, win_modules[i].dim);
