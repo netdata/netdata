@@ -70,7 +70,7 @@ void wevt_closelog6(WEVT_LOG *log);
 
 bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, EVT_RETENTION *retention);
 
-EVT_HANDLE wevt_query(LPCWSTR channel, usec_t seek_to, bool backward);
+EVT_HANDLE wevt_query(LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS direction);
 void wevt_query_done(WEVT_LOG *log);
 
 bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full);

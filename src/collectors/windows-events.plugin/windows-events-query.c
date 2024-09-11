@@ -535,9 +535,9 @@ bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, EVT_RETENTION
     log->event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath);
     if (!log->event_query) {
         if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, channel '%s' not found, cannot open log", channel2utf8(channel));
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, channel '%s' not found, cannot get retention", channel2utf8(channel));
         else
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() on channel '%s' failed, cannot open log", channel2utf8(channel));
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() on channel '%s' failed, cannot get retention", channel2utf8(channel));
 
         goto cleanup;
     }
@@ -634,38 +634,14 @@ cleanup:
     return file_size;
 }
 
-EVT_HANDLE wevt_query(LPCWSTR channel, usec_t seek_to, bool backward) {
-    // Convert microseconds to nanoseconds first (correct handling of precision)
-    if(backward) seek_to += USEC_PER_MS;  // for backward mode, add a millisecond to the seek time.
-
-    // Convert the microseconds since Unix epoch to FILETIME (used in Windows APIs)
-    FILETIME fileTime = os_unix_epoch_ut_to_filetime(seek_to);
-
-    // Convert FILETIME to SYSTEMTIME for use in XPath
-    SYSTEMTIME systemTime;
-    if (!FileTimeToSystemTime(&fileTime, &systemTime)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "FileTimeToSystemTime() failed");
-        return NULL;
-    }
-
-    // Format SYSTEMTIME into ISO 8601 format (YYYY-MM-DDTHH:MM:SS.sssZ)
-    static __thread WCHAR query[4096];
-    swprintf(query, 4096,
-             L"Event/System[TimeCreated[@SystemTime%ls\"%04d-%02d-%02dT%02d:%02d:%02d.%03dZ\"]]",
-             backward ? L"<=" : L">=",  // Use <= if backward, >= if forward
-             systemTime.wYear, systemTime.wMonth, systemTime.wDay,
-             systemTime.wHour, systemTime.wMinute, systemTime.wSecond, systemTime.wMilliseconds);
-
-    // Execute the query
-    EVT_HANDLE hQuery = EvtQuery(NULL, channel, query, EvtQueryChannelPath | (backward ? EvtQueryReverseDirection : EvtQueryForwardDirection));
+EVT_HANDLE wevt_query(LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS direction) {
+    EVT_HANDLE hQuery = EvtQuery(NULL, channel, query, EvtQueryChannelPath | (direction & (EvtQueryReverseDirection | EvtQueryForwardDirection)));
     if (!hQuery) {
         wchar_t wbuf[1024];
         DWORD wbuf_used;
         EvtGetExtendedStatus(sizeof(wbuf), wbuf, &wbuf_used);
-
-        char buf[1024];
-        rfc3339_datetime_ut(buf, sizeof(buf), seek_to, 3, true);
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, seek to '%s', query: %s | extended info: %ls", buf, query2utf8(query), wbuf);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, query: %s | extended info: %ls",
+               query2utf8(query), wbuf);
     }
 
     return hQuery;

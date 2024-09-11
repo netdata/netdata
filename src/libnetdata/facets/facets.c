@@ -576,7 +576,7 @@ static inline void FACET_VALUE_ADD_OR_UPDATE_SELECTED(FACET_KEY *k, const char *
             .hash = hash,
             .selected = true,
             .name = name,
-            .name_len = 0,
+            .name_len = name ? strlen(name) : 0,
     };
     FACET_VALUE_ADD_TO_INDEX(k, &tv);
 }
@@ -642,6 +642,35 @@ bool facets_key_name_value_length_is_selected(FACETS *facets, const char *key, s
     hash = FACETS_HASH_FUNCTION(value, value_length);
     FACET_VALUE *v = FACET_VALUE_GET_FROM_INDEX(k, hash);
     return (v && v->selected) ? true : false;
+}
+
+bool facets_foreach_selected_value_in_key(FACETS *facets, const char *key, size_t key_length, DICTIONARY *used_hashes_registry, facets_foreach_selected_value_in_key_t cb, void *data) {
+    FACETS_HASH hash = FACETS_HASH_FUNCTION(key, key_length);
+    FACET_KEY *k = FACETS_KEY_GET_FROM_INDEX(facets, hash);
+    if(!k || k->default_selected_for_values)
+        return false;
+
+    size_t selected = 0;
+    for(FACET_VALUE *v = k->values.ll; v ;v = v->next) {
+        if(!v->selected) continue;
+
+        const char *value = v->name;
+        if(!value) {
+            if(used_hashes_registry) {
+                char hash_str[FACET_STRING_HASH_SIZE];
+                facets_hash_to_str(v->hash, hash_str);
+                value = dictionary_get(used_hashes_registry, hash_str);
+            }
+
+            if(!value)
+                return false;
+        }
+
+        if(!cb(facets, selected++, k->name, value, data))
+            return false;
+    }
+
+    return selected > 0;
 }
 
 void facets_add_possible_value_name_to_key(FACETS *facets, const char *key, size_t key_length, const char *value, size_t value_length) {

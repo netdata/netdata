@@ -132,4 +132,7 @@ void facets_table_config(BUFFER *wb);
 
 const char *facets_severity_to_string(FACET_ROW_SEVERITY severity);
 
+typedef bool (*facets_foreach_selected_value_in_key_t)(FACETS *facets, size_t id, const char *key, const char *value, void *data);
+bool facets_foreach_selected_value_in_key(FACETS *facets, const char *key, size_t key_length, DICTIONARY *used_hashes_registry, facets_foreach_selected_value_in_key_t cb, void *data);
+
 #endif

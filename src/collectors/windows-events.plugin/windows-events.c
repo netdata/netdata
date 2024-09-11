@@ -26,6 +26,8 @@ static bool plugin_should_exit = false;
 
 // structures needed by LQS
 struct lqs_extension {
+    wchar_t *query;
+
     struct {
         usec_t start_ut;
         usec_t stop_ut;
@@ -74,7 +76,7 @@ struct lqs_extension {
 };
 
 // prepare LQS
-#define LQS_DEFAULT_SLICE_MODE      0
+#define LQS_DEFAULT_SLICE_MODE      1
 #define LQS_FUNCTION_NAME           WEVT_FUNCTION_NAME
 #define LQS_FUNCTION_DESCRIPTION    WEVT_FUNCTION_DESCRIPTION
 #define LQS_DEFAULT_ITEMS_PER_QUERY 200
@@ -511,17 +513,14 @@ static WEVT_QUERY_STATUS wevt_query_backward(
         LOGS_QUERY_SOURCE *src,
         LOGS_QUERY_STATUS *lqs)
 {
-
-    usec_t anchor_delta = ANCHOR_DELTA_UT;
-
-    usec_t start_ut = ((lqs->rq.data_only && lqs->anchor.start_ut) ? lqs->anchor.start_ut : lqs->rq.before_ut) + anchor_delta;
-    usec_t stop_ut = (lqs->rq.data_only && lqs->anchor.stop_ut) ? lqs->anchor.stop_ut : lqs->rq.after_ut;
-    bool stop_when_full = (lqs->rq.data_only && !lqs->anchor.stop_ut);
+    usec_t start_ut = lqs->query.start_ut;
+    usec_t stop_ut = lqs->query.stop_ut;
+    bool stop_when_full = lqs->query.stop_when_full;
 
     lqs->c.query_file.start_ut = start_ut;
     lqs->c.query_file.stop_ut = stop_ut;
 
-    log->event_query = wevt_query(channel2unicode(src->fullname), start_ut, true);
+    log->event_query = wevt_query(channel2unicode(src->fullname), lqs->c.query, EvtQueryReverseDirection);
     if(!log->event_query)
         return WEVT_FAILED_TO_SEEK;
 
@@ -582,7 +581,7 @@ static WEVT_QUERY_STATUS wevt_query_backward(
                         facets_rows(facets) >= lqs->rq.entries)) {
                 // stop the data only query
                 usec_t oldest = facets_row_oldest_ut(facets);
-                if(oldest && msg_ut < (oldest - anchor_delta))
+                if(oldest && msg_ut < (oldest - lqs->anchor.delta_ut))
                     break;
             }
 
@@ -625,16 +624,14 @@ static WEVT_QUERY_STATUS wevt_query_forward(
         LOGS_QUERY_SOURCE *src,
         LOGS_QUERY_STATUS *lqs)
 {
-    usec_t anchor_delta = ANCHOR_DELTA_UT;
-
-    usec_t start_ut = (lqs->rq.data_only && lqs->anchor.start_ut) ? lqs->anchor.start_ut : lqs->rq.after_ut;
-    usec_t stop_ut = ((lqs->rq.data_only && lqs->anchor.stop_ut) ? lqs->anchor.stop_ut : lqs->rq.before_ut) + anchor_delta;
-    bool stop_when_full = (lqs->rq.data_only && !lqs->anchor.stop_ut);
+    usec_t start_ut = lqs->query.start_ut;
+    usec_t stop_ut = lqs->query.stop_ut;
+    bool stop_when_full = lqs->query.stop_when_full;
 
     lqs->c.query_file.start_ut = start_ut;
     lqs->c.query_file.stop_ut = stop_ut;
 
-    log->event_query = wevt_query(channel2unicode(src->fullname), start_ut, false);
+    log->event_query = wevt_query(channel2unicode(src->fullname), lqs->c.query, EvtQueryForwardDirection);
     if(!log->event_query)
         return WEVT_FAILED_TO_SEEK;
 
@@ -695,7 +692,7 @@ static WEVT_QUERY_STATUS wevt_query_forward(
                         facets_rows(facets) >= lqs->rq.entries)) {
                 // stop the data only query
                 usec_t newest = facets_row_newest_ut(facets);
-                if(newest && msg_ut > (newest + anchor_delta))
+                if(newest && msg_ut > (newest + lqs->anchor.delta_ut))
                     break;
             }
 
@@ -742,25 +739,10 @@ static WEVT_QUERY_STATUS wevt_query_one_channel(
     errno_clear();
 
     WEVT_QUERY_STATUS status;
-    bool matches_filters = true;
-
-    // if(lqs->rq.slice) {
-    //     usec_t started = now_monotonic_usec();
-    //
-    //     matches_filters = netdata_systemd_filtering_by_journal(j, facets, lqs) || !lqs->rq.filters;
-    //     usec_t ended = now_monotonic_usec();
-    //
-    //     lqs->c.matches_setup_ut += (ended - started);
-    // }
-
-    if(matches_filters) {
-        if(lqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD)
-            status = wevt_query_forward(log, wb, facets, src, lqs);
-        else
-            status = wevt_query_backward(log, wb, facets, src, lqs);
-    }
+    if(lqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD)
+        status = wevt_query_forward(log, wb, facets, src, lqs);
     else
-        status = WEVT_NO_CHANNEL_MATCHED;
+        status = wevt_query_backward(log, wb, facets, src, lqs);
 
     return status;
 }
@@ -774,7 +756,7 @@ static bool source_is_mine(LOGS_QUERY_SOURCE *src, LOGS_QUERY_STATUS *lqs) {
             // so we don't know if it can contribute or not - let's add it.
             return true;
 
-        usec_t anchor_delta = 0;
+        usec_t anchor_delta = ANCHOR_DELTA_UT;
         usec_t first_ut = src->msg_first_ut - anchor_delta;
         usec_t last_ut = src->msg_last_ut + anchor_delta;
 
@@ -785,9 +767,108 @@ static bool source_is_mine(LOGS_QUERY_SOURCE *src, LOGS_QUERY_STATUS *lqs) {
     return false;
 }
 
+typedef struct static_utf8_8k {
+    char buffer[8192];
+    size_t size;
+    size_t len;
+} STATIC_BUF_8K;
+
+typedef struct static_unicode_16k {
+    wchar_t buffer[16384];
+    size_t size;
+    size_t len;
+} STATIC_UNI_16K;
+
+static bool wevt_foreach_selected_value_cb(FACETS *facets __maybe_unused, size_t id, const char *key, const char *value, void *data) {
+    STATIC_BUF_8K *b = data;
+
+    b->len += snprintfz(&b->buffer[b->len], b->size - b->len,
+                        "%s%s=%s",
+                        id ? " or " : "", key, value);
+
+    return b->len < b->size;
+}
+
+static wchar_t *wevt_generate_query(LOGS_QUERY_STATUS *lqs) {
+    static __thread STATIC_UNI_16K q = {
+        .size = sizeof(q.buffer) / sizeof(wchar_t),
+        .len = 0,
+    };
+    static __thread STATIC_BUF_8K b = {
+        .size = sizeof(b.buffer) / sizeof(char),
+        .len = 0,
+    };
+
+    lqs_query_timeframe(lqs, ANCHOR_DELTA_UT);
+
+    usec_t seek_to = lqs->query.start_ut;
+    if(lqs->rq.direction == FACETS_ANCHOR_DIRECTION_BACKWARD)
+        // windows events queries are limited to millisecond resolution
+        // so, in order not to lose data, we have to add
+        // a millisecond when the direction is backward
+        seek_to += USEC_PER_MS;
+
+    // Convert the microseconds since Unix epoch to FILETIME (used in Windows APIs)
+    FILETIME fileTime = os_unix_epoch_ut_to_filetime(seek_to);
+
+    // Convert FILETIME to SYSTEMTIME for use in XPath
+    SYSTEMTIME systemTime;
+    if (!FileTimeToSystemTime(&fileTime, &systemTime)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "FileTimeToSystemTime() failed");
+        return NULL;
+    }
+
+    // Format SYSTEMTIME into ISO 8601 format (YYYY-MM-DDTHH:MM:SS.sssZ)
+    q.len = swprintf(q.buffer, q.size,
+                 L"Event/System[TimeCreated[@SystemTime%ls\"%04d-%02d-%02dT%02d:%02d:%02d.%03dZ\"]",
+                 lqs->rq.direction == FACETS_ANCHOR_DIRECTION_BACKWARD ? L"<=" : L">=",
+                 systemTime.wYear, systemTime.wMonth, systemTime.wDay,
+                 systemTime.wHour, systemTime.wMinute, systemTime.wSecond, systemTime.wMilliseconds);
+
+
+    if(lqs->rq.slice) {
+        b.len = snprintf(b.buffer, b.size, " and (");
+        if (facets_foreach_selected_value_in_key(
+                lqs->facets,
+                WEVT_FIELD_LEVEL,
+                sizeof(WEVT_FIELD_LEVEL) - 1,
+                used_hashes_registry,
+                wevt_foreach_selected_value_cb,
+                &b)) {
+            b.len += snprintf(&b.buffer[b.len], b.size - b.len, ")");
+            if (b.len < b.size) {
+                utf82unicode(&q.buffer[q.len], q.size - q.len, b.buffer);
+                q.len = wcslen(q.buffer);
+            }
+        }
+
+        b.len = snprintf(b.buffer, b.size, " and (");
+        if (facets_foreach_selected_value_in_key(
+                lqs->facets,
+                WEVT_FIELD_EVENTID,
+                sizeof(WEVT_FIELD_EVENTID) - 1,
+                used_hashes_registry,
+                wevt_foreach_selected_value_cb,
+                &b)) {
+            b.len += snprintf(&b.buffer[b.len], b.size - b.len, ")");
+            if (b.len < b.size) {
+                utf82unicode(&q.buffer[q.len], q.size - q.len, b.buffer);
+                q.len = wcslen(q.buffer);
+            }
+        }
+    }
+
+    q.len += swprintf(&q.buffer[q.len], q.size - q.len, L"]");
+    return q.buffer;
+}
+
 static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs __maybe_unused) {
     // make sure the sources list is updated
     wevt_sources_scan();
+
+    lqs->c.query = wevt_generate_query(lqs);
+    if(!lqs->c.query)
+        return rrd_call_function_error(wb, "failed to generate XPath query", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
     FACETS *facets = lqs->facets;
 
@@ -819,8 +900,13 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
 
     lqs->c.files_matched = files_used;
 
-    if(lqs->rq.if_modified_since && !files_are_newer)
+    if(lqs->rq.if_modified_since && !files_are_newer) {
+        // release the files
+        for(size_t f = 0; f < files_used ;f++)
+            dictionary_acquired_item_release(wevt_sources, file_items[f]);
+
         return rrd_call_function_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
+    }
 
     // sort the files, so that they are optimal for facets
     if(files_used >= 2) {
@@ -841,7 +927,11 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
 
     WEVT_LOG *log = wevt_openlog6();
     if(!log) {
-        netdata_log_error("WEVT: cannot windows event log");
+        // release the files
+        for(size_t f = 0; f < files_used ;f++)
+            dictionary_acquired_item_release(wevt_sources, file_items[f]);
+
+        netdata_log_error("WINDOWS EVENTS: cannot open windows event log");
         return rrd_call_function_error(wb, "cannot open windows events log", HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
 
@@ -1150,8 +1240,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         struct {
             const char *func;
         } array[] = {
-            { "windows-events after:1726041786 before:1726042686 last:200 source:All" },
-            //{ "windows-events after:1725650277 before:1725736677 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
+            { "windows-events after:1726055370 before:1726056270 direction:backward last:200 data_only:false source:All" },
+            //{ "windows-events after:1726055370 before:1726056270 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6,ClaDGnYSQE7,H106l8MXSSr,HREiMN.4Ahu data_only:false source:All HytMJ9kj82B:BlC24d5JBBV,PtVoyIuX.MU,HMj1B38kHTv KeCITtVD5AD:PY1JtCeWwSe,O9kz5J37nNl,JZoJURadhDb" },
             //{ "windows-events after:1725650284 before:1725736684 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
             //{ "windows-events after:1725650386 before:1725736786 anchor:1725652420809461 direction:forward last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 if_modified_since:1725736649011085 data_only:true delta:true tail:true source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
             //{ "windows-events info after:1725650420 before:1725736820" },
