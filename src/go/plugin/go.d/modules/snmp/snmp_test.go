@@ -580,10 +580,11 @@ func setMockClientInitExpect(m *snmpmock.MockHandler) {
 }
 
 func setMockClientSysExpect(m *snmpmock.MockHandler) {
-	m.EXPECT().Get([]string{oidSysName}).Return(&gosnmp.SnmpPacket{
-		Variables: []gosnmp.SnmpPDU{
-			{Value: []uint8("mock-host"), Type: gosnmp.OctetString},
-		},
+	m.EXPECT().WalkAll(rootOidMibSystem).Return([]gosnmp.SnmpPDU{
+		{Name: oidSysDescr, Value: []uint8("mock sysDescr"), Type: gosnmp.OctetString},
+		{Name: oidSysContact, Value: []uint8("mock sysContact"), Type: gosnmp.OctetString},
+		{Name: oidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
+		{Name: oidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
 	}, nil).MinTimes(1)
 
 	m.EXPECT().Get([]string{oidSysUptime}).Return(&gosnmp.SnmpPacket{
