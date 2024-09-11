@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"bytes"
 	_ "embed"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -50,7 +49,6 @@ var numbers = func() map[string]string {
 		if id != "" {
 			line = vr.Replace(line)
 			if line == "---none---" || line == "Reserved" {
-				fmt.Println(id, line)
 				id = ""
 				continue
 			}
