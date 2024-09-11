@@ -2,21 +2,34 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.99.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.1...HEAD)
 
 **Merged pull requests:**
 
+- remove save-database from netdatacli usage [\#18519](https://github.com/netdata/netdata/pull/18519) ([ilyam8](https://github.com/ilyam8))
+- improve netdatacli docs [\#18518](https://github.com/netdata/netdata/pull/18518) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18517](https://github.com/netdata/netdata/pull/18517) ([netdatabot](https://github.com/netdatabot))
+- go.d/varnish update meta [\#18516](https://github.com/netdata/netdata/pull/18516) ([ilyam8](https://github.com/ilyam8))
+- Bump github.com/jackc/pgx/v5 from 5.7.0 to 5.7.1 in /src/go [\#18515](https://github.com/netdata/netdata/pull/18515) ([dependabot[bot]](https://github.com/apps/dependabot))
+- go.d update redis lib to v9 [\#18513](https://github.com/netdata/netdata/pull/18513) ([ilyam8](https://github.com/ilyam8))
+- go.d/varnish: add docker support [\#18512](https://github.com/netdata/netdata/pull/18512) ([ilyam8](https://github.com/ilyam8))
+- go.d add function to execute a command inside a Docker container [\#18509](https://github.com/netdata/netdata/pull/18509) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18508](https://github.com/netdata/netdata/pull/18508) ([netdatabot](https://github.com/netdatabot))
+- server dashboard v3 static files, when available [\#18507](https://github.com/netdata/netdata/pull/18507) ([ktsaou](https://github.com/ktsaou))
 - add varnishstat and varnishadm to ndsudo [\#18503](https://github.com/netdata/netdata/pull/18503) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/docker/docker from 27.2.0+incompatible to 27.2.1+incompatible in /src/go [\#18502](https://github.com/netdata/netdata/pull/18502) ([dependabot[bot]](https://github.com/apps/dependabot))
+- remove python.d/varnish [\#18499](https://github.com/netdata/netdata/pull/18499) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/jackc/pgx/v5 from 5.6.0 to 5.7.0 in /src/go [\#18498](https://github.com/netdata/netdata/pull/18498) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/prometheus/common from 0.58.0 to 0.59.1 in /src/go [\#18497](https://github.com/netdata/netdata/pull/18497) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump golang.org/x/net from 0.28.0 to 0.29.0 in /src/go [\#18496](https://github.com/netdata/netdata/pull/18496) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations.js [\#18493](https://github.com/netdata/netdata/pull/18493) ([netdatabot](https://github.com/netdatabot))
+- varnish collector Go implementation [\#18491](https://github.com/netdata/netdata/pull/18491) ([Ancairon](https://github.com/Ancairon))
 - add go.d/apcupsd [\#18489](https://github.com/netdata/netdata/pull/18489) ([ilyam8](https://github.com/ilyam8))
 - Improve processing on removed alerts after agent restart [\#18488](https://github.com/netdata/netdata/pull/18488) ([stelfrag](https://github.com/stelfrag))
 - Bump github.com/prometheus/common from 0.57.0 to 0.58.0 in /src/go [\#18487](https://github.com/netdata/netdata/pull/18487) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump golang.org/x/text from 0.17.0 to 0.18.0 in /src/go [\#18486](https://github.com/netdata/netdata/pull/18486) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Remove Warnings \(ebpf\) [\#18484](https://github.com/netdata/netdata/pull/18484) ([thiagoftsm](https://github.com/thiagoftsm))
+- \[WIP\] Windows-Events Logs Explorer [\#18483](https://github.com/netdata/netdata/pull/18483) ([ktsaou](https://github.com/ktsaou))
 - fix win sysinfo installed ram calculation [\#18482](https://github.com/netdata/netdata/pull/18482) ([ilyam8](https://github.com/ilyam8))
 - remove charts.d/apcupsd [\#18481](https://github.com/netdata/netdata/pull/18481) ([ilyam8](https://github.com/ilyam8))
 - Update LIbbpf [\#18480](https://github.com/netdata/netdata/pull/18480) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -84,6 +97,10 @@
 - remove python.d/boinc [\#18397](https://github.com/netdata/netdata/pull/18397) ([ilyam8](https://github.com/ilyam8))
 - fix warnings in Dockerfile [\#18395](https://github.com/netdata/netdata/pull/18395) ([NicolasCARPi](https://github.com/NicolasCARPi))
 - Use existing ACLK event loop for cloud queries [\#18218](https://github.com/netdata/netdata/pull/18218) ([stelfrag](https://github.com/stelfrag))
+
+## [v1.47.1](https://github.com/netdata/netdata/tree/v1.47.1) (2024-09-10)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.99.0...v1.47.1)
 
 ## [v1.99.0](https://github.com/netdata/netdata/tree/v1.99.0) (2024-08-23)
 
@@ -416,20 +433,6 @@
 - Regenerate integrations.js [\#17950](https://github.com/netdata/netdata/pull/17950) ([netdatabot](https://github.com/netdatabot))
 - fix indentation in go.d/dnsquery conf [\#17948](https://github.com/netdata/netdata/pull/17948) ([ilyam8](https://github.com/ilyam8))
 - go.d add dmcache collector [\#17947](https://github.com/netdata/netdata/pull/17947) ([ilyam8](https://github.com/ilyam8))
-- add "dmsetup status --target cache --noflush" to ndsudo [\#17946](https://github.com/netdata/netdata/pull/17946) ([ilyam8](https://github.com/ilyam8))
-- Fix disk max calculation [\#17945](https://github.com/netdata/netdata/pull/17945) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#17944](https://github.com/netdata/netdata/pull/17944) ([netdatabot](https://github.com/netdatabot))
-- Update enable-an-exporting-connector.md [\#17943](https://github.com/netdata/netdata/pull/17943) ([Ancairon](https://github.com/Ancairon))
-- add OpenSearch to exporting prom meta [\#17942](https://github.com/netdata/netdata/pull/17942) ([ilyam8](https://github.com/ilyam8))
-- Fix warnings [\#17940](https://github.com/netdata/netdata/pull/17940) ([thiagoftsm](https://github.com/thiagoftsm))
-- update bundled UI to v6.138.3 [\#17939](https://github.com/netdata/netdata/pull/17939) ([ilyam8](https://github.com/ilyam8))
-- go.d storcli add initial support for mpt3sas controllers [\#17938](https://github.com/netdata/netdata/pull/17938) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17937](https://github.com/netdata/netdata/pull/17937) ([netdatabot](https://github.com/netdatabot))
-- Adds GreptimeDB to prometheus metadata [\#17936](https://github.com/netdata/netdata/pull/17936) ([killme2008](https://github.com/killme2008))
-- go.d smartctl: don't log found devices on every scan [\#17934](https://github.com/netdata/netdata/pull/17934) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17933](https://github.com/netdata/netdata/pull/17933) ([netdatabot](https://github.com/netdatabot))
-- go.d whoisquery fix defaults in config\_schema [\#17932](https://github.com/netdata/netdata/pull/17932) ([ilyam8](https://github.com/ilyam8))
-- Move to using CPack for repository configuration packages. [\#17930](https://github.com/netdata/netdata/pull/17930) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
