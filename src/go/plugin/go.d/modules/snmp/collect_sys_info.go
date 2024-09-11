@@ -39,12 +39,16 @@ func (s *SNMP) getSysInfo() (*sysInfo, error) {
 		organization: "Unknown",
 	}
 
+	r := strings.NewReplacer("\n", "\\n", "\r", "\\r")
+
 	for _, pdu := range pdus {
 		oid := strings.TrimPrefix(pdu.Name, ".")
 
 		switch oid {
 		case oidSysDescr:
-			si.descr, err = pduToString(pdu)
+			if si.descr, err = pduToString(pdu); err == nil {
+				si.descr = r.Replace(si.descr)
+			}
 		case oidSysObject:
 			var sysObj string
 			if sysObj, err = pduToString(pdu); err == nil {

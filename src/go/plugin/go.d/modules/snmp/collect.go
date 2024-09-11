@@ -4,6 +4,7 @@ package snmp
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
@@ -59,15 +60,17 @@ func (s *SNMP) setupVnode(si *sysInfo) *vnodes.VirtualNode {
 	if s.Vnode.GUID == "" {
 		s.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(s.Hostname)).String()
 	}
-	if s.Vnode.Hostname == "" {
-		s.Vnode.Hostname = fmt.Sprintf("%s(%s)", si.name, s.Hostname)
-	}
+
+	hostnames := []string{s.Vnode.Hostname, si.name, "snmp-device"}
+	i := slices.IndexFunc(hostnames, func(s string) bool { return s != "" })
+
+	s.Vnode.Hostname = fmt.Sprintf("%s(%s)", hostnames[i], s.Hostname)
 
 	labels := make(map[string]string)
+
 	for k, v := range s.Vnode.Labels {
 		labels[k] = v
 	}
-
 	if si.descr != "" {
 		labels["sysDescr"] = si.descr
 	}
