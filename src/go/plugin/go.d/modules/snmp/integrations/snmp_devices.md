@@ -153,6 +153,10 @@ The following options can be defined globally: update_every, autodetection_retry
 | update_every | Data collection frequency. | 10 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | hostname | Target ipv4 address. |  | yes |
+| create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | false | no |
+| vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
+| vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
+| vnode.labels | Additional key-value pairs to associate with the Virtual Node. |  | no |
 | community | SNMPv1/2 community string. | public | no |
 | options.version | SNMP version. Available versions: 1, 2, 3. | 2 | no |
 | options.port | Target port. | 161 | no |
