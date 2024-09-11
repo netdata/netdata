@@ -39,27 +39,37 @@ func (s *SNMP) getSysInfo() (*sysInfo, error) {
 		organization: "Unknown",
 	}
 
+	r := strings.NewReplacer("\n", "\\n", "\r", "\\r", "'", "")
+
 	for _, pdu := range pdus {
 		oid := strings.TrimPrefix(pdu.Name, ".")
 
 		switch oid {
 		case oidSysDescr:
-			si.descr, err = pduToString(pdu)
+			if si.descr, err = pduToString(pdu); err == nil {
+				si.descr = r.Replace(si.descr)
+			}
 		case oidSysObject:
 			var sysObj string
 			if sysObj, err = pduToString(pdu); err == nil {
 				org := entnum.LookupBySysObject(sysObj)
 				s.Debugf("device sysObject '%s', organization '%s'", sysObj, org)
 				if org != "" {
-					si.organization = org
+					si.organization = r.Replace(org)
 				}
 			}
 		case oidSysContact:
-			si.contact, err = pduToString(pdu)
+			if si.contact, err = pduToString(pdu); err == nil {
+				si.contact = r.Replace(si.contact)
+			}
 		case oidSysName:
-			si.name, err = pduToString(pdu)
+			if si.name, err = pduToString(pdu); err == nil {
+				si.name = r.Replace(si.name)
+			}
 		case oidSysLocation:
-			si.location, err = pduToString(pdu)
+			if si.location, err = pduToString(pdu); err == nil {
+				si.location = r.Replace(si.location)
+			}
 		}
 		if err != nil {
 			return nil, fmt.Errorf("OID '%s': %v", pdu.Name, err)
