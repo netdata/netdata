@@ -52,11 +52,8 @@ func (s *SNMP) getSysInfo() (*sysInfo, error) {
 		case oidSysObject:
 			var sysObj string
 			if sysObj, err = pduToString(pdu); err == nil {
-				org := entnum.LookupBySysObject(sysObj)
-				s.Debugf("device sysObject '%s', organization '%s'", sysObj, org)
-				if org != "" {
-					si.organization = org
-				}
+				si.organization = entnum.LookupBySysObject(sysObj)
+				s.Debugf("device sysObject '%s', organization '%s'", sysObj, si.organization)
 			}
 		case oidSysContact:
 			si.contact, err = pduToString(pdu)
