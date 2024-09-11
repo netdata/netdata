@@ -97,7 +97,8 @@ static void do_memory_swap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjec
             "mem"
         , "swap_pages", NULL
         , "swap"
-        , "mem.swap_pages"
+        , "mem.swap_pages_io"
+
         , "Swap Pages"
         , "pages/s"
         , PLUGIN_WINDOWS_NAME
