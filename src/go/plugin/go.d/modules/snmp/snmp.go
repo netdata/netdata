@@ -68,12 +68,14 @@ type SNMP struct {
 	netIfaceFilterByName matcher.Matcher
 	netIfaceFilterByType matcher.Matcher
 
-	checkMaxReps  bool
-	collectIfMib  bool
-	netInterfaces map[string]*netInterface
-	sysName       string
+	checkMaxReps bool
+	collectIfMib bool
 
-	oids []string
+	netInterfaces map[string]*netInterface
+
+	sysInfo *sysInfo
+
+	customOids []string
 }
 
 func (s *SNMP) Configuration() any {
@@ -115,7 +117,7 @@ func (s *SNMP) Init() error {
 	}
 	s.charts = charts
 
-	s.oids = s.initOIDs()
+	s.customOids = s.initOIDs()
 
 	return nil
 }
