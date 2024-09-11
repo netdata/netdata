@@ -10,7 +10,9 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 
+	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
 )
 
@@ -29,6 +31,10 @@ func (s *SNMP) collect() (map[string]int64, error) {
 		}
 		s.sysName = sysName
 		s.addSysUptimeChart()
+
+		if s.CreateVnode {
+			s.vnode = s.setupVnode(sysName)
+		}
 	}
 
 	mx := make(map[string]int64)
@@ -50,6 +56,20 @@ func (s *SNMP) collect() (map[string]int64, error) {
 	}
 
 	return mx, nil
+}
+
+func (s *SNMP) setupVnode(sysName string) *vnodes.VirtualNode {
+	if s.Vnode.GUID == "" {
+		s.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(s.Hostname)).String()
+	}
+	if s.Vnode.Hostname == "" {
+		s.Vnode.Hostname = fmt.Sprintf("%s(%s)", sysName, s.Hostname)
+	}
+	return &vnodes.VirtualNode{
+		GUID:     s.Vnode.GUID,
+		Hostname: s.Vnode.Hostname,
+		Labels:   s.Vnode.Labels,
+	}
 }
 
 func (s *SNMP) getSysName() (string, error) {

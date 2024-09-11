@@ -394,9 +394,18 @@ func (j *Job) collect() (result map[string]int64) {
 }
 
 func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinceLastRun int) bool {
-	if !j.vnodeCreated && j.vnodeGUID != "" {
-		_ = j.api.HOSTINFO(j.vnodeGUID, j.vnodeHostname, j.vnodeLabels)
-		j.vnodeCreated = true
+	if !j.vnodeCreated {
+		if j.vnodeGUID == "" {
+			if v := j.module.VirtualNode(); v != nil && v.GUID != "" && v.Hostname != "" {
+				j.vnodeGUID = v.GUID
+				j.vnodeHostname = v.Hostname
+				j.vnodeLabels = v.Labels
+			}
+		}
+		if j.vnodeGUID != "" {
+			_ = j.api.HOSTINFO(j.vnodeGUID, j.vnodeHostname, j.vnodeLabels)
+			j.vnodeCreated = true
+		}
 	}
 
 	_ = j.api.HOST(j.vnodeGUID)

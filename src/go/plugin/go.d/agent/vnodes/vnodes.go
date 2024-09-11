@@ -37,9 +37,9 @@ type (
 		vnodes  map[string]*VirtualNode
 	}
 	VirtualNode struct {
-		GUID     string            `yaml:"guid"`
-		Hostname string            `yaml:"hostname"`
-		Labels   map[string]string `yaml:"labels"`
+		GUID     string            `yaml:"guid" json:"guid"`
+		Hostname string            `yaml:"hostname" json:"hostname"`
+		Labels   map[string]string `yaml:"labels" json:"labels"`
 	}
 )
 
