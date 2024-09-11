@@ -59,11 +59,8 @@ typedef struct wevt_log {
         TXT_UTF8 event;
         TXT_UTF8 user;
         TXT_UTF8 opcode;
-        TXT_UTF8 level;
         TXT_UTF8 keyword;
         TXT_UTF8 xml;
-
-        BUFFER *message;
     } ops;
 
 } WEVT_LOG;

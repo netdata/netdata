@@ -92,7 +92,6 @@ struct lqs_extension {
 #define WEVT_FIELD_SOURCE               "Source"
 #define WEVT_FIELD_EVENTRECORDID        "EventRecordID"
 #define WEVT_FIELD_EVENTID              "EventID"
-#define WEVT_FIELD_LEVELID              "LevelID"
 #define WEVT_FIELD_LEVEL                "Level"
 #define WEVT_FIELD_KEYWORDID            "KeywordID"
 #define WEVT_FIELD_KEYWORD              "Keyword"
@@ -118,8 +117,7 @@ struct lqs_extension {
     "|" WEVT_FIELD_PROVIDER                     \
     "|" WEVT_FIELD_SOURCE                       \
     "|" WEVT_FIELD_CHANNEL                      \
-    "|" WEVT_FIELD_LEVEL                        \
-    "|" WEVT_FIELD_KEYWORD                      \
+    "|" WEVT_FIELD_LEVEL "|" WEVT_FIELD_KEYWORD                      \
     "|" WEVT_FIELD_OPCODE                       \
     "|" WEVT_FIELD_COMPUTER                     \
     "|" WEVT_FIELD_USER                         \
@@ -140,7 +138,7 @@ static inline WEVT_QUERY_STATUS check_stop(const bool *cancelled, const usec_t *
 }
 
 FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused, FACET_ROW *row, void *data __maybe_unused) {
-    FACET_ROW_KEY_VALUE *levelid_rkv = dictionary_get(row->dict, WEVT_FIELD_LEVELID);
+    FACET_ROW_KEY_VALUE *levelid_rkv = dictionary_get(row->dict, WEVT_FIELD_LEVEL);
     if(!levelid_rkv || levelid_rkv->empty)
         return FACET_ROW_SEVERITY_NORMAL;
 
@@ -149,16 +147,14 @@ FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused,
     switch (windows_event_level) {
         case 5: // Verbose
             return FACET_ROW_SEVERITY_DEBUG;
+        default:
         case 4: // Information
             return FACET_ROW_SEVERITY_NORMAL;
         case 3: // Warning
             return FACET_ROW_SEVERITY_WARNING;
         case 2: // Error
-            return FACET_ROW_SEVERITY_CRITICAL;
         case 1: // Critical
             return FACET_ROW_SEVERITY_CRITICAL;
-        default: // Any unhandled or special levels
-            return FACET_ROW_SEVERITY_NORMAL;
     }
 }
 
@@ -171,65 +167,110 @@ void wevt_render_message(
 
     buffer_flush(rkv->wb);
 
+    const FACET_ROW_KEY_VALUE *xml_rkv = dictionary_get(row->dict, WEVT_FIELD_XML);
+
     const FACET_ROW_KEY_VALUE *event_rkv = dictionary_get(row->dict, WEVT_FIELD_EVENT);
     if(!event_rkv || !buffer_strlen(event_rkv->wb)) {
-        const FACET_ROW_KEY_VALUE *event_id_rkv = dictionary_get(row->dict, WEVT_FIELD_EVENTID);
-        if(event_id_rkv && buffer_strlen(event_id_rkv->wb)) {
-            buffer_fast_strcat(rkv->wb, "EventID ", 8);
-            buffer_fast_strcat(rkv->wb, buffer_tostring(event_id_rkv->wb), buffer_strlen(event_id_rkv->wb));
-        }
-        else
-            buffer_strcat(rkv->wb, "Unknown EventID ");
+        bool added_message = false;
 
-        const FACET_ROW_KEY_VALUE *provider_rkv = dictionary_get(row->dict, WEVT_FIELD_PROVIDER);
-        if(provider_rkv && buffer_strlen(provider_rkv->wb)) {
-            buffer_fast_strcat(rkv->wb, " of ", 4);
-            buffer_fast_strcat(rkv->wb, buffer_tostring(provider_rkv->wb), buffer_strlen(provider_rkv->wb));
-            buffer_putc(rkv->wb, '.');
+        if(xml_rkv && buffer_strlen(xml_rkv->wb)) {
+            const char *message_path[] = {
+                "RenderingInfo",
+                "Message",
+                NULL};
+
+            added_message = buffer_extract_and_print_value(
+                rkv->wb,
+                buffer_tostring(xml_rkv->wb),
+                buffer_strlen(xml_rkv->wb),
+                NULL,
+                message_path);
         }
-        else
-            buffer_strcat(rkv->wb, "of unknown Provider.");
+
+        if(!added_message) {
+            const FACET_ROW_KEY_VALUE *event_id_rkv = dictionary_get(row->dict, WEVT_FIELD_EVENTID);
+            if (event_id_rkv && buffer_strlen(event_id_rkv->wb)) {
+                buffer_fast_strcat(rkv->wb, "EventID ", 8);
+                buffer_fast_strcat(rkv->wb, buffer_tostring(event_id_rkv->wb), buffer_strlen(event_id_rkv->wb));
+            } else
+                buffer_strcat(rkv->wb, "Unknown EventID ");
+
+            const FACET_ROW_KEY_VALUE *provider_rkv = dictionary_get(row->dict, WEVT_FIELD_PROVIDER);
+            if (provider_rkv && buffer_strlen(provider_rkv->wb)) {
+                buffer_fast_strcat(rkv->wb, " of ", 4);
+                buffer_fast_strcat(rkv->wb, buffer_tostring(provider_rkv->wb), buffer_strlen(provider_rkv->wb));
+                buffer_putc(rkv->wb, '.');
+            } else
+                buffer_strcat(rkv->wb, "of unknown Provider.");
+        }
     }
     else
         buffer_fast_strcat(rkv->wb, buffer_tostring(event_rkv->wb), buffer_strlen(event_rkv->wb));
 
-    const FACET_ROW_KEY_VALUE *xml_rkv = dictionary_get(row->dict, WEVT_FIELD_XML);
     if(xml_rkv && buffer_strlen(xml_rkv->wb)) {
-        const char *xml = buffer_tostring(xml_rkv->wb);
+        const char *event_path[] = {
+            "EventData",
+            NULL
+        };
+        bool added_event_data = buffer_extract_and_print_xml(
+            rkv->wb,
+            buffer_tostring(xml_rkv->wb), buffer_strlen(xml_rkv->wb),
+            "\n\nRelated event data:\n",
+            event_path);
 
-        bool added_event_data = false, added_user_data = false;
-
-        const char *data_start = strstr(xml, "<EventData>");
-        if(data_start) {
-            data_start = &data_start[11];
-            const char *data_end = strstr(data_start, "</EventData>");
-
-            if(data_start && data_end) {
-                buffer_fast_strcat(rkv->wb, "\n\nRelated event data:\n", 22);
-                // copy the event data block
-                buffer_pretty_print_xml(rkv->wb, data_start, data_end - data_start);
-                added_event_data = true;
-            }
-        }
-
-        data_start = strstr(xml, "<UserData>");
-        if(data_start) {
-            data_start = &data_start[10];
-            const char *data_end = strstr(data_start, "</UserData>");
-
-            if(data_start && data_end) {
-                buffer_fast_strcat(rkv->wb, "\n\nRelated user data:\n", 21);
-                // copy the event data block
-                buffer_pretty_print_xml(rkv->wb, data_start, data_end - data_start);
-                added_user_data = true;
-            }
-        }
+        const char *user_path[] = {
+            "UserData",
+            NULL
+        };
+        bool added_user_data = buffer_extract_and_print_xml(
+            rkv->wb,
+            buffer_tostring(xml_rkv->wb), buffer_strlen(xml_rkv->wb),
+            "\n\nRelated user data:\n",
+            user_path);
 
         if(!added_event_data && !added_user_data)
             buffer_strcat(rkv->wb, " Without any related data.");
     }
 
     buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
+}
+
+static const char *wevt_level_to_name(int level) {
+    switch (level) {
+        case 5:
+            return "Verbose";
+        case 4:
+            return "Information";
+        case 3:
+            return "Warning";
+        case 2:
+            return "Error";
+        case 1:
+            return "Critical";
+
+        case 0:
+            // it seems that this defaults to "Information" for some providers
+            // however we need to differentiate to support slicing on it
+            return "None";
+
+        default:
+            return NULL;
+    }
+}
+
+static void wevt_transform_level(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+    if(scope == FACETS_TRANSFORM_FACET_SORT)
+        return;
+
+    const char *v = buffer_tostring(wb);
+    if(*v && isdigit(*v)) {
+        int priority = str2i(buffer_tostring(wb));
+        const char *name = wevt_level_to_name(priority);
+        if (name) {
+            buffer_flush(wb);
+            buffer_strcat(wb, name);
+        }
+    }
 }
 
 static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
@@ -262,13 +303,12 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             rq->default_facet |
             FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
 
-    facets_register_key_name(
-            facets, WEVT_FIELD_LEVELID,
-            rq->default_facet);
-
-    facets_register_key_name(
-            facets, WEVT_FIELD_LEVEL,
-            rq->default_facet | FACET_KEY_OPTION_FTS);
+    facets_register_key_name_transformation(
+        facets,
+        WEVT_FIELD_LEVEL,
+        rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW | FACET_KEY_OPTION_EXPANDED_FILTER,
+        wevt_transform_level,
+        NULL);
 
     facets_register_key_name(
             facets, WEVT_FIELD_KEYWORDID,
@@ -372,13 +412,8 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
     len = print_uint64(level_id_str, e->level);
     bytes += len;
     facets_add_key_value_length(facets,
-                                WEVT_FIELD_LEVELID, sizeof(WEVT_FIELD_LEVELID) - 1,
-                                level_id_str, len);
-
-    bytes += log->ops.level.used * 2;
-    facets_add_key_value_length(facets,
                                 WEVT_FIELD_LEVEL, sizeof(WEVT_FIELD_LEVEL) - 1,
-                                log->ops.level.data, log->ops.level.used - 1);
+                                level_id_str, len);
 
     if(e->keyword) {
         static __thread char keyword_id_str[24];
@@ -1115,7 +1150,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         struct {
             const char *func;
         } array[] = {
-            { "windows-events after:1725866669 before:1725953069 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6,ClaDGnYSQE7,H106l8MXSSr,HREiMN.4Ahu data_only:false source:All" },
+            { "windows-events after:1726041786 before:1726042686 last:200 source:All" },
             //{ "windows-events after:1725650277 before:1725736677 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
             //{ "windows-events after:1725650284 before:1725736684 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
             //{ "windows-events after:1725650386 before:1725736786 anchor:1725652420809461 direction:forward last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 if_modified_since:1725736649011085 data_only:true delta:true tail:true source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },

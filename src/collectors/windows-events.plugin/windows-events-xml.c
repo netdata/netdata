@@ -32,14 +32,19 @@ const char *parse_value_and_closing_tag(BUFFER *buffer, const char *xml, const c
     const char *start = xml;
     bool has_subnodes = false;
 
+    // const char *tag_start = NULL, *tag_end = NULL;
     while (xml < end) {
         if(*xml == '<') {
             if(xml + 1 < end && *(xml + 1) == '/') {
                 // a closing tag
                 xml += 2;
 
+//                tag_start = xml;
+
                 while(xml < end && *xml != '>')
                     xml++;
+
+//                tag_end = xml;
 
                 if(xml < end && *xml == '>')
                     xml++;
@@ -139,11 +144,13 @@ static inline const char *parse_node(BUFFER *buffer, const char *xml, const char
     while(xml < end && isspace(*xml)) xml++;
 
     // Parse the tag name
+//    const char *tag_start = xml, *tag_end = NULL;
     while (xml < end && *xml != '>' && *xml != '/') {
         xml++;
 
         if(xml < end && isspace(*xml)) {
             xml++;
+//            tag_end = xml;
 
             while(xml < end && isspace(*xml))
                 xml++;
@@ -193,10 +200,7 @@ static inline const char *parse_node(BUFFER *buffer, const char *xml, const char
     return append_the_rest(buffer, start, end);
 }
 
-// Main pretty-print XML function
-void buffer_pretty_print_xml(BUFFER *buffer, const char *xml, size_t xml_len) {
-    const char *end = xml + xml_len;
-
+static inline void buffer_pretty_print_xml_object(BUFFER *buffer, const char *xml, const char *end) {
     while(xml < end) {
         while(xml < end && isspace(*xml))
             xml++;
@@ -208,4 +212,92 @@ void buffer_pretty_print_xml(BUFFER *buffer, const char *xml, size_t xml_len) {
             return;
         }
     }
+}
+
+void buffer_pretty_print_xml(BUFFER *buffer, const char *xml, size_t xml_len) {
+    const char *end = xml + xml_len;
+    buffer_pretty_print_xml_object(buffer, xml, end);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+bool buffer_extract_and_print_xml_with_cb(BUFFER *buffer, const char *xml, size_t xml_len, const char *prefix, const char *keys[],
+                                          void (*cb)(BUFFER *, const char *, const char *, const char *)) {
+    if(!keys || !*keys[0]) {
+        buffer_pretty_print_xml(buffer, xml, xml_len);
+        return true;
+    }
+
+    const char *start = NULL, *end = NULL;
+    for(size_t k = 0; keys[k] ; k++) {
+        if(!*keys[k]) continue;
+
+        size_t klen = strlen(keys[k]);
+        char tag_open[klen + 2];
+        tag_open[0] = '<';
+        strcpy(&tag_open[1], keys[k]);
+        tag_open[klen + 1] = '\0';
+
+        start = strstr(xml, tag_open);
+        if(!start)
+            return false;
+
+        start = start + klen + 1;
+
+        if(*start != '>' && !isspace(*start))
+            return false;
+
+        if(*start != '>') {
+            start = strchr(start, '>');
+            if(!start) return false;
+        }
+        start++; // skip the >
+
+        char tag_close[klen + 4];
+        tag_close[0] = '<';
+        tag_close[1] = '/';
+        strcpy(&tag_close[2], keys[k]);
+        tag_close[klen + 2] = '>';
+        tag_close[klen + 3] = '\0';
+
+        const char *new_end = strstr(start, tag_close);
+        if(!new_end || (end && new_end > end))
+            return false;
+
+        end = new_end;
+    }
+
+    if(!start || !end || start == end)
+        return false;
+
+    cb(buffer, prefix, start, end);
+    return true;
+}
+
+static void print_xml_cb(BUFFER *buffer, const char *prefix, const char *start, const char *end) {
+    if(prefix)
+        buffer_strcat(buffer, prefix);
+
+    buffer_pretty_print_xml_object(buffer, start, end);
+}
+
+bool buffer_extract_and_print_xml(BUFFER *buffer, const char *xml, size_t xml_len, const char *prefix, const char *keys[]) {
+    return buffer_extract_and_print_xml_with_cb(
+        buffer, xml, xml_len,
+        prefix, keys,
+        print_xml_cb);
+}
+
+static void print_value_cb(BUFFER *buffer, const char *prefix, const char *start, const char *end) {
+    if(prefix)
+        buffer_strcat(buffer, prefix);
+
+    buffer_fast_strcat(buffer, start, end - start);
+}
+
+bool buffer_extract_and_print_value(BUFFER *buffer, const char *xml, size_t xml_len, const char *prefix, const char *keys[]) {
+    return buffer_extract_and_print_xml_with_cb(
+        buffer, xml, xml_len,
+        prefix, keys,
+        print_value_cb);
 }
