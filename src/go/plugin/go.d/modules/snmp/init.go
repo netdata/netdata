@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 
 	"github.com/gosnmp/gosnmp"
@@ -16,6 +17,11 @@ import (
 func (s *SNMP) validateConfig() error {
 	if s.Hostname == "" {
 		return errors.New("SNMP hostname is required")
+	}
+	if s.Vnode.GUID != "" {
+		if err := uuid.Validate(s.Vnode.GUID); err != nil {
+			return fmt.Errorf("invalid Vnode GUID: %v", err)
+		}
 	}
 	return nil
 }
