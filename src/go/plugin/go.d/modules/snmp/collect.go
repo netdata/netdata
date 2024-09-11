@@ -77,6 +77,7 @@ func (s *SNMP) setupVnode(si *sysInfo) *vnodes.VirtualNode {
 	if si.location != "" {
 		labels["sysLocation"] = si.descr
 	}
+	labels["organization"] = si.organization
 
 	return &vnodes.VirtualNode{
 		GUID:     s.Vnode.GUID,
@@ -96,6 +97,12 @@ func pduToString(pdu gosnmp.SnmpPDU) (string, error) {
 		return strings.ToValidUTF8(string(bs), "�"), nil
 	case gosnmp.Counter32, gosnmp.Counter64, gosnmp.Integer, gosnmp.Gauge32:
 		return gosnmp.ToBigInt(pdu.Value).String(), nil
+	case gosnmp.ObjectIdentifier:
+		v, ok := pdu.Value.(string)
+		if !ok {
+			return "", fmt.Errorf("ObjectIdentifier is not a string but %T", pdu.Value)
+		}
+		return strings.TrimPrefix(v, "."), nil
 	default:
 		return "", fmt.Errorf("unussported type: '%v'", pdu.Type)
 	}

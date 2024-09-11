@@ -6,11 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/snmp/entnum"
 )
 
 const (
 	rootOidMibSystem = "1.3.6.1.2.1.1"
 	oidSysDescr      = "1.3.6.1.2.1.1.1.0"
+	oidSysObject     = "1.3.6.1.2.1.1.2.0"
 	oidSysUptime     = "1.3.6.1.2.1.1.3.0"
 	oidSysContact    = "1.3.6.1.2.1.1.4.0"
 	oidSysName       = "1.3.6.1.2.1.1.5.0"
@@ -22,6 +25,8 @@ type sysInfo struct {
 	contact  string
 	name     string
 	location string
+
+	organization string
 }
 
 func (s *SNMP) getSysInfo() (*sysInfo, error) {
@@ -30,7 +35,9 @@ func (s *SNMP) getSysInfo() (*sysInfo, error) {
 		return nil, err
 	}
 
-	var si sysInfo
+	si := &sysInfo{
+		organization: "Unknown",
+	}
 
 	for _, pdu := range pdus {
 		oid := strings.TrimPrefix(pdu.Name, ".")
@@ -38,6 +45,15 @@ func (s *SNMP) getSysInfo() (*sysInfo, error) {
 		switch oid {
 		case oidSysDescr:
 			si.descr, err = pduToString(pdu)
+		case oidSysObject:
+			var sysObj string
+			if sysObj, err = pduToString(pdu); err == nil {
+				org := entnum.LookupBySysObject(sysObj)
+				s.Debugf("device sysObject '%s', organization '%s'", sysObj, org)
+				if org != "" {
+					si.organization = org
+				}
+			}
 		case oidSysContact:
 			si.contact, err = pduToString(pdu)
 		case oidSysName:
@@ -54,7 +70,7 @@ func (s *SNMP) getSysInfo() (*sysInfo, error) {
 		return nil, errors.New("no system name")
 	}
 
-	return &si, nil
+	return si, nil
 }
 
 func (s *SNMP) collectSysUptime(mx map[string]int64) error {
