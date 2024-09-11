@@ -15,8 +15,8 @@ import (
 //go:embed "enterprise-numbers.txt"
 var enterpriseNumberTxt []byte
 
-func Lookup(number string) string {
-	return numbers[number]
+func LookupBySysObject(sysObject string) string {
+	return numbers[extractEntNumber(sysObject)]
 }
 
 var numbers = func() map[string]string {
@@ -63,3 +63,20 @@ var numbers = func() map[string]string {
 
 	return mapping
 }()
+
+func extractEntNumber(sysObject string) string {
+	const rootOidIanaPEN = "1.3.6.1.4.1"
+
+	// .1.3.6.1.4.1.14988.1 => 14988
+
+	sysObject = strings.TrimPrefix(sysObject, ".")
+
+	s := strings.TrimPrefix(sysObject, rootOidIanaPEN+".")
+
+	num, _, ok := strings.Cut(s, ".")
+	if !ok {
+		return ""
+	}
+
+	return num
+}

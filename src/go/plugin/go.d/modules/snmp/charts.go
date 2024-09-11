@@ -162,7 +162,8 @@ func (s *SNMP) addNetIfaceCharts(iface *netInterface) {
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanIfaceName(iface.ifName))
 		chart.Labels = []module.Label{
-			{Key: "sysName", Value: s.sysName},
+			{Key: "organization", Value: s.sysInfo.organization},
+			{Key: "sysName", Value: s.sysInfo.name},
 			{Key: "ifDescr", Value: iface.ifDescr},
 			{Key: "ifName", Value: iface.ifName},
 			{Key: "ifType", Value: ifTypeMapping[iface.ifType]},
@@ -190,7 +191,8 @@ func (s *SNMP) removeNetIfaceCharts(iface *netInterface) {
 func (s *SNMP) addSysUptimeChart() {
 	chart := uptimeChart.Copy()
 	chart.Labels = []module.Label{
-		{Key: "sysName", Value: s.sysName},
+		{Key: "organization", Value: s.sysInfo.organization},
+		{Key: "sysName", Value: s.sysInfo.name},
 	}
 	if err := s.Charts().Add(chart); err != nil {
 		s.Warning(err)
