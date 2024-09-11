@@ -66,7 +66,8 @@ static void do_memory_swap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjec
             "mem"
         , "swap_operations", NULL
         , "swap"
-        , "mem.swap_operations"
+        , "mem.swap_iops"
+
         , "Swap Operations"
         , "operations/s"
         , PLUGIN_WINDOWS_NAME
