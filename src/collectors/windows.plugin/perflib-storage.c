@@ -44,6 +44,10 @@ struct physical_disk {
     ND_DISK_UAVGSIZE udisk_size;
     COUNTER_DATA diskTransfersPerSec;
 
+    RRDSET *st_splitio;
+    RRDDIM *rd_splitio;
+    COUNTER_DATA splitIoPerSec;
+
     COUNTER_DATA percentIdleTime;
     COUNTER_DATA percentDiskTime;
     COUNTER_DATA percentDiskReadTime;
@@ -56,7 +60,6 @@ struct physical_disk {
     COUNTER_DATA averageDiskSecondsPerRead;
     COUNTER_DATA averageDiskSecondsPerWrite;
     COUNTER_DATA averageDiskBytesPerTransfer;
-    COUNTER_DATA splitIoPerSec;
 };
 
 struct physical_disk system_physical_total = {
@@ -325,6 +328,30 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                         d);
         }
 
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->splitIoPerSec)) {
+            if (!d->st_splitio) {
+                d->st_splitio = rrdset_create_localhost(
+                    "disk_splitio"
+                    , device , NULL
+                    , "iops"
+                    , "disk.splitio"
+                    , "Rate I/O operations were split"
+                    , "operations/s"
+                    , _COMMON_PLUGIN_NAME
+                    , _COMMON_PLUGIN_MODULE_NAME
+                    , NETDATA_CHART_PRIO_DISK_OPS + 1
+                    , update_every
+                    , RRDSET_TYPE_LINE
+                );
+
+                d->rd_splitio  = rrddim_add(d->st_splitio, "io",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                physical_disk_labels(d->st_splitio, d);
+            }
+
+            rrddim_set_by_pointer(d->st_splitio, d->rd_splitio, (collected_number)d->splitIoPerSec.current.Data);
+            rrdset_done(d->st_splitio);
+        }
+
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime);
@@ -337,7 +364,6 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerWrite);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerTransfer);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->splitIoPerSec);
     }
 
     return true;
