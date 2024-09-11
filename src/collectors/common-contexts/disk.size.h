@@ -25,7 +25,7 @@ static inline void common_disk_avgsize(ND_DISK_AVGSIZE *d, const char *id, const
             , "size"
             , "disk.avgsz"
             , "Average Completed I/O Operation Bandwidth"
-            , "KiB/s"
+            , "operations/s"
             , _COMMON_PLUGIN_NAME
             , _COMMON_PLUGIN_MODULE_NAME
             , NETDATA_CHART_PRIO_DISK_AVGSZ
@@ -54,8 +54,8 @@ static inline void common_unified_disk_avgsize(ND_DISK_UAVGSIZE *d, const char *
             , name
             , "size"
             , "disk.uavgsz"
-            , "Disk I/O Bandwidth"
-            , "KiB/s"
+            , "Average Completed I/O Operation Bandwidth"
+            , "operations/s"
             , _COMMON_PLUGIN_NAME
             , _COMMON_PLUGIN_MODULE_NAME
             , NETDATA_CHART_PRIO_DISK_AVGSZ + 1
