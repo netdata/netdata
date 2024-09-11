@@ -129,14 +129,15 @@ static bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UT
         }
     }
 
-    // EvtFormatMessage pads it with zeros at the end
-    while(size >= 2 && log->ops.unicode.data[size - 2] == 0)
-        size--;
+    // make sure it is null terminated
+    if(size <= log->ops.unicode.size)
+        log->ops.unicode.data[size - 1] = 0;
+    else
+        log->ops.unicode.data[log->ops.unicode.size - 1] = 0;
 
-    log->ops.unicode.used = size;
-
-    internal_fatal(wcslen(log->ops.unicode.data) + 1 != (size_t)log->ops.unicode.used,
-                   "Wrong unicode string length!");
+    // unfortunately we have to calculate the length every time
+    // the size returned may not be the length of the unicode string
+    log->ops.unicode.used = wcslen(log->ops.unicode.data) + 1;
 
     return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
 
