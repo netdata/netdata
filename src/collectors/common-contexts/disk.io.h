@@ -96,7 +96,7 @@ static inline void common_disk_splitio(ND_DISK_SPLIT_IO *d, const char *id, cons
                                                 , RRDSET_TYPE_LINE
             );
 
-        d->rd_splitio  = rrddim_add(d->st_splitio, "io",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        d->rd_splitio  = rrddim_add(d->st_splitio, "io",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         if(cb)
             cb(d->st_splitio, data);
@@ -126,7 +126,7 @@ static inline void system_disk_splitio(uint64_t ops, int update_every) {
                                         );
 
 
-        rd_io  = rrddim_add(st_io, "io",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        rd_io  = rrddim_add(st_io, "io",  NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
     }
 
     // this always have to be in base units, so that exporting sends base units to other time-series db
