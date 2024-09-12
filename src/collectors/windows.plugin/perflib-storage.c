@@ -47,14 +47,16 @@ struct physical_disk {
     ND_DISK_SPLIT_IO disk_split_io;
     COUNTER_DATA splitIoPerSec;
 
+    ND_DISK_AWAIT disk_await;
+    COUNTER_DATA averageDiskReadQueueLength;
+    COUNTER_DATA averageDiskWriteQueueLength;
+
     COUNTER_DATA percentIdleTime;
     COUNTER_DATA percentDiskTime;
     COUNTER_DATA percentDiskReadTime;
     COUNTER_DATA percentDiskWriteTime;
     COUNTER_DATA currentDiskQueueLength;
     COUNTER_DATA averageDiskQueueLength;
-    COUNTER_DATA averageDiskReadQueueLength;
-    COUNTER_DATA averageDiskWriteQueueLength;
     COUNTER_DATA averageDiskSecondsPerTransfer;
     COUNTER_DATA averageDiskSecondsPerRead;
     COUNTER_DATA averageDiskSecondsPerWrite;
@@ -357,19 +359,18 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskReadQueueLength) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskWriteQueueLength)) {
             if (is_system)
-                common_system_avgsize(d->averageDiskBytesPerRead.current.Data,
-                                      d->averageDiskBytesPerWrite.current.Data,
+                common_system_ioawait(d->averageDiskReadQueueLength.current.Data * 1000,
+                                      d->averageDiskWriteQueueLength.current.Data * 1000,
                                       update_every);
             else
-                common_disk_avgsize(&d->disk_size,
-                                    device,
-                                    NULL,
-                                    d->averageDiskBytesPerRead.current.Data,
-                                    d->averageDiskBytesPerWrite.current.Data,
-                                    1,
-                                    update_every,
-                                    physical_disk_labels,
-                                    d);
+                common_disk_await(&d->disk_await,
+                                  device,
+                                  NULL,
+                                  d->averageDiskReadQueueLength.current.Data * 1000,
+                                  d->averageDiskWriteQueueLength.current.Data * 1000,
+                                  update_every,
+                                  physical_disk_labels,
+                                  d);
         }
 
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime);

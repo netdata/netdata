@@ -24,6 +24,7 @@
 #define NETDATA_CHART_PRIO_SYSTEM_PGPGIO                151
 #define NETDATA_CHART_PRIO_SYSTEM_OPS_IO                152 // windows only
 #define NETDATA_CHART_PRIO_SYSTEM_AVGZ_OPS_IO           153 // windows only
+#define NETDATA_CHART_PRIO_SYSTEM_IOAWAIT               154 // windows only
 #define NETDATA_CHART_PRIO_SYSTEM_RAM                   200
 #define NETDATA_CHART_PRIO_SYSTEM_NET                   500
 #define NETDATA_CHART_PRIO_SYSTEM_IPV4                  500 // freebsd only
