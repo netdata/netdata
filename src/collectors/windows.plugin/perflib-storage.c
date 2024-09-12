@@ -20,6 +20,11 @@ struct logical_disk {
     // COUNTER_DATA freeMegabytes;
 };
 
+typedef struct {
+    RRDSET *st_queue;
+    RRDDIM *rd_queue;
+} ND_DISK_QUEUE;
+
 struct physical_disk {
     bool collected_metadata;
 
@@ -51,11 +56,13 @@ struct physical_disk {
     COUNTER_DATA averageDiskReadQueueLength;
     COUNTER_DATA averageDiskWriteQueueLength;
 
+    ND_DISK_QUEUE disk_cqueue;
+    COUNTER_DATA currentDiskQueueLength;
+
     COUNTER_DATA percentIdleTime;
     COUNTER_DATA percentDiskTime;
     COUNTER_DATA percentDiskReadTime;
     COUNTER_DATA percentDiskWriteTime;
-    COUNTER_DATA currentDiskQueueLength;
     COUNTER_DATA averageDiskQueueLength;
     COUNTER_DATA averageDiskSecondsPerTransfer;
     COUNTER_DATA averageDiskSecondsPerRead;
@@ -66,6 +73,63 @@ struct physical_disk {
 struct physical_disk system_physical_total = {
     .collected_metadata = true,
 };
+
+// ------------ Disk Queue
+static inline void system_disk_queue(uint64_t queue, int update_every) {
+    static RRDSET *st_dqueue = NULL;
+    static RRDDIM *rd_dqueue = NULL;
+
+    if(unlikely(!st_dqueue)) {
+        st_dqueue = rrdset_create_localhost("system"
+                                           , "disk_queue"
+                                           , NULL
+                                           , "disk"
+                                           , NULL
+                                           , "Number of requests"
+                                           , "requests"
+                                           , _COMMON_PLUGIN_NAME
+                                           , _COMMON_PLUGIN_MODULE_NAME
+                                           , NETDATA_CHART_PRIO_SYSTEM_IOAWAIT
+                                           , update_every
+                                           , RRDSET_TYPE_LINE
+                                           );
+
+
+        rd_dqueue = rrddim_add(st_dqueue, "reads",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    // this always have to be in base units, so that exporting sends base units to other time-series db
+    rrddim_set_by_pointer(st_dqueue, rd_dqueue, (collected_number)queue);
+    rrdset_done(st_dqueue);
+}
+
+static inline void common_disk_queue(ND_DISK_QUEUE *d, const char *id, const char *name, uint64_t queue, int update_every, instance_labels_cb_t cb, void *data) {
+    if(unlikely(!d->st_queue)) {
+        d->st_queue = rrdset_create_localhost("disk_queue"
+                                              , id
+                                              , name
+                                              , "queue"
+                                              , "disk.queue"
+                                              , "Number of requests"
+                                              , "requests"
+                                              , _COMMON_PLUGIN_NAME
+                                              , _COMMON_PLUGIN_MODULE_NAME
+                                              , NETDATA_CHART_PRIO_DISK_AWAIT
+                                              , update_every
+                                              , RRDSET_TYPE_LINE
+                                              );
+
+        d->rd_queue  = rrddim_add(d->st_queue, "reads",  NULL,  1, 1024, RRD_ALGORITHM_INCREMENTAL);
+
+        if(cb)
+            cb(d->st_queue, data);
+    }
+
+    // this always have to be in base units, so that exporting sends base units to other time-series db
+    rrddim_set_by_pointer(d->st_queue, d->rd_queue, (collected_number)queue);
+    rrdset_done(d->st_queue);
+}
+// ------------ Disk Queue
 
 void dict_logical_disk_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct logical_disk *ld = value;
@@ -373,11 +437,23 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                   d);
         }
 
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->currentDiskQueueLength)) {
+            if (is_system)
+                system_disk_queue(d->currentDiskQueueLength.current.Data, update_every);
+            else
+                common_disk_queue(&d->disk_cqueue,
+                                  device,
+                                  NULL,
+                                  d->currentDiskQueueLength.current.Data,
+                                  update_every,
+                                  physical_disk_labels,
+                                  d);
+        }
+
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskWriteTime);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->currentDiskQueueLength);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskQueueLength);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerTransfer);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead);
