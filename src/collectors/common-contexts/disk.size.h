@@ -118,7 +118,7 @@ static inline void common_system_uavgsize(uint64_t bytes, int update_every) {
                                             , "operations/s"
                                             , _COMMON_PLUGIN_NAME
                                             , _COMMON_PLUGIN_MODULE_NAME
-                                            , NETDATA_CHART_PRIO_SYSTEM_AVGZ_OPS_IO
+                                            , NETDATA_CHART_PRIO_SYSTEM_UAVGZ_OPS_IO
                                             , update_every
                                             , RRDSET_TYPE_AREA
                                             );
