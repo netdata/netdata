@@ -493,15 +493,15 @@ func (j *Job) createChart(chart *Chart) {
 			if ls == 0 {
 				ls = LabelSourceAuto
 			}
-			_ = j.api.CLABEL(l.Key, l.Value, ls)
+			_ = j.api.CLABEL(l.Key, lblReplacer.Replace(l.Value), ls)
 		}
 	}
 	for k, v := range j.labels {
 		if !seen[k] {
-			_ = j.api.CLABEL(k, v, LabelSourceConf)
+			_ = j.api.CLABEL(k, lblReplacer.Replace(v), LabelSourceConf)
 		}
 	}
-	_ = j.api.CLABEL("_collect_job", j.Name(), LabelSourceAuto)
+	_ = j.api.CLABEL("_collect_job", lblReplacer.Replace(j.Name()), LabelSourceAuto)
 	_ = j.api.CLABELCOMMIT()
 
 	for _, dim := range chart.Dims {
@@ -647,3 +647,5 @@ func handleZero(v int) int {
 	}
 	return v
 }
+
+var lblReplacer = strings.NewReplacer("'", "")
