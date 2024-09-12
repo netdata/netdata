@@ -103,6 +103,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/tomcat"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/tor"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/traefik"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/typesense"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/unbound"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/upsd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/uwsgi"

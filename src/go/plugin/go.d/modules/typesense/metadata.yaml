@@ -1,0 +1,222 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-typesense
+      plugin_name: go.d.plugin
+      module_name: typesense
+      monitored_instance:
+        name: NGINX
+        link: https://typesense.org/
+        categories:
+          - data-collection.search-engines
+        icon_filename: typesense.svg
+      related_resources:
+        integrations:
+          list: []
+      alternative_monitored_instances: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - typesense
+        - search engine
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the overall health status and performance of your Typesense servers.
+          It gathers detailed metrics, including the total number of requests processed, the breakdown of different request types, and the average latency experienced by each request.
+        method_description: |
+          It gathers metrics by periodically issuing HTTP GET requests to the Typesense server:
+
+          - [/health](https://typesense.org/docs/27.0/api/cluster-operations.html#health) endpoint to check server health.
+          - [/stats.json](https://typesense.org/docs/27.0/api/cluster-operations.html#api-stats) endpoint to collect data on requests and latency.
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector can automatically detect Typesense instances running on:
+            
+            - localhost that are listening on port 8108
+            - within Docker containers
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: API Key Configuration
+            description: |
+              While optional, configuring an [API key](https://typesense.org/docs/0.20.0/api/api-keys.html#api-keys) is highly recommended to enable the collector to gather [stats metrics](https://typesense.org/docs/27.0/api/cluster-operations.html#api-stats), including request counts and latency.
+              Without an API key, the collector will only collect health status information.
+              
+              > If you're running Typesense with the API key provided as a command-line parameter (e.g., --api-key=XYZ), Netdata can automatically detect and use this key for queries.
+              > In this case, no additional configuration is required.
+      configuration:
+        file:
+          name: go.d/typesense.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:8108
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: api_key
+              description: "The Typesense [API Key](https://typesense.org/docs/0.20.0/api/api-keys.html#api-keys) (`X-TYPESENSE-API-KEY`)."
+              default_value: ""
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8108
+                    api_key: XYZ
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8108
+                    api_key: XYZ
+                
+                  - name: remote
+                    url: http://192.0.2.1:8108
+                    api_key: XYZ
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: typesense.health_status
+              description: Health Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: out_of_disk
+                - name: out_of_memory
+            - name: typesense.total_requests
+              description: Total Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: typesense.requests_by_operation
+              description: Requests by Operation
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: search
+                - name: write
+                - name: import
+                - name: delete
+            - name: typesense.latency_by_operation
+              description: Latency by Operation
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: search
+                - name: write
+                - name: import
+                - name: delete
+            - name: typesense.overloaded_requests
+              description: Overloaded Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: overloaded
