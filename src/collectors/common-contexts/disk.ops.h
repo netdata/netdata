@@ -41,4 +41,33 @@ static inline void common_disk_ops(ND_DISK_OPS *d, const char *id, const char *n
     rrdset_done(d->st_ops);
 }
 
+static inline void common_system_iops(uint64_t read_ops, uint64_t write_ops, int update_every) {
+    static RRDSET *st_ops = NULL;
+    static RRDDIM *rd_read = NULL, *rd_write = NULL;
+
+    if(unlikely(!st_ops)) {
+        st_ops = rrdset_create_localhost("system"
+                                         , "ops"
+                                         , NULL
+                                         , "disk"
+                                         , NULL
+                                         , "Disk Completed I/O Operations"
+                                         , "operations/s"
+                                         , _COMMON_PLUGIN_NAME
+                                         , _COMMON_PLUGIN_MODULE_NAME
+                                         , NETDATA_CHART_PRIO_SYSTEM_OPS_IO
+                                         , update_every
+                                         , RRDSET_TYPE_AREA
+        );
+
+        rd_read = rrddim_add(st_ops, "read",  "read",  1, 1024, RRD_ALGORITHM_INCREMENTAL);
+        rd_write = rrddim_add(st_ops, "write",  "write",  1, 1024, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    // this always have to be in base units, so that exporting sends base units to other time-series db
+    rrddim_set_by_pointer(st_ops, rd_read, (collected_number)read_ops);
+    rrddim_set_by_pointer(st_ops, rd_write, (collected_number)write_ops);
+    rrdset_done(st_ops);
+}
+
 #endif //NETDATA_DISK_OPS_H

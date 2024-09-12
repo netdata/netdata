@@ -46,6 +46,36 @@ static inline void common_disk_avgsize(ND_DISK_AVGSIZE *d, const char *id, const
     rrdset_done(d->st_avgsz);
 }
 
+static inline void common_system_avgsize(uint64_t bytes_read, uint64_t bytes_write, int update_every) {
+    static RRDSET *st_avgsz = NULL;
+    static RRDDIM *rd_avgsz_reads = NULL, *rd_avgsz_writes = NULL;
+
+    if(unlikely(!st_avgsz)) {
+        st_avgsz = rrdset_create_localhost("system"
+                                           , "avgsz"
+                                           , NULL
+                                           , "disk"
+                                           , NULL
+                                           , "Disk Completed I/O Operations"
+                                           , "operations/s"
+                                           , _COMMON_PLUGIN_NAME
+                                           , _COMMON_PLUGIN_MODULE_NAME
+                                           , NETDATA_CHART_PRIO_SYSTEM_AVGZ_OPS_IO
+                                           , update_every
+                                           , RRDSET_TYPE_AREA
+                                           );
+
+
+        rd_avgsz_reads  = rrddim_add(st_avgsz, "reads",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        rd_avgsz_writes = rrddim_add(st_avgsz, "writes", NULL, -1, 1024, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    // this always have to be in base units, so that exporting sends base units to other time-series db
+    rrddim_set_by_pointer(st_avgsz, rd_avgsz_reads, (collected_number)bytes_read);
+    rrddim_set_by_pointer(st_avgsz, rd_avgsz_writes, (collected_number)bytes_write);
+    rrdset_done(st_avgsz);
+}
+
 static inline void common_unified_disk_avgsize(ND_DISK_UAVGSIZE *d, const char *id, const char *name, uint64_t bytes, int update_every, instance_labels_cb_t cb, void *data) {
     if(unlikely(!d->st_uavgsz)) {
         d->st_uavgsz = rrdset_create_localhost(
@@ -72,6 +102,33 @@ static inline void common_unified_disk_avgsize(ND_DISK_UAVGSIZE *d, const char *
     // this always have to be in base units, so that exporting sends base units to other time-series db
     rrddim_set_by_pointer(d->st_uavgsz, d->rd_avgsz_bytes, (collected_number)bytes);
     rrdset_done(d->st_uavgsz);
+}
+
+static inline void common_system_uavgsize(uint64_t bytes, int update_every) {
+    static RRDSET *st_uavgsz = NULL;
+    static RRDDIM *rd_avgsz_bytes = NULL;
+
+    if(unlikely(!st_uavgsz)) {
+        st_uavgsz = rrdset_create_localhost("system"
+                                            , "uavgsz"
+                                            , NULL
+                                            , "disk"
+                                            , NULL
+                                            , "Disk Completed I/O Operations"
+                                            , "operations/s"
+                                            , _COMMON_PLUGIN_NAME
+                                            , _COMMON_PLUGIN_MODULE_NAME
+                                            , NETDATA_CHART_PRIO_SYSTEM_AVGZ_OPS_IO
+                                            , update_every
+                                            , RRDSET_TYPE_AREA
+                                            );
+
+        rd_avgsz_bytes  = rrddim_add(st_uavgsz, "io",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    // this always have to be in base units, so that exporting sends base units to other time-series db
+    rrddim_set_by_pointer(st_uavgsz, rd_avgsz_bytes, (collected_number)bytes);
+    rrdset_done(st_uavgsz);
 }
 
 #endif //NETDATA_DISK_SIZE_H

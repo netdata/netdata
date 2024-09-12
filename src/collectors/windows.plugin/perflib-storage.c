@@ -44,8 +44,7 @@ struct physical_disk {
     ND_DISK_UAVGSIZE udisk_size;
     COUNTER_DATA diskTransfersPerSec;
 
-    RRDSET *st_splitio;
-    RRDDIM *rd_splitio;
+    ND_DISK_SPLIT_IO disk_split_io;
     COUNTER_DATA splitIoPerSec;
 
     COUNTER_DATA percentIdleTime;
@@ -283,73 +282,76 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskBytesPerSec)) {
-            common_unified_disk_io(&d->disk_uio,
-                                   device,
-                                   NULL,
-                                   d->diskBytesPerSec.current.Data,
-                                   update_every,
-                                   physical_disk_labels,
-                                   d);
+            if (is_system)
+                common_system_uio(d->diskBytesPerSec.current.Data, update_every);
+            else
+                common_unified_disk_io(&d->disk_uio,
+                                       device,
+                                       NULL,
+                                       d->diskBytesPerSec.current.Data,
+                                       update_every,
+                                       physical_disk_labels,
+                                       d);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskReadsPerSec) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskWritesPerSec)) {
-            common_disk_ops(&d->disk_op,
-                            device,
-                            NULL,
-                            device,
-                            d->diskReadsPerSec.current.Data,
-                            d->diskWritesPerSec.current.Data,
-                            update_every,
-                            physical_disk_labels,
-                            d);
-        }
-
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerRead) &&
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerWrite)) {
-            common_disk_avgsize(&d->disk_size,
+            if (is_system)
+                common_system_iops(d->diskReadsPerSec.current.Data, d->diskWritesPerSec.current.Data, update_every);
+            else
+                common_disk_ops(&d->disk_op,
                                 device,
                                 NULL,
-                                d->averageDiskBytesPerRead.current.Data,
-                                d->averageDiskBytesPerWrite.current.Data,
-                                1,
+                                device,
+                                d->diskReadsPerSec.current.Data,
+                                d->diskWritesPerSec.current.Data,
                                 update_every,
                                 physical_disk_labels,
                                 d);
         }
 
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerRead) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerWrite)) {
+            if (is_system)
+                common_system_avgsize(d->averageDiskBytesPerRead.current.Data,
+                                      d->averageDiskBytesPerWrite.current.Data,
+                                      update_every);
+            else
+                common_disk_avgsize(&d->disk_size,
+                                    device,
+                                    NULL,
+                                    d->averageDiskBytesPerRead.current.Data,
+                                    d->averageDiskBytesPerWrite.current.Data,
+                                    1,
+                                    update_every,
+                                    physical_disk_labels,
+                                    d);
+        }
+
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskTransfersPerSec)) {
-            common_unified_disk_avgsize(&d->udisk_size,
-                                        device,
-                                        NULL,
-                                        d->diskTransfersPerSec.current.Data,
-                                        update_every,
-                                        physical_disk_labels,
-                                        d);
+            if (is_system)
+                system_disk_splitio(d->diskTransfersPerSec.current.Data, update_every);
+            else
+                common_unified_disk_avgsize(&d->udisk_size,
+                                            device,
+                                            NULL,
+                                            d->diskTransfersPerSec.current.Data,
+                                            update_every,
+                                            physical_disk_labels,
+                                            d);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->splitIoPerSec)) {
-            if (!d->st_splitio) {
-                d->st_splitio = rrdset_create_localhost(
-                    "disk_splitio"
-                    , device , NULL
-                    , "iops"
-                    , "disk.splitio"
-                    , "Rate I/O operations were split"
-                    , "operations/s"
-                    , _COMMON_PLUGIN_NAME
-                    , _COMMON_PLUGIN_MODULE_NAME
-                    , NETDATA_CHART_PRIO_DISK_OPS + 1
-                    , update_every
-                    , RRDSET_TYPE_LINE
-                );
-
-                d->rd_splitio  = rrddim_add(d->st_splitio, "io",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                physical_disk_labels(d->st_splitio, d);
-            }
-
-            rrddim_set_by_pointer(d->st_splitio, d->rd_splitio, (collected_number)d->splitIoPerSec.current.Data);
-            rrdset_done(d->st_splitio);
+            if (is_system)
+                common_system_uavgsize(d->diskTransfersPerSec.current.Data, update_every);
+            else
+                common_disk_splitio(&d->disk_split_io,
+                                    device,
+                                    NULL,
+                                    d->splitIoPerSec.current.Data,
+                                    update_every,
+                                    physical_disk_labels,
+                                    d);
         }
 
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime);
