@@ -7,14 +7,14 @@
 
 typedef struct wevt_event {
     uint64_t id;                        // EventRecordId (unique and sequential per channel)
-    uint16_t event_id;                  // This is the template that defines the message to be shown
-    uint16_t opcode;
-    uint8_t  level;                     // The severity of event
     uint8_t  version;
+    uint8_t  level;                     // The severity of event
+    uint16_t event_id;                  // This is the template that defines the message to be shown
+    uint64_t keywords;                   // Categorization of the event
+    uint16_t opcode;
     uint16_t task;
     uint32_t process_id;
     uint32_t thread_id;
-    uint64_t keyword;                   // Categorization of the event
     ND_UUID  provider;
     ND_UUID  correlation_activity_id;
     nsec_t   created_ns;
@@ -58,9 +58,9 @@ typedef struct wevt_log {
         TXT_UTF8 computer;
         TXT_UTF8 event;
         TXT_UTF8 user;
-        TXT_UTF8 opcode;
-        TXT_UTF8 keyword;
         TXT_UTF8 xml;
+
+        BUFFER *transform;
     } ops;
 
 } WEVT_LOG;

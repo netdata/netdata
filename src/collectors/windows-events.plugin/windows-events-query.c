@@ -21,7 +21,6 @@ static uint64_t wevt_log_file_size(const wchar_t *channel);
 #define FIELD_TASK                          (14)
 #define FIELD_PROCESS_ID                    (15)
 #define FIELD_THREAD_ID                     (16)
-#define	FIELD_EVENT_DATA                    (17)
 
 // These are the fields we extract from the logs
 static const wchar_t *RENDER_ITEMS[] = {
@@ -42,7 +41,6 @@ static const wchar_t *RENDER_ITEMS[] = {
         L"/Event/System/Task",
         L"/Event/System/Execution/@ProcessID",
         L"/Event/System/Execution/@ThreadID",
-        L"/Event/EventData/Data"
 };
 
 static bool wevt_GUID_to_ND_UUID(ND_UUID *nd_uuid, const GUID *guid) {
@@ -144,6 +142,18 @@ static bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UT
 cleanup:
     wevt_empty_utf8(dst);
     return false;
+}
+
+static bool wevt_get_keyword_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
+    return wevt_get_message_utf8(log, event_handle, dst, what);
+}
+
+static bool wevt_get_opcode_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
+    return wevt_get_message_utf8(log, event_handle, dst, what);
+}
+
+static bool wevt_get_xml_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
+    return wevt_get_message_utf8(log, event_handle, dst, EvtFormatMessageXml);
 }
 
 static bool wevt_get_utf8_by_type(WEVT_LOG *log, size_t field, TXT_UTF8 *dst) {
@@ -443,7 +453,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
     ev->id = wevt_get_unsigned_by_type(log, FIELD_RECORD_NUMBER);
     ev->event_id = wevt_get_unsigned_by_type(log, FIELD_EVENT_ID);
     ev->level = wevt_get_unsigned_by_type(log, FIELD_LEVEL);
-    ev->keyword = wevt_get_unsigned_by_type(log, FIELD_KEYWORDS);
+    ev->keywords = wevt_get_unsigned_by_type(log, FIELD_KEYWORDS);
     ev->created_ns = wevt_get_filetime_to_ns_by_type(log, FIELD_TIME_CREATED);
     ev->opcode = wevt_get_unsigned_by_type(log, FIELD_OPCODE);
     ev->version = wevt_get_unsigned_by_type(log, FIELD_VERSION);
@@ -457,21 +467,6 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
         wevt_get_utf8_by_type(log, FIELD_EVENT_SOURCE_NAME, &log->ops.source);
         wevt_get_uuid_by_type(log, FIELD_PROVIDER_GUID, &ev->provider);
 
-        if(ev->event_id)
-            wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.event, EvtFormatMessageEvent);
-        else
-            wevt_empty_utf8(&log->ops.event);
-
-        if(ev->keyword)
-            wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.keyword, EvtFormatMessageKeyword);
-        else
-            wevt_empty_utf8(&log->ops.keyword);
-
-        if(ev->opcode)
-            wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.opcode, EvtFormatMessageOpcode);
-        else
-            wevt_empty_utf8(&log->ops.keyword);
-
         // ComputerName
         wevt_get_utf8_by_type(log, FIELD_COMPUTER_NAME, &log->ops.computer);
 
@@ -482,7 +477,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
         wevt_get_uuid_by_type(log, FIELD_CORRELATION_ACTIVITY_ID, &ev->correlation_activity_id);
 
         // Full XML of the entire message
-        wevt_get_message_utf8(log, tmp_event_bookmark, &log->ops.xml, EvtFormatMessageXml);
+        wevt_get_xml_utf8(log, tmp_event_bookmark, &log->ops.xml);
 
         // Format a text message for the users to see
         // wevt_format_summary(log, ev);
@@ -516,11 +511,9 @@ void wevt_closelog6(WEVT_LOG *log) {
     txt_utf8_cleanup(&log->ops.provider);
     txt_utf8_cleanup(&log->ops.source);
     txt_utf8_cleanup(&log->ops.computer);
-    txt_utf8_cleanup(&log->ops.event);
     txt_utf8_cleanup(&log->ops.user);
-    txt_utf8_cleanup(&log->ops.opcode);
-    txt_utf8_cleanup(&log->ops.keyword);
     txt_utf8_cleanup(&log->ops.xml);
+    buffer_free(log->ops.transform);
     freez(log);
 }
 
@@ -598,8 +591,12 @@ WEVT_LOG *wevt_openlog6(void) {
     log->render_context = EvtCreateRenderContext(RENDER_ITEMS_count, RENDER_ITEMS, EvtRenderContextValues);
     if (!log->render_context) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed.");
+        freez(log);
+        log = NULL;
         goto cleanup;
     }
+
+    log->ops.transform = buffer_create(4096, NULL);
 
 cleanup:
     return log;

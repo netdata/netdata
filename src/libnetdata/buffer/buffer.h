@@ -414,6 +414,16 @@ static inline char *print_uint64_hex_reversed(char *dst, uint64_t value) {
 #endif
 }
 
+static inline char *print_uint64_hex_reversed_full(char *dst, uint64_t value) {
+    char *d = dst;
+    for(size_t c = 0; c < sizeof(uint64_t) * 2; c++) {
+        *d++ = hex_digits[value & 0xf];
+        value >>= 4;
+    }
+
+    return d;
+}
+
 static inline char *print_uint64_base64_reversed(char *dst, uint64_t value) {
     char *d = dst;
     do *d++ = base64_digits[value & 63]; while ((value >>= 6));
@@ -509,6 +519,7 @@ static inline size_t print_int64(char *dst, int64_t value) {
     return print_uint64(dst, value) + len;
 }
 
+#define UINT64_MAX_LENGTH (24) // 21 should be enough
 static inline void buffer_print_uint64(BUFFER *wb, uint64_t value) {
     buffer_need_bytes(wb, 50);
     wb->len += print_uint64(&wb->buffer[wb->len], value);
@@ -521,7 +532,7 @@ static inline void buffer_print_int64(BUFFER *wb, int64_t value) {
     buffer_overflow_check(wb);
 }
 
-#define UINT64_HEX_LENGTH ((sizeof(HEX_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 2 + 1)
+#define UINT64_HEX_MAX_LENGTH ((sizeof(HEX_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 1)
 static inline size_t print_uint64_hex(char *dst, uint64_t value) {
     char *d = dst;
 
@@ -534,14 +545,27 @@ static inline size_t print_uint64_hex(char *dst, uint64_t value) {
     return e - dst;
 }
 
+static inline size_t print_uint64_hex_full(char *dst, uint64_t value) {
+    char *d = dst;
+
+    const char *s = HEX_PREFIX;
+    while(*s) *d++ = *s++;
+
+    char *e = print_uint64_hex_reversed_full(d, value);
+    char_array_reverse(d, e - 1);
+    *e = '\0';
+    return e - dst;
+}
+
 static inline void buffer_print_uint64_hex(BUFFER *wb, uint64_t value) {
-    buffer_need_bytes(wb, UINT64_HEX_LENGTH);
+    buffer_need_bytes(wb, UINT64_HEX_MAX_LENGTH);
     wb->len += print_uint64_hex(&wb->buffer[wb->len], value);
     buffer_overflow_check(wb);
 }
 
+#define UINT64_B64_MAX_LENGTH ((sizeof(IEEE754_UINT64_B64_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 1)
 static inline void buffer_print_uint64_base64(BUFFER *wb, uint64_t value) {
-    buffer_need_bytes(wb, sizeof(uint64_t) * 2 + 2 + 1);
+    buffer_need_bytes(wb, UINT64_B64_MAX_LENGTH);
 
     buffer_fast_strcat(wb, IEEE754_UINT64_B64_PREFIX, sizeof(IEEE754_UINT64_B64_PREFIX) - 1);
 
@@ -580,8 +604,9 @@ static inline void buffer_print_int64_base64(BUFFER *wb, int64_t value) {
     buffer_overflow_check(wb);
 }
 
+#define DOUBLE_MAX_LENGTH (512) // 318 should be enough, including null
 static inline void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value) {
-    buffer_need_bytes(wb, 512 + 2);
+    buffer_need_bytes(wb, DOUBLE_MAX_LENGTH);
 
     if(isnan(value) || isinf(value)) {
         buffer_fast_strcat(wb, "null", 4);
@@ -597,8 +622,9 @@ static inline void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value)
     buffer_overflow_check(wb);
 }
 
+#define DOUBLE_HEX_MAX_LENGTH ((sizeof(IEEE754_DOUBLE_HEX_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 1)
 static inline void buffer_print_netdata_double_hex(BUFFER *wb, NETDATA_DOUBLE value) {
-    buffer_need_bytes(wb, sizeof(uint64_t) * 2 + 2 + 1 + 1);
+    buffer_need_bytes(wb, DOUBLE_HEX_MAX_LENGTH);
 
     uint64_t *ptr = (uint64_t *) (&value);
     buffer_fast_strcat(wb, IEEE754_DOUBLE_HEX_PREFIX, sizeof(IEEE754_DOUBLE_HEX_PREFIX) - 1);
@@ -612,8 +638,9 @@ static inline void buffer_print_netdata_double_hex(BUFFER *wb, NETDATA_DOUBLE va
     buffer_overflow_check(wb);
 }
 
+#define DOUBLE_B64_MAX_LENGTH ((sizeof(IEEE754_DOUBLE_B64_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 1)
 static inline void buffer_print_netdata_double_base64(BUFFER *wb, NETDATA_DOUBLE value) {
-    buffer_need_bytes(wb, sizeof(uint64_t) * 2 + 2 + 1 + 1);
+    buffer_need_bytes(wb, DOUBLE_B64_MAX_LENGTH);
 
     uint64_t *ptr = (uint64_t *) (&value);
     buffer_fast_strcat(wb, IEEE754_DOUBLE_B64_PREFIX, sizeof(IEEE754_DOUBLE_B64_PREFIX) - 1);

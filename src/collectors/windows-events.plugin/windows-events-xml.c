@@ -228,7 +228,7 @@ bool buffer_extract_and_print_xml_with_cb(BUFFER *buffer, const char *xml, size_
         return true;
     }
 
-    const char *start = NULL, *end = NULL;
+    const char *start = xml, *end = NULL;
     for(size_t k = 0; keys[k] ; k++) {
         if(!*keys[k]) continue;
 
@@ -238,11 +238,11 @@ bool buffer_extract_and_print_xml_with_cb(BUFFER *buffer, const char *xml, size_
         strcpy(&tag_open[1], keys[k]);
         tag_open[klen + 1] = '\0';
 
-        start = strstr(xml, tag_open);
-        if(!start)
+        const char *new_start = strstr(start, tag_open);
+        if(!new_start)
             return false;
 
-        start = start + klen + 1;
+        start = new_start + klen + 1;
 
         if(*start != '>' && !isspace(*start))
             return false;
