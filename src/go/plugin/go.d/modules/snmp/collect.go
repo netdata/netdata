@@ -80,7 +80,8 @@ func (s *SNMP) setupVnode(si *sysInfo) *vnodes.VirtualNode {
 	if si.location != "" {
 		labels["sysLocation"] = si.location
 	}
-	labels["organization"] = si.organization
+	// FIXME: vendor should be obtained from sysDescr, org should be used as a fallback
+	labels["vendor"] = si.organization
 
 	return &vnodes.VirtualNode{
 		GUID:     s.Vnode.GUID,
