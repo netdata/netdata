@@ -75,10 +75,10 @@ func (s *SNMP) setupVnode(si *sysInfo) *vnodes.VirtualNode {
 		labels["sysDescr"] = si.descr
 	}
 	if si.contact != "" {
-		labels["sysContact"] = si.descr
+		labels["sysContact"] = si.contact
 	}
 	if si.location != "" {
-		labels["sysLocation"] = si.descr
+		labels["sysLocation"] = si.location
 	}
 	labels["organization"] = si.organization
 
