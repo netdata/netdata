@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- Bump github.com/vmware/govmomi from 0.42.0 to 0.43.0 in /src/go [\#18532](https://github.com/netdata/netdata/pull/18532) ([dependabot[bot]](https://github.com/apps/dependabot))
+- go.d add vnode guid validation [\#18531](https://github.com/netdata/netdata/pull/18531) ([ilyam8](https://github.com/ilyam8))
+- go.d snmp handle multiline sysDescr [\#18530](https://github.com/netdata/netdata/pull/18530) ([ilyam8](https://github.com/ilyam8))
+- go.d/snmp: add "organization" label \(vnode\) [\#18529](https://github.com/netdata/netdata/pull/18529) ([ilyam8](https://github.com/ilyam8))
+- go.d snmp: add sys descr, contact and loc as host labels for vnode [\#18527](https://github.com/netdata/netdata/pull/18527) ([ilyam8](https://github.com/ilyam8))
+- Windows Events: recalculate the length of unicode strings returned every time [\#18525](https://github.com/netdata/netdata/pull/18525) ([ktsaou](https://github.com/ktsaou))
+- go.d snmp add private enterprise numbers mapping [\#18523](https://github.com/netdata/netdata/pull/18523) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18522](https://github.com/netdata/netdata/pull/18522) ([netdatabot](https://github.com/netdatabot))
+- go.d/snmp: add an option to automatically create vnode [\#18520](https://github.com/netdata/netdata/pull/18520) ([ilyam8](https://github.com/ilyam8))
 - remove save-database from netdatacli usage [\#18519](https://github.com/netdata/netdata/pull/18519) ([ilyam8](https://github.com/ilyam8))
 - improve netdatacli docs [\#18518](https://github.com/netdata/netdata/pull/18518) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18517](https://github.com/netdata/netdata/pull/18517) ([netdatabot](https://github.com/netdatabot))
@@ -402,7 +411,6 @@
 - go.d replace colon in job name [\#17967](https://github.com/netdata/netdata/pull/17967) ([ilyam8](https://github.com/ilyam8))
 - Fix space percentage calculation in dbengine retention chart [\#17963](https://github.com/netdata/netdata/pull/17963) ([stelfrag](https://github.com/stelfrag))
 - Tidy-up build related CI jobs. [\#17962](https://github.com/netdata/netdata/pull/17962) ([Ferroin](https://github.com/Ferroin))
-- Sign DEB packages in the GHA runners that build them. [\#17949](https://github.com/netdata/netdata/pull/17949) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
@@ -426,13 +434,6 @@
 - fix apcupsd status [\#17960](https://github.com/netdata/netdata/pull/17960) ([ilyam8](https://github.com/ilyam8))
 - docs: clarify setting time/disk limits to 0 [\#17958](https://github.com/netdata/netdata/pull/17958) ([ilyam8](https://github.com/ilyam8))
 - docs: add time-based retention to "Change how long Netdata stores metrics" [\#17957](https://github.com/netdata/netdata/pull/17957) ([ilyam8](https://github.com/ilyam8))
-- go.d systemdunits: remove "omitempty" tag from collect\_unit\_files [\#17956](https://github.com/netdata/netdata/pull/17956) ([ilyam8](https://github.com/ilyam8))
-- fix installing netdata journald conf for native packages [\#17954](https://github.com/netdata/netdata/pull/17954) ([ilyam8](https://github.com/ilyam8))
-- remove Discord badge \(rate limited by upstream service\) [\#17953](https://github.com/netdata/netdata/pull/17953) ([ilyam8](https://github.com/ilyam8))
-- rename env var for extended internal monitoring [\#17951](https://github.com/netdata/netdata/pull/17951) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17950](https://github.com/netdata/netdata/pull/17950) ([netdatabot](https://github.com/netdatabot))
-- fix indentation in go.d/dnsquery conf [\#17948](https://github.com/netdata/netdata/pull/17948) ([ilyam8](https://github.com/ilyam8))
-- go.d add dmcache collector [\#17947](https://github.com/netdata/netdata/pull/17947) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 
