@@ -354,14 +354,30 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                     d);
         }
 
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskReadQueueLength) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskWriteQueueLength)) {
+            if (is_system)
+                common_system_avgsize(d->averageDiskBytesPerRead.current.Data,
+                                      d->averageDiskBytesPerWrite.current.Data,
+                                      update_every);
+            else
+                common_disk_avgsize(&d->disk_size,
+                                    device,
+                                    NULL,
+                                    d->averageDiskBytesPerRead.current.Data,
+                                    d->averageDiskBytesPerWrite.current.Data,
+                                    1,
+                                    update_every,
+                                    physical_disk_labels,
+                                    d);
+        }
+
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskWriteTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->currentDiskQueueLength);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskQueueLength);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskReadQueueLength);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskWriteQueueLength);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerTransfer);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerWrite);

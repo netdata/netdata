@@ -118,6 +118,7 @@ static struct disk {
     RRDDIM *rd_iotime_discards;
     RRDDIM *rd_iotime_flushes;
 
+    ND_DISK_AWAIT disk_await;
     RRDSET *st_await;
     RRDDIM *rd_await_reads;
     RRDDIM *rd_await_writes;
@@ -1285,7 +1286,7 @@ static void diskstats_cleanup_disks() {
 
             rrdset_obsolete_and_pointer_null(d->disk_size.st_avgsz);
             rrdset_obsolete_and_pointer_null(d->st_ext_avgsz);
-            rrdset_obsolete_and_pointer_null(d->st_await);
+            rrdset_obsolete_and_pointer_null(d->disk_await.st_await);
             rrdset_obsolete_and_pointer_null(d->st_ext_await);
             rrdset_obsolete_and_pointer_null(d->st_backlog);
             rrdset_obsolete_and_pointer_null(d->st_busy);
@@ -1901,36 +1902,17 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if(likely(dt)) {
             if ((d->do_iotime == CONFIG_BOOLEAN_YES || d->do_iotime == CONFIG_BOOLEAN_AUTO) &&
                 (d->do_ops == CONFIG_BOOLEAN_YES || d->do_ops == CONFIG_BOOLEAN_AUTO)) {
-                if(unlikely(!d->st_await)) {
-                    d->st_await = rrdset_create_localhost(
-                            "disk_await"
-                            , d->chart_id
-                            , d->disk
-                            , family
-                            , "disk.await"
-                            , "Average Completed I/O Operation Time"
-                            , "milliseconds/operation"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
-                            , NETDATA_CHART_PRIO_DISK_AWAIT
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rrdset_flag_set(d->st_await, RRDSET_FLAG_DETAIL);
-
-                    d->rd_await_reads  = rrddim_add(d->st_await, "reads",  NULL,  1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                    d->rd_await_writes = rrddim_add(d->st_await, "writes", NULL, -1, 1000, RRD_ALGORITHM_ABSOLUTE);
-
-                    add_labels_to_disk(d, d->st_await);
-                }
-
                 double read_avg = (reads - last_reads) ? (double)(readms - last_readms) / (reads - last_reads) : 0;
                 double write_avg = (writes - last_writes) ? (double)(writems - last_writems) / (writes - last_writes) : 0;
 
-                rrddim_set_by_pointer(d->st_await, d->rd_await_reads, (collected_number)(read_avg * 1000));
-                rrddim_set_by_pointer(d->st_await, d->rd_await_writes, (collected_number)(write_avg * 1000));
-                rrdset_done(d->st_await);
+                common_disk_await(&d->disk_await,
+                               d->chart_id,
+                               disk,
+                               (uint64_t)(read_avg * 1000),
+                               (uint64_t)(write_avg * 1000),
+                               update_every,
+                               disk_labels_cb,
+                               d);
             }
 
             if (do_dc_stats && d->do_iotime == CONFIG_BOOLEAN_YES && d->do_ops == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
