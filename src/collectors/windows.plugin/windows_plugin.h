@@ -24,6 +24,7 @@ int do_PerflibProcesses(int update_every, usec_t dt);
 int do_PerflibProcessor(int update_every, usec_t dt);
 int do_PerflibMemory(int update_every, usec_t dt);
 int do_PerflibObjects(int update_every, usec_t dt);
+int do_PerflibThermalZone(int update_every, usec_t dt);
 
 #include "perflib.h"
 
