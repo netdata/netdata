@@ -141,7 +141,8 @@
 #define NETDATA_CHART_PRIO_DISK_SVCTM                 2070
 #define NETDATA_CHART_PRIO_DISK_MOPS                  2080
 #define NETDATA_CHART_PRIO_DISK_IOTIME                2090
-#define NETDATA_CHART_PRIO_DISK_IOTIME_OP             2091
+#define NETDATA_CHART_PRIO_DISK_IOTIME_OP             2091 // windows only
+#define NETDATA_CHART_PRIO_DISK_IOTIME_AVGOP          2092 // windows only
 #define NETDATA_CHART_PRIO_DISK_LATENCY               2095
 #define NETDATA_CHART_PRIO_BCACHE_CACHE_ALLOC         2120
 #define NETDATA_CHART_PRIO_BCACHE_HIT_RATIO           2120

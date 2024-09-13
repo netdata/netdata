@@ -69,12 +69,14 @@ struct physical_disk {
     COUNTER_DATA percentDiskReadTime;
     COUNTER_DATA percentDiskWriteTime;
 
+    ND_DISK_TIME_USAGE disk_avgtime;
+    COUNTER_DATA averageDiskSecondsPerRead;
+    COUNTER_DATA averageDiskSecondsPerWrite;
+
     COUNTER_DATA percentIdleTime;
     COUNTER_DATA percentDiskTime;
     COUNTER_DATA averageDiskQueueLength;
     COUNTER_DATA averageDiskSecondsPerTransfer;
-    COUNTER_DATA averageDiskSecondsPerRead;
-    COUNTER_DATA averageDiskSecondsPerWrite;
     COUNTER_DATA averageDiskBytesPerTransfer;
 };
 
@@ -181,6 +183,66 @@ static inline void common_disk_time_usage(ND_DISK_TIME_USAGE *d, const char *id,
                                                    , _COMMON_PLUGIN_NAME
                                                    , _COMMON_PLUGIN_MODULE_NAME
                                                    , NETDATA_CHART_PRIO_DISK_IOTIME_OP
+                                                   , update_every
+                                                   , RRDSET_TYPE_LINE
+                                                   );
+
+        d->rd_read_time  = rrddim_add(d->st_time_usage, "reads",  NULL,  1, ND_SECONDS_TO_100NS, RRD_ALGORITHM_INCREMENTAL);
+        d->rd_write_time = rrddim_add(d->st_time_usage, "writes",  NULL,  -1, ND_SECONDS_TO_100NS, RRD_ALGORITHM_INCREMENTAL);
+
+        if(cb)
+            cb(d->st_time_usage, data);
+    }
+
+    // this always have to be in base units, so that exporting sends base units to other time-series db
+    rrddim_set_by_pointer(d->st_time_usage, d->rd_read_time, (collected_number)reads);
+    rrddim_set_by_pointer(d->st_time_usage, d->rd_write_time, (collected_number)writes);
+    rrdset_done(d->st_time_usage);
+}
+// ------------ Disk Time usage
+
+// ------------ Disk Average IO
+static inline void system_disk_average_io(uint64_t reads, uint64_t writes, int update_every) {
+    static RRDSET *st_io_time = NULL;
+    static RRDDIM *rd_read_time = NULL, *rd_write_time = NULL;
+
+    if(unlikely(!st_io_time)) {
+        st_io_time = rrdset_create_localhost("system"
+                                             , "avg_iotime"
+                                             , NULL
+                                             , "disk"
+                                             , NULL
+                                             , "Avergage IO time"
+                                             , "seconds"
+                                             , _COMMON_PLUGIN_NAME
+                                             , _COMMON_PLUGIN_MODULE_NAME
+                                             , NETDATA_CHART_PRIO_SYSTEM_IOTIMEOP
+                                             , update_every
+                                             , RRDSET_TYPE_LINE
+                                             );
+
+        rd_read_time = rrddim_add(st_io_time, "reads",  NULL, 1, ND_SECONDS_TO_100NS, RRD_ALGORITHM_INCREMENTAL);
+        rd_write_time = rrddim_add(st_io_time, "writes",  NULL, -1, ND_SECONDS_TO_100NS, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    // this always have to be in base units, so that exporting sends base units to other time-series db
+    rrddim_set_by_pointer(st_io_time, rd_read_time, (collected_number)reads);
+    rrddim_set_by_pointer(st_io_time, rd_write_time, (collected_number)writes);
+    rrdset_done(st_io_time);
+}
+
+static inline void common_disk_avg_time(ND_DISK_TIME_USAGE *d, const char *id, const char *name, uint64_t reads, uint64_t writes, int update_every, instance_labels_cb_t cb, void *data) {
+    if(unlikely(!d->st_time_usage)) {
+        d->st_time_usage = rrdset_create_localhost("disk_time_avgop"
+                                                   , id
+                                                   , name
+                                                   , "iotime"
+                                                   , "disk.time_operation"
+                                                   , "Avergage time operating request"
+                                                   , "seconds"
+                                                   , _COMMON_PLUGIN_NAME
+                                                   , _COMMON_PLUGIN_MODULE_NAME
+                                                   , NETDATA_CHART_PRIO_DISK_IOTIME_AVGOP
                                                    , update_every
                                                    , RRDSET_TYPE_LINE
                                                    );
@@ -525,15 +587,32 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskWriteTime)) {
             if (is_system)
-                system_disk_time_usage(d->averageDiskBytesPerRead.current.Data,
-                                      d->averageDiskBytesPerWrite.current.Data,
+                system_disk_time_usage(d->percentDiskReadTime.current.Data,
+                                       d->percentDiskWriteTime.current.Data,
                                       update_every);
             else
                 common_disk_time_usage(&d->disk_time,
                                        device,
                                        NULL,
-                                       d->averageDiskBytesPerRead.current.Data,
-                                       d->averageDiskBytesPerWrite.current.Data,
+                                       d->percentDiskReadTime.current.Data,
+                                       d->percentDiskWriteTime.current.Data,
+                                       update_every,
+                                       physical_disk_labels,
+                                       d);
+        }
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerWrite)) {
+            if (is_system)
+                system_disk_average_io(d->averageDiskSecondsPerRead.current.Data,
+                                       d->averageDiskSecondsPerWrite.current.Data,
+                                       update_every);
+            else
+                common_disk_avg_time(&d->disk_avgtime,
+                                       device,
+                                       NULL,
+                                       d->averageDiskSecondsPerRead.current.Data,
+                                       d->averageDiskSecondsPerWrite.current.Data,
                                        update_every,
                                        physical_disk_labels,
                                        d);
@@ -543,8 +622,6 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskQueueLength);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerTransfer);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerWrite);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerTransfer);
     }
 
