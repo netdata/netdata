@@ -56,7 +56,6 @@ typedef struct wevt_log {
         TXT_UTF8 provider;
         TXT_UTF8 source;
         TXT_UTF8 computer;
-        TXT_UTF8 event;
         TXT_UTF8 user;
         TXT_UTF8 xml;
 
