@@ -39,7 +39,7 @@ func TestLogLine_Assign(t *testing.T) {
 			},
 		},
 		{
-			name:  "ClientConfig Address",
+			name:  "Client Address",
 			field: fieldClientAddr,
 			cases: []subTest{
 				{input: "127.0.0.1", wantLine: logLine{clientAddr: "127.0.0.1"}},
@@ -69,7 +69,7 @@ func TestLogLine_Assign(t *testing.T) {
 			},
 		},
 		{
-			name:  "HTTPConfig Code",
+			name:  "HTTP Code",
 			field: fieldHTTPCode,
 			cases: []subTest{
 				{input: "000", wantLine: logLine{httpCode: 0}},
@@ -100,7 +100,7 @@ func TestLogLine_Assign(t *testing.T) {
 			},
 		},
 		{
-			name:  "RequestConfig Method",
+			name:  "Request Method",
 			field: fieldReqMethod,
 			cases: []subTest{
 				{input: "GET", wantLine: logLine{reqMethod: "GET"}},
@@ -255,7 +255,7 @@ func TestLogLine_verify(t *testing.T) {
 			},
 		},
 		{
-			name:  "ClientConfig Address",
+			name:  "Client Address",
 			field: fieldClientAddr,
 			cases: []subTest{
 				{input: "127.0.0.1"},
@@ -283,7 +283,7 @@ func TestLogLine_verify(t *testing.T) {
 			},
 		},
 		{
-			name:  "HTTPConfig Code",
+			name:  "HTTP Code",
 			field: fieldHTTPCode,
 			cases: []subTest{
 				{input: "000"},
@@ -307,7 +307,7 @@ func TestLogLine_verify(t *testing.T) {
 			},
 		},
 		{
-			name:  "RequestConfig Method",
+			name:  "Request Method",
 			field: fieldReqMethod,
 			cases: []subTest{
 				{input: "GET"},

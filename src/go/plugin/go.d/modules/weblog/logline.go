@@ -31,17 +31,17 @@ import (
 |-------------------------|-----------|-----------------------------------------------|
 | $host ($http_host)      | %v        | Name of the server which accepted a request.
 | $server_port            | %p        | Port of the server which accepted a request.
-| $scheme                 | -         | RequestConfig scheme. "http" or "https".
-| $remote_addr            | %a (%h)   | ClientConfig address.
+| $scheme                 | -         | Request scheme. "http" or "https".
+| $remote_addr            | %a (%h)   | Client address.
 | $request                | %r        | Full original request line. The line is "$request_method $request_uri $server_protocol".
-| $request_method         | %m        | RequestConfig method. Usually "GET" or "POST".
+| $request_method         | %m        | Request method. Usually "GET" or "POST".
 | $request_uri            | %U        | Full original request URI.
-| $server_protocol        | %H        | RequestConfig protocol. Usually "HTTPConfig/1.0", "HTTPConfig/1.1", or "HTTPConfig/2.0".
+| $server_protocol        | %H        | Request protocol. Usually "HTTP/1.0", "HTTP/1.1", or "HTTP/2.0".
 | $status                 | %s (%>s)  | Response status code.
 | $request_length         | %I        | Bytes received from a client, including request and headers.
 | $bytes_sent             | %O        | Bytes sent to a client, including request and headers.
 | $body_bytes_sent        | %B (%b)   | Bytes sent to a client, not counting the response header.
-| $request_time           | %D        | RequestConfig processing time.
+| $request_time           | %D        | Request processing time.
 | $upstream_response_time | -         | Time spent on receiving the response from the upstream server.
 | $ssl_protocol           | -         | Protocol of an established SSL connection.
 | $ssl_cipher             | -         | String of ciphers used for an established SSL connection.
@@ -538,7 +538,7 @@ func isReqMethodValid(method string) bool {
 		"PRI",
 		"PROPFIND",
 		"PROPPATCH",
-		"PURGE", // not a standardized HTTPConfig method
+		"PURGE", // not a standardized HTTP method
 		"PUT",
 		"REBIND",
 		"REPORT",
@@ -556,7 +556,7 @@ func isReqMethodValid(method string) bool {
 }
 
 func isReqProtoValid(proto string) bool {
-	return len(proto) >= 6 && proto[:5] == "HTTPConfig/" && isReqProtoVerValid(proto[5:])
+	return len(proto) >= 6 && proto[:5] == "HTTP/" && isReqProtoVerValid(proto[5:])
 }
 
 func isReqProtoVerValid(version string) bool {
@@ -581,7 +581,7 @@ func isRespCodeValid(code int) bool {
 	// Informational responses (100–199),
 	// Successful responses (200–299),
 	// Redirects (300–399),
-	// ClientConfig errors (400–499),
+	// Client errors (400–499),
 	// Server errors (500–599).
 	return code >= 100 && code <= 600
 }

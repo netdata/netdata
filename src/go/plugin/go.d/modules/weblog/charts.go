@@ -158,7 +158,7 @@ var (
 	}
 	respCodes4xx = Chart{
 		ID:       "status_code_class_4xx_responses",
-		Title:    "ClientConfig Errors Responses By Status Code",
+		Title:    "Client Errors Responses By Status Code",
 		Units:    "responses/s",
 		Fam:      "responses",
 		Ctx:      "web_log.status_code_class_4xx_responses",
@@ -197,7 +197,7 @@ var (
 var (
 	reqProcTime = Chart{
 		ID:       "request_processing_time",
-		Title:    "RequestConfig Processing Time",
+		Title:    "Request Processing Time",
 		Units:    "milliseconds",
 		Fam:      "timings",
 		Ctx:      "web_log.request_processing_time",
@@ -260,7 +260,7 @@ var (
 	}
 )
 
-// RequestConfig By N
+// Request By N
 var (
 	reqByVhost = Chart{
 		ID:       "requests_by_vhost",
@@ -295,7 +295,7 @@ var (
 	}
 	reqByMethod = Chart{
 		ID:       "requests_by_http_method",
-		Title:    "Requests By HTTPConfig Method",
+		Title:    "Requests By HTTP Method",
 		Units:    "requests/s",
 		Fam:      "http method",
 		Ctx:      "web_log.http_method_requests",
@@ -304,7 +304,7 @@ var (
 	}
 	reqByVersion = Chart{
 		ID:       "requests_by_http_version",
-		Title:    "Requests By HTTPConfig Version",
+		Title:    "Requests By HTTP Version",
 		Units:    "requests/s",
 		Fam:      "http version",
 		Ctx:      "web_log.http_version_requests",
@@ -344,7 +344,7 @@ var (
 	}
 )
 
-// RequestConfig By N Patterns
+// Request By N Patterns
 var (
 	reqByURLPattern = Chart{
 		ID:       "requests_by_url_pattern",
@@ -420,7 +420,7 @@ var (
 	}
 	urlPatternReqMethods = Chart{
 		ID:       "url_pattern_%s_requests_by_http_method",
-		Title:    "Requests By HTTPConfig Method",
+		Title:    "Requests By HTTP Method",
 		Units:    "requests/s",
 		Fam:      "url ptn %s",
 		Ctx:      "web_log.url_pattern_http_method_requests",
@@ -442,7 +442,7 @@ var (
 	}
 	urlPatternReqProcTime = Chart{
 		ID:       "url_pattern_%s_request_processing_time",
-		Title:    "RequestConfig Processing Time",
+		Title:    "Request Processing Time",
 		Units:    "milliseconds",
 		Fam:      "url ptn %s",
 		Ctx:      "web_log.url_pattern_request_processing_time",

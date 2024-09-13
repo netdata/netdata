@@ -24,23 +24,23 @@ func TestWebLog_guessParser(t *testing.T) {
 			name:           "guessed csv",
 			wantParserType: logs.TypeCSV,
 			inputs: []string{
-				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 "-" "-" 8674 0.123 0.123,0.321`,
-				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 "-" "-" 8674 0.123`,
-				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 8674 0.123 0.123,0.321`,
-				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 8674 0.123`,
-				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674`,
-				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 "-" "-" 8674 0.123 0.123,0.321`,
-				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 "-" "-" 8674 0.123`,
-				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 8674 0.123 0.123,0.321`,
-				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 8674 0.123`,
-				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674`,
+				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 "-" "-" 8674 0.123 0.123,0.321`,
+				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 "-" "-" 8674 0.123`,
+				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 8674 0.123 0.123,0.321`,
+				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 8674 0.123`,
+				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674`,
+				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 "-" "-" 8674 0.123 0.123,0.321`,
+				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 "-" "-" 8674 0.123`,
+				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 8674 0.123 0.123,0.321`,
+				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 8674 0.123`,
+				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674`,
 			},
 		},
 		{
 			name:           "guessed ltsv",
 			wantParserType: logs.TypeLTSV,
 			inputs: []string{
-				`field1:test.example.com:80 field2:88.191.254.20 field3:"GET / HTTPConfig/1.0" 200 8674 field4:8674 field5:0.123`,
+				`field1:test.example.com:80 field2:88.191.254.20 field3:"GET / HTTP/1.0" 200 8674 field4:8674 field5:0.123`,
 			},
 		},
 		{
@@ -59,8 +59,8 @@ func TestWebLog_guessParser(t *testing.T) {
 			name:    "unknown",
 			wantErr: true,
 			inputs: []string{
-				`test.example.com 80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674`,
-				`test.example.com 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674`,
+				`test.example.com 80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674`,
+				`test.example.com 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674`,
 			},
 		},
 	}
@@ -106,78 +106,78 @@ func TestWebLog_guessCSVParser(t *testing.T) {
 			name:          "guessed vhost custom4",
 			wantCSVFormat: csvVhostCustom4,
 			inputs: []string{
-				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 "-" "-" 8674 0.123 0.123,0.321`,
+				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 "-" "-" 8674 0.123 0.123,0.321`,
 			},
 		},
 		{
 			name:          "guessed vhost custom3",
 			wantCSVFormat: csvVhostCustom3,
 			inputs: []string{
-				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 "-" "-" 8674 0.123`,
+				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 "-" "-" 8674 0.123`,
 			},
 		},
 		{
 			name:          "guessed vhost custom2",
 			wantCSVFormat: csvVhostCustom2,
 			inputs: []string{
-				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 8674 0.123 0.123,0.321`,
+				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 8674 0.123 0.123,0.321`,
 			},
 		},
 		{
 			name:          "guessed vhost custom1",
 			wantCSVFormat: csvVhostCustom1,
 			inputs: []string{
-				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 8674 0.123`,
+				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 8674 0.123`,
 			},
 		},
 		{
 			name:          "guessed vhost common",
 			wantCSVFormat: csvVhostCommon,
 			inputs: []string{
-				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674`,
+				`test.example.com:80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674`,
 			},
 		},
 		{
 			name:          "guessed custom4",
 			wantCSVFormat: csvCustom4,
 			inputs: []string{
-				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 "-" "-" 8674 0.123 0.123,0.321`,
+				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 "-" "-" 8674 0.123 0.123,0.321`,
 			},
 		},
 		{
 			name:          "guessed custom3",
 			wantCSVFormat: csvCustom3,
 			inputs: []string{
-				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 "-" "-" 8674 0.123`,
+				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 "-" "-" 8674 0.123`,
 			},
 		},
 		{
 			name:          "guessed custom2",
 			wantCSVFormat: csvCustom2,
 			inputs: []string{
-				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 8674 0.123 0.123,0.321`,
+				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 8674 0.123 0.123,0.321`,
 			},
 		},
 		{
 			name:          "guessed custom1",
 			wantCSVFormat: csvCustom1,
 			inputs: []string{
-				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674 8674 0.123`,
+				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674 8674 0.123`,
 			},
 		},
 		{
 			name:          "guessed common",
 			wantCSVFormat: csvCommon,
 			inputs: []string{
-				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674`,
+				`88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674`,
 			},
 		},
 		{
 			name:    "unknown",
 			wantErr: true,
 			inputs: []string{
-				`test.example.com 80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674`,
-				`test.example.com 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTPConfig/1.0" 200 8674`,
+				`test.example.com 80 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674`,
+				`test.example.com 88.191.254.20 - - [22/Mar/2009:09:30:31 +0100] "GET / HTTP/1.0" 200 8674`,
 			},
 		},
 	}

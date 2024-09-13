@@ -18,8 +18,8 @@ import (
 /*
 4.6.1:
 logformat squid      %ts.%03tu %6tr %>a %Ss/%03>Hs %<st %rm %ru %[un %Sh/%<a %mt
-logformat common     %>a %[ui %[un [%tl] "%rm %ru HTTPConfig/%rv" %>Hs %<st %Ss:%Sh
-logformat combined   %>a %[ui %[un [%tl] "%rm %ru HTTPConfig/%rv" %>Hs %<st "%{Referer}>h" "%{User-Agent}>h" %Ss:%Sh
+logformat common     %>a %[ui %[un [%tl] "%rm %ru HTTP/%rv" %>Hs %<st %Ss:%Sh
+logformat combined   %>a %[ui %[un [%tl] "%rm %ru HTTP/%rv" %>Hs %<st "%{Referer}>h" "%{User-Agent}>h" %Ss:%Sh
 logformat referrer   %ts.%03tu %>a %{Referer}>h %ru
 logformat useragent  %>a [%tl] "%{User-Agent}>h"
 logformat icap_squid %ts.%03tu %6icap::tr %>A %icap::to/%03icap::Hs %icap::<st %icap::rm %icap::ru %un -/%icap::<A -
@@ -32,12 +32,12 @@ Valid Capture Name: [A-Za-z0-9_]+
 | local                   | squid format code | description                                                            |
 |-------------------------|-------------------|------------------------------------------------------------------------|
 | resp_time               | %tr               | Response time (milliseconds).
-| client_address          | %>a               | ClientConfig source IP address.
-| client_address          | %>A               | ClientConfig FQDN.
+| client_address          | %>a               | Client source IP address.
+| client_address          | %>A               | Client FQDN.
 | cache_code              | %Ss               | Squid request status (TCP_MISS etc).
-| http_code               | %>Hs              | The HTTPConfig response status code from Content Gateway to client.
+| http_code               | %>Hs              | The HTTP response status code from Content Gateway to client.
 | resp_size               | %<st              | Total size of reply sent to client (after adaptation).
-| req_method              | %rm               | RequestConfig method (GET/POST etc).
+| req_method              | %rm               | Request method (GET/POST etc).
 | hier_code               | %Sh               | Squid hierarchy status (DEFAULT_PARENT etc).
 | server_address          | %<a               | Server IP address of the last server or peer connection.
 | server_address          | %<A               | Server FQDN or peer name.
