@@ -199,6 +199,8 @@ func (d *Discoverer) buildTargetGroup(cntr types.Container) model.TargetGroup {
 			}
 			tgt.Address = net.JoinHostPort(tgt.IPAddress, tgt.PrivatePort)
 
+			d.Infof("%+v\n", tgt)
+
 			hash, err := calcHash(tgt)
 			if err != nil {
 				continue

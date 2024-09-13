@@ -1,0 +1,15 @@
+{
+  "delete_latency_ms": 1,
+  "delete_requests_per_second": 1.1,
+  "import_latency_ms": 1,
+  "import_requests_per_second": 1.1,
+  "latency_ms": {},
+  "overloaded_requests_per_second": 1.1,
+  "pending_write_batches": 1,
+  "requests_per_second": {},
+  "search_latency_ms": 1,
+  "search_requests_per_second": 1.1,
+  "total_requests_per_second": 1.1,
+  "write_latency_ms": 1,
+  "write_requests_per_second": 1.1
+}
