@@ -18,6 +18,10 @@
 
 typedef void (*instance_labels_cb_t)(RRDSET *st, void *data);
 
+// Microsoft uses 100ns time base for some metrics
+// https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/sensorsutils/nf-sensorsutils-milliseconds_to_100nanoseconds
+#define ND_SECONDS_TO_100NS 10000000
+
 #include "system.io.h"
 #include "system.ram.h"
 #include "system.interrupts.h"

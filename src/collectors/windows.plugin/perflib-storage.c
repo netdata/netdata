@@ -25,6 +25,12 @@ typedef struct {
     RRDDIM *rd_queue;
 } ND_DISK_QUEUE;
 
+typedef struct {
+    RRDSET *st_time_usage;
+    RRDDIM *rd_read_time;
+    RRDDIM *rd_write_time;
+} ND_DISK_TIME_USAGE;
+
 struct physical_disk {
     bool collected_metadata;
 
@@ -59,10 +65,12 @@ struct physical_disk {
     ND_DISK_QUEUE disk_cqueue;
     COUNTER_DATA currentDiskQueueLength;
 
-    COUNTER_DATA percentIdleTime;
-    COUNTER_DATA percentDiskTime;
+    ND_DISK_TIME_USAGE disk_time;
     COUNTER_DATA percentDiskReadTime;
     COUNTER_DATA percentDiskWriteTime;
+
+    COUNTER_DATA percentIdleTime;
+    COUNTER_DATA percentDiskTime;
     COUNTER_DATA averageDiskQueueLength;
     COUNTER_DATA averageDiskSecondsPerTransfer;
     COUNTER_DATA averageDiskSecondsPerRead;
@@ -130,6 +138,66 @@ static inline void common_disk_queue(ND_DISK_QUEUE *d, const char *id, const cha
     rrdset_done(d->st_queue);
 }
 // ------------ Disk Queue
+
+// ------------ Disk Time usage
+static inline void system_disk_time_usage(uint64_t reads, uint64_t writes, int update_every) {
+    static RRDSET *st_io_time = NULL;
+    static RRDDIM *rd_read_time = NULL, *rd_write_time = NULL;
+
+    if(unlikely(!st_io_time)) {
+        st_io_time = rrdset_create_localhost("system"
+                                            , "disk_time_op"
+                                            , NULL
+                                            , "disk"
+                                            , NULL
+                                            , "Number of requests"
+                                            , "requests"
+                                            , _COMMON_PLUGIN_NAME
+                                            , _COMMON_PLUGIN_MODULE_NAME
+                                            , NETDATA_CHART_PRIO_SYSTEM_IOTIMEOP
+                                            , update_every
+                                            , RRDSET_TYPE_LINE
+                                            );
+
+        rd_read_time = rrddim_add(st_io_time, "reads",  NULL, 1, ND_SECONDS_TO_100NS, RRD_ALGORITHM_INCREMENTAL);
+        rd_write_time = rrddim_add(st_io_time, "writes",  NULL, -1, ND_SECONDS_TO_100NS, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    // this always have to be in base units, so that exporting sends base units to other time-series db
+    rrddim_set_by_pointer(st_io_time, rd_read_time, (collected_number)reads);
+    rrddim_set_by_pointer(st_io_time, rd_write_time, (collected_number)writes);
+    rrdset_done(st_io_time);
+}
+
+static inline void common_disk_time_usage(ND_DISK_TIME_USAGE *d, const char *id, const char *name, uint64_t reads, uint64_t writes, int update_every, instance_labels_cb_t cb, void *data) {
+    if(unlikely(!d->st_time_usage)) {
+        d->st_time_usage = rrdset_create_localhost("disk_time_op"
+                                                   , id
+                                                   , name
+                                                   , "iotime"
+                                                   , "disk.time_operation"
+                                                   , "Time operating request"
+                                                   , "seconds"
+                                                   , _COMMON_PLUGIN_NAME
+                                                   , _COMMON_PLUGIN_MODULE_NAME
+                                                   , NETDATA_CHART_PRIO_DISK_IOTIME_OP
+                                                   , update_every
+                                                   , RRDSET_TYPE_LINE
+                                                   );
+
+        d->rd_read_time  = rrddim_add(d->st_time_usage, "reads",  NULL,  1, ND_SECONDS_TO_100NS, RRD_ALGORITHM_INCREMENTAL);
+        d->rd_write_time = rrddim_add(d->st_time_usage, "writes",  NULL,  -1, ND_SECONDS_TO_100NS, RRD_ALGORITHM_INCREMENTAL);
+
+        if(cb)
+            cb(d->st_time_usage, data);
+    }
+
+    // this always have to be in base units, so that exporting sends base units to other time-series db
+    rrddim_set_by_pointer(d->st_time_usage, d->rd_read_time, (collected_number)reads);
+    rrddim_set_by_pointer(d->st_time_usage, d->rd_write_time, (collected_number)writes);
+    rrdset_done(d->st_time_usage);
+}
+// ------------ Disk Time usage
 
 void dict_logical_disk_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct logical_disk *ld = value;
@@ -450,10 +518,25 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                   d);
         }
 
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskWriteTime)) {
+            if (is_system)
+                system_disk_time_usage(d->averageDiskBytesPerRead.current.Data,
+                                      d->averageDiskBytesPerWrite.current.Data,
+                                      update_every);
+            else
+                common_disk_time_usage(&d->disk_time,
+                                       device,
+                                       NULL,
+                                       d->averageDiskBytesPerRead.current.Data,
+                                       d->averageDiskBytesPerWrite.current.Data,
+                                       update_every,
+                                       physical_disk_labels,
+                                       d);
+        }
+
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskWriteTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskQueueLength);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerTransfer);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead);
