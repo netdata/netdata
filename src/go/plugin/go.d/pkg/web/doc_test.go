@@ -2,7 +2,7 @@
 
 package web
 
-func ExampleHTTP_usage() {
+func ExampleHTTPConfig_usage() {
 	// Just embed HTTPConfig into your module structure.
 	// It allows you to have both RequestConfig and ClientConfig fields in the module configuration file.
 	type myModule struct {
