@@ -6,16 +6,17 @@ import (
 	"context"
 	_ "embed"
 	"errors"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 
 	"github.com/docker/docker/api/types"
 	typesContainer "github.com/docker/docker/api/types/container"
 	typesImage "github.com/docker/docker/api/types/image"
 	typesSystem "github.com/docker/docker/api/types/system"
 	docker "github.com/docker/docker/client"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 )
 
 //go:embed "config_schema.json"

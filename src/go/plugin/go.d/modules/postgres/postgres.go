@@ -6,15 +6,16 @@ import (
 	"database/sql"
 	_ "embed"
 	"errors"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrics"
+
+	"github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 //go:embed "config_schema.json"

@@ -4,11 +4,11 @@ package portcheck
 
 import (
 	_ "embed"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 )
 
 //go:embed "config_schema.json"

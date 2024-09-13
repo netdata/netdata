@@ -5,12 +5,13 @@ package chrony
 import (
 	_ "embed"
 	"errors"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"sync"
 	"time"
 
-	"github.com/facebook/time/ntp/chrony"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+
+	"github.com/facebook/time/ntp/chrony"
 )
 
 //go:embed "config_schema.json"

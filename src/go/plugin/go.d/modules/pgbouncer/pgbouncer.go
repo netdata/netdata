@@ -6,12 +6,13 @@ import (
 	"database/sql"
 	_ "embed"
 	"errors"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 
 	"github.com/blang/semver/v4"
 	_ "github.com/jackc/pgx/v4/stdlib"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 //go:embed "config_schema.json"

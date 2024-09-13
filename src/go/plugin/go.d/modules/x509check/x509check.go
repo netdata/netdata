@@ -5,12 +5,13 @@ package x509check
 import (
 	_ "embed"
 	"errors"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
-	cfssllog "github.com/cloudflare/cfssl/log"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
+
+	cfssllog "github.com/cloudflare/cfssl/log"
 )
 
 //go:embed "config_schema.json"

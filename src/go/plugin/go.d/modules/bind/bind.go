@@ -5,14 +5,13 @@ package bind
 import (
 	_ "embed"
 	"errors"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 //go:embed "config_schema.json"
