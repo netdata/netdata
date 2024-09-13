@@ -95,7 +95,7 @@ var (
 
 	clientConnectionsRateChart = module.Chart{
 		ID:       "client_connections_rate",
-		Title:    "ClientConfig connections rate",
+		Title:    "Client connections rate",
 		Units:    "connections/s",
 		Fam:      "connections",
 		Ctx:      "nginxplus.client_connections_rate",
@@ -107,7 +107,7 @@ var (
 	}
 	clientConnectionsCountChart = module.Chart{
 		ID:       "client_connections_count",
-		Title:    "ClientConfig connections",
+		Title:    "Client connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "nginxplus.client_connections_count",
@@ -216,7 +216,7 @@ var (
 	}
 	httpServerZoneRequestsRateChartTmpl = module.Chart{
 		ID:       "http_server_zone_%s_requests_rate",
-		Title:    "HTTPConfig Server Zone requests rate",
+		Title:    "HTTP Server Zone requests rate",
 		Units:    "requests/s",
 		Fam:      "http requests",
 		Ctx:      "nginxplus.http_server_zone_requests_rate",
@@ -227,7 +227,7 @@ var (
 	}
 	httpServerZoneResponsesPerCodeClassRateChartTmpl = module.Chart{
 		ID:       "http_server_zone_%s_responses_per_code_class_rate",
-		Title:    "HTTPConfig Server Zone responses rate",
+		Title:    "HTTP Server Zone responses rate",
 		Units:    "responses/s",
 		Fam:      "http responses",
 		Ctx:      "nginxplus.http_server_zone_responses_per_code_class_rate",
@@ -243,7 +243,7 @@ var (
 	}
 	httpServerZoneTrafficRateChartTmpl = module.Chart{
 		ID:       "http_server_zone_%s_traffic_rate",
-		Title:    "HTTPConfig Server Zone traffic",
+		Title:    "HTTP Server Zone traffic",
 		Units:    "bytes/s",
 		Fam:      "http traffic",
 		Ctx:      "nginxplus.http_server_zone_traffic_rate",
@@ -256,7 +256,7 @@ var (
 	}
 	httpServerZoneRequestsProcessingCountChartTmpl = module.Chart{
 		ID:       "http_server_zone_%s_requests_processing_count",
-		Title:    "HTTPConfig Server Zone currently processed requests",
+		Title:    "HTTP Server Zone currently processed requests",
 		Units:    "requests",
 		Fam:      "http requests",
 		Ctx:      "nginxplus.http_server_zone_requests_processing_count",
@@ -267,7 +267,7 @@ var (
 	}
 	httpServerZoneRequestsDiscardedRateChartTmpl = module.Chart{
 		ID:       "http_server_zone_%s_requests_discarded_rate",
-		Title:    "HTTPConfig Server Zone requests discarded rate",
+		Title:    "HTTP Server Zone requests discarded rate",
 		Units:    "requests/s",
 		Fam:      "http requests",
 		Ctx:      "nginxplus.http_server_zone_requests_discarded_rate",
@@ -287,7 +287,7 @@ var (
 	}
 	httpLocationZoneRequestsRateChartTmpl = module.Chart{
 		ID:       "http_location_zone_%s_requests_rate",
-		Title:    "HTTPConfig Location Zone requests rate",
+		Title:    "HTTP Location Zone requests rate",
 		Units:    "requests/s",
 		Fam:      "http requests",
 		Ctx:      "nginxplus.http_location_zone_requests_rate",
@@ -298,7 +298,7 @@ var (
 	}
 	httpLocationZoneResponsesPerCodeClassRateChartTmpl = module.Chart{
 		ID:       "http_location_zone_%s_responses_per_code_class_rate",
-		Title:    "HTTPConfig Location Zone responses rate",
+		Title:    "HTTP Location Zone responses rate",
 		Units:    "responses/s",
 		Fam:      "http responses",
 		Ctx:      "nginxplus.http_location_zone_responses_per_code_class_rate",
@@ -314,7 +314,7 @@ var (
 	}
 	httpLocationZoneTrafficRateChartTmpl = module.Chart{
 		ID:       "http_location_zone_%s_traffic_rate",
-		Title:    "HTTPConfig Location Zone traffic rate",
+		Title:    "HTTP Location Zone traffic rate",
 		Units:    "bytes/s",
 		Fam:      "http traffic",
 		Ctx:      "nginxplus.http_location_zone_traffic_rate",
@@ -327,7 +327,7 @@ var (
 	}
 	httpLocationZoneRequestsDiscardedRateChartTmpl = module.Chart{
 		ID:       "http_location_zone_%s_requests_discarded_rate",
-		Title:    "HTTPConfig Location Zone requests discarded rate",
+		Title:    "HTTP Location Zone requests discarded rate",
 		Units:    "requests/s",
 		Fam:      "http requests",
 		Ctx:      "nginxplus.http_location_zone_requests_discarded_rate",
@@ -346,7 +346,7 @@ var (
 	}
 	httpUpstreamPeersCountChartTmpl = module.Chart{
 		ID:       "http_upstream_%s_zone_%s_peers_count",
-		Title:    "HTTPConfig Upstream peers",
+		Title:    "HTTP Upstream peers",
 		Units:    "peers",
 		Fam:      "http upstream",
 		Ctx:      "nginxplus.http_upstream_peers_count",
@@ -357,7 +357,7 @@ var (
 	}
 	httpUpstreamZombiesCountChartTmpl = module.Chart{
 		ID:       "http_upstream_%s_zone_%s_zombies_count",
-		Title:    "HTTPConfig Upstream zombies",
+		Title:    "HTTP Upstream zombies",
 		Units:    "servers",
 		Fam:      "http upstream",
 		Ctx:      "nginxplus.http_upstream_zombies_count",
@@ -368,7 +368,7 @@ var (
 	}
 	httpUpstreamKeepaliveCountChartTmpl = module.Chart{
 		ID:       "http_upstream_%s_zone_%s_keepalive_count",
-		Title:    "HTTPConfig Upstream keepalive",
+		Title:    "HTTP Upstream keepalive",
 		Units:    "connections",
 		Fam:      "http upstream",
 		Ctx:      "nginxplus.http_upstream_keepalive_count",
@@ -390,7 +390,7 @@ var (
 	}
 	httpUpstreamServerRequestsRateChartTmpl = module.Chart{
 		ID:       "http_upstream_%s_server_%s_zone_%s_requests_rate",
-		Title:    "HTTPConfig Upstream Server requests",
+		Title:    "HTTP Upstream Server requests",
 		Units:    "requests/s",
 		Fam:      "http upstream requests",
 		Ctx:      "nginxplus.http_upstream_server_requests_rate",
@@ -401,7 +401,7 @@ var (
 	}
 	httpUpstreamServerResponsesPerCodeClassRateChartTmpl = module.Chart{
 		ID:       "http_upstream_%s_server_%s_zone_%s_responses_per_code_class_rate",
-		Title:    "HTTPConfig Upstream Server responses",
+		Title:    "HTTP Upstream Server responses",
 		Units:    "responses/s",
 		Fam:      "http upstream responses",
 		Ctx:      "nginxplus.http_upstream_server_responses_per_code_class_rate",
@@ -417,7 +417,7 @@ var (
 	}
 	httpUpstreamServerResponseTimeChartTmpl = module.Chart{
 		ID:       "http_upstream_%s_server_%s_zone_%s_response_time",
-		Title:    "HTTPConfig Upstream Server average response time",
+		Title:    "HTTP Upstream Server average response time",
 		Units:    "milliseconds",
 		Fam:      "http upstream response time",
 		Ctx:      "nginxplus.http_upstream_server_response_time",
@@ -428,7 +428,7 @@ var (
 	}
 	httpUpstreamServerResponseHeaderTimeChartTmpl = module.Chart{
 		ID:       "http_upstream_%s_server_%s_zone_%s_response_header_time",
-		Title:    "HTTPConfig Upstream Server average response header time",
+		Title:    "HTTP Upstream Server average response header time",
 		Units:    "milliseconds",
 		Fam:      "http upstream response time",
 		Ctx:      "nginxplus.http_upstream_server_response_header_time",
@@ -439,7 +439,7 @@ var (
 	}
 	httpUpstreamServerTrafficRateChartTmpl = module.Chart{
 		ID:       "http_upstream_%s_server_%s_zone_%s_traffic_rate",
-		Title:    "HTTPConfig Upstream Server traffic rate",
+		Title:    "HTTP Upstream Server traffic rate",
 		Units:    "bytes/s",
 		Fam:      "http upstream traffic",
 		Ctx:      "nginxplus.http_upstream_server_traffic_rate",
@@ -452,7 +452,7 @@ var (
 	}
 	httpUpstreamServerStateChartTmpl = module.Chart{
 		ID:       "http_upstream_%s_server_%s_zone_%s_state",
-		Title:    "HTTPConfig Upstream Server state",
+		Title:    "HTTP Upstream Server state",
 		Units:    "state",
 		Fam:      "http upstream state",
 		Ctx:      "nginxplus.http_upstream_server_state",
@@ -468,7 +468,7 @@ var (
 	}
 	httpUpstreamServerConnectionsCountChartTmpl = module.Chart{
 		ID:       "http_upstream_%s_server_%s_zone_%s_connection_count",
-		Title:    "HTTPConfig Upstream Server connections",
+		Title:    "HTTP Upstream Server connections",
 		Units:    "connections",
 		Fam:      "http upstream connections",
 		Ctx:      "nginxplus.http_upstream_server_connections_count",
@@ -479,7 +479,7 @@ var (
 	}
 	httpUpstreamServerDowntimeChartTmpl = module.Chart{
 		ID:       "http_upstream_%s_server_%s_zone_%s_downtime",
-		Title:    "HTTPConfig Upstream Server downtime",
+		Title:    "HTTP Upstream Server downtime",
 		Units:    "seconds",
 		Fam:      "http upstream state",
 		Ctx:      "nginxplus.http_upstream_server_downtime",
@@ -499,7 +499,7 @@ var (
 	}
 	httpCacheStateChartTmpl = module.Chart{
 		ID:       "http_cache_%s_state",
-		Title:    "HTTPConfig Cache state",
+		Title:    "HTTP Cache state",
 		Units:    "state",
 		Fam:      "http cache",
 		Ctx:      "nginxplus.http_cache_state",
@@ -511,7 +511,7 @@ var (
 	}
 	httpCacheSizeChartTmpl = module.Chart{
 		ID:       "http_cache_%s_size",
-		Title:    "HTTPConfig Cache size",
+		Title:    "HTTP Cache size",
 		Units:    "bytes",
 		Fam:      "http cache",
 		Ctx:      "nginxplus.http_cache_size",
@@ -522,7 +522,7 @@ var (
 	}
 	httpCacheIOPSChartTmpl = module.Chart{
 		ID:       "http_cache_%s_iops",
-		Title:    "HTTPConfig Cache IOPS",
+		Title:    "HTTP Cache IOPS",
 		Units:    "responses/s",
 		Fam:      "http cache",
 		Ctx:      "nginxplus.http_cache_iops",
@@ -535,7 +535,7 @@ var (
 	}
 	httpCacheIOChartTmpl = module.Chart{
 		ID:       "http_cache_%s_io",
-		Title:    "HTTPConfig Cache IO",
+		Title:    "HTTP Cache IO",
 		Units:    "bytes/s",
 		Fam:      "http cache",
 		Ctx:      "nginxplus.http_cache_io",

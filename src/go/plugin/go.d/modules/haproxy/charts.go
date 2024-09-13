@@ -45,7 +45,7 @@ var (
 	}
 	chartTemplateBackendHTTPResponses = module.Chart{
 		ID:    "backend_http_responses_proxy_%s",
-		Title: "HTTPConfig responses by code class for <code>%s</code> proxy",
+		Title: "HTTP responses by code class for <code>%s</code> proxy",
 		Units: "responses/s",
 		Fam:   "backend responses",
 		Ctx:   "haproxy.backend_http_responses",

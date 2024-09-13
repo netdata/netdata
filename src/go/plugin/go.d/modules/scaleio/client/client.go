@@ -263,12 +263,12 @@ func checkStatusCode(resp *http.Response) error {
 		if err := json.NewDecoder(resp.Body).Decode(e); err != nil {
 			e = err
 		}
-		return fmt.Errorf("HTTPConfig status code %d : %v", resp.StatusCode, e)
+		return fmt.Errorf("HTTP status code %d : %v", resp.StatusCode, e)
 	}
 
 	// 200(OK), 201(Created), 202(Accepted), 204 (No Content).
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return fmt.Errorf("HTTPConfig status code %d", resp.StatusCode)
+		return fmt.Errorf("HTTP status code %d", resp.StatusCode)
 	}
 	return nil
 }

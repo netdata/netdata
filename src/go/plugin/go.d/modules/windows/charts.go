@@ -319,7 +319,7 @@ const (
 	prioExchangeWorkloadYieldedTasks
 	prioExchangeWorkloadActivityStatus
 
-	// HTTPConfig Proxy
+	// HTTP Proxy
 	prioExchangeHTTPProxyAVGAuthLatency
 	prioExchangeHTTPProxyAVGCASProcessingLatency
 	prioExchangeHTTPProxyMailboxProxyFailureRate
@@ -327,7 +327,7 @@ const (
 	prioExchangeHTTPProxyOutstandingProxyRequests
 	prioExchangeHTTPProxyRequestsTotal
 
-	// RequestConfig
+	// Request
 	prioExchangeAutoDiscoverRequests
 	prioExchangeAvailServiceRequests
 
@@ -2461,7 +2461,7 @@ var (
 	exchangeRPCConnectionChart = module.Chart{
 		OverModule: "exchange",
 		ID:         "exchange_rpc_connection",
-		Title:      "ClientConfig connections",
+		Title:      "Client connections",
 		Units:      "connections",
 		Fam:        "rpc",
 		Ctx:        "exchange.rpc_connection_count",

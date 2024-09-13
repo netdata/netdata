@@ -75,7 +75,7 @@ func (c *ClickHouse) Init() error {
 
 	httpClient, err := c.initHTTPClient()
 	if err != nil {
-		c.Errorf("init HTTPConfig client: %v", err)
+		c.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	c.httpClient = httpClient

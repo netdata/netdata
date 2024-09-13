@@ -76,7 +76,7 @@ func (vts *NginxVTS) Init() error {
 
 	httpClient, err := vts.initHTTPClient()
 	if err != nil {
-		vts.Errorf("init HTTPConfig client: %v", err)
+		vts.Errorf("init HTTP client: %v", err)
 	}
 	vts.httpClient = httpClient
 

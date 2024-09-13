@@ -34,7 +34,7 @@ var clusterCharts = module.Charts{
 var (
 	clusterServersStatsRequestChart = module.Chart{
 		ID:       "cluster_cluster_servers_stats_request",
-		Title:    "Cluster Servers Stats RequestConfig",
+		Title:    "Cluster Servers Stats Request",
 		Units:    "servers",
 		Fam:      "servers",
 		Ctx:      "rethinkdb.cluster_servers_stats_request",
@@ -46,7 +46,7 @@ var (
 	}
 	clusterClientConnectionsChart = module.Chart{
 		ID:       "cluster_client_connections",
-		Title:    "Cluster ClientConfig Connections",
+		Title:    "Cluster Client Connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "rethinkdb.cluster_client_connections",
@@ -102,7 +102,7 @@ var serverChartsTmpl = module.Charts{
 var (
 	serverStatsRequestStatusChartTmpl = module.Chart{
 		ID:       "server_%s_stats_request_status",
-		Title:    "Server Stats RequestConfig Status",
+		Title:    "Server Stats Request Status",
 		Units:    "status",
 		Fam:      "srv status",
 		Ctx:      "rethinkdb.server_stats_request_status",

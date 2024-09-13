@@ -22,7 +22,7 @@ func (p *Prometheus) validateConfig() error {
 func (p *Prometheus) initPrometheusClient() (prometheus.Prometheus, error) {
 	httpClient, err := web.NewHTTPClient(p.ClientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("init HTTPConfig client: %v", err)
+		return nil, fmt.Errorf("init HTTP client: %v", err)
 	}
 
 	req := p.RequestConfig.Copy()

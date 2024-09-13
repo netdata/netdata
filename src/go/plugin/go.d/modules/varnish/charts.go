@@ -67,11 +67,11 @@ var storageChartsTmpl = module.Charts{
 	storageAllocatedObjectsChartTmpl.Copy(),
 }
 
-// ClientConfig metrics
+// Client metrics
 var (
 	clientSessionConnectionsChart = module.Chart{
 		ID:       "client_session_connections",
-		Title:    "ClientConfig Session Connections",
+		Title:    "Client Session Connections",
 		Fam:      "client connections",
 		Units:    "connections/s",
 		Ctx:      "varnish.client_session_connections",
@@ -85,7 +85,7 @@ var (
 
 	clientRequestsChart = module.Chart{
 		ID:       "client_requests",
-		Title:    "ClientConfig Requests",
+		Title:    "Client Requests",
 		Fam:      "client requests",
 		Units:    "requests/s",
 		Ctx:      "varnish.client_requests",

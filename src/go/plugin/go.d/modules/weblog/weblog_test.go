@@ -1457,9 +1457,9 @@ func prepareWebLogCollectIISFields(t *testing.T) *WebLog {
 //		if unmatched {
 //			line = "Unmatched! The rat the cat the dog chased killed ate the malt!\n"
 //		} else {
-//			// test.example.com:80 203.0.113.1 - - "GET /HTTP/1.1" 200 1674 2674 3674 4674 http TLSv1 AES256-SHA dark beer
+//			// test.example.com:80 203.0.113.1 - - "GET / HTTP/1.1" 200 1674 2674 3674 4674 http TLSv1 AES256-SHA dark beer
 //			line = fmt.Sprintf(
-//				"%s:%d %s - - [22/Mar/2009:09:30:31 +0100] \"%s /%sHTTP/%s\" %d %d %d %d %d %s %s %s %s %s\n",
+//				"%s:%d %s - - [22/Mar/2009:09:30:31 +0100] \"%s /%s HTTP/%s\" %d %d %d %d %d %s %s %s %s %s\n",
 //				randFromString(vhost),
 //				randInt(80, 85),
 //				randFromString(client),

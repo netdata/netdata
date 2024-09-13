@@ -346,7 +346,7 @@ var (
 
 	clientRPCRequestsRateChart = module.Chart{
 		ID:       "client_rpc_requests_rate",
-		Title:    "ClientConfig RPC requests",
+		Title:    "Client RPC requests",
 		Units:    "requests/s",
 		Fam:      "rpc network activity",
 		Ctx:      "consul.client_rpc_requests_rate",
@@ -357,7 +357,7 @@ var (
 	}
 	clientRPCRequestsExceededRateChart = module.Chart{
 		ID:       "client_rpc_requests_exceeded_rate",
-		Title:    "ClientConfig rate-limited RPC requests",
+		Title:    "Client rate-limited RPC requests",
 		Units:    "requests/s",
 		Fam:      "rpc network activity",
 		Ctx:      "consul.client_rpc_requests_exceeded_rate",
@@ -368,7 +368,7 @@ var (
 	}
 	clientRPCRequestsFailedRateChart = module.Chart{
 		ID:       "client_rpc_requests_failed_rate",
-		Title:    "ClientConfig failed RPC requests",
+		Title:    "Client failed RPC requests",
 		Units:    "requests/s",
 		Fam:      "rpc network activity",
 		Ctx:      "consul.client_rpc_requests_failed_rate",

@@ -23,7 +23,7 @@ type (
 
 	// SummaryVec is a Collector that bundles a set of Summary which have different values for their names.
 	// This is used if you want to count the same thing partitioned by various dimensions
-	// (e.g. number of HTTPConfig response time, partitioned by response code and method).
+	// (e.g. number of HTTP response time, partitioned by response code and method).
 	//
 	// Create instances with NewSummaryVec.
 	SummaryVec map[string]Summary

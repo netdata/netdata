@@ -14,7 +14,7 @@ type (
 var charts = Charts{
 	{
 		ID:    "connections",
-		Title: "Active ClientConfig Connections Including Waiting Connections",
+		Title: "Active Client Connections Including Waiting Connections",
 		Units: "connections",
 		Fam:   "connections",
 		Ctx:   "nginx.connections",
@@ -47,7 +47,7 @@ var charts = Charts{
 	},
 	{
 		ID:    "requests",
-		Title: "ClientConfig Requests",
+		Title: "Client Requests",
 		Units: "requests/s",
 		Fam:   "requests",
 		Ctx:   "nginx.requests",

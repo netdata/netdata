@@ -89,7 +89,7 @@ func (hc *HTTPCheck) Init() error {
 
 	httpClient, err := hc.initHTTPClient()
 	if err != nil {
-		hc.Errorf("init HTTPConfig client: %v", err)
+		hc.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	hc.httpClient = httpClient
@@ -113,7 +113,7 @@ func (hc *HTTPCheck) Init() error {
 	}
 
 	hc.Debugf("using URL %s", hc.URL)
-	hc.Debugf("using HTTPConfig timeout %s", hc.Timeout.Duration())
+	hc.Debugf("using HTTP timeout %s", hc.Timeout.Duration())
 	hc.Debugf("using accepted HTTPConfig statuses %v", hc.AcceptedStatuses)
 	if hc.reResponse != nil {
 		hc.Debugf("using response match regexp %s", hc.reResponse)

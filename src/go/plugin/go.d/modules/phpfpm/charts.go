@@ -59,7 +59,7 @@ var charts = Charts{
 	},
 	{
 		ID:    "request_cpu",
-		Title: "Last RequestConfig CPU Usage Among All Idle Processes",
+		Title: "Last Request CPU Usage Among All Idle Processes",
 		Units: "percentage",
 		Fam:   "request CPU",
 		Ctx:   "phpfpm.request_cpu",
@@ -71,7 +71,7 @@ var charts = Charts{
 	},
 	{
 		ID:    "request_mem",
-		Title: "Last RequestConfig Memory Usage Among All Idle Processes",
+		Title: "Last Request Memory Usage Among All Idle Processes",
 		Units: "KB",
 		Fam:   "request memory",
 		Ctx:   "phpfpm.request_mem",

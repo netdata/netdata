@@ -95,7 +95,7 @@ func (c *httpClient) getStatus() (*status, error) {
 
 	st := &status{}
 	if err := c.dec(resp.Body, st); err != nil {
-		return nil, fmt.Errorf("error parsing HTTPConfig response from '%s': %v", req.URL, err)
+		return nil, fmt.Errorf("error parsing HTTP response from '%s': %v", req.URL, err)
 	}
 
 	return st, nil

@@ -70,7 +70,7 @@ func (a *Apache) Init() error {
 
 	httpClient, err := a.initHTTPClient()
 	if err != nil {
-		a.Errorf("init HTTPConfig client: %v", err)
+		a.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	a.httpClient = httpClient

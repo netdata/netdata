@@ -69,7 +69,7 @@ func (d *DNSdist) Init() error {
 
 	client, err := d.initHTTPClient()
 	if err != nil {
-		d.Errorf("init HTTPConfig client: %v", err)
+		d.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	d.httpClient = client

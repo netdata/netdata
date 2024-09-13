@@ -71,7 +71,7 @@ func (t *Tomcat) Init() error {
 
 	httpClient, err := t.initHTTPClient()
 	if err != nil {
-		t.Errorf("init HTTPConfig client: %v", err)
+		t.Errorf("init HTTP client: %v", err)
 		return err
 	}
 

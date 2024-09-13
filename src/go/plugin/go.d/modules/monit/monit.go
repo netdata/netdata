@@ -71,7 +71,7 @@ func (m *Monit) Init() error {
 
 	httpClient, err := web.NewHTTPClient(m.ClientConfig)
 	if err != nil {
-		m.Errorf("init HTTPConfig client: %v", err)
+		m.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	m.httpClient = httpClient

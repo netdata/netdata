@@ -66,7 +66,7 @@ func (r *Recursor) Init() error {
 
 	client, err := r.initHTTPClient()
 	if err != nil {
-		r.Errorf("init HTTPConfig client: %v", err)
+		r.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	r.httpClient = client

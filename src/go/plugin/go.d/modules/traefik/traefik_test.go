@@ -308,7 +308,7 @@ func prepareCaseNotTraefikMetrics(t *testing.T) (*Traefik, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(`
-# HELP application_backend_http_responses_total Total number of HTTPConfig responses.
+# HELP application_backend_http_responses_total Total number of HTTP responses.
 # TYPE application_backend_http_responses_total counter
 application_backend_http_responses_total{proxy="infra-traefik-web",code="1xx"} 0
 application_backend_http_responses_total{proxy="infra-vernemq-ws",code="1xx"} 4130401

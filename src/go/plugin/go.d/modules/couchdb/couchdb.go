@@ -77,7 +77,7 @@ func (cdb *CouchDB) Init() error {
 
 	httpClient, err := cdb.initHTTPClient()
 	if err != nil {
-		cdb.Errorf("init HTTPConfig client: %v", err)
+		cdb.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	cdb.httpClient = httpClient

@@ -301,7 +301,7 @@ var (
 	}
 	clusterUpstreamHTTPConnectionsRateChartTmpl = module.Chart{
 		ID:       "cluster_upstream_cx_http_total_%s",
-		Title:    "Cluster upstream connections by HTTPConfig version",
+		Title:    "Cluster upstream connections by HTTP version",
 		Units:    "connections/s",
 		Fam:      "upstream conns",
 		Ctx:      "envoy.cluster_upstream_cx_http_rate",

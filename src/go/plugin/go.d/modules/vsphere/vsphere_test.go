@@ -3,7 +3,6 @@ package vsphere
 
 import (
 	"crypto/tls"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"os"
 	"strings"
 	"testing"
@@ -13,6 +12,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere/discover"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere/resources"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vmware/govmomi/performance"

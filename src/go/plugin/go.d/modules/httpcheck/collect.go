@@ -80,7 +80,7 @@ func (hc *HTTPCheck) collectErrResponse(mx *metrics, err error) {
 }
 
 func (hc *HTTPCheck) collectOKResponse(mx *metrics, resp *http.Response) {
-	hc.Debugf("endpoint '%s' returned %d (%s) HTTPConfig status code", hc.URL, resp.StatusCode, resp.Status)
+	hc.Debugf("endpoint '%s' returned %d (%s) HTTP status code", hc.URL, resp.StatusCode, resp.Status)
 
 	if !hc.acceptedStatuses[resp.StatusCode] {
 		mx.Status.BadStatusCode = true

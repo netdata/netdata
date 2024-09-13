@@ -59,7 +59,7 @@ var (
 var (
 	netThroughputHttpChart = module.Chart{
 		ID:       "net_throughput_http",
-		Title:    "HTTPConfig throughput",
+		Title:    "HTTP throughput",
 		Units:    "kilobits/s",
 		Fam:      "throughput",
 		Ctx:      "litespeed.net_throughput",
@@ -88,7 +88,7 @@ var (
 var (
 	connectionsHttpChart = module.Chart{
 		ID:       "connections_http",
-		Title:    "HTTPConfig connections",
+		Title:    "HTTP connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "litespeed.connections",

@@ -71,7 +71,7 @@ func (cb *Couchbase) Init() error {
 
 	httpClient, err := cb.initHTTPClient()
 	if err != nil {
-		cb.Errorf("init HTTPConfig client: %v", err)
+		cb.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	cb.httpClient = httpClient

@@ -69,7 +69,7 @@ func (l *Logstash) Init() error {
 
 	httpClient, err := web.NewHTTPClient(l.ClientConfig)
 	if err != nil {
-		l.Errorf("init HTTPConfig client: %v", err)
+		l.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	l.httpClient = httpClient

@@ -111,7 +111,7 @@ func parseScoreboard(value string) *scoreboard {
 	// “k” = Keeping the TCP connection open for more HTTP requests from the same client to avoid the TCP handling overhead (keep-alive)
 	// “r” = ReadAsMap the content of the HTTP request (read)
 	// “R” = ReadAsMap the content of the HTTP request (read-POST)
-	// “W” = Write the HTTPConfig response to the socket (write)
+	// “W” = Write the HTTP response to the socket (write)
 	// “h” = Decide action to take with the request (handle-request)
 	// “q” = Start of HTTP request (request-start)
 	// “Q” = End of HTTP request (request-end)

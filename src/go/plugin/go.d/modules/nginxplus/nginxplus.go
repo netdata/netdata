@@ -86,7 +86,7 @@ func (n *NginxPlus) Init() error {
 
 	client, err := web.NewHTTPClient(n.ClientConfig)
 	if err != nil {
-		n.Errorf("init HTTPConfig client: %v", err)
+		n.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	n.httpClient = client

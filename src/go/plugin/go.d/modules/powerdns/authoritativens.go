@@ -66,7 +66,7 @@ func (ns *AuthoritativeNS) Init() error {
 
 	client, err := ns.initHTTPClient()
 	if err != nil {
-		ns.Errorf("init HTTPConfig client: %v", err)
+		ns.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	ns.httpClient = client

@@ -93,7 +93,7 @@ func (es *Elasticsearch) Init() error {
 
 	httpClient, err := es.initHTTPClient()
 	if err != nil {
-		es.Errorf("init HTTPConfig client: %v", err)
+		es.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	es.httpClient = httpClient

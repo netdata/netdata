@@ -23,7 +23,7 @@ var charts = module.Charts{
 var (
 	clientsNetChart = module.Chart{
 		ID:       "clients_net",
-		Title:    "Squid ClientConfig Bandwidth",
+		Title:    "Squid Client Bandwidth",
 		Units:    "kilobits/s",
 		Fam:      "clients",
 		Ctx:      "squid.clients_net",
@@ -38,7 +38,7 @@ var (
 
 	clientsRequestsChart = module.Chart{
 		ID:       "clients_requests",
-		Title:    "Squid ClientConfig Requests",
+		Title:    "Squid Client Requests",
 		Units:    "requests/s",
 		Fam:      "clients",
 		Ctx:      "squid.clients_requests",

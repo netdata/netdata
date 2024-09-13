@@ -81,7 +81,7 @@ func (r *RabbitMQ) Init() error {
 
 	client, err := web.NewHTTPClient(r.ClientConfig)
 	if err != nil {
-		r.Errorf("init HTTPConfig client: %v", err)
+		r.Errorf("init HTTP client: %v", err)
 		return err
 	}
 	r.httpClient = client

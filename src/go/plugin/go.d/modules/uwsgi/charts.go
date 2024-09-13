@@ -148,7 +148,7 @@ var (
 	}
 	workerAvgRequestTimeChartTmpl = module.Chart{
 		ID:       "worker_%s_average_request_time",
-		Title:    "UWSGI Worker Average RequestConfig Time",
+		Title:    "UWSGI Worker Average Request Time",
 		Units:    "milliseconds",
 		Fam:      "wrk request time",
 		Ctx:      "uwsgi.worker_average_request_time",
@@ -196,7 +196,7 @@ var (
 	}
 	workerRequestHandlingStatusChartTmpl = module.Chart{
 		ID:       "worker_%s_request_handling_status",
-		Title:    "UWSGI Worker RequestConfig Handling Status",
+		Title:    "UWSGI Worker Request Handling Status",
 		Units:    "status",
 		Fam:      "wrk status",
 		Ctx:      "uwsgi.request_handling_status",
