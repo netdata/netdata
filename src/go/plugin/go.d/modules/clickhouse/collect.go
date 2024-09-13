@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 const precision = 1000
@@ -43,7 +45,8 @@ func (c *ClickHouse) doOKDecodeCSV(req *http.Request, assign func(column, value 
 	if err != nil {
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
-	defer closeBody(resp)
+
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
@@ -86,11 +89,4 @@ func readCSVResponseData(reader io.Reader, assign func(column, value string, lin
 
 func makeURLQuery(q string) string {
 	return url.Values{"query": {q}}.Encode()
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

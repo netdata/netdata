@@ -62,7 +62,8 @@ func (c xml3Client) serverStats() (*serverStats, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error on request : %v", err)
 	}
-	defer closeBody(resp)
+
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%s returned HTTP status %d", httpReq.URL, resp.StatusCode)

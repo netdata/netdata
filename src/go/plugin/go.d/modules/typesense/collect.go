@@ -5,7 +5,6 @@ package typesense
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -121,15 +120,17 @@ func (ts *Typesense) doOKDecode(req *http.Request, in interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
-	defer closeBody(resp)
+
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		// {"message": "Forbidden - a valid `x-typesense-api-key` header must be sent."}
 		var msg struct {
 			Msg string `json:"message"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&msg); err == nil {
-			return fmt.Errorf("'%s' returned HTTP status code: %d (msg: '%s')", req.URL, resp.StatusCode, msg.Msg)
+		if err := json.NewDecoder(resp.Body).Decode(&msg); err == nil && msg.Msg != "" {
+			return fmt.Errorf("'%s' returned HTTP status code: %d (msg: '%s')",
+				req.URL, resp.StatusCode, msg.Msg)
 		}
 		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
 	}
@@ -138,13 +139,6 @@ func (ts *Typesense) doOKDecode(req *http.Request, in interface{}) error {
 		return fmt.Errorf("error on decoding response from '%s': %v", req.URL, err)
 	}
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }
 
 func isStatusUnauthorized(err error) bool {

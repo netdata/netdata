@@ -105,7 +105,7 @@ func (c *Client) Login() error {
 	}
 	req := c.createLoginRequest()
 	resp, err := c.doOK(req)
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (c *Client) Logout() error {
 	c.token.unset()
 
 	resp, err := c.do(req)
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 	return err
 }
 
@@ -136,7 +136,7 @@ func (c *Client) Logout() error {
 func (c *Client) APIVersion() (Version, error) {
 	req := c.createAPIVersionRequest()
 	resp, err := c.doOK(req)
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 	if err != nil {
 		return Version{}, err
 	}
@@ -248,18 +248,11 @@ func (c *Client) doOKWithRetry(req web.Request) (*http.Response, error) {
 
 func (c *Client) doJSONWithRetry(dst interface{}, req web.Request) error {
 	resp, err := c.doOKWithRetry(req)
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 	if err != nil {
 		return err
 	}
 	return json.NewDecoder(resp.Body).Decode(dst)
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }
 
 func checkStatusCode(resp *http.Response) error {

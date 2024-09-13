@@ -5,7 +5,6 @@ package fluentd
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -55,30 +54,31 @@ func (a apiClient) getPluginsInfo() (*pluginsInfo, error) {
 		return nil, fmt.Errorf("error on creating request : %v", err)
 	}
 
-	resp, err := a.doRequestOK(req)
-	defer closeBody(resp)
-	if err != nil {
-		return nil, err
-	}
-
 	var info pluginsInfo
-	if err = json.NewDecoder(resp.Body).Decode(&info); err != nil {
-		return nil, fmt.Errorf("error on decoding response from %s : %v", req.URL, err)
+	if err := a.doOKDecode(req, &info); err != nil {
+		return nil, err
 	}
 
 	return &info, nil
 }
 
-func (a apiClient) doRequestOK(req *http.Request) (*http.Response, error) {
+func (a apiClient) doOKDecode(req *http.Request, in any) error {
 	resp, err := a.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error on request: %v", err)
+		return fmt.Errorf("error on request: %v", err)
 	}
 
+	defer web.CloseBody(resp)
+
 	if resp.StatusCode != http.StatusOK {
-		return resp, fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
 	}
-	return resp, nil
+
+	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {
+		return fmt.Errorf("error on decoding response from %s : %v", req.URL, err)
+	}
+
+	return nil
 }
 
 func (a apiClient) createRequest(urlPath string) (*http.Request, error) {
@@ -91,11 +91,4 @@ func (a apiClient) createRequest(urlPath string) (*http.Request, error) {
 	u.Path = path.Join(u.Path, urlPath)
 	req.URL = u.String()
 	return web.NewHTTPRequest(req)
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

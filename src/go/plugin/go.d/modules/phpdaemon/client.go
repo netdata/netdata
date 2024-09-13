@@ -44,7 +44,7 @@ func (c *client) doWithDecode(dst interface{}, decode decodeFunc, request web.Re
 	}
 
 	resp, err := c.doOK(req)
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 	if err != nil {
 		return err
 	}
@@ -67,11 +67,4 @@ func (c *client) doOK(req *http.Request) (*http.Response, error) {
 	}
 
 	return resp, err
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

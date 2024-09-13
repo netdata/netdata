@@ -5,7 +5,6 @@ package dnsdist
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 
@@ -55,7 +54,8 @@ func (d *DNSdist) doOKDecode(req *http.Request, in interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
-	defer closeBody(resp)
+
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
@@ -66,11 +66,4 @@ func (d *DNSdist) doOKDecode(req *http.Request, in interface{}) error {
 	}
 
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

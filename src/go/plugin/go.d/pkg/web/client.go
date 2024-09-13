@@ -5,6 +5,7 @@ package web
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -62,6 +63,13 @@ func NewHTTPClient(cfg Client) (*http.Client, error) {
 		Transport:     transport,
 		CheckRedirect: redirectFunc(cfg.NotFollowRedirect),
 	}, nil
+}
+
+func CloseBody(resp *http.Response) {
+	if resp != nil && resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
 }
 
 func redirectFunc(notFollowRedirect bool) func(req *http.Request, via []*http.Request) error {
