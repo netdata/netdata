@@ -2365,7 +2365,7 @@ var (
 	exchangeActiveSyncRequestsChart = module.Chart{
 		OverModule: "exchange",
 		ID:         "exchange_activesync_requests",
-		Title:      "HTTPConfig requests received from ASP.NET",
+		Title:      "HTTP requests received from ASP.NET",
 		Units:      "requests/s",
 		Fam:        "sync",
 		Ctx:        "exchange.activesync_requests",

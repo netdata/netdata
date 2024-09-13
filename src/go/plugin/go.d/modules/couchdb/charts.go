@@ -31,7 +31,7 @@ var dbActivityCharts = Charts{
 var httpTrafficBreakdownCharts = Charts{
 	{
 		ID:    "request_methods",
-		Title: "HTTPConfig request methods",
+		Title: "HTTP request methods",
 		Units: "requests/s",
 		Fam:   "httptraffic",
 		Ctx:   "couchdb.request_methods",

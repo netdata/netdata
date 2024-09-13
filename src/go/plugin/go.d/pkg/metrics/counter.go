@@ -23,7 +23,7 @@ type (
 
 	// CounterVec is a Collector that bundles a set of Counters which have different values for their names.
 	// This is used if you want to count the same thing partitioned by various dimensions
-	// (e.g. number of HTTPConfig requests, partitioned by response code and method).
+	// (e.g. number of HTTP requests, partitioned by response code and method).
 	//
 	// Create instances with NewCounterVec.
 	CounterVec map[string]*Counter

@@ -38,7 +38,7 @@ func (a *Apache) scrapeStatus() (*serverStatus, error) {
 
 	resp, err := a.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
+		return nil, fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)

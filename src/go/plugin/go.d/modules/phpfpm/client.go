@@ -77,12 +77,12 @@ func newHTTPClient(c *http.Client, r web.RequestConfig) (*httpClient, error) {
 func (c *httpClient) getStatus() (*status, error) {
 	req, err := web.NewHTTPRequest(c.req)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating HTTPConfig request: %v", err)
+		return nil, fmt.Errorf("error on creating HTTP request: %v", err)
 	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error on HTTPConfig request to '%s': %v", req.URL, err)
+		return nil, fmt.Errorf("error on HTTP request to '%s': %v", req.URL, err)
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)

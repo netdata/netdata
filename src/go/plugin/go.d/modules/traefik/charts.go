@@ -10,7 +10,7 @@ import (
 
 var chartTmplEntrypointRequests = module.Chart{
 	ID:    "entrypoint_requests_%s_%s",
-	Title: "Processed HTTPConfig requests on <code>%s</code> entrypoint (protocol <code>%s</code>)",
+	Title: "Processed HTTP requests on <code>%s</code> entrypoint (protocol <code>%s</code>)",
 	Units: "requests/s",
 	Fam:   "entrypoint %s %s",
 	Ctx:   "traefik.entrypoint_requests",
@@ -26,7 +26,7 @@ var chartTmplEntrypointRequests = module.Chart{
 
 var chartTmplEntrypointRequestDuration = module.Chart{
 	ID:    "entrypoint_request_duration_%s_%s",
-	Title: "Average HTTPConfig request processing time on <code>%s</code> entrypoint (protocol <code>%s</code>)",
+	Title: "Average HTTP request processing time on <code>%s</code> entrypoint (protocol <code>%s</code>)",
 	Units: "milliseconds",
 	Fam:   "entrypoint %s %s",
 	Ctx:   "traefik.entrypoint_request_duration_average",

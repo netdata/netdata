@@ -173,7 +173,7 @@ var (
 	}
 	httpRequestsRateChart = module.Chart{
 		ID:       "http_requests_rate",
-		Title:    "HTTPConfig requests rate",
+		Title:    "HTTP requests rate",
 		Units:    "requests/s",
 		Fam:      "http requests",
 		Ctx:      "nginxplus.http_requests_rate",
@@ -184,7 +184,7 @@ var (
 	}
 	httpRequestsCountChart = module.Chart{
 		ID:       "http_requests_count",
-		Title:    "HTTPConfig requests",
+		Title:    "HTTP requests",
 		Units:    "requests",
 		Fam:      "http requests",
 		Ctx:      "nginxplus.http_requests_count",

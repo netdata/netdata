@@ -53,7 +53,7 @@ func (c jsonClient) serverStats() (*serverStats, error) {
 
 	httpReq, err := web.NewHTTPRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating HTTPConfig request: %v", err)
+		return nil, fmt.Errorf("error on creating HTTP request: %v", err)
 	}
 
 	resp, err := c.httpClient.Do(httpReq)

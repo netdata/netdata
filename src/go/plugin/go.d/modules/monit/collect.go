@@ -90,7 +90,7 @@ func (m *Monit) fetchStatus() (*monitStatus, error) {
 func (m *Monit) doOKDecode(req *http.Request, in interface{}) error {
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
+		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)

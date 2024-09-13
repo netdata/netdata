@@ -85,7 +85,7 @@ func (s *Squid) collectCounters(mx map[string]int64) error {
 func (s *Squid) doOK(req *http.Request, parse func(body io.Reader) error) error {
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
+		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)

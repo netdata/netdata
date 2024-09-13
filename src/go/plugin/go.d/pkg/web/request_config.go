@@ -14,7 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
-// RequestConfig is the configuration of the HTTPConfig request.
+// RequestConfig is the configuration of the HTTP request.
 // This structure is not intended to be used directly as part of a module's configuration.
 // Supported configuration file formats: YAML.
 type RequestConfig struct {
@@ -38,10 +38,10 @@ type RequestConfig struct {
 	// Method specifies the HTTPConfig method (GET, POST, PUT, etc.). An empty string means GET.
 	Method string `yaml:"method,omitempty" json:"method"`
 
-	// Headers specifies the HTTPConfig request header fields to be sent by the client.
+	// Headers specifies the HTTP request header fields to be sent by the client.
 	Headers map[string]string `yaml:"headers,omitempty" json:"headers"`
 
-	// Body specifies the HTTPConfig request body to be sent by the client.
+	// Body specifies the HTTP request body to be sent by the client.
 	Body string `yaml:"body,omitempty" json:"body"`
 }
 

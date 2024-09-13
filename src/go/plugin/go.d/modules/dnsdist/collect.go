@@ -52,7 +52,7 @@ func (d *DNSdist) scrapeStatistics() (*statisticMetrics, error) {
 func (d *DNSdist) doOKDecode(req *http.Request, in interface{}) error {
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
+		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)
