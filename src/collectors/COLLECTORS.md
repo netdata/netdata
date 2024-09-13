@@ -921,6 +921,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Sphinx](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/sphinx.md)
 
+- [Typesense](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/typesense/integrations/typesense.md)
+
 ### Security Systems
 
 - [Certificate Transparency](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/certificate_transparency.md)
