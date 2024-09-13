@@ -76,6 +76,11 @@ static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root, BOO
     }
 }
 
+static inline void netdata_cli_open_dashboard()
+{
+    (void)ShellExecuteW(NULL, NULL, L"http://localhost:19999", NULL, NULL, SW_SHOW);
+}
+
 static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     HWND hwndReloadHealth, hwndReloadLabels, hwndSaveDatabase, hwndReopenLogs, hwndStopService, hwndOpenMsys,
@@ -84,10 +89,10 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
 
     switch (message) {
         case WM_CREATE: {
-            hwndReloadHealth = CreateWindowExW(0, L"BUTTON", L"Reload Health",
+            hwndReloadHealth = CreateWindowExW(0, L"BUTTON", L"Open Dashboard",
                                                WS_CHILD | WS_VISIBLE,
                                                20, 20, 120, 30,
-                                               hNetdatawnd, (HMENU)IDC_RELOAD_HEALTH,
+                                               hNetdatawnd, (HMENU)IDC_NETDATA_DASHBOARD,
                                                NULL, NULL);
 
             hwndReloadLabels = CreateWindowExW(0, L"BUTTON", L"Reload Labels",
@@ -149,10 +154,8 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
                         netdata_cli_run_specific_command(L"msys2.exe", TRUE, FALSE);
                         break;
                     }
-                    case IDC_RELOAD_HEALTH: {
-                        netdata_cli_run_specific_command(L"\\bash.exe -l -c \"netdatacli reload-health; export CURRRET=`echo $?`; exit $CURRRET\"",
-                                                         FALSE,
-                                                         TRUE);
+                    case IDC_NETDATA_DASHBOARD: {
+                        netdata_cli_open_dashboard();
                         break;
                     }
                     case IDC_RELOAD_LABELS: {
