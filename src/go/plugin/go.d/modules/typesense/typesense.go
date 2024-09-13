@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
@@ -28,12 +29,12 @@ func init() {
 func New() *Typesense {
 	return &Typesense{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1:8108",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 		},
@@ -43,9 +44,9 @@ func New() *Typesense {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
-	APIKey      string `yaml:"api_key,omitempty" json:"api_key"`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
+	APIKey         string `yaml:"api_key,omitempty" json:"api_key"`
 }
 
 type Typesense struct {
@@ -70,7 +71,7 @@ func (ts *Typesense) Init() error {
 		return errors.New("typesense URL not configured")
 	}
 
-	httpClient, err := web.NewHTTPClient(ts.Client)
+	httpClient, err := web.NewHTTPClient(ts.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("initialize http client: %w", err)
 	}

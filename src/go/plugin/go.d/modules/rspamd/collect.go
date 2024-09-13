@@ -49,7 +49,7 @@ func (r *Rspamd) collect() (map[string]int64, error) {
 }
 
 func (r *Rspamd) queryRspamdStats() (*rspamdStats, error) {
-	req, err := web.NewHTTPRequestWithPath(r.Request, "/stat")
+	req, err := web.NewHTTPRequestWithPath(r.RequestConfig, "/stat")
 	if err != nil {
 		return nil, err
 	}

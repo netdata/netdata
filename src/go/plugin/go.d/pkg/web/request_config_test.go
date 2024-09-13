@@ -14,11 +14,11 @@ import (
 
 func TestRequest_Copy(t *testing.T) {
 	tests := map[string]struct {
-		orig   Request
-		change func(req *Request)
+		orig   RequestConfig
+		change func(req *RequestConfig)
 	}{
 		"change headers": {
-			orig: Request{
+			orig: RequestConfig{
 				URL:    "http://127.0.0.1:19999/api/v1/info",
 				Method: "POST",
 				Headers: map[string]string{
@@ -29,7 +29,7 @@ func TestRequest_Copy(t *testing.T) {
 				ProxyUsername: "proxy_username",
 				ProxyPassword: "proxy_password",
 			},
-			change: func(req *Request) {
+			change: func(req *RequestConfig) {
 				req.Headers["header_key"] = "header_value"
 			},
 		},
@@ -48,29 +48,29 @@ func TestRequest_Copy(t *testing.T) {
 
 func TestNewHTTPRequest(t *testing.T) {
 	tests := map[string]struct {
-		req     Request
+		req     RequestConfig
 		wantErr bool
 	}{
 		"test url": {
-			req: Request{
+			req: RequestConfig{
 				URL: "http://127.0.0.1:19999/api/v1/info",
 			},
 			wantErr: false,
 		},
 		"test body": {
-			req: Request{
+			req: RequestConfig{
 				Body: "content",
 			},
 			wantErr: false,
 		},
 		"test method": {
-			req: Request{
+			req: RequestConfig{
 				Method: "POST",
 			},
 			wantErr: false,
 		},
 		"test headers": {
-			req: Request{
+			req: RequestConfig{
 				Headers: map[string]string{
 					"X-Api-Key": "secret",
 				},
@@ -78,7 +78,7 @@ func TestNewHTTPRequest(t *testing.T) {
 			wantErr: false,
 		},
 		"test special headers (host)": {
-			req: Request{
+			req: RequestConfig{
 				Headers: map[string]string{
 					"host": "Host",
 				},
@@ -86,7 +86,7 @@ func TestNewHTTPRequest(t *testing.T) {
 			wantErr: false,
 		},
 		"test special headers (Host)": {
-			req: Request{
+			req: RequestConfig{
 				Headers: map[string]string{
 					"Host": "Host",
 				},
@@ -94,14 +94,14 @@ func TestNewHTTPRequest(t *testing.T) {
 			wantErr: false,
 		},
 		"test username and password": {
-			req: Request{
+			req: RequestConfig{
 				Username: "username",
 				Password: "password",
 			},
 			wantErr: false,
 		},
 		"test proxy username and proxy password": {
-			req: Request{
+			req: RequestConfig{
 				ProxyUsername: "proxy_username",
 				ProxyPassword: "proxy_password",
 			},
@@ -179,7 +179,7 @@ func TestNewRequest(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			req, err := NewHTTPRequestWithPath(Request{URL: test.url}.Copy(), test.path)
+			req, err := NewHTTPRequestWithPath(RequestConfig{URL: test.url}.Copy(), test.path)
 			require.NoError(t, err)
 
 			assert.Equal(t, test.wantURL, req.URL.String())

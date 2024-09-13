@@ -47,15 +47,15 @@ func TestTraefik_Init(t *testing.T) {
 		},
 		"fails on unset 'url'": {
 			wantFail: true,
-			config: Config{HTTP: web.HTTP{
-				Request: web.Request{},
+			config: Config{HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{},
 			}},
 		},
 		"fails on invalid TLSCA": {
 			wantFail: true,
 			config: Config{
-				HTTP: web.HTTP{
-					Client: web.Client{
+				HTTPConfig: web.HTTPConfig{
+					ClientConfig: web.ClientConfig{
 						TLSConfig: tlscfg.TLSConfig{TLSCA: "testdata/tls"},
 					},
 				}},

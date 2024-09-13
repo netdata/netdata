@@ -49,13 +49,13 @@ var (
 	reStatus = regexp.MustCompile(`^Active connections: ([0-9]+)\n[^\d]+([0-9]+) ([0-9]+) ([0-9]+) ?([0-9]+)?\nReading: ([0-9]+) Writing: ([0-9]+) Waiting: ([0-9]+)`)
 )
 
-func newAPIClient(client *http.Client, request web.Request) *apiClient {
+func newAPIClient(client *http.Client, request web.RequestConfig) *apiClient {
 	return &apiClient{httpClient: client, request: request}
 }
 
 type apiClient struct {
 	httpClient *http.Client
-	request    web.Request
+	request    web.RequestConfig
 }
 
 func (a apiClient) getStubStatus() (*stubStatus, error) {

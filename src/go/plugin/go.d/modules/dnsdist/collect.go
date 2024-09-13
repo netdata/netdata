@@ -35,7 +35,7 @@ func (d *DNSdist) collectStatistic(collected map[string]int64, statistics *stati
 }
 
 func (d *DNSdist) scrapeStatistics() (*statisticMetrics, error) {
-	req, err := web.NewHTTPRequestWithPath(d.Request, urlPathJSONStat)
+	req, err := web.NewHTTPRequestWithPath(d.RequestConfig, urlPathJSONStat)
 	if err != nil {
 		return nil, err
 	}

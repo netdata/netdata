@@ -16,12 +16,12 @@ func (es *Elasticsearch) validateConfig() error {
 	if !(es.DoNodeStats || es.DoClusterHealth || es.DoClusterStats || es.DoIndicesStats) {
 		return errors.New("all API calls are disabled")
 	}
-	if _, err := web.NewHTTPRequest(es.Request); err != nil {
+	if _, err := web.NewHTTPRequest(es.RequestConfig); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (es *Elasticsearch) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(es.Client)
+	return web.NewHTTPClient(es.ClientConfig)
 }

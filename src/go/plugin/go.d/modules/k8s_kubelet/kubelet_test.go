@@ -54,12 +54,12 @@ func TestKubelet_Init_ReadServiceAccountToken(t *testing.T) {
 	job.TokenPath = "testdata/token.txt"
 
 	assert.NoError(t, job.Init())
-	assert.Equal(t, "Bearer "+string(dataServiceAccountToken), job.Request.Headers["Authorization"])
+	assert.Equal(t, "Bearer "+string(dataServiceAccountToken), job.RequestConfig.Headers["Authorization"])
 }
 
 func TestKubelet_InitErrorOnCreatingClientWrongTLSCA(t *testing.T) {
 	job := New()
-	job.Client.TLSConfig.TLSCA = "testdata/tls"
+	job.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
 	assert.Error(t, job.Init())
 }

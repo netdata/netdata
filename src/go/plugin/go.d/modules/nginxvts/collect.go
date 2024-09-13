@@ -44,7 +44,7 @@ func (vts *NginxVTS) collectServerZones(collected map[string]interface{}, ms *vt
 }
 
 func (vts *NginxVTS) scapeVTS() (*vtsMetrics, error) {
-	req, _ := web.NewHTTPRequest(vts.Request)
+	req, _ := web.NewHTTPRequest(vts.RequestConfig)
 
 	var total vtsMetrics
 

@@ -26,10 +26,10 @@ func (f *Fluentd) initPermitPluginMatcher() (matcher.Matcher, error) {
 }
 
 func (f *Fluentd) initApiClient() (*apiClient, error) {
-	client, err := web.NewHTTPClient(f.Client)
+	client, err := web.NewHTTPClient(f.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return newAPIClient(client, f.Request), nil
+	return newAPIClient(client, f.RequestConfig), nil
 }

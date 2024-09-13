@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 
 	"github.com/miekg/dns"
 )
@@ -29,7 +29,7 @@ func New() *Dnsmasq {
 		Config: Config{
 			Protocol: "udp",
 			Address:  "127.0.0.1:53",
-			Timeout:  web.Duration(time.Second),
+			Timeout:  confopt.Duration(time.Second),
 		},
 
 		newDNSClient: func(network string, timeout time.Duration) dnsClient {
@@ -42,10 +42,10 @@ func New() *Dnsmasq {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	Address     string       `yaml:"address" json:"address"`
-	Protocol    string       `yaml:"protocol,omitempty" json:"protocol"`
-	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	Address     string           `yaml:"address" json:"address"`
+	Protocol    string           `yaml:"protocol,omitempty" json:"protocol"`
+	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
 type (

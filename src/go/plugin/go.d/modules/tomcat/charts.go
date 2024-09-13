@@ -103,7 +103,7 @@ var (
 
 	connectorRequestThreadsChartTmpl = module.Chart{
 		ID:       "connector_%s_request_threads",
-		Title:    "Connector Request Threads",
+		Title:    "Connector RequestConfig Threads",
 		Units:    "threads",
 		Fam:      "threads",
 		Ctx:      "tomcat.connector_request_threads",

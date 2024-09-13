@@ -26,7 +26,7 @@ type diskStats struct {
 }
 
 func (c *ClickHouse) collectSystemDisks(mx map[string]int64) error {
-	req, _ := web.NewHTTPRequest(c.Request)
+	req, _ := web.NewHTTPRequest(c.RequestConfig)
 	req.URL.RawQuery = makeURLQuery(querySystemDisks)
 
 	seen := make(map[string]*diskStats)

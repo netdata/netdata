@@ -49,7 +49,7 @@ func TestWindows_Init(t *testing.T) {
 	}{
 		"success if 'url' is set": {
 			config: Config{
-				HTTP: web.HTTP{Request: web.Request{URL: "http://127.0.0.1:9182/metrics"}}},
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9182/metrics"}}},
 		},
 		"fails on default config": {
 			wantFail: true,
@@ -57,7 +57,7 @@ func TestWindows_Init(t *testing.T) {
 		},
 		"fails if 'url' is unset": {
 			wantFail: true,
-			config:   Config{HTTP: web.HTTP{Request: web.Request{URL: ""}}},
+			config:   Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: ""}}},
 		},
 	}
 

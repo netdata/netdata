@@ -17,10 +17,10 @@ func (v *VerneMQ) validateConfig() error {
 }
 
 func (v *VerneMQ) initPrometheusClient() (prometheus.Prometheus, error) {
-	client, err := web.NewHTTPClient(v.Client)
+	client, err := web.NewHTTPClient(v.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return prometheus.New(client, v.Request), nil
+	return prometheus.New(client, v.RequestConfig), nil
 }

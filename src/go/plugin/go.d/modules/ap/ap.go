@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 )
 
 //go:embed "config_schema.json"
@@ -29,7 +29,7 @@ func New() *AP {
 	return &AP{
 		Config: Config{
 			BinaryPath: "/usr/sbin/iw",
-			Timeout:    web.Duration(time.Second * 2),
+			Timeout:    confopt.Duration(time.Second * 2),
 		},
 		charts:     &module.Charts{},
 		seenIfaces: make(map[string]*iwInterface),
@@ -37,9 +37,9 @@ func New() *AP {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	BinaryPath  string       `yaml:"binary_path,omitempty" json:"binary_path"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	BinaryPath  string           `yaml:"binary_path,omitempty" json:"binary_path"`
 }
 
 type (

@@ -22,7 +22,7 @@ where
 `
 
 func (c *ClickHouse) collectSystemAsyncMetrics(mx map[string]int64) error {
-	req, _ := web.NewHTTPRequest(c.Request)
+	req, _ := web.NewHTTPRequest(c.RequestConfig)
 	req.URL.RawQuery = makeURLQuery(querySystemAsyncMetrics)
 
 	want := map[string]float64{

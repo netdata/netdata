@@ -131,7 +131,7 @@ func (p *Pihole) queryMetrics(pmx *piholeMetrics, doConcurrently bool) {
 }
 
 func (p *Pihole) querySummary(pmx *piholeMetrics) {
-	req, err := web.NewHTTPRequestWithPath(p.Request, urlPathAPI)
+	req, err := web.NewHTTPRequestWithPath(p.RequestConfig, urlPathAPI)
 	if err != nil {
 		p.Error(err)
 		return
@@ -152,7 +152,7 @@ func (p *Pihole) querySummary(pmx *piholeMetrics) {
 }
 
 func (p *Pihole) queryQueryTypes(pmx *piholeMetrics) {
-	req, err := web.NewHTTPRequestWithPath(p.Request, urlPathAPI)
+	req, err := web.NewHTTPRequestWithPath(p.RequestConfig, urlPathAPI)
 	if err != nil {
 		p.Error(err)
 		return
@@ -174,7 +174,7 @@ func (p *Pihole) queryQueryTypes(pmx *piholeMetrics) {
 }
 
 func (p *Pihole) queryForwardedDestinations(pmx *piholeMetrics) {
-	req, err := web.NewHTTPRequestWithPath(p.Request, urlPathAPI)
+	req, err := web.NewHTTPRequestWithPath(p.RequestConfig, urlPathAPI)
 	if err != nil {
 		p.Error(err)
 		return
@@ -196,7 +196,7 @@ func (p *Pihole) queryForwardedDestinations(pmx *piholeMetrics) {
 }
 
 func (p *Pihole) queryAPIVersion() (int, error) {
-	req, err := web.NewHTTPRequestWithPath(p.Request, urlPathAPI)
+	req, err := web.NewHTTPRequestWithPath(p.RequestConfig, urlPathAPI)
 	if err != nil {
 		return 0, err
 	}

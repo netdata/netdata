@@ -30,7 +30,7 @@ func (r *RiakKv) collect() (map[string]int64, error) {
 }
 
 func (r *RiakKv) getStats() (*riakStats, error) {
-	req, err := web.NewHTTPRequest(r.Request)
+	req, err := web.NewHTTPRequest(r.RequestConfig)
 	if err != nil {
 		return nil, err
 	}

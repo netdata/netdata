@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -27,15 +27,15 @@ func New() *Zookeeper {
 	return &Zookeeper{
 		Config: Config{
 			Address: "127.0.0.1:2181",
-			Timeout: web.Duration(time.Second),
+			Timeout: confopt.Duration(time.Second),
 			UseTLS:  false,
 		}}
 }
 
 type Config struct {
-	UpdateEvery      int          `yaml:"update_every,omitempty" json:"update_every"`
-	Address          string       `yaml:"address" json:"address"`
-	Timeout          web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	UpdateEvery      int              `yaml:"update_every,omitempty" json:"update_every"`
+	Address          string           `yaml:"address" json:"address"`
+	Timeout          confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	tlscfg.TLSConfig `yaml:",inline" json:""`
 	UseTLS           bool `yaml:"use_tls,omitempty" json:"use_tls"`
 }

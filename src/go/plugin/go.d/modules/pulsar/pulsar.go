@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
@@ -31,12 +32,12 @@ func init() {
 func New() *Pulsar {
 	return &Pulsar{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1:8080/metrics",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second * 5),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 5),
 				},
 			},
 			TopicFilter: matcher.SimpleExpr{
@@ -54,9 +55,9 @@ func New() *Pulsar {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
-	TopicFilter matcher.SimpleExpr `yaml:"topic_filter,omitempty" json:"topic_filter"`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
+	TopicFilter    matcher.SimpleExpr `yaml:"topic_filter,omitempty" json:"topic_filter"`
 }
 
 type Pulsar struct {

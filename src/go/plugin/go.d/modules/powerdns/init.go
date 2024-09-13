@@ -14,14 +14,14 @@ func (ns *AuthoritativeNS) validateConfig() error {
 	if ns.URL == "" {
 		return errors.New("URL not set")
 	}
-	if _, err := web.NewHTTPRequest(ns.Request); err != nil {
+	if _, err := web.NewHTTPRequest(ns.RequestConfig); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (ns *AuthoritativeNS) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(ns.Client)
+	return web.NewHTTPClient(ns.ClientConfig)
 }
 
 func (ns *AuthoritativeNS) initCharts() (*module.Charts, error) {

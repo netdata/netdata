@@ -87,7 +87,7 @@ func cleanName(name string) string {
 }
 
 func (t *Tomcat) queryServerStatus() (*serverStatusResponse, error) {
-	req, err := web.NewHTTPRequestWithPath(t.Request, urlPathServerStatus)
+	req, err := web.NewHTTPRequestWithPath(t.RequestConfig, urlPathServerStatus)
 	if err != nil {
 		return nil, err
 	}

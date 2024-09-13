@@ -19,13 +19,13 @@ func (c *Consul) validateConfig() error {
 }
 
 func (c *Consul) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(c.Client)
+	return web.NewHTTPClient(c.ClientConfig)
 }
 
 const urlPathAgentMetrics = "/v1/agent/metrics"
 
 func (c *Consul) initPrometheusClient(httpClient *http.Client) (prometheus.Prometheus, error) {
-	r, err := web.NewHTTPRequest(c.Request.Copy())
+	r, err := web.NewHTTPRequest(c.RequestConfig.Copy())
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (c *Consul) initPrometheusClient(httpClient *http.Client) (prometheus.Prome
 		"format": []string{"prometheus"},
 	}.Encode()
 
-	req := c.Request.Copy()
+	req := c.RequestConfig.Copy()
 	req.URL = r.URL.String()
 
 	if c.ACLToken != "" {

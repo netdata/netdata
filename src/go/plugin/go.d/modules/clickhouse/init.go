@@ -17,5 +17,5 @@ func (c *ClickHouse) validateConfig() error {
 }
 
 func (c *ClickHouse) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(c.Client)
+	return web.NewHTTPClient(c.ClientConfig)
 }

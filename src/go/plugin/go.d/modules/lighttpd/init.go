@@ -21,9 +21,9 @@ func (l *Lighttpd) validateConfig() error {
 }
 
 func (l *Lighttpd) initApiClient() (*apiClient, error) {
-	client, err := web.NewHTTPClient(l.Client)
+	client, err := web.NewHTTPClient(l.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
-	return newAPIClient(client, l.Request), nil
+	return newAPIClient(client, l.RequestConfig), nil
 }

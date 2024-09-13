@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
@@ -25,20 +26,20 @@ func init() {
 func New() *Nginx {
 	return &Nginx{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1/stub_status",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second * 1),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 1),
 				},
 			},
 		}}
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
 type Nginx struct {
@@ -58,13 +59,13 @@ func (n *Nginx) Init() error {
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(n.Client)
+	client, err := web.NewHTTPClient(n.ClientConfig)
 	if err != nil {
 		n.Error(err)
 		return err
 	}
 
-	n.apiClient = newAPIClient(client, n.Request)
+	n.apiClient = newAPIClient(client, n.RequestConfig)
 
 	n.Debugf("using URL %s", n.URL)
 	n.Debugf("using timeout: %s", n.Timeout)

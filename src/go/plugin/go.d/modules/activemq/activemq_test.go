@@ -178,7 +178,7 @@ func TestActiveMQ_Check(t *testing.T) {
 	defer ts.Close()
 
 	job := New()
-	job.HTTP.Request = web.Request{URL: ts.URL}
+	job.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
 	job.Webadmin = "webadmin"
 
 	require.NoError(t, job.Init())
@@ -211,7 +211,7 @@ func TestActiveMQ_Collect(t *testing.T) {
 	defer ts.Close()
 
 	job := New()
-	job.HTTP.Request = web.Request{URL: ts.URL}
+	job.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
 	job.Webadmin = "webadmin"
 
 	require.NoError(t, job.Init())
@@ -319,7 +319,7 @@ func TestActiveMQ_404(t *testing.T) {
 
 	job := New()
 	job.Webadmin = "webadmin"
-	job.HTTP.Request = web.Request{URL: ts.URL}
+	job.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
 
 	require.NoError(t, job.Init())
 	assert.Error(t, job.Check())
@@ -333,7 +333,7 @@ func TestActiveMQ_InvalidData(t *testing.T) {
 
 	mod := New()
 	mod.Webadmin = "webadmin"
-	mod.HTTP.Request = web.Request{URL: ts.URL}
+	mod.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
 
 	require.NoError(t, mod.Init())
 	assert.Error(t, mod.Check())

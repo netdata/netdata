@@ -120,7 +120,7 @@ func (cdb *CouchDB) scrapeCouchDB() *cdbMetrics {
 }
 
 func (cdb *CouchDB) scrapeNodeStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(cdb.Request, fmt.Sprintf(urlPathOverviewStats, cdb.Config.Node))
+	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, fmt.Sprintf(urlPathOverviewStats, cdb.Config.Node))
 
 	var stats cdbNodeStats
 	if err := cdb.doOKDecode(req, &stats); err != nil {
@@ -131,7 +131,7 @@ func (cdb *CouchDB) scrapeNodeStats(ms *cdbMetrics) {
 }
 
 func (cdb *CouchDB) scrapeSystemStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(cdb.Request, fmt.Sprintf(urlPathSystemStats, cdb.Config.Node))
+	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, fmt.Sprintf(urlPathSystemStats, cdb.Config.Node))
 
 	var stats cdbNodeSystem
 	if err := cdb.doOKDecode(req, &stats); err != nil {
@@ -142,7 +142,7 @@ func (cdb *CouchDB) scrapeSystemStats(ms *cdbMetrics) {
 }
 
 func (cdb *CouchDB) scrapeActiveTasks(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(cdb.Request, urlPathActiveTasks)
+	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, urlPathActiveTasks)
 
 	var stats []cdbActiveTask
 	if err := cdb.doOKDecode(req, &stats); err != nil {
@@ -153,7 +153,7 @@ func (cdb *CouchDB) scrapeActiveTasks(ms *cdbMetrics) {
 }
 
 func (cdb *CouchDB) scrapeDBStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(cdb.Request, urlPathDatabases)
+	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, urlPathDatabases)
 	req.Method = http.MethodPost
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
@@ -193,7 +193,7 @@ func findMaxMQSize(MessageQueues map[string]interface{}) int64 {
 }
 
 func (cdb *CouchDB) pingCouchDB() error {
-	req, _ := web.NewHTTPRequest(cdb.Request)
+	req, _ := web.NewHTTPRequest(cdb.RequestConfig)
 
 	var info struct{ Couchdb string }
 	if err := cdb.doOKDecode(req, &info); err != nil {

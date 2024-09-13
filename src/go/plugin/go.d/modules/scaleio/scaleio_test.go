@@ -53,7 +53,7 @@ func TestScaleIO_Init_ErrorOnCreatingClientWrongTLSCA(t *testing.T) {
 	job := New()
 	job.Username = "username"
 	job.Password = "password"
-	job.Client.TLSConfig.TLSCA = "testdata/tls"
+	job.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
 	assert.Error(t, job.Init())
 }

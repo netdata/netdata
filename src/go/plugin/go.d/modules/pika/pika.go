@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 
 	"github.com/blang/semver/v4"
 	"github.com/redis/go-redis/v9"
@@ -31,7 +31,7 @@ func New() *Pika {
 	return &Pika{
 		Config: Config{
 			Address: "redis://@localhost:9221",
-			Timeout: web.Duration(time.Second),
+			Timeout: confopt.Duration(time.Second),
 		},
 
 		collectedCommands: make(map[string]bool),
@@ -40,9 +40,9 @@ func New() *Pika {
 }
 
 type Config struct {
-	UpdateEvery      int          `yaml:"update_every,omitempty" json:"update_every"`
-	Address          string       `yaml:"address" json:"address"`
-	Timeout          web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	UpdateEvery      int              `yaml:"update_every,omitempty" json:"update_every"`
+	Address          string           `yaml:"address" json:"address"`
+	Timeout          confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 

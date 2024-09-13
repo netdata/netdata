@@ -73,7 +73,7 @@ func (m *Monit) collectStatus(mx map[string]int64) error {
 }
 
 func (m *Monit) fetchStatus() (*monitStatus, error) {
-	req, err := web.NewHTTPRequestWithPath(m.Request, urlPathStatus)
+	req, err := web.NewHTTPRequestWithPath(m.RequestConfig, urlPathStatus)
 	if err != nil {
 		return nil, err
 	}

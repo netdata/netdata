@@ -64,7 +64,7 @@ func (r *Recursor) collectStatistics(collected map[string]int64, statistics stat
 }
 
 func (r *Recursor) scrapeStatistics() ([]statisticMetric, error) {
-	req, _ := web.NewHTTPRequestWithPath(r.Request, urlPathLocalStatistics)
+	req, _ := web.NewHTTPRequestWithPath(r.RequestConfig, urlPathLocalStatistics)
 
 	var statistics statisticMetrics
 	if err := r.doOKDecode(req, &statistics); err != nil {

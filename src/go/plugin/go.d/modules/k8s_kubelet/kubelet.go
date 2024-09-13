@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
@@ -30,13 +31,13 @@ func init() {
 func New() *Kubelet {
 	return &Kubelet{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL:     "http://127.0.0.1:10255/metrics",
 					Headers: make(map[string]string),
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 			TokenPath: "/var/run/secrets/kubernetes.io/serviceaccount/token",
@@ -48,9 +49,9 @@ func New() *Kubelet {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
-	TokenPath   string `yaml:"token_path,omitempty" json:"token_path"`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
+	TokenPath      string `yaml:"token_path,omitempty" json:"token_path"`
 }
 
 type Kubelet struct {
@@ -82,7 +83,7 @@ func (k *Kubelet) Init() error {
 	k.prom = prom
 
 	if tok := k.initAuthToken(); tok != "" {
-		k.Request.Headers["Authorization"] = "Bearer " + tok
+		k.RequestConfig.Headers["Authorization"] = "Bearer " + tok
 	}
 
 	return nil

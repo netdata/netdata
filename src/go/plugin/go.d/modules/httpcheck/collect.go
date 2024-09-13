@@ -25,9 +25,9 @@ const (
 )
 
 func (hc *HTTPCheck) collect() (map[string]int64, error) {
-	req, err := web.NewHTTPRequest(hc.Request)
+	req, err := web.NewHTTPRequest(hc.RequestConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating HTTP requests to %s : %v", hc.Request.URL, err)
+		return nil, fmt.Errorf("error on creating HTTP requests to %s : %v", hc.RequestConfig.URL, err)
 	}
 
 	if hc.CookieFile != "" {

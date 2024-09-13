@@ -74,7 +74,7 @@ Relationships:
 */
 
 // New creates new ScaleIO client.
-func New(client web.Client, request web.Request) (*Client, error) {
+func New(client web.ClientConfig, request web.RequestConfig) (*Client, error) {
 	httpClient, err := web.NewHTTPClient(client)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func New(client web.Client, request web.Request) (*Client, error) {
 
 // Client represents ScaleIO client.
 type Client struct {
-	Request    web.Request
+	Request    web.RequestConfig
 	httpClient *http.Client
 	token      *token
 }
@@ -160,7 +160,7 @@ func (c *Client) Instances() (Instances, error) {
 	return instances, err
 }
 
-func (c *Client) createLoginRequest() web.Request {
+func (c *Client) createLoginRequest() web.RequestConfig {
 	req := c.Request.Copy()
 	u, _ := url.Parse(req.URL)
 	u.Path = path.Join(u.Path, "/api/login")
@@ -168,7 +168,7 @@ func (c *Client) createLoginRequest() web.Request {
 	return req
 }
 
-func (c *Client) createLogoutRequest() web.Request {
+func (c *Client) createLogoutRequest() web.RequestConfig {
 	req := c.Request.Copy()
 	u, _ := url.Parse(req.URL)
 	u.Path = path.Join(u.Path, "/api/logout")
@@ -177,7 +177,7 @@ func (c *Client) createLogoutRequest() web.Request {
 	return req
 }
 
-func (c *Client) createAPIVersionRequest() web.Request {
+func (c *Client) createAPIVersionRequest() web.RequestConfig {
 	req := c.Request.Copy()
 	u, _ := url.Parse(req.URL)
 	u.Path = path.Join(u.Path, "/api/version")
@@ -186,7 +186,7 @@ func (c *Client) createAPIVersionRequest() web.Request {
 	return req
 }
 
-func (c *Client) createSelectedStatisticsRequest(query []byte) web.Request {
+func (c *Client) createSelectedStatisticsRequest(query []byte) web.RequestConfig {
 	req := c.Request.Copy()
 	u, _ := url.Parse(req.URL)
 	u.Path = path.Join(u.Path, "/api/instances/querySelectedStatistics")
@@ -200,7 +200,7 @@ func (c *Client) createSelectedStatisticsRequest(query []byte) web.Request {
 	return req
 }
 
-func (c *Client) createInstancesRequest() web.Request {
+func (c *Client) createInstancesRequest() web.RequestConfig {
 	req := c.Request.Copy()
 	u, _ := url.Parse(req.URL)
 	u.Path = path.Join(u.Path, "/api/instances")
@@ -209,7 +209,7 @@ func (c *Client) createInstancesRequest() web.Request {
 	return req
 }
 
-func (c *Client) do(req web.Request) (*http.Response, error) {
+func (c *Client) do(req web.RequestConfig) (*http.Response, error) {
 	httpReq, err := web.NewHTTPRequest(req)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating http request to %s: %v", req.URL, err)
@@ -217,7 +217,7 @@ func (c *Client) do(req web.Request) (*http.Response, error) {
 	return c.httpClient.Do(httpReq)
 }
 
-func (c *Client) doOK(req web.Request) (*http.Response, error) {
+func (c *Client) doOK(req web.RequestConfig) (*http.Response, error) {
 	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
@@ -228,7 +228,7 @@ func (c *Client) doOK(req web.Request) (*http.Response, error) {
 	return resp, err
 }
 
-func (c *Client) doOKWithRetry(req web.Request) (*http.Response, error) {
+func (c *Client) doOKWithRetry(req web.RequestConfig) (*http.Response, error) {
 	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
@@ -246,7 +246,7 @@ func (c *Client) doOKWithRetry(req web.Request) (*http.Response, error) {
 	return resp, err
 }
 
-func (c *Client) doJSONWithRetry(dst interface{}, req web.Request) error {
+func (c *Client) doJSONWithRetry(dst interface{}, req web.RequestConfig) error {
 	resp, err := c.doOKWithRetry(req)
 	defer web.CloseBody(resp)
 	if err != nil {

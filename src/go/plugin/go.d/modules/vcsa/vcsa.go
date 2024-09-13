@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
@@ -28,9 +29,9 @@ func init() {
 func New() *VCSA {
 	return &VCSA{
 		Config: Config{
-			HTTP: web.HTTP{
-				Client: web.Client{
-					Timeout: web.Duration(time.Second * 5),
+			HTTPConfig: web.HTTPConfig{
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 5),
 				},
 			},
 		},
@@ -39,8 +40,8 @@ func New() *VCSA {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
 type (

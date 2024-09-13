@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
@@ -26,8 +27,8 @@ func New() *Supervisord {
 	return &Supervisord{
 		Config: Config{
 			URL: "http://127.0.0.1:9001/RPC2",
-			Client: web.Client{
-				Timeout: web.Duration(time.Second),
+			ClientConfig: web.ClientConfig{
+				Timeout: confopt.Duration(time.Second),
 			},
 		},
 
@@ -37,9 +38,9 @@ func New() *Supervisord {
 }
 
 type Config struct {
-	UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
-	URL         string `yaml:"url" json:"url"`
-	web.Client  `yaml:",inline" json:""`
+	UpdateEvery      int    `yaml:"update_every,omitempty" json:"update_every"`
+	URL              string `yaml:"url" json:"url"`
+	web.ClientConfig `yaml:",inline" json:""`
 }
 
 type (

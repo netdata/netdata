@@ -17,10 +17,10 @@ func (kp *KubeProxy) validateConfig() error {
 }
 
 func (kp *KubeProxy) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(kp.Client)
+	httpClient, err := web.NewHTTPClient(kp.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return prometheus.New(httpClient, kp.Request), nil
+	return prometheus.New(httpClient, kp.RequestConfig), nil
 }

@@ -64,7 +64,7 @@ func (ns *AuthoritativeNS) collectStatistics(collected map[string]int64, statist
 }
 
 func (ns *AuthoritativeNS) scrapeStatistics() ([]statisticMetric, error) {
-	req, _ := web.NewHTTPRequestWithPath(ns.Request, urlPathLocalStatistics)
+	req, _ := web.NewHTTPRequestWithPath(ns.RequestConfig, urlPathLocalStatistics)
 
 	var statistics statisticMetrics
 	if err := ns.doOKDecode(req, &statistics); err != nil {

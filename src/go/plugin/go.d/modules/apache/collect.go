@@ -31,7 +31,7 @@ func (a *Apache) collect() (map[string]int64, error) {
 }
 
 func (a *Apache) scrapeStatus() (*serverStatus, error) {
-	req, err := web.NewHTTPRequest(a.Request)
+	req, err := web.NewHTTPRequest(a.RequestConfig)
 	if err != nil {
 		return nil, err
 	}

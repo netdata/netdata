@@ -10,6 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere/resources"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 
 	"github.com/vmware/govmomi/performance"
@@ -32,12 +33,12 @@ func init() {
 func New() *VSphere {
 	return &VSphere{
 		Config: Config{
-			HTTP: web.HTTP{
-				Client: web.Client{
-					Timeout: web.Duration(time.Second * 20),
+			HTTPConfig: web.HTTPConfig{
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 20),
 				},
 			},
-			DiscoveryInterval: web.Duration(time.Minute * 5),
+			DiscoveryInterval: confopt.Duration(time.Minute * 5),
 			HostsInclude:      []string{"/*"},
 			VMsInclude:        []string{"/*"},
 		},
@@ -51,8 +52,8 @@ func New() *VSphere {
 
 type Config struct {
 	UpdateEvery       int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP          `yaml:",inline" json:""`
-	DiscoveryInterval web.Duration       `yaml:"discovery_interval,omitempty" json:"discovery_interval"`
+	web.HTTPConfig    `yaml:",inline" json:""`
+	DiscoveryInterval confopt.Duration   `yaml:"discovery_interval,omitempty" json:"discovery_interval"`
 	HostsInclude      match.HostIncludes `yaml:"host_include,omitempty" json:"host_include"`
 	VMsInclude        match.VMIncludes   `yaml:"vm_include,omitempty" json:"vm_include"`
 }

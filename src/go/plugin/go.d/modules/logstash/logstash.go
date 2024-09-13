@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
@@ -26,12 +27,12 @@ func init() {
 func New() *Logstash {
 	return &Logstash{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://localhost:9600",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 		},
@@ -41,8 +42,8 @@ func New() *Logstash {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
 type Logstash struct {
@@ -66,7 +67,7 @@ func (l *Logstash) Init() error {
 		return errors.New("url not set")
 	}
 
-	httpClient, err := web.NewHTTPClient(l.Client)
+	httpClient, err := web.NewHTTPClient(l.ClientConfig)
 	if err != nil {
 		l.Errorf("init HTTP client: %v", err)
 		return err

@@ -67,7 +67,7 @@ func (ic *Icecast) collectServerStats(mx map[string]int64) error {
 }
 
 func (ic *Icecast) queryServerStats() (*serverStats, error) {
-	req, err := web.NewHTTPRequestWithPath(ic.Request, urlPathServerStats)
+	req, err := web.NewHTTPRequestWithPath(ic.RequestConfig, urlPathServerStats)
 	if err != nil {
 		return nil, err
 	}

@@ -42,7 +42,7 @@ func (s *Squid) collect() (map[string]int64, error) {
 }
 
 func (s *Squid) collectCounters(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(s.Request, urlPathServerStats)
+	req, err := web.NewHTTPRequestWithPath(s.RequestConfig, urlPathServerStats)
 	if err != nil {
 		return err
 	}

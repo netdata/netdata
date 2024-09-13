@@ -47,7 +47,7 @@ func TestCassandra_Init(t *testing.T) {
 	}{
 		"success if 'url' is set": {
 			config: Config{
-				HTTP: web.HTTP{Request: web.Request{URL: "http://127.0.0.1:7072"}}},
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:7072"}}},
 		},
 		"success on default config": {
 			wantFail: false,
@@ -55,7 +55,7 @@ func TestCassandra_Init(t *testing.T) {
 		},
 		"fails if 'url' is unset": {
 			wantFail: true,
-			config:   Config{HTTP: web.HTTP{Request: web.Request{URL: ""}}},
+			config:   Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: ""}}},
 		},
 	}
 

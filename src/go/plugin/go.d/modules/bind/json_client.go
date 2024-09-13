@@ -32,13 +32,13 @@ type jsonViewResolver struct {
 	CacheStats map[string]int64
 }
 
-func newJSONClient(client *http.Client, request web.Request) *jsonClient {
+func newJSONClient(client *http.Client, request web.RequestConfig) *jsonClient {
 	return &jsonClient{httpClient: client, request: request}
 }
 
 type jsonClient struct {
 	httpClient *http.Client
-	request    web.Request
+	request    web.RequestConfig
 }
 
 func (c jsonClient) serverStats() (*serverStats, error) {

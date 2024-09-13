@@ -9,7 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 
 	probing "github.com/prometheus-community/pro-bing"
 )
@@ -34,7 +34,7 @@ func New() *Ping {
 			Network:     "ip",
 			Privileged:  true,
 			SendPackets: 5,
-			Interval:    web.Duration(time.Millisecond * 100),
+			Interval:    confopt.Duration(time.Millisecond * 100),
 		},
 
 		charts:    &module.Charts{},
@@ -44,13 +44,13 @@ func New() *Ping {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	Hosts       []string     `yaml:"hosts" json:"hosts"`
-	Network     string       `yaml:"network,omitempty" json:"network"`
-	Privileged  bool         `yaml:"privileged" json:"privileged"`
-	SendPackets int          `yaml:"packets,omitempty" json:"packets"`
-	Interval    web.Duration `yaml:"interval,omitempty" json:"interval"`
-	Interface   string       `yaml:"interface,omitempty" json:"interface"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	Hosts       []string         `yaml:"hosts" json:"hosts"`
+	Network     string           `yaml:"network,omitempty" json:"network"`
+	Privileged  bool             `yaml:"privileged" json:"privileged"`
+	SendPackets int              `yaml:"packets,omitempty" json:"packets"`
+	Interval    confopt.Duration `yaml:"interval,omitempty" json:"interval"`
+	Interface   string           `yaml:"interface,omitempty" json:"interface"`
 }
 
 type (

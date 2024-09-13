@@ -30,7 +30,7 @@ func (p *Puppet) collect() (map[string]int64, error) {
 }
 
 func (p *Puppet) queryStatsService() (*statusServiceResponse, error) {
-	req, err := web.NewHTTPRequestWithPath(p.Request, urlPathStatusService)
+	req, err := web.NewHTTPRequestWithPath(p.RequestConfig, urlPathStatusService)
 	if err != nil {
 		return nil, err
 	}

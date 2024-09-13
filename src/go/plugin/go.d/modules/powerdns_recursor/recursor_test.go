@@ -50,19 +50,19 @@ func TestRecursor_Init(t *testing.T) {
 		"fails on unset URL": {
 			wantFail: true,
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{URL: ""},
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: ""},
 				},
 			},
 		},
 		"fails on invalid TLSCA": {
 			wantFail: true,
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{
 						URL: "http://127.0.0.1:38001",
 					},
-					Client: web.Client{
+					ClientConfig: web.ClientConfig{
 						TLSConfig: tlscfg.TLSConfig{TLSCA: "testdata/tls"},
 					},
 				},

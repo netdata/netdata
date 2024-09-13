@@ -9,7 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/freeradius/api"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 )
 
 //go:embed "config_schema.json"
@@ -29,17 +29,17 @@ func New() *FreeRADIUS {
 			Address: "127.0.0.1",
 			Port:    18121,
 			Secret:  "adminsecret",
-			Timeout: web.Duration(time.Second),
+			Timeout: confopt.Duration(time.Second),
 		},
 	}
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every" json:"update_every"`
-	Address     string       `yaml:"address" json:"address"`
-	Port        int          `yaml:"port" json:"port"`
-	Secret      string       `yaml:"secret" json:"secret"`
-	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
+	UpdateEvery int              `yaml:"update_every" json:"update_every"`
+	Address     string           `yaml:"address" json:"address"`
+	Port        int              `yaml:"port" json:"port"`
+	Secret      string           `yaml:"secret" json:"secret"`
+	Timeout     confopt.Duration `yaml:"timeout" json:"timeout"`
 }
 
 type (

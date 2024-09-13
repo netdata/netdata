@@ -3,6 +3,7 @@
 package web
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"testing"
 	"time"
@@ -11,8 +12,8 @@ import (
 )
 
 func TestNewHTTPClient(t *testing.T) {
-	client, _ := NewHTTPClient(Client{
-		Timeout:           Duration(time.Second * 5),
+	client, _ := NewHTTPClient(ClientConfig{
+		Timeout:           confopt.Duration(time.Second * 5),
 		NotFollowRedirect: true,
 		ProxyURL:          "http://127.0.0.1:3128",
 	})

@@ -53,7 +53,7 @@ func (ts *Typesense) collect() (map[string]int64, error) {
 }
 
 func (ts *Typesense) collectHealth(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(ts.Request, urlPathHealth)
+	req, err := web.NewHTTPRequestWithPath(ts.RequestConfig, urlPathHealth)
 	if err != nil {
 		return fmt.Errorf("creating health request: %w", err)
 	}
@@ -87,7 +87,7 @@ func (ts *Typesense) collectStats(mx map[string]int64) error {
 		return nil
 	}
 
-	req, err := web.NewHTTPRequestWithPath(ts.Request, urlPathStats)
+	req, err := web.NewHTTPRequestWithPath(ts.RequestConfig, urlPathStats)
 	if err != nil {
 		return fmt.Errorf("creating stats request: %w", err)
 	}

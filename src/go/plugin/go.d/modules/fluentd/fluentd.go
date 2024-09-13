@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
@@ -26,12 +27,12 @@ func init() {
 func New() *Fluentd {
 	return &Fluentd{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1:24220",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			}},
 		activePlugins: make(map[string]bool),
@@ -40,9 +41,9 @@ func New() *Fluentd {
 }
 
 type Config struct {
-	UpdateEvery  int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP     `yaml:",inline" json:""`
-	PermitPlugin string `yaml:"permit_plugin_id,omitempty" json:"permit_plugin_id"`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
+	PermitPlugin   string `yaml:"permit_plugin_id,omitempty" json:"permit_plugin_id"`
 }
 
 type Fluentd struct {

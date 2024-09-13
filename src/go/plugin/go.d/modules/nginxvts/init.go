@@ -15,14 +15,14 @@ func (vts *NginxVTS) validateConfig() error {
 		return errors.New("URL not set")
 	}
 
-	if _, err := web.NewHTTPRequest(vts.Request); err != nil {
+	if _, err := web.NewHTTPRequest(vts.RequestConfig); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (vts *NginxVTS) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(vts.Client)
+	return web.NewHTTPClient(vts.ClientConfig)
 }
 
 func (vts *NginxVTS) initCharts() (*module.Charts, error) {

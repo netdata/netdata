@@ -21,13 +21,13 @@ type repository struct {
 	LastUpdated string `json:"last_updated"`
 }
 
-func newAPIClient(client *http.Client, request web.Request) *apiClient {
+func newAPIClient(client *http.Client, request web.RequestConfig) *apiClient {
 	return &apiClient{httpClient: client, request: request}
 }
 
 type apiClient struct {
 	httpClient *http.Client
-	request    web.Request
+	request    web.RequestConfig
 }
 
 func (a apiClient) getRepository(repoName string) (*repository, error) {

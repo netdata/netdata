@@ -56,13 +56,13 @@ func TestDockerEngine_Init(t *testing.T) {
 			config: New().Config,
 		},
 		"empty URL": {
-			config:   Config{HTTP: web.HTTP{Request: web.Request{URL: ""}}},
+			config:   Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: ""}}},
 			wantFail: true,
 		},
 		"nonexistent TLS CA": {
-			config: Config{HTTP: web.HTTP{
-				Request: web.Request{URL: "http://127.0.0.1:9323/metrics"},
-				Client:  web.Client{TLSConfig: tlscfg.TLSConfig{TLSCA: "testdata/tls"}}}},
+			config: Config{HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9323/metrics"},
+				ClientConfig:  web.ClientConfig{TLSConfig: tlscfg.TLSConfig{TLSCA: "testdata/tls"}}}},
 			wantFail: true,
 		},
 	}

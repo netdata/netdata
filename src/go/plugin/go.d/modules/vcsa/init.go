@@ -20,7 +20,7 @@ func (vc *VCSA) validateConfig() error {
 }
 
 func (vc *VCSA) initHealthClient() (*client.Client, error) {
-	httpClient, err := web.NewHTTPClient(vc.Client)
+	httpClient, err := web.NewHTTPClient(vc.ClientConfig)
 	if err != nil {
 		return nil, err
 	}

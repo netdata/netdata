@@ -44,7 +44,7 @@ type stats struct {
 
 const pathStats = "/%s/xml/%s.jsp"
 
-func newAPIClient(client *http.Client, request web.Request, webadmin string) *apiClient {
+func newAPIClient(client *http.Client, request web.RequestConfig, webadmin string) *apiClient {
 	return &apiClient{
 		httpClient: client,
 		request:    request,
@@ -54,7 +54,7 @@ func newAPIClient(client *http.Client, request web.Request, webadmin string) *ap
 
 type apiClient struct {
 	httpClient *http.Client
-	request    web.Request
+	request    web.RequestConfig
 	webadmin   string
 }
 

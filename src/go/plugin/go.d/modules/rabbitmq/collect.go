@@ -144,12 +144,12 @@ func (r *RabbitMQ) collectQueuesStats(mx map[string]int64) error {
 }
 
 func (r *RabbitMQ) doOKDecode(urlPath string, in interface{}) error {
-	req, err := web.NewHTTPRequestWithPath(r.Request, urlPath)
+	req, err := web.NewHTTPRequestWithPath(r.RequestConfig, urlPath)
 	if err != nil {
 		return fmt.Errorf("error on creating request: %v", err)
 	}
 
-	r.Debugf("doing HTTP %s to '%s'", req.Method, req.URL)
+	r.Debugf("doing HTTPConfig %s to '%s'", req.Method, req.URL)
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("error on request to %s: %v", req.URL, err)
