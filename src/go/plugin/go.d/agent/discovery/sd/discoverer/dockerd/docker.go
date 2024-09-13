@@ -5,20 +5,21 @@ package dockerd
 import (
 	"context"
 	"fmt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"log/slog"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
+
 	"github.com/docker/docker/api/types"
 	typesContainer "github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
 	"github.com/ilyam8/hashstructure"
-	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 )
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
