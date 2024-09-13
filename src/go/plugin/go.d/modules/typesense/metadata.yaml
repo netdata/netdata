@@ -5,7 +5,7 @@ modules:
       plugin_name: go.d.plugin
       module_name: typesense
       monitored_instance:
-        name: NGINX
+        name: Typesense
         link: https://typesense.org/
         categories:
           - data-collection.search-engines
