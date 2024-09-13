@@ -75,6 +75,9 @@ ninja -v -C "${build}" install || ninja -v -C "${build}" -j 1
 #echo "Compile with:"
 #echo "ninja -v -C \"${build}\" install || ninja -v -C \"${build}\" -j 1"
 
+echo "Stopping service Netdata"
+sc stop "Netdata" || echo "Failed"
+
 echo "starting netdata..."
 # enable JIT debug with gdb
 export MSYS="error_start:$(cygpath -w /usr/bin/gdb)"
