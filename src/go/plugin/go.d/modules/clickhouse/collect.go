@@ -5,11 +5,12 @@ package clickhouse
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 	"io"
 	"net/http"
 	"net/url"
 	"slices"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 const precision = 1000
