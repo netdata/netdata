@@ -34,7 +34,7 @@ modules:
         auto_detection:
           description: |
             The collector can automatically detect Typesense instances running on:
-            
+
             - localhost that are listening on port 8108
             - within Docker containers
         limits:
@@ -54,8 +54,8 @@ modules:
             description: |
               While optional, configuring an [API key](https://typesense.org/docs/0.20.0/api/api-keys.html#api-keys) is highly recommended to enable the collector to gather [stats metrics](https://typesense.org/docs/27.0/api/cluster-operations.html#api-stats), including request counts and latency.
               Without an API key, the collector will only collect health status information.
-              
-              > If you're running Typesense with the API key provided as a command-line parameter (e.g., --api-key=XYZ), Netdata can automatically detect and use this key for queries.
+
+              > If you're running Typesense with the API key provided as a command-line parameter (e.g., `--api-key=XYZ`), Netdata can automatically detect and use this key for queries.
               > In this case, no additional configuration is required.
       configuration:
         file:
@@ -156,14 +156,14 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1:8108
                     api_key: XYZ
-                
+
                   - name: remote
                     url: http://192.0.2.1:8108
                     api_key: XYZ
