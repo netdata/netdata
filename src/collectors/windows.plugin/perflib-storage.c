@@ -103,7 +103,7 @@ static inline void system_disk_queue(uint64_t queue, int update_every) {
                                            );
 
 
-        rd_dqueue = rrddim_add(st_dqueue, "reads",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_dqueue = rrddim_add(st_dqueue, "request",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     // this always have to be in base units, so that exporting sends base units to other time-series db
@@ -127,7 +127,7 @@ static inline void common_disk_queue(ND_DISK_QUEUE *d, const char *id, const cha
                                               , RRDSET_TYPE_LINE
                                               );
 
-        d->rd_queue  = rrddim_add(d->st_queue, "reads",  NULL,  1, 1024, RRD_ALGORITHM_INCREMENTAL);
+        d->rd_queue  = rrddim_add(d->st_queue, "request",  NULL,  1, 1024, RRD_ALGORITHM_INCREMENTAL);
 
         if(cb)
             cb(d->st_queue, data);
@@ -490,16 +490,20 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskReadQueueLength) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskWriteQueueLength)) {
+            NETDATA_DOUBLE reads = d->averageDiskReadQueueLength.current.Data;
+            reads /= (NETDATA_DOUBLE)ND_SECONDS_TO_100NS;
+            NETDATA_DOUBLE writes = d->averageDiskWriteQueueLength.current.Data;
+            writes /= (NETDATA_DOUBLE)ND_SECONDS_TO_100NS;
             if (is_system)
-                common_system_ioawait(d->averageDiskReadQueueLength.current.Data * 1000,
-                                      d->averageDiskWriteQueueLength.current.Data * 1000,
+                common_system_ioawait(((uint64_t)reads) * 1024,
+                                      ((uint64_t)writes) * 1024,
                                       update_every);
             else
                 common_disk_await(&d->disk_await,
                                   device,
                                   NULL,
-                                  d->averageDiskReadQueueLength.current.Data * 1000,
-                                  d->averageDiskWriteQueueLength.current.Data * 1000,
+                                  ((uint64_t)reads) * 1024,
+                                  ((uint64_t)writes) * 1024,
                                   update_every,
                                   physical_disk_labels,
                                   d);
