@@ -330,7 +330,8 @@ func (n *NginxPlus) doWithDecode(dst interface{}, req *http.Request) error {
 	if err != nil {
 		return err
 	}
-	defer closeBody(resp)
+
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode == http.StatusNotFound {
 		return fmt.Errorf("%s returned %d status code (%w)", req.URL, resp.StatusCode, errPathNotFound)
@@ -349,13 +350,6 @@ func (n *NginxPlus) doWithDecode(dst interface{}, req *http.Request) error {
 	}
 
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }
 
 func (n *nginxMetrics) empty() bool {

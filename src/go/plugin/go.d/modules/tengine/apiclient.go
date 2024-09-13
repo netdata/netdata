@@ -93,7 +93,7 @@ func (a apiClient) getStatus() (*tengineStatus, error) {
 	}
 
 	resp, err := a.doRequestOK(req)
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 	if err != nil {
 		return nil, err
 	}
@@ -115,13 +115,6 @@ func (a apiClient) doRequestOK(req *http.Request) (*http.Response, error) {
 		return resp, fmt.Errorf("%s returned HTTP code %d", req.URL, resp.StatusCode)
 	}
 	return resp, nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }
 
 func parseStatus(r io.Reader) (*tengineStatus, error) {

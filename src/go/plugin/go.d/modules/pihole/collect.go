@@ -220,7 +220,8 @@ func (p *Pihole) doWithDecode(dst interface{}, req *http.Request) error {
 	if err != nil {
 		return err
 	}
-	defer closeBody(resp)
+
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("%s returned %d status code", req.URL, resp.StatusCode)
@@ -246,13 +247,6 @@ func (p *Pihole) doWithDecode(dst interface{}, req *http.Request) error {
 func isEmptyArray(data []byte) bool {
 	empty := "[]"
 	return len(data) == len(empty) && string(data) == empty
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }
 
 func boolToInt(b bool) int64 {

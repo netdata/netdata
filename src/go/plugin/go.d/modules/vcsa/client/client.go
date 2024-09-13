@@ -5,7 +5,6 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 
@@ -96,7 +95,7 @@ func (c *Client) Logout() error {
 	}
 
 	resp, err := c.doOK(req)
-	closeBody(resp)
+	web.CloseBody(resp)
 	c.token.set("")
 	return err
 }
@@ -110,7 +109,7 @@ func (c *Client) Ping() error {
 		Headers: map[string]string{apiSessIDKey: c.token.get()},
 	}
 	resp, err := c.doOK(req)
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 	if resp != nil && resp.StatusCode == http.StatusUnauthorized {
 		return c.Login()
 	}
@@ -193,7 +192,7 @@ func (c *Client) doOK(req web.Request) (*http.Response, error) {
 
 func (c *Client) doOKWithDecode(req web.Request, dst interface{}) error {
 	resp, err := c.doOK(req)
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 	if err != nil {
 		return err
 	}
@@ -203,11 +202,4 @@ func (c *Client) doOKWithDecode(req web.Request, dst interface{}) error {
 		return fmt.Errorf("error on decoding response from %s : %v", req.URL, err)
 	}
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

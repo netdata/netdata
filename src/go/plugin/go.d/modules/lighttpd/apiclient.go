@@ -43,7 +43,7 @@ func (a apiClient) getServerStatus() (*serverStatus, error) {
 
 	resp, err := a.doRequestOK(req)
 
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 
 	if err != nil {
 		return nil, err
@@ -160,11 +160,4 @@ func mustParseInt(value string) *int64 {
 		panic(err)
 	}
 	return &v
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

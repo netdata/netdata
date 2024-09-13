@@ -40,7 +40,8 @@ func (a *Apache) scrapeStatus() (*serverStatus, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
-	defer closeBody(resp)
+
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
@@ -153,11 +154,4 @@ func parseFloat(value string) *float64 {
 		return nil
 	}
 	return &v
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

@@ -5,7 +5,6 @@ package hdfs
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
@@ -49,7 +48,7 @@ func (c *client) doOK() (*http.Response, error) {
 
 func (c *client) doOKWithDecodeJSON(dst interface{}) error {
 	resp, err := c.doOK()
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 	if err != nil {
 		return err
 	}
@@ -59,11 +58,4 @@ func (c *client) doOKWithDecodeJSON(dst interface{}) error {
 		return fmt.Errorf("error on decoding response from %s : %v", c.request.URL, err)
 	}
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

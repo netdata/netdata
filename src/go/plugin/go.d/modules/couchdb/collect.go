@@ -212,11 +212,18 @@ func (cdb *CouchDB) doOKDecode(req *http.Request, in interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
-	defer closeBody(resp)
 
-	// TODO: read resp body, it contains reason
-	// ex.: {"error":"bad_request","reason":"`keys` member must exist."} (400)
+	defer web.CloseBody(resp)
+
 	if resp.StatusCode != http.StatusOK {
+		var msg struct {
+			Error  string `json:"error"`
+			Reason string `json:"reason"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&msg); err == nil && msg.Error != "" {
+			return fmt.Errorf("'%s' returned HTTP status code: %d (err '%s', reason '%s')",
+				req.URL, resp.StatusCode, msg.Error, msg.Reason)
+		}
 		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
 	}
 
@@ -224,13 +231,6 @@ func (cdb *CouchDB) doOKDecode(req *http.Request, in interface{}) error {
 		return fmt.Errorf("error on decoding response from '%s': %v", req.URL, err)
 	}
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }
 
 func merge(dst, src map[string]int64, prefix string) {

@@ -5,7 +5,6 @@ package consul
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
@@ -83,7 +82,7 @@ func (c *Consul) doOKDecode(urlPath string, in interface{}, statusCodes ...int) 
 		return fmt.Errorf("error on request to %s : %v", req.URL, err)
 	}
 
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 
 	codes := map[int]bool{http.StatusOK: true}
 	for _, v := range statusCodes {
@@ -99,13 +98,6 @@ func (c *Consul) doOKDecode(urlPath string, in interface{}, statusCodes ...int) 
 	}
 
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }
 
 func boolToInt(v bool) int64 {
