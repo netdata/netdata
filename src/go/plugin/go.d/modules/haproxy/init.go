@@ -14,19 +14,19 @@ func (h *Haproxy) validateConfig() error {
 	if h.URL == "" {
 		return errors.New("'url' is not set")
 	}
-	if _, err := web.NewHTTPRequest(h.Request); err != nil {
+	if _, err := web.NewHTTPRequest(h.RequestConfig); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (h *Haproxy) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(h.Client)
+	httpClient, err := web.NewHTTPClient(h.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	prom := prometheus.NewWithSelector(httpClient, h.Request, sr)
+	prom := prometheus.NewWithSelector(httpClient, h.RequestConfig, sr)
 	return prom, nil
 }
 

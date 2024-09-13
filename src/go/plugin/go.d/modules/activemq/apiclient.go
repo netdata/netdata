@@ -5,7 +5,6 @@ package activemq
 import (
 	"encoding/xml"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -45,7 +44,7 @@ type stats struct {
 
 const pathStats = "/%s/xml/%s.jsp"
 
-func newAPIClient(client *http.Client, request web.Request, webadmin string) *apiClient {
+func newAPIClient(client *http.Client, request web.RequestConfig, webadmin string) *apiClient {
 	return &apiClient{
 		httpClient: client,
 		request:    request,
@@ -55,7 +54,7 @@ func newAPIClient(client *http.Client, request web.Request, webadmin string) *ap
 
 type apiClient struct {
 	httpClient *http.Client
-	request    web.Request
+	request    web.RequestConfig
 	webadmin   string
 }
 
@@ -67,7 +66,7 @@ func (a *apiClient) getQueues() (*queues, error) {
 
 	resp, err := a.doRequestOK(req)
 
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 
 	if err != nil {
 		return nil, err
@@ -90,7 +89,7 @@ func (a *apiClient) getTopics() (*topics, error) {
 
 	resp, err := a.doRequestOK(req)
 
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 
 	if err != nil {
 		return nil, err
@@ -127,11 +126,4 @@ func (a *apiClient) createRequest(urlPath string) (*http.Request, error) {
 	u.Path = path.Join(u.Path, urlPath)
 	req.URL = u.String()
 	return web.NewHTTPRequest(req)
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

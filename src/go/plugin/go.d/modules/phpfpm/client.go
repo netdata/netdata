@@ -53,11 +53,11 @@ type client interface {
 
 type httpClient struct {
 	client *http.Client
-	req    web.Request
+	req    web.RequestConfig
 	dec    decoder
 }
 
-func newHTTPClient(c *http.Client, r web.Request) (*httpClient, error) {
+func newHTTPClient(c *http.Client, r web.RequestConfig) (*httpClient, error) {
 	u, err := url.Parse(r.URL)
 	if err != nil {
 		return nil, err

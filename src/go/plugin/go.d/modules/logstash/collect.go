@@ -45,7 +45,7 @@ func (l *Logstash) updateCharts(pipelines map[string]pipelineStats) {
 }
 
 func (l *Logstash) queryNodeStats() (*nodeStats, error) {
-	req, err := web.NewHTTPRequestWithPath(l.Request, urlPathNodeStatsAPI)
+	req, err := web.NewHTTPRequestWithPath(l.RequestConfig, urlPathNodeStatsAPI)
 	if err != nil {
 		return nil, err
 	}
@@ -61,11 +61,13 @@ func (l *Logstash) queryNodeStats() (*nodeStats, error) {
 
 func (l *Logstash) doWithDecode(dst interface{}, req *http.Request) error {
 	l.Debugf("executing %s '%s'", req.Method, req.URL)
+
 	resp, err := l.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
-	defer closeBody(resp)
+
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("%s returned %d status code (%s)", req.URL, resp.StatusCode, resp.Status)
@@ -81,11 +83,4 @@ func (l *Logstash) doWithDecode(dst interface{}, req *http.Request) error {
 	}
 
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

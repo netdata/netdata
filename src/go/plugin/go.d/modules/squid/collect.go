@@ -42,7 +42,7 @@ func (s *Squid) collect() (map[string]int64, error) {
 }
 
 func (s *Squid) collectCounters(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(s.Request, urlPathServerStats)
+	req, err := web.NewHTTPRequestWithPath(s.RequestConfig, urlPathServerStats)
 	if err != nil {
 		return err
 	}
@@ -88,18 +88,11 @@ func (s *Squid) doOK(req *http.Request, parse func(body io.Reader) error) error 
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
 
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
 	}
 
 	return parse(resp.Body)
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
@@ -26,14 +27,14 @@ func init() {
 func New() *Monit {
 	return &Monit{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL:      "http://127.0.0.1:2812",
 					Username: "admin",
 					Password: "monit",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 		},
@@ -43,8 +44,8 @@ func New() *Monit {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
 type Monit struct {
@@ -68,7 +69,7 @@ func (m *Monit) Init() error {
 		return errors.New("config: missing URL")
 	}
 
-	httpClient, err := web.NewHTTPClient(m.Client)
+	httpClient, err := web.NewHTTPClient(m.ClientConfig)
 	if err != nil {
 		m.Errorf("init HTTP client: %v", err)
 		return err

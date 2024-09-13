@@ -5,7 +5,6 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 
@@ -72,7 +71,7 @@ type Client struct {
 // Login creates a session with the API. This operation exchanges user credentials supplied in the security context
 // for a session identifier that is to be used for authenticating subsequent calls.
 func (c *Client) Login() error {
-	req := web.Request{
+	req := web.RequestConfig{
 		URL:      fmt.Sprintf("%s%s", c.url, pathCISSession),
 		Username: c.username,
 		Password: c.password,
@@ -89,14 +88,14 @@ func (c *Client) Login() error {
 
 // Logout terminates the validity of a session token.
 func (c *Client) Logout() error {
-	req := web.Request{
+	req := web.RequestConfig{
 		URL:     fmt.Sprintf("%s%s", c.url, pathCISSession),
 		Method:  http.MethodDelete,
 		Headers: map[string]string{apiSessIDKey: c.token.get()},
 	}
 
 	resp, err := c.doOK(req)
-	closeBody(resp)
+	web.CloseBody(resp)
 	c.token.set("")
 	return err
 }
@@ -104,13 +103,13 @@ func (c *Client) Logout() error {
 // Ping sent a request to VCSA server to ensure the link is operating.
 // In case of 401 error Ping tries to re authenticate.
 func (c *Client) Ping() error {
-	req := web.Request{
+	req := web.RequestConfig{
 		URL:     fmt.Sprintf("%s%s?~action=get", c.url, pathCISSession),
 		Method:  http.MethodPost,
 		Headers: map[string]string{apiSessIDKey: c.token.get()},
 	}
 	resp, err := c.doOK(req)
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 	if resp != nil && resp.StatusCode == http.StatusUnauthorized {
 		return c.Login()
 	}
@@ -118,7 +117,7 @@ func (c *Client) Ping() error {
 }
 
 func (c *Client) health(urlPath string) (string, error) {
-	req := web.Request{
+	req := web.RequestConfig{
 		URL:     fmt.Sprintf("%s%s", c.url, urlPath),
 		Headers: map[string]string{apiSessIDKey: c.token.get()},
 	}
@@ -171,7 +170,7 @@ func (c *Client) System() (string, error) {
 	return c.health(pathHealthSystem)
 }
 
-func (c *Client) do(req web.Request) (*http.Response, error) {
+func (c *Client) do(req web.RequestConfig) (*http.Response, error) {
 	httpReq, err := web.NewHTTPRequest(req)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating http request to %s : %v", req.URL, err)
@@ -179,7 +178,7 @@ func (c *Client) do(req web.Request) (*http.Response, error) {
 	return c.httpClient.Do(httpReq)
 }
 
-func (c *Client) doOK(req web.Request) (*http.Response, error) {
+func (c *Client) doOK(req web.RequestConfig) (*http.Response, error) {
 	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
@@ -191,9 +190,9 @@ func (c *Client) doOK(req web.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-func (c *Client) doOKWithDecode(req web.Request, dst interface{}) error {
+func (c *Client) doOKWithDecode(req web.RequestConfig, dst interface{}) error {
 	resp, err := c.doOK(req)
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 	if err != nil {
 		return err
 	}
@@ -203,11 +202,4 @@ func (c *Client) doOKWithDecode(req web.Request, dst interface{}) error {
 		return fmt.Errorf("error on decoding response from %s : %v", req.URL, err)
 	}
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

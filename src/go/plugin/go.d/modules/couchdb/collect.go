@@ -120,7 +120,7 @@ func (cdb *CouchDB) scrapeCouchDB() *cdbMetrics {
 }
 
 func (cdb *CouchDB) scrapeNodeStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(cdb.Request, fmt.Sprintf(urlPathOverviewStats, cdb.Config.Node))
+	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, fmt.Sprintf(urlPathOverviewStats, cdb.Config.Node))
 
 	var stats cdbNodeStats
 	if err := cdb.doOKDecode(req, &stats); err != nil {
@@ -131,7 +131,7 @@ func (cdb *CouchDB) scrapeNodeStats(ms *cdbMetrics) {
 }
 
 func (cdb *CouchDB) scrapeSystemStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(cdb.Request, fmt.Sprintf(urlPathSystemStats, cdb.Config.Node))
+	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, fmt.Sprintf(urlPathSystemStats, cdb.Config.Node))
 
 	var stats cdbNodeSystem
 	if err := cdb.doOKDecode(req, &stats); err != nil {
@@ -142,7 +142,7 @@ func (cdb *CouchDB) scrapeSystemStats(ms *cdbMetrics) {
 }
 
 func (cdb *CouchDB) scrapeActiveTasks(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(cdb.Request, urlPathActiveTasks)
+	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, urlPathActiveTasks)
 
 	var stats []cdbActiveTask
 	if err := cdb.doOKDecode(req, &stats); err != nil {
@@ -153,7 +153,7 @@ func (cdb *CouchDB) scrapeActiveTasks(ms *cdbMetrics) {
 }
 
 func (cdb *CouchDB) scrapeDBStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(cdb.Request, urlPathDatabases)
+	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, urlPathDatabases)
 	req.Method = http.MethodPost
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
@@ -193,7 +193,7 @@ func findMaxMQSize(MessageQueues map[string]interface{}) int64 {
 }
 
 func (cdb *CouchDB) pingCouchDB() error {
-	req, _ := web.NewHTTPRequest(cdb.Request)
+	req, _ := web.NewHTTPRequest(cdb.RequestConfig)
 
 	var info struct{ Couchdb string }
 	if err := cdb.doOKDecode(req, &info); err != nil {
@@ -212,11 +212,18 @@ func (cdb *CouchDB) doOKDecode(req *http.Request, in interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
-	defer closeBody(resp)
 
-	// TODO: read resp body, it contains reason
-	// ex.: {"error":"bad_request","reason":"`keys` member must exist."} (400)
+	defer web.CloseBody(resp)
+
 	if resp.StatusCode != http.StatusOK {
+		var msg struct {
+			Error  string `json:"error"`
+			Reason string `json:"reason"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&msg); err == nil && msg.Error != "" {
+			return fmt.Errorf("'%s' returned HTTP status code: %d (err '%s', reason '%s')",
+				req.URL, resp.StatusCode, msg.Error, msg.Reason)
+		}
 		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
 	}
 
@@ -224,13 +231,6 @@ func (cdb *CouchDB) doOKDecode(req *http.Request, in interface{}) error {
 		return fmt.Errorf("error on decoding response from '%s': %v", req.URL, err)
 	}
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }
 
 func merge(dst, src map[string]int64, prefix string) {

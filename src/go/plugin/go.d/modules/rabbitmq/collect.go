@@ -5,7 +5,6 @@ package rabbitmq
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"path/filepath"
 
@@ -145,18 +144,18 @@ func (r *RabbitMQ) collectQueuesStats(mx map[string]int64) error {
 }
 
 func (r *RabbitMQ) doOKDecode(urlPath string, in interface{}) error {
-	req, err := web.NewHTTPRequestWithPath(r.Request, urlPath)
+	req, err := web.NewHTTPRequestWithPath(r.RequestConfig, urlPath)
 	if err != nil {
 		return fmt.Errorf("error on creating request: %v", err)
 	}
 
-	r.Debugf("doing HTTP %s to '%s'", req.Method, req.URL)
+	r.Debugf("doing HTTPConfig %s to '%s'", req.Method, req.URL)
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("error on request to %s: %v", req.URL, err)
 	}
 
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("%s returned HTTP status %d (%s)", req.URL, resp.StatusCode, resp.Status)
@@ -167,11 +166,4 @@ func (r *RabbitMQ) doOKDecode(urlPath string, in interface{}) error {
 	}
 
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

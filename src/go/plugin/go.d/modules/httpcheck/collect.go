@@ -25,9 +25,9 @@ const (
 )
 
 func (hc *HTTPCheck) collect() (map[string]int64, error) {
-	req, err := web.NewHTTPRequest(hc.Request)
+	req, err := web.NewHTTPRequest(hc.RequestConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating HTTP requests to %s : %v", hc.Request.URL, err)
+		return nil, fmt.Errorf("error on creating HTTP requests to %s : %v", hc.RequestConfig.URL, err)
 	}
 
 	if hc.CookieFile != "" {
@@ -40,7 +40,7 @@ func (hc *HTTPCheck) collect() (map[string]int64, error) {
 	resp, err := hc.httpClient.Do(req)
 	dur := time.Since(start)
 
-	defer closeBody(resp)
+	defer web.CloseBody(resp)
 
 	var mx metrics
 
@@ -174,14 +174,6 @@ func (hc *HTTPCheck) readCookieFile() error {
 	hc.cookieFileModTime = fi.ModTime()
 
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp == nil || resp.Body == nil {
-		return
-	}
-	_, _ = io.Copy(io.Discard, resp.Body)
-	_ = resp.Body.Close()
 }
 
 func durationToMs(duration time.Duration) int {

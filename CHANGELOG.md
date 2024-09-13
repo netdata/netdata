@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- add typesense to apps\_groups.conf [\#18537](https://github.com/netdata/netdata/pull/18537) ([ilyam8](https://github.com/ilyam8))
+- go.d snmp change label name organization-\>vendor [\#18535](https://github.com/netdata/netdata/pull/18535) ([ilyam8](https://github.com/ilyam8))
+- go.d snmp fix vnode host labels [\#18534](https://github.com/netdata/netdata/pull/18534) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/vmware/govmomi from 0.42.0 to 0.43.0 in /src/go [\#18532](https://github.com/netdata/netdata/pull/18532) ([dependabot[bot]](https://github.com/apps/dependabot))
 - go.d add vnode guid validation [\#18531](https://github.com/netdata/netdata/pull/18531) ([ilyam8](https://github.com/ilyam8))
 - go.d snmp handle multiline sysDescr [\#18530](https://github.com/netdata/netdata/pull/18530) ([ilyam8](https://github.com/ilyam8))
@@ -31,6 +34,7 @@
 - Bump github.com/jackc/pgx/v5 from 5.6.0 to 5.7.0 in /src/go [\#18498](https://github.com/netdata/netdata/pull/18498) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/prometheus/common from 0.58.0 to 0.59.1 in /src/go [\#18497](https://github.com/netdata/netdata/pull/18497) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump golang.org/x/net from 0.28.0 to 0.29.0 in /src/go [\#18496](https://github.com/netdata/netdata/pull/18496) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Windows Plugin Metrics \(Thermal and Memory\) [\#18494](https://github.com/netdata/netdata/pull/18494) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations.js [\#18493](https://github.com/netdata/netdata/pull/18493) ([netdatabot](https://github.com/netdatabot))
 - varnish collector Go implementation [\#18491](https://github.com/netdata/netdata/pull/18491) ([Ancairon](https://github.com/Ancairon))
 - add go.d/apcupsd [\#18489](https://github.com/netdata/netdata/pull/18489) ([ilyam8](https://github.com/ilyam8))
@@ -409,8 +413,6 @@
 - cgroups: fix cgroups version detection on non-systemd nodes with cgroupv1 [\#17969](https://github.com/netdata/netdata/pull/17969) ([ilyam8](https://github.com/ilyam8))
 - go.d postgres index name replace space [\#17968](https://github.com/netdata/netdata/pull/17968) ([ilyam8](https://github.com/ilyam8))
 - go.d replace colon in job name [\#17967](https://github.com/netdata/netdata/pull/17967) ([ilyam8](https://github.com/ilyam8))
-- Fix space percentage calculation in dbengine retention chart [\#17963](https://github.com/netdata/netdata/pull/17963) ([stelfrag](https://github.com/stelfrag))
-- Tidy-up build related CI jobs. [\#17962](https://github.com/netdata/netdata/pull/17962) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
@@ -427,13 +429,6 @@
 ## [v1.46.0](https://github.com/netdata/netdata/tree/v1.46.0) (2024-06-19)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.45.6...v1.46.0)
-
-**Merged pull requests:**
-
-- fix apcupsd status "slave" [\#17961](https://github.com/netdata/netdata/pull/17961) ([ilyam8](https://github.com/ilyam8))
-- fix apcupsd status [\#17960](https://github.com/netdata/netdata/pull/17960) ([ilyam8](https://github.com/ilyam8))
-- docs: clarify setting time/disk limits to 0 [\#17958](https://github.com/netdata/netdata/pull/17958) ([ilyam8](https://github.com/ilyam8))
-- docs: add time-based retention to "Change how long Netdata stores metrics" [\#17957](https://github.com/netdata/netdata/pull/17957) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.45.6](https://github.com/netdata/netdata/tree/v1.45.6) (2024-06-05)
 

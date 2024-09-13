@@ -2,10 +2,10 @@
 
 package web
 
-// HTTP is a struct with embedded Request and Client.
+// HTTPConfig is a struct with embedded RequestConfig and ClientConfig.
 // This structure intended to be part of the module configuration.
 // Supported configuration file formats: YAML.
-type HTTP struct {
-	Request `yaml:",inline" json:""`
-	Client  `yaml:",inline" json:""`
+type HTTPConfig struct {
+	RequestConfig `yaml:",inline" json:""`
+	ClientConfig  `yaml:",inline" json:""`
 }

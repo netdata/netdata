@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
@@ -26,12 +27,12 @@ func init() {
 func New() *ActiveMQ {
 	return &ActiveMQ{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1:8161",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 			Webadmin:  "admin",
@@ -45,13 +46,13 @@ func New() *ActiveMQ {
 }
 
 type Config struct {
-	UpdateEvery  int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP     `yaml:",inline" json:""`
-	Webadmin     string `yaml:"webadmin,omitempty" json:"webadmin"`
-	MaxQueues    int    `yaml:"max_queues" json:"max_queues"`
-	MaxTopics    int    `yaml:"max_topics" json:"max_topics"`
-	QueuesFilter string `yaml:"queues_filter,omitempty" json:"queues_filter"`
-	TopicsFilter string `yaml:"topics_filter,omitempty" json:"topics_filter"`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
+	Webadmin       string `yaml:"webadmin,omitempty" json:"webadmin"`
+	MaxQueues      int    `yaml:"max_queues" json:"max_queues"`
+	MaxTopics      int    `yaml:"max_topics" json:"max_topics"`
+	QueuesFilter   string `yaml:"queues_filter,omitempty" json:"queues_filter"`
+	TopicsFilter   string `yaml:"topics_filter,omitempty" json:"topics_filter"`
 }
 
 type ActiveMQ struct {
@@ -92,13 +93,13 @@ func (a *ActiveMQ) Init() error {
 	}
 	a.topicsFilter = tf
 
-	client, err := web.NewHTTPClient(a.Client)
+	client, err := web.NewHTTPClient(a.ClientConfig)
 	if err != nil {
 		a.Error(err)
 		return err
 	}
 
-	a.apiClient = newAPIClient(client, a.Request, a.Webadmin)
+	a.apiClient = newAPIClient(client, a.RequestConfig, a.Webadmin)
 
 	return nil
 }

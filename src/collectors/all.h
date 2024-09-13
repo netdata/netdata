@@ -55,6 +55,7 @@
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_CALLS 1207
 #define NETDATA_CHART_PRIO_SYSTEM_PACKETS              7001 // freebsd only
 #define NETDATA_CHART_PRIO_WINDOWS_THREADS             8001 // Windows only
+#define NETDATA_CHART_PRIO_WINDOWS_THERMAL_ZONES       8002 // Windows only
 
 
 // CPU per core
@@ -76,7 +77,9 @@
 #define NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED       1030
 #define NETDATA_CHART_PRIO_MEM_SWAP                   1035
 #define NETDATA_CHART_PRIO_MEM_SWAP_CALLS             1037
+#define NETDATA_CHART_PRIO_MEM_SWAP_PAGES             1037 // Windows only
 #define NETDATA_CHART_PRIO_MEM_SWAPIO                 1038
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_POOL            1039 // Windows only
 #define NETDATA_CHART_PRIO_MEM_ZSWAP                  1036
 #define NETDATA_CHART_PRIO_MEM_ZSWAPIO                1037
 #define NETDATA_CHART_PRIO_MEM_ZSWAP_COMPRESS_RATIO   1038

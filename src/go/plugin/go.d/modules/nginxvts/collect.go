@@ -5,7 +5,6 @@ package nginxvts
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
@@ -45,7 +44,7 @@ func (vts *NginxVTS) collectServerZones(collected map[string]interface{}, ms *vt
 }
 
 func (vts *NginxVTS) scapeVTS() (*vtsMetrics, error) {
-	req, _ := web.NewHTTPRequest(vts.Request)
+	req, _ := web.NewHTTPRequest(vts.RequestConfig)
 
 	var total vtsMetrics
 
@@ -61,7 +60,8 @@ func (vts *NginxVTS) doOKDecode(req *http.Request, in interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
-	defer closeBody(resp)
+
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
@@ -71,11 +71,4 @@ func (vts *NginxVTS) doOKDecode(req *http.Request, in interface{}) error {
 		return fmt.Errorf("error on decoding response from '%s': %v", req.URL, err)
 	}
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

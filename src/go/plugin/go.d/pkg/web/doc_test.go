@@ -2,14 +2,14 @@
 
 package web
 
-func ExampleHTTP_usage() {
-	// Just embed HTTP into your module structure.
-	// It allows you to have both Request and Client fields in the module configuration file.
+func ExampleHTTPConfig_usage() {
+	// Just embed HTTPConfig into your module structure.
+	// It allows you to have both RequestConfig and ClientConfig fields in the module configuration file.
 	type myModule struct {
-		HTTP `yaml:",inline"`
+		HTTPConfig `yaml:",inline"`
 	}
 
 	var m myModule
-	_, _ = NewHTTPRequest(m.Request)
-	_, _ = NewHTTPClient(m.Client)
+	_, _ = NewHTTPRequest(m.RequestConfig)
+	_, _ = NewHTTPClient(m.ClientConfig)
 }

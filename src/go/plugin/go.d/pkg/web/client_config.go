@@ -5,23 +5,25 @@ package web
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
 )
 
 // ErrRedirectAttempted indicates that a redirect occurred.
 var ErrRedirectAttempted = errors.New("redirect")
 
-// Client is the configuration of the HTTP client.
+// ClientConfig is the configuration of the HTTPConfig client.
 // This structure is not intended to be used directly as part of a module's configuration.
 // Supported configuration file formats: YAML.
-type Client struct {
-	// Timeout specifies a time limit for requests made by this Client.
+type ClientConfig struct {
+	// Timeout specifies a time limit for requests made by this ClientConfig.
 	// Default (zero value) is no timeout. Must be set before http.Client creation.
-	Timeout Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Timeout confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 
 	// NotFollowRedirect specifies the policy for handling redirects.
 	// Default (zero value) is std http package default policy (stop after 10 consecutive requests).
@@ -35,8 +37,8 @@ type Client struct {
 	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 
-// NewHTTPClient returns a new *http.Client given a Client configuration and an error if any.
-func NewHTTPClient(cfg Client) (*http.Client, error) {
+// NewHTTPClient returns a new *http.Client given a ClientConfig configuration and an error if any.
+func NewHTTPClient(cfg ClientConfig) (*http.Client, error) {
 	tlsConfig, err := tlscfg.NewTLSConfig(cfg.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating TLS config: %v", err)
@@ -62,6 +64,13 @@ func NewHTTPClient(cfg Client) (*http.Client, error) {
 		Transport:     transport,
 		CheckRedirect: redirectFunc(cfg.NotFollowRedirect),
 	}, nil
+}
+
+func CloseBody(resp *http.Response) {
+	if resp != nil && resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
 }
 
 func redirectFunc(notFollowRedirect bool) func(req *http.Request, via []*http.Request) error {

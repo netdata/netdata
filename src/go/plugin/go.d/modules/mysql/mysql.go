@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
 	"github.com/blang/semver/v4"
 	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 )
 
 //go:embed "config_schema.json"
@@ -33,7 +33,7 @@ func New() *MySQL {
 	return &MySQL{
 		Config: Config{
 			DSN:     "root@tcp(localhost:3306)/",
-			Timeout: web.Duration(time.Second),
+			Timeout: confopt.Duration(time.Second),
 		},
 
 		charts:                         baseCharts.Copy(),
@@ -55,10 +55,10 @@ func New() *MySQL {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	DSN         string       `yaml:"dsn" json:"dsn"`
-	MyCNF       string       `yaml:"my.cnf,omitempty" json:"my.cnf"`
-	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	DSN         string           `yaml:"dsn" json:"dsn"`
+	MyCNF       string           `yaml:"my.cnf,omitempty" json:"my.cnf"`
+	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
 type MySQL struct {

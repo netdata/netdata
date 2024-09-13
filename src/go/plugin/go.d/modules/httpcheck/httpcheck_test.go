@@ -4,6 +4,7 @@ package httpcheck
 
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -42,8 +43,8 @@ func TestHTTPCheck_Init(t *testing.T) {
 		"success if url set": {
 			wantFail: false,
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{URL: "http://127.0.0.1:38001"},
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:38001"},
 				},
 			},
 		},
@@ -54,16 +55,16 @@ func TestHTTPCheck_Init(t *testing.T) {
 		"fail when URL not set": {
 			wantFail: true,
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{URL: ""},
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: ""},
 				},
 			},
 		},
 		"fail if wrong response regex": {
 			wantFail: true,
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{URL: "http://127.0.0.1:38001"},
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:38001"},
 				},
 				ResponseMatch: "(?:qwe))",
 			},
@@ -495,7 +496,7 @@ func prepareSuccessCase() (*HTTPCheck, func()) {
 func prepareTimeoutCase() (*HTTPCheck, func()) {
 	httpCheck := New()
 	httpCheck.UpdateEvery = 1
-	httpCheck.Timeout = web.Duration(time.Millisecond * 100)
+	httpCheck.Timeout = confopt.Duration(time.Millisecond * 100)
 
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {

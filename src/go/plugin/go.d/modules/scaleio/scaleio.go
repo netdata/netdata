@@ -9,6 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/scaleio/client"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
@@ -26,12 +27,12 @@ func init() {
 func New() *ScaleIO {
 	return &ScaleIO{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "https://127.0.0.1",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 		},
@@ -41,8 +42,8 @@ func New() *ScaleIO {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
 type (
@@ -75,7 +76,7 @@ func (s *ScaleIO) Init() error {
 		return errors.New("username and password aren't set")
 	}
 
-	c, err := client.New(s.Client, s.Request)
+	c, err := client.New(s.ClientConfig, s.RequestConfig)
 	if err != nil {
 		s.Errorf("error on creating ScaleIO client: %v", err)
 		return err

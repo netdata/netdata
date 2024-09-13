@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 	"strconv"
@@ -165,7 +164,7 @@ func (es *Elasticsearch) scrapeNodesStats(ms *esMetrics) {
 		p = urlPathLocalNodeStats
 	}
 
-	req, _ := web.NewHTTPRequestWithPath(es.Request, p)
+	req, _ := web.NewHTTPRequestWithPath(es.RequestConfig, p)
 
 	var stats esNodesStats
 	if err := es.doOKDecode(req, &stats); err != nil {
@@ -177,7 +176,7 @@ func (es *Elasticsearch) scrapeNodesStats(ms *esMetrics) {
 }
 
 func (es *Elasticsearch) scrapeClusterHealth(ms *esMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(es.Request, urlPathClusterHealth)
+	req, _ := web.NewHTTPRequestWithPath(es.RequestConfig, urlPathClusterHealth)
 
 	var health esClusterHealth
 	if err := es.doOKDecode(req, &health); err != nil {
@@ -189,7 +188,7 @@ func (es *Elasticsearch) scrapeClusterHealth(ms *esMetrics) {
 }
 
 func (es *Elasticsearch) scrapeClusterStats(ms *esMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(es.Request, urlPathClusterStats)
+	req, _ := web.NewHTTPRequestWithPath(es.RequestConfig, urlPathClusterStats)
 
 	var stats esClusterStats
 	if err := es.doOKDecode(req, &stats); err != nil {
@@ -201,7 +200,7 @@ func (es *Elasticsearch) scrapeClusterStats(ms *esMetrics) {
 }
 
 func (es *Elasticsearch) scrapeLocalIndicesStats(ms *esMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(es.Request, urlPathIndicesStats)
+	req, _ := web.NewHTTPRequestWithPath(es.RequestConfig, urlPathIndicesStats)
 	req.URL.RawQuery = "local=true&format=json"
 
 	var stats []esIndexStats
@@ -214,7 +213,7 @@ func (es *Elasticsearch) scrapeLocalIndicesStats(ms *esMetrics) {
 }
 
 func (es *Elasticsearch) getClusterName() (string, error) {
-	req, _ := web.NewHTTPRequest(es.Request)
+	req, _ := web.NewHTTPRequest(es.RequestConfig)
 
 	var info struct {
 		ClusterName string `json:"cluster_name"`
@@ -236,7 +235,8 @@ func (es *Elasticsearch) doOKDecode(req *http.Request, in interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
-	defer closeBody(resp)
+
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
@@ -246,13 +246,6 @@ func (es *Elasticsearch) doOKDecode(req *http.Request, in interface{}) error {
 		return fmt.Errorf("error on decoding response from '%s': %v", req.URL, err)
 	}
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }
 
 func convertIndexStoreSizeToBytes(size string) int64 {

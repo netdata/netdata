@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +47,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "udp",
 				RecordTypes: []string{"A"},
 				Port:        53,
-				Timeout:     web.Duration(time.Second),
+				Timeout:     confopt.Duration(time.Second),
 			},
 		},
 		"success when using deprecated record_type": {
@@ -58,7 +58,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:    "udp",
 				RecordType: "A",
 				Port:       53,
-				Timeout:    web.Duration(time.Second),
+				Timeout:    confopt.Duration(time.Second),
 			},
 		},
 		"fail with default": {
@@ -73,7 +73,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "udp",
 				RecordTypes: []string{"A"},
 				Port:        53,
-				Timeout:     web.Duration(time.Second),
+				Timeout:     confopt.Duration(time.Second),
 			},
 		},
 		"fail when servers not set": {
@@ -84,7 +84,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "udp",
 				RecordTypes: []string{"A"},
 				Port:        53,
-				Timeout:     web.Duration(time.Second),
+				Timeout:     confopt.Duration(time.Second),
 			},
 		},
 		"fail when network is invalid": {
@@ -95,7 +95,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "gcp",
 				RecordTypes: []string{"A"},
 				Port:        53,
-				Timeout:     web.Duration(time.Second),
+				Timeout:     confopt.Duration(time.Second),
 			},
 		},
 		"fail when record_type is invalid": {
@@ -106,7 +106,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "udp",
 				RecordTypes: []string{"B"},
 				Port:        53,
-				Timeout:     web.Duration(time.Second),
+				Timeout:     confopt.Duration(time.Second),
 			},
 		},
 	}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
@@ -29,9 +30,9 @@ func init() {
 func New() *Windows {
 	return &Windows{
 		Config: Config{
-			HTTP: web.HTTP{
-				Client: web.Client{
-					Timeout: web.Duration(time.Second * 5),
+			HTTPConfig: web.HTTPConfig{
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 5),
 				},
 			},
 		},
@@ -69,9 +70,9 @@ func New() *Windows {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
-	Vnode       string `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
+	Vnode          string `yaml:"vnode,omitempty" json:"vnode"`
 }
 
 type (

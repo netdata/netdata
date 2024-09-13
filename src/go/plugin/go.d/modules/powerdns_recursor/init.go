@@ -14,14 +14,14 @@ func (r *Recursor) validateConfig() error {
 	if r.URL == "" {
 		return errors.New("URL not set")
 	}
-	if _, err := web.NewHTTPRequest(r.Request); err != nil {
+	if _, err := web.NewHTTPRequest(r.RequestConfig); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (r *Recursor) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(r.Client)
+	return web.NewHTTPClient(r.ClientConfig)
 }
 
 func (r *Recursor) initCharts() (*module.Charts, error) {

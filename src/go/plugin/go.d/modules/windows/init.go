@@ -17,9 +17,9 @@ func (w *Windows) validateConfig() error {
 }
 
 func (w *Windows) initPrometheusClient() (prometheus.Prometheus, error) {
-	client, err := web.NewHTTPClient(w.Client)
+	client, err := web.NewHTTPClient(w.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
-	return prometheus.New(client, w.Request), nil
+	return prometheus.New(client, w.RequestConfig), nil
 }

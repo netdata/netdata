@@ -174,9 +174,9 @@ func (cd *CoreDNS) collectSummaryRequests(mx *metrics, raw prometheus.Series) {
 //			continue
 //		}
 //
-//		setRequestDuration(&mx.Summary.Request, value, le)
+//		setRequestDuration(&mx.Summary.RequestConfig, value, le)
 //	}
-//	processRequestDuration(&mx.Summary.Request)
+//	processRequestDuration(&mx.Summary.RequestConfig)
 //}
 
 func (cd *CoreDNS) collectSummaryRequestsPerType(mx *metrics, raw prometheus.Series) {
@@ -290,10 +290,10 @@ func (cd *CoreDNS) collectPerServerRequests(mx *metrics, raw prometheus.Series) 
 //			mx.PerServer[server] = &requestResponse{}
 //		}
 //
-//		setRequestDuration(&mx.PerServer[server].Request, value, le)
+//		setRequestDuration(&mx.PerServer[server].RequestConfig, value, le)
 //	}
 //	for _, s := range mx.PerServer {
-//		processRequestDuration(&s.Request)
+//		processRequestDuration(&s.RequestConfig)
 //	}
 //}
 
@@ -433,10 +433,10 @@ func (cd *CoreDNS) collectPerZoneRequests(mx *metrics, raw prometheus.Series) {
 //			mx.PerZone[zone] = &requestResponse{}
 //		}
 //
-//		setRequestDuration(&mx.PerZone[zone].Request, value, le)
+//		setRequestDuration(&mx.PerZone[zone].RequestConfig, value, le)
 //	}
 //	for _, s := range mx.PerZone {
-//		processRequestDuration(&s.Request)
+//		processRequestDuration(&s.RequestConfig)
 //	}
 //}
 

@@ -25,14 +25,14 @@ func (cb *Couchbase) initCharts() (*Charts, error) {
 }
 
 func (cb *Couchbase) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(cb.Client)
+	return web.NewHTTPClient(cb.ClientConfig)
 }
 
 func (cb *Couchbase) validateConfig() error {
 	if cb.URL == "" {
 		return errors.New("URL not set")
 	}
-	if _, err := web.NewHTTPRequest(cb.Request); err != nil {
+	if _, err := web.NewHTTPRequest(cb.RequestConfig); err != nil {
 		return err
 	}
 	return nil

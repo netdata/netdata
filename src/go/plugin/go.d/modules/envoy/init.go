@@ -17,10 +17,10 @@ func (e *Envoy) validateConfig() error {
 }
 
 func (e *Envoy) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(e.Client)
+	httpClient, err := web.NewHTTPClient(e.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return prometheus.New(httpClient, e.Request), nil
+	return prometheus.New(httpClient, e.RequestConfig), nil
 }

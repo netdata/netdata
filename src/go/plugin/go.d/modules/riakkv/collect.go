@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
@@ -31,7 +30,7 @@ func (r *RiakKv) collect() (map[string]int64, error) {
 }
 
 func (r *RiakKv) getStats() (*riakStats, error) {
-	req, err := web.NewHTTPRequest(r.Request)
+	req, err := web.NewHTTPRequest(r.RequestConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +48,8 @@ func (r *RiakKv) doOKDecode(req *http.Request, in interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
 	}
-	defer closeBody(resp)
+
+	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		msg := fmt.Sprintf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
@@ -64,11 +64,4 @@ func (r *RiakKv) doOKDecode(req *http.Request, in interface{}) error {
 	}
 
 	return nil
-}
-
-func closeBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
 }

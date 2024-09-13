@@ -13,8 +13,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 
 	"github.com/docker/docker/api/types"
 	typesContainer "github.com/docker/docker/api/types/container"
@@ -64,9 +64,9 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 type Config struct {
 	Source string
 
-	Tags    string       `yaml:"tags"`
-	Address string       `yaml:"address"`
-	Timeout web.Duration `yaml:"timeout"`
+	Tags    string           `yaml:"tags"`
+	Address string           `yaml:"address"`
+	Timeout confopt.Duration `yaml:"timeout"`
 }
 
 type (
@@ -198,6 +198,8 @@ func (d *Discoverer) buildTargetGroup(cntr types.Container) model.TargetGroup {
 				IPAddress:     network.IPAddress,
 			}
 			tgt.Address = net.JoinHostPort(tgt.IPAddress, tgt.PrivatePort)
+
+			d.Infof("%+v\n", tgt)
 
 			hash, err := calcHash(tgt)
 			if err != nil {

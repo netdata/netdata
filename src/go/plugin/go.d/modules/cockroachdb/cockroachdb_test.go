@@ -56,7 +56,7 @@ func TestCockroachDB_Init_ReturnsFalseIfConfigURLIsNotSet(t *testing.T) {
 
 func TestCockroachDB_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
 	cdb := prepareCockroachDB()
-	cdb.Client.TLSConfig.TLSCA = "testdata/tls"
+	cdb.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
 	assert.Error(t, cdb.Init())
 }

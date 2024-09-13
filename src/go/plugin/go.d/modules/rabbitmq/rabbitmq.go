@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
@@ -26,14 +27,14 @@ func init() {
 func New() *RabbitMQ {
 	return &RabbitMQ{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL:      "http://localhost:15672",
 					Username: "guest",
 					Password: "guest",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 			CollectQueues: false,
@@ -45,9 +46,9 @@ func New() *RabbitMQ {
 }
 
 type Config struct {
-	UpdateEvery   int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP      `yaml:",inline" json:""`
-	CollectQueues bool `yaml:"collect_queues_metrics" json:"collect_queues_metrics"`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
+	CollectQueues  bool `yaml:"collect_queues_metrics" json:"collect_queues_metrics"`
 }
 
 type (
@@ -78,7 +79,7 @@ func (r *RabbitMQ) Init() error {
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(r.Client)
+	client, err := web.NewHTTPClient(r.ClientConfig)
 	if err != nil {
 		r.Errorf("init HTTP client: %v", err)
 		return err

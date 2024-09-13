@@ -10,8 +10,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -29,7 +29,7 @@ func New() *Beanstalk {
 	return &Beanstalk{
 		Config: Config{
 			Address:      "127.0.0.1:11300",
-			Timeout:      web.Duration(time.Second * 1),
+			Timeout:      confopt.Duration(time.Second * 1),
 			TubeSelector: "*",
 		},
 
@@ -42,10 +42,10 @@ func New() *Beanstalk {
 }
 
 type Config struct {
-	UpdateEvery  int          `yaml:"update_every,omitempty" json:"update_every"`
-	Address      string       `yaml:"address" json:"address"`
-	Timeout      web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	TubeSelector string       `yaml:"tube_selector,omitempty" json:"tube_selector"`
+	UpdateEvery  int              `yaml:"update_every,omitempty" json:"update_every"`
+	Address      string           `yaml:"address" json:"address"`
+	Timeout      confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	TubeSelector string           `yaml:"tube_selector,omitempty" json:"tube_selector"`
 }
 
 type Beanstalk struct {

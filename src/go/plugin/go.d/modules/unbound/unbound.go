@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -29,7 +29,7 @@ func New() *Unbound {
 		Config: Config{
 			Address:    "127.0.0.1:8953",
 			ConfPath:   "/etc/unbound/unbound.conf",
-			Timeout:    web.Duration(time.Second),
+			Timeout:    confopt.Duration(time.Second),
 			Cumulative: false,
 			UseTLS:     true,
 			TLSConfig: tlscfg.TLSConfig{
@@ -44,12 +44,12 @@ func New() *Unbound {
 }
 
 type Config struct {
-	UpdateEvery      int          `yaml:"update_every,omitempty" json:"update_every"`
-	Address          string       `yaml:"address" json:"address"`
-	ConfPath         string       `yaml:"conf_path,omitempty" json:"conf_path"`
-	Timeout          web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Cumulative       bool         `yaml:"cumulative_stats" json:"cumulative_stats"`
-	UseTLS           bool         `yaml:"use_tls,omitempty" json:"use_tls"`
+	UpdateEvery      int              `yaml:"update_every,omitempty" json:"update_every"`
+	Address          string           `yaml:"address" json:"address"`
+	ConfPath         string           `yaml:"conf_path,omitempty" json:"conf_path"`
+	Timeout          confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Cumulative       bool             `yaml:"cumulative_stats" json:"cumulative_stats"`
+	UseTLS           bool             `yaml:"use_tls,omitempty" json:"use_tls"`
 	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 

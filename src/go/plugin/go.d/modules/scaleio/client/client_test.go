@@ -13,7 +13,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	_, err := New(web.Client{}, web.Request{})
+	_, err := New(web.ClientConfig{}, web.RequestConfig{})
 	assert.NoError(t, err)
 }
 
@@ -110,7 +110,7 @@ func prepareSrvClient(t *testing.T) (*httptest.Server, *Client) {
 		Instances:  testInstances,
 		Statistics: testStatistics,
 	})
-	client, err := New(web.Client{}, web.Request{
+	client, err := New(web.ClientConfig{}, web.RequestConfig{
 		URL:      srv.URL,
 		Username: testUser,
 		Password: testPassword,

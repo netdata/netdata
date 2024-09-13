@@ -9,7 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 )
 
 //go:embed "config_schema.json"
@@ -27,7 +27,7 @@ func New() *Boinc {
 	return &Boinc{
 		Config: Config{
 			Address: "127.0.0.1:31416",
-			Timeout: web.Duration(time.Second * 1),
+			Timeout: confopt.Duration(time.Second * 1),
 		},
 		newConn: newBoincConn,
 		charts:  charts.Copy(),
@@ -35,10 +35,10 @@ func New() *Boinc {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	Address     string       `yaml:"address" json:"address"`
-	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
-	Password    string       `yaml:"password" json:"password"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	Address     string           `yaml:"address" json:"address"`
+	Timeout     confopt.Duration `yaml:"timeout" json:"timeout"`
+	Password    string           `yaml:"password" json:"password"`
 }
 
 type Boinc struct {
