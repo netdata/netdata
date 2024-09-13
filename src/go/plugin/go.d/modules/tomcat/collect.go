@@ -87,7 +87,7 @@ func cleanName(name string) string {
 }
 
 func (t *Tomcat) queryServerStatus() (*serverStatusResponse, error) {
-	req, err := web.NewHTTPRequestWithPath(t.Request, urlPathServerStatus)
+	req, err := web.NewHTTPRequestWithPath(t.RequestConfig, urlPathServerStatus)
 	if err != nil {
 		return nil, err
 	}
@@ -106,12 +106,12 @@ func (t *Tomcat) queryServerStatus() (*serverStatusResponse, error) {
 func (t *Tomcat) doOKDecode(req *http.Request, in interface{}) error {
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
+		return fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
 	}
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
 	}
 
 	if err := xml.NewDecoder(resp.Body).Decode(in); err != nil {

@@ -57,8 +57,8 @@ func TestElasticsearch_Init(t *testing.T) {
 		},
 		"all stats": {
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{URL: "http://127.0.0.1:38001"},
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:38001"},
 				},
 				DoNodeStats:     true,
 				DoClusterHealth: true,
@@ -68,8 +68,8 @@ func TestElasticsearch_Init(t *testing.T) {
 		},
 		"only node_stats": {
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{URL: "http://127.0.0.1:38001"},
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:38001"},
 				},
 				DoNodeStats:     true,
 				DoClusterHealth: false,
@@ -80,15 +80,15 @@ func TestElasticsearch_Init(t *testing.T) {
 		"URL not set": {
 			wantFail: true,
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{URL: ""},
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: ""},
 				}},
 		},
 		"invalid TLSCA": {
 			wantFail: true,
 			config: Config{
-				HTTP: web.HTTP{
-					Client: web.Client{
+				HTTPConfig: web.HTTPConfig{
+					ClientConfig: web.ClientConfig{
 						TLSConfig: tlscfg.TLSConfig{TLSCA: "testdata/tls"},
 					},
 				}},
@@ -96,8 +96,8 @@ func TestElasticsearch_Init(t *testing.T) {
 		"all API calls are disabled": {
 			wantFail: true,
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{URL: "http://127.0.0.1:38001"},
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:38001"},
 				},
 				DoNodeStats:     false,
 				DoClusterHealth: false,

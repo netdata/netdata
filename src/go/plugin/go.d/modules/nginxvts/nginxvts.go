@@ -5,6 +5,7 @@ package nginxvts
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"time"
 
@@ -29,12 +30,12 @@ func init() {
 func New() *NginxVTS {
 	return &NginxVTS{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://localhost/status/format/json",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 		},
@@ -42,8 +43,8 @@ func New() *NginxVTS {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
 type NginxVTS struct {
@@ -75,7 +76,7 @@ func (vts *NginxVTS) Init() error {
 
 	httpClient, err := vts.initHTTPClient()
 	if err != nil {
-		vts.Errorf("init HTTP client: %v", err)
+		vts.Errorf("init HTTPConfig client: %v", err)
 	}
 	vts.httpClient = httpClient
 

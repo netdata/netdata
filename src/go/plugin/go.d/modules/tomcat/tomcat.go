@@ -5,6 +5,7 @@ package tomcat
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"time"
 
@@ -26,12 +27,12 @@ func init() {
 func New() *Tomcat {
 	return &Tomcat{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1:8080",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second * 1),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 1),
 				},
 			},
 		},
@@ -42,8 +43,8 @@ func New() *Tomcat {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
 type Tomcat struct {
@@ -70,7 +71,7 @@ func (t *Tomcat) Init() error {
 
 	httpClient, err := t.initHTTPClient()
 	if err != nil {
-		t.Errorf("init HTTP client: %v", err)
+		t.Errorf("init HTTPConfig client: %v", err)
 		return err
 	}
 

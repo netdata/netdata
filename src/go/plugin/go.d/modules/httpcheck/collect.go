@@ -25,9 +25,9 @@ const (
 )
 
 func (hc *HTTPCheck) collect() (map[string]int64, error) {
-	req, err := web.NewHTTPRequest(hc.Request)
+	req, err := web.NewHTTPRequest(hc.RequestConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating HTTP requests to %s : %v", hc.Request.URL, err)
+		return nil, fmt.Errorf("error on creating HTTPConfig requests to %s : %v", hc.RequestConfig.URL, err)
 	}
 
 	if hc.CookieFile != "" {
@@ -80,7 +80,7 @@ func (hc *HTTPCheck) collectErrResponse(mx *metrics, err error) {
 }
 
 func (hc *HTTPCheck) collectOKResponse(mx *metrics, resp *http.Response) {
-	hc.Debugf("endpoint '%s' returned %d (%s) HTTP status code", hc.URL, resp.StatusCode, resp.Status)
+	hc.Debugf("endpoint '%s' returned %d (%s) HTTPConfig status code", hc.URL, resp.StatusCode, resp.Status)
 
 	if !hc.acceptedStatuses[resp.StatusCode] {
 		mx.Status.BadStatusCode = true

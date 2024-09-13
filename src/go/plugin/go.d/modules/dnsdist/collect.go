@@ -35,7 +35,7 @@ func (d *DNSdist) collectStatistic(collected map[string]int64, statistics *stati
 }
 
 func (d *DNSdist) scrapeStatistics() (*statisticMetrics, error) {
-	req, err := web.NewHTTPRequestWithPath(d.Request, urlPathJSONStat)
+	req, err := web.NewHTTPRequestWithPath(d.RequestConfig, urlPathJSONStat)
 	if err != nil {
 		return nil, err
 	}
@@ -52,13 +52,13 @@ func (d *DNSdist) scrapeStatistics() (*statisticMetrics, error) {
 func (d *DNSdist) doOKDecode(req *http.Request, in interface{}) error {
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
+		return fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {

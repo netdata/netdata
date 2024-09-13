@@ -25,13 +25,13 @@ const (
 	scoreBoard    = "Scoreboard"
 )
 
-func newAPIClient(client *http.Client, request web.Request) *apiClient {
+func newAPIClient(client *http.Client, request web.RequestConfig) *apiClient {
 	return &apiClient{httpClient: client, request: request}
 }
 
 type apiClient struct {
 	httpClient *http.Client
-	request    web.Request
+	request    web.RequestConfig
 }
 
 func (a apiClient) getServerStatus() (*serverStatus, error) {
@@ -64,7 +64,7 @@ func (a apiClient) doRequestOK(req *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("error on request : %v", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return resp, fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
+		return resp, fmt.Errorf("%s returned HTTPConfig status %d", req.URL, resp.StatusCode)
 	}
 	return resp, nil
 }
@@ -106,17 +106,17 @@ func parseScoreboard(value string) *scoreboard {
 	// Descriptions from https://blog.serverdensity.com/monitor-lighttpd/
 	//
 	// “.” = Opening the TCP connection (connect)
-	// “C” = Closing the TCP connection if no other HTTP request will use it (close)
+	// “C” = Closing the TCP connection if no other HTTPConfig request will use it (close)
 	// “E” = hard error
-	// “k” = Keeping the TCP connection open for more HTTP requests from the same client to avoid the TCP handling overhead (keep-alive)
-	// “r” = ReadAsMap the content of the HTTP request (read)
-	// “R” = ReadAsMap the content of the HTTP request (read-POST)
-	// “W” = Write the HTTP response to the socket (write)
+	// “k” = Keeping the TCP connection open for more HTTPConfig requests from the same client to avoid the TCP handling overhead (keep-alive)
+	// “r” = ReadAsMap the content of the HTTPConfig request (read)
+	// “R” = ReadAsMap the content of the HTTPConfig request (read-POST)
+	// “W” = Write the HTTPConfig response to the socket (write)
 	// “h” = Decide action to take with the request (handle-request)
-	// “q” = Start of HTTP request (request-start)
-	// “Q” = End of HTTP request (request-end)
-	// “s” = Start of the HTTP request response (response-start)
-	// “S” = End of the HTTP request response (response-end)
+	// “q” = Start of HTTPConfig request (request-start)
+	// “Q” = End of HTTPConfig request (request-end)
+	// “s” = Start of the HTTPConfig request response (response-start)
+	// “S” = End of the HTTPConfig request response (response-end)
 	// “_” Waiting for Connection (NOTE: not sure, copied the description from apache score board)
 
 	var sb scoreboard

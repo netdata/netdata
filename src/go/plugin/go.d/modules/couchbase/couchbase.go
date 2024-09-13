@@ -5,6 +5,7 @@ package couchbase
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"time"
 
@@ -29,12 +30,12 @@ func init() {
 func New() *Couchbase {
 	return &Couchbase{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1:8091",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 		},
@@ -43,8 +44,8 @@ func New() *Couchbase {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
 type Couchbase struct {
@@ -70,7 +71,7 @@ func (cb *Couchbase) Init() error {
 
 	httpClient, err := cb.initHTTPClient()
 	if err != nil {
-		cb.Errorf("init HTTP client: %v", err)
+		cb.Errorf("init HTTPConfig client: %v", err)
 		return err
 	}
 	cb.httpClient = httpClient

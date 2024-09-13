@@ -5,10 +5,10 @@ package nvidia_smi
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -28,7 +28,7 @@ func init() {
 func New() *NvidiaSmi {
 	return &NvidiaSmi{
 		Config: Config{
-			Timeout:  web.Duration(time.Second * 10),
+			Timeout:  confopt.Duration(time.Second * 10),
 			LoopMode: true,
 		},
 		binName: "nvidia-smi",
@@ -40,10 +40,10 @@ func New() *NvidiaSmi {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	BinaryPath  string       `yaml:"binary_path" json:"binary_path"`
-	LoopMode    bool         `yaml:"loop_mode,omitempty" json:"loop_mode"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	BinaryPath  string           `yaml:"binary_path" json:"binary_path"`
+	LoopMode    bool             `yaml:"loop_mode,omitempty" json:"loop_mode"`
 }
 
 type NvidiaSmi struct {

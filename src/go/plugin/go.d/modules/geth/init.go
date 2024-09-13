@@ -15,10 +15,10 @@ func (g *Geth) validateConfig() error {
 }
 
 func (g *Geth) initPrometheusClient() (prometheus.Prometheus, error) {
-	client, err := web.NewHTTPClient(g.Client)
+	client, err := web.NewHTTPClient(g.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return prometheus.New(client, g.Request), nil
+	return prometheus.New(client, g.RequestConfig), nil
 }

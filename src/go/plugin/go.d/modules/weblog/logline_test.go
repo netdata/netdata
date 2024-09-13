@@ -97,12 +97,12 @@ func TestLogLine_Assign(t *testing.T) {
 				{input: "https", wantLine: logLine{web: web{reqScheme: "https"}}},
 				{input: emptyStr, wantLine: emptyLogLine},
 				{input: hyphen, wantLine: emptyLogLine},
-				{input: "HTTP", wantLine: emptyLogLine, wantErr: errBadReqScheme},
+				{input: "HTTPConfig", wantLine: emptyLogLine, wantErr: errBadReqScheme},
 				{input: "HTTPS", wantLine: emptyLogLine, wantErr: errBadReqScheme},
 			},
 		},
 		{
-			name: "Client",
+			name: "ClientConfig",
 			fields: []string{
 				"remote_addr",
 				"a",
@@ -116,39 +116,39 @@ func TestLogLine_Assign(t *testing.T) {
 			},
 		},
 		{
-			name: "Request",
+			name: "RequestConfig",
 			fields: []string{
 				"request",
 				"r",
 			},
 			cases: []subTest{
-				{input: "GET / HTTP/1.0", wantLine: logLine{web: web{reqMethod: "GET", reqURL: "/", reqProto: "1.0"}}},
-				{input: "HEAD /ihs.gif HTTP/1.0", wantLine: logLine{web: web{reqMethod: "HEAD", reqURL: "/ihs.gif", reqProto: "1.0"}}},
-				{input: "POST /ihs.gif HTTP/1.0", wantLine: logLine{web: web{reqMethod: "POST", reqURL: "/ihs.gif", reqProto: "1.0"}}},
-				{input: "PUT /ihs.gif HTTP/1.0", wantLine: logLine{web: web{reqMethod: "PUT", reqURL: "/ihs.gif", reqProto: "1.0"}}},
-				{input: "PATCH /ihs.gif HTTP/1.0", wantLine: logLine{web: web{reqMethod: "PATCH", reqURL: "/ihs.gif", reqProto: "1.0"}}},
-				{input: "DELETE /ihs.gif HTTP/1.0", wantLine: logLine{web: web{reqMethod: "DELETE", reqURL: "/ihs.gif", reqProto: "1.0"}}},
-				{input: "OPTIONS /ihs.gif HTTP/1.0", wantLine: logLine{web: web{reqMethod: "OPTIONS", reqURL: "/ihs.gif", reqProto: "1.0"}}},
-				{input: "TRACE /ihs.gif HTTP/1.0", wantLine: logLine{web: web{reqMethod: "TRACE", reqURL: "/ihs.gif", reqProto: "1.0"}}},
-				{input: "CONNECT ip.cn:443 HTTP/1.1", wantLine: logLine{web: web{reqMethod: "CONNECT", reqURL: "ip.cn:443", reqProto: "1.1"}}},
-				{input: "MKCOL ip.cn:443 HTTP/1.1", wantLine: logLine{web: web{reqMethod: "MKCOL", reqURL: "ip.cn:443", reqProto: "1.1"}}},
-				{input: "PROPFIND ip.cn:443 HTTP/1.1", wantLine: logLine{web: web{reqMethod: "PROPFIND", reqURL: "ip.cn:443", reqProto: "1.1"}}},
-				{input: "MOVE ip.cn:443 HTTP/1.1", wantLine: logLine{web: web{reqMethod: "MOVE", reqURL: "ip.cn:443", reqProto: "1.1"}}},
-				{input: "SEARCH ip.cn:443 HTTP/1.1", wantLine: logLine{web: web{reqMethod: "SEARCH", reqURL: "ip.cn:443", reqProto: "1.1"}}},
-				{input: "GET / HTTP/1.1", wantLine: logLine{web: web{reqMethod: "GET", reqURL: "/", reqProto: "1.1"}}},
-				{input: "GET / HTTP/2", wantLine: logLine{web: web{reqMethod: "GET", reqURL: "/", reqProto: "2"}}},
-				{input: "GET / HTTP/2.0", wantLine: logLine{web: web{reqMethod: "GET", reqURL: "/", reqProto: "2.0"}}},
+				{input: "GET / HTTPConfig/1.0", wantLine: logLine{web: web{reqMethod: "GET", reqURL: "/", reqProto: "1.0"}}},
+				{input: "HEAD /ihs.gif HTTPConfig/1.0", wantLine: logLine{web: web{reqMethod: "HEAD", reqURL: "/ihs.gif", reqProto: "1.0"}}},
+				{input: "POST /ihs.gif HTTPConfig/1.0", wantLine: logLine{web: web{reqMethod: "POST", reqURL: "/ihs.gif", reqProto: "1.0"}}},
+				{input: "PUT /ihs.gif HTTPConfig/1.0", wantLine: logLine{web: web{reqMethod: "PUT", reqURL: "/ihs.gif", reqProto: "1.0"}}},
+				{input: "PATCH /ihs.gif HTTPConfig/1.0", wantLine: logLine{web: web{reqMethod: "PATCH", reqURL: "/ihs.gif", reqProto: "1.0"}}},
+				{input: "DELETE /ihs.gif HTTPConfig/1.0", wantLine: logLine{web: web{reqMethod: "DELETE", reqURL: "/ihs.gif", reqProto: "1.0"}}},
+				{input: "OPTIONS /ihs.gif HTTPConfig/1.0", wantLine: logLine{web: web{reqMethod: "OPTIONS", reqURL: "/ihs.gif", reqProto: "1.0"}}},
+				{input: "TRACE /ihs.gif HTTPConfig/1.0", wantLine: logLine{web: web{reqMethod: "TRACE", reqURL: "/ihs.gif", reqProto: "1.0"}}},
+				{input: "CONNECT ip.cn:443 HTTPConfig/1.1", wantLine: logLine{web: web{reqMethod: "CONNECT", reqURL: "ip.cn:443", reqProto: "1.1"}}},
+				{input: "MKCOL ip.cn:443 HTTPConfig/1.1", wantLine: logLine{web: web{reqMethod: "MKCOL", reqURL: "ip.cn:443", reqProto: "1.1"}}},
+				{input: "PROPFIND ip.cn:443 HTTPConfig/1.1", wantLine: logLine{web: web{reqMethod: "PROPFIND", reqURL: "ip.cn:443", reqProto: "1.1"}}},
+				{input: "MOVE ip.cn:443 HTTPConfig/1.1", wantLine: logLine{web: web{reqMethod: "MOVE", reqURL: "ip.cn:443", reqProto: "1.1"}}},
+				{input: "SEARCH ip.cn:443 HTTPConfig/1.1", wantLine: logLine{web: web{reqMethod: "SEARCH", reqURL: "ip.cn:443", reqProto: "1.1"}}},
+				{input: "GET / HTTPConfig/1.1", wantLine: logLine{web: web{reqMethod: "GET", reqURL: "/", reqProto: "1.1"}}},
+				{input: "GET / HTTPConfig/2", wantLine: logLine{web: web{reqMethod: "GET", reqURL: "/", reqProto: "2"}}},
+				{input: "GET / HTTPConfig/2.0", wantLine: logLine{web: web{reqMethod: "GET", reqURL: "/", reqProto: "2.0"}}},
 				{input: "GET /invalid_version http/1.1", wantLine: logLine{web: web{reqMethod: "GET", reqURL: "/invalid_version", reqProto: emptyString}}, wantErr: errBadReqProto},
 				{input: emptyStr, wantLine: emptyLogLine},
 				{input: hyphen, wantLine: emptyLogLine},
 				{input: "GET no_version", wantLine: emptyLogLine, wantErr: errBadRequest},
-				{input: "GOT / HTTP/2", wantLine: emptyLogLine, wantErr: errBadReqMethod},
-				{input: "get / HTTP/2", wantLine: emptyLogLine, wantErr: errBadReqMethod},
+				{input: "GOT / HTTPConfig/2", wantLine: emptyLogLine, wantErr: errBadReqMethod},
+				{input: "get / HTTPConfig/2", wantLine: emptyLogLine, wantErr: errBadReqMethod},
 				{input: "x04\x01\x00P$3\xFE\xEA\x00", wantLine: emptyLogLine, wantErr: errBadRequest},
 			},
 		},
 		{
-			name: "Request HTTP Method",
+			name: "RequestConfig HTTPConfig Method",
 			fields: []string{
 				"request_method",
 				"m",
@@ -171,12 +171,12 @@ func TestLogLine_Assign(t *testing.T) {
 				{input: emptyStr, wantLine: emptyLogLine},
 				{input: hyphen, wantLine: emptyLogLine},
 				{input: "GET no_version", wantLine: emptyLogLine, wantErr: errBadReqMethod},
-				{input: "GOT / HTTP/2", wantLine: emptyLogLine, wantErr: errBadReqMethod},
-				{input: "get / HTTP/2", wantLine: emptyLogLine, wantErr: errBadReqMethod},
+				{input: "GOT / HTTPConfig/2", wantLine: emptyLogLine, wantErr: errBadReqMethod},
+				{input: "get / HTTPConfig/2", wantLine: emptyLogLine, wantErr: errBadReqMethod},
 			},
 		},
 		{
-			name: "Request URL",
+			name: "RequestConfig URL",
 			fields: []string{
 				"request_uri",
 				"U",
@@ -190,18 +190,18 @@ func TestLogLine_Assign(t *testing.T) {
 			},
 		},
 		{
-			name: "Request HTTP Protocol",
+			name: "RequestConfig HTTPConfig Protocol",
 			fields: []string{
 				"server_protocol",
 				"H",
 			},
 			cases: []subTest{
-				{input: "HTTP/1.0", wantLine: logLine{web: web{reqProto: "1.0"}}},
-				{input: "HTTP/1.1", wantLine: logLine{web: web{reqProto: "1.1"}}},
-				{input: "HTTP/2", wantLine: logLine{web: web{reqProto: "2"}}},
-				{input: "HTTP/2.0", wantLine: logLine{web: web{reqProto: "2.0"}}},
-				{input: "HTTP/3", wantLine: logLine{web: web{reqProto: "3"}}},
-				{input: "HTTP/3.0", wantLine: logLine{web: web{reqProto: "3.0"}}},
+				{input: "HTTPConfig/1.0", wantLine: logLine{web: web{reqProto: "1.0"}}},
+				{input: "HTTPConfig/1.1", wantLine: logLine{web: web{reqProto: "1.1"}}},
+				{input: "HTTPConfig/2", wantLine: logLine{web: web{reqProto: "2"}}},
+				{input: "HTTPConfig/2.0", wantLine: logLine{web: web{reqProto: "2.0"}}},
+				{input: "HTTPConfig/3", wantLine: logLine{web: web{reqProto: "3"}}},
+				{input: "HTTPConfig/3.0", wantLine: logLine{web: web{reqProto: "3.0"}}},
 				{input: emptyStr, wantLine: emptyLogLine},
 				{input: hyphen, wantLine: emptyLogLine},
 				{input: "1.1", wantLine: emptyLogLine, wantErr: errBadReqProto},
@@ -232,7 +232,7 @@ func TestLogLine_Assign(t *testing.T) {
 			},
 		},
 		{
-			name: "Request Size",
+			name: "RequestConfig Size",
 			fields: []string{
 				"request_length",
 				"I",
@@ -267,7 +267,7 @@ func TestLogLine_Assign(t *testing.T) {
 			},
 		},
 		{
-			name: "Request Processing Time",
+			name: "RequestConfig Processing Time",
 			fields: []string{
 				"request_time",
 				"D",
@@ -340,7 +340,7 @@ func TestLogLine_Assign(t *testing.T) {
 			cases: []subTest{
 				{input: "POST", wantLine: logLine{custom: custom{values: []customValue{{name: "custom", value: "POST"}}}}},
 				{input: "/example.com", wantLine: logLine{custom: custom{values: []customValue{{name: "custom", value: "/example.com"}}}}},
-				{input: "HTTP/1.1", wantLine: logLine{custom: custom{values: []customValue{{name: "custom", value: "HTTP/1.1"}}}}},
+				{input: "HTTPConfig/1.1", wantLine: logLine{custom: custom{values: []customValue{{name: "custom", value: "HTTPConfig/1.1"}}}}},
 				{input: "0.333,0.444,0.555", wantLine: logLine{custom: custom{values: []customValue{{name: "custom", value: "0.333,0.444,0.555"}}}}},
 				{input: "-1", wantLine: logLine{custom: custom{values: []customValue{{name: "custom", value: "-1"}}}}},
 				{input: "invalid", wantLine: logLine{custom: custom{values: []customValue{{name: "custom", value: "invalid"}}}}},
@@ -356,7 +356,7 @@ func TestLogLine_Assign(t *testing.T) {
 			cases: []subTest{
 				{input: "POST", wantLine: emptyLogLine},
 				{input: "/example.com", wantLine: emptyLogLine},
-				{input: "HTTP/1.1", wantLine: emptyLogLine},
+				{input: "HTTPConfig/1.1", wantLine: emptyLogLine},
 				{input: "0.333,0.444,0.555", wantLine: emptyLogLine},
 				{input: "-1", wantLine: emptyLogLine},
 				{input: "invalid", wantLine: emptyLogLine},
@@ -430,13 +430,13 @@ func TestLogLine_verify(t *testing.T) {
 				{line: logLine{web: web{reqScheme: "http"}}},
 				{line: logLine{web: web{reqScheme: "https"}}},
 				{line: logLine{web: web{reqScheme: "not_https"}}, wantErr: errBadReqScheme},
-				{line: logLine{web: web{reqScheme: "HTTP"}}, wantErr: errBadReqScheme},
+				{line: logLine{web: web{reqScheme: "HTTPConfig"}}, wantErr: errBadReqScheme},
 				{line: logLine{web: web{reqScheme: "HTTPS"}}, wantErr: errBadReqScheme},
 				{line: logLine{web: web{reqScheme: "10"}}, wantErr: errBadReqScheme},
 			},
 		},
 		{
-			name:  "Client",
+			name:  "ClientConfig",
 			field: "remote_addr",
 			cases: []subTest{
 				{line: logLine{web: web{reqClient: "1.1.1.1"}}},
@@ -448,7 +448,7 @@ func TestLogLine_verify(t *testing.T) {
 			},
 		},
 		{
-			name:  "Request HTTP Method",
+			name:  "RequestConfig HTTPConfig Method",
 			field: "request_method",
 			cases: []subTest{
 				{line: logLine{web: web{reqMethod: "GET"}}},
@@ -469,7 +469,7 @@ func TestLogLine_verify(t *testing.T) {
 			},
 		},
 		{
-			name:  "Request URL",
+			name:  "RequestConfig URL",
 			field: "request_uri",
 			cases: []subTest{
 				{line: logLine{web: web{reqURL: "/"}}},
@@ -482,7 +482,7 @@ func TestLogLine_verify(t *testing.T) {
 			},
 		},
 		{
-			name:  "Request HTTP Protocol",
+			name:  "RequestConfig HTTPConfig Protocol",
 			field: "server_protocol",
 			cases: []subTest{
 				{line: logLine{web: web{reqProto: "1"}}},
@@ -512,7 +512,7 @@ func TestLogLine_verify(t *testing.T) {
 			},
 		},
 		{
-			name:  "Request size",
+			name:  "RequestConfig size",
 			field: "request_length",
 			cases: []subTest{
 				{line: logLine{web: web{reqSize: 0}}},
@@ -532,7 +532,7 @@ func TestLogLine_verify(t *testing.T) {
 			},
 		},
 		{
-			name:  "Request Processing Time",
+			name:  "RequestConfig Processing Time",
 			field: "request_time",
 			cases: []subTest{
 				{line: logLine{web: web{reqProcTime: 0}}},

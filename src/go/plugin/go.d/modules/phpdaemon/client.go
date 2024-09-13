@@ -15,7 +15,7 @@ type decodeFunc func(dst interface{}, reader io.Reader) error
 
 func decodeJson(dst interface{}, reader io.Reader) error { return json.NewDecoder(reader).Decode(dst) }
 
-func newAPIClient(httpClient *http.Client, request web.Request) *client {
+func newAPIClient(httpClient *http.Client, request web.RequestConfig) *client {
 	return &client{
 		httpClient: httpClient,
 		request:    request,
@@ -24,7 +24,7 @@ func newAPIClient(httpClient *http.Client, request web.Request) *client {
 
 type client struct {
 	httpClient *http.Client
-	request    web.Request
+	request    web.RequestConfig
 }
 
 func (c *client) queryFullStatus() (*FullStatus, error) {
@@ -37,7 +37,7 @@ func (c *client) queryFullStatus() (*FullStatus, error) {
 	return &status, nil
 }
 
-func (c *client) doWithDecode(dst interface{}, decode decodeFunc, request web.Request) error {
+func (c *client) doWithDecode(dst interface{}, decode decodeFunc, request web.RequestConfig) error {
 	req, err := web.NewHTTPRequest(request)
 	if err != nil {
 		return fmt.Errorf("error on creating http request to %s : %v", request.URL, err)
@@ -63,7 +63,7 @@ func (c *client) doOK(req *http.Request) (*http.Response, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return resp, fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
+		return resp, fmt.Errorf("%s returned HTTPConfig status %d", req.URL, resp.StatusCode)
 	}
 
 	return resp, err

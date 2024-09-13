@@ -5,6 +5,7 @@ package riakkv
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"sync"
 	"time"
@@ -33,13 +34,13 @@ func init() {
 func New() *RiakKv {
 	return &RiakKv{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					// https://docs.riak.com/riak/kv/2.2.3/developing/api/http/status.1.html
 					URL: "http://127.0.0.1:8098/stats",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 		},
@@ -49,8 +50,8 @@ func New() *RiakKv {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
 type RiakKv struct {
@@ -73,9 +74,9 @@ func (r *RiakKv) Init() error {
 		return errors.New("url not set")
 	}
 
-	httpClient, err := web.NewHTTPClient(r.Client)
+	httpClient, err := web.NewHTTPClient(r.ClientConfig)
 	if err != nil {
-		r.Errorf("init HTTP client: %v", err)
+		r.Errorf("init HTTPConfig client: %v", err)
 		return err
 	}
 	r.httpClient = httpClient

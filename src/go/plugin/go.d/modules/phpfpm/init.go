@@ -25,14 +25,14 @@ func (p *Phpfpm) initClient() (client, error) {
 }
 
 func (p *Phpfpm) initHTTPClient() (*httpClient, error) {
-	c, err := web.NewHTTPClient(p.Client)
+	c, err := web.NewHTTPClient(p.ClientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("create HTTP client: %v", err)
+		return nil, fmt.Errorf("create HTTPConfig client: %v", err)
 	}
 
-	p.Debugf("using HTTP client: url='%s', timeout='%s'", p.URL, p.Timeout)
+	p.Debugf("using HTTPConfig client: url='%s', timeout='%s'", p.URL, p.Timeout)
 
-	return newHTTPClient(c, p.Request)
+	return newHTTPClient(c, p.RequestConfig)
 }
 
 func (p *Phpfpm) initSocketClient() (*socketClient, error) {

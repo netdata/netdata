@@ -77,13 +77,13 @@ var defaultLineFormat = []string{
 	httpUps5xx,
 }
 
-func newAPIClient(client *http.Client, request web.Request) *apiClient {
+func newAPIClient(client *http.Client, request web.RequestConfig) *apiClient {
 	return &apiClient{httpClient: client, request: request}
 }
 
 type apiClient struct {
 	httpClient *http.Client
-	request    web.Request
+	request    web.RequestConfig
 }
 
 func (a apiClient) getStatus() (*tengineStatus, error) {
@@ -112,7 +112,7 @@ func (a apiClient) doRequestOK(req *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("error on request : %v", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return resp, fmt.Errorf("%s returned HTTP code %d", req.URL, resp.StatusCode)
+		return resp, fmt.Errorf("%s returned HTTPConfig code %d", req.URL, resp.StatusCode)
 	}
 	return resp, nil
 }

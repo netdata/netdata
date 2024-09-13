@@ -5,6 +5,7 @@ package pihole
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"sync"
 	"time"
@@ -30,12 +31,12 @@ func init() {
 func New() *Pihole {
 	return &Pihole{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second * 5),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 5),
 				},
 			},
 			SetupVarsPath: "/etc/pihole/setupVars.conf",
@@ -48,9 +49,9 @@ func New() *Pihole {
 }
 
 type Config struct {
-	UpdateEvery   int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP      `yaml:",inline" json:""`
-	SetupVarsPath string `yaml:"setup_vars_path" json:"setup_vars_path"`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
+	SetupVarsPath  string `yaml:"setup_vars_path" json:"setup_vars_path"`
 }
 
 type Pihole struct {

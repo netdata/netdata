@@ -5,6 +5,7 @@ package apache
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"sync"
 	"time"
@@ -27,12 +28,12 @@ func init() {
 func New() *Apache {
 	return &Apache{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1/server-status?auto",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 		},
@@ -42,8 +43,8 @@ func New() *Apache {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
 type Apache struct {
@@ -69,7 +70,7 @@ func (a *Apache) Init() error {
 
 	httpClient, err := a.initHTTPClient()
 	if err != nil {
-		a.Errorf("init HTTP client: %v", err)
+		a.Errorf("init HTTPConfig client: %v", err)
 		return err
 	}
 	a.httpClient = httpClient

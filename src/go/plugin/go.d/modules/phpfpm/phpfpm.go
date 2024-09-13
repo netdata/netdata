@@ -5,6 +5,7 @@ package phpfpm
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -25,12 +26,12 @@ func init() {
 func New() *Phpfpm {
 	return &Phpfpm{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1/status?full&json",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 			FcgiPath: "/status",
@@ -39,11 +40,11 @@ func New() *Phpfpm {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
-	Socket      string `yaml:"socket,omitempty" json:"socket"`
-	Address     string `yaml:"address,omitempty" json:"address"`
-	FcgiPath    string `yaml:"fcgi_path,omitempty" json:"fcgi_path"`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
+	Socket         string `yaml:"socket,omitempty" json:"socket"`
+	Address        string `yaml:"address,omitempty" json:"address"`
+	FcgiPath       string `yaml:"fcgi_path,omitempty" json:"fcgi_path"`
 }
 
 type Phpfpm struct {

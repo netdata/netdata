@@ -17,14 +17,14 @@ func (cdb *CouchDB) validateConfig() error {
 	if cdb.Node == "" {
 		return errors.New("'node' not set")
 	}
-	if _, err := web.NewHTTPRequest(cdb.Request); err != nil {
+	if _, err := web.NewHTTPRequest(cdb.RequestConfig); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (cdb *CouchDB) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(cdb.Client)
+	return web.NewHTTPClient(cdb.ClientConfig)
 }
 
 func (cdb *CouchDB) initCharts() (*Charts, error) {

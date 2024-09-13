@@ -31,20 +31,20 @@ func (a *Apache) collect() (map[string]int64, error) {
 }
 
 func (a *Apache) scrapeStatus() (*serverStatus, error) {
-	req, err := web.NewHTTPRequest(a.Request)
+	req, err := web.NewHTTPRequest(a.RequestConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	resp, err := a.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
+		return nil, fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
+		return nil, fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
 	}
 
 	return parseResponse(resp.Body)
@@ -101,7 +101,7 @@ func parseResponse(r io.Reader) (*serverStatus, error) {
 func parseScoreboard(line string) *scoreboard {
 	//  “_” Waiting for Connection
 	// “S” Starting up
-	// “R” Reading Request
+	// “R” Reading RequestConfig
 	// “W” Sending Reply
 	// “K” Keepalive (read)
 	// “D” DNS Lookup

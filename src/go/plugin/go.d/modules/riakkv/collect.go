@@ -30,7 +30,7 @@ func (r *RiakKv) collect() (map[string]int64, error) {
 }
 
 func (r *RiakKv) getStats() (*riakStats, error) {
-	req, err := web.NewHTTPRequest(r.Request)
+	req, err := web.NewHTTPRequest(r.RequestConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -46,13 +46,13 @@ func (r *RiakKv) getStats() (*riakStats, error) {
 func (r *RiakKv) doOKDecode(req *http.Request, in interface{}) error {
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
+		return fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		msg := fmt.Sprintf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
+		msg := fmt.Sprintf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
 		if resp.StatusCode == http.StatusNotFound {
 			msg = fmt.Sprintf("%s (riak_kv_stat is not enabled)", msg)
 		}

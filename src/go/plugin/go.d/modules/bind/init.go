@@ -28,9 +28,9 @@ func (b *Bind) initPermitViewMatcher() (matcher.Matcher, error) {
 func (b *Bind) initBindApiClient(httpClient *http.Client) (bindAPIClient, error) {
 	switch {
 	case strings.HasSuffix(b.URL, "/xml/v3"): // BIND 9.9+
-		return newXML3Client(httpClient, b.Request), nil
+		return newXML3Client(httpClient, b.RequestConfig), nil
 	case strings.HasSuffix(b.URL, "/json/v1"): // BIND 9.10+
-		return newJSONClient(httpClient, b.Request), nil
+		return newJSONClient(httpClient, b.RequestConfig), nil
 	default:
 		return nil, fmt.Errorf("URL %s is wrong, supported endpoints: `/xml/v3`, `/json/v1`", b.URL)
 	}

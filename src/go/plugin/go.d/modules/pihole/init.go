@@ -21,7 +21,7 @@ func (p *Pihole) validateConfig() error {
 }
 
 func (p *Pihole) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(p.Client)
+	return web.NewHTTPClient(p.ClientConfig)
 }
 
 func (p *Pihole) getWebPassword() string {

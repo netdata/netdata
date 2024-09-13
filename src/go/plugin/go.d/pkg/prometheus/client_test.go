@@ -39,7 +39,7 @@ func TestPrometheus404(t *testing.T) {
 	ts := httptest.NewServer(tsMux)
 	defer ts.Close()
 
-	req := web.Request{URL: ts.URL + "/metrics"}
+	req := web.RequestConfig{URL: ts.URL + "/metrics"}
 	prom := New(http.DefaultClient, req)
 	res, err := prom.ScrapeSeries()
 
@@ -55,7 +55,7 @@ func TestPrometheusPlain(t *testing.T) {
 	ts := httptest.NewServer(tsMux)
 	defer ts.Close()
 
-	req := web.Request{URL: ts.URL + "/metrics"}
+	req := web.RequestConfig{URL: ts.URL + "/metrics"}
 	prom := New(http.DefaultClient, req)
 	res, err := prom.ScrapeSeries()
 
@@ -71,7 +71,7 @@ func TestPrometheusPlainWithSelector(t *testing.T) {
 	ts := httptest.NewServer(tsMux)
 	defer ts.Close()
 
-	req := web.Request{URL: ts.URL + "/metrics"}
+	req := web.RequestConfig{URL: ts.URL + "/metrics"}
 	sr, err := selector.Parse("go_gc*")
 	require.NoError(t, err)
 	prom := NewWithSelector(http.DefaultClient, req, sr)
@@ -101,7 +101,7 @@ func TestPrometheusGzip(t *testing.T) {
 	ts := httptest.NewServer(tsMux)
 	defer ts.Close()
 
-	req := web.Request{URL: ts.URL + "/metrics"}
+	req := web.RequestConfig{URL: ts.URL + "/metrics"}
 	prom := New(http.DefaultClient, req)
 
 	for i := 0; i < 2; i++ {
@@ -112,7 +112,7 @@ func TestPrometheusGzip(t *testing.T) {
 }
 
 func TestPrometheusReadFromFile(t *testing.T) {
-	req := web.Request{URL: "file://testdata/testdata.txt"}
+	req := web.RequestConfig{URL: "file://testdata/testdata.txt"}
 	prom := NewWithSelector(http.DefaultClient, req, nil)
 
 	for i := 0; i < 2; i++ {

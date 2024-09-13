@@ -53,7 +53,7 @@ func (ts *Typesense) collect() (map[string]int64, error) {
 }
 
 func (ts *Typesense) collectHealth(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(ts.Request, urlPathHealth)
+	req, err := web.NewHTTPRequestWithPath(ts.RequestConfig, urlPathHealth)
 	if err != nil {
 		return fmt.Errorf("creating health request: %w", err)
 	}
@@ -87,7 +87,7 @@ func (ts *Typesense) collectStats(mx map[string]int64) error {
 		return nil
 	}
 
-	req, err := web.NewHTTPRequestWithPath(ts.Request, urlPathStats)
+	req, err := web.NewHTTPRequestWithPath(ts.RequestConfig, urlPathStats)
 	if err != nil {
 		return fmt.Errorf("creating stats request: %w", err)
 	}
@@ -118,7 +118,7 @@ func (ts *Typesense) collectStats(mx map[string]int64) error {
 func (ts *Typesense) doOKDecode(req *http.Request, in interface{}) error {
 	resp, err := ts.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
+		return fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)
@@ -129,10 +129,10 @@ func (ts *Typesense) doOKDecode(req *http.Request, in interface{}) error {
 			Msg string `json:"message"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&msg); err == nil && msg.Msg != "" {
-			return fmt.Errorf("'%s' returned HTTP status code: %d (msg: '%s')",
+			return fmt.Errorf("'%s' returned HTTPConfig status code: %d (msg: '%s')",
 				req.URL, resp.StatusCode, msg.Msg)
 		}
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {

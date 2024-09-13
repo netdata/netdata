@@ -5,6 +5,7 @@ package ipfs
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"time"
 
@@ -26,13 +27,13 @@ func init() {
 func New() *IPFS {
 	return &IPFS{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL:    "http://127.0.0.1:5001",
 					Method: http.MethodPost,
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second * 1),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 1),
 				},
 			},
 			QueryRepoApi: false,
@@ -43,10 +44,10 @@ func New() *IPFS {
 }
 
 type Config struct {
-	UpdateEvery  int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP     `yaml:",inline" json:""`
-	QueryPinApi  bool `yaml:"pinapi" json:"pinapi"`
-	QueryRepoApi bool `yaml:"repoapi" json:"repoapi"`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
+	QueryPinApi    bool `yaml:"pinapi" json:"pinapi"`
+	QueryRepoApi   bool `yaml:"repoapi" json:"repoapi"`
 }
 
 type IPFS struct {
@@ -68,7 +69,7 @@ func (ip *IPFS) Init() error {
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(ip.Client)
+	client, err := web.NewHTTPClient(ip.ClientConfig)
 	if err != nil {
 		ip.Error(err)
 		return err

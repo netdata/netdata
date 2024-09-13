@@ -27,7 +27,7 @@ func (hc *HTTPCheck) validateConfig() error {
 }
 
 func (hc *HTTPCheck) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(hc.Client)
+	return web.NewHTTPClient(hc.ClientConfig)
 }
 
 func (hc *HTTPCheck) initResponseMatchRegexp() (*regexp.Regexp, error) {

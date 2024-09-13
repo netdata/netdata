@@ -5,10 +5,10 @@ package nvme
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -28,7 +28,7 @@ func init() {
 func New() *NVMe {
 	return &NVMe{
 		Config: Config{
-			Timeout: web.Duration(time.Second * 2),
+			Timeout: confopt.Duration(time.Second * 2),
 		},
 
 		charts:           &module.Charts{},
@@ -39,8 +39,8 @@ func New() *NVMe {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
 type (

@@ -22,9 +22,9 @@ func (s *Supervisord) initSupervisorClient() (supervisorClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse 'url': %v (%s)", err, s.URL)
 	}
-	httpClient, err := web.NewHTTPClient(s.Client)
+	httpClient, err := web.NewHTTPClient(s.ClientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("create HTTP client: %v", err)
+		return nil, fmt.Errorf("create HTTPConfig client: %v", err)
 	}
 	return newSupervisorRPCClient(u, httpClient)
 }

@@ -4,14 +4,13 @@ package dnsquery
 
 import (
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
 	"github.com/miekg/dns"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +46,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "udp",
 				RecordTypes: []string{"A"},
 				Port:        53,
-				Timeout:     web.Duration(time.Second),
+				Timeout:     confopt.Duration(time.Second),
 			},
 		},
 		"success when using deprecated record_type": {
@@ -58,7 +57,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:    "udp",
 				RecordType: "A",
 				Port:       53,
-				Timeout:    web.Duration(time.Second),
+				Timeout:    confopt.Duration(time.Second),
 			},
 		},
 		"fail with default": {
@@ -73,7 +72,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "udp",
 				RecordTypes: []string{"A"},
 				Port:        53,
-				Timeout:     web.Duration(time.Second),
+				Timeout:     confopt.Duration(time.Second),
 			},
 		},
 		"fail when servers not set": {
@@ -84,7 +83,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "udp",
 				RecordTypes: []string{"A"},
 				Port:        53,
-				Timeout:     web.Duration(time.Second),
+				Timeout:     confopt.Duration(time.Second),
 			},
 		},
 		"fail when network is invalid": {
@@ -95,7 +94,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "gcp",
 				RecordTypes: []string{"A"},
 				Port:        53,
-				Timeout:     web.Duration(time.Second),
+				Timeout:     confopt.Duration(time.Second),
 			},
 		},
 		"fail when record_type is invalid": {
@@ -106,7 +105,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "udp",
 				RecordTypes: []string{"B"},
 				Port:        53,
-				Timeout:     web.Duration(time.Second),
+				Timeout:     confopt.Duration(time.Second),
 			},
 		},
 	}

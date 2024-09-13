@@ -5,10 +5,10 @@ package dovecot
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -26,7 +26,7 @@ func New() *Dovecot {
 	return &Dovecot{
 		Config: Config{
 			Address: "127.0.0.1:24242",
-			Timeout: web.Duration(time.Second * 1),
+			Timeout: confopt.Duration(time.Second * 1),
 		},
 		newConn: newDovecotConn,
 		charts:  charts.Copy(),
@@ -34,9 +34,9 @@ func New() *Dovecot {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	Address     string       `yaml:"address" json:"address"`
-	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	Address     string           `yaml:"address" json:"address"`
+	Timeout     confopt.Duration `yaml:"timeout" json:"timeout"`
 }
 
 type Dovecot struct {

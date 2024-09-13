@@ -47,7 +47,7 @@ func TestHDFS_Init(t *testing.T) {
 
 func TestHDFS_InitErrorOnCreatingClientWrongTLSCA(t *testing.T) {
 	job := New()
-	job.Client.TLSConfig.TLSCA = "testdata/tls"
+	job.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
 	assert.Error(t, job.Init())
 }

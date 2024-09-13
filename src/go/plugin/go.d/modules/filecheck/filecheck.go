@@ -4,11 +4,11 @@ package filecheck
 
 import (
 	_ "embed"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -28,7 +28,7 @@ func init() {
 func New() *Filecheck {
 	return &Filecheck{
 		Config: Config{
-			DiscoveryEvery: web.Duration(time.Minute * 1),
+			DiscoveryEvery: confopt.Duration(time.Minute * 1),
 			Files:          filesConfig{},
 			Dirs:           dirsConfig{CollectDirSize: false},
 		},
@@ -40,10 +40,10 @@ func New() *Filecheck {
 
 type (
 	Config struct {
-		UpdateEvery    int          `yaml:"update_every,omitempty" json:"update_every"`
-		DiscoveryEvery web.Duration `yaml:"discovery_every,omitempty" json:"discovery_every"`
-		Files          filesConfig  `yaml:"files" json:"files"`
-		Dirs           dirsConfig   `yaml:"dirs" json:"dirs"`
+		UpdateEvery    int              `yaml:"update_every,omitempty" json:"update_every"`
+		DiscoveryEvery confopt.Duration `yaml:"discovery_every,omitempty" json:"discovery_every"`
+		Files          filesConfig      `yaml:"files" json:"files"`
+		Dirs           dirsConfig       `yaml:"dirs" json:"dirs"`
 	}
 	filesConfig struct {
 		Include []string `yaml:"include" json:"include"`

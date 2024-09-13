@@ -6,13 +6,12 @@ import (
 	"database/sql"
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 
 	"github.com/blang/semver/v4"
 	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 //go:embed "config_schema.json"
@@ -29,7 +28,7 @@ func init() {
 func New() *PgBouncer {
 	return &PgBouncer{
 		Config: Config{
-			Timeout: web.Duration(time.Second),
+			Timeout: confopt.Duration(time.Second),
 			DSN:     "postgres://postgres:postgres@127.0.0.1:6432/pgbouncer",
 		},
 		charts:               globalCharts.Copy(),
@@ -41,9 +40,9 @@ func New() *PgBouncer {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	DSN         string       `yaml:"dsn" json:"dsn"`
-	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	DSN         string           `yaml:"dsn" json:"dsn"`
+	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
 type PgBouncer struct {

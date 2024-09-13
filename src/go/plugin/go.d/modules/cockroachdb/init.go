@@ -17,9 +17,9 @@ func (c *CockroachDB) validateConfig() error {
 }
 
 func (c *CockroachDB) initPrometheusClient() (prometheus.Prometheus, error) {
-	client, err := web.NewHTTPClient(c.Client)
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
-	return prometheus.New(client, c.Request), nil
+	return prometheus.New(client, c.RequestConfig), nil
 }

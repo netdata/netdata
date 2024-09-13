@@ -64,7 +64,7 @@ func (ns *AuthoritativeNS) collectStatistics(collected map[string]int64, statist
 }
 
 func (ns *AuthoritativeNS) scrapeStatistics() ([]statisticMetric, error) {
-	req, _ := web.NewHTTPRequestWithPath(ns.Request, urlPathLocalStatistics)
+	req, _ := web.NewHTTPRequestWithPath(ns.RequestConfig, urlPathLocalStatistics)
 
 	var statistics statisticMetrics
 	if err := ns.doOKDecode(req, &statistics); err != nil {
@@ -77,13 +77,13 @@ func (ns *AuthoritativeNS) scrapeStatistics() ([]statisticMetric, error) {
 func (ns *AuthoritativeNS) doOKDecode(req *http.Request, in interface{}) error {
 	resp, err := ns.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
+		return fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {

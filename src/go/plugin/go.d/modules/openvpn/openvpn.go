@@ -4,13 +4,13 @@ package openvpn
 
 import (
 	_ "embed"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/openvpn/client"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -28,7 +28,7 @@ func New() *OpenVPN {
 	return &OpenVPN{
 		Config: Config{
 			Address: "127.0.0.1:7505",
-			Timeout: web.Duration(time.Second),
+			Timeout: confopt.Duration(time.Second),
 		},
 
 		charts:         charts.Copy(),
@@ -39,7 +39,7 @@ func New() *OpenVPN {
 type Config struct {
 	UpdateEvery  int                `yaml:"update_every,omitempty" json:"update_every"`
 	Address      string             `yaml:"address" json:"address"`
-	Timeout      web.Duration       `yaml:"timeout,omitempty" json:"timeout"`
+	Timeout      confopt.Duration   `yaml:"timeout,omitempty" json:"timeout"`
 	PerUserStats matcher.SimpleExpr `yaml:"per_user_stats,omitempty" json:"per_user_stats"`
 }
 

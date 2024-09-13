@@ -5,12 +5,12 @@ package mongo
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -28,7 +28,7 @@ func New() *Mongo {
 	return &Mongo{
 		Config: Config{
 			URI:     "mongodb://localhost:27017",
-			Timeout: web.Duration(time.Second),
+			Timeout: confopt.Duration(time.Second),
 			Databases: matcher.SimpleExpr{
 				Includes: []string{},
 				Excludes: []string{},
@@ -50,7 +50,7 @@ func New() *Mongo {
 type Config struct {
 	UpdateEvery int                `yaml:"update_every,omitempty" json:"update_every"`
 	URI         string             `yaml:"uri" json:"uri"`
-	Timeout     web.Duration       `yaml:"timeout,omitempty" json:"timeout"`
+	Timeout     confopt.Duration   `yaml:"timeout,omitempty" json:"timeout"`
 	Databases   matcher.SimpleExpr `yaml:"databases,omitempty" json:"databases"`
 }
 

@@ -126,7 +126,7 @@ var (
 	}
 	getRateChart = module.Chart{
 		ID:       "get_rate",
-		Title:    "Get Request Rate",
+		Title:    "Get RequestConfig Rate",
 		Units:    "requests/s",
 		Fam:      "get ops",
 		Ctx:      "memcached.get_rate",
@@ -138,7 +138,7 @@ var (
 	}
 	setRateChart = module.Chart{
 		ID:       "set_rate",
-		Title:    "Set Request Rate",
+		Title:    "Set RequestConfig Rate",
 		Units:    "requests/s",
 		Fam:      "set ops",
 		Ctx:      "memcached.set_rate",

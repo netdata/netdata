@@ -16,7 +16,7 @@ FROM
 `
 
 func (c *ClickHouse) collectLongestRunningQueryTime(mx map[string]int64) error {
-	req, _ := web.NewHTTPRequest(c.Request)
+	req, _ := web.NewHTTPRequest(c.RequestConfig)
 	req.URL.RawQuery = makeURLQuery(queryLongestQueryTime)
 
 	return c.doOKDecodeCSV(req, func(column, value string, lineEnd bool) {

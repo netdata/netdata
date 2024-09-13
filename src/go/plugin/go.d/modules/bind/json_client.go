@@ -32,13 +32,13 @@ type jsonViewResolver struct {
 	CacheStats map[string]int64
 }
 
-func newJSONClient(client *http.Client, request web.Request) *jsonClient {
+func newJSONClient(client *http.Client, request web.RequestConfig) *jsonClient {
 	return &jsonClient{httpClient: client, request: request}
 }
 
 type jsonClient struct {
 	httpClient *http.Client
-	request    web.Request
+	request    web.RequestConfig
 }
 
 func (c jsonClient) serverStats() (*serverStats, error) {
@@ -53,7 +53,7 @@ func (c jsonClient) serverStats() (*serverStats, error) {
 
 	httpReq, err := web.NewHTTPRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating HTTP request: %v", err)
+		return nil, fmt.Errorf("error on creating HTTPConfig request: %v", err)
 	}
 
 	resp, err := c.httpClient.Do(httpReq)
@@ -64,7 +64,7 @@ func (c jsonClient) serverStats() (*serverStats, error) {
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s returned HTTP status %d", httpReq.URL, resp.StatusCode)
+		return nil, fmt.Errorf("%s returned HTTPConfig status %d", httpReq.URL, resp.StatusCode)
 	}
 
 	stats := &jsonServerStats{}

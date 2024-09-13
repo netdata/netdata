@@ -5,6 +5,7 @@ package puppet
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"time"
 
@@ -26,12 +27,12 @@ func init() {
 func New() *Puppet {
 	return &Puppet{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "https://127.0.0.1:8140",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second * 1),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 1),
 				},
 			},
 		},
@@ -40,8 +41,8 @@ func New() *Puppet {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
 type Puppet struct {
@@ -63,7 +64,7 @@ func (p *Puppet) Init() error {
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(p.Client)
+	client, err := web.NewHTTPClient(p.ClientConfig)
 	if err != nil {
 		p.Error(err)
 		return err

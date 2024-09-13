@@ -5,21 +5,20 @@ package dockerd
 import (
 	"context"
 	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"log/slog"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
 	"github.com/docker/docker/api/types"
 	typesContainer "github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
 	"github.com/ilyam8/hashstructure"
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 )
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
@@ -64,9 +63,9 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 type Config struct {
 	Source string
 
-	Tags    string       `yaml:"tags"`
-	Address string       `yaml:"address"`
-	Timeout web.Duration `yaml:"timeout"`
+	Tags    string           `yaml:"tags"`
+	Address string           `yaml:"address"`
+	Timeout confopt.Duration `yaml:"timeout"`
 }
 
 type (

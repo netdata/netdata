@@ -5,6 +5,7 @@ package dockerhub
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -28,12 +29,12 @@ func init() {
 func New() *DockerHub {
 	return &DockerHub{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "https://hub.docker.com/v2/repositories",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second * 2),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 2),
 				},
 			},
 		},
@@ -41,9 +42,9 @@ func New() *DockerHub {
 }
 
 type Config struct {
-	UpdateEvery  int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP     `yaml:",inline" json:""`
-	Repositories []string `yaml:"repositories" json:"repositories"`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
+	Repositories   []string `yaml:"repositories" json:"repositories"`
 }
 
 type DockerHub struct {

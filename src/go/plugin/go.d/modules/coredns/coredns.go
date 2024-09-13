@@ -5,6 +5,7 @@ package coredns
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -29,12 +30,12 @@ func init() {
 func New() *CoreDNS {
 	return &CoreDNS{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1:9153/metrics",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 		},
@@ -46,7 +47,7 @@ func New() *CoreDNS {
 
 type Config struct {
 	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP       `yaml:",inline" json:""`
+	web.HTTPConfig `yaml:",inline" json:""`
 	PerServerStats matcher.SimpleExpr `yaml:"per_server_stats,omitempty" json:"per_server_stats"`
 	PerZoneStats   matcher.SimpleExpr `yaml:"per_zone_stats,omitempty" json:"per_zone_stats"`
 }

@@ -32,9 +32,9 @@ func (cd *CoreDNS) initPerZoneMatcher() (matcher.Matcher, error) {
 }
 
 func (cd *CoreDNS) initPrometheusClient() (prometheus.Prometheus, error) {
-	client, err := web.NewHTTPClient(cd.Client)
+	client, err := web.NewHTTPClient(cd.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
-	return prometheus.New(client, cd.Request), nil
+	return prometheus.New(client, cd.RequestConfig), nil
 }

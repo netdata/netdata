@@ -67,7 +67,7 @@ func (ic *Icecast) collectServerStats(mx map[string]int64) error {
 }
 
 func (ic *Icecast) queryServerStats() (*serverStats, error) {
-	req, err := web.NewHTTPRequestWithPath(ic.Request, urlPathServerStats)
+	req, err := web.NewHTTPRequestWithPath(ic.RequestConfig, urlPathServerStats)
 	if err != nil {
 		return nil, err
 	}
@@ -84,13 +84,13 @@ func (ic *Icecast) queryServerStats() (*serverStats, error) {
 func (ic *Icecast) doOKDecode(req *http.Request, in interface{}) error {
 	resp, err := ic.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
+		return fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {

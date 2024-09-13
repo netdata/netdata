@@ -55,16 +55,16 @@ func TestApache_Init(t *testing.T) {
 		"fail when URL not set": {
 			wantFail: true,
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{URL: ""},
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: ""},
 				},
 			},
 		},
 		"fail when URL has no wantMetrics suffix": {
 			wantFail: true,
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{URL: "http://127.0.0.1:38001"},
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:38001"},
 				},
 			},
 		},

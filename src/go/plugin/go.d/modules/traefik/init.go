@@ -18,12 +18,12 @@ func (t *Traefik) validateConfig() error {
 }
 
 func (t *Traefik) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(t.Client)
+	httpClient, err := web.NewHTTPClient(t.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	prom := prometheus.NewWithSelector(httpClient, t.Request, sr)
+	prom := prometheus.NewWithSelector(httpClient, t.RequestConfig, sr)
 	return prom, nil
 }
 

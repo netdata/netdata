@@ -17,5 +17,5 @@ func (t *Tomcat) validateConfig() error {
 }
 
 func (t *Tomcat) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(t.Client)
+	return web.NewHTTPClient(t.ClientConfig)
 }

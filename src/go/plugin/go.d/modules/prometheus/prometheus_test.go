@@ -42,13 +42,13 @@ func TestPrometheus_Init(t *testing.T) {
 	}{
 		"non empty URL": {
 			wantFail: false,
-			config:   Config{HTTP: web.HTTP{Request: web.Request{URL: "http://127.0.0.1:9090/metric"}}},
+			config:   Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}}},
 		},
 		"invalid selector syntax": {
 			wantFail: true,
 			config: Config{
-				HTTP:     web.HTTP{Request: web.Request{URL: "http://127.0.0.1:9090/metric"}},
-				Selector: selector.Expr{Allow: []string{`name{label=#"value"}`}},
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Selector:   selector.Expr{Allow: []string{`name{label=#"value"}`}},
 			},
 		},
 		"default": {

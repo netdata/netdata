@@ -34,13 +34,13 @@ type xml3View struct {
 	CounterGroups []xml3CounterGroup `xml:"counters"`
 }
 
-func newXML3Client(client *http.Client, request web.Request) *xml3Client {
+func newXML3Client(client *http.Client, request web.RequestConfig) *xml3Client {
 	return &xml3Client{httpClient: client, request: request}
 }
 
 type xml3Client struct {
 	httpClient *http.Client
-	request    web.Request
+	request    web.RequestConfig
 }
 
 func (c xml3Client) serverStats() (*serverStats, error) {
@@ -55,7 +55,7 @@ func (c xml3Client) serverStats() (*serverStats, error) {
 
 	httpReq, err := web.NewHTTPRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating HTTP request: %v", err)
+		return nil, fmt.Errorf("error on creating HTTPConfig request: %v", err)
 	}
 
 	resp, err := c.httpClient.Do(httpReq)
@@ -66,7 +66,7 @@ func (c xml3Client) serverStats() (*serverStats, error) {
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s returned HTTP status %d", httpReq.URL, resp.StatusCode)
+		return nil, fmt.Errorf("%s returned HTTPConfig status %d", httpReq.URL, resp.StatusCode)
 	}
 
 	stats := xml3Stats{}

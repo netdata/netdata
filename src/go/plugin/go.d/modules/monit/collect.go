@@ -73,7 +73,7 @@ func (m *Monit) collectStatus(mx map[string]int64) error {
 }
 
 func (m *Monit) fetchStatus() (*monitStatus, error) {
-	req, err := web.NewHTTPRequestWithPath(m.Request, urlPathStatus)
+	req, err := web.NewHTTPRequestWithPath(m.RequestConfig, urlPathStatus)
 	if err != nil {
 		return nil, err
 	}
@@ -90,13 +90,13 @@ func (m *Monit) fetchStatus() (*monitStatus, error) {
 func (m *Monit) doOKDecode(req *http.Request, in interface{}) error {
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
+		return fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
 	}
 
 	dec := xml.NewDecoder(resp.Body)

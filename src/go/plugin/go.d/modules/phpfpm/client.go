@@ -53,11 +53,11 @@ type client interface {
 
 type httpClient struct {
 	client *http.Client
-	req    web.Request
+	req    web.RequestConfig
 	dec    decoder
 }
 
-func newHTTPClient(c *http.Client, r web.Request) (*httpClient, error) {
+func newHTTPClient(c *http.Client, r web.RequestConfig) (*httpClient, error) {
 	u, err := url.Parse(r.URL)
 	if err != nil {
 		return nil, err
@@ -77,12 +77,12 @@ func newHTTPClient(c *http.Client, r web.Request) (*httpClient, error) {
 func (c *httpClient) getStatus() (*status, error) {
 	req, err := web.NewHTTPRequest(c.req)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating HTTP request: %v", err)
+		return nil, fmt.Errorf("error on creating HTTPConfig request: %v", err)
 	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error on HTTP request to '%s': %v", req.URL, err)
+		return nil, fmt.Errorf("error on HTTPConfig request to '%s': %v", req.URL, err)
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
@@ -90,12 +90,12 @@ func (c *httpClient) getStatus() (*status, error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
+		return nil, fmt.Errorf("%s returned HTTPConfig status %d", req.URL, resp.StatusCode)
 	}
 
 	st := &status{}
 	if err := c.dec(resp.Body, st); err != nil {
-		return nil, fmt.Errorf("error parsing HTTP response from '%s': %v", req.URL, err)
+		return nil, fmt.Errorf("error parsing HTTPConfig response from '%s': %v", req.URL, err)
 	}
 
 	return st, nil

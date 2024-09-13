@@ -44,7 +44,7 @@ func (vts *NginxVTS) collectServerZones(collected map[string]interface{}, ms *vt
 }
 
 func (vts *NginxVTS) scapeVTS() (*vtsMetrics, error) {
-	req, _ := web.NewHTTPRequest(vts.Request)
+	req, _ := web.NewHTTPRequest(vts.RequestConfig)
 
 	var total vtsMetrics
 
@@ -58,13 +58,13 @@ func (vts *NginxVTS) scapeVTS() (*vtsMetrics, error) {
 func (vts *NginxVTS) doOKDecode(req *http.Request, in interface{}) error {
 	resp, err := vts.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
+		return fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {

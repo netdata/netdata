@@ -18,7 +18,7 @@ FROM
 `
 
 func (c *ClickHouse) collectSystemEvents(mx map[string]int64) error {
-	req, _ := web.NewHTTPRequest(c.Request)
+	req, _ := web.NewHTTPRequest(c.RequestConfig)
 	req.URL.RawQuery = makeURLQuery(querySystemEvents)
 
 	px := "events_"

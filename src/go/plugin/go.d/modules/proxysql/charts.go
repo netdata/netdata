@@ -87,7 +87,7 @@ var (
 
 	clientConnectionsCountChart = module.Chart{
 		ID:       "client_connections_count",
-		Title:    "Client connections",
+		Title:    "ClientConfig connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "proxysql.client_connections_count",
@@ -100,7 +100,7 @@ var (
 	}
 	clientConnectionsRateChart = module.Chart{
 		ID:       "client_connections_rate",
-		Title:    "Client connections rate",
+		Title:    "ClientConfig connections rate",
 		Units:    "connections/s",
 		Fam:      "connections",
 		Ctx:      "proxysql.client_connections_rate",
@@ -163,7 +163,7 @@ var (
 
 	activeTransactionsCountChart = module.Chart{
 		ID:       "active_transactions_count",
-		Title:    "Client connections that are currently processing a transaction",
+		Title:    "ClientConfig connections that are currently processing a transaction",
 		Units:    "transactions",
 		Fam:      "transactions",
 		Ctx:      "proxysql.active_transactions_count",
@@ -174,7 +174,7 @@ var (
 	}
 	questionsRateChart = module.Chart{
 		ID:       "questions_rate",
-		Title:    "Client requests / statements executed",
+		Title:    "ClientConfig requests / statements executed",
 		Units:    "questions/s",
 		Fam:      "queries",
 		Ctx:      "proxysql.questions_rate",

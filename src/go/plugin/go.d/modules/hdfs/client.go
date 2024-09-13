@@ -10,7 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func newClient(httpClient *http.Client, request web.Request) *client {
+func newClient(httpClient *http.Client, request web.RequestConfig) *client {
 	return &client{
 		httpClient: httpClient,
 		request:    request,
@@ -19,7 +19,7 @@ func newClient(httpClient *http.Client, request web.Request) *client {
 
 type client struct {
 	httpClient *http.Client
-	request    web.Request
+	request    web.RequestConfig
 }
 
 func (c *client) do() (*http.Response, error) {

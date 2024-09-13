@@ -3,6 +3,7 @@ package vsphere
 
 import (
 	"crypto/tls"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"os"
 	"strings"
 	"testing"
@@ -12,8 +13,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere/discover"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere/resources"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vmware/govmomi/performance"
@@ -77,7 +76,7 @@ func TestVSphere_Init_ReturnsFalseIfPasswordNotSet(t *testing.T) {
 func TestVSphere_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
 	vSphere, _, teardown := prepareVSphereSim(t)
 	defer teardown()
-	vSphere.Client.TLSConfig.TLSCA = "testdata/tls"
+	vSphere.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
 	assert.Error(t, vSphere.Init())
 }
@@ -402,7 +401,7 @@ func TestVSphere_Collect_Run(t *testing.T) {
 	vSphere, model, teardown := prepareVSphereSim(t)
 	defer teardown()
 
-	vSphere.DiscoveryInterval = web.Duration(time.Second * 2)
+	vSphere.DiscoveryInterval = confopt.Duration(time.Second * 2)
 	require.NoError(t, vSphere.Init())
 	require.NoError(t, vSphere.Check())
 

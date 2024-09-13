@@ -5,6 +5,7 @@ package elasticsearch
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"sync"
 	"time"
@@ -30,12 +31,12 @@ func init() {
 func New() *Elasticsearch {
 	return &Elasticsearch{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1:9200",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second * 2),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 2),
 				},
 			},
 			ClusterMode: false,
@@ -56,7 +57,7 @@ func New() *Elasticsearch {
 
 type Config struct {
 	UpdateEvery     int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP        `yaml:",inline" json:""`
+	web.HTTPConfig  `yaml:",inline" json:""`
 	ClusterMode     bool `yaml:"cluster_mode" json:"cluster_mode"`
 	DoNodeStats     bool `yaml:"collect_node_stats" json:"collect_node_stats"`
 	DoClusterHealth bool `yaml:"collect_cluster_health" json:"collect_cluster_health"`
@@ -92,7 +93,7 @@ func (es *Elasticsearch) Init() error {
 
 	httpClient, err := es.initHTTPClient()
 	if err != nil {
-		es.Errorf("init HTTP client: %v", err)
+		es.Errorf("init HTTPConfig client: %v", err)
 		return err
 	}
 	es.httpClient = httpClient

@@ -5,6 +5,7 @@ package httpcheck
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"regexp"
 	"time"
@@ -30,9 +31,9 @@ func init() {
 func New() *HTTPCheck {
 	return &HTTPCheck{
 		Config: Config{
-			HTTP: web.HTTP{
-				Client: web.Client{
-					Timeout: web.Duration(time.Second),
+			HTTPConfig: web.HTTPConfig{
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second),
 				},
 			},
 			AcceptedStatuses: []int{200},
@@ -45,7 +46,7 @@ func New() *HTTPCheck {
 type (
 	Config struct {
 		UpdateEvery      int `yaml:"update_every,omitempty" json:"update_every"`
-		web.HTTP         `yaml:",inline" json:""`
+		web.HTTPConfig   `yaml:",inline" json:""`
 		AcceptedStatuses []int               `yaml:"status_accepted" json:"status_accepted"`
 		ResponseMatch    string              `yaml:"response_match,omitempty" json:"response_match"`
 		CookieFile       string              `yaml:"cookie_file,omitempty" json:"cookie_file"`
@@ -88,7 +89,7 @@ func (hc *HTTPCheck) Init() error {
 
 	httpClient, err := hc.initHTTPClient()
 	if err != nil {
-		hc.Errorf("init HTTP client: %v", err)
+		hc.Errorf("init HTTPConfig client: %v", err)
 		return err
 	}
 	hc.httpClient = httpClient
@@ -112,8 +113,8 @@ func (hc *HTTPCheck) Init() error {
 	}
 
 	hc.Debugf("using URL %s", hc.URL)
-	hc.Debugf("using HTTP timeout %s", hc.Timeout.Duration())
-	hc.Debugf("using accepted HTTP statuses %v", hc.AcceptedStatuses)
+	hc.Debugf("using HTTPConfig timeout %s", hc.Timeout.Duration())
+	hc.Debugf("using accepted HTTPConfig statuses %v", hc.AcceptedStatuses)
 	if hc.reResponse != nil {
 		hc.Debugf("using response match regexp %s", hc.reResponse)
 	}

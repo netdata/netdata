@@ -84,10 +84,10 @@ var (
 		},
 	}
 
-	// HTTP Code
+	// HTTPConfig Code
 	httpRespCodeClassChart = Chart{
 		ID:       "responses_by_http_status_code_class",
-		Title:    "Responses By HTTP Status Code Class",
+		Title:    "Responses By HTTPConfig Status Code Class",
 		Units:    "responses/s",
 		Fam:      "http code",
 		Ctx:      "squidlog.http_status_code_class_responses",
@@ -105,7 +105,7 @@ var (
 	}
 	httpRespCodesChart = Chart{
 		ID:       "responses_by_http_status_code",
-		Title:    "Responses By HTTP Status Code",
+		Title:    "Responses By HTTPConfig Status Code",
 		Units:    "responses/s",
 		Fam:      "http code",
 		Ctx:      "squidlog.http_status_code_responses",
@@ -210,10 +210,10 @@ var (
 		Priority: prioCacheErrorTag,
 	}
 
-	// HTTP Method
+	// HTTPConfig Method
 	reqMethodChart = Chart{
 		ID:       "requests_by_http_method",
-		Title:    "Requests By HTTP Method",
+		Title:    "Requests By HTTPConfig Method",
 		Units:    "requests/s",
 		Fam:      "http method",
 		Ctx:      "squidlog.http_method_requests",

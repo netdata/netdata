@@ -4,13 +4,12 @@ package smartctl
 
 import (
 	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -357,8 +356,8 @@ func TestSmartctl_Collect(t *testing.T) {
 			}
 			mock := test.prepareMock()
 			smart.exec = mock
-			smart.ScanEvery = web.Duration(time.Microsecond * 1)
-			smart.PollDevicesEvery = web.Duration(time.Microsecond * 1)
+			smart.ScanEvery = confopt.Duration(time.Microsecond * 1)
+			smart.PollDevicesEvery = confopt.Duration(time.Microsecond * 1)
 
 			var mx map[string]int64
 			for i := 0; i < 10; i++ {

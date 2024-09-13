@@ -5,6 +5,7 @@ package nginxplus
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"time"
 
@@ -26,12 +27,12 @@ func init() {
 func New() *NginxPlus {
 	return &NginxPlus{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "http://127.0.0.1",
 				},
-				Client: web.Client{
-					Timeout: web.Duration(time.Second * 1),
+				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 1),
 				},
 			},
 		},
@@ -42,8 +43,8 @@ func New() *NginxPlus {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
 type NginxPlus struct {
@@ -83,9 +84,9 @@ func (n *NginxPlus) Init() error {
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(n.Client)
+	client, err := web.NewHTTPClient(n.ClientConfig)
 	if err != nil {
-		n.Errorf("init HTTP client: %v", err)
+		n.Errorf("init HTTPConfig client: %v", err)
 		return err
 	}
 	n.httpClient = client

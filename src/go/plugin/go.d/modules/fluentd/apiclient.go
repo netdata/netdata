@@ -39,13 +39,13 @@ func (p pluginData) hasBufferTotalQueuedSize() bool {
 	return p.BufferTotalQueuedSize != nil
 }
 
-func newAPIClient(client *http.Client, request web.Request) *apiClient {
+func newAPIClient(client *http.Client, request web.RequestConfig) *apiClient {
 	return &apiClient{httpClient: client, request: request}
 }
 
 type apiClient struct {
 	httpClient *http.Client
-	request    web.Request
+	request    web.RequestConfig
 }
 
 func (a apiClient) getPluginsInfo() (*pluginsInfo, error) {
@@ -71,7 +71,7 @@ func (a apiClient) doOKDecode(req *http.Request, in any) error {
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("%s returned HTTPConfig status %d", req.URL, resp.StatusCode)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {

@@ -5,12 +5,11 @@ package smartctl
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
 	"github.com/tidwall/gjson"
 )
 
@@ -31,9 +30,9 @@ func init() {
 func New() *Smartctl {
 	return &Smartctl{
 		Config: Config{
-			Timeout:          web.Duration(time.Second * 5),
-			ScanEvery:        web.Duration(time.Minute * 15),
-			PollDevicesEvery: web.Duration(time.Minute * 5),
+			Timeout:          confopt.Duration(time.Second * 5),
+			ScanEvery:        confopt.Duration(time.Minute * 15),
+			PollDevicesEvery: confopt.Duration(time.Minute * 5),
 			NoCheckPowerMode: "standby",
 			DeviceSelector:   "*",
 		},
@@ -47,9 +46,9 @@ func New() *Smartctl {
 type (
 	Config struct {
 		UpdateEvery      int                 `yaml:"update_every,omitempty" json:"update_every"`
-		Timeout          web.Duration        `yaml:"timeout,omitempty" json:"timeout"`
-		ScanEvery        web.Duration        `yaml:"scan_every,omitempty" json:"scan_every"`
-		PollDevicesEvery web.Duration        `yaml:"poll_devices_every,omitempty" json:"poll_devices_every"`
+		Timeout          confopt.Duration    `yaml:"timeout,omitempty" json:"timeout"`
+		ScanEvery        confopt.Duration    `yaml:"scan_every,omitempty" json:"scan_every"`
+		PollDevicesEvery confopt.Duration    `yaml:"poll_devices_every,omitempty" json:"poll_devices_every"`
 		NoCheckPowerMode string              `yaml:"no_check_power_mode,omitempty" json:"no_check_power_mode"`
 		DeviceSelector   string              `yaml:"device_selector,omitempty" json:"device_selector"`
 		ExtraDevices     []ConfigExtraDevice `yaml:"extra_devices,omitempty" json:"extra_devices"`

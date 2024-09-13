@@ -22,7 +22,7 @@ var httpCheckCharts = module.Charts{
 
 var responseTimeChart = module.Chart{
 	ID:       "response_time",
-	Title:    "HTTP Response Time",
+	Title:    "HTTPConfig Response Time",
 	Units:    "ms",
 	Fam:      "response",
 	Ctx:      "httpcheck.response_time",
@@ -34,7 +34,7 @@ var responseTimeChart = module.Chart{
 
 var responseLengthChart = module.Chart{
 	ID:       "response_length",
-	Title:    "HTTP Response Body Length",
+	Title:    "HTTPConfig Response Body Length",
 	Units:    "characters",
 	Fam:      "response",
 	Ctx:      "httpcheck.response_length",
@@ -46,7 +46,7 @@ var responseLengthChart = module.Chart{
 
 var responseStatusChart = module.Chart{
 	ID:       "request_status",
-	Title:    "HTTP Check Status",
+	Title:    "HTTPConfig Check Status",
 	Units:    "boolean",
 	Fam:      "status",
 	Ctx:      "httpcheck.status",
@@ -64,7 +64,7 @@ var responseStatusChart = module.Chart{
 
 var responseInStatusDurationChart = module.Chart{
 	ID:       "current_state_duration",
-	Title:    "HTTP Current State Duration",
+	Title:    "HTTPConfig Current State Duration",
 	Units:    "seconds",
 	Fam:      "status",
 	Ctx:      "httpcheck.in_state",

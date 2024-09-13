@@ -5,10 +5,10 @@ package whoisquery
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -28,7 +28,7 @@ func init() {
 func New() *WhoisQuery {
 	return &WhoisQuery{
 		Config: Config{
-			Timeout:       web.Duration(time.Second * 5),
+			Timeout:       confopt.Duration(time.Second * 5),
 			DaysUntilWarn: 30,
 			DaysUntilCrit: 15,
 		},
@@ -36,11 +36,11 @@ func New() *WhoisQuery {
 }
 
 type Config struct {
-	UpdateEvery   int          `yaml:"update_every,omitempty" json:"update_every"`
-	Source        string       `yaml:"source" json:"source"`
-	Timeout       web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	DaysUntilWarn int64        `yaml:"days_until_expiration_warning,omitempty" json:"days_until_expiration_warning"`
-	DaysUntilCrit int64        `yaml:"days_until_expiration_critical,omitempty" json:"days_until_expiration_critical"`
+	UpdateEvery   int              `yaml:"update_every,omitempty" json:"update_every"`
+	Source        string           `yaml:"source" json:"source"`
+	Timeout       confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	DaysUntilWarn int64            `yaml:"days_until_expiration_warning,omitempty" json:"days_until_expiration_warning"`
+	DaysUntilCrit int64            `yaml:"days_until_expiration_critical,omitempty" json:"days_until_expiration_critical"`
 }
 
 type WhoisQuery struct {

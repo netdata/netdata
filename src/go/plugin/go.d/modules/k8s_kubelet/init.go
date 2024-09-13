@@ -26,10 +26,10 @@ func (k *Kubelet) initAuthToken() string {
 }
 
 func (k *Kubelet) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(k.Client)
+	httpClient, err := web.NewHTTPClient(k.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return prometheus.New(httpClient, k.Request), nil
+	return prometheus.New(httpClient, k.RequestConfig), nil
 }

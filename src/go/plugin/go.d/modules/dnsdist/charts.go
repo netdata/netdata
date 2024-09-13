@@ -7,7 +7,7 @@ import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 var charts = module.Charts{
 	{
 		ID:    "queries",
-		Title: "Client queries received",
+		Title: "ClientConfig queries received",
 		Units: "queries/s",
 		Fam:   "queries",
 		Ctx:   "dnsdist.queries",
@@ -19,7 +19,7 @@ var charts = module.Charts{
 	},
 	{
 		ID:    "queries_dropped",
-		Title: "Client queries dropped",
+		Title: "ClientConfig queries dropped",
 		Units: "queries/s",
 		Fam:   "queries",
 		Ctx:   "dnsdist.queries_dropped",

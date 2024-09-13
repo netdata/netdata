@@ -15,7 +15,7 @@ func (d *DNSdist) validateConfig() error {
 		return errors.New("URL not set")
 	}
 
-	if _, err := web.NewHTTPRequest(d.Request); err != nil {
+	if _, err := web.NewHTTPRequest(d.RequestConfig); err != nil {
 		return err
 	}
 
@@ -23,7 +23,7 @@ func (d *DNSdist) validateConfig() error {
 }
 
 func (d *DNSdist) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(d.Client)
+	return web.NewHTTPClient(d.ClientConfig)
 }
 
 func (d *DNSdist) initCharts() (*module.Charts, error) {

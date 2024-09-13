@@ -16,10 +16,10 @@ func (h *HDFS) validateConfig() error {
 }
 
 func (h *HDFS) createClient() (*client, error) {
-	httpClient, err := web.NewHTTPClient(h.Client)
+	httpClient, err := web.NewHTTPClient(h.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return newClient(httpClient, h.Request), nil
+	return newClient(httpClient, h.RequestConfig), nil
 }

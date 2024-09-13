@@ -4,12 +4,11 @@ package dnsquery
 
 import (
 	_ "embed"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
 	"github.com/miekg/dns"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 //go:embed "config_schema.json"
@@ -29,7 +28,7 @@ func init() {
 func New() *DNSQuery {
 	return &DNSQuery{
 		Config: Config{
-			Timeout:     web.Duration(time.Second * 2),
+			Timeout:     confopt.Duration(time.Second * 2),
 			Network:     "udp",
 			RecordTypes: []string{"A"},
 			Port:        53,
@@ -44,14 +43,14 @@ func New() *DNSQuery {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Domains     []string     `yaml:"domains" json:"domains"`
-	Servers     []string     `yaml:"servers" json:"servers"`
-	Network     string       `yaml:"network,omitempty" json:"network"`
-	RecordType  string       `yaml:"record_type,omitempty" json:"record_type"`
-	RecordTypes []string     `yaml:"record_types,omitempty" json:"record_types"`
-	Port        int          `yaml:"port,omitempty" json:"port"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Domains     []string         `yaml:"domains" json:"domains"`
+	Servers     []string         `yaml:"servers" json:"servers"`
+	Network     string           `yaml:"network,omitempty" json:"network"`
+	RecordType  string           `yaml:"record_type,omitempty" json:"record_type"`
+	RecordTypes []string         `yaml:"record_types,omitempty" json:"record_types"`
+	Port        int              `yaml:"port,omitempty" json:"port"`
 }
 
 type (

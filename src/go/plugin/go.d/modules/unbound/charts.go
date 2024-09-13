@@ -240,7 +240,7 @@ var (
 	}
 	reqListUsageChart = Chart{
 		ID:       "request_list_usage",
-		Title:    "Request List Usage",
+		Title:    "RequestConfig List Usage",
 		Units:    "queries",
 		Fam:      "request list",
 		Ctx:      "unbound.request_list_usage",
@@ -252,7 +252,7 @@ var (
 	}
 	reqListCurUsageChart = Chart{
 		ID:       "current_request_list_usage",
-		Title:    "Current Request List Usage",
+		Title:    "Current RequestConfig List Usage",
 		Units:    "queries",
 		Fam:      "request list",
 		Ctx:      "unbound.current_request_list_usage",
@@ -265,7 +265,7 @@ var (
 	}
 	reqListJostleChart = Chart{
 		ID:       "request_list_jostle_list",
-		Title:    "Request List Jostle List Events",
+		Title:    "RequestConfig List Jostle List Events",
 		Units:    "queries",
 		Fam:      "request list",
 		Ctx:      "unbound.request_list_jostle_list",

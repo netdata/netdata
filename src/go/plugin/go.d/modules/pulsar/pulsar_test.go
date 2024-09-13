@@ -54,22 +54,22 @@ func TestPulsar_Init(t *testing.T) {
 			config: New().Config,
 		},
 		"empty topic filter": {
-			config: Config{HTTP: web.HTTP{Request: web.Request{URL: "http://127.0.0.1:8080/metric"}}},
+			config: Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:8080/metric"}}},
 		},
 		"bad syntax topic filer": {
 			config: Config{
-				HTTP:        web.HTTP{Request: web.Request{URL: "http://127.0.0.1:8080/metrics"}},
+				HTTPConfig:  web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:8080/metrics"}},
 				TopicFilter: matcher.SimpleExpr{Includes: []string{"+"}}},
 			wantFail: true,
 		},
 		"empty URL": {
-			config:   Config{HTTP: web.HTTP{Request: web.Request{URL: ""}}},
+			config:   Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: ""}}},
 			wantFail: true,
 		},
 		"nonexistent TLS CA": {
-			config: Config{HTTP: web.HTTP{
-				Request: web.Request{URL: "http://127.0.0.1:8080/metric"},
-				Client:  web.Client{TLSConfig: tlscfg.TLSConfig{TLSCA: "testdata/tls"}}}},
+			config: Config{HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:8080/metric"},
+				ClientConfig:  web.ClientConfig{TLSConfig: tlscfg.TLSConfig{TLSCA: "testdata/tls"}}}},
 			wantFail: true,
 		},
 	}

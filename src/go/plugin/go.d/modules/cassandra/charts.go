@@ -82,7 +82,7 @@ var baseCharts = module.Charts{
 var (
 	chartClientRequestsRate = module.Chart{
 		ID:       "client_requests_rate",
-		Title:    "Client requests rate",
+		Title:    "ClientConfig requests rate",
 		Units:    "requests/s",
 		Fam:      "throughput",
 		Ctx:      "cassandra.client_requests_rate",
@@ -97,7 +97,7 @@ var (
 var (
 	chartClientRequestReadLatencyHistogram = module.Chart{
 		ID:       "client_request_read_latency_histogram",
-		Title:    "Client request read latency histogram",
+		Title:    "ClientConfig request read latency histogram",
 		Units:    "seconds",
 		Fam:      "latency",
 		Ctx:      "cassandra.client_request_read_latency_histogram",
@@ -113,7 +113,7 @@ var (
 	}
 	chartClientRequestWriteLatencyHistogram = module.Chart{
 		ID:       "client_request_write_latency_histogram",
-		Title:    "Client request write latency histogram",
+		Title:    "ClientConfig request write latency histogram",
 		Units:    "seconds",
 		Fam:      "latency",
 		Ctx:      "cassandra.client_request_write_latency_histogram",
@@ -129,7 +129,7 @@ var (
 	}
 	chartClientRequestsLatency = module.Chart{
 		ID:       "client_requests_latency",
-		Title:    "Client requests total latency",
+		Title:    "ClientConfig requests total latency",
 		Units:    "seconds",
 		Fam:      "latency",
 		Ctx:      "cassandra.client_requests_latency",
@@ -395,7 +395,7 @@ var (
 	}
 	chartClientRequestTimeoutsRate = module.Chart{
 		ID:       "client_requests_timeouts_rate",
-		Title:    "Client requests timeouts rate",
+		Title:    "ClientConfig requests timeouts rate",
 		Units:    "timeouts/s",
 		Fam:      "errors",
 		Ctx:      "cassandra.client_requests_timeouts_rate",
@@ -407,7 +407,7 @@ var (
 	}
 	chartClientRequestUnavailablesRate = module.Chart{
 		ID:       "client_requests_unavailables_rate",
-		Title:    "Client requests unavailable exceptions rate",
+		Title:    "ClientConfig requests unavailable exceptions rate",
 		Units:    "exceptions/s",
 		Fam:      "errors",
 		Ctx:      "cassandra.client_requests_unavailables_rate",
@@ -419,7 +419,7 @@ var (
 	}
 	chartClientRequestFailuresRate = module.Chart{
 		ID:       "client_requests_failures_rate",
-		Title:    "Client requests failures rate",
+		Title:    "ClientConfig requests failures rate",
 		Units:    "failures/s",
 		Fam:      "errors",
 		Ctx:      "cassandra.client_requests_failures_rate",

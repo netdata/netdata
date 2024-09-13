@@ -504,7 +504,7 @@ var (
 
 	nodeHTTPConnectionsChartTmpl = module.Chart{
 		ID:       "node_%s_cluster_%s_http_connections",
-		Title:    "HTTP Connections",
+		Title:    "HTTPConfig Connections",
 		Units:    "connections",
 		Fam:      "http",
 		Ctx:      "elasticsearch.node_http_connections",

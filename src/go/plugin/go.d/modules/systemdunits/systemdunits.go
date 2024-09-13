@@ -8,13 +8,12 @@ package systemdunits
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
+	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
-	"github.com/coreos/go-systemd/v22/dbus"
 )
 
 //go:embed "config_schema.json"
@@ -34,12 +33,12 @@ func init() {
 func New() *SystemdUnits {
 	return &SystemdUnits{
 		Config: Config{
-			Timeout:               web.Duration(time.Second * 2),
+			Timeout:               confopt.Duration(time.Second * 2),
 			Include:               []string{"*.service"},
 			SkipTransient:         false,
 			CollectUnitFiles:      false,
 			IncludeUnitFiles:      []string{"*.service"},
-			CollectUnitFilesEvery: web.Duration(time.Minute * 5),
+			CollectUnitFilesEvery: confopt.Duration(time.Minute * 5),
 		},
 		charts:        &module.Charts{},
 		client:        newSystemdDBusClient(),
@@ -50,13 +49,13 @@ func New() *SystemdUnits {
 }
 
 type Config struct {
-	UpdateEvery           int          `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout               web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Include               []string     `yaml:"include,omitempty" json:"include"`
-	SkipTransient         bool         `yaml:"skip_transient" json:"skip_transient"`
-	CollectUnitFiles      bool         `yaml:"collect_unit_files" json:"collect_unit_files"`
-	IncludeUnitFiles      []string     `yaml:"include_unit_files,omitempty" json:"include_unit_files"`
-	CollectUnitFilesEvery web.Duration `yaml:"collect_unit_files_every,omitempty" json:"collect_unit_files_every"`
+	UpdateEvery           int              `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout               confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Include               []string         `yaml:"include,omitempty" json:"include"`
+	SkipTransient         bool             `yaml:"skip_transient" json:"skip_transient"`
+	CollectUnitFiles      bool             `yaml:"collect_unit_files" json:"collect_unit_files"`
+	IncludeUnitFiles      []string         `yaml:"include_unit_files,omitempty" json:"include_unit_files"`
+	CollectUnitFilesEvery confopt.Duration `yaml:"collect_unit_files_every,omitempty" json:"collect_unit_files_every"`
 }
 
 type SystemdUnits struct {

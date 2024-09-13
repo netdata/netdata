@@ -6,17 +6,16 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 
 	"github.com/docker/docker/api/types"
 	typesContainer "github.com/docker/docker/api/types/container"
 	typesImage "github.com/docker/docker/api/types/image"
 	typesSystem "github.com/docker/docker/api/types/system"
 	docker "github.com/docker/docker/client"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 )
 
 //go:embed "config_schema.json"
@@ -34,7 +33,7 @@ func New() *Docker {
 	return &Docker{
 		Config: Config{
 			Address:              docker.DefaultDockerHost,
-			Timeout:              web.Duration(time.Second * 2),
+			Timeout:              confopt.Duration(time.Second * 2),
 			CollectContainerSize: false,
 		},
 
@@ -47,10 +46,10 @@ func New() *Docker {
 }
 
 type Config struct {
-	UpdateEvery          int          `yaml:"update_every,omitempty" json:"update_every"`
-	Address              string       `yaml:"address" json:"address"`
-	Timeout              web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	CollectContainerSize bool         `yaml:"collect_container_size" json:"collect_container_size"`
+	UpdateEvery          int              `yaml:"update_every,omitempty" json:"update_every"`
+	Address              string           `yaml:"address" json:"address"`
+	Timeout              confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	CollectContainerSize bool             `yaml:"collect_container_size" json:"collect_container_size"`
 }
 
 type (

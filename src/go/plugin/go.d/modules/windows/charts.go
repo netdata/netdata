@@ -319,7 +319,7 @@ const (
 	prioExchangeWorkloadYieldedTasks
 	prioExchangeWorkloadActivityStatus
 
-	// HTTP Proxy
+	// HTTPConfig Proxy
 	prioExchangeHTTPProxyAVGAuthLatency
 	prioExchangeHTTPProxyAVGCASProcessingLatency
 	prioExchangeHTTPProxyMailboxProxyFailureRate
@@ -327,7 +327,7 @@ const (
 	prioExchangeHTTPProxyOutstandingProxyRequests
 	prioExchangeHTTPProxyRequestsTotal
 
-	// Request
+	// RequestConfig
 	prioExchangeAutoDiscoverRequests
 	prioExchangeAvailServiceRequests
 
@@ -2365,7 +2365,7 @@ var (
 	exchangeActiveSyncRequestsChart = module.Chart{
 		OverModule: "exchange",
 		ID:         "exchange_activesync_requests",
-		Title:      "HTTP requests received from ASP.NET",
+		Title:      "HTTPConfig requests received from ASP.NET",
 		Units:      "requests/s",
 		Fam:        "sync",
 		Ctx:        "exchange.activesync_requests",
@@ -2461,7 +2461,7 @@ var (
 	exchangeRPCConnectionChart = module.Chart{
 		OverModule: "exchange",
 		ID:         "exchange_rpc_connection",
-		Title:      "Client connections",
+		Title:      "ClientConfig connections",
 		Units:      "connections",
 		Fam:        "rpc",
 		Ctx:        "exchange.rpc_connection_count",

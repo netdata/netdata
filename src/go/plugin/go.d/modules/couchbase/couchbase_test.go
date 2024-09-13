@@ -47,8 +47,8 @@ func TestCouchbase_Init(t *testing.T) {
 		"fails on unset 'URL'": {
 			wantFail: true,
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{
 						URL: "",
 					},
 				},
@@ -57,8 +57,8 @@ func TestCouchbase_Init(t *testing.T) {
 		"fails on invalid URL": {
 			wantFail: true,
 			config: Config{
-				HTTP: web.HTTP{
-					Request: web.Request{
+				HTTPConfig: web.HTTPConfig{
+					RequestConfig: web.RequestConfig{
 						URL: "127.0.0.1:9090",
 					},
 				},

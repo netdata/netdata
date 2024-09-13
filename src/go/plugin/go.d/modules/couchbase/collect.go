@@ -111,7 +111,7 @@ func (cb *Couchbase) addDimToChart(chartID string, dim *module.Dim) {
 }
 
 func (cb *Couchbase) scrapeCouchbase() (*cbMetrics, error) {
-	req, err := web.NewHTTPRequestWithPath(cb.Request, urlPathBucketsStats)
+	req, err := web.NewHTTPRequestWithPath(cb.RequestConfig, urlPathBucketsStats)
 	if err != nil {
 		return nil, err
 	}
@@ -127,13 +127,13 @@ func (cb *Couchbase) scrapeCouchbase() (*cbMetrics, error) {
 func (cb *Couchbase) doOKDecode(req *http.Request, in interface{}) error {
 	resp, err := cb.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
+		return fmt.Errorf("error on HTTPConfig request '%s': %v", req.URL, err)
 	}
 
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {

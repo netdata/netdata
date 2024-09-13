@@ -27,7 +27,7 @@ type autopilotHealth struct {
 func (c *Consul) collectAutopilotHealth(mx map[string]int64) error {
 	var health autopilotHealth
 
-	// The HTTP status code will indicate the health of the cluster: 200 is healthy, 429 is unhealthy.
+	// The HTTPConfig status code will indicate the health of the cluster: 200 is healthy, 429 is unhealthy.
 	// https://github.com/hashicorp/consul/blob/c7ef04c5979dbc311ff3c67b7bf3028a93e8b0f1/agent/operator_endpoint.go#L325
 	if err := c.doOKDecode(urlPathOperationAutopilotHealth, &health, http.StatusTooManyRequests); err != nil {
 		return err

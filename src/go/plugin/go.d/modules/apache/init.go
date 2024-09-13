@@ -21,5 +21,5 @@ func (a *Apache) validateConfig() error {
 }
 
 func (a *Apache) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(a.Client)
+	return web.NewHTTPClient(a.ClientConfig)
 }

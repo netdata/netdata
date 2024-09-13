@@ -4,11 +4,11 @@ package portcheck
 
 import (
 	_ "embed"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -28,17 +28,17 @@ func init() {
 func New() *PortCheck {
 	return &PortCheck{
 		Config: Config{
-			Timeout: web.Duration(time.Second * 2),
+			Timeout: confopt.Duration(time.Second * 2),
 		},
 		dial: net.DialTimeout,
 	}
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	Host        string       `yaml:"host" json:"host"`
-	Ports       []int        `yaml:"ports" json:"ports"`
-	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	Host        string           `yaml:"host" json:"host"`
+	Ports       []int            `yaml:"ports" json:"ports"`
+	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
 type PortCheck struct {

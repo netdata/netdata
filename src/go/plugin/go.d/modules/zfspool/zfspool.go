@@ -5,10 +5,10 @@ package zfspool
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -29,7 +29,7 @@ func New() *ZFSPool {
 	return &ZFSPool{
 		Config: Config{
 			BinaryPath: "/usr/bin/zpool",
-			Timeout:    web.Duration(time.Second * 2),
+			Timeout:    confopt.Duration(time.Second * 2),
 		},
 		charts:     &module.Charts{},
 		seenZpools: make(map[string]bool),
@@ -38,9 +38,9 @@ func New() *ZFSPool {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	BinaryPath  string       `yaml:"binary_path,omitempty" json:"binary_path"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	BinaryPath  string           `yaml:"binary_path,omitempty" json:"binary_path"`
 }
 
 type (

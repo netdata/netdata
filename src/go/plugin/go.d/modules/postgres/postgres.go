@@ -6,16 +6,15 @@ import (
 	"database/sql"
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrics"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
-	"github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 //go:embed "config_schema.json"
@@ -32,7 +31,7 @@ func init() {
 func New() *Postgres {
 	return &Postgres{
 		Config: Config{
-			Timeout:            web.Duration(time.Second * 2),
+			Timeout:            confopt.Duration(time.Second * 2),
 			DSN:                "postgres://postgres:postgres@127.0.0.1:5432/postgres",
 			XactTimeHistogram:  []float64{.1, .5, 1, 2.5, 5, 10},
 			QueryTimeHistogram: []float64{.1, .5, 1, 2.5, 5, 10},
@@ -58,14 +57,14 @@ func New() *Postgres {
 }
 
 type Config struct {
-	UpdateEvery        int          `yaml:"update_every,omitempty" json:"update_every"`
-	DSN                string       `yaml:"dsn" json:"dsn"`
-	Timeout            web.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	DBSelector         string       `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
-	XactTimeHistogram  []float64    `yaml:"transaction_time_histogram,omitempty" json:"transaction_time_histogram"`
-	QueryTimeHistogram []float64    `yaml:"query_time_histogram,omitempty" json:"query_time_histogram"`
-	MaxDBTables        int64        `yaml:"max_db_tables" json:"max_db_tables"`
-	MaxDBIndexes       int64        `yaml:"max_db_indexes" json:"max_db_indexes"`
+	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	DSN                string           `yaml:"dsn" json:"dsn"`
+	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	DBSelector         string           `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
+	XactTimeHistogram  []float64        `yaml:"transaction_time_histogram,omitempty" json:"transaction_time_histogram"`
+	QueryTimeHistogram []float64        `yaml:"query_time_histogram,omitempty" json:"query_time_histogram"`
+	MaxDBTables        int64            `yaml:"max_db_tables" json:"max_db_tables"`
+	MaxDBIndexes       int64            `yaml:"max_db_indexes" json:"max_db_indexes"`
 }
 
 type (

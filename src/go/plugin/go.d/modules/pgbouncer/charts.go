@@ -32,7 +32,7 @@ var (
 
 	clientConnectionsUtilization = module.Chart{
 		ID:       "client_connections_utilization",
-		Title:    "Client connections utilization",
+		Title:    "ClientConfig connections utilization",
 		Units:    "percentage",
 		Fam:      "client connections",
 		Ctx:      "pgbouncer.client_connections_utilization",

@@ -5,6 +5,7 @@ package hdfs
 import (
 	_ "embed"
 	"errors"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -24,12 +25,12 @@ func init() {
 
 func New() *HDFS {
 	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
+		HTTPConfig: web.HTTPConfig{
+			RequestConfig: web.RequestConfig{
 				URL: "http://127.0.0.1:9870/jmx",
 			},
-			Client: web.Client{
-				Timeout: web.Duration(time.Second),
+			ClientConfig: web.ClientConfig{
+				Timeout: confopt.Duration(time.Second),
 			},
 		},
 	}
@@ -40,8 +41,8 @@ func New() *HDFS {
 }
 
 type Config struct {
-	web.HTTP    `yaml:",inline" json:""`
-	UpdateEvery int `yaml:"update_every" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
+	UpdateEvery    int `yaml:"update_every" json:"update_every"`
 }
 
 type (

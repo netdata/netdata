@@ -14,39 +14,39 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
-// Request is the configuration of the HTTP request.
+// RequestConfig is the configuration of the HTTPConfig request.
 // This structure is not intended to be used directly as part of a module's configuration.
 // Supported configuration file formats: YAML.
-type Request struct {
+type RequestConfig struct {
 	// URL specifies the URL to access.
 	URL string `yaml:"url" json:"url"`
 
-	// Username specifies the username for basic HTTP authentication.
+	// Username specifies the username for basic HTTPConfig authentication.
 	Username string `yaml:"username,omitempty" json:"username"`
 
-	// Password specifies the password for basic HTTP authentication.
+	// Password specifies the password for basic HTTPConfig authentication.
 	Password string `yaml:"password,omitempty" json:"password"`
 
-	// ProxyUsername specifies the username for basic HTTP authentication.
+	// ProxyUsername specifies the username for basic HTTPConfig authentication.
 	// It is used to authenticate a user agent to a proxy server.
 	ProxyUsername string `yaml:"proxy_username,omitempty" json:"proxy_username"`
 
-	// ProxyPassword specifies the password for basic HTTP authentication.
+	// ProxyPassword specifies the password for basic HTTPConfig authentication.
 	// It is used to authenticate a user agent to a proxy server.
 	ProxyPassword string `yaml:"proxy_password,omitempty" json:"proxy_password"`
 
-	// Method specifies the HTTP method (GET, POST, PUT, etc.). An empty string means GET.
+	// Method specifies the HTTPConfig method (GET, POST, PUT, etc.). An empty string means GET.
 	Method string `yaml:"method,omitempty" json:"method"`
 
-	// Headers specifies the HTTP request header fields to be sent by the client.
+	// Headers specifies the HTTPConfig request header fields to be sent by the client.
 	Headers map[string]string `yaml:"headers,omitempty" json:"headers"`
 
-	// Body specifies the HTTP request body to be sent by the client.
+	// Body specifies the HTTPConfig request body to be sent by the client.
 	Body string `yaml:"body,omitempty" json:"body"`
 }
 
-// Copy makes a full copy of the Request.
-func (r Request) Copy() Request {
+// Copy makes a full copy of the RequestConfig.
+func (r RequestConfig) Copy() RequestConfig {
 	headers := make(map[string]string, len(r.Headers))
 	for k, v := range r.Headers {
 		headers[k] = v
@@ -57,8 +57,8 @@ func (r Request) Copy() Request {
 
 var userAgent = fmt.Sprintf("Netdata %s.plugin/%s", executable.Name, buildinfo.Version)
 
-// NewHTTPRequest returns a new *http.Requests given a Request configuration and an error if any.
-func NewHTTPRequest(cfg Request) (*http.Request, error) {
+// NewHTTPRequest returns a new *http.Requests given a RequestConfig configuration and an error if any.
+func NewHTTPRequest(cfg RequestConfig) (*http.Request, error) {
 	var body io.Reader
 	if cfg.Body != "" {
 		body = strings.NewReader(cfg.Body)
@@ -92,7 +92,7 @@ func NewHTTPRequest(cfg Request) (*http.Request, error) {
 	return req, nil
 }
 
-func NewHTTPRequestWithPath(cfg Request, urlPath string) (*http.Request, error) {
+func NewHTTPRequestWithPath(cfg RequestConfig, urlPath string) (*http.Request, error) {
 	cfg = cfg.Copy()
 
 	v, err := url.JoinPath(cfg.URL, urlPath)

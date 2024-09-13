@@ -68,7 +68,7 @@ func (c *Consul) isServer() bool {
 }
 
 func (c *Consul) doOKDecode(urlPath string, in interface{}, statusCodes ...int) error {
-	req, err := web.NewHTTPRequestWithPath(c.Request, urlPath)
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPath)
 	if err != nil {
 		return fmt.Errorf("error on creating request: %v", err)
 	}
@@ -90,7 +90,7 @@ func (c *Consul) doOKDecode(urlPath string, in interface{}, statusCodes ...int) 
 	}
 
 	if !codes[resp.StatusCode] {
-		return fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("%s returned HTTPConfig status %d", req.URL, resp.StatusCode)
 	}
 
 	if err = json.NewDecoder(resp.Body).Decode(&in); err != nil {

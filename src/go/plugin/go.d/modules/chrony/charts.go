@@ -286,7 +286,7 @@ var (
 //	}
 //	clientLogRecordsChart = module.Chart{
 //		ID:       "client_log_records",
-//		Title:    "Client log records",
+//		Title:    "ClientConfig log records",
 //		Units:    "records/s",
 //		Fam:      "client requests",
 //		Ctx:      "chrony.client_log_records",
