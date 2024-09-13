@@ -39,7 +39,6 @@ func TestPHPDaemon_Init(t *testing.T) {
 	job := New()
 
 	require.NoError(t, job.Init())
-	assert.NotNil(t, job.client)
 }
 
 func TestPHPDaemon_Check(t *testing.T) {

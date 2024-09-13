@@ -3,9 +3,9 @@
 package consul
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
@@ -67,37 +67,23 @@ func (c *Consul) isServer() bool {
 	return c.cfg.Config.Server
 }
 
-func (c *Consul) doOKDecode(urlPath string, in interface{}, statusCodes ...int) error {
+func (c *Consul) client(statusCodes ...int) *web.Client {
+	return web.DoHTTP(c.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
+		return slices.Contains(statusCodes, resp.StatusCode), nil
+	})
+}
+
+func (c *Consul) createRequest(urlPath string) (*http.Request, error) {
 	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPath)
 	if err != nil {
-		return fmt.Errorf("error on creating request: %v", err)
+		return nil, fmt.Errorf("failed to create '%s' request: %w", urlPath, err)
 	}
 
 	if c.ACLToken != "" {
 		req.Header.Set("X-Consul-Token", c.ACLToken)
 	}
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error on request to %s : %v", req.URL, err)
-	}
-
-	defer web.CloseBody(resp)
-
-	codes := map[int]bool{http.StatusOK: true}
-	for _, v := range statusCodes {
-		codes[v] = true
-	}
-
-	if !codes[resp.StatusCode] {
-		return fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
-	}
-
-	if err = json.NewDecoder(resp.Body).Decode(&in); err != nil {
-		return fmt.Errorf("error on decoding response from %s : %v", req.URL, err)
-	}
-
-	return nil
+	return req, nil
 }
 
 func boolToInt(v bool) int64 {

@@ -18,9 +18,14 @@ type agentCheck struct {
 }
 
 func (c *Consul) collectChecks(mx map[string]int64) error {
+	req, err := c.createRequest(urlPathAgentChecks)
+	if err != nil {
+		return err
+	}
+
 	var checks map[string]*agentCheck
 
-	if err := c.doOKDecode(urlPathAgentChecks, &checks); err != nil {
+	if err := c.client().RequestJSON(req, &checks); err != nil {
 		return err
 	}
 

@@ -3,10 +3,13 @@
 package k8s_state
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -21,7 +24,7 @@ func (ks *KubeState) getKubeClusterID() string {
 }
 
 func (ks *KubeState) getKubeClusterName() string {
-	client := http.Client{Timeout: time.Second}
+	client := &http.Client{Timeout: time.Second}
 	n, err := getGKEKubeClusterName(client)
 	if err != nil {
 		ks.Debugf("error on getting GKE cluster name: %v", err)
@@ -29,7 +32,7 @@ func (ks *KubeState) getKubeClusterName() string {
 	return n
 }
 
-func getGKEKubeClusterName(client http.Client) (string, error) {
+func getGKEKubeClusterName(client *http.Client) (string, error) {
 	id, err := doMetaGKEHTTPReq(client, "http://metadata/computeMetadata/v1/project/project-id")
 	if err != nil {
 		return "", err
@@ -46,39 +49,30 @@ func getGKEKubeClusterName(client http.Client) (string, error) {
 	return fmt.Sprintf("gke_%s_%s_%s", id, loc, name), nil
 }
 
-func doMetaGKEHTTPReq(client http.Client, url string) (string, error) {
+func doMetaGKEHTTPReq(client *http.Client, url string) (string, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
 	}
 
 	req.Header.Add("Metadata-Flavor", "Google")
-	resp, err := client.Do(req)
-	if err != nil {
+
+	var resp string
+
+	if err := web.DoHTTP(client).Request(req, func(body io.Reader) error {
+		bs, rerr := io.ReadAll(body)
+		if rerr != nil {
+			return rerr
+		}
+
+		if resp = string(bs); len(resp) == 0 {
+			return errors.New("empty response")
+		}
+
+		return nil
+	}); err != nil {
 		return "", err
 	}
-	defer closeHTTPRespBody(resp)
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("'%s' returned HTTP status code %d", url, resp.StatusCode)
-	}
-
-	bs, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	s := string(bs)
-	if s == "" {
-		return "", fmt.Errorf("an empty response from '%s'", url)
-	}
-
-	return s, nil
-}
-
-func closeHTTPRespBody(resp *http.Response) {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
+	return resp, nil
 }

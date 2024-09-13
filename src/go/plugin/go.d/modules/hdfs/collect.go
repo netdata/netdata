@@ -9,12 +9,17 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 func (h *HDFS) collect() (map[string]int64, error) {
-	var raw rawJMX
-	err := h.client.doOKWithDecodeJSON(&raw)
+	req, err := web.NewHTTPRequest(h.RequestConfig)
 	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
+	}
+
+	var raw rawJMX
+	if err := web.DoHTTP(h.httpClient).RequestJSON(req, &raw); err != nil {
 		return nil, err
 	}
 
@@ -28,9 +33,13 @@ func (h *HDFS) collect() (map[string]int64, error) {
 }
 
 func (h *HDFS) determineNodeType() (nodeType, error) {
-	var raw rawJMX
-	err := h.client.doOKWithDecodeJSON(&raw)
+	req, err := web.NewHTTPRequest(h.RequestConfig)
 	if err != nil {
+		return "", fmt.Errorf("failed to create HTTP request: %v", err)
+	}
+
+	var raw rawJMX
+	if err := web.DoHTTP(h.httpClient).RequestJSON(req, &raw); err != nil {
 		return "", err
 	}
 
@@ -69,40 +78,33 @@ func (h *HDFS) collectRawJMX(raw rawJMX) *metrics {
 }
 
 func (h *HDFS) collectNameNode(mx *metrics, raw rawJMX) {
-	err := h.collectJVM(mx, raw)
-	if err != nil {
+	if err := h.collectJVM(mx, raw); err != nil {
 		h.Debugf("error on collecting jvm : %v", err)
 	}
 
-	err = h.collectRPCActivity(mx, raw)
-	if err != nil {
+	if err := h.collectRPCActivity(mx, raw); err != nil {
 		h.Debugf("error on collecting rpc activity : %v", err)
 	}
 
-	err = h.collectFSNameSystem(mx, raw)
-	if err != nil {
+	if err := h.collectFSNameSystem(mx, raw); err != nil {
 		h.Debugf("error on collecting fs name system : %v", err)
 	}
 }
 
 func (h *HDFS) collectDataNode(mx *metrics, raw rawJMX) {
-	err := h.collectJVM(mx, raw)
-	if err != nil {
+	if err := h.collectJVM(mx, raw); err != nil {
 		h.Debugf("error on collecting jvm : %v", err)
 	}
 
-	err = h.collectRPCActivity(mx, raw)
-	if err != nil {
+	if err := h.collectRPCActivity(mx, raw); err != nil {
 		h.Debugf("error on collecting rpc activity : %v", err)
 	}
 
-	err = h.collectFSDatasetState(mx, raw)
-	if err != nil {
+	if err := h.collectFSDatasetState(mx, raw); err != nil {
 		h.Debugf("error on collecting fs dataset state : %v", err)
 	}
 
-	err = h.collectDataNodeActivity(mx, raw)
-	if err != nil {
+	if err := h.collectDataNodeActivity(mx, raw); err != nil {
 		h.Debugf("error on collecting datanode activity state : %v", err)
 	}
 }

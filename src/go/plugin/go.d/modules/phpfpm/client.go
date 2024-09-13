@@ -77,25 +77,15 @@ func newHTTPClient(c *http.Client, r web.RequestConfig) (*httpClient, error) {
 func (c *httpClient) getStatus() (*status, error) {
 	req, err := web.NewHTTPRequest(c.req)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating HTTP request: %v", err)
-	}
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error on HTTP request to '%s': %v", req.URL, err)
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
+		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}
 
 	st := &status{}
-	if err := c.dec(resp.Body, st); err != nil {
-		return nil, fmt.Errorf("error parsing HTTP response from '%s': %v", req.URL, err)
+
+	if err := web.DoHTTP(c.client).Request(req, func(body io.Reader) error {
+		return c.dec(body, st)
+	}); err != nil {
+		return nil, err
 	}
 
 	return st, nil

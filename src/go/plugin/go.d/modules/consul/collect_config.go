@@ -46,9 +46,14 @@ type consulConfig struct {
 }
 
 func (c *Consul) collectConfiguration() error {
+	req, err := c.createRequest(urlPathAgentSelf)
+	if err != nil {
+		return err
+	}
+
 	var cfg consulConfig
 
-	if err := c.doOKDecode(urlPathAgentSelf, &cfg); err != nil {
+	if err := c.client().RequestJSON(req, &cfg); err != nil {
 		return err
 	}
 

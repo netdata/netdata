@@ -6,11 +6,8 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 const (
@@ -25,49 +22,35 @@ const (
 	scoreBoard    = "Scoreboard"
 )
 
-func newAPIClient(client *http.Client, request web.RequestConfig) *apiClient {
-	return &apiClient{httpClient: client, request: request}
-}
-
-type apiClient struct {
-	httpClient *http.Client
-	request    web.RequestConfig
-}
-
-func (a apiClient) getServerStatus() (*serverStatus, error) {
-	req, err := web.NewHTTPRequest(a.request)
-
-	if err != nil {
-		return nil, fmt.Errorf("error on creating request : %v", err)
+type (
+	serverStatus struct {
+		Total struct {
+			Accesses *int64 `stm:"accesses"`
+			KBytes   *int64 `stm:"kBytes"`
+		} `stm:"total"`
+		Servers struct {
+			Busy *int64 `stm:"busy_servers"`
+			Idle *int64 `stm:"idle_servers"`
+		} `stm:""`
+		Uptime     *int64      `stm:"uptime"`
+		Scoreboard *scoreboard `stm:"scoreboard"`
 	}
-
-	resp, err := a.doRequestOK(req)
-
-	defer web.CloseBody(resp)
-
-	if err != nil {
-		return nil, err
+	scoreboard struct {
+		Waiting       int64 `stm:"waiting"`
+		Open          int64 `stm:"open"`
+		Close         int64 `stm:"close"`
+		HardError     int64 `stm:"hard_error"`
+		KeepAlive     int64 `stm:"keepalive"`
+		Read          int64 `stm:"read"`
+		ReadPost      int64 `stm:"read_post"`
+		Write         int64 `stm:"write"`
+		HandleRequest int64 `stm:"handle_request"`
+		RequestStart  int64 `stm:"request_start"`
+		RequestEnd    int64 `stm:"request_end"`
+		ResponseStart int64 `stm:"response_start"`
+		ResponseEnd   int64 `stm:"response_end"`
 	}
-
-	status, err := parseResponse(resp.Body)
-
-	if err != nil {
-		return nil, fmt.Errorf("error on parsing response from %s : %v", req.URL, err)
-	}
-
-	return status, nil
-}
-
-func (a apiClient) doRequestOK(req *http.Request) (*http.Response, error) {
-	resp, err := a.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error on request : %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return resp, fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
-	}
-	return resp, nil
-}
+)
 
 func parseResponse(r io.Reader) (*serverStatus, error) {
 	s := bufio.NewScanner(r)

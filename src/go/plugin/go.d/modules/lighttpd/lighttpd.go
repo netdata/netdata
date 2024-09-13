@@ -5,6 +5,9 @@ package lighttpd
 import (
 	_ "embed"
 	"errors"
+	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -33,7 +36,9 @@ func New() *Lighttpd {
 				Timeout: confopt.Duration(time.Second * 2),
 			},
 		},
-	}}
+	},
+		charts: charts.Copy(),
+	}
 }
 
 type Config struct {
@@ -45,7 +50,9 @@ type Lighttpd struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
-	apiClient *apiClient
+	charts *module.Charts
+
+	httpClient *http.Client
 }
 
 func (l *Lighttpd) Configuration() any {
@@ -53,17 +60,18 @@ func (l *Lighttpd) Configuration() any {
 }
 
 func (l *Lighttpd) Init() error {
-	if err := l.validateConfig(); err != nil {
-		l.Errorf("config validation: %v", err)
-		return err
+	if l.URL == "" {
+		return errors.New("URL is required but not set")
+	}
+	if !strings.HasSuffix(l.URL, "?auto") {
+		return fmt.Errorf("bad URL '%s', should ends in '?auto'", l.URL)
 	}
 
-	client, err := l.initApiClient()
+	httpClient, err := web.NewHTTPClient(l.ClientConfig)
 	if err != nil {
-		l.Error(err)
-		return err
+		return fmt.Errorf("failed to create http client: %v", err)
 	}
-	l.apiClient = client
+	l.httpClient = httpClient
 
 	l.Debugf("using URL %s", l.URL)
 	l.Debugf("using timeout: %s", l.Timeout.Duration())
@@ -74,22 +82,22 @@ func (l *Lighttpd) Init() error {
 func (l *Lighttpd) Check() error {
 	mx, err := l.collect()
 	if err != nil {
-		l.Error(err)
 		return err
 	}
+
 	if len(mx) == 0 {
 		return errors.New("no metrics collected")
 	}
+
 	return nil
 }
 
 func (l *Lighttpd) Charts() *Charts {
-	return charts.Copy()
+	return l.charts
 }
 
 func (l *Lighttpd) Collect() map[string]int64 {
 	mx, err := l.collect()
-
 	if err != nil {
 		l.Error(err)
 		return nil
@@ -99,7 +107,7 @@ func (l *Lighttpd) Collect() map[string]int64 {
 }
 
 func (l *Lighttpd) Cleanup() {
-	if l.apiClient != nil && l.apiClient.httpClient != nil {
-		l.apiClient.httpClient.CloseIdleConnections()
+	if l.httpClient != nil {
+		l.httpClient.CloseIdleConnections()
 	}
 }

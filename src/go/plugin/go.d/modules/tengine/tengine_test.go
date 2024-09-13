@@ -43,7 +43,6 @@ func TestTengine_Init(t *testing.T) {
 	job := New()
 
 	require.NoError(t, job.Init())
-	assert.NotNil(t, job.apiClient)
 }
 
 func TestTengine_Check(t *testing.T) {
