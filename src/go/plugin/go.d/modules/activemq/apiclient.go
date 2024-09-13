@@ -111,7 +111,7 @@ func (a *apiClient) doRequestOK(req *http.Request) (*http.Response, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return resp, fmt.Errorf("%s returned HTTPConfig status %d", req.URL, resp.StatusCode)
+		return resp, fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
 	}
 
 	return resp, err

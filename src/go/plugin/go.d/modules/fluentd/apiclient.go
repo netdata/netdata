@@ -71,7 +71,7 @@ func (a apiClient) doOKDecode(req *http.Request, in any) error {
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s returned HTTPConfig status %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {

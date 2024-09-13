@@ -91,7 +91,7 @@ func (s *Squid) doOK(req *http.Request, parse func(body io.Reader) error) error 
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
 	}
 
 	return parse(resp.Body)

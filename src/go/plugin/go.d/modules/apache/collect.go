@@ -44,7 +44,7 @@ func (a *Apache) scrapeStatus() (*serverStatus, error) {
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
+		return nil, fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
 	}
 
 	return parseResponse(resp.Body)

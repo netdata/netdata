@@ -90,7 +90,7 @@ func (c *Consul) doOKDecode(urlPath string, in interface{}, statusCodes ...int) 
 	}
 
 	if !codes[resp.StatusCode] {
-		return fmt.Errorf("%s returned HTTPConfig status %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
 	}
 
 	if err = json.NewDecoder(resp.Body).Decode(&in); err != nil {

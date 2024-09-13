@@ -52,7 +52,7 @@ func (r *RiakKv) doOKDecode(req *http.Request, in interface{}) error {
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		msg := fmt.Sprintf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
+		msg := fmt.Sprintf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
 		if resp.StatusCode == http.StatusNotFound {
 			msg = fmt.Sprintf("%s (riak_kv_stat is not enabled)", msg)
 		}

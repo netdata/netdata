@@ -60,7 +60,7 @@ func doMetaGKEHTTPReq(client http.Client, url string) (string, error) {
 	defer closeHTTPRespBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("'%s' returned HTTPConfig status code %d", url, resp.StatusCode)
+		return "", fmt.Errorf("'%s' returned HTTP status code %d", url, resp.StatusCode)
 	}
 
 	bs, err := io.ReadAll(resp.Body)

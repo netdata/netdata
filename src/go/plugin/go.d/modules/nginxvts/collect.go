@@ -64,7 +64,7 @@ func (vts *NginxVTS) doOKDecode(req *http.Request, in interface{}) error {
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {

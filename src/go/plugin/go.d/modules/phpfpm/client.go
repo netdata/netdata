@@ -90,7 +90,7 @@ func (c *httpClient) getStatus() (*status, error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s returned HTTPConfig status %d", req.URL, resp.StatusCode)
+		return nil, fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
 	}
 
 	st := &status{}

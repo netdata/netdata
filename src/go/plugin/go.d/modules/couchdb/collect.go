@@ -221,10 +221,10 @@ func (cdb *CouchDB) doOKDecode(req *http.Request, in interface{}) error {
 			Reason string `json:"reason"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&msg); err == nil && msg.Error != "" {
-			return fmt.Errorf("'%s' returned HTTPConfig status code: %d (err '%s', reason '%s')",
+			return fmt.Errorf("'%s' returned HTTP status code: %d (err '%s', reason '%s')",
 				req.URL, resp.StatusCode, msg.Error, msg.Reason)
 		}
-		return fmt.Errorf("'%s' returned HTTPConfig status code: %d", req.URL, resp.StatusCode)
+		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {

@@ -66,7 +66,7 @@ func (c xml3Client) serverStats() (*serverStats, error) {
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s returned HTTPConfig status %d", httpReq.URL, resp.StatusCode)
+		return nil, fmt.Errorf("%s returned HTTP status %d", httpReq.URL, resp.StatusCode)
 	}
 
 	stats := xml3Stats{}

@@ -158,7 +158,7 @@ func (r *RabbitMQ) doOKDecode(urlPath string, in interface{}) error {
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s returned HTTPConfig status %d (%s)", req.URL, resp.StatusCode, resp.Status)
+		return fmt.Errorf("%s returned HTTP status %d (%s)", req.URL, resp.StatusCode, resp.Status)
 	}
 
 	if err = json.NewDecoder(resp.Body).Decode(&in); err != nil {
