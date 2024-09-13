@@ -114,7 +114,7 @@ var (
 	}
 	serverConnectionsChartTmpl = module.Chart{
 		ID:       "server_%s_client_connections",
-		Title:    "Server ClientConfig Connections",
+		Title:    "Server Client Connections",
 		Units:    "connections",
 		Fam:      "srv connections",
 		Ctx:      "rethinkdb.server_client_connections",

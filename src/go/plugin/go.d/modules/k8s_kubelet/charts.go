@@ -205,7 +205,7 @@ var charts = Charts{
 	},
 	{
 		ID:    "rest_client_requests_by_code",
-		Title: "HTTPConfig Requests By Status Code",
+		Title: "HTTP Requests By Status Code",
 		Units: "requests/s",
 		Fam:   "rest client",
 		Ctx:   "k8s_kubelet.rest_client_requests_by_code",
@@ -213,7 +213,7 @@ var charts = Charts{
 	},
 	{
 		ID:    "rest_client_requests_by_method",
-		Title: "HTTPConfig Requests By Status Method",
+		Title: "HTTP Requests By Status Method",
 		Units: "requests/s",
 		Fam:   "rest client",
 		Ctx:   "k8s_kubelet.rest_client_requests_by_method",

@@ -78,7 +78,7 @@ var charts = Charts{
 	},
 	{
 		ID:    "rest_client_requests_by_code",
-		Title: "HTTPConfig Requests By Status Code",
+		Title: "HTTP Requests By Status Code",
 		Units: "requests/s",
 		Fam:   "rest client",
 		Ctx:   "k8s_kubeproxy.rest_client_requests_by_code",
@@ -86,7 +86,7 @@ var charts = Charts{
 	},
 	{
 		ID:    "rest_client_requests_by_method",
-		Title: "HTTPConfig Requests By Status Method",
+		Title: "HTTP Requests By Status Method",
 		Units: "requests/s",
 		Fam:   "rest client",
 		Ctx:   "k8s_kubeproxy.rest_client_requests_by_method",
@@ -94,7 +94,7 @@ var charts = Charts{
 	},
 	{
 		ID:    "http_request_duration",
-		Title: "HTTPConfig Requests Duration",
+		Title: "HTTP Requests Duration",
 		Units: "microseconds",
 		Fam:   "http",
 		Ctx:   "k8s_kubeproxy.http_request_duration",

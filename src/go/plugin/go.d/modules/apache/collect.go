@@ -101,7 +101,7 @@ func parseResponse(r io.Reader) (*serverStatus, error) {
 func parseScoreboard(line string) *scoreboard {
 	//  “_” Waiting for Connection
 	// “S” Starting up
-	// “R” Reading RequestConfig
+	// “R” Reading Request
 	// “W” Sending Reply
 	// “K” Keepalive (read)
 	// “D” DNS Lookup

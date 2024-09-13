@@ -70,7 +70,7 @@ var httpTrafficBreakdownCharts = Charts{
 			{ID: "couchdb_httpd_status_codes_409", Name: "409 Conflict", Algo: module.Incremental},
 			{ID: "couchdb_httpd_status_codes_412", Name: "412 Precondition Failed", Algo: module.Incremental},
 			{ID: "couchdb_httpd_status_codes_413", Name: "413 Request Entity Too Long", Algo: module.Incremental},
-			{ID: "couchdb_httpd_status_codes_414", Name: "414 RequestConfig URI Too Long", Algo: module.Incremental},
+			{ID: "couchdb_httpd_status_codes_414", Name: "414 Request URI Too Long", Algo: module.Incremental},
 			{ID: "couchdb_httpd_status_codes_415", Name: "415 Unsupported Media Type", Algo: module.Incremental},
 			{ID: "couchdb_httpd_status_codes_416", Name: "416 Requested Range Not Satisfiable", Algo: module.Incremental},
 			{ID: "couchdb_httpd_status_codes_417", Name: "417 Expectation Failed", Algo: module.Incremental},
