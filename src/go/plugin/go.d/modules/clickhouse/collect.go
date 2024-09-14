@@ -40,19 +40,10 @@ func (c *ClickHouse) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *ClickHouse) doOKDecodeCSV(req *http.Request, assign func(column, value string, lineEnd bool)) error {
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
-	}
-
-	defer web.CloseBody(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
-	}
-
-	return readCSVResponseData(resp.Body, assign)
+func (c *ClickHouse) doHTTP(req *http.Request, assign func(column, value string, lineEnd bool)) error {
+	return web.DoHTTP(c.httpClient).Request(req, func(body io.Reader) error {
+		return readCSVResponseData(body, assign)
+	})
 }
 
 func readCSVResponseData(reader io.Reader, assign func(column, value string, lineEnd bool)) error {

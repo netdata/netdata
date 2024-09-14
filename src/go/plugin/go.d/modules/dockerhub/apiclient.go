@@ -3,7 +3,6 @@
 package dockerhub
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -37,29 +36,11 @@ func (a apiClient) getRepository(repoName string) (*repository, error) {
 	}
 
 	var repo repository
-	if err := a.doOKDecode(req, &repo); err != nil {
+	if err := web.DoHTTP(a.httpClient).RequestJSON(req, &repo); err != nil {
 		return nil, err
 	}
+
 	return &repo, nil
-}
-
-func (a apiClient) doOKDecode(req *http.Request, in any) error {
-	resp, err := a.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error on request: %v", err)
-	}
-
-	defer web.CloseBody(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {
-		return fmt.Errorf("error on decoding response from '%s': %v", req.URL, err)
-	}
-
-	return nil
 }
 
 func (a apiClient) createRequest(urlPath string) (*http.Request, error) {

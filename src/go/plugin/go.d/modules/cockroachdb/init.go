@@ -4,9 +4,9 @@ package cockroachdb
 
 import (
 	"errors"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 func (c *CockroachDB) validateConfig() error {

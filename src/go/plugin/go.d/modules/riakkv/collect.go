@@ -3,9 +3,7 @@
 package riakkv
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
@@ -36,32 +34,18 @@ func (r *RiakKv) getStats() (*riakStats, error) {
 	}
 
 	var stats riakStats
-	if err := r.doOKDecode(req, &stats); err != nil {
+	if err := r.client().RequestJSON(req, &stats); err != nil {
 		return nil, err
 	}
 
 	return &stats, nil
 }
 
-func (r *RiakKv) doOKDecode(req *http.Request, in interface{}) error {
-	resp, err := r.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
-	}
-
-	defer web.CloseBody(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		msg := fmt.Sprintf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
+func (r *RiakKv) client() *web.Client {
+	return web.DoHTTP(r.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
 		if resp.StatusCode == http.StatusNotFound {
-			msg = fmt.Sprintf("%s (riak_kv_stat is not enabled)", msg)
+			return false, errors.New("riak_kv_stat is not enabled)")
 		}
-		return errors.New(msg)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {
-		return fmt.Errorf("error on decoding response from '%s': %v", req.URL, err)
-	}
-
-	return nil
+		return false, nil
+	})
 }

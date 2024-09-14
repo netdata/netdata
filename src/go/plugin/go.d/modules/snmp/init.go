@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 
+	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
 )
 

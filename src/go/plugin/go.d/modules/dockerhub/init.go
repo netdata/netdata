@@ -4,6 +4,7 @@ package dockerhub
 
 import (
 	"errors"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 

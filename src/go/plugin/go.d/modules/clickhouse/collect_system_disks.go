@@ -42,7 +42,7 @@ func (c *ClickHouse) collectSystemDisks(mx map[string]int64) error {
 
 	var name string
 
-	err := c.doOKDecodeCSV(req, func(column, value string, lineEnd bool) {
+	err := c.doHTTP(req, func(column, value string, lineEnd bool) {
 		switch column {
 		case "name":
 			name = value

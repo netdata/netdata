@@ -134,7 +134,7 @@ func TestKubeDiscoverer_Discover(t *testing.T) {
 }
 
 func prepareDiscoverer(role role, namespaces []string, objects ...runtime.Object) (*KubeDiscoverer, kubernetes.Interface) {
-	client := fake.NewSimpleClientset(objects...)
+	client := fake.NewClientset(objects...)
 	tags, _ := model.ParseTags("k8s")
 	disc := &KubeDiscoverer{
 		tags:        tags,

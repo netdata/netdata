@@ -3,11 +3,8 @@
 package bind
 
 import (
-	"encoding/xml"
 	"fmt"
 	"net/http"
-	"net/url"
-	"path"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
@@ -44,35 +41,17 @@ type xml3Client struct {
 }
 
 func (c xml3Client) serverStats() (*serverStats, error) {
-	req := c.request.Copy()
-	u, err := url.Parse(req.URL)
+	req, err := web.NewHTTPRequestWithPath(c.request, "/server")
 	if err != nil {
-		return nil, fmt.Errorf("error on parsing URL: %v", err)
+		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}
 
-	u.Path = path.Join(u.Path, "/server")
-	req.URL = u.String()
+	var stats xml3Stats
 
-	httpReq, err := web.NewHTTPRequest(req)
-	if err != nil {
-		return nil, fmt.Errorf("error on creating HTTP request: %v", err)
+	if err := web.DoHTTP(c.httpClient).RequestXML(req, &stats); err != nil {
+		return nil, err
 	}
 
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("error on request : %v", err)
-	}
-
-	defer web.CloseBody(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s returned HTTP status %d", httpReq.URL, resp.StatusCode)
-	}
-
-	stats := xml3Stats{}
-	if err = xml.NewDecoder(resp.Body).Decode(&stats); err != nil {
-		return nil, fmt.Errorf("error on decoding response from %s : %v", httpReq.URL, err)
-	}
 	return convertXML(stats), nil
 }
 

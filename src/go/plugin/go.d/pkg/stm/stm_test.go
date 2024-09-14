@@ -171,14 +171,14 @@ func TestToMap_map(t *testing.T) {
 
 func TestToMap_nestMap(t *testing.T) {
 	s := struct {
-		I int                    `stm:"int"`
-		M map[string]interface{} `stm:""`
+		I int            `stm:"int"`
+		M map[string]any `stm:""`
 	}{
 		I: 1,
-		M: map[string]interface{}{
+		M: map[string]any{
 			"a": 2,
 			"b": 3,
-			"m": map[string]interface{}{
+			"m": map[string]any{
 				"c": 4,
 			},
 		},
@@ -352,7 +352,7 @@ func TestToMap_bool(t *testing.T) {
 }
 
 func TestToMap_ArraySlice(t *testing.T) {
-	s := [4]interface{}{
+	s := [4]any{
 		map[string]int{
 			"B": 1,
 			"C": 2,

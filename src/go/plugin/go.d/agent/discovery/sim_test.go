@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -23,9 +23,14 @@ type nodeCoordinates struct {
 }
 
 func (c *Consul) collectNetworkRTT(mx map[string]int64) error {
+	req, err := c.createRequest(urlPathCoordinateNodes)
+	if err != nil {
+		return err
+	}
+
 	var coords []nodeCoordinates
 
-	if err := c.doOKDecode(urlPathCoordinateNodes, &coords); err != nil {
+	if err := c.client().RequestJSON(req, &coords); err != nil {
 		return err
 	}
 

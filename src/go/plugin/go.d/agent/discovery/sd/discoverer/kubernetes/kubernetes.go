@@ -234,7 +234,7 @@ func (d *KubeDiscoverer) setupServiceDiscoverer(ctx context.Context, namespace s
 	return td
 }
 
-func enqueue(queue *workqueue.Type, obj any) {
+func enqueue(queue *workqueue.Typed[any], obj any) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return

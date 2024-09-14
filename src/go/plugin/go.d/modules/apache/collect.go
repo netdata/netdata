@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -36,18 +35,19 @@ func (a *Apache) scrapeStatus() (*serverStatus, error) {
 		return nil, err
 	}
 
-	resp, err := a.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
+	var stats *serverStatus
+	var perr error
+
+	if err := web.DoHTTP(a.httpClient).Request(req, func(body io.Reader) error {
+		if stats, perr = parseResponse(body); perr != nil {
+			return perr
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
-	defer web.CloseBody(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
-	}
-
-	return parseResponse(resp.Body)
+	return stats, nil
 }
 
 func parseResponse(r io.Reader) (*serverStatus, error) {

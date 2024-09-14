@@ -6,12 +6,9 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 const (
@@ -49,46 +46,35 @@ var (
 	reStatus = regexp.MustCompile(`^Active connections: ([0-9]+)\n[^\d]+([0-9]+) ([0-9]+) ([0-9]+) ?([0-9]+)?\nReading: ([0-9]+) Writing: ([0-9]+) Waiting: ([0-9]+)`)
 )
 
-func newAPIClient(client *http.Client, request web.RequestConfig) *apiClient {
-	return &apiClient{httpClient: client, request: request}
-}
+type stubStatus struct {
+	Connections struct {
+		// The current number of active client connections including Waiting connections.
+		Active int64 `stm:"active"`
 
-type apiClient struct {
-	httpClient *http.Client
-	request    web.RequestConfig
-}
+		// The total number of accepted client connections.
+		Accepts int64 `stm:"accepts"`
 
-func (a apiClient) getStubStatus() (*stubStatus, error) {
-	req, err := web.NewHTTPRequest(a.request)
-	if err != nil {
-		return nil, fmt.Errorf("error on creating request : %v", err)
-	}
+		// The total number of handled connections.
+		// Generally, the parameter value is the same as accepts unless some resource limits have been reached.
+		Handled int64 `stm:"handled"`
 
-	resp, err := a.doRequestOK(req)
-	defer web.CloseBody(resp)
-	if err != nil {
-		return nil, err
-	}
+		// The current number of connections where nginx is reading the request header.
+		Reading int64 `stm:"reading"`
 
-	status, err := parseStubStatus(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error on parsing response : %v", err)
-	}
+		// The current number of connections where nginx is writing the response back to the client.
+		Writing int64 `stm:"writing"`
 
-	return status, nil
-}
+		// The current number of idle client connections waiting for a request.
+		Waiting int64 `stm:"waiting"`
+	} `stm:""`
+	Requests struct {
+		// The total number of client requests.
+		Total int64 `stm:"requests"`
 
-func (a apiClient) doRequestOK(req *http.Request) (*http.Response, error) {
-	resp, err := a.httpClient.Do(req)
-	if err != nil {
-		return resp, fmt.Errorf("error on request : %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return resp, fmt.Errorf("%s returned HTTP status %d", req.URL, resp.StatusCode)
-	}
-
-	return resp, err
+		// Note: tengine specific
+		// The total requests' response time, which is in millisecond
+		Time *int64 `stm:"request_time"`
+	} `stm:""`
 }
 
 func parseStubStatus(r io.Reader) (*stubStatus, error) {

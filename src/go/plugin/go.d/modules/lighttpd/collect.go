@@ -4,22 +4,29 @@ package lighttpd
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 func (l *Lighttpd) collect() (map[string]int64, error) {
-	status, err := l.apiClient.getServerStatus()
-
+	req, err := web.NewHTTPRequest(l.RequestConfig)
 	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
+	}
+
+	var status *serverStatus
+	var perr error
+
+	if err := web.DoHTTP(l.httpClient).Request(req, func(body io.Reader) error {
+		if status, perr = parseResponse(body); perr != nil {
+			return perr
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 
-	mx := stm.ToMap(status)
-
-	if len(mx) == 0 {
-		return nil, fmt.Errorf("nothing was collected from %s", l.URL)
-	}
-
-	return mx, nil
+	return stm.ToMap(status), nil
 }

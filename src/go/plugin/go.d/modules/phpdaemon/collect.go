@@ -2,18 +2,61 @@
 
 package phpdaemon
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
+import (
+	"fmt"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+)
+
+// https://github.com/kakserpom/phpdaemon/blob/master/PHPDaemon/Core/Daemon.php
+// see getStateOfWorkers()
+
+type fullStatus struct {
+	// Alive is sum of Idle, Busy and Reloading
+	Alive    int64 `json:"alive" stm:"alive"`
+	Shutdown int64 `json:"shutdown" stm:"shutdown"`
+
+	// Idle that the worker is not in the middle of execution valuable callback (e.g. request) at this moment of time.
+	// It does not mean that worker not have any pending operations.
+	// Idle is sum of Preinit, Init and Initialized.
+	Idle int64 `json:"idle" stm:"idle"`
+	// Busy means that the worker is in the middle of execution valuable callback.
+	Busy      int64 `json:"busy" stm:"busy"`
+	Reloading int64 `json:"reloading" stm:"reloading"`
+
+	Preinit int64 `json:"preinit" stm:"preinit"`
+	// Init means that worker is starting right now.
+	Init int64 `json:"init" stm:"init"`
+	// Initialized means that the worker is in Idle state.
+	Initialized int64 `json:"initialized" stm:"initialized"`
+
+	Uptime *int64 `json:"uptime" stm:"uptime"`
+}
 
 func (p *PHPDaemon) collect() (map[string]int64, error) {
-	s, err := p.client.queryFullStatus()
-
+	req, err := web.NewHTTPRequest(p.RequestConfig)
 	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request to '%s': %w", p.URL, err)
+	}
+
+	var st fullStatus
+
+	if err := web.DoHTTP(p.httpClient).RequestJSON(req, &st); err != nil {
 		return nil, err
 	}
 
 	// https://github.com/kakserpom/phpdaemon/blob/master/PHPDaemon/Core/Daemon.php
 	// see getStateOfWorkers()
-	s.Initialized = s.Idle - (s.Init + s.Preinit)
+	st.Initialized = st.Idle - (st.Init + st.Preinit)
 
-	return stm.ToMap(s), nil
+	mx := stm.ToMap(st)
+
+	p.once.Do(func() {
+		if _, ok := mx["uptime"]; ok {
+			_ = p.charts.Add(uptimeChart.Copy())
+		}
+	})
+
+	return mx, nil
 }

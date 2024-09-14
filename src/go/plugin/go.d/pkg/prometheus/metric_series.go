@@ -100,11 +100,11 @@ func (s Series) Max() float64 {
 	case 1:
 		return s[0].Value
 	}
-	max := s[0].Value
+	maxv := s[0].Value
 	for _, kv := range s[1:] {
-		if max < kv.Value {
-			max = kv.Value
+		if maxv < kv.Value {
+			maxv = kv.Value
 		}
 	}
-	return max
+	return maxv
 }

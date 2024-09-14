@@ -4,6 +4,7 @@ package pihole
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -143,7 +144,7 @@ func (p *Pihole) querySummary(pmx *piholeMetrics) {
 	}.Encode()
 
 	var v summaryRawMetrics
-	if err = p.doWithDecode(&v, req); err != nil {
+	if err = p.doHTTP(req, &v); err != nil {
 		p.Error(err)
 		return
 	}
@@ -164,7 +165,7 @@ func (p *Pihole) queryQueryTypes(pmx *piholeMetrics) {
 	}.Encode()
 
 	var v queryTypesMetrics
-	err = p.doWithDecode(&v, req)
+	err = p.doHTTP(req, &v)
 	if err != nil {
 		p.Error(err)
 		return
@@ -186,7 +187,7 @@ func (p *Pihole) queryForwardedDestinations(pmx *piholeMetrics) {
 	}.Encode()
 
 	var v forwardDestinations
-	err = p.doWithDecode(&v, req)
+	err = p.doHTTP(req, &v)
 	if err != nil {
 		p.Error(err)
 		return
@@ -207,7 +208,7 @@ func (p *Pihole) queryAPIVersion() (int, error) {
 	}.Encode()
 
 	var v piholeAPIVersion
-	err = p.doWithDecode(&v, req)
+	err = p.doHTTP(req, &v)
 	if err != nil {
 		return 0, err
 	}
@@ -215,33 +216,24 @@ func (p *Pihole) queryAPIVersion() (int, error) {
 	return v.Version, nil
 }
 
-func (p *Pihole) doWithDecode(dst interface{}, req *http.Request) error {
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
+func (p *Pihole) doHTTP(req *http.Request, dst any) error {
+	return web.DoHTTP(p.httpClient).Request(req, func(body io.Reader) error {
+		content, err := io.ReadAll(body)
+		if err != nil {
+			return fmt.Errorf("failed to read response: %v", err)
+		}
 
-	defer web.CloseBody(resp)
+		// empty array if unauthorized query or wrong query
+		if isEmptyArray(content) {
+			return errors.New("unauthorized access")
+		}
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s returned %d status code", req.URL, resp.StatusCode)
-	}
+		if err := json.Unmarshal(content, dst); err != nil {
+			return fmt.Errorf("failed to decode JSON response: %v", err)
+		}
 
-	content, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("error on reading response from %s : %v", req.URL, err)
-	}
-
-	// empty array if unauthorized query or wrong query
-	if isEmptyArray(content) {
-		return fmt.Errorf("unauthorized access to %s", req.URL)
-	}
-
-	if err := json.Unmarshal(content, dst); err != nil {
-		return fmt.Errorf("error on parsing response from %s : %v", req.URL, err)
-	}
-
-	return nil
+		return nil
+	})
 }
 
 func isEmptyArray(data []byte) bool {

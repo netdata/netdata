@@ -10,7 +10,7 @@ learn_rel_path: "Installation/Install on specific environments"
 
 # Deploy Netdata with Ansible
 
-Netdata's [one-line kickstart](/packaging/installer/README.md#install-on-linux-with-one-line-installer) is zero-configuration, highly adaptable, and compatible with tons
+Netdata's [one-line kickstart](/packaging/installer/README.md) is zero-configuration, highly adaptable, and compatible with tons
 of different operating systems and Linux distributions. You can use it on bare metal, VMs, containers, and everything
 in-between.
 
