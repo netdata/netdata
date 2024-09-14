@@ -804,7 +804,7 @@ func (fi *memoryDirEntry) Name() string               { return fi.name }
 func (fi *memoryDirEntry) Type() os.FileMode          { return fi.mode }
 func (fi *memoryDirEntry) IsDir() bool                { return fi.isDir }
 func (fi *memoryDirEntry) Info() (fs.FileInfo, error) { return fi, nil }
-func (fi *memoryDirEntry) Sys() interface{}           { return nil }
+func (fi *memoryDirEntry) Sys() any                   { return nil }
 func (fi *memoryDirEntry) Size() int64                { return 0 }
 func (fi *memoryDirEntry) Mode() os.FileMode          { return fi.Type() }
 func (fi *memoryDirEntry) ModTime() time.Time         { return time.Now() }

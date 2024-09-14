@@ -22,7 +22,7 @@ type (
 )
 
 // ToMap converts struct to a map[string]int64 based on 'stm' tags
-func ToMap(s ...interface{}) map[string]int64 {
+func ToMap(s ...any) map[string]int64 {
 	rv := map[string]int64{}
 	for _, v := range s {
 		value := reflect.Indirect(reflect.ValueOf(v))

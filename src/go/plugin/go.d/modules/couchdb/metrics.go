@@ -182,7 +182,7 @@ type cdbNodeSystem struct {
 	ProcessCount            float64 `stm:"process_count" json:"process_count"`
 	InternalReplicationJobs float64 `stm:"internal_replication_jobs" json:"internal_replication_jobs"`
 
-	MessageQueues map[string]interface{} `json:"message_queues"`
+	MessageQueues map[string]any `json:"message_queues"`
 }
 
 type cdbDBStats struct {

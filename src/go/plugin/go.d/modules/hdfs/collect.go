@@ -194,7 +194,7 @@ func (h *HDFS) collectDataNodeActivity(mx *metrics, raw rawJMX) error {
 	return nil
 }
 
-func writeJSONTo(dst interface{}, src interface{}) error {
+func writeJSONTo(dst, src any) error {
 	b, err := json.Marshal(src)
 	if err != nil {
 		return err

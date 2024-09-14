@@ -246,7 +246,7 @@ func (c *Client) doOKWithRetry(req web.RequestConfig) (*http.Response, error) {
 	return resp, err
 }
 
-func (c *Client) doJSONWithRetry(dst interface{}, req web.RequestConfig) error {
+func (c *Client) doJSONWithRetry(dst any, req web.RequestConfig) error {
 	resp, err := c.doOKWithRetry(req)
 	defer web.CloseBody(resp)
 	if err != nil {

@@ -110,7 +110,7 @@ func (d *tmpDir) renameFile(origFilename, newFilename string) {
 	require.NoError(d.t, err)
 }
 
-func (d *tmpDir) writeYAML(filename string, in interface{}) {
+func (d *tmpDir) writeYAML(filename string, in any) {
 	bs, err := yaml.Marshal(in)
 	require.NoError(d.t, err)
 	err = os.WriteFile(filename, bs, 0644)

@@ -14,7 +14,7 @@ import (
 )
 
 func newFuncMap() template.FuncMap {
-	custom := map[string]interface{}{
+	custom := map[string]any{
 		"match": funcMatchAny,
 		"glob": func(value, pattern string, patterns ...string) bool {
 			return funcMatchAny("glob", value, pattern, patterns...)

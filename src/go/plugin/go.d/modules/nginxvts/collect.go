@@ -13,7 +13,7 @@ func (vts *NginxVTS) collect() (map[string]int64, error) {
 		return nil, nil
 	}
 
-	collected := make(map[string]interface{})
+	collected := make(map[string]any)
 	vts.collectMain(collected, ms)
 	vts.collectSharedZones(collected, ms)
 	vts.collectServerZones(collected, ms)
@@ -21,16 +21,16 @@ func (vts *NginxVTS) collect() (map[string]int64, error) {
 	return stm.ToMap(collected), nil
 }
 
-func (vts *NginxVTS) collectMain(collected map[string]interface{}, ms *vtsMetrics) {
+func (vts *NginxVTS) collectMain(collected map[string]any, ms *vtsMetrics) {
 	collected["uptime"] = (ms.NowMsec - ms.LoadMsec) / 1000
 	collected["connections"] = ms.Connections
 }
 
-func (vts *NginxVTS) collectSharedZones(collected map[string]interface{}, ms *vtsMetrics) {
+func (vts *NginxVTS) collectSharedZones(collected map[string]any, ms *vtsMetrics) {
 	collected["sharedzones"] = ms.SharedZones
 }
 
-func (vts *NginxVTS) collectServerZones(collected map[string]interface{}, ms *vtsMetrics) {
+func (vts *NginxVTS) collectServerZones(collected map[string]any, ms *vtsMetrics) {
 	if !ms.hasServerZones() {
 		return
 	}

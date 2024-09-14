@@ -13,7 +13,7 @@ import (
 func TestConfig_Name(t *testing.T) {
 	tests := map[string]struct {
 		cfg      Config
-		expected interface{}
+		expected any
 	}{
 		"string":       {cfg: Config{"name": "name"}, expected: "name"},
 		"empty string": {cfg: Config{"name": ""}, expected: ""},
@@ -32,7 +32,7 @@ func TestConfig_Name(t *testing.T) {
 func TestConfig_Module(t *testing.T) {
 	tests := map[string]struct {
 		cfg      Config
-		expected interface{}
+		expected any
 	}{
 		"string":       {cfg: Config{"module": "module"}, expected: "module"},
 		"empty string": {cfg: Config{"module": ""}, expected: ""},
@@ -51,7 +51,7 @@ func TestConfig_Module(t *testing.T) {
 func TestConfig_FullName(t *testing.T) {
 	tests := map[string]struct {
 		cfg      Config
-		expected interface{}
+		expected any
 	}{
 		"name == module": {cfg: Config{"name": "name", "module": "name"}, expected: "name"},
 		"name != module": {cfg: Config{"name": "name", "module": "module"}, expected: "module_name"},
@@ -68,7 +68,7 @@ func TestConfig_FullName(t *testing.T) {
 func TestConfig_UpdateEvery(t *testing.T) {
 	tests := map[string]struct {
 		cfg      Config
-		expected interface{}
+		expected any
 	}{
 		"int":     {cfg: Config{"update_every": 1}, expected: 1},
 		"not int": {cfg: Config{"update_every": "1"}, expected: 0},
@@ -86,7 +86,7 @@ func TestConfig_UpdateEvery(t *testing.T) {
 func TestConfig_AutoDetectionRetry(t *testing.T) {
 	tests := map[string]struct {
 		cfg      Config
-		expected interface{}
+		expected any
 	}{
 		"int":     {cfg: Config{"autodetection_retry": 1}, expected: 1},
 		"not int": {cfg: Config{"autodetection_retry": "1"}, expected: 0},
@@ -104,7 +104,7 @@ func TestConfig_AutoDetectionRetry(t *testing.T) {
 func TestConfig_Priority(t *testing.T) {
 	tests := map[string]struct {
 		cfg      Config
-		expected interface{}
+		expected any
 	}{
 		"int":     {cfg: Config{"priority": 1}, expected: 1},
 		"not int": {cfg: Config{"priority": "1"}, expected: 0},

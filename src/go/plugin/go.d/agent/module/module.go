@@ -53,8 +53,8 @@ func TestConfigurationSerialize(t *testing.T, mod Module, cfgJSON, cfgYAML []byt
 	t.Helper()
 	tests := map[string]struct {
 		config    []byte
-		unmarshal func(in []byte, out interface{}) (err error)
-		marshal   func(in interface{}) (out []byte, err error)
+		unmarshal func(in []byte, out any) (err error)
+		marshal   func(in any) (out []byte, err error)
 	}{
 		"json": {config: cfgJSON, marshal: json.Marshal, unmarshal: json.Unmarshal},
 		"yaml": {config: cfgYAML, marshal: yaml.Marshal, unmarshal: yaml.Unmarshal},

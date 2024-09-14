@@ -190,7 +190,7 @@ func (c *Client) doOK(req web.RequestConfig) (*http.Response, error) {
 	return resp, nil
 }
 
-func (c *Client) doOKWithDecode(req web.RequestConfig, dst interface{}) error {
+func (c *Client) doOKWithDecode(req web.RequestConfig, dst any) error {
 	resp, err := c.doOK(req)
 	defer web.CloseBody(resp)
 	if err != nil {
