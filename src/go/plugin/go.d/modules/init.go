@@ -62,6 +62,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/mysql"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nginx"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nginxplus"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nginxunit"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nginxvts"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/nsd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/ntpd"

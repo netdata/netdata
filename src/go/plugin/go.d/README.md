@@ -107,6 +107,7 @@ see the appropriate collector readme.
 | [mysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/mysql)                           |             MySQL             |
 | [nginx](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginx)                           |             NGINX             |
 | [nginxplus](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginxplus)                   |          NGINX Plus           |
+| [nginxunit](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginxunit)                   |          NGINX Unit           |
 | [nginxvts](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginxvts)                     |           NGINX VTS           |
 | [nsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nsd)                               |       NSD (NLnet Labs)        |
 | [ntpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ntpd)                             |          NTP daemon           |
