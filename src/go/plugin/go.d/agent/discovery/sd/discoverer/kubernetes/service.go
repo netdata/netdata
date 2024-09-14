@@ -53,7 +53,7 @@ type serviceDiscoverer struct {
 	model.Base
 
 	informer cache.SharedInformer
-	queue    *workqueue.Type
+	queue    *workqueue.Typed[any]
 }
 
 func newServiceDiscoverer(inf cache.SharedInformer) *serviceDiscoverer {
@@ -61,7 +61,8 @@ func newServiceDiscoverer(inf cache.SharedInformer) *serviceDiscoverer {
 		panic("nil service informer")
 	}
 
-	queue := workqueue.NewWithConfig(workqueue.QueueConfig{Name: "service"})
+	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{Name: "service"})
+
 	_, _ = inf.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj any) { enqueue(queue, obj) },
 		UpdateFunc: func(_, obj any) { enqueue(queue, obj) },
