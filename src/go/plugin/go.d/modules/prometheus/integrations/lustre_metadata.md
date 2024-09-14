@@ -117,6 +117,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | fallback_type | Time series selector (filter). |  | no |
 | max_time_series | Global time series limit. If an endpoint returns number of time series > limit the data is not processed. | 2000 | no |
 | max_time_series_per_metric | Time series per metric (metric name) limit. Metrics with number of time series > limit are skipped. | 200 | no |
+| label_prefix | An optional prefix that will be added to all labels of all charts. If set, the label names will be automatically formatted as `prefix_name` (the prefix followed by an underscore and the original name). |  | no |
 | timeout | HTTP request timeout. | 10 | no |
 | username | Username for basic HTTP authentication. |  | no |
 | password | Password for basic HTTP authentication. |  | no |
