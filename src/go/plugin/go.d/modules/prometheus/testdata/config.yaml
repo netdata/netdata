@@ -17,6 +17,7 @@ tls_key: "ok"
 tls_skip_verify: yes
 name: "ok"
 app: "ok"
+label_prefix: "ok"
 bearer_token_file: "ok"
 selector:
   allow:
