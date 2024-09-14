@@ -49,7 +49,7 @@ func hasIdleProcesses(processes []proc) bool {
 type accessor func(p proc) int64
 
 func statProcesses(m map[string]int64, processes []proc, met string, acc accessor) {
-	var sum, count, min, max int64
+	var sum, count, minv, maxv int64
 	for _, proc := range processes {
 		if proc.State != "Idle" {
 			continue
@@ -59,14 +59,14 @@ func statProcesses(m map[string]int64, processes []proc, met string, acc accesso
 		sum += val
 		count += 1
 		if count == 1 {
-			min, max = val, val
+			minv, maxv = val, val
 			continue
 		}
-		min = int64(math.Min(float64(min), float64(val)))
-		max = int64(math.Max(float64(max), float64(val)))
+		minv = int64(math.Min(float64(minv), float64(val)))
+		maxv = int64(math.Max(float64(maxv), float64(val)))
 	}
 
-	m["min"+met] = min
-	m["max"+met] = max
+	m["min"+met] = minv
+	m["max"+met] = maxv
 	m["avg"+met] = sum / count
 }

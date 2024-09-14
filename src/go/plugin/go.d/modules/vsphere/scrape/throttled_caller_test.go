@@ -13,7 +13,7 @@ import (
 
 func Test_throttledCaller(t *testing.T) {
 	var current int64
-	var max int64
+	var maxv int64
 	var total int64
 	var mux sync.Mutex
 	limit := 5
@@ -28,8 +28,8 @@ func Test_throttledCaller(t *testing.T) {
 
 			mux.Lock()
 			defer mux.Unlock()
-			if atomic.LoadInt64(&current) > max {
-				max = atomic.LoadInt64(&current)
+			if atomic.LoadInt64(&current) > maxv {
+				maxv = atomic.LoadInt64(&current)
 			}
 			atomic.AddInt64(&current, -1)
 		}
@@ -38,5 +38,5 @@ func Test_throttledCaller(t *testing.T) {
 	tc.wait()
 
 	assert.Equal(t, int64(n), total)
-	assert.Equal(t, max, int64(limit))
+	assert.Equal(t, maxv, int64(limit))
 }
