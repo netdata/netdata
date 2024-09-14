@@ -43,7 +43,7 @@ modules:
           description: ""
       additional_permissions:
         description: ""
-      multi_instance: true
+      multi_instance: false
       supported_platforms:
         include: []
         exclude: []

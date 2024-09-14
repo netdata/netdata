@@ -22,7 +22,7 @@ modules:
         - web
         - appserver
         - http
-      most_popular: true
+      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -51,7 +51,7 @@ modules:
         list:
           - title: Enable HTTP Control API
             description: |
-              See [Control API]([HTTP Control API](https://unit.nginx.org/controlapi/#configuration-api)) documentation.
+              See [Control API](https://unit.nginx.org/controlapi/#configuration-api) documentation.
       configuration:
         file:
           name: go.d/nginxunit.conf
@@ -71,7 +71,7 @@ modules:
               default_value: 0
               required: false
             - name: url
-              description: NGINX Unit URL.
+              description: The URL of the NGINX Unit HTTP Control API.
               default_value: http://127.0.0.1:8000
               required: true
             - name: timeout

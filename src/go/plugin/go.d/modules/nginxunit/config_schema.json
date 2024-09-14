@@ -13,7 +13,7 @@
       },
       "url": {
         "title": "URL",
-        "description": "The URL of the NGINX Unit.",
+        "description": "The URL of the NGINX Unit HTTP Control API.",
         "type": "string",
         "default": "http://127.0.0.1:8000",
         "format": "uri"
