@@ -10,10 +10,8 @@
 #define WINDOWS_EVENTS_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
 #define WINDOWS_EVENTS_PROGRESS_EVERY_UT (250 * USEC_PER_MS)
 
-#define FUNCTION_PROGRESS_UPDATE_ROWS(rows_read, rows) __atomic_fetch_add(&(rows_read), rows, __ATOMIC_RELAXED)
-#define FUNCTION_PROGRESS_UPDATE_BYTES(bytes_read, bytes) __atomic_fetch_add(&(bytes_read), bytes, __ATOMIC_RELAXED)
-#define FUNCTION_PROGRESS_EVERY_ROWS (1ULL << 13)
-#define FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS (1ULL << 7)
+#define FUNCTION_PROGRESS_EVERY_ROWS (2000)
+#define FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS (1000)
 #define ANCHOR_DELTA_UT (10 * USEC_PER_SEC)
 
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -29,12 +27,27 @@ struct lqs_extension {
     wchar_t *query;
 
     struct {
-        usec_t start_ut;
-        usec_t stop_ut;
-        usec_t first_msg_ut;
+        struct {
+            size_t completed;
+            size_t total;
+        } queries;
 
-        uint64_t first_msg_seqnum;
-    } query_file;
+        struct {
+            size_t current_query_total;
+            size_t completed;
+            size_t total;
+        } entries;
+
+        usec_t last_ut;
+    } progress;
+
+    // struct {
+    //     usec_t start_ut;
+    //     usec_t stop_ut;
+    //     usec_t first_msg_ut;
+    //
+    //     uint64_t first_msg_seqnum;
+    // } query_file;
 
     // struct {
     //     uint32_t enable_after_samples;
@@ -125,7 +138,7 @@ struct lqs_extension {
 
 static inline WEVT_QUERY_STATUS check_stop(const bool *cancelled, const usec_t *stop_monotonic_ut) {
     if(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)) {
-        internal_error(true, "Function has been cancelled");
+        nd_log(NDLS_COLLECTORS, NDLP_INFO, "Function has been cancelled");
         return WEVT_CANCELLED;
     }
 
@@ -536,6 +549,35 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
     return bytes;
 }
 
+static void send_progress_update(LOGS_QUERY_STATUS *lqs, size_t current_row_counter, bool flush_current_file) {
+    usec_t now_ut = now_monotonic_usec();
+
+    if(current_row_counter > lqs->c.progress.entries.current_query_total) {
+        lqs->c.progress.entries.total += current_row_counter - lqs->c.progress.entries.current_query_total;
+        lqs->c.progress.entries.current_query_total = current_row_counter;
+    }
+
+    if(flush_current_file) {
+        lqs->c.progress.entries.total += current_row_counter;
+        lqs->c.progress.entries.total -= lqs->c.progress.entries.current_query_total;
+        lqs->c.progress.entries.completed += current_row_counter;
+        lqs->c.progress.entries.current_query_total = 0;
+    }
+
+    size_t completed = lqs->c.progress.entries.completed + current_row_counter;
+    if(completed > lqs->c.progress.entries.total)
+        lqs->c.progress.entries.total = completed;
+
+    usec_t progress_duration_ut = now_ut - lqs->c.progress.last_ut;
+    if(progress_duration_ut >= WINDOWS_EVENTS_PROGRESS_EVERY_UT) {
+        lqs->c.progress.last_ut = now_ut;
+
+        netdata_mutex_lock(&stdout_mutex);
+        pluginsd_function_progress_to_stdout(lqs->rq.transaction, completed, lqs->c.progress.entries.total);
+        netdata_mutex_unlock(&stdout_mutex);
+    }
+}
+
 static WEVT_QUERY_STATUS wevt_query_backward(
         WEVT_LOG *log, BUFFER *wb __maybe_unused, FACETS *facets,
         LOGS_QUERY_SOURCE *src,
@@ -545,8 +587,8 @@ static WEVT_QUERY_STATUS wevt_query_backward(
     usec_t stop_ut = lqs->query.stop_ut;
     bool stop_when_full = lqs->query.stop_when_full;
 
-    lqs->c.query_file.start_ut = start_ut;
-    lqs->c.query_file.stop_ut = stop_ut;
+//    lqs->c.query_file.start_ut = start_ut;
+//    lqs->c.query_file.stop_ut = stop_ut;
 
     log->event_query = wevt_query(channel2unicode(src->fullname), lqs->c.query, EvtQueryReverseDirection);
     if(!log->event_query)
@@ -584,7 +626,7 @@ static WEVT_QUERY_STATUS wevt_query_backward(
 
         if(unlikely(!first_msg_ut)) {
             first_msg_ut = msg_ut;
-            lqs->c.query_file.first_msg_ut = msg_ut;
+            // lqs->c.query_file.first_msg_ut = msg_ut;
         }
 
 //        sampling_t sample = is_row_in_sample(log, lqs, src, msg_ut,
@@ -614,13 +656,17 @@ static WEVT_QUERY_STATUS wevt_query_backward(
             }
 
             if(unlikely(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0)) {
-                FUNCTION_PROGRESS_UPDATE_ROWS(lqs->c.rows_read, row_counter - last_row_counter);
-                last_row_counter = row_counter;
-
-                FUNCTION_PROGRESS_UPDATE_BYTES(lqs->c.bytes_read, bytes - last_bytes);
-                last_bytes = bytes;
-
                 status = check_stop(lqs->cancelled, lqs->stop_monotonic_ut);
+
+                if(status == WEVT_OK) {
+                    lqs->c.rows_read += row_counter - last_row_counter;
+                    last_row_counter = row_counter;
+
+                    lqs->c.bytes_read += bytes - last_bytes;
+                    last_bytes = bytes;
+
+                    send_progress_update(lqs, row_counter, false);
+                }
             }
 //        }
 //        else if(sample == SAMPLING_SKIP_FIELDS)
@@ -631,9 +677,9 @@ static WEVT_QUERY_STATUS wevt_query_backward(
 //        }
     }
 
-    FUNCTION_PROGRESS_UPDATE_ROWS(lqs->c.rows_read, row_counter - last_row_counter);
-    FUNCTION_PROGRESS_UPDATE_BYTES(lqs->c.bytes_read, bytes - last_bytes);
-
+    send_progress_update(lqs, row_counter, true);
+    lqs->c.rows_read += row_counter - last_row_counter;
+    lqs->c.bytes_read += bytes - last_bytes;
     lqs->c.rows_useful += rows_useful;
 
     if(errors_no_timestamp)
@@ -656,8 +702,8 @@ static WEVT_QUERY_STATUS wevt_query_forward(
     usec_t stop_ut = lqs->query.stop_ut;
     bool stop_when_full = lqs->query.stop_when_full;
 
-    lqs->c.query_file.start_ut = start_ut;
-    lqs->c.query_file.stop_ut = stop_ut;
+//    lqs->c.query_file.start_ut = start_ut;
+//    lqs->c.query_file.stop_ut = stop_ut;
 
     log->event_query = wevt_query(channel2unicode(src->fullname), lqs->c.query, EvtQueryForwardDirection);
     if(!log->event_query)
@@ -695,7 +741,7 @@ static WEVT_QUERY_STATUS wevt_query_forward(
 
         if(unlikely(!first_msg_ut)) {
             first_msg_ut = msg_ut;
-            lqs->c.query_file.first_msg_ut = msg_ut;
+            // lqs->c.query_file.first_msg_ut = msg_ut;
         }
 
 //        sampling_t sample = is_row_in_sample(log, lqs, src, msg_ut,
@@ -725,13 +771,17 @@ static WEVT_QUERY_STATUS wevt_query_forward(
             }
 
             if(unlikely(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0)) {
-                FUNCTION_PROGRESS_UPDATE_ROWS(lqs->c.rows_read, row_counter - last_row_counter);
-                last_row_counter = row_counter;
-
-                FUNCTION_PROGRESS_UPDATE_BYTES(lqs->c.bytes_read, bytes - last_bytes);
-                last_bytes = bytes;
-
                 status = check_stop(lqs->cancelled, lqs->stop_monotonic_ut);
+
+                if(status == WEVT_OK) {
+                    lqs->c.rows_read += row_counter - last_row_counter;
+                    last_row_counter = row_counter;
+
+                    lqs->c.bytes_read += bytes - last_bytes;
+                    last_bytes = bytes;
+
+                    send_progress_update(lqs, row_counter, false);
+                }
             }
 //        }
 //        else if(sample == SAMPLING_SKIP_FIELDS)
@@ -742,9 +792,9 @@ static WEVT_QUERY_STATUS wevt_query_forward(
 //        }
     }
 
-    FUNCTION_PROGRESS_UPDATE_ROWS(lqs->c.rows_read, row_counter - last_row_counter);
-    FUNCTION_PROGRESS_UPDATE_BYTES(lqs->c.bytes_read, bytes - last_bytes);
-
+    send_progress_update(lqs, row_counter, true);
+    lqs->c.rows_read += row_counter - last_row_counter;
+    lqs->c.bytes_read += bytes - last_bytes;
     lqs->c.rows_useful += rows_useful;
 
     if(errors_no_timestamp)
@@ -926,6 +976,8 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
 
         if(src->msg_last_ut > lqs->rq.if_modified_since)
             files_are_newer = true;
+
+        lqs->c.progress.entries.total += src->entries;
     }
     dfe_done(jf);
 
@@ -953,8 +1005,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
     usec_t query_started_ut = now_monotonic_usec();
     usec_t started_ut = query_started_ut;
     usec_t ended_ut = started_ut;
-    usec_t duration_ut = 0, max_duration_ut = 0;
-    usec_t progress_duration_ut = 0;
+    usec_t duration_ut, max_duration_ut = 0;
 
     WEVT_LOG *log = wevt_openlog6();
     if(!log) {
@@ -994,6 +1045,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
 
         // sampling_file_init(lqs, src);
 
+        lqs->c.progress.entries.current_query_total = src->entries;
         WEVT_QUERY_STATUS tmp_status = wevt_query_one_channel(log, wb, facets, src, lqs);
 
         rows_useful = lqs->c.rows_useful - rows_useful;
@@ -1006,14 +1058,6 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
 
         if(duration_ut > max_duration_ut)
             max_duration_ut = duration_ut;
-
-        progress_duration_ut += duration_ut;
-        if(progress_duration_ut >= WINDOWS_EVENTS_PROGRESS_EVERY_UT) {
-            progress_duration_ut = 0;
-            netdata_mutex_lock(&stdout_mutex);
-            pluginsd_function_progress_to_stdout(lqs->rq.transaction, f + 1, files_used);
-            netdata_mutex_unlock(&stdout_mutex);
-        }
 
         buffer_json_add_array_item_object(wb); // channel source
         {
