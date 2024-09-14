@@ -260,7 +260,7 @@ static void wevt_transform_level(FACETS *facets __maybe_unused, BUFFER *wb, FACE
         return;
 
     const char *v = buffer_tostring(wb);
-    if(*v && isdigit(*v)) {
+    if(*v && isdigit((uint8_t)*v)) {
         int priority = str2i(buffer_tostring(wb));
         const char *name = wevt_level_to_name(priority);
         if (name) {
@@ -365,11 +365,11 @@ static inline size_t wevt_process_keywords(WEVT_LOG *log, FACETS *facets, WEVT_E
             NULL,
         };
 
-        buffer_flush(log->ops.transform);
-        if(buffer_extract_and_print_value(log->ops.transform, log->ops.xml.data, log->ops.xml.used - 1, NULL, path)) {
-            if (buffer_strlen(log->ops.transform)) {
-                value = buffer_tostring(log->ops.transform);
-                len = buffer_strlen(log->ops.transform);
+        buffer_flush(log->ops.keywords);
+        if(buffer_extract_and_print_value(log->ops.keywords, log->ops.xml.data, log->ops.xml.used - 1, NULL, path)) {
+            if (buffer_strlen(log->ops.keywords)) {
+                value = buffer_tostring(log->ops.keywords);
+                len = buffer_strlen(log->ops.keywords);
             }
         }
     }
@@ -392,11 +392,11 @@ static inline size_t wevt_process_opcode(WEVT_LOG *log, FACETS *facets, WEVT_EVE
             NULL,
         };
 
-        buffer_flush(log->ops.transform);
-        if(buffer_extract_and_print_value(log->ops.transform, log->ops.xml.data, log->ops.xml.used - 1, NULL, path)) {
-            if (buffer_strlen(log->ops.transform)) {
-                value = buffer_tostring(log->ops.transform);
-                len = buffer_strlen(log->ops.transform);
+        buffer_flush(log->ops.opcode);
+        if(buffer_extract_and_print_value(log->ops.opcode, log->ops.xml.data, log->ops.xml.used - 1, NULL, path)) {
+            if (buffer_strlen(log->ops.opcode)) {
+                value = buffer_tostring(log->ops.opcode);
+                len = buffer_strlen(log->ops.opcode);
             }
         }
     }
@@ -419,11 +419,11 @@ static inline size_t wevt_process_task(WEVT_LOG *log, FACETS *facets, WEVT_EVENT
             NULL,
         };
 
-        buffer_flush(log->ops.transform);
-        if(buffer_extract_and_print_value(log->ops.transform, log->ops.xml.data, log->ops.xml.used - 1, NULL, path)) {
-            if (buffer_strlen(log->ops.transform)) {
-                value = buffer_tostring(log->ops.transform);
-                len = buffer_strlen(log->ops.transform);
+        buffer_flush(log->ops.task);
+        if(buffer_extract_and_print_value(log->ops.task, log->ops.xml.data, log->ops.xml.used - 1, NULL, path)) {
+            if (buffer_strlen(log->ops.task)) {
+                value = buffer_tostring(log->ops.task);
+                len = buffer_strlen(log->ops.task);
             }
         }
     }
@@ -1271,9 +1271,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         struct {
             const char *func;
         } array[] = {
-            { "windows-events after:-86400 before:0 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,JM3OPW3kHn6,H106l8MXSSr,HREiMN.4Ahu,ClaDGnYSQE7,ApYltST_icg,PtkRm91M0En data_only:false slice:true source:All" },
+            //{ "windows-events after:-86400 before:0 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,JM3OPW3kHn6,H106l8MXSSr,HREiMN.4Ahu,ClaDGnYSQE7,ApYltST_icg,PtkRm91M0En data_only:false slice:true source:All" },
             //{ "windows-events after:1726055370 before:1726056270 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6,ClaDGnYSQE7,H106l8MXSSr,HREiMN.4Ahu data_only:false source:All HytMJ9kj82B:BlC24d5JBBV,PtVoyIuX.MU,HMj1B38kHTv KeCITtVD5AD:PY1JtCeWwSe,O9kz5J37nNl,JZoJURadhDb" },
-            //{ "windows-events after:1725650284 before:1725736684 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
+            { "windows-events after:1725636012 before:1726240812 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,JM3OPW3kHn6,H106l8MXSSr,HREiMN.4Ahu,ClaDGnYSQE7,ApYltST_icg,PtkRm91M0En data_only:false source:All PtkRm91M0En:LDzHbP5libb" },
             //{ "windows-events after:1725650386 before:1725736786 anchor:1725652420809461 direction:forward last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 if_modified_since:1725736649011085 data_only:true delta:true tail:true source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
             //{ "windows-events info after:1725650420 before:1725736820" },
             //{ "windows-events after:1725650420 before:1725736820 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },

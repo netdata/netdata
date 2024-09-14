@@ -52,6 +52,13 @@ typedef struct wevt_log {
 
         // string attributes of the current event log entry
         // valid until another event if fetched
+
+        // IMPORTANT:
+        // EVERY FIELD NEEDS ITS OWN BUFFER!
+        // the way facets work, all the field value pointers need to be valid
+        // until the entire row closes, so reusing a buffer for the same field
+        // actually copies the same value to all fields using the same buffer.
+
         TXT_UTF8 channel;
         TXT_UTF8 provider;
         TXT_UTF8 source;
@@ -59,7 +66,9 @@ typedef struct wevt_log {
         TXT_UTF8 user;
         TXT_UTF8 xml;
 
-        BUFFER *transform;
+        BUFFER *opcode;
+        BUFFER *keywords;
+        BUFFER *task;
     } ops;
 
 } WEVT_LOG;

@@ -61,7 +61,7 @@ const char *parse_value_and_closing_tag(BUFFER *buffer, const char *xml, const c
                 // an opening tag
                 buffer_fast_strcat(buffer, start, xml - start);
                 xml = start = parse_node(buffer, xml, end, level + 1);
-                while(xml < end && isspace(*xml))
+                while(xml < end && isspace((uint8_t)*xml))
                     xml++;
                 has_subnodes = true;
             }
@@ -106,7 +106,7 @@ const char *parse_field_value(BUFFER *buffer, const char *xml, const char *end) 
 
 // Parse a field name and return the next position to parse
 const char *parse_field(BUFFER *buffer, const char *xml, const char *end) {
-    while(isspace(*xml) && xml < end) xml++;
+    while(isspace((uint8_t)*xml) && xml < end) xml++;
 
     const char *start = xml;
 
@@ -141,18 +141,18 @@ static inline const char *parse_node(BUFFER *buffer, const char *xml, const char
     buffer_add_xml_indent(buffer, level);
 
     // skip spaces before the tag name
-    while(xml < end && isspace(*xml)) xml++;
+    while(xml < end && isspace((uint8_t)*xml)) xml++;
 
     // Parse the tag name
 //    const char *tag_start = xml, *tag_end = NULL;
     while (xml < end && *xml != '>' && *xml != '/') {
         xml++;
 
-        if(xml < end && isspace(*xml)) {
+        if(xml < end && isspace((uint8_t)*xml)) {
             xml++;
 //            tag_end = xml;
 
-            while(xml < end && isspace(*xml))
+            while(xml < end && isspace((uint8_t)*xml))
                 xml++;
 
             if(xml < end && *xml == '/') {
@@ -175,7 +175,7 @@ static inline const char *parse_node(BUFFER *buffer, const char *xml, const char
             else {
                 buffer_fast_strcat(buffer, start, xml - start);
                 xml = start = parse_field(buffer, xml, end);
-                while(xml < end && isspace(*xml))
+                while(xml < end && isspace((uint8_t)*xml))
                     xml++;
             }
         }
@@ -202,7 +202,7 @@ static inline const char *parse_node(BUFFER *buffer, const char *xml, const char
 
 static inline void buffer_pretty_print_xml_object(BUFFER *buffer, const char *xml, const char *end) {
     while(xml < end) {
-        while(xml < end && isspace(*xml))
+        while(xml < end && isspace((uint8_t)*xml))
             xml++;
 
         if(xml < end && *xml == '<')
@@ -244,7 +244,7 @@ bool buffer_extract_and_print_xml_with_cb(BUFFER *buffer, const char *xml, size_
 
         start = new_start + klen + 1;
 
-        if(*start != '>' && !isspace(*start))
+        if(*start != '>' && !isspace((uint8_t)*start))
             return false;
 
         if(*start != '>') {

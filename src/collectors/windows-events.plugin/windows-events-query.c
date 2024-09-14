@@ -513,7 +513,9 @@ void wevt_closelog6(WEVT_LOG *log) {
     txt_utf8_cleanup(&log->ops.computer);
     txt_utf8_cleanup(&log->ops.user);
     txt_utf8_cleanup(&log->ops.xml);
-    buffer_free(log->ops.transform);
+    buffer_free(log->ops.keywords);
+    buffer_free(log->ops.opcode);
+    buffer_free(log->ops.task);
     freez(log);
 }
 
@@ -596,7 +598,9 @@ WEVT_LOG *wevt_openlog6(void) {
         goto cleanup;
     }
 
-    log->ops.transform = buffer_create(4096, NULL);
+    log->ops.keywords = buffer_create(4096, NULL);
+    log->ops.opcode = buffer_create(4096, NULL);
+    log->ops.task = buffer_create(4096, NULL);
 
 cleanup:
     return log;
