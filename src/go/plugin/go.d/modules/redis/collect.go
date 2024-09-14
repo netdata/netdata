@@ -7,9 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/blang/semver/v4"
 	"regexp"
 	"strings"
+
+	"github.com/blang/semver/v4"
 )
 
 const precision = 1000 // float values multiplier and dimensions divisor
