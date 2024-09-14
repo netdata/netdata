@@ -5,6 +5,8 @@
 
 #include "windows-events.h"
 
+#define BATCH_NEXT_EVENT 500
+
 typedef struct wevt_event {
     uint64_t id;                        // EventRecordId (unique and sequential per channel)
     uint8_t  version;
@@ -34,6 +36,12 @@ typedef struct {
 struct provider_meta_handle;
 
 typedef struct wevt_log {
+    struct {
+        DWORD size;
+        DWORD used;
+        EVT_HANDLE bk[BATCH_NEXT_EVENT];
+    } batch;
+
     EVT_HANDLE bookmark;
     EVT_HANDLE event_query;
     EVT_HANDLE render_context;
@@ -77,6 +85,19 @@ typedef struct wevt_log {
         TXT_UTF8 xml;
     } ops;
 
+    struct {
+        size_t event_count;
+        size_t failed_count;
+    } query_stats;
+
+    struct {
+        size_t queries_count;
+        size_t queries_failed;
+
+        size_t event_count;
+        size_t failed_count;
+    } log_stats;
+
 } WEVT_LOG;
 
 WEVT_LOG *wevt_openlog6(void);
@@ -84,7 +105,7 @@ void wevt_closelog6(WEVT_LOG *log);
 
 bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, EVT_RETENTION *retention);
 
-EVT_HANDLE wevt_query(LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS direction);
+bool wevt_query(WEVT_LOG *log, LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS direction);
 void wevt_query_done(WEVT_LOG *log);
 
 bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full);

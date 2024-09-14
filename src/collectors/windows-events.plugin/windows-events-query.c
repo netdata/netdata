@@ -43,6 +43,25 @@ static const wchar_t *RENDER_ITEMS[] = {
         L"/Event/System/Execution/@ThreadID",
 };
 
+static const char *wevt_extended_status(void) {
+    static __thread wchar_t wbuf[4096];
+    static __thread char buf[4096];
+    DWORD wbuf_used = 0;
+
+    if(EvtGetExtendedStatus(sizeof(wbuf) / sizeof(wchar_t), wbuf, &wbuf_used) == ERROR_SUCCESS) {
+        wbuf[sizeof(wbuf) / sizeof(wchar_t) - 1] = 0;
+        unicode2utf8(buf, sizeof(buf), wbuf);
+    }
+    else
+        buf[0] = '\0';
+
+    // the EvtGetExtendedStatus() may be successful with an empty message
+    if(!buf[0])
+        strncpyz(buf, "no additional information", sizeof(buf) - 1);
+
+    return buf;
+}
+
 static bool wevt_GUID_to_ND_UUID(ND_UUID *nd_uuid, const GUID *guid) {
     if(guid && sizeof(GUID) == sizeof(ND_UUID)) {
         memcpy(nd_uuid->uuid, guid, sizeof(ND_UUID));
@@ -194,22 +213,16 @@ static inline void wevt_event_done(WEVT_LOG *log) {
     }
 }
 
-bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
-    DWORD returned = 0, bytes_used = 0, property_count = 0;
+bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
     bool ret = false;
 
-    fatal_assert(log && log->event_query && log->render_context);
-
-    wevt_event_done(log);
-
-    if (!EvtNext(log->event_query, 1, &log->bookmark, INFINITE, 0, &returned))
-        goto cleanup; // no data available, return failure
-
     // obtain the information from selected events
+    DWORD bytes_used = 0, property_count = 0;
     if (!EvtRender(log->render_context, log->bookmark, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
         // information exceeds the allocated space
         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed");
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, render_context: 0x%lx, bookmark: 0x%lx, content: 0x%lx, size: %zu, extended info: %s",
+                   (uintptr_t)log->render_context, (uintptr_t)log->bookmark, (uintptr_t)log->ops.content.data, log->ops.content.size, wevt_extended_status());
             goto cleanup;
         }
 
@@ -218,7 +231,8 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
         log->ops.content.data = (EVT_VARIANT *)mallocz(log->ops.content.size);
 
         if (!EvtRender(log->render_context, log->bookmark, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, after bytes_used increase");
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, after bytes_used increase, extended info: %s",
+                   wevt_extended_status());
             goto cleanup;
         }
     }
@@ -248,7 +262,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
         wevt_get_sid_by_type(log, FIELD_USER_ID, &log->ops.user);
 
         PROVIDER_META_HANDLE *p = log->publisher =
-                publisher_get(ev->provider, log->ops.content.data[FIELD_PROVIDER_NAME].StringVal);
+            publisher_get(ev->provider, log->ops.content.data[FIELD_PROVIDER_NAME].StringVal);
 
         if(!field_cache_get(WEVT_FIELD_TYPE_LEVEL, ev->provider, ev->level, &log->ops.level)) {
             wevt_get_level_utf8(log, publisher_handle(p), log->bookmark, &log->ops.level);
@@ -277,13 +291,82 @@ cleanup:
     return ret;
 }
 
+bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
+    DWORD size = full ? BATCH_NEXT_EVENT : 1;
+    DWORD max_failures = 10;
+
+    fatal_assert(log && log->event_query && log->render_context);
+
+    while(max_failures > 0) {
+        if (log->batch.used >= log->batch.size) {
+            log->batch.size = 0;
+            log->batch.used = 0;
+            DWORD err = 0;
+            if(!EvtNext(log->event_query, size, log->batch.bk, INFINITE, 0, &log->batch.size)) {
+                err = GetLastError();
+                if(err == ERROR_NO_MORE_ITEMS)
+                    return false; // no data available, return failure
+            }
+
+            if(!log->batch.size) {
+                if(size == 1) {
+                    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                           "EvtNext() failed, event_query: 0x%lx, size: %zu, extended info: %s",
+                           (uintptr_t)log->event_query, (size_t)size, wevt_extended_status());
+                    return false;
+                }
+
+                // EvtNext() returns true when it can full the array
+                // so, let's retry with a smaller array.
+                size /= 2;
+                if(size < 1) size = 1;
+                continue;
+            }
+        }
+
+        log->query_stats.event_count++;
+        log->log_stats.event_count++;
+
+        // cleanup any previous event data
+        wevt_event_done(log);
+
+        log->bookmark = log->batch.bk[log->batch.used];
+        log->batch.bk[log->batch.used] = NULL;
+        log->batch.used++;
+
+        if(wevt_get_next_event_one(log, ev, full))
+            return true;
+        else {
+            log->query_stats.failed_count++;
+            log->log_stats.failed_count++;
+            max_failures--;
+        }
+    }
+
+    return false;
+}
+
 void wevt_query_done(WEVT_LOG *log) {
+    // close the last working bookmark
     wevt_event_done(log);
+
+    // close all batched bookmarks
+    for(DWORD i = log->batch.used; i < log->batch.size ;i++) {
+        if(log->batch.bk[i])
+            EvtClose(log->batch.bk[i]);
+
+        log->batch.bk[i] = NULL;
+    }
+    log->batch.used = 0;
+    log->batch.size = 0;
 
     if (log->event_query) {
         EvtClose(log->event_query);
         log->event_query = NULL;
     }
+
+    log->query_stats.event_count = 0;
+    log->query_stats.failed_count = 0;
 }
 
 void wevt_closelog6(WEVT_LOG *log) {
@@ -317,12 +400,14 @@ bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, EVT_RETENTION
     // we have to get it from the first EventRecordID
 
     // query the eventlog
-    log->event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath);
+    log->event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath | EvtQueryForwardDirection);
     if (!log->event_query) {
         if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, channel '%s' not found, cannot get retention", channel2utf8(channel));
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() for retention failed, channel '%s' not found, cannot get retention, extended info: %s",
+                   channel2utf8(channel), wevt_extended_status());
         else
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() on channel '%s' failed, cannot get retention", channel2utf8(channel));
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() for retention on channel '%s' failed, cannot get retention, extended info: %s",
+                   channel2utf8(channel), wevt_extended_status());
 
         goto cleanup;
     }
@@ -341,9 +426,11 @@ bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, EVT_RETENTION
     log->event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath | EvtQueryReverseDirection);
     if (!log->event_query) {
         if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, channel '%s' not found", channel2utf8(channel));
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() for retention failed, channel '%s' not found, extended info: %s",
+                   channel2utf8(channel), wevt_extended_status());
         else
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() on channel '%s' failed", channel2utf8(channel));
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() for retention on channel '%s' failed, extended info: %s",
+                   channel2utf8(channel), wevt_extended_status());
 
         goto cleanup;
     }
@@ -382,7 +469,7 @@ WEVT_LOG *wevt_openlog6(void) {
     // create the system render
     log->render_context = EvtCreateRenderContext(RENDER_ITEMS_count, RENDER_ITEMS, EvtRenderContextValues);
     if (!log->render_context) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed.");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed, extended info: %s", wevt_extended_status());
         freez(log);
         log = NULL;
         goto cleanup;
@@ -401,13 +488,15 @@ static uint64_t wevt_log_file_size(const wchar_t *channel) {
     // Open the event log channel
     hLog = EvtOpenLog(NULL, channel, EvtOpenChannelPath);
     if (!hLog) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtOpenLog() on channel '%s' failed", channel2utf8(channel));
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtOpenLog() on channel '%s' failed, extended info: %s",
+               channel2utf8(channel), wevt_extended_status());
         goto cleanup;
     }
 
     // Get the file size of the log
     if (!EvtGetLogInfo(hLog, EvtLogFileSize, sizeof(evtVariant), &evtVariant, &bufferUsed)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetLogInfo() on channel '%s' failed", channel2utf8(channel));
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetLogInfo() on channel '%s' failed, extended info: %s",
+               channel2utf8(channel), wevt_extended_status());
         goto cleanup;
     }
 
@@ -421,15 +510,19 @@ cleanup:
     return file_size;
 }
 
-EVT_HANDLE wevt_query(LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS direction) {
-    EVT_HANDLE hQuery = EvtQuery(NULL, channel, query, EvtQueryChannelPath | (direction & (EvtQueryReverseDirection | EvtQueryForwardDirection)));
+bool wevt_query(WEVT_LOG *log, LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS direction) {
+    wevt_query_done(log);
+    log->log_stats.queries_count++;
+
+    EVT_HANDLE hQuery = EvtQuery(NULL, channel, query, EvtQueryChannelPath | (direction & (EvtQueryReverseDirection | EvtQueryForwardDirection)) | EvtQueryTolerateQueryErrors);
     if (!hQuery) {
-        wchar_t wbuf[1024];
-        DWORD wbuf_used;
-        EvtGetExtendedStatus(sizeof(wbuf), wbuf, &wbuf_used);
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, query: %s | extended info: %ls",
-               query2utf8(query), wbuf);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, query: %s | extended info: %s",
+               query2utf8(query), wevt_extended_status());
+
+        log->log_stats.queries_failed++;
+        return false;
     }
 
-    return hQuery;
+    log->event_query = hQuery;
+    return true;
 }
