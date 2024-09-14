@@ -83,33 +83,21 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
                                                hNetdatawnd, (HMENU)IDC_EDIT_CONFIG,
                                                NULL, NULL);
 
-            hwndReopenLogs = CreateWindowExW(0, L"BUTTON", L"Reopen Logs",
-                                             WS_CHILD | WS_VISIBLE,
-                                             20, 100, 120, 30,
-                                             hNetdatawnd, (HMENU)IDC_REOPEN_LOGS,
-                                             NULL, NULL);
-
-            hwndSaveDatabase = CreateWindowExW(0, L"BUTTON", L"Save Database",
-                                               WS_CHILD | WS_VISIBLE,
-                                               20, 60, 120, 30,
-                                               hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
-                                               NULL, NULL);
-
             hwndStopService = CreateWindowExW(0, L"BUTTON", L"Stop Service",
                                               WS_CHILD | WS_VISIBLE,
                                               280, 60, 120, 30,
-                                              hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
+                                              hNetdatawnd, (HMENU)IDC_STOP_SERVICE,
                                               NULL, NULL);
 
             hwndOpenMsys = CreateWindowExW(0, L"BUTTON", L"Open terminal",
                                            WS_CHILD | WS_VISIBLE,
-                                           280, 100, 120, 30,
+                                           20, 60, 120, 30,
                                            hNetdatawnd, (HMENU)IDC_OPEN_MSYS,
                                            NULL, NULL);
 
             hwndExit = CreateWindowExW(0, L"BUTTON", L"Exit",
                                        WS_CHILD | WS_VISIBLE,
-                                       140, 140, 120, 30,
+                                       140, 100, 120, 30,
                                        hNetdatawnd, (HMENU)IDC_CLOSE_WINDOW,
                                        NULL, NULL);
             break;
@@ -142,16 +130,6 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
                     }
                     case IDC_EDIT_CONFIG: {
                         netdata_cli_run_specific_command(L"\\bash.exe -l -c \"cd /etc/netdata; ./edit-config; $SHELL\"",
-                                                         FALSE);
-                        break;
-                    }
-                    case IDC_REOPEN_LOGS: {
-                        netdata_cli_run_specific_command(L"\\bash.exe -l -c \"netdatacli reopen-logs; export CURRRET=`echo $?`; exit $CURRRET\"",
-                                                         FALSE);
-                        break;
-                    }
-                    case IDC_SAVE_DATABASE: {
-                        netdata_cli_run_specific_command(L"\\bash.exe -l -c \"netdatacli save-database; export CURRRET=`echo $?`; exit $CURRRET\"",
                                                          FALSE);
                         break;
                     }
@@ -213,7 +191,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                                   L"Netdata Client",
                                   WS_OVERLAPPEDWINDOW,
                                   CW_USEDEFAULT, CW_USEDEFAULT,
-                                  440, 250,
+                                  440, 200,
                                   HWND_DESKTOP,
                                   NULL,
                                   hInstance,
