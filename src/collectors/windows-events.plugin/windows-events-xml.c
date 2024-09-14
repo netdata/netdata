@@ -295,7 +295,7 @@ static void print_value_cb(BUFFER *buffer, const char *prefix, const char *start
     buffer_fast_strcat(buffer, start, end - start);
 }
 
-bool buffer_extract_and_print_value(BUFFER *buffer, const char *xml, size_t xml_len, const char *prefix, const char *keys[]) {
+bool buffer_xml_extract_and_print_value(BUFFER *buffer, const char *xml, size_t xml_len, const char *prefix, const char *keys[]) {
     return buffer_extract_and_print_xml_with_cb(
         buffer, xml, xml_len,
         prefix, keys,

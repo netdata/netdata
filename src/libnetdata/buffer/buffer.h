@@ -563,6 +563,12 @@ static inline void buffer_print_uint64_hex(BUFFER *wb, uint64_t value) {
     buffer_overflow_check(wb);
 }
 
+static inline void buffer_print_uint64_hex_full(BUFFER *wb, uint64_t value) {
+    buffer_need_bytes(wb, UINT64_HEX_MAX_LENGTH);
+    wb->len += print_uint64_hex_full(&wb->buffer[wb->len], value);
+    buffer_overflow_check(wb);
+}
+
 #define UINT64_B64_MAX_LENGTH ((sizeof(IEEE754_UINT64_B64_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 1)
 static inline void buffer_print_uint64_base64(BUFFER *wb, uint64_t value) {
     buffer_need_bytes(wb, UINT64_B64_MAX_LENGTH);
