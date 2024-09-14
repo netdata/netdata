@@ -82,7 +82,7 @@ jobs:
 ```
 
 Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system. Netdata should pick up your web server's access log and
+method](/docs/netdata-agent/start-stop-restart.md)) for your system. Netdata should pick up your web server's access log and
 begin showing real-time charts!
 
 ### Custom log formats and fields

@@ -19,11 +19,7 @@ changes reflected in those visualizations due to the way Netdata Cloud proxies m
 
 ### Increase the long-term metrics retention period
 
-Read our doc
-on [increasing long-term metrics storage](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md)
-for details, including a
-[calculator](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
-to help you determine the exact settings for your desired retention period.
+Read our doc on [increasing long-term metrics storage](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md) for details.
 
 ### Reduce the data collection frequency
 
