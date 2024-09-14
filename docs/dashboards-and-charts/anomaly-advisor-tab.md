@@ -3,9 +3,9 @@
 The Anomaly Advisor tab lets you focus on potentially anomalous metrics and charts related to a particular highlighted window of interest. In addition to this tab, each chart in the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) also has an [Anomaly Rate ribbon](/docs/dashboards-and-charts/netdata-charts.md#anomaly-rate-ribbon). 
 
 
-More details about configuration can be found in the [ML documentation](/src/ml/README.md#configuration).
+More details about configuration can be found in the [ML documentation](/src/ml/README.md).
 
-This tab uses our [Anomaly Rate ML feature](/src/ml/README.md#anomaly-rate---averageanomaly-bit) to score metrics in terms of anomalous behavior.
+This tab uses our [Anomaly Rate ML feature](/src/ml/README.md#anomaly-bit) to score metrics in terms of anomalous behavior.
 
 - The "Anomaly Rate" chart shows the percentage of anomalous metrics over time per node.
 

@@ -45,7 +45,7 @@ At the bottom of the panel you can click the green button "View alert page" to o
 
 ### Silence an alert
 
-From this tab, the "Silencing" column shows if there is any rule present for each alert, and from the "Actions" column you can create a new [silencing rule](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#alert-notifications-silencing-rules) for this alert, or get help and information about this alert from the [Netdata Assistant](/docs/netdata-assistant.md).
+From this tab, the "Silencing" column shows if there is any rule present for each alert, and from the "Actions" column you can create a new [silencing rule](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#alert-notification-silencing-rules) for this alert, or get help and information about this alert from the [Netdata Assistant](/docs/netdata-assistant.md).
 
 ## Alert Configurations tab
 

@@ -46,7 +46,7 @@ If you want to minimize the gap in metrics caused by stopping the Netdata Agent,
 
 ### Restoring Netdata
 
-1. Ensure that the Netdata agent is installed and is [stopped](/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
+1. Ensure that the Netdata agent is installed and is [stopped](/docs/netdata-agent/start-stop-restart.md))
 
    If you plan to deploy the Agent and restore a backup on top of it, then you might find it helpful to use the [`--dont-start-it`](/packaging/installer/methods/kickstart.md#other-options) option upon installation.
 
@@ -67,4 +67,4 @@ If you want to minimize the gap in metrics caused by stopping the Netdata Agent,
     sudo tar -xvpzf /path/to/netdata_backup.tar.gz -C /
     ```
 
-3. [Start the Netdata agent](/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
+3. [Start the Netdata agent](/docs/netdata-agent/start-stop-restart.md))
