@@ -51,7 +51,7 @@ func (c *ClickHouse) collectSystemParts(mx map[string]int64) error {
 
 	var database, table string
 
-	err := c.doOKDecodeCSV(req, func(column, value string, lineEnd bool) {
+	err := c.doHTTP(req, func(column, value string, lineEnd bool) {
 		switch column {
 		case "database":
 			database = value

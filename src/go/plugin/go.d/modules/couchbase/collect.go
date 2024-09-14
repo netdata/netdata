@@ -3,9 +3,7 @@
 package couchbase
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -118,28 +116,11 @@ func (cb *Couchbase) scrapeCouchbase() (*cbMetrics, error) {
 	req.URL.RawQuery = url.Values{"skipMap": []string{"true"}}.Encode()
 
 	ms := &cbMetrics{}
-	if err := cb.doOKDecode(req, &ms.BucketsBasicStats); err != nil {
+	if err := web.DoHTTP(cb.httpClient).RequestJSON(req, &ms.BucketsBasicStats); err != nil {
 		return nil, err
 	}
+
 	return ms, nil
-}
-
-func (cb *Couchbase) doOKDecode(req *http.Request, in interface{}) error {
-	resp, err := cb.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
-	}
-
-	defer web.CloseBody(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {
-		return fmt.Errorf("error on decoding response from '%s': %v", req.URL, err)
-	}
-	return nil
 }
 
 func indexDimID(name, metric string) string {

@@ -123,10 +123,12 @@ func (cdb *CouchDB) scrapeNodeStats(ms *cdbMetrics) {
 	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, fmt.Sprintf(urlPathOverviewStats, cdb.Config.Node))
 
 	var stats cdbNodeStats
-	if err := cdb.doOKDecode(req, &stats); err != nil {
+
+	if err := cdb.client().RequestJSON(req, &stats); err != nil {
 		cdb.Warning(err)
 		return
 	}
+
 	ms.NodeStats = &stats
 }
 
@@ -134,10 +136,12 @@ func (cdb *CouchDB) scrapeSystemStats(ms *cdbMetrics) {
 	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, fmt.Sprintf(urlPathSystemStats, cdb.Config.Node))
 
 	var stats cdbNodeSystem
-	if err := cdb.doOKDecode(req, &stats); err != nil {
+
+	if err := cdb.client().RequestJSON(req, &stats); err != nil {
 		cdb.Warning(err)
 		return
 	}
+
 	ms.NodeSystem = &stats
 }
 
@@ -145,10 +149,12 @@ func (cdb *CouchDB) scrapeActiveTasks(ms *cdbMetrics) {
 	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, urlPathActiveTasks)
 
 	var stats []cdbActiveTask
-	if err := cdb.doOKDecode(req, &stats); err != nil {
+
+	if err := cdb.client().RequestJSON(req, &stats); err != nil {
 		cdb.Warning(err)
 		return
 	}
+
 	ms.ActiveTasks = stats
 }
 
@@ -170,10 +176,12 @@ func (cdb *CouchDB) scrapeDBStats(ms *cdbMetrics) {
 	req.Body = io.NopCloser(bytes.NewReader(body))
 
 	var stats []cdbDBStats
-	if err := cdb.doOKDecode(req, &stats); err != nil {
+
+	if err := cdb.client().RequestJSON(req, &stats); err != nil {
 		cdb.Warning(err)
 		return
 	}
+
 	ms.DBStats = stats
 }
 
@@ -196,7 +204,8 @@ func (cdb *CouchDB) pingCouchDB() error {
 	req, _ := web.NewHTTPRequest(cdb.RequestConfig)
 
 	var info struct{ Couchdb string }
-	if err := cdb.doOKDecode(req, &info); err != nil {
+
+	if err := cdb.client().RequestJSON(req, &info); err != nil {
 		return err
 	}
 
@@ -207,30 +216,17 @@ func (cdb *CouchDB) pingCouchDB() error {
 	return nil
 }
 
-func (cdb *CouchDB) doOKDecode(req *http.Request, in interface{}) error {
-	resp, err := cdb.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
-	}
-
-	defer web.CloseBody(resp)
-
-	if resp.StatusCode != http.StatusOK {
+func (cdb *CouchDB) client() *web.Client {
+	return web.DoHTTP(cdb.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
 		var msg struct {
 			Error  string `json:"error"`
 			Reason string `json:"reason"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&msg); err == nil && msg.Error != "" {
-			return fmt.Errorf("'%s' returned HTTP status code: %d (err '%s', reason '%s')",
-				req.URL, resp.StatusCode, msg.Error, msg.Reason)
+			return false, fmt.Errorf("error '%s', reason '%s'", msg.Error, msg.Reason)
 		}
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {
-		return fmt.Errorf("error on decoding response from '%s': %v", req.URL, err)
-	}
-	return nil
+		return false, nil
+	})
 }
 
 func merge(dst, src map[string]int64, prefix string) {

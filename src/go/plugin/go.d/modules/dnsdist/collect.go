@@ -3,9 +3,6 @@
 package dnsdist
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
 	"net/url"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
@@ -41,29 +38,10 @@ func (d *DNSdist) scrapeStatistics() (*statisticMetrics, error) {
 	}
 	req.URL.RawQuery = url.Values{"command": []string{"stats"}}.Encode()
 
-	var statistics statisticMetrics
-	if err := d.doOKDecode(req, &statistics); err != nil {
+	var stats statisticMetrics
+	if err := web.DoHTTP(d.httpClient).RequestJSON(req, &stats); err != nil {
 		return nil, err
 	}
 
-	return &statistics, nil
-}
-
-func (d *DNSdist) doOKDecode(req *http.Request, in interface{}) error {
-	resp, err := d.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
-	}
-
-	defer web.CloseBody(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {
-		return fmt.Errorf("error on decoding response from '%s': %v", req.URL, err)
-	}
-
-	return nil
+	return &stats, nil
 }

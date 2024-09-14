@@ -227,14 +227,14 @@ func (j *Job) AutoDetection() (err error) {
 	}
 
 	if err = j.init(); err != nil {
-		j.Error("init failed")
+		j.Errorf("init failed: %v", err)
 		j.Unmute()
 		j.disableAutoDetection()
 		return err
 	}
 
 	if err = j.check(); err != nil {
-		j.Error("check failed")
+		j.Errorf("check failed: %v", err)
 		j.Unmute()
 		return err
 	}
@@ -243,7 +243,7 @@ func (j *Job) AutoDetection() (err error) {
 	j.Info("check success")
 
 	if err = j.postCheck(); err != nil {
-		j.Error("postCheck failed")
+		j.Errorf("postCheck failed: %v", err)
 		j.disableAutoDetection()
 		return err
 	}

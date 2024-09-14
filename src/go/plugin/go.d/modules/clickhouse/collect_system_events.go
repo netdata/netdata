@@ -25,7 +25,7 @@ func (c *ClickHouse) collectSystemEvents(mx map[string]int64) error {
 	var event string
 	var n int
 
-	err := c.doOKDecodeCSV(req, func(column, value string, lineEnd bool) {
+	err := c.doHTTP(req, func(column, value string, lineEnd bool) {
 		switch column {
 		case "event":
 			event = value

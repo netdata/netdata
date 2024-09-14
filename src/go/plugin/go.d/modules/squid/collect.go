@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -44,10 +43,10 @@ func (s *Squid) collect() (map[string]int64, error) {
 func (s *Squid) collectCounters(mx map[string]int64) error {
 	req, err := web.NewHTTPRequestWithPath(s.RequestConfig, urlPathServerStats)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create '%s' request: %w", urlPathServerStats, err)
 	}
 
-	if err := s.doOK(req, func(body io.Reader) error {
+	return web.DoHTTP(s.httpClient).Request(req, func(body io.Reader) error {
 		sc := bufio.NewScanner(body)
 
 		for sc.Scan() {
@@ -70,29 +69,10 @@ func (s *Squid) collectCounters(mx map[string]int64) error {
 
 			mx[key] = v
 		}
+
+		if len(mx) == 0 {
+			return fmt.Errorf("unexpected response from '%s': no metrics found", req.URL)
+		}
 		return nil
-	}); err != nil {
-		return err
-	}
-
-	if len(mx) == 0 {
-		return fmt.Errorf("unexpected response from '%s': no metrics found", req.URL)
-	}
-
-	return nil
-}
-
-func (s *Squid) doOK(req *http.Request, parse func(body io.Reader) error) error {
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
-	}
-
-	defer web.CloseBody(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
-	}
-
-	return parse(resp.Body)
+	})
 }

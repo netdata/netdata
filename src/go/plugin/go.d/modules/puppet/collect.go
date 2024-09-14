@@ -3,9 +3,7 @@
 package puppet
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
@@ -38,7 +36,7 @@ func (p *Puppet) queryStatsService() (*statusServiceResponse, error) {
 	req.URL.RawQuery = urlQueryStatusService
 
 	var stats statusServiceResponse
-	if err := p.doOKDecode(req, &stats); err != nil {
+	if err := web.DoHTTP(p.httpClient).RequestJSON(req, &stats); err != nil {
 		return nil, err
 	}
 
@@ -47,22 +45,4 @@ func (p *Puppet) queryStatsService() (*statusServiceResponse, error) {
 	}
 
 	return &stats, nil
-}
-
-func (p *Puppet) doOKDecode(req *http.Request, in interface{}) error {
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
-	}
-
-	defer web.CloseBody(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {
-		return fmt.Errorf("error on decoding response from '%s': %v", req.URL, err)
-	}
-	return nil
 }

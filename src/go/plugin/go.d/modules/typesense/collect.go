@@ -59,7 +59,7 @@ func (ts *Typesense) collectHealth(mx map[string]int64) error {
 	}
 
 	var resp healthResponse
-	if err := ts.doOKDecode(req, &resp); err != nil {
+	if err := ts.client().RequestJSON(req, &resp); err != nil {
 		return err
 	}
 
@@ -95,8 +95,8 @@ func (ts *Typesense) collectStats(mx map[string]int64) error {
 	req.Header.Set("X-TYPESENSE-API-KEY", ts.APIKey)
 
 	var resp statsResponse
-	if err := ts.doOKDecode(req, &resp); err != nil {
-		if !isStatusUnauthorized(err) {
+	if err := ts.client().RequestJSON(req, &resp); err != nil {
+		if !strings.Contains(err.Error(), "code: 401") {
 			return err
 		}
 
@@ -115,32 +115,15 @@ func (ts *Typesense) collectStats(mx map[string]int64) error {
 	return nil
 }
 
-func (ts *Typesense) doOKDecode(req *http.Request, in interface{}) error {
-	resp, err := ts.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
-	}
-
-	defer web.CloseBody(resp)
-
-	if resp.StatusCode != http.StatusOK {
+func (ts *Typesense) client() *web.Client {
+	return web.DoHTTP(ts.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
 		// {"message": "Forbidden - a valid `x-typesense-api-key` header must be sent."}
 		var msg struct {
 			Msg string `json:"message"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&msg); err == nil && msg.Msg != "" {
-			return fmt.Errorf("'%s' returned HTTP status code: %d (msg: '%s')",
-				req.URL, resp.StatusCode, msg.Msg)
+			return false, fmt.Errorf("msg: '%s'", msg.Msg)
 		}
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(in); err != nil {
-		return fmt.Errorf("error on decoding response from '%s': %v", req.URL, err)
-	}
-	return nil
-}
-
-func isStatusUnauthorized(err error) bool {
-	return strings.Contains(err.Error(), "code: 401")
+		return false, nil
+	})
 }

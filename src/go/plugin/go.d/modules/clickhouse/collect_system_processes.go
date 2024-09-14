@@ -19,7 +19,7 @@ func (c *ClickHouse) collectLongestRunningQueryTime(mx map[string]int64) error {
 	req, _ := web.NewHTTPRequest(c.RequestConfig)
 	req.URL.RawQuery = makeURLQuery(queryLongestQueryTime)
 
-	return c.doOKDecodeCSV(req, func(column, value string, lineEnd bool) {
+	return c.doHTTP(req, func(column, value string, lineEnd bool) {
 		if column == "value" {
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
 				mx["LongestRunningQueryTime"] = int64(v * precision)

@@ -3,10 +3,7 @@
 package tomcat
 
 import (
-	"encoding/xml"
 	"errors"
-	"fmt"
-	"net/http"
 	"net/url"
 	"strings"
 
@@ -95,28 +92,9 @@ func (t *Tomcat) queryServerStatus() (*serverStatusResponse, error) {
 	req.URL.RawQuery = urlQueryServerStatus
 
 	var status serverStatusResponse
-
-	if err := t.doOKDecode(req, &status); err != nil {
+	if err := web.DoHTTP(t.httpClient).RequestXML(req, &status); err != nil {
 		return nil, err
 	}
 
 	return &status, nil
-}
-
-func (t *Tomcat) doOKDecode(req *http.Request, in interface{}) error {
-	resp, err := t.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error on HTTP request '%s': %v", req.URL, err)
-	}
-	defer web.CloseBody(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("'%s' returned HTTP status code: %d", req.URL, resp.StatusCode)
-	}
-
-	if err := xml.NewDecoder(resp.Body).Decode(in); err != nil {
-		return fmt.Errorf("error decoding XML response from '%s': %v", req.URL, err)
-	}
-
-	return nil
 }
