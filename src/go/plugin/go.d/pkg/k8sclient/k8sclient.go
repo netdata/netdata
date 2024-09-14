@@ -27,7 +27,7 @@ func New(userAgent string) (kubernetes.Interface, error) {
 
 	switch {
 	case os.Getenv(EnvFakeClient) != "":
-		return fake.NewSimpleClientset(), nil
+		return fake.NewClientset(), nil
 	case os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_SERVICE_PORT") != "":
 		return newInCluster(userAgent)
 	default:

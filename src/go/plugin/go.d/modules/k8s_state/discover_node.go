@@ -16,7 +16,8 @@ func newNodeDiscoverer(si cache.SharedInformer, l *logger.Logger) *nodeDiscovere
 		panic("nil node shared informer")
 	}
 
-	queue := workqueue.NewWithConfig(workqueue.QueueConfig{Name: "node"})
+	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{Name: "node"})
+
 	_, _ = si.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj any) { enqueue(queue, obj) },
 		UpdateFunc: func(_, obj any) { enqueue(queue, obj) },
@@ -44,7 +45,7 @@ func (r nodeResource) value() any             { return r.val }
 type nodeDiscoverer struct {
 	*logger.Logger
 	informer cache.SharedInformer
-	queue    *workqueue.Type
+	queue    *workqueue.Typed[any]
 	readyCh  chan struct{}
 	stopCh   chan struct{}
 }

@@ -132,7 +132,7 @@ func (d *kubeDiscovery) setupDiscoverers(ctx context.Context) []discoverer {
 	}
 }
 
-func enqueue(queue *workqueue.Type, obj any) {
+func enqueue(queue *workqueue.Typed[any], obj any) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return
