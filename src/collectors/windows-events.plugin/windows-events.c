@@ -201,7 +201,7 @@ static inline void wevt_facets_register_bin_data(WEVT_LOG *log, FACETS *facets) 
     facets_row_bin_data_set(facets, wevt_cleanup_bin_data, d);
 }
 
-void wevt_render_xml(
+static void wevt_render_xml(
         FACETS *facets,
         BUFFER *json_array,
         FACET_ROW_KEY_VALUE *rkv __maybe_unused,
@@ -220,7 +220,7 @@ void wevt_render_xml(
         buffer_json_add_array_item_string(json_array, d->log->ops.xml.data);
 }
 
-void wevt_render_message(
+static void wevt_render_message(
         FACETS *facets,
         BUFFER *json_array,
         FACET_ROW_KEY_VALUE *rkv __maybe_unused,
@@ -237,80 +237,6 @@ void wevt_render_message(
         buffer_json_add_array_item_string(json_array, "Failed to extract Event Message from the Events Log");
     else
         buffer_json_add_array_item_string(json_array, d->log->ops.event.data);
-}
-
-void wevt_render_message2(
-    FACETS *facets __maybe_unused,
-    BUFFER *json_array,
-    FACET_ROW_KEY_VALUE *rkv,
-    FACET_ROW *row,
-    void *data __maybe_unused) {
-
-    buffer_flush(rkv->wb);
-
-    const FACET_ROW_KEY_VALUE *xml_rkv = dictionary_get(row->dict, WEVT_FIELD_XML);
-
-    {
-        bool added_message = false;
-
-        if(xml_rkv && buffer_strlen(xml_rkv->wb)) {
-            const char *message_path[] = {
-                "RenderingInfo",
-                "Message",
-                NULL};
-
-            added_message = buffer_xml_extract_and_print_value(
-                    rkv->wb,
-                    buffer_tostring(xml_rkv->wb),
-                    buffer_strlen(xml_rkv->wb),
-                    NULL,
-                    message_path) && buffer_strlen(rkv->wb) > 0;
-        }
-
-        if(!added_message) {
-            const FACET_ROW_KEY_VALUE *event_id_rkv = dictionary_get(row->dict, WEVT_FIELD_EVENTID);
-            if (event_id_rkv && buffer_strlen(event_id_rkv->wb)) {
-                buffer_fast_strcat(rkv->wb, "Event ", 6);
-                buffer_fast_strcat(rkv->wb, buffer_tostring(event_id_rkv->wb), buffer_strlen(event_id_rkv->wb));
-            } else
-                buffer_strcat(rkv->wb, "Unknown EventID ");
-
-            const FACET_ROW_KEY_VALUE *provider_rkv = dictionary_get(row->dict, WEVT_FIELD_PROVIDER);
-            if (provider_rkv && buffer_strlen(provider_rkv->wb)) {
-                buffer_fast_strcat(rkv->wb, " of ", 4);
-                buffer_fast_strcat(rkv->wb, buffer_tostring(provider_rkv->wb), buffer_strlen(provider_rkv->wb));
-                buffer_putc(rkv->wb, '.');
-            } else
-                buffer_strcat(rkv->wb, "of unknown Provider.");
-
-            if(xml_rkv && buffer_strlen(xml_rkv->wb)) {
-                const char *event_path[] = {
-                        "EventData",
-                        NULL
-                };
-                bool added_event_data = buffer_extract_and_print_xml(
-                        rkv->wb,
-                        buffer_tostring(xml_rkv->wb), buffer_strlen(xml_rkv->wb),
-                        "\n\nRelated event data:\n",
-                        event_path);
-
-                const char *user_path[] = {
-                        "UserData",
-                        NULL
-                };
-                bool added_user_data = buffer_extract_and_print_xml(
-                        rkv->wb,
-                        buffer_tostring(xml_rkv->wb), buffer_strlen(xml_rkv->wb),
-                        "\n\nRelated user data:\n",
-                        user_path);
-
-                if(!added_event_data && !added_user_data)
-                    buffer_strcat(rkv->wb, " Without any related data.");
-            }
-        }
-    }
-
-    buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
 }
 
 static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
@@ -392,10 +318,6 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             facets, WEVT_FIELD_XML,
             FACET_KEY_OPTION_NEVER_FACET,
             wevt_render_xml, NULL);
-
-//    facets_register_key_name(
-//        facets, WEVT_FIELD_XML,
-//        FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_FTS);
 }
 
 static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUERY_SOURCE *src, usec_t *msg_ut __maybe_unused, WEVT_EVENT *e) {
