@@ -1133,6 +1133,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [NGINX Plus](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/nginxplus/integrations/nginx_plus.md)
 
+- [NGINX Unit](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/nginxunit/integrations/nginx_unit.md)
+
 - [NGINX VTS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/nginxvts/integrations/nginx_vts.md)
 
 - [NGINX](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/nginx/integrations/nginx.md)
