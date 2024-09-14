@@ -113,6 +113,10 @@ modules:
               description: Time series per metric (metric name) limit. Metrics with number of time series > limit are skipped.
               default_value: 200
               required: false
+            - name: label_prefix
+              description: "An optional prefix that will be added to all labels of all charts. If set, the label names will be automatically formatted as `prefix_name` (the prefix followed by an underscore and the original name)."
+              default_value: ""
+              required: false
             - name: timeout
               description: HTTP request timeout.
               default_value: 10
