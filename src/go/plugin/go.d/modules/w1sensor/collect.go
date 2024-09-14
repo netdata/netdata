@@ -72,7 +72,7 @@ func readW1sensorTemperature(filename string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	sc := bufio.NewScanner(file)
 	sc.Scan()

@@ -103,7 +103,7 @@ func (p *prometheus) fetch(w io.Writer) error {
 		if err != nil {
 			return err
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		_, err = io.Copy(w, f)
 
