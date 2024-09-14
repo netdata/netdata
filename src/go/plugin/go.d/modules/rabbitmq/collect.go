@@ -80,7 +80,7 @@ func (r *RabbitMQ) collectNodeStats(mx map[string]int64) error {
 	for k, v := range stm.ToMap(stats) {
 		mx[k] = v
 	}
-	mx["proc_available"] = int64(stats.ProcTotal - stats.ProcUsed)
+	mx["proc_available"] = stats.ProcTotal - stats.ProcUsed
 
 	return nil
 }
