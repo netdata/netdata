@@ -31,9 +31,15 @@ static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root)
         MessageBoxW(NULL, L"Cannot find binary.", L"Error", MB_OK|MB_ICONERROR);
         return;
     }
-    if (root && wcsstr(localPath, L"\\usr\\bin")) {
+    wchar_t *hasUsr = wcsstr(localPath, L"\\usr\\bin");
+    if (hasUsr && root) {
         // Remove usr\bin
         length -= 8;
+    }
+
+    if (!hasUsr && !root) {
+        wcscpy(&localPath[length], L"\\usr\\bin");
+        length += 8;
     }
     wcscpy(&localPath[length], cmd);
 
@@ -42,6 +48,8 @@ static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root)
 
     ZeroMemory( &si, sizeof(si) );
     si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_MAXIMIZE;
     ZeroMemory( &pi, sizeof(pi) );
 
     if(!CreateProcess(NULL, localPath, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi )) {
@@ -71,7 +79,7 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
 
             hwndReloadLabels = CreateWindowExW(0, L"BUTTON", L"Run edit-config",
                                                WS_CHILD | WS_VISIBLE,
-                                               20, 60, 120, 30,
+                                               280, 20, 120, 30,
                                                hNetdatawnd, (HMENU)IDC_EDIT_CONFIG,
                                                NULL, NULL);
 
@@ -83,7 +91,7 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
 
             hwndSaveDatabase = CreateWindowExW(0, L"BUTTON", L"Save Database",
                                                WS_CHILD | WS_VISIBLE,
-                                               280, 20, 120, 30,
+                                               20, 60, 120, 30,
                                                hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
                                                NULL, NULL);
 
@@ -133,7 +141,7 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
                         break;
                     }
                     case IDC_EDIT_CONFIG: {
-                        netdata_cli_run_specific_command(L"\\bash.exe -l -c \"netdatacli reload-labels; export CURRRET=`echo $?`; exit $CURRRET\"",
+                        netdata_cli_run_specific_command(L"\\bash.exe -l -c \"cd /etc/netdata; ./edit-config; $SHELL\"",
                                                          FALSE);
                         break;
                     }
