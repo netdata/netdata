@@ -256,6 +256,7 @@ struct facets {
     } keys_in_row;
 
     FACET_ROW *base;    // double linked list of the selected facets rows
+    FACET_ROW_BIN_DATA bin_data;
 
     uint32_t items_to_return;
     uint32_t max_items_to_return;
@@ -329,6 +330,10 @@ struct facets {
         struct {
             size_t searches;
         } fts;
+
+        struct {
+            size_t bin_data_inflight;
+        };
     } operations;
 
     struct {
@@ -1621,6 +1626,31 @@ static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k) {
 }
 
 // ----------------------------------------------------------------------------
+// bin_data management
+
+static inline void facets_row_bin_data_cleanup(FACETS *facets, FACET_ROW_BIN_DATA *bin_data) {
+    if(!bin_data->data)
+        return;
+
+    bin_data->cleanup_cb(bin_data->data);
+    *bin_data = FACET_ROW_BIN_DATA_EMPTY;
+
+    fatal_assert(facets->operations.bin_data_inflight > 0);
+    facets->operations.bin_data_inflight--;
+}
+
+void facets_row_bin_data_set(FACETS *facets, void (*cleanup_cb)(void *data), void *data) {
+    // in case the caller tries to register bin_data multiple times
+    // for the same row.
+    facets_row_bin_data_cleanup(facets, &facets->bin_data);
+
+    // set the new values
+    facets->bin_data.cleanup_cb = cleanup_cb;
+    facets->bin_data.data = data;
+    facets->operations.bin_data_inflight++;
+}
+
+// ----------------------------------------------------------------------------
 
 FACETS *facets_create(uint32_t items_to_return, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys) {
     FACETS *facets = callocz(1, sizeof(FACETS));
@@ -1661,6 +1691,13 @@ void facets_destroy(FACETS *facets) {
 
         facets_row_free(facets, r);
     }
+
+    // in case the caller did not call facets_row_finished()
+    // on the last row.
+    facets_row_bin_data_cleanup(facets, &facets->bin_data);
+
+    // make sure we didn't lose any data
+    fatal_assert(facets->operations.bin_data_inflight == 0);
 
     freez(facets->histogram.chart);
     freez(facets);
@@ -1959,7 +1996,9 @@ static void facet_row_key_value_delete_callback(const DICTIONARY_ITEM *item __ma
 // FACET_ROW management
 
 static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row) {
+    facets_row_bin_data_cleanup(facets, &row->bin_data);
     dictionary_destroy(row->dict);
+    row->dict = NULL;
     freez(row);
 }
 
@@ -1969,6 +2008,7 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
     if(into) {
         row = into;
         facets->operations.rows.reused++;
+        facets_row_bin_data_cleanup(facets, &row->bin_data);
     }
     else {
         row = callocz(1, sizeof(FACET_ROW));
@@ -1978,6 +2018,11 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
         dictionary_register_delete_callback(row->dict, facet_row_key_value_delete_callback, row);
         facets->operations.rows.created++;
     }
+
+    // copy the bin_data to the row
+    // and forget about them in facets
+    row->bin_data = facets->bin_data;
+    facets->bin_data = FACET_ROW_BIN_DATA_EMPTY;
 
     row->severity = facets->current_row.severity;
     row->usec = usec;
@@ -2163,6 +2208,8 @@ static void facets_reset_keys_with_value_and_row(FACETS *facets) {
     facets->current_row.keys_matched_by_query_positive = 0;
     facets->current_row.keys_matched_by_query_negative = 0;
     facets->keys_in_row.used = 0;
+
+    facets_row_bin_data_cleanup(facets, &facets->bin_data);
 }
 
 void facets_rows_begin(FACETS *facets) {

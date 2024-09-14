@@ -100,11 +100,11 @@ static void wevt_empty_utf8(TXT_UTF8 *dst) {
     dst->used = 1;
 }
 
-static bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
+static bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE bookmark, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
     DWORD size = 0;
 
     if(!log->ops.unicode.data) {
-        EvtFormatMessage(NULL, event_handle, 0, 0, NULL, what, 0, NULL, &size);
+        EvtFormatMessage(hMetadata, bookmark, 0, 0, NULL, what, 0, NULL, &size);
         if(!size) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() to get message size failed.");
             goto cleanup;
@@ -113,7 +113,7 @@ static bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UT
     }
 
     // First, try to get the message using the existing buffer
-    if (!EvtFormatMessage(NULL, event_handle, 0, 0, NULL, what, log->ops.unicode.size, log->ops.unicode.data, &size) || !log->ops.unicode.data) {
+    if (!EvtFormatMessage(hMetadata, bookmark, 0, 0, NULL, what, log->ops.unicode.size, log->ops.unicode.data, &size) || !log->ops.unicode.data) {
         if (log->ops.unicode.data && GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed.");
             goto cleanup;
@@ -121,7 +121,7 @@ static bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UT
 
         // Try again with the resized buffer
         txt_unicode_resize(&log->ops.unicode, size);
-        if (!EvtFormatMessage(NULL, event_handle, 0, 0, NULL, what, log->ops.unicode.size, log->ops.unicode.data, &size)) {
+        if (!EvtFormatMessage(hMetadata, bookmark, 0, 0, NULL, what, log->ops.unicode.size, log->ops.unicode.data, &size)) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed after resizing buffer.");
             goto cleanup;
         }
@@ -144,16 +144,28 @@ cleanup:
     return false;
 }
 
-static bool wevt_get_keyword_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
-    return wevt_get_message_utf8(log, event_handle, dst, what);
+static bool wevt_get_event_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
+    return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageEvent);
 }
 
-static bool wevt_get_opcode_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
-    return wevt_get_message_utf8(log, event_handle, dst, what);
+static bool wevt_get_level_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
+    return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageLevel);
 }
 
-static bool wevt_get_xml_utf8(WEVT_LOG *log, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    return wevt_get_message_utf8(log, event_handle, dst, EvtFormatMessageXml);
+static bool wevt_get_task_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
+    return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageTask);
+}
+
+static bool wevt_get_opcode_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
+    return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageOpcode);
+}
+
+static bool wevt_get_keywords_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
+    return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageKeyword);
+}
+
+static bool wevt_get_xml_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE bookmark, TXT_UTF8 *dst) {
+    return wevt_get_message_utf8(log, hMetadata, bookmark, dst, EvtFormatMessageXml);
 }
 
 static bool wevt_get_utf8_by_type(WEVT_LOG *log, size_t field, TXT_UTF8 *dst) {
@@ -178,261 +190,31 @@ static bool wevt_get_sid_by_type(WEVT_LOG *log, size_t field, TXT_UTF8 *dst) {
     }
 }
 
-//void wevt_field_to_buffer_append(BUFFER *wb, EVT_VARIANT *d, const char *prefix, const char *suffix) {
-//    buffer_strcat(wb, prefix);
-//
-//    switch(d->Type & EVT_VARIANT_TYPE_MASK) {
-//        case EvtVarTypeNull:
-//            buffer_strcat(wb, "(null)");
-//            break;
-//
-//        case EvtVarTypeString:
-//            buffer_sprintf(wb, "%ls", d->StringVal);
-//            break;
-//
-//        case EvtVarTypeSByte:
-//            buffer_sprintf(wb, "%d", (int) d->SByteVal);
-//            break;
-//
-//        case EvtVarTypeByte:
-//            buffer_sprintf(wb, "%u", (unsigned) d->ByteVal);
-//            break;
-//
-//        case EvtVarTypeInt16:
-//            buffer_sprintf(wb, "%d", (int) d->Int16Val);
-//            break;
-//
-//        case EvtVarTypeUInt16:
-//            buffer_sprintf(wb, "%u", (unsigned) d->UInt16Val);
-//            break;
-//
-//        case EvtVarTypeInt32:
-//            buffer_sprintf(wb, "%d", (int) d->Int32Val);
-//            break;
-//
-//        case EvtVarTypeUInt32:
-//        case EvtVarTypeHexInt32:
-//            buffer_sprintf(wb, "%u", (unsigned) d->UInt32Val);
-//            break;
-//
-//        case EvtVarTypeInt64:
-//            buffer_sprintf(wb, "%" PRIi64, (uint64_t)d->Int64Val);
-//            break;
-//
-//        case EvtVarTypeUInt64:
-//        case EvtVarTypeHexInt64:
-//            buffer_sprintf(wb, "%" PRIu64, (uint64_t)d->UInt64Val);
-//            break;
-//
-//        case EvtVarTypeSizeT:
-//            buffer_sprintf(wb, "%zu", d->SizeTVal);
-//            break;
-//
-//        case EvtVarTypeSysTime:
-//            buffer_sprintf(wb, "%04d-%02d-%02dT%02d:%02d:%02d.%03d (SystemTime)",
-//                           d->SysTimeVal->wYear, d->SysTimeVal->wMonth, d->SysTimeVal->wDay,
-//                           d->SysTimeVal->wHour, d->SysTimeVal->wMinute, d->SysTimeVal->wSecond,
-//                           d->SysTimeVal->wMilliseconds);
-//            break;
-//
-//        case EvtVarTypeGuid: {
-//            char uuid_str[UUID_COMPACT_STR_LEN];
-//            ND_UUID uuid;
-//            if (wevt_GUID_to_ND_UUID(&uuid, d->GuidVal)) {
-//                uuid_unparse_lower_compact(uuid.uuid, uuid_str);
-//                buffer_strcat(wb, uuid_str);
-//                buffer_strcat(wb, " (GUID)");
-//            }
-//            break;
-//        }
-//
-//        case EvtVarTypeSingle:
-//            buffer_print_netdata_double(wb, d->SingleVal);
-//            break;
-//
-//        case EvtVarTypeDouble:
-//            buffer_print_netdata_double(wb, d->DoubleVal);
-//            break;
-//
-//        case EvtVarTypeBoolean:
-//            buffer_strcat(wb, d->BooleanVal ? "true" : "false");
-//            break;
-//
-//        case EvtVarTypeFileTime: {
-//            nsec_t ns = os_windows_ulonglong_to_unix_epoch_ns(d->FileTimeVal);
-//            char buf[RFC3339_MAX_LENGTH];
-//            rfc3339_datetime_ut(buf, sizeof(buf), ns, 2, true);
-//            buffer_strcat(wb, buf);
-//            buffer_strcat(wb, " (FileTime)");
-//            break;
-//        }
-//
-//        case EvtVarTypeBinary:
-//            buffer_strcat(wb, "(binary data)");
-//            break;
-//
-//        case EvtVarTypeSid:
-//            buffer_strcat(wb, "(user id data)");
-//            break;
-//
-//        case EvtVarTypeAnsiString:
-//        case EvtVarTypeEvtHandle:
-//        case EvtVarTypeEvtXml:
-//        default:
-//            buffer_sprintf(wb, "(unsupported data type: %u)", d->Type);
-//            break;
-//    }
-//
-//    buffer_strcat(wb, suffix);
-//}
-//
-//static bool wevt_format_summary_array_traversal(WEVT_LOG *log, size_t field, WEVT_EVENT *ev) {
-//    EVT_VARIANT *d = &log->ops.content.data[field];
-//
-//    if (!log->ops.message)
-//        log->ops.message = buffer_create(0, NULL);
-//
-//    BUFFER *wb = log->ops.message;
-//    buffer_flush(wb);
-//
-//    // Check if there is an event description
-//    if (log->ops.event.data && *log->ops.event.data) {
-//        buffer_strcat(wb, log->ops.event.data);
-//        buffer_strcat(wb, "\nRelated data:\n");
-//    } else {
-//        buffer_sprintf(wb, "Event %" PRIu64 ", with the following related data:\n", (uint64_t)ev->event_id);
-//    }
-//
-//    // Check if the field contains an array or a single value
-//    bool is_array = (d->Type & EVT_VARIANT_TYPE_ARRAY) != 0;
-//    EVT_VARIANT_TYPE base_type = (EVT_VARIANT_TYPE)(d->Type & EVT_VARIANT_TYPE_MASK);
-//
-//    if (is_array) {
-//        DWORD count = d->Count; // Number of elements in the array
-//
-//        for (DWORD i = 0; i < count; i++) {
-//            EVT_VARIANT array_element = {
-//                    .Type = base_type,
-//                    .Count = 0,
-//            };
-//
-//            // Point the array element to the correct data
-//            switch (base_type) {
-//                case EvtVarTypeBoolean:
-//                    array_element.BooleanVal = d->BooleanArr[i];
-//                    break;
-//                case EvtVarTypeSByte:
-//                    array_element.SByteVal = d->SByteArr[i];
-//                    break;
-//                case EvtVarTypeByte:
-//                    array_element.ByteVal = d->ByteArr[i];
-//                    break;
-//                case EvtVarTypeInt16:
-//                    array_element.Int16Val = d->Int16Arr[i];
-//                    break;
-//                case EvtVarTypeUInt16:
-//                    array_element.UInt16Val = d->UInt16Arr[i];
-//                    break;
-//                case EvtVarTypeInt32:
-//                    array_element.Int32Val = d->Int32Arr[i];
-//                    break;
-//                case EvtVarTypeUInt32:
-//                    array_element.UInt32Val = d->UInt32Arr[i];
-//                    break;
-//                case EvtVarTypeInt64:
-//                    array_element.Int64Val = d->Int64Arr[i];
-//                    break;
-//                case EvtVarTypeUInt64:
-//                    array_element.UInt64Val = d->UInt64Arr[i];
-//                    break;
-//                case EvtVarTypeSingle:
-//                    array_element.SingleVal = d->SingleArr[i];
-//                    break;
-//                case EvtVarTypeDouble:
-//                    array_element.DoubleVal = d->DoubleArr[i];
-//                    break;
-//                case EvtVarTypeFileTime:
-//                    array_element.FileTimeVal = ((ULONGLONG)d->FileTimeArr[i].dwLowDateTime |
-//                                                 ((ULONGLONG)d->FileTimeArr[i].dwHighDateTime << 32));
-//                    break;
-//                case EvtVarTypeSysTime:
-//                    array_element.SysTimeVal = &d->SysTimeArr[i];
-//                    break;
-//                case EvtVarTypeGuid:
-//                    array_element.GuidVal = &d->GuidArr[i];
-//                    break;
-//                case EvtVarTypeString:
-//                    array_element.StringVal = d->StringArr[i];
-//                    break;
-//                case EvtVarTypeAnsiString:
-//                    array_element.AnsiStringVal = d->AnsiStringArr[i];
-//                    break;
-//                case EvtVarTypeSid:
-//                    array_element.SidVal = d->SidArr[i];
-//                    break;
-//                case EvtVarTypeSizeT:
-//                    array_element.SizeTVal = d->SizeTArr[i];
-//                    break;
-//                case EvtVarTypeEvtXml:
-//                    array_element.XmlVal = d->XmlValArr[i];
-//                    break;
-//                default:
-//                    buffer_sprintf(wb, "  - Unsupported array type: %u\n", base_type);
-//                    continue;
-//            }
-//
-//            // Call the field appending function for each array element
-//            wevt_field_to_buffer_append(wb, &array_element, "  - ", "\n");
-//        }
-//    } else {
-//        // Handle single values, pass the EVT_VARIANT directly
-//        wevt_field_to_buffer_append(wb, d, "  - ", "\n");
-//    }
-//
-//    return true;
-//}
-//
-//static bool wevt_format_summary(WEVT_LOG *log, WEVT_EVENT *ev) {
-//    if (!log->ops.message)
-//        log->ops.message = buffer_create(0, NULL);
-//
-//    BUFFER *wb = log->ops.message;
-//    buffer_flush(wb);
-//
-//    // Check if there is an event description
-//    if (log->ops.event.data && *log->ops.event.data)
-//        buffer_strcat(wb, log->ops.event.data);
-//    else
-//        buffer_sprintf(wb, "Event %" PRIu64, (uint64_t) ev->event_id);
-//
-//    const char *xml = log->ops.xml.data;
-//    const char *event_data_start = strstr(xml, "<EventData>");
-//    if(event_data_start)
-//        event_data_start = &event_data_start[11];
-//
-//    const char *event_data_end = event_data_start ? strstr(xml, "</EventData>") : NULL;
-//
-//    if(event_data_start && event_data_end) {
-//        buffer_strcat(wb, "\n\nRelated data:\n\n");
-//        // copy the event data block
-//        buffer_fast_strcat(wb, event_data_start, event_data_end - event_data_start);
-//    }
-//
-//    return true;
-//}
+static inline void wevt_event_done(WEVT_LOG *log) {
+    if (log->publisher) {
+        publisher_release(log->publisher);
+        log->publisher = NULL;
+    }
+
+    if (log->bookmark) {
+        EvtClose(log->bookmark);
+        log->bookmark = NULL;
+    }
+}
 
 bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
-    DWORD		size_required_next = 0, size = 0, bookmarkedCount = 0;
-    EVT_HANDLE	tmp_event_bookmark = NULL;
+    DWORD returned = 0, bytes_used = 0, property_count = 0;
     bool ret = false;
 
     fatal_assert(log && log->event_query && log->render_context);
 
-    if (!EvtNext(log->event_query, 1, &tmp_event_bookmark, INFINITE, 0, &size_required_next))
+    wevt_event_done(log);
+
+    if (!EvtNext(log->event_query, 1, &log->bookmark, INFINITE, 0, &returned))
         goto cleanup; // no data available, return failure
 
     // obtain the information from selected events
-    if (!EvtRender(log->render_context, tmp_event_bookmark, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &size, &bookmarkedCount)) {
+    if (!EvtRender(log->render_context, log->bookmark, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
         // information exceeds the allocated space
         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed");
@@ -440,15 +222,15 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
         }
 
         freez(log->ops.content.data);
-        log->ops.content.size = size;
+        log->ops.content.size = bytes_used;
         log->ops.content.data = (EVT_VARIANT *)mallocz(log->ops.content.size);
 
-        if (!EvtRender(log->render_context, tmp_event_bookmark, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &size, &bookmarkedCount)) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, after size increase");
+        if (!EvtRender(log->render_context, log->bookmark, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, after bytes_used increase");
             goto cleanup;
         }
     }
-    log->ops.content.len = size;
+    log->ops.content.len = bytes_used;
 
     ev->id = wevt_get_unsigned_by_type(log, FIELD_RECORD_NUMBER);
     ev->event_id = wevt_get_unsigned_by_type(log, FIELD_EVENT_ID);
@@ -464,39 +246,54 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
     if(full) {
         wevt_get_utf8_by_type(log, FIELD_CHANNEL, &log->ops.channel);
         wevt_get_utf8_by_type(log, FIELD_PROVIDER_NAME, &log->ops.provider);
-        wevt_get_utf8_by_type(log, FIELD_EVENT_SOURCE_NAME, &log->ops.source);
-        wevt_get_uuid_by_type(log, FIELD_PROVIDER_GUID, &ev->provider);
-
-        // ComputerName
         wevt_get_utf8_by_type(log, FIELD_COMPUTER_NAME, &log->ops.computer);
+        wevt_get_utf8_by_type(log, FIELD_EVENT_SOURCE_NAME, &log->ops.source);
+
+        wevt_get_uuid_by_type(log, FIELD_PROVIDER_GUID, &ev->provider);
+        wevt_get_uuid_by_type(log, FIELD_CORRELATION_ACTIVITY_ID, &ev->correlation_activity_id);
 
         // User
         wevt_get_sid_by_type(log, FIELD_USER_ID, &log->ops.user);
 
-        // CorrelationActivityID
-        wevt_get_uuid_by_type(log, FIELD_CORRELATION_ACTIVITY_ID, &ev->correlation_activity_id);
+        PROVIDER_META_HANDLE *p = log->publisher =
+                publisher_get(ev->provider, log->ops.content.data[FIELD_PROVIDER_NAME].StringVal);
 
-        // Full XML of the entire message
-        wevt_get_xml_utf8(log, tmp_event_bookmark, &log->ops.xml);
+//        if(!field_cache_get(WEVT_FIELD_TYPE_LEVEL, ev->provider, ev->level, &log->ops.level2)) {
+//            wevt_get_level_utf8(log, publisher_handle(p), log->bookmark, &log->ops.level2);
+//            field_cache_set(WEVT_FIELD_TYPE_LEVEL, ev->provider, ev->level, &log->ops.level2);
+//        }
+//
+//        if(!field_cache_get(WEVT_FIELD_TYPE_TASK, ev->provider, ev->task, &log->ops.task2)) {
+//            wevt_get_task_utf8(log, publisher_handle(p), log->bookmark, &log->ops.task2);
+//            field_cache_set(WEVT_FIELD_TYPE_TASK, ev->provider, ev->task, &log->ops.task2);
+//        }
+//
+//        if(!field_cache_get(WEVT_FIELD_TYPE_OPCODE, ev->provider, ev->opcode, &log->ops.opcode2)) {
+//            wevt_get_opcode_utf8(log, publisher_handle(p), log->bookmark, &log->ops.opcode2);
+//            field_cache_set(WEVT_FIELD_TYPE_OPCODE, ev->provider, ev->opcode, &log->ops.opcode2);
+//        }
+//
+//        if(!field_cache_get(WEVT_FIELD_TYPE_KEYWORDS, ev->provider, ev->keywords, &log->ops.keywords2)) {
+//            wevt_get_keywords_utf8(log, publisher_handle(p), log->bookmark, &log->ops.keywords2);
+//            field_cache_set(WEVT_FIELD_TYPE_KEYWORDS, ev->provider, ev->keywords, &log->ops.keywords2);
+//        }
 
-        // Format a text message for the users to see
-        // wevt_format_summary(log, ev);
+        wevt_get_xml_utf8(log, publisher_handle(p), log->bookmark, &log->ops.xml);
     }
 
     ret = true;
 
 cleanup:
-    if (tmp_event_bookmark)
-        EvtClose(tmp_event_bookmark);
-
     return ret;
 }
 
 void wevt_query_done(WEVT_LOG *log) {
-    if (!log->event_query) return;
+    wevt_event_done(log);
 
-    EvtClose(log->event_query);
-    log->event_query = NULL;
+    if (log->event_query) {
+        EvtClose(log->event_query);
+        log->event_query = NULL;
+    }
 }
 
 void wevt_closelog6(WEVT_LOG *log) {
@@ -512,7 +309,14 @@ void wevt_closelog6(WEVT_LOG *log) {
     txt_utf8_cleanup(&log->ops.source);
     txt_utf8_cleanup(&log->ops.computer);
     txt_utf8_cleanup(&log->ops.user);
+
+    txt_utf8_cleanup(&log->ops.event2);
+    txt_utf8_cleanup(&log->ops.level2);
+    txt_utf8_cleanup(&log->ops.keywords2);
+    txt_utf8_cleanup(&log->ops.opcode2);
+    txt_utf8_cleanup(&log->ops.task2);
     txt_utf8_cleanup(&log->ops.xml);
+
     buffer_free(log->ops.keywords);
     buffer_free(log->ops.opcode);
     buffer_free(log->ops.task);

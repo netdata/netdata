@@ -26,11 +26,9 @@ typedef struct {
 
 static struct {
     SPINLOCK spinlock;
-    bool initialized;
     struct simple_hashtable_SID hashtable;
 } sid_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-        .hashtable = { 0 },
 };
 
 static inline SID_KEY *sid_value_to_key(SID_VALUE *s) {
@@ -39,6 +37,10 @@ static inline SID_KEY *sid_value_to_key(SID_VALUE *s) {
 
 static inline bool sid_cache_compar(SID_KEY *a, SID_KEY *b) {
     return a->len == b->len && memcmp(&a->sid, &b->sid, a->len) == 0;
+}
+
+void sid_cache_init(void) {
+    simple_hashtable_init_SID(&sid_globals.hashtable, 100);
 }
 
 static bool update_user(SID_VALUE *found, TXT_UTF8 *dst) {
@@ -94,10 +96,6 @@ bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst) {
     tmp->key.len = size;
 
     spinlock_lock(&sid_globals.spinlock);
-    if(!sid_globals.initialized) {
-        simple_hashtable_init_SID(&sid_globals.hashtable, 100);
-        sid_globals.initialized = true;
-    }
     SID_VALUE *found = simple_hashtable_get_SID(&sid_globals.hashtable, &tmp->key, tmp_key_size);
     spinlock_unlock(&sid_globals.spinlock);
     if(found) return update_user(found, dst);

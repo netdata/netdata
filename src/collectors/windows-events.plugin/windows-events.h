@@ -24,5 +24,7 @@ typedef enum {
 #include "windows-events-sources.h"
 #include "windows-events-sid.h"
 #include "windows-events-xml.h"
+#include "windows-events-publishers.h"
+#include "windows-events-fields-cache.h"
 
 #endif //NETDATA_WINDOWS_EVENTS_H

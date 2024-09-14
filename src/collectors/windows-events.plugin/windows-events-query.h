@@ -31,9 +31,13 @@ typedef struct {
     uint64_t size_bytes;
 } EVT_RETENTION;
 
+struct provider_meta_handle;
+
 typedef struct wevt_log {
+    EVT_HANDLE bookmark;
     EVT_HANDLE event_query;
     EVT_HANDLE render_context;
+    struct provider_meta_handle *publisher;
 
     struct {
         // temp buffer used for rendering event log messages
@@ -64,6 +68,12 @@ typedef struct wevt_log {
         TXT_UTF8 source;
         TXT_UTF8 computer;
         TXT_UTF8 user;
+
+        TXT_UTF8 event2;
+        TXT_UTF8 level2;
+        TXT_UTF8 keywords2;
+        TXT_UTF8 opcode2;
+        TXT_UTF8 task2;
         TXT_UTF8 xml;
 
         BUFFER *opcode;

@@ -52,10 +52,18 @@ typedef struct facet_row_key_value {
     BUFFER *wb;
 } FACET_ROW_KEY_VALUE;
 
+typedef struct facet_row_bin_data {
+    void (*cleanup_cb)(void *data);
+    void *data;
+} FACET_ROW_BIN_DATA;
+
+#define FACET_ROW_BIN_DATA_EMPTY (FACET_ROW_BIN_DATA){.data = NULL, .cleanup_cb = NULL}
+
 typedef struct facet_row {
     usec_t usec;
     DICTIONARY *dict;
     FACET_ROW_SEVERITY severity;
+    FACET_ROW_BIN_DATA bin_data;
     struct facet_row *prev, *next;
 } FACET_ROW;
 
@@ -134,5 +142,7 @@ const char *facets_severity_to_string(FACET_ROW_SEVERITY severity);
 
 typedef bool (*facets_foreach_selected_value_in_key_t)(FACETS *facets, size_t id, const char *key, const char *value, void *data);
 bool facets_foreach_selected_value_in_key(FACETS *facets, const char *key, size_t key_length, DICTIONARY *used_hashes_registry, facets_foreach_selected_value_in_key_t cb, void *data);
+
+void facets_row_bin_data_set(FACETS *facets, void (*cleanup_cb)(void *data), void *data);
 
 #endif

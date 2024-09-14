@@ -292,7 +292,48 @@ static void print_value_cb(BUFFER *buffer, const char *prefix, const char *start
     if(prefix)
         buffer_strcat(buffer, prefix);
 
-    buffer_fast_strcat(buffer, start, end - start);
+    buffer_need_bytes(buffer, end - start + 1);
+
+    char *started = &buffer->buffer[buffer->len];
+    char *d = started;
+    const char *s = start;
+
+    while(s < end && s) {
+        if(*s == '&' && s + 3 < end) {
+            if(*(s + 1) == '#') {
+                if(s + 4 < end && *(s + 2) == '1' && *(s + 4) == ';') {
+                    if (*(s + 3) == '0') {
+                        s += 5;
+                        *d++ = '\n';
+                        continue;
+                    } else if (*(s + 3) == '3') {
+                        s += 5;
+                        // *d++ = '\r';
+                        continue;
+                    }
+                } else if (*(s + 2) == '9' && *(s + 3) == ';') {
+                    s += 4;
+                    *d++ = '\t';
+                    continue;
+                }
+            }
+            else if(s + 3 < end && *(s + 2) == 't' && *(s + 3) == ';') {
+                if(*(s + 1) == 'l') {
+                    s += 4;
+                    *d++ = '<';
+                    continue;
+                }
+                else if(*(s + 1) == 'g') {
+                    s += 4;
+                    *d++ = '>';
+                    continue;
+                }
+            }
+        }
+        *d++ = *s++;
+    }
+    *d = '\0';
+    buffer->len += d - started;
 }
 
 bool buffer_xml_extract_and_print_value(BUFFER *buffer, const char *xml, size_t xml_len, const char *prefix, const char *keys[]) {

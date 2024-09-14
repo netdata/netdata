@@ -196,7 +196,7 @@ void wevt_render_message(
                     buffer_tostring(xml_rkv->wb),
                     buffer_strlen(xml_rkv->wb),
                     NULL,
-                    message_path);
+                    message_path) && buffer_strlen(rkv->wb) > 0;
         }
 
         if(!added_message) {
@@ -214,32 +214,32 @@ void wevt_render_message(
                 buffer_putc(rkv->wb, '.');
             } else
                 buffer_strcat(rkv->wb, "of unknown Provider.");
+
+            if(xml_rkv && buffer_strlen(xml_rkv->wb)) {
+                const char *event_path[] = {
+                        "EventData",
+                        NULL
+                };
+                bool added_event_data = buffer_extract_and_print_xml(
+                        rkv->wb,
+                        buffer_tostring(xml_rkv->wb), buffer_strlen(xml_rkv->wb),
+                        "\n\nRelated event data:\n",
+                        event_path);
+
+                const char *user_path[] = {
+                        "UserData",
+                        NULL
+                };
+                bool added_user_data = buffer_extract_and_print_xml(
+                        rkv->wb,
+                        buffer_tostring(xml_rkv->wb), buffer_strlen(xml_rkv->wb),
+                        "\n\nRelated user data:\n",
+                        user_path);
+
+                if(!added_event_data && !added_user_data)
+                    buffer_strcat(rkv->wb, " Without any related data.");
+            }
         }
-    }
-
-    if(xml_rkv && buffer_strlen(xml_rkv->wb)) {
-        const char *event_path[] = {
-            "EventData",
-            NULL
-        };
-        bool added_event_data = buffer_extract_and_print_xml(
-            rkv->wb,
-            buffer_tostring(xml_rkv->wb), buffer_strlen(xml_rkv->wb),
-            "\n\nRelated event data:\n",
-            event_path);
-
-        const char *user_path[] = {
-            "UserData",
-            NULL
-        };
-        bool added_user_data = buffer_extract_and_print_xml(
-            rkv->wb,
-            buffer_tostring(xml_rkv->wb), buffer_strlen(xml_rkv->wb),
-            "\n\nRelated user data:\n",
-            user_path);
-
-        if(!added_event_data && !added_user_data)
-            buffer_strcat(rkv->wb, " Without any related data.");
     }
 
     buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
@@ -1379,6 +1379,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // initialization
 
     wevt_sources_init();
+    publisher_cache_init();
+    sid_cache_init();
+    field_cache_init();
 
     // ------------------------------------------------------------------------
     // debug
