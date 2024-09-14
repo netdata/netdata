@@ -144,5 +144,6 @@ typedef bool (*facets_foreach_selected_value_in_key_t)(FACETS *facets, size_t id
 bool facets_foreach_selected_value_in_key(FACETS *facets, const char *key, size_t key_length, DICTIONARY *used_hashes_registry, facets_foreach_selected_value_in_key_t cb, void *data);
 
 void facets_row_bin_data_set(FACETS *facets, void (*cleanup_cb)(void *data), void *data);
+void *facets_row_bin_data_get(FACETS *facets __maybe_unused, FACET_ROW *row);
 
 #endif

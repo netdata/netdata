@@ -100,7 +100,7 @@ static void wevt_empty_utf8(TXT_UTF8 *dst) {
     dst->used = 1;
 }
 
-static bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE bookmark, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
+bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE bookmark, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
     DWORD size = 0;
 
     if(!log->ops.unicode.data) {
@@ -144,10 +144,6 @@ cleanup:
     return false;
 }
 
-static bool wevt_get_event_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageEvent);
-}
-
 static bool wevt_get_level_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
     return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageLevel);
 }
@@ -162,10 +158,6 @@ static bool wevt_get_opcode_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE
 
 static bool wevt_get_keywords_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
     return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageKeyword);
-}
-
-static bool wevt_get_xml_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE bookmark, TXT_UTF8 *dst) {
-    return wevt_get_message_utf8(log, hMetadata, bookmark, dst, EvtFormatMessageXml);
 }
 
 static bool wevt_get_utf8_by_type(WEVT_LOG *log, size_t field, TXT_UTF8 *dst) {
@@ -258,27 +250,25 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
         PROVIDER_META_HANDLE *p = log->publisher =
                 publisher_get(ev->provider, log->ops.content.data[FIELD_PROVIDER_NAME].StringVal);
 
-//        if(!field_cache_get(WEVT_FIELD_TYPE_LEVEL, ev->provider, ev->level, &log->ops.level2)) {
-//            wevt_get_level_utf8(log, publisher_handle(p), log->bookmark, &log->ops.level2);
-//            field_cache_set(WEVT_FIELD_TYPE_LEVEL, ev->provider, ev->level, &log->ops.level2);
-//        }
-//
-//        if(!field_cache_get(WEVT_FIELD_TYPE_TASK, ev->provider, ev->task, &log->ops.task2)) {
-//            wevt_get_task_utf8(log, publisher_handle(p), log->bookmark, &log->ops.task2);
-//            field_cache_set(WEVT_FIELD_TYPE_TASK, ev->provider, ev->task, &log->ops.task2);
-//        }
-//
-//        if(!field_cache_get(WEVT_FIELD_TYPE_OPCODE, ev->provider, ev->opcode, &log->ops.opcode2)) {
-//            wevt_get_opcode_utf8(log, publisher_handle(p), log->bookmark, &log->ops.opcode2);
-//            field_cache_set(WEVT_FIELD_TYPE_OPCODE, ev->provider, ev->opcode, &log->ops.opcode2);
-//        }
-//
-//        if(!field_cache_get(WEVT_FIELD_TYPE_KEYWORDS, ev->provider, ev->keywords, &log->ops.keywords2)) {
-//            wevt_get_keywords_utf8(log, publisher_handle(p), log->bookmark, &log->ops.keywords2);
-//            field_cache_set(WEVT_FIELD_TYPE_KEYWORDS, ev->provider, ev->keywords, &log->ops.keywords2);
-//        }
+        if(!field_cache_get(WEVT_FIELD_TYPE_LEVEL, ev->provider, ev->level, &log->ops.level)) {
+            wevt_get_level_utf8(log, publisher_handle(p), log->bookmark, &log->ops.level);
+            field_cache_set(WEVT_FIELD_TYPE_LEVEL, ev->provider, ev->level, &log->ops.level);
+        }
 
-        wevt_get_xml_utf8(log, publisher_handle(p), log->bookmark, &log->ops.xml);
+        if(!field_cache_get(WEVT_FIELD_TYPE_TASK, ev->provider, ev->task, &log->ops.task)) {
+            wevt_get_task_utf8(log, publisher_handle(p), log->bookmark, &log->ops.task);
+            field_cache_set(WEVT_FIELD_TYPE_TASK, ev->provider, ev->task, &log->ops.task);
+        }
+
+        if(!field_cache_get(WEVT_FIELD_TYPE_OPCODE, ev->provider, ev->opcode, &log->ops.opcode)) {
+            wevt_get_opcode_utf8(log, publisher_handle(p), log->bookmark, &log->ops.opcode);
+            field_cache_set(WEVT_FIELD_TYPE_OPCODE, ev->provider, ev->opcode, &log->ops.opcode);
+        }
+
+        if(!field_cache_get(WEVT_FIELD_TYPE_KEYWORDS, ev->provider, ev->keywords, &log->ops.keywords)) {
+            wevt_get_keywords_utf8(log, publisher_handle(p), log->bookmark, &log->ops.keywords);
+            field_cache_set(WEVT_FIELD_TYPE_KEYWORDS, ev->provider, ev->keywords, &log->ops.keywords);
+        }
     }
 
     ret = true;
@@ -310,16 +300,12 @@ void wevt_closelog6(WEVT_LOG *log) {
     txt_utf8_cleanup(&log->ops.computer);
     txt_utf8_cleanup(&log->ops.user);
 
-    txt_utf8_cleanup(&log->ops.event2);
-    txt_utf8_cleanup(&log->ops.level2);
-    txt_utf8_cleanup(&log->ops.keywords2);
-    txt_utf8_cleanup(&log->ops.opcode2);
-    txt_utf8_cleanup(&log->ops.task2);
+    txt_utf8_cleanup(&log->ops.event);
+    txt_utf8_cleanup(&log->ops.level);
+    txt_utf8_cleanup(&log->ops.keywords);
+    txt_utf8_cleanup(&log->ops.opcode);
+    txt_utf8_cleanup(&log->ops.task);
     txt_utf8_cleanup(&log->ops.xml);
-
-    buffer_free(log->ops.keywords);
-    buffer_free(log->ops.opcode);
-    buffer_free(log->ops.task);
     freez(log);
 }
 
@@ -401,10 +387,6 @@ WEVT_LOG *wevt_openlog6(void) {
         log = NULL;
         goto cleanup;
     }
-
-    log->ops.keywords = buffer_create(4096, NULL);
-    log->ops.opcode = buffer_create(4096, NULL);
-    log->ops.task = buffer_create(4096, NULL);
 
 cleanup:
     return log;

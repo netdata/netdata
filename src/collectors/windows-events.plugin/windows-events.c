@@ -171,7 +171,75 @@ FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused,
     }
 }
 
+struct wevt_bin_data {
+    WEVT_LOG *log;
+    EVT_HANDLE bookmark;
+    PROVIDER_META_HANDLE *publisher;
+};
+
+static void wevt_cleanup_bin_data(void *data) {
+    struct wevt_bin_data *d = data;
+
+    if(d->bookmark)
+        EvtClose(d->bookmark);
+
+    publisher_release(d->publisher);
+    freez(d);
+}
+
+static inline void wevt_facets_register_bin_data(WEVT_LOG *log, FACETS *facets) {
+    struct wevt_bin_data *d = mallocz(sizeof(struct wevt_bin_data));
+
+    d->log = log;
+
+    // take the bookmark
+    d->bookmark = log->bookmark; log->bookmark = NULL;
+
+    // dup the publisher
+    d->publisher = publisher_dup(log->publisher);
+
+    facets_row_bin_data_set(facets, wevt_cleanup_bin_data, d);
+}
+
+void wevt_render_xml(
+        FACETS *facets,
+        BUFFER *json_array,
+        FACET_ROW_KEY_VALUE *rkv __maybe_unused,
+        FACET_ROW *row,
+        void *data __maybe_unused) {
+
+    struct wevt_bin_data *d = facets_row_bin_data_get(facets, row);
+    if(!d) {
+        buffer_json_add_array_item_string(json_array, "Failed to get row BIN DATA from facets");
+        return;
+    }
+
+    if(!wevt_get_message_utf8(d->log, publisher_handle(d->publisher), d->bookmark, &d->log->ops.xml, EvtFormatMessageXml))
+        buffer_json_add_array_item_string(json_array, "Failed to extract XML object from the Events Log");
+    else
+        buffer_json_add_array_item_string(json_array, d->log->ops.xml.data);
+}
+
 void wevt_render_message(
+        FACETS *facets,
+        BUFFER *json_array,
+        FACET_ROW_KEY_VALUE *rkv __maybe_unused,
+        FACET_ROW *row,
+        void *data __maybe_unused) {
+
+    struct wevt_bin_data *d = facets_row_bin_data_get(facets, row);
+    if(!d) {
+        buffer_json_add_array_item_string(json_array, "Failed to get row BIN DATA from facets");
+        return;
+    }
+
+    if(!wevt_get_message_utf8(d->log, publisher_handle(d->publisher), d->bookmark, &d->log->ops.event, EvtFormatMessageEvent))
+        buffer_json_add_array_item_string(json_array, "Failed to extract Event Message from the Events Log");
+    else
+        buffer_json_add_array_item_string(json_array, d->log->ops.event.data);
+}
+
+void wevt_render_message2(
     FACETS *facets __maybe_unused,
     BUFFER *json_array,
     FACET_ROW_KEY_VALUE *rkv,
@@ -245,44 +313,6 @@ void wevt_render_message(
     buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
 }
 
-static const char *wevt_level_to_name(int level) {
-    switch (level) {
-        case 5:
-            return "Verbose";
-        case 4:
-            return "Information";
-        case 3:
-            return "Warning";
-        case 2:
-            return "Error";
-        case 1:
-            return "Critical";
-
-        case 0:
-            // it seems that this defaults to "Information" for some providers
-            // however we need to differentiate to support slicing on it
-            return "None";
-
-        default:
-            return NULL;
-    }
-}
-
-static void wevt_transform_level(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
-    if(scope == FACETS_TRANSFORM_FACET_SORT)
-        return;
-
-    const char *v = buffer_tostring(wb);
-    if(*v && isdigit((uint8_t)*v)) {
-        int priority = str2i(buffer_tostring(wb));
-        const char *name = wevt_level_to_name(priority);
-        if (name) {
-            buffer_flush(wb);
-            buffer_strcat(wb, name);
-        }
-    }
-}
-
 static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
     FACETS *facets = lqs->facets;
     LOGS_QUERY_REQUEST *rq = &lqs->rq;
@@ -313,12 +343,9 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             rq->default_facet |
             FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
 
-    facets_register_key_name_transformation(
-        facets,
-        WEVT_FIELD_LEVEL,
-        rq->default_facet | FACET_KEY_OPTION_TRANSFORM_VIEW | FACET_KEY_OPTION_EXPANDED_FILTER,
-        wevt_transform_level,
-        NULL);
+    facets_register_key_name(
+            facets, WEVT_FIELD_LEVEL,
+            rq->default_facet | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_EXPANDED_FILTER);
 
     facets_register_key_name(
             facets, WEVT_FIELD_USER,
@@ -361,178 +388,27 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
         FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_VISIBLE,
         wevt_render_message, NULL);
 
-    facets_register_key_name(
-        facets, WEVT_FIELD_XML,
-        FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_FTS);
-}
+    facets_register_dynamic_key_name(
+            facets, WEVT_FIELD_XML,
+            FACET_KEY_OPTION_NEVER_FACET,
+            wevt_render_xml, NULL);
 
-static inline size_t wevt_process_keywords(WEVT_LOG *log, FACETS *facets, WEVT_EVENT *e) {
-    const char *value = NULL;
-    size_t len = 0;
-    BUFFER *wb = log->ops.keywords;
-
-    if(log->ops.xml.data && log->ops.xml.used > 1) {
-        static const char *path[] = {
-            "RenderingInfo",
-            "Keywords",
-            NULL,
-        };
-
-        buffer_flush(wb);
-        if(buffer_xml_extract_and_print_value(wb, log->ops.xml.data, log->ops.xml.used - 1, NULL, path)) {
-            // the string has XML tags, which have to be removed
-
-            char *d = (char *) buffer_tostring(wb);
-            char *s = d;
-
-            while(*s) {
-                if(d + 2 < s) {
-                    *d++ = ',';
-                    *d++ = ' ';
-                }
-
-                // copy everything up to the XML opening tag
-                while (*s && *s != '<') *d++ = *s++;
-
-                // skip the XML opening tag
-                while (*s && *s != '>') s++;
-                if(*s == '>') s++;
-
-                // copy everything up to the XML closing tag
-                while (*s && *s != '<') *d++ = *s++;
-
-                // skip the XML closing tag
-                while (*s && *s != '>') s++;
-                if(*s == '>') s++;
-            }
-            *d = '\0';
-
-            wb->len = d - wb->buffer;
-
-            value = buffer_tostring(wb);
-            len = buffer_strlen(wb);
-        }
-    }
-
-    if(!len || !value) {
-        switch(e->keywords) {
-            case 0:
-                value = "None";
-                len = 4;
-                break;
-
-            default:
-                buffer_flush(wb);
-                buffer_print_uint64_hex_full(wb, e->keywords);
-                value = buffer_tostring(wb);
-                len = buffer_strlen(wb);
-                break;
-        }
-    }
-
-    if(len && value)
-        facets_add_key_value_length(facets, WEVT_FIELD_KEYWORDS, sizeof(WEVT_FIELD_KEYWORDS) - 1,
-                                    value, len);
-
-    return len + 1;
-}
-
-static inline size_t wevt_process_opcode(WEVT_LOG *log, FACETS *facets, WEVT_EVENT *e) {
-    BUFFER *wb = log->ops.opcode;
-    const char *value = NULL;
-    size_t len = 0;
-
-    if(log->ops.xml.data && log->ops.xml.used > 1) {
-        static const char *path[] = {
-            "RenderingInfo",
-            "Opcode",
-            NULL,
-        };
-
-        buffer_flush(wb);
-        if(buffer_xml_extract_and_print_value(wb, log->ops.xml.data, log->ops.xml.used - 1, NULL, path)) {
-            value = buffer_tostring(wb);
-            len = buffer_strlen(wb);
-        }
-    }
-
-    if(!len || !value) {
-        switch(e->opcode) {
-            case 0:
-                value = "None";
-                len = 4;
-                break;
-
-            default:
-                buffer_flush(wb);
-                buffer_print_uint64(wb, e->opcode);
-                value = buffer_tostring(wb);
-                len = buffer_strlen(wb);
-                break;
-        }
-    }
-
-    if(len && value)
-        facets_add_key_value_length(facets, WEVT_FIELD_OPCODE, sizeof(WEVT_FIELD_OPCODE) - 1,
-                                    value, len);
-
-    return len + 1;
-}
-
-static inline size_t wevt_process_task(WEVT_LOG *log, FACETS *facets, WEVT_EVENT *e) {
-    BUFFER *wb = log->ops.task;
-    const char *value = NULL;
-    size_t len = 0;
-
-    if(log->ops.xml.data && log->ops.xml.used > 1) {
-        static const char *path[] = {
-            "RenderingInfo",
-            "Task",
-            NULL,
-        };
-
-        buffer_flush(wb);
-        if(buffer_xml_extract_and_print_value(wb, log->ops.xml.data, log->ops.xml.used - 1, NULL, path)) {
-            value = buffer_tostring(wb);
-            len = buffer_strlen(wb);
-        }
-    }
-
-    if(!len || !value) {
-        switch (e->task) {
-            case 0:
-                value = "None";
-                len = 4;
-                break;
-
-            default:
-                buffer_flush(wb);
-                buffer_print_uint64(wb, e->task);
-                value = buffer_tostring(wb);
-                len = buffer_strlen(wb);
-                break;
-        }
-    }
-
-    if(len && value)
-        facets_add_key_value_length(facets,
-                                    WEVT_FIELD_TASK, sizeof(WEVT_FIELD_TASK) - 1,
-                                    value, len);
-
-    return len + 1;
+//    facets_register_key_name(
+//        facets, WEVT_FIELD_XML,
+//        FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_FTS);
 }
 
 static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUERY_SOURCE *src, usec_t *msg_ut __maybe_unused, WEVT_EVENT *e) {
     size_t len, bytes = log->ops.content.len;
 
-    {
+    if(log->ops.provider.used > 1) {
         bytes += log->ops.provider.used * 2; // unicode is double
         facets_add_key_value_length(
             facets, WEVT_FIELD_PROVIDER, sizeof(WEVT_FIELD_PROVIDER) - 1,
             log->ops.provider.data, log->ops.provider.used - 1);
     }
 
-    {
+    if(log->ops.source.used > 1) {
         bytes += log->ops.source.used * 2;
         facets_add_key_value_length(
             facets, WEVT_FIELD_SOURCE, sizeof(WEVT_FIELD_SOURCE) - 1,
@@ -561,27 +437,42 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
             event_record_id_str, len);
     }
 
-    {
-        static __thread char level_id_str[UINT64_MAX_LENGTH];
-        len = print_uint64(level_id_str, e->level);
-        bytes += len;
+    if(log->ops.level.used > 1) {
+        bytes += log->ops.level.used * 2;
         facets_add_key_value_length(
-            facets, WEVT_FIELD_LEVEL, sizeof(WEVT_FIELD_LEVEL) - 1,
-            level_id_str, len);
+                facets, WEVT_FIELD_LEVEL, sizeof(WEVT_FIELD_LEVEL) - 1,
+                log->ops.level.data, log->ops.level.used - 1);
     }
 
-    {
+    if(log->ops.computer.used > 1) {
         bytes += log->ops.computer.used * 2;
         facets_add_key_value_length(
             facets, WEVT_FIELD_COMPUTER, sizeof(WEVT_FIELD_COMPUTER) - 1,
             log->ops.computer.data, log->ops.computer.used - 1);
     }
 
-    bytes += wevt_process_keywords(log, facets, e);
-    bytes += wevt_process_opcode(log, facets, e);
-    bytes += wevt_process_task(log, facets, e);
+    if(log->ops.opcode.used > 1) {
+        bytes += log->ops.opcode.used * 2;
+        facets_add_key_value_length(
+                facets, WEVT_FIELD_OPCODE, sizeof(WEVT_FIELD_OPCODE) - 1,
+                log->ops.opcode.data, log->ops.opcode.used - 1);
+    }
 
-    {
+    if(log->ops.keywords.used > 1) {
+        bytes += log->ops.keywords.used * 2;
+        facets_add_key_value_length(
+                facets, WEVT_FIELD_KEYWORDS, sizeof(WEVT_FIELD_KEYWORDS) - 1,
+                log->ops.keywords.data, log->ops.keywords.used - 1);
+    }
+
+    if(log->ops.task.used > 1) {
+        bytes += log->ops.task.used * 2;
+        facets_add_key_value_length(
+                facets, WEVT_FIELD_TASK, sizeof(WEVT_FIELD_TASK) - 1,
+                log->ops.task.data, log->ops.task.used - 1);
+    }
+
+    if(log->ops.user.used > 1) {
         bytes += log->ops.user.used * 2;
         facets_add_key_value_length(
             facets, WEVT_FIELD_USER, sizeof(WEVT_FIELD_USER) - 1,
@@ -615,10 +506,12 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
             thread_id_str, len);
     }
 
-    bytes += log->ops.xml.used * 2;
-    facets_add_key_value_length(
-        facets, WEVT_FIELD_XML, sizeof(WEVT_FIELD_XML) - 1,
-        log->ops.xml.data, log->ops.xml.used - 1);
+//    bytes += log->ops.xml.used * 2;
+//    facets_add_key_value_length(
+//        facets, WEVT_FIELD_XML, sizeof(WEVT_FIELD_XML) - 1,
+//        log->ops.xml.data, log->ops.xml.used - 1);
+
+    wevt_facets_register_bin_data(log, facets);
 
     return bytes;
 }
@@ -1198,8 +1091,6 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
     for(size_t f = 0; f < files_used ;f++)
         dictionary_acquired_item_release(wevt_sources, file_items[f]);
 
-    wevt_closelog6(log);
-
     switch (status) {
         case WEVT_OK:
             if(lqs->rq.if_modified_since && !lqs->c.rows_useful)
@@ -1312,6 +1203,8 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
     //     buffer_json_object_close(wb); // _sampling
     // }
 
+    wevt_closelog6(log);
+
     wb->content_type = CT_APPLICATION_JSON;
     wb->response_code = HTTP_RESP_OK;
     return wb->response_code;
@@ -1394,7 +1287,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         } array[] = {
             //{ "windows-events after:-86400 before:0 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,JM3OPW3kHn6,H106l8MXSSr,HREiMN.4Ahu,ClaDGnYSQE7,ApYltST_icg,PtkRm91M0En data_only:false slice:true source:All" },
             //{ "windows-events after:1726055370 before:1726056270 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6,ClaDGnYSQE7,H106l8MXSSr,HREiMN.4Ahu data_only:false source:All HytMJ9kj82B:BlC24d5JBBV,PtVoyIuX.MU,HMj1B38kHTv KeCITtVD5AD:PY1JtCeWwSe,O9kz5J37nNl,JZoJURadhDb" },
-            { "windows-events after:1725636012 before:1726240812 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,JM3OPW3kHn6,H106l8MXSSr,HREiMN.4Ahu,ClaDGnYSQE7,ApYltST_icg,PtkRm91M0En data_only:false source:All PtkRm91M0En:LDzHbP5libb" },
+            { "windows-events after:1715964175 before:1726332175 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,JM3OPW3kHn6,H106l8MXSSr,HREiMN.4Ahu,ClaDGnYSQE7,ApYltST_icg,PtkRm91M0En data_only:false source:All HytMJ9kj82B:BFijk5.3RIu,DGWAe74kTCP,IM1u5G4piZu,NSEpfktXB5t" },
+            // { "windows-events after:1725636012 before:1726240812 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,JM3OPW3kHn6,H106l8MXSSr,HREiMN.4Ahu,ClaDGnYSQE7,ApYltST_icg,PtkRm91M0En data_only:false source:All PtkRm91M0En:LDzHbP5libb" },
             //{ "windows-events after:1725650386 before:1725736786 anchor:1725652420809461 direction:forward last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 if_modified_since:1725736649011085 data_only:true delta:true tail:true source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
             //{ "windows-events info after:1725650420 before:1725736820" },
             //{ "windows-events after:1725650420 before:1725736820 last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },

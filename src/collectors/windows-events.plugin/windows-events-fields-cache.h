@@ -12,7 +12,7 @@ typedef enum __attribute__((packed)) {
     WEVT_FIELD_TYPE_TASK,
 
     // terminator
-    EVT_FIELD_TYPE_MAX,
+    WEVT_FIELD_TYPE_MAX,
 } WEVT_FIELD_TYPE;
 
 void field_cache_init(void);

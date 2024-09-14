@@ -26,7 +26,7 @@ static inline WEVT_FIELD_KEY *field_cache_value_to_key(WEVT_FIELD_VALUE *p) {
 }
 
 static inline bool field_cache_cache_compar(WEVT_FIELD_KEY *a, WEVT_FIELD_KEY *b) {
-    return memcmp(a, b, sizeof(WEVT_FIELD_KEY));
+    return memcmp(a, b, sizeof(WEVT_FIELD_KEY)) == 0;
 }
 
 struct ht {
@@ -38,37 +38,42 @@ struct ht {
 
 static struct {
     bool initialized;
-    struct ht ht[EVT_FIELD_TYPE_MAX];
+    struct ht ht[WEVT_FIELD_TYPE_MAX];
 } fdc = {
         .initialized = false,
 };
 
 void field_cache_init(void) {
-    for(WEVT_FIELD_TYPE type = 0; type < EVT_FIELD_TYPE_MAX ; type++) {
+    for(size_t type = 0; type < WEVT_FIELD_TYPE_MAX ; type++) {
         spinlock_init(&fdc.ht[type].spinlock);
         simple_hashtable_init_FIELDS_CACHE(&fdc.ht[type].ht, 10000);
     }
 }
 
+static inline bool should_zero_provider(WEVT_FIELD_TYPE type, uint64_t value) {
+    return (value == 0 || (type == WEVT_FIELD_TYPE_LEVEL && value <= 5));
+}
+
 bool field_cache_get(WEVT_FIELD_TYPE type, ND_UUID uuid, uint64_t value, TXT_UTF8 *dst) {
-    fatal_assert(type < EVT_FIELD_TYPE_MAX);
+    fatal_assert(type < WEVT_FIELD_TYPE_MAX);
 
     struct ht *ht = &fdc.ht[type];
 
     WEVT_FIELD_KEY t = {
             .value = value,
-            .provider = uuid,
+            .provider = should_zero_provider(type, value) ? UUID_ZERO : uuid,
     };
     XXH64_hash_t hash = XXH3_64bits(&t, sizeof(t));
 
     spinlock_lock(&ht->spinlock);
-    SIMPLE_HASHTABLE_SLOT_FIELDS_CACHE *slot = simple_hashtable_get_slot_FIELDS_CACHE(&ht->ht, hash, &t, false);
+    SIMPLE_HASHTABLE_SLOT_FIELDS_CACHE *slot = simple_hashtable_get_slot_FIELDS_CACHE(&ht->ht, hash, &t, true);
     WEVT_FIELD_VALUE *v = SIMPLE_HASHTABLE_SLOT_DATA(slot);
     spinlock_unlock(&ht->spinlock);
 
     if(v) {
         txt_utf8_resize(dst, v->name_size);
         memcpy(dst->data, v->name, v->name_size);
+        dst->used = v->name_size;
         return true;
     }
 
@@ -76,18 +81,18 @@ bool field_cache_get(WEVT_FIELD_TYPE type, ND_UUID uuid, uint64_t value, TXT_UTF
 }
 
 void field_cache_set(WEVT_FIELD_TYPE type, ND_UUID uuid, uint64_t value, TXT_UTF8 *name) {
-    fatal_assert(type < EVT_FIELD_TYPE_MAX);
+    fatal_assert(type < WEVT_FIELD_TYPE_MAX);
 
     struct ht *ht = &fdc.ht[type];
 
     WEVT_FIELD_KEY t = {
             .value = value,
-            .provider = uuid,
+            .provider = should_zero_provider(type, value) ? UUID_ZERO : uuid,
     };
     XXH64_hash_t hash = XXH3_64bits(&t, sizeof(t));
 
     spinlock_lock(&ht->spinlock);
-    SIMPLE_HASHTABLE_SLOT_FIELDS_CACHE *slot = simple_hashtable_get_slot_FIELDS_CACHE(&ht->ht, hash, &t, false);
+    SIMPLE_HASHTABLE_SLOT_FIELDS_CACHE *slot = simple_hashtable_get_slot_FIELDS_CACHE(&ht->ht, hash, &t, true);
     WEVT_FIELD_VALUE *v = SIMPLE_HASHTABLE_SLOT_DATA(slot);
     if(!v) {
         size_t bytes = sizeof(*v) + name->used;

@@ -45,7 +45,7 @@ static inline ND_UUID *publisher_value_to_key(PUBLISHER *p) {
 }
 
 static inline bool publisher_cache_compar(ND_UUID *a, ND_UUID *b) {
-    return nd_uuid_compare(a->uuid, b->uuid);
+    return UUIDeq(*a, *b);
 }
 
 void publisher_cache_init(void) {
@@ -107,9 +107,9 @@ EVT_HANDLE publisher_handle(PROVIDER_META_HANDLE *h) {
     return h ? h->hMetadata : NULL;
 }
 
-void publisher_dup(PROVIDER_META_HANDLE *h) {
-    if(!h) return;
-    h->locks++;
+PROVIDER_META_HANDLE *publisher_dup(PROVIDER_META_HANDLE *h) {
+    if(h) h->locks++;
+    return h;
 }
 
 void publisher_release(PROVIDER_META_HANDLE *h) {
@@ -123,22 +123,25 @@ void publisher_release(PROVIDER_META_HANDLE *h) {
         spinlock_lock(&pbc.spinlock);
         h->locker = 0;
 
-        if(++p->available_handles > 1) {
-            // there are multiple handles on this publisher
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->handles, h, prev, next);
-
-            if(h->hMetadata)
-                EvtClose(h->hMetadata);
-
-            aral_freez(pbc.aral_handles, h);
-
-            pbc.total_handles--;
-            p->total_handles--;
-
-            pbc.deleted_handles++;
-            p->deleted_handles++;
-        }
-        else if(h->next) {
+//        if(++p->available_handles > 1) {
+//            // there are multiple handles on this publisher
+//            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->handles, h, prev, next);
+//
+//            if(h->hMetadata)
+//                EvtClose(h->hMetadata);
+//
+//            aral_freez(pbc.aral_handles, h);
+//
+//            pbc.total_handles--;
+//            p->total_handles--;
+//
+//            pbc.deleted_handles++;
+//            p->deleted_handles++;
+//
+//            p->available_handles--;
+//        }
+//        else
+        if(h->next) {
             // it is not the last, put it at the end
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->handles, h, prev, next);
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(p->handles, h, prev, next);

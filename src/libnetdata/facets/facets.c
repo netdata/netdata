@@ -1650,6 +1650,10 @@ void facets_row_bin_data_set(FACETS *facets, void (*cleanup_cb)(void *data), voi
     facets->operations.bin_data_inflight++;
 }
 
+void *facets_row_bin_data_get(FACETS *facets __maybe_unused, FACET_ROW *row) {
+    return row->bin_data.data;
+}
+
 // ----------------------------------------------------------------------------
 
 FACETS *facets_create(uint32_t items_to_return, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys) {

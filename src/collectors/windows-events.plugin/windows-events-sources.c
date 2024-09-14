@@ -129,8 +129,8 @@ static int wevt_source_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry
                           (time_t)((s->last_ut - s->first_ut) / USEC_PER_SEC), "s", true);
 
         char info[1024];
-        snprintfz(info, sizeof(info), "%zu channels, with a total size of %s, covering %s",
-                s->count, size_for_humans, duration_for_humans);
+        snprintfz(info, sizeof(info), "%zu channel%s, with a total size of %s, covering %s",
+                s->count, s->count > 1 ? "s":"", size_for_humans, duration_for_humans);
 
         buffer_json_member_add_string(wb, "id", name);
         buffer_json_member_add_string(wb, "name", name);

@@ -69,16 +69,12 @@ typedef struct wevt_log {
         TXT_UTF8 computer;
         TXT_UTF8 user;
 
-        TXT_UTF8 event2;
-        TXT_UTF8 level2;
-        TXT_UTF8 keywords2;
-        TXT_UTF8 opcode2;
-        TXT_UTF8 task2;
+        TXT_UTF8 event;
+        TXT_UTF8 level;
+        TXT_UTF8 keywords;
+        TXT_UTF8 opcode;
+        TXT_UTF8 task;
         TXT_UTF8 xml;
-
-        BUFFER *opcode;
-        BUFFER *keywords;
-        BUFFER *task;
     } ops;
 
 } WEVT_LOG;
@@ -92,5 +88,7 @@ EVT_HANDLE wevt_query(LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS direction)
 void wevt_query_done(WEVT_LOG *log);
 
 bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full);
+
+bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE bookmark, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what);
 
 #endif //NETDATA_WINDOWS_EVENTS_QUERY_H

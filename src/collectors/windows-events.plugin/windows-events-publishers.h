@@ -11,7 +11,7 @@ typedef struct provider_meta_handle PROVIDER_META_HANDLE;
 PROVIDER_META_HANDLE *publisher_get(ND_UUID uuid, LPCWSTR providerName);
 void publisher_release(PROVIDER_META_HANDLE *h);
 EVT_HANDLE publisher_handle(PROVIDER_META_HANDLE *h);
-void publisher_dup(PROVIDER_META_HANDLE *h);
+PROVIDER_META_HANDLE *publisher_dup(PROVIDER_META_HANDLE *h);
 
 void publisher_cache_init(void);
 
