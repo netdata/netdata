@@ -3,10 +3,11 @@
 package web
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 
 	"github.com/stretchr/testify/assert"
 )

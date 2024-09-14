@@ -58,7 +58,7 @@ func newPodDiscoverer(pod, cmap, secret cache.SharedInformer) *podDiscoverer {
 		panic("nil pod or cmap or secret informer")
 	}
 
-	queue := workqueue.NewWithConfig(workqueue.QueueConfig{Name: "pod"})
+	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{Name: "pod"})
 
 	_, _ = pod.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj any) { enqueue(queue, obj) },
@@ -82,7 +82,7 @@ type podDiscoverer struct {
 	podInformer    cache.SharedInformer
 	cmapInformer   cache.SharedInformer
 	secretInformer cache.SharedInformer
-	queue          *workqueue.Type
+	queue          *workqueue.Typed[any]
 }
 
 func (p *podDiscoverer) String() string {

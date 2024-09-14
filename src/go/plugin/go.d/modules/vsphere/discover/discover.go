@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere/resources"
 
-	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 )

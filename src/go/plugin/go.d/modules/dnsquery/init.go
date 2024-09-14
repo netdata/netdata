@@ -5,6 +5,7 @@ package dnsquery
 import (
 	"errors"
 	"fmt"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 
 	"github.com/miekg/dns"

@@ -41,7 +41,7 @@ func Exec(ctx context.Context, container string, cmd string, args ...string) ([]
 		return nil, fmt.Errorf("failed to create docker client: %v", err)
 	}
 
-	defer cli.Close()
+	defer func() { _ = cli.Close() }()
 
 	cli.NegotiateAPIVersion(ctx)
 

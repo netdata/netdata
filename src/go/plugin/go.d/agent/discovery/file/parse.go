@@ -97,7 +97,7 @@ func parseSDFormat(reg confgroup.Registry, path string, bs []byte) (*confgroup.G
 }
 
 func cfgFormat(bs []byte) format {
-	var data interface{}
+	var data any
 	if err := yaml.Unmarshal(bs, &data); err != nil {
 		return unknownFormat
 	}

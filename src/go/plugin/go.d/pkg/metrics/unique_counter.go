@@ -3,8 +3,9 @@
 package metrics
 
 import (
-	"github.com/axiomhq/hyperloglog"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
+
+	"github.com/axiomhq/hyperloglog"
 )
 
 type (

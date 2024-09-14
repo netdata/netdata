@@ -4,6 +4,7 @@ package example
 
 import (
 	"errors"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 

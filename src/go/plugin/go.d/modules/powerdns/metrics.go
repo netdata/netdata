@@ -8,6 +8,6 @@ type (
 	statisticMetric  struct {
 		Name  string
 		Type  string
-		Value interface{}
+		Value any
 	}
 )

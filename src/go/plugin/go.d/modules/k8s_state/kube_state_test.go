@@ -51,7 +51,7 @@ func TestKubeState_Init(t *testing.T) {
 			wantFail: false,
 			prepare: func() *KubeState {
 				ks := New()
-				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewSimpleClientset(), nil }
+				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
 				return ks
 			},
 		},
@@ -87,7 +87,7 @@ func TestKubeState_Check(t *testing.T) {
 			wantFail: false,
 			prepare: func() *KubeState {
 				ks := New()
-				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewSimpleClientset(), nil }
+				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
 				return ks
 			},
 		},
@@ -95,7 +95,7 @@ func TestKubeState_Check(t *testing.T) {
 			wantFail: true,
 			prepare: func() *KubeState {
 				ks := New()
-				client := &brokenInfoKubeClient{fake.NewSimpleClientset()}
+				client := &brokenInfoKubeClient{fake.NewClientset()}
 				ks.newKubeClient = func() (kubernetes.Interface, error) { return client, nil }
 				return ks
 			},
@@ -133,7 +133,7 @@ func TestKubeState_Cleanup(t *testing.T) {
 			doCollect: false,
 			prepare: func() *KubeState {
 				ks := New()
-				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewSimpleClientset(), nil }
+				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
 				return ks
 			},
 		},
@@ -142,7 +142,7 @@ func TestKubeState_Cleanup(t *testing.T) {
 			doCollect: false,
 			prepare: func() *KubeState {
 				ks := New()
-				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewSimpleClientset(), nil }
+				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
 				return ks
 			},
 		},
@@ -151,7 +151,7 @@ func TestKubeState_Cleanup(t *testing.T) {
 			doCollect: true,
 			prepare: func() *KubeState {
 				ks := New()
-				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewSimpleClientset(), nil }
+				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
 				return ks
 			},
 		},
@@ -192,7 +192,7 @@ func TestKubeState_Collect(t *testing.T) {
 	}{
 		"Node only": {
 			create: func(t *testing.T) testCase {
-				client := fake.NewSimpleClientset(
+				client := fake.NewClientset(
 					newNode("node01"),
 				)
 
@@ -257,7 +257,7 @@ func TestKubeState_Collect(t *testing.T) {
 		"Pod only": {
 			create: func(t *testing.T) testCase {
 				pod := newPod("node01", "pod01")
-				client := fake.NewSimpleClientset(
+				client := fake.NewClientset(
 					pod,
 				)
 
@@ -317,7 +317,7 @@ func TestKubeState_Collect(t *testing.T) {
 			create: func(t *testing.T) testCase {
 				node := newNode("node01")
 				pod := newPod(node.Name, "pod01")
-				client := fake.NewSimpleClientset(
+				client := fake.NewClientset(
 					node,
 					pod,
 				)
@@ -417,7 +417,7 @@ func TestKubeState_Collect(t *testing.T) {
 				ctx := context.Background()
 				node := newNode("node01")
 				pod := newPod(node.Name, "pod01")
-				client := fake.NewSimpleClientset(
+				client := fake.NewClientset(
 					node,
 					pod,
 				)
@@ -495,7 +495,7 @@ func TestKubeState_Collect(t *testing.T) {
 				node := newNode("node01")
 				podOrig := newPod(node.Name, "pod01")
 				podOrig.Spec.NodeName = ""
-				client := fake.NewSimpleClientset(
+				client := fake.NewClientset(
 					node,
 					podOrig,
 				)
@@ -535,7 +535,7 @@ func TestKubeState_Collect(t *testing.T) {
 				node := newNode("node01")
 				pod1 := newPod(node.Name, "pod01")
 				pod2 := newPod(node.Name, "pod02")
-				client := fake.NewSimpleClientset(
+				client := fake.NewClientset(
 					node,
 					pod1,
 				)

@@ -47,13 +47,13 @@ func (c *config) isEnabled(moduleName string, explicit bool) bool {
 	return c.DefaultRun
 }
 
-func (c *config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (c *config) UnmarshalYAML(unmarshal func(any) error) error {
 	type plain config
 	if err := unmarshal((*plain)(c)); err != nil {
 		return err
 	}
 
-	var m map[string]interface{}
+	var m map[string]any
 	if err := unmarshal(&m); err != nil {
 		return err
 	}

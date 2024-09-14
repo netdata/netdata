@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
+
 	"github.com/stretchr/testify/assert"
 )
 

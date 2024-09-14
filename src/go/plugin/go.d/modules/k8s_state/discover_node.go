@@ -16,11 +16,12 @@ func newNodeDiscoverer(si cache.SharedInformer, l *logger.Logger) *nodeDiscovere
 		panic("nil node shared informer")
 	}
 
-	queue := workqueue.NewWithConfig(workqueue.QueueConfig{Name: "node"})
+	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{Name: "node"})
+
 	_, _ = si.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { enqueue(queue, obj) },
-		UpdateFunc: func(_, obj interface{}) { enqueue(queue, obj) },
-		DeleteFunc: func(obj interface{}) { enqueue(queue, obj) },
+		AddFunc:    func(obj any) { enqueue(queue, obj) },
+		UpdateFunc: func(_, obj any) { enqueue(queue, obj) },
+		DeleteFunc: func(obj any) { enqueue(queue, obj) },
 	})
 
 	return &nodeDiscoverer{
@@ -34,17 +35,17 @@ func newNodeDiscoverer(si cache.SharedInformer, l *logger.Logger) *nodeDiscovere
 
 type nodeResource struct {
 	src string
-	val interface{}
+	val any
 }
 
 func (r nodeResource) source() string         { return r.src }
 func (r nodeResource) kind() kubeResourceKind { return kubeResourceNode }
-func (r nodeResource) value() interface{}     { return r.val }
+func (r nodeResource) value() any             { return r.val }
 
 type nodeDiscoverer struct {
 	*logger.Logger
 	informer cache.SharedInformer
-	queue    *workqueue.Type
+	queue    *workqueue.Typed[any]
 	readyCh  chan struct{}
 	stopCh   chan struct{}
 }

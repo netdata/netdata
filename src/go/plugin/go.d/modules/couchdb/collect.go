@@ -185,13 +185,13 @@ func (cdb *CouchDB) scrapeDBStats(ms *cdbMetrics) {
 	ms.DBStats = stats
 }
 
-func findMaxMQSize(MessageQueues map[string]interface{}) int64 {
+func findMaxMQSize(MessageQueues map[string]any) int64 {
 	var maxSize float64
 	for _, mq := range MessageQueues {
 		switch mqSize := mq.(type) {
 		case float64:
 			maxSize = math.Max(maxSize, mqSize)
-		case map[string]interface{}:
+		case map[string]any:
 			if v, ok := mqSize["count"].(float64); ok {
 				maxSize = math.Max(maxSize, v)
 			}

@@ -20,7 +20,7 @@ type documentServerStatus struct {
 	Tcmalloc     *documentTCMallocStatus `bson:"tcmalloc" stm:"tcmalloc"`
 	Locks        *documentLocks          `bson:"locks" stm:"locks"`
 	WiredTiger   *documentWiredTiger     `bson:"wiredTiger" stm:"wiredtiger"`
-	Repl         interface{}             `bson:"repl"`
+	Repl         any                     `bson:"repl"`
 }
 
 type (

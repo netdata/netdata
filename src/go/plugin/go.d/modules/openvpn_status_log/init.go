@@ -4,6 +4,7 @@ package openvpn_status_log
 
 import (
 	"errors"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 )
 

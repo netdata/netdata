@@ -11,7 +11,7 @@ import (
 type resource interface {
 	source() string
 	kind() kubeResourceKind
-	value() interface{}
+	value() any
 }
 
 type kubeResourceKind uint8
@@ -21,7 +21,7 @@ const (
 	kubeResourcePod
 )
 
-func toNode(i interface{}) (*corev1.Node, error) {
+func toNode(i any) (*corev1.Node, error) {
 	switch v := i.(type) {
 	case *corev1.Node:
 		return v, nil
@@ -32,7 +32,7 @@ func toNode(i interface{}) (*corev1.Node, error) {
 	}
 }
 
-func toPod(i interface{}) (*corev1.Pod, error) {
+func toPod(i any) (*corev1.Pod, error) {
 	switch v := i.(type) {
 	case *corev1.Pod:
 		return v, nil

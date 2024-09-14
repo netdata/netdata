@@ -3,12 +3,12 @@
 package elasticsearch
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 

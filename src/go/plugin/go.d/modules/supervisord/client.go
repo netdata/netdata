@@ -66,7 +66,7 @@ func (c *supervisorRPCClient) closeIdleConnections() {
 	c.client.HttpClient.CloseIdleConnections()
 }
 
-func parseGetAllProcessInfo(resp interface{}) ([]processStatus, error) {
+func parseGetAllProcessInfo(resp any) ([]processStatus, error) {
 	arr, ok := resp.(xmlrpc.Array)
 	if !ok {
 		return nil, fmt.Errorf("unexpected response type, want=xmlrpc.Array, got=%T", resp)

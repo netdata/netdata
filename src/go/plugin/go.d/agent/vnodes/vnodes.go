@@ -130,7 +130,7 @@ func isConfigFile(path string) bool {
 	}
 }
 
-func loadConfigFile(conf interface{}, path string) error {
+func loadConfigFile(conf any, path string) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
