@@ -23,7 +23,7 @@ static LPCTSTR szWindowClass = _T("DesktopApp");
 HWND hNetdataWND = NULL;
 
 // TODO: Convert to thread
-static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root, BOOL checkRet)
+static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root)
 {
     wchar_t localPath[MAX_PATH + 1] = { };
     DWORD length = GetCurrentDirectoryW(MAX_PATH, localPath);
@@ -31,9 +31,9 @@ static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root, BOO
         MessageBoxW(NULL, L"Cannot find binary.", L"Error", MB_OK|MB_ICONERROR);
         return;
     }
-    if (root) {
+    if (root && wcsstr(localPath, L"\\usr\\bin")) {
         // Remove usr\bin
-        length -= 7;
+        length -= 8;
     }
     wcscpy(&localPath[length], cmd);
 
@@ -47,32 +47,6 @@ static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root, BOO
     if(!CreateProcess(NULL, localPath, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi )) {
         MessageBoxW(NULL, L"Cannot start process.", L"Error", MB_OK|MB_ICONERROR);
         return;
-    }
-
-    if (checkRet) {
-        WaitForSingleObject(pi.hProcess, INFINITE);
-
-        CloseHandle( pi.hProcess );
-        CloseHandle( pi.hThread );
-
-        DWORD ret;
-        GetExitCodeProcess(pi.hProcess, &ret);
-
-        wchar_t *msg;
-        wchar_t *title;
-        UINT flags;
-
-        if (ret) {
-            msg = L"Netdata returned error, check your logs.";
-            title = L"Error";
-            flags = MB_OK|MB_ICONERROR;
-        } else {
-            msg = L"Netdata ran command with success!";
-            title = L"Success";
-            flags = MB_OK|MB_ICONINFORMATION;
-        }
-
-        MessageBoxW(NULL, msg, title, flags);
     }
 }
 
@@ -95,10 +69,10 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
                                                hNetdatawnd, (HMENU)IDC_NETDATA_DASHBOARD,
                                                NULL, NULL);
 
-            hwndReloadLabels = CreateWindowExW(0, L"BUTTON", L"Reload Labels",
+            hwndReloadLabels = CreateWindowExW(0, L"BUTTON", L"Run edit-config",
                                                WS_CHILD | WS_VISIBLE,
                                                20, 60, 120, 30,
-                                               hNetdatawnd, (HMENU)IDC_RELOAD_LABELS,
+                                               hNetdatawnd, (HMENU)IDC_EDIT_CONFIG,
                                                NULL, NULL);
 
             hwndReopenLogs = CreateWindowExW(0, L"BUTTON", L"Reopen Logs",
@@ -119,7 +93,7 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
                                               hNetdatawnd, (HMENU)IDC_SAVE_DATABASE,
                                               NULL, NULL);
 
-            hwndOpenMsys = CreateWindowExW(0, L"BUTTON", L"Open Msys2",
+            hwndOpenMsys = CreateWindowExW(0, L"BUTTON", L"Open terminal",
                                            WS_CHILD | WS_VISIBLE,
                                            280, 100, 120, 30,
                                            hNetdatawnd, (HMENU)IDC_OPEN_MSYS,
@@ -151,29 +125,26 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
             if (HIWORD(wParam) == BN_CLICKED) {
                 switch(LOWORD(wParam)) {
                     case IDC_OPEN_MSYS: {
-                        netdata_cli_run_specific_command(L"msys2.exe", TRUE, FALSE);
+                        netdata_cli_run_specific_command(L"\\msys2.exe", TRUE);
                         break;
                     }
                     case IDC_NETDATA_DASHBOARD: {
                         netdata_cli_open_dashboard();
                         break;
                     }
-                    case IDC_RELOAD_LABELS: {
+                    case IDC_EDIT_CONFIG: {
                         netdata_cli_run_specific_command(L"\\bash.exe -l -c \"netdatacli reload-labels; export CURRRET=`echo $?`; exit $CURRRET\"",
-                                                         FALSE,
-                                                         TRUE);
+                                                         FALSE);
                         break;
                     }
                     case IDC_REOPEN_LOGS: {
                         netdata_cli_run_specific_command(L"\\bash.exe -l -c \"netdatacli reopen-logs; export CURRRET=`echo $?`; exit $CURRRET\"",
-                                                         FALSE,
-                                                         TRUE);
+                                                         FALSE);
                         break;
                     }
                     case IDC_SAVE_DATABASE: {
                         netdata_cli_run_specific_command(L"\\bash.exe -l -c \"netdatacli save-database; export CURRRET=`echo $?`; exit $CURRRET\"",
-                                                         FALSE,
-                                                         TRUE);
+                                                         FALSE);
                         break;
                     }
                     case IDC_CLOSE_WINDOW: {
