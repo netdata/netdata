@@ -33,7 +33,7 @@ It gathers metrics by periodically issuing HTTP GET requests to the Typesense se
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector only supports collecting metrics from a single instance of this integration.
 
 
 ### Default Behavior
