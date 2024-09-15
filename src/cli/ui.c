@@ -106,10 +106,10 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
                                                hNetdatawnd, (HMENU)IDC_EDIT_CONFIG,
                                                NULL, NULL);
 
-            hwndStopService = CreateWindowExW(0, L"BUTTON", L"Stop Service",
+            hwndStopService = CreateWindowExW(0, L"BUTTON", L"Check Update!",
                                               WS_CHILD | WS_VISIBLE,
                                               280, 60, 120, 30,
-                                              hNetdatawnd, (HMENU)IDC_STOP_SERVICE,
+                                              hNetdatawnd, (HMENU)IDC_CHECK_UPDATE,
                                               NULL, NULL);
 
             hwndOpenMsys = CreateWindowExW(0, L"BUTTON", L"Open terminal",
@@ -154,6 +154,10 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
                     }
                     case IDC_NETDATA_DASHBOARD: {
                         netdata_cli_open_dashboard();
+                        break;
+                    }
+                    case IDC_CHECK_UPDATE: {
+                        MessageBoxW(NULL, L"This option is a working in progress.", L"Info", MB_OK|MB_ICONINFORMATION);
                         break;
                     }
                     case IDC_EDIT_CONFIG: {
