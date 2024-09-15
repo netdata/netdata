@@ -25,6 +25,12 @@ typedef struct wevt_event {
 #define WEVT_EVENT_EMPTY (WEVT_EVENT){ .id = 0, .created_ns = 0, }
 
 typedef struct {
+    EVT_VARIANT	*data;
+    size_t size;
+    size_t used;
+} WEVT_VARIANT;
+
+typedef struct {
     WEVT_EVENT first_event;
     WEVT_EVENT last_event;
 
@@ -50,11 +56,7 @@ typedef struct wevt_log {
     struct {
         // temp buffer used for rendering event log messages
         // never use directly
-        struct {
-            EVT_VARIANT	*data;
-            size_t size;
-            size_t len;
-        } content;
+        WEVT_VARIANT content;
 
         // temp buffer used for fetching and converting UNICODE and UTF-8
         // every string operation overwrites it, multiple times per event log entry
@@ -111,5 +113,18 @@ void wevt_query_done(WEVT_LOG *log);
 bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full);
 
 bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE bookmark, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what);
+
+static inline void wevt_variant_cleanup(WEVT_VARIANT *v) {
+    freez(v->data);
+}
+
+static inline void wevt_variant_resize(WEVT_VARIANT *v, size_t required_size) {
+    if(required_size < v->size)
+        return;
+
+    wevt_variant_cleanup(v);
+    v->size = compute_new_size(v->size, required_size);
+    v->data = mallocz(v->size);
+}
 
 #endif //NETDATA_WINDOWS_EVENTS_QUERY_H

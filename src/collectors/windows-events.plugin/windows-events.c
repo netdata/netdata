@@ -321,7 +321,7 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 }
 
 static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUERY_SOURCE *src, usec_t *msg_ut __maybe_unused, WEVT_EVENT *e) {
-    size_t len, bytes = log->ops.content.len;
+    size_t len, bytes = log->ops.content.used;
 
     if(log->ops.provider.used > 1) {
         bytes += log->ops.provider.used * 2; // unicode is double

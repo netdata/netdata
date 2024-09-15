@@ -33,13 +33,20 @@ static inline void txt_utf8_cleanup(TXT_UTF8 *utf8) {
     freez(utf8->data);
 }
 
-static inline void txt_utf8_resize(TXT_UTF8 *utf8, size_t required_size) {
+static inline void txt_utf8_resize(TXT_UTF8 *utf8, size_t required_size, bool keep) {
     if(required_size < utf8->size)
         return;
 
-    txt_utf8_cleanup(utf8);
-    utf8->size = compute_new_size(utf8->size, required_size);
-    utf8->data = mallocz(utf8->size);
+    if(keep) {
+        size_t new_size = compute_new_size(utf8->size, required_size);
+        utf8->data = reallocz(utf8->data, new_size);
+        utf8->size = new_size;
+    }
+    else {
+        txt_utf8_cleanup(utf8);
+        utf8->size = compute_new_size(utf8->size, required_size);
+        utf8->data = mallocz(utf8->size);
+    }
 }
 
 static inline void txt_unicode_cleanup(TXT_UNICODE *unicode) {
@@ -68,5 +75,7 @@ char *channel2utf8(const wchar_t *channel);
 wchar_t *channel2unicode(const char *utf8str);
 
 char *query2utf8(const wchar_t *query);
+
+char *unicode2utf8_strdupz(const wchar_t *src, size_t *utf8_len);
 
 #endif //NETDATA_WINDOWS_EVENTS_UNICODE_H

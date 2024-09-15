@@ -7,7 +7,6 @@
 
 typedef enum __attribute__((packed)) {
     WEVT_FIELD_TYPE_LEVEL = 0,
-    WEVT_FIELD_TYPE_KEYWORDS,
     WEVT_FIELD_TYPE_OPCODE,
     WEVT_FIELD_TYPE_TASK,
 

@@ -45,13 +45,13 @@ void sid_cache_init(void) {
 
 static bool update_user(SID_VALUE *found, TXT_UTF8 *dst) {
     if(found && found->user) {
-        txt_utf8_resize(dst, found->user_len + 1);
+        txt_utf8_resize(dst, found->user_len + 1, false);
         memcpy(dst->data, found->user, found->user_len + 1);
         dst->used = found->user_len + 1;
         return true;
     }
 
-    txt_utf8_resize(dst, 1);
+    txt_utf8_resize(dst, 1, false);
     dst->data[0] = '\0';
     dst->used = 1;
     return false;
@@ -64,7 +64,7 @@ static void lookup_user(PSID *sid, TXT_UTF8 *dst) {
     DWORD domain_name_size = sizeof(domain_unicode) / sizeof(domain_unicode[0]);
     SID_NAME_USE sid_type;
 
-    txt_utf8_resize(dst, 1024);
+    txt_utf8_resize(dst, 1024, false);
 
     if (LookupAccountSidW(NULL, sid, account_unicode, &account_name_size, domain_unicode, &domain_name_size, &sid_type)) {
         const char *user = account2utf8(account_unicode);

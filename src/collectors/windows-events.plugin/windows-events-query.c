@@ -114,7 +114,7 @@ static bool wevt_get_uuid_by_type(WEVT_LOG *log, size_t field, ND_UUID *dst) {
 }
 
 static void wevt_empty_utf8(TXT_UTF8 *dst) {
-    txt_utf8_resize(dst, 1);
+    txt_utf8_resize(dst, 1, false);
     dst->data[0] = '\0';
     dst->used = 1;
 }
@@ -175,10 +175,6 @@ static bool wevt_get_opcode_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE
     return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageOpcode);
 }
 
-static bool wevt_get_keywords_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageKeyword);
-}
-
 static bool wevt_get_utf8_by_type(WEVT_LOG *log, size_t field, TXT_UTF8 *dst) {
     switch(log->ops.content.data[field].Type & EVT_VARIANT_TYPE_MASK) {
         case EvtVarTypeString:
@@ -226,17 +222,14 @@ bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
             goto cleanup;
         }
 
-        freez(log->ops.content.data);
-        log->ops.content.size = bytes_used;
-        log->ops.content.data = (EVT_VARIANT *)mallocz(log->ops.content.size);
-
+        wevt_variant_resize(&log->ops.content, bytes_used);
         if (!EvtRender(log->render_context, log->bookmark, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, after bytes_used increase, extended info: %s",
                    wevt_extended_status());
             goto cleanup;
         }
     }
-    log->ops.content.len = bytes_used;
+    log->ops.content.used = bytes_used;
 
     ev->id = wevt_get_unsigned_by_type(log, FIELD_RECORD_NUMBER);
     ev->event_id = wevt_get_unsigned_by_type(log, FIELD_EVENT_ID);
@@ -279,10 +272,7 @@ bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
             field_cache_set(WEVT_FIELD_TYPE_OPCODE, ev->provider, ev->opcode, &log->ops.opcode);
         }
 
-        if(!field_cache_get(WEVT_FIELD_TYPE_KEYWORDS, ev->provider, ev->keywords, &log->ops.keywords)) {
-            wevt_get_keywords_utf8(log, publisher_handle(p), log->bookmark, &log->ops.keywords);
-            field_cache_set(WEVT_FIELD_TYPE_KEYWORDS, ev->provider, ev->keywords, &log->ops.keywords);
-        }
+        publisher_keywords(&log->ops.keywords, p, ev->keywords);
     }
 
     ret = true;
@@ -375,7 +365,7 @@ void wevt_closelog6(WEVT_LOG *log) {
     if (log->render_context)
         EvtClose(log->render_context);
 
-    freez(log->ops.content.data);
+    wevt_variant_cleanup(&log->ops.content);
     txt_unicode_cleanup(&log->ops.unicode);
     txt_utf8_cleanup(&log->ops.channel);
     txt_utf8_cleanup(&log->ops.provider);

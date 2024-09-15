@@ -15,4 +15,6 @@ PROVIDER_META_HANDLE *publisher_dup(PROVIDER_META_HANDLE *h);
 
 void publisher_cache_init(void);
 
+bool publisher_keywords(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value);
+
 #endif //NETDATA_WINDOWS_EVENTS_PUBLISHERS_H

@@ -71,7 +71,7 @@ bool field_cache_get(WEVT_FIELD_TYPE type, ND_UUID uuid, uint64_t value, TXT_UTF
     spinlock_unlock(&ht->spinlock);
 
     if(v) {
-        txt_utf8_resize(dst, v->name_size);
+        txt_utf8_resize(dst, v->name_size, false);
         memcpy(dst->data, v->name, v->name_size);
         dst->used = v->name_size;
         return true;

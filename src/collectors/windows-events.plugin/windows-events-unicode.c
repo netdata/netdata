@@ -21,6 +21,24 @@ inline void unicode2utf8(char *dst, size_t dst_size, const wchar_t *src) {
         strncpyz(dst, "[null]", dst_size - 1);
 }
 
+char *unicode2utf8_strdupz(const wchar_t *src, size_t *utf8_len) {
+    int size = WideCharToMultiByte(CP_UTF8, 0, src, -1, NULL, 0, NULL, NULL);
+    if (size > 0) {
+        char *dst = mallocz(size);
+        WideCharToMultiByte(CP_UTF8, 0, src, -1, dst, size, NULL, NULL);
+
+        if(utf8_len)
+            *utf8_len = size - 1;
+
+        return dst;
+    }
+
+    if(utf8_len)
+        *utf8_len = 0;
+
+    return NULL;
+}
+
 wchar_t *channel2unicode(const char *utf8str) {
     static __thread wchar_t buffer[1024];
     utf82unicode(buffer, sizeof(buffer) / sizeof(buffer[0]), utf8str);
@@ -79,7 +97,7 @@ bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len_with
         }
 
         // Retry conversion with the new buffer
-        txt_utf8_resize(utf8, size);
+        txt_utf8_resize(utf8, size, false);
         size = WideCharToMultiByte(CP_UTF8, 0, src, src_len_with_null, utf8->data, (int)utf8->size, NULL, NULL);
         if (size <= 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "WideCharToMultiByte() failed after resizing.");
@@ -99,7 +117,7 @@ bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len_with
     return true;
 
 cleanup:
-    txt_utf8_resize(utf8, 128);
+    txt_utf8_resize(utf8, 128, false);
     if(src)
         utf8->used = snprintfz(utf8->data, utf8->size, "[failed conv.]") + 1;
     else {
