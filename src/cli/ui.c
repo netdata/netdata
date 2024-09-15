@@ -17,6 +17,7 @@
 
 #include "tchar.h"
 #include "ui.h"
+#include "windows-services.h"
 
 static LPCTSTR szWindowClass = _T("DesktopApp");
 
@@ -61,6 +62,28 @@ static inline void netdata_cli_run_specific_command(wchar_t *cmd, BOOL root)
 static inline void netdata_cli_open_dashboard()
 {
     (void)ShellExecuteW(NULL, NULL, L"http://localhost:19999", NULL, NULL, SW_SHOW);
+}
+
+static inline void netdata_cli_check_service_status(wchar_t *status, size_t length)
+{
+    SC_HANDLE sm = GetWServiceMagagerHandle(SC_MANAGER_ALL_ACCESS);
+    if (!sm) {
+        swprintf(status, length, L"Cannot open Service Management!");
+        return;
+    }
+
+    SC_HANDLE service = GetWServiceHandle(sm, L"Netdata", SERVICE_ALL_ACCESS);
+    if (!service) {
+        swprintf(status, length, L"Cannot find the service Netdata!");
+        CloseServiceHandle(sm);
+        return;
+    }
+
+    int isrunning = IsServiceRunning(sm, service);
+    swprintf(status, length, L"Netdata service is %s!", (isrunning)? "running" : "stopped");
+
+    CloseServiceHandle(sm);
+    CloseServiceHandle(service);
 }
 
 static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -108,13 +131,18 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
               L"Client"
             };
 
+            wchar_t statusMsg[64];
+            netdata_cli_check_service_status(statusMsg, 63);
+
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hNetdatawnd, &ps);;
             int i;
             for (i = 0; i < sizeof(screenMessages) / sizeof(LPCTSTR); i++) {
                 TextOut(hdc, 180, 40 + 20 * i, screenMessages[i], wcslen(screenMessages[i]));
             }
+            TextOut(hdc, 20, 150, statusMsg, wcslen(statusMsg));
             EndPaint(hNetdatawnd, &ps);
+
             break;
         }
         case WM_COMMAND: {
@@ -191,7 +219,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                                   L"Netdata Client",
                                   WS_OVERLAPPEDWINDOW,
                                   CW_USEDEFAULT, CW_USEDEFAULT,
-                                  440, 200,
+                                  440, 230,
                                   HWND_DESKTOP,
                                   NULL,
                                   hInstance,
