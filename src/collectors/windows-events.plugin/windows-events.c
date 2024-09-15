@@ -214,10 +214,8 @@ static void wevt_render_xml(
         return;
     }
 
-    if(!wevt_get_message_utf8(d->log, publisher_handle(d->publisher), d->bookmark, &d->log->ops.xml, EvtFormatMessageXml))
-        buffer_json_add_array_item_string(json_array, "Failed to extract XML object from the Events Log");
-    else
-        buffer_json_add_array_item_string(json_array, d->log->ops.xml.data);
+    wevt_get_xml_utf8(d->log, d->publisher, d->bookmark, &d->log->ops.xml);
+    buffer_json_add_array_item_string(json_array, d->log->ops.xml.data);
 }
 
 static void wevt_render_message(
@@ -233,10 +231,8 @@ static void wevt_render_message(
         return;
     }
 
-    if(!wevt_get_message_utf8(d->log, publisher_handle(d->publisher), d->bookmark, &d->log->ops.event, EvtFormatMessageEvent))
-        buffer_json_add_array_item_string(json_array, "Failed to extract Event Message from the Events Log");
-    else
-        buffer_json_add_array_item_string(json_array, d->log->ops.event.data);
+    wevt_get_event_utf8(d->log, d->publisher, d->bookmark, &d->log->ops.event);
+    buffer_json_add_array_item_string(json_array, d->log->ops.event.data);
 }
 
 static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {

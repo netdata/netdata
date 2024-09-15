@@ -119,60 +119,90 @@ static void wevt_empty_utf8(TXT_UTF8 *dst) {
     dst->used = 1;
 }
 
-bool wevt_get_message_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE bookmark, TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS what) {
-    DWORD size = 0;
+bool wevt_get_message_unicode(TXT_UNICODE *unicode, EVT_HANDLE hMetadata, EVT_HANDLE bookmark, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags) {
+    unicode->used = 0;
 
-    if(!log->ops.unicode.data) {
-        EvtFormatMessage(hMetadata, bookmark, 0, 0, NULL, what, 0, NULL, &size);
+    DWORD size = 0;
+    if(!unicode->data) {
+        EvtFormatMessage(hMetadata, bookmark, dwMessageId, 0, NULL, flags, 0, NULL, &size);
         if(!size) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() to get message size failed.");
             goto cleanup;
         }
-        txt_unicode_resize(&log->ops.unicode, size);
+        txt_unicode_resize(unicode, size);
     }
 
     // First, try to get the message using the existing buffer
-    if (!EvtFormatMessage(hMetadata, bookmark, 0, 0, NULL, what, log->ops.unicode.size, log->ops.unicode.data, &size) || !log->ops.unicode.data) {
-        if (log->ops.unicode.data && GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+    if (!EvtFormatMessage(hMetadata, bookmark, dwMessageId, 0, NULL, flags, unicode->size, unicode->data, &size) || !unicode->data) {
+        if (unicode->data && GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed.");
             goto cleanup;
         }
 
         // Try again with the resized buffer
-        txt_unicode_resize(&log->ops.unicode, size);
-        if (!EvtFormatMessage(hMetadata, bookmark, 0, 0, NULL, what, log->ops.unicode.size, log->ops.unicode.data, &size)) {
+        txt_unicode_resize(unicode, size);
+        if (!EvtFormatMessage(hMetadata, bookmark, dwMessageId, 0, NULL, flags, unicode->size, unicode->data, &size)) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed after resizing buffer.");
             goto cleanup;
         }
     }
 
     // make sure it is null terminated
-    if(size <= log->ops.unicode.size)
-        log->ops.unicode.data[size - 1] = 0;
+    if(size <= unicode->size)
+        unicode->data[size - 1] = 0;
     else
-        log->ops.unicode.data[log->ops.unicode.size - 1] = 0;
+        unicode->data[unicode->size - 1] = 0;
 
     // unfortunately we have to calculate the length every time
     // the size returned may not be the length of the unicode string
-    log->ops.unicode.used = wcslen(log->ops.unicode.data) + 1;
-
-    return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
+    unicode->used = wcslen(unicode->data) + 1;
+    return true;
 
 cleanup:
+    unicode->used = 0;
+    return false;
+}
+
+static bool wevt_get_level_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
+    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0, EvtFormatMessageLevel))
+        return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
+
     wevt_empty_utf8(dst);
     return false;
 }
 
-static bool wevt_get_level_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageLevel);
+static bool wevt_get_task_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
+    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0,EvtFormatMessageTask))
+        return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
+
+    wevt_empty_utf8(dst);
+    return false;
 }
 
-static bool wevt_get_task_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageTask);
+static bool wevt_get_opcode_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
+    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0, EvtFormatMessageOpcode))
+        return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
+
+    wevt_empty_utf8(dst);
+    return false;
 }
 
-static bool wevt_get_opcode_utf8(WEVT_LOG *log, EVT_HANDLE hMetadata, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    return wevt_get_message_utf8(log, hMetadata, event_handle, dst, EvtFormatMessageOpcode);
+bool wevt_get_event_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
+    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0, EvtFormatMessageEvent))
+        return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
+
+    txt_utf8_resize(dst, 128, false);
+    dst->used = snprintfz(dst->data, dst->size, "No event message for this event.");
+    return false;
+}
+
+bool wevt_get_xml_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
+    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0, EvtFormatMessageXml))
+        return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
+
+    txt_utf8_resize(dst, 128, false);
+    dst->used = snprintfz(dst->data, dst->size, "No XML in this event entry.");
+    return false;
 }
 
 static bool wevt_get_utf8_by_type(WEVT_LOG *log, size_t field, TXT_UTF8 *dst) {
@@ -258,17 +288,17 @@ bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
             publisher_get(ev->provider, log->ops.content.data[FIELD_PROVIDER_NAME].StringVal);
 
         if(!field_cache_get(WEVT_FIELD_TYPE_LEVEL, ev->provider, ev->level, &log->ops.level)) {
-            wevt_get_level_utf8(log, publisher_handle(p), log->bookmark, &log->ops.level);
+            wevt_get_level_utf8(log, p, log->bookmark, &log->ops.level);
             field_cache_set(WEVT_FIELD_TYPE_LEVEL, ev->provider, ev->level, &log->ops.level);
         }
 
         if(!field_cache_get(WEVT_FIELD_TYPE_TASK, ev->provider, ev->task, &log->ops.task)) {
-            wevt_get_task_utf8(log, publisher_handle(p), log->bookmark, &log->ops.task);
+            wevt_get_task_utf8(log, p, log->bookmark, &log->ops.task);
             field_cache_set(WEVT_FIELD_TYPE_TASK, ev->provider, ev->task, &log->ops.task);
         }
 
         if(!field_cache_get(WEVT_FIELD_TYPE_OPCODE, ev->provider, ev->opcode, &log->ops.opcode)) {
-            wevt_get_opcode_utf8(log, publisher_handle(p), log->bookmark, &log->ops.opcode);
+            wevt_get_opcode_utf8(log, p, log->bookmark, &log->ops.opcode);
             field_cache_set(WEVT_FIELD_TYPE_OPCODE, ev->provider, ev->opcode, &log->ops.opcode);
         }
 

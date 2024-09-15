@@ -120,8 +120,15 @@ PROVIDER_META_HANDLE *publisher_get(ND_UUID uuid, LPCWSTR providerName) {
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(p->handles, h, prev, next);
         pbc.total_handles++;
         p->total_handles++;
+        p->available_handles++;
     }
-    h->owner = me;
+
+    if(!h->owner) {
+        fatal_assert(p->available_handles > 0);
+        p->available_handles--;
+        h->owner = me;
+    }
+
     h->locks++;
 
     spinlock_unlock(&pbc.spinlock);
@@ -200,26 +207,6 @@ static bool wevt_get_property_from_array(WEVT_VARIANT *property, EVT_HANDLE hand
     return true;
 }
 
-static bool wevt_get_message_id(TXT_UNICODE *dst, EVT_HANDLE hMetadata, DWORD dwMessageId) {
-    DWORD used;
-    if (!EvtFormatMessage(hMetadata, NULL, dwMessageId, 0, NULL, EvtFormatMessageId, dst->size, dst->data, &used)) {
-        DWORD status = GetLastError();
-        if (status != ERROR_INSUFFICIENT_BUFFER) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed");
-            return false;
-        }
-
-        txt_unicode_resize(dst, used);
-        if (!EvtFormatMessage(hMetadata, NULL, dwMessageId, 0, NULL, EvtFormatMessageId, dst->size, dst->data, &used)) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed after resize");
-            return false;
-        }
-    }
-
-    dst->used = used;
-    return true;
-}
-
 static void publisher_load_keywords(PUBLISHER *p, LPCWSTR providerName) {
     EVT_HANDLE hMetadata = NULL;
     EVT_HANDLE hKeywordArray = NULL;
@@ -294,7 +281,7 @@ static void publisher_load_keywords(PUBLISHER *p, LPCWSTR providerName) {
             DWORD messageID = property.data->UInt32Val;
             if ((int) messageID < 0) continue;
 
-            if (!wevt_get_message_id(&unicode, hMetadata, messageID))
+            if (!wevt_get_message_unicode(&unicode, hMetadata, NULL, messageID, EvtFormatMessageId))
                 continue;
 
             size_t len;
