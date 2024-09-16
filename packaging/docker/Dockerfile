@@ -28,7 +28,8 @@ WORKDIR /opt/netdata.git
 RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
    /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='$(uname -m)'" > ./system/.install-type && \
-   CFLAGS="$(packaging/docker/gen-cflags.sh)" LDFLAGS="-Wl,--gc-sections" ./netdata-installer.sh --dont-wait --dont-start-it --use-system-protobuf \
+   CFLAGS="$(packaging/docker/gen-cflags.sh)" LDFLAGS="-Wl,--gc-sections" NETDATA_CMAKE_OPTIONS="-DBUILD_FOR_PACKAGING=On -DPACKAGE_TYPE=docker" \
+   ./netdata-installer.sh --dont-wait --dont-start-it --use-system-protobuf \
    ${EXTRA_INSTALL_OPTS} --disable-ebpf --install-no-prefix / "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)"
 
 # files to one directory
