@@ -25,7 +25,7 @@ static inline void common_disk_ops(ND_DISK_OPS *d, const char *id, const char *n
             , _COMMON_PLUGIN_MODULE_NAME
             , NETDATA_CHART_PRIO_DISK_OPS
             , update_every
-            , RRDSET_TYPE_AREA
+            , RRDSET_TYPE_LINE
         );
 
         d->rd_ops_reads  = rrddim_add(d->st_ops, "reads",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
