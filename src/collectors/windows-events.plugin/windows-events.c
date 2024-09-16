@@ -125,14 +125,13 @@ struct lqs_extension {
     ""
 
 #define WEVT_KEYS_INCLUDED_IN_FACETS            \
+    "|" WEVT_FIELD_COMPUTER                     \
     "|" WEVT_FIELD_PROVIDER                     \
     "|" WEVT_FIELD_SOURCE                       \
-    "|" WEVT_FIELD_CHANNEL                      \
     "|" WEVT_FIELD_LEVEL                        \
     "|" WEVT_FIELD_KEYWORDS                     \
     "|" WEVT_FIELD_OPCODE                       \
     "|" WEVT_FIELD_TASK                         \
-    "|" WEVT_FIELD_COMPUTER                     \
     "|" WEVT_FIELD_USER                         \
     ""
 
@@ -158,15 +157,18 @@ FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused,
     int windows_event_level = str2i(buffer_tostring(levelid_rkv->wb));
 
     switch (windows_event_level) {
-        case 5: // Verbose
+        case WINEVENT_LEVEL_VERBOSE:
             return FACET_ROW_SEVERITY_DEBUG;
+
         default:
-        case 4: // Information
+        case WINEVENT_LEVEL_INFORMATION:
             return FACET_ROW_SEVERITY_NORMAL;
-        case 3: // Warning
+
+        case WINEVENT_LEVEL_WARNING:
             return FACET_ROW_SEVERITY_WARNING;
-        case 2: // Error
-        case 1: // Critical
+
+        case WINEVENT_LEVEL_ERROR:
+        case WINEVENT_LEVEL_CRITICAL:
             return FACET_ROW_SEVERITY_CRITICAL;
     }
 }
@@ -188,7 +190,7 @@ static void wevt_cleanup_bin_data(void *data) {
     freez(d);
 }
 
-static inline void wevt_facets_register_bin_data(WEVT_LOG *log, FACETS *facets, WEVT_EVENT *ev) {
+static inline void wevt_facets_register_bin_data(WEVT_LOG *log, FACETS *facets, WEVT_EVENT *ev __maybe_unused) {
     struct wevt_bin_data *d = mallocz(sizeof(struct wevt_bin_data));
 
     d->log = log;
@@ -324,7 +326,7 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 
     facets_register_key_name(
             facets, WEVT_FIELD_CHANNEL,
-            rq->default_facet | FACET_KEY_OPTION_FTS);
+            FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_PROVIDER,
@@ -353,11 +355,11 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 
     facets_register_key_name(
             facets, WEVT_FIELD_PROCESSID,
-            rq->default_facet | FACET_KEY_OPTION_FTS);
+            FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_THREADID,
-            rq->default_facet | FACET_KEY_OPTION_FTS);
+            FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_TASK,

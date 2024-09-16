@@ -26,7 +26,7 @@ struct provider_data {
 };
 
 struct provider_list {
-    uint64_t min, max;
+    uint64_t min, max, mask;
     bool exceeds_data_type;             // true when the manifest values exceed the capacity of the EvtXXX() API
     uint32_t total;                     // the number of entries in the array
     struct provider_data *array;        // the array of entries, sorted (for binary search)
@@ -340,7 +340,7 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
     l->array = callocz(itemCount, sizeof(struct provider_data));
     l->total = itemCount;
 
-    uint64_t min = UINT64_MAX, max = 0;
+    uint64_t min = UINT64_MAX, max = 0, mask = 0;
 
     // Iterate over the list and populate the entries
     for (DWORD i = 0; i < itemCount; ++i) {
@@ -363,6 +363,8 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
 
             if(d->value > max)
                 max = d->value;
+
+            mask |= d->value;
 
             if(!is_valid(d->value, false))
                 l->exceeds_data_type = true;
@@ -396,6 +398,7 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
 
     l->min = min;
     l->max = max;
+    l->mask = mask;
 
     if(itemCount > 1 && compare_func != NULL) {
         // Sort the array based on the value (ascending for all except keywords, descending for keywords)
@@ -412,11 +415,16 @@ cleanup:
 
 // lookup bitmap metdata (returns a comma separated list of strings)
 static bool publisher_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
-    if(value < l->min || value > l->max || !l->total || !l->array || l->exceeds_data_type)
+    if(!(value & l->mask) || !l->total || !l->array || l->exceeds_data_type)
         return false;
 
-    dst->used = 0;
+    // do not empty the buffer, there may be reserved keywords in it
+    // dst->used = 0;
 
+    if(dst->used)
+        dst->used--;
+
+    size_t added = 0;
     for(size_t k = 0; value && k < l->total; k++) {
         struct provider_data *d = &l->array[k];
 
@@ -438,6 +446,7 @@ static bool publisher_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, ui
             memcpy(&dst->data[dst->used], s, slen);
             dst->used += slen;
             dst->src = TXT_SOURCE_PUBLISHER;
+            added++;
         }
     }
 
@@ -447,8 +456,7 @@ static bool publisher_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, ui
     }
 
     fatal_assert(dst->used <= dst->size);
-
-    return (dst->used > 0);
+    return added;
 }
 
 //// lookup a single value (returns its string)

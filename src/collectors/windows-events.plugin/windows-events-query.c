@@ -156,30 +156,25 @@ static void wevt_get_field_from_cache(
     field_cache_set(cache_type, provider, value, dst);
 }
 
+#define SET_LEN_AND_RETURN(constant) *len = sizeof(constant) - 1; return constant
+
 static inline const char *wevt_level_hardcoded(uint64_t level, size_t *len) {
     switch(level) {
-        case 0: *len = 4; return "None";
-        case 1: *len = 8; return "Critical";
-        case 2: *len = 5; return "Error";
-        case 3: *len = 7; return "Warning";
-        case 4: *len = 11; return "Information";
-        case 5: *len = 7; return "Verbose";
-        default: return NULL;
+        case WINEVENT_LEVEL_NONE:        SET_LEN_AND_RETURN(WINEVENT_NAME_NONE);
+        case WINEVENT_LEVEL_CRITICAL:    SET_LEN_AND_RETURN(WINEVENT_NAME_CRITICAL);
+        case WINEVENT_LEVEL_ERROR:       SET_LEN_AND_RETURN(WINEVENT_NAME_ERROR);
+        case WINEVENT_LEVEL_WARNING:     SET_LEN_AND_RETURN(WINEVENT_NAME_WARNING);
+        case WINEVENT_LEVEL_INFORMATION: SET_LEN_AND_RETURN(WINEVENT_NAME_INFORMATION);
+        case WINEVENT_LEVEL_VERBOSE:     SET_LEN_AND_RETURN(WINEVENT_NAME_VERBOSE);
+        default: *len = 0; return NULL;
     }
-}
-
-static const char *wevt_level_default(uint64_t level, size_t *len) {
-    static __thread char buf[6 + UINT64_MAX_LENGTH + 1];
-    strcpy(buf, "Level ");
-    *len = 6 + print_uint64(&buf[6], level);
-    return buf;
 }
 
 static void wevt_get_level(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
     TXT_UTF8 *dst = &log->ops.level;
     uint64_t value = ev->level;
 
-    dst->used = 0; // empty our response
+    wevt_utf8_empty(dst);
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageLevel;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_LEVEL;
@@ -189,9 +184,7 @@ static void wevt_get_level(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *
         size_t len;
         const char *hardcoded = wevt_level_hardcoded(value, &len);
         if(hardcoded) {
-            txt_utf8_resize(dst, len + 1,  false);
-            memcpy(dst->data, hardcoded, len + 1);
-            dst->used = len + 1;
+            txt_utf8_set(dst, hardcoded,  len);
             dst->src = TXT_SOURCE_HARDCODED;
         }
         else {
@@ -205,45 +198,32 @@ static void wevt_get_level(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *
         wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
     }
 
-    if(dst->used <= 1) {
-        // an empty value, provide something meaningful
-        size_t len = 0;
-        const char *s = wevt_level_default(value, &len);
-        txt_utf8_resize(dst, len + 1,  false);
-        memcpy(dst->data, s, len + 1);
-        dst->used = len + 1;
-    }
+    txt_utf8_set_numeric_if_empty(
+        dst, WINEVENT_NAME_LEVEL_PREFIX, sizeof(WINEVENT_NAME_LEVEL_PREFIX) - 1, ev->level);
 }
 
-static const char *wevt_opcode_hardcoded(uint64_t level, size_t *len) {
-    switch(level) {
-        case 0: *len = 4; return "Info";
-        case 1: *len = 5; return "Start";
-        case 2: *len = 4; return "Stop";
-        case 3: *len = 8; return "DC Start";
-        case 4: *len = 7; return "DC Stop";
-        case 5: *len = 9; return "Extension";
-        case 6: *len = 5; return "Reply";
-        case 7: *len = 6; return "Resume";
-        case 8: *len = 7; return "Suspend";
-        case 9: *len = 4; return "Send";
-        case 240: *len = 7; return "Receive";
+static inline const char *wevt_opcode_hardcoded(uint64_t opcode, size_t *len) {
+    switch(opcode) {
+        case WINEVENT_OPCODE_INFO:      SET_LEN_AND_RETURN(WINEVENT_NAME_INFO);
+        case WINEVENT_OPCODE_START:     SET_LEN_AND_RETURN(WINEVENT_NAME_START);
+        case WINEVENT_OPCODE_STOP:      SET_LEN_AND_RETURN(WINEVENT_NAME_STOP);
+        case WINEVENT_OPCODE_DC_START:  SET_LEN_AND_RETURN(WINEVENT_NAME_DC_START);
+        case WINEVENT_OPCODE_DC_STOP:   SET_LEN_AND_RETURN(WINEVENT_NAME_DC_STOP);
+        case WINEVENT_OPCODE_EXTENSION: SET_LEN_AND_RETURN(WINEVENT_NAME_EXTENSION);
+        case WINEVENT_OPCODE_REPLY:     SET_LEN_AND_RETURN(WINEVENT_NAME_REPLY);
+        case WINEVENT_OPCODE_RESUME:    SET_LEN_AND_RETURN(WINEVENT_NAME_RESUME);
+        case WINEVENT_OPCODE_SUSPEND:   SET_LEN_AND_RETURN(WINEVENT_NAME_SUSPEND);
+        case WINEVENT_OPCODE_SEND:      SET_LEN_AND_RETURN(WINEVENT_NAME_SEND);
+        case WINEVENT_OPCODE_RECEIVE:   SET_LEN_AND_RETURN(WINEVENT_NAME_RECEIVE);
         default: *len = 0; return NULL;
     }
-}
-
-static const char *wevt_opcode_default(uint64_t opcode, size_t *len) {
-    static __thread char buf[7 + UINT64_MAX_LENGTH + 1];
-    strcpy(buf, "Opcode ");
-    *len = 7 + print_uint64(&buf[7], opcode);
-    return buf;
 }
 
 static void wevt_get_opcode(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
     TXT_UTF8 *dst = &log->ops.opcode;
     uint64_t value = ev->opcode;
 
-    dst->used = 0; // empty our response
+    wevt_utf8_empty(dst);
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageOpcode;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_OPCODE;
@@ -253,9 +233,7 @@ static void wevt_get_opcode(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE 
         size_t len;
         const char *hardcoded = wevt_opcode_hardcoded(value, &len);
         if(hardcoded) {
-            txt_utf8_resize(dst, len + 1,  false);
-            memcpy(dst->data, hardcoded, len + 1);
-            dst->used = len + 1;
+            txt_utf8_set(dst, hardcoded,  len);
             dst->src = TXT_SOURCE_HARDCODED;
         }
         else {
@@ -269,35 +247,22 @@ static void wevt_get_opcode(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE 
         wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
     }
 
-    if(dst->used <= 1) {
-        // an empty value, provide something meaningful
-        size_t len = 0;
-        const char *s = wevt_opcode_default(value, &len);
-        txt_utf8_resize(dst, len + 1,  false);
-        memcpy(dst->data, s, len + 1);
-        dst->used = len + 1;
-    }
+    txt_utf8_set_numeric_if_empty(
+        dst, WINEVENT_NAME_OPCODE_PREFIX, sizeof(WINEVENT_NAME_OPCODE_PREFIX) - 1, ev->opcode);
 }
 
 static const char *wevt_task_hardcoded(uint64_t task, size_t *len) {
     switch(task) {
-        case 0: *len = 4; return "None";
+        case WINEVENT_TASK_NONE: SET_LEN_AND_RETURN(WINEVENT_NAME_NONE);
         default: *len = 0; return NULL;
     }
-}
-
-static const char *wevt_task_default(uint64_t task, size_t *len) {
-    static __thread char buf[5 + UINT64_MAX_LENGTH + 1];
-    strcpy(buf, "Task ");
-    *len = 5 + print_uint64(&buf[5], task);
-    return buf;
 }
 
 static void wevt_get_task(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
     TXT_UTF8 *dst = &log->ops.task;
     uint64_t value = ev->task;
 
-    dst->used = 0; // empty our response
+    wevt_utf8_empty(dst);
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageTask;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_TASK;
@@ -307,9 +272,7 @@ static void wevt_get_task(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h
         size_t len;
         const char *hardcoded = wevt_task_hardcoded(value, &len);
         if(hardcoded) {
-            txt_utf8_resize(dst, len + 1,  false);
-            memcpy(dst->data, hardcoded, len + 1);
-            dst->used = len + 1;
+            txt_utf8_set(dst, hardcoded,  len);
             dst->src = TXT_SOURCE_HARDCODED;
         }
         else {
@@ -323,70 +286,72 @@ static void wevt_get_task(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h
         wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
     }
 
-    if(dst->used <= 1) {
-        // an empty value, provide something meaningful
-        size_t len = 0;
-        const char *s = wevt_task_default(value, &len);
-        txt_utf8_resize(dst, len + 1,  false);
-        memcpy(dst->data, s, len + 1);
-        dst->used = len + 1;
-    }
+    txt_utf8_set_numeric_if_empty(
+        dst, WINEVENT_NAME_TASK_PREFIX, sizeof(WINEVENT_NAME_TASK_PREFIX) - 1, ev->task);
 }
 
-static const char *wevt_keywords_hardcoded(uint64_t keywords, size_t *len) {
-    switch(keywords) {
-        case 0: *len = 4; return "None";
-        default: *len = 0; return NULL;
-    }
-}
+#define SET_BITS(msk, txt) { .mask = msk, .name = txt, .len = sizeof(txt) - 1, }
 
-static const char *wevt_keywords_default(uint64_t task, size_t *len) {
-    static __thread char buf[9 + UINT64_MAX_LENGTH + 1];
-    strcpy(buf, "Keywords ");
-    *len = 9 + print_uint64(&buf[9], task);
-    return buf;
+static uint64_t wevt_keywords_handle_reserved(uint64_t value, TXT_UTF8 *dst) {
+    struct {
+        uint64_t mask;
+        const char *name;
+        size_t len;
+    } bits[] = {
+        SET_BITS(WINEVENT_KEYWORD_EVENTLOG_CLASSIC, WINEVENT_NAME_EVENTLOG_CLASSIC),
+        SET_BITS(WINEVENT_KEYWORD_CORRELATION_HINT, WINEVENT_NAME_CORRELATION_HINT),
+        SET_BITS(WINEVENT_KEYWORD_AUDIT_SUCCESS,    WINEVENT_NAME_AUDIT_SUCCESS),
+        SET_BITS(WINEVENT_KEYWORD_AUDIT_FAILURE,    WINEVENT_NAME_AUDIT_FAILURE),
+        SET_BITS(WINEVENT_KEYWORD_SQM,              WINEVENT_NAME_SQM),
+        SET_BITS(WINEVENT_KEYWORD_WDI_DIAG,         WINEVENT_NAME_WDI_DIAG),
+        SET_BITS(WINEVENT_KEYWORD_WDI_CONTEXT,      WINEVENT_NAME_WDI_CONTEXT),
+        SET_BITS(WINEVENT_KEYWORD_RESPONSE_TIME,    WINEVENT_NAME_RESPONSE_TIME),
+    };
+
+    wevt_utf8_empty(dst);
+
+    for(size_t i = 0; i < sizeof(bits) / sizeof(bits[0]) ;i++) {
+        if((value & bits[i].mask) == bits[i].mask) {
+            txt_utf8_add_keywords_separator_if_needed(dst);
+            txt_utf8_append(dst, bits[i].name, bits[i].len);
+            value &= ~(bits[i].mask);
+            dst->src = TXT_SOURCE_HARDCODED;
+        }
+    }
+
+    // return it without any remaining reserved bits
+    return value & 0x0000FFFFFFFFFFFF;
 }
 
 static void wevt_get_keywords(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
     TXT_UTF8 *dst = &log->ops.keywords;
 
-    // microsoft suggests the high 16 bits are for internal use
-    uint64_t value = ev->keywords & 0x0000FFFFFFFFFFFF;
+    if(ev->keywords == WINEVT_KEYWORD_NONE) {
+        txt_utf8_resize(dst, sizeof(WINEVENT_NAME_NONE),  false);
+        memcpy(dst->data, WINEVENT_NAME_NONE, sizeof(WINEVENT_NAME_NONE));
+        dst->used = sizeof(WINEVENT_NAME_NONE);
+        dst->src = TXT_SOURCE_HARDCODED;
+    }
 
-    dst->used = 0; // empty our response
+    uint64_t value = wevt_keywords_handle_reserved(ev->keywords, dst);
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageKeyword;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_KEYWORDS;
-    bool is_publisher = is_valid_publisher_keywords(value, true);
 
-    if(!is_publisher) {
-        size_t len;
-        const char *hardcoded = wevt_keywords_hardcoded(value, &len);
-        if(hardcoded) {
-            txt_utf8_resize(dst, len + 1,  false);
-            memcpy(dst->data, hardcoded, len + 1);
-            dst->used = len + 1;
-            dst->src = TXT_SOURCE_HARDCODED;
-        }
-        else {
-            // since this is not a publisher value
-            // we expect to get the system description of it
-            wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
-        }
+    if(!value && dst->used <= 1) {
+        // no hardcoded info in the buffer, make it None
+        txt_utf8_set(dst, WINEVENT_NAME_NONE,  sizeof(WINEVENT_NAME_NONE) - 1);
+        dst->src = TXT_SOURCE_HARDCODED;
     }
-    else if (!publisher_get_keywords(dst, h, value)) {
-        // not found in the manifest, get it from the cache
-        wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+    else if (value && !publisher_get_keywords(dst, h, value) && dst->used <= 1) {
+        // the publisher did not provide any info and the description is still empty.
+        // the system returns 1 keyword, the highest bit, not a list
+        // so, when we call the system, we pass the original value (ev->keywords)
+        wevt_get_field_from_cache(log, ev->keywords, h, dst, &ev->provider, cache_type, flags);
     }
 
-    if(dst->used <= 1) {
-        // an empty value, provide something meaningful
-        size_t len = 0;
-        const char *s = wevt_keywords_default(value, &len);
-        txt_utf8_resize(dst, len + 1,  false);
-        memcpy(dst->data, s, len + 1);
-        dst->used = len + 1;
-    }
+    txt_utf8_set_hex_if_empty(
+        dst, WINEVENT_NAME_KEYWORDS_PREFIX, sizeof(WINEVENT_NAME_KEYWORDS_PREFIX) - 1, ev->keywords);
 }
 
 bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
