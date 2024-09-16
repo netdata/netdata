@@ -242,14 +242,18 @@ static int compare_ascending(const void *a, const void *b) {
     return 0;
 }
 
-// Comparison function for descending order (for Keywords)
-static int compare_descending(const void *a, const void *b) {
-    struct provider_data *d1 = (struct provider_data *)a;
-    struct provider_data *d2 = (struct provider_data *)b;
+//// Comparison function for descending order (for Keywords)
+//static int compare_descending(const void *a, const void *b) {
+//    struct provider_data *d1 = (struct provider_data *)a;
+//    struct provider_data *d2 = (struct provider_data *)b;
+//
+//    if (d1->value > d2->value) return -1;
+//    if (d1->value < d2->value) return 1;
+//    return 0;
+//}
 
-    if (d1->value > d2->value) return -1;
-    if (d1->value < d2->value) return 1;
-    return 0;
+static bool is_valid_always(uint64_t value __maybe_unused) {
+    return true;
 }
 
 static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *unicode, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id) {
@@ -293,8 +297,8 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
             message_id = EvtPublisherMetadataKeywordMessageID;
             value_id = EvtPublisherMetadataKeywordValue;
             value_bits = 64;
-            is_valid = is_valid_publisher_keywords;
-            compare_func = compare_descending;
+            is_valid = is_valid_always;
+            compare_func = NULL;
             break;
 
         default:
@@ -385,7 +389,7 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
             d->hash = XXH3_64bits(d->name, d->len);
     }
 
-    if(itemCount > 1) {
+    if(itemCount > 1 && compare_func != NULL) {
         // Sort the array based on the value (ascending for all except keywords, descending for keywords)
         qsort(l->array, itemCount, sizeof(struct provider_data), compare_func);
     }

@@ -207,25 +207,27 @@ static inline bool wevt_get_uuid_by_type(EVT_VARIANT *ev, ND_UUID *dst) {
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-severity-levels
 static inline bool is_valid_publisher_level(uint64_t level) {
     // the spec says >= 16, but many publishers redefine the standard ones (<=5)
-    // so we remove the lower bound
+    // so, we remove the lower bound
     return level <= 255;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-tasks-and-opcodes
 static inline bool is_valid_publisher_opcode(uint64_t opcode) {
     // the spec says >= 16, but many publishers redefine the standard ones (<=10)
-    // so we remove the lower bound
+    // so, we remove the lower bound
     return opcode <= 239;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-tasks-and-opcodes
 static inline bool is_valid_publisher_task(uint64_t task) {
-    return task > 0 && task <= 0xFFFF;
+    // the spec says > 0, but publishers define zero too
+    // so, we remove the lower bound
+    return task <= 0xFFFF;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-keywords-used-to-classify-types-of-events
 static inline bool is_valid_publisher_keywords(uint64_t keyword) {
-    return keyword > 0 && keyword <= 0x0000FFFFFFFFFFFF;
+    return keyword <= 0x0000FFFFFFFFFFFF;
 }
 
 #endif //NETDATA_WINDOWS_EVENTS_QUERY_H

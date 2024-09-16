@@ -268,7 +268,7 @@ static void wevt_get_level(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *
     uint64_t value = ev->level;
 
     dst->used = 0; // empty our response
-    if(value <= 5) {
+    if(value < 16) {
         txt_utf8_resize(dst, 128,  false);
         strcpy(dst->data, wevt_hardcoded_level(value));
         dst->used = strlen(dst->data) + 1;
