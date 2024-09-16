@@ -201,6 +201,14 @@ static inline void wevt_facets_register_bin_data(WEVT_LOG *log, FACETS *facets) 
     facets_row_bin_data_set(facets, wevt_cleanup_bin_data, d);
 }
 
+static void wevt_lazy_loading_event_and_xml(struct wevt_bin_data *d) {
+    if(!d->log->ops.xml.used)
+        wevt_get_xml_utf8(d->log, d->publisher, d->bookmark, &d->log->ops.xml);
+
+    if(!d->log->ops.event.used)
+        wevt_get_event_utf8(d->log, d->publisher, d->bookmark, &d->log->ops.event);
+}
+
 static void wevt_render_xml(
         FACETS *facets,
         BUFFER *json_array,
@@ -214,7 +222,7 @@ static void wevt_render_xml(
         return;
     }
 
-    wevt_get_xml_utf8(d->log, d->publisher, d->bookmark, &d->log->ops.xml);
+    wevt_lazy_loading_event_and_xml(d);
     buffer_json_add_array_item_string(json_array, d->log->ops.xml.data);
 }
 
@@ -231,8 +239,73 @@ static void wevt_render_message(
         return;
     }
 
-    wevt_get_event_utf8(d->log, d->publisher, d->bookmark, &d->log->ops.event);
-    buffer_json_add_array_item_string(json_array, d->log->ops.event.data);
+    wevt_lazy_loading_event_and_xml(d);
+
+    if(d->log->ops.event.used <= 1) {
+        TXT_UTF8 *xml = &d->log->ops.xml;
+
+        buffer_flush(rkv->wb);
+
+        bool added_message = false;
+        if(xml->used > 1) {
+            const char *message_path[] = {
+                    "RenderingInfo",
+                    "Message",
+                    NULL};
+
+            added_message = buffer_xml_extract_and_print_value(
+                    rkv->wb,
+                    xml->data, xml->used - 1,
+                    NULL,
+                    message_path);
+        }
+
+        if(!added_message) {
+            const FACET_ROW_KEY_VALUE *event_id_rkv = dictionary_get(row->dict, WEVT_FIELD_EVENTID);
+            if (event_id_rkv && buffer_strlen(event_id_rkv->wb)) {
+                buffer_fast_strcat(rkv->wb, "Event ", 6);
+                buffer_fast_strcat(rkv->wb, buffer_tostring(event_id_rkv->wb), buffer_strlen(event_id_rkv->wb));
+            } else
+                buffer_strcat(rkv->wb, "Unknown Event ");
+
+            const FACET_ROW_KEY_VALUE *provider_rkv = dictionary_get(row->dict, WEVT_FIELD_PROVIDER);
+            if (provider_rkv && buffer_strlen(provider_rkv->wb)) {
+                buffer_fast_strcat(rkv->wb, " of ", 4);
+                buffer_fast_strcat(rkv->wb, buffer_tostring(provider_rkv->wb), buffer_strlen(provider_rkv->wb));
+                buffer_putc(rkv->wb, '.');
+            } else
+                buffer_strcat(rkv->wb, "of unknown Provider.");
+        }
+
+        if(xml->used > 1) {
+            const char *event_path[] = {
+                    "EventData",
+                    NULL
+            };
+            bool added_event_data = buffer_extract_and_print_xml(
+                    rkv->wb,
+                    xml->data, xml->used - 1,
+                    "\n\nRelated event data:\n",
+                    event_path);
+
+            const char *user_path[] = {
+                    "UserData",
+                    NULL
+            };
+            bool added_user_data = buffer_extract_and_print_xml(
+                    rkv->wb,
+                    xml->data, xml->used - 1,
+                    "\n\nRelated user data:\n",
+                    user_path);
+
+            if(!added_event_data && !added_user_data)
+                buffer_strcat(rkv->wb, " Without any related data.");
+        }
+
+        buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
+    }
+    else
+        buffer_json_add_array_item_string(json_array, d->log->ops.event.data);
 }
 
 static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
@@ -512,11 +585,10 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
             facets, WEVT_FIELD_TASK "ID", sizeof(WEVT_FIELD_TASK) + 2 - 1, str, len);
     }
 
-//    bytes += log->ops.xml.used * 2;
-//    facets_add_key_value_length(
-//        facets, WEVT_FIELD_XML, sizeof(WEVT_FIELD_XML) - 1,
-//        log->ops.xml.data, log->ops.xml.used - 1);
-
+    // we need to zero the lengths of the event and the xml
+    // because we check if they are there before fetching them.
+    log->ops.event.used = 0;
+    log->ops.xml.used = 0;
     wevt_facets_register_bin_data(log, facets);
 
 #ifdef NETDATA_INTERNAL_CHECKS

@@ -108,31 +108,23 @@ cleanup:
 
 static bool wevt_get_field_from_events_log(
     WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle,
-    TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS flags, const char *empty) {
+    TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS flags) {
 
     dst->src = TXT_SOURCE_EVENT_LOG;
 
     if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0, flags))
         return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
 
-    if(empty) {
-        txt_utf8_resize(dst, 128, false);
-        dst->used = snprintfz(dst->data, dst->size, "%s", empty);
-    }
-    else
-        wevt_utf8_empty(dst);
-
+    wevt_utf8_empty(dst);
     return false;
 }
 
 bool wevt_get_event_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    return wevt_get_field_from_events_log(
-        log, p, event_handle, dst, EvtFormatMessageEvent, "No event message for this event.");
+    return wevt_get_field_from_events_log(log, p, event_handle, dst, EvtFormatMessageEvent);
 }
 
 bool wevt_get_xml_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    return wevt_get_field_from_events_log(
-        log, p, event_handle, dst, EvtFormatMessageXml, "No XML in this event entry.");
+    return wevt_get_field_from_events_log(log, p, event_handle, dst, EvtFormatMessageXml);
 }
 
 static inline void wevt_event_done(WEVT_LOG *log) {
@@ -160,7 +152,7 @@ static void wevt_get_field_from_cache(
     if (field_cache_get(cache_type, provider, value, dst))
         return;
 
-    wevt_get_field_from_events_log(log, h, log->bookmark, dst, flags, NULL);
+    wevt_get_field_from_events_log(log, h, log->bookmark, dst, flags);
     field_cache_set(cache_type, provider, value, dst);
 }
 
