@@ -434,7 +434,7 @@ bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
         wevt_field_get_sid(&content[FIELD_USER_ID], &log->ops.user);
 
         PROVIDER_META_HANDLE *h = log->publisher =
-            publisher_get(ev->provider, log->ops.content.data[FIELD_PROVIDER_NAME].StringVal);
+            publisher_get(ev->provider, content[FIELD_PROVIDER_NAME].StringVal);
 
         wevt_get_level(log, ev, h);
         wevt_get_task(log, ev, h);
