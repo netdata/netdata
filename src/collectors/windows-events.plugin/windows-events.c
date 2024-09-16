@@ -309,6 +309,8 @@ static void wevt_render_message(
 }
 
 static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
+    // the order of the fields here, controls the order of the fields at the table presented
+
     FACETS *facets = lqs->facets;
     LOGS_QUERY_REQUEST *rq = &lqs->rq;
 
@@ -320,18 +322,15 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 
     facets_register_key_name(
             facets, WEVT_FIELD_CHANNEL,
-            rq->default_facet |
-            FACET_KEY_OPTION_FTS);
+            rq->default_facet | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_PROVIDER,
-            rq->default_facet |
-            FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
+            rq->default_facet | FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_SOURCE,
-            rq->default_facet |
-            FACET_KEY_OPTION_FTS);
+            rq->default_facet | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_USER,
@@ -357,18 +356,6 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
     facets_register_key_name(
             facets, WEVT_FIELD_THREADID,
             rq->default_facet | FACET_KEY_OPTION_FTS);
-
-    facets_register_key_name(
-            facets, WEVT_FIELD_TASK,
-            rq->default_facet | FACET_KEY_OPTION_FTS);
-
-    facets_register_key_name(
-            facets, WEVT_FIELD_PROCESSID,
-            rq->default_facet | FACET_KEY_OPTION_FTS);
-
-    facets_register_key_name(
-        facets, WEVT_FIELD_THREADID,
-        rq->default_facet | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_TASK,
