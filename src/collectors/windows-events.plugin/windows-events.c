@@ -371,19 +371,19 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
         rq->default_facet | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
+            facets, WEVT_FIELD_TASK,
+            rq->default_facet | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_VISIBLE);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_TASK "ID",
+            FACET_KEY_OPTION_NONE);
+
+    facets_register_key_name(
             facets, WEVT_FIELD_OPCODE,
             rq->default_facet | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_VISIBLE);
 
     facets_register_key_name(
             facets, WEVT_FIELD_OPCODE "ID",
-            FACET_KEY_OPTION_NONE);
-
-    facets_register_key_name(
-            facets, WEVT_FIELD_TASK,
-            rq->default_facet | FACET_KEY_OPTION_FTS);
-
-    facets_register_key_name(
-            facets, WEVT_FIELD_TASK "ID",
             FACET_KEY_OPTION_NONE);
 
     facets_register_key_name(
