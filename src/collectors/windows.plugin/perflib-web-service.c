@@ -80,19 +80,47 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if(!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
             strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
 
+        // We are not ploting _Total here, because cloud will group the sites
+        if(strcasecmp(windows_shared_buffer, "_Total") == 0) {
+            continue;
+        }
+
         netdata_fix_chart_name(windows_shared_buffer);
         struct web_service *p = dictionary_set(web_services, windows_shared_buffer, NULL, sizeof(*p));
 
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentAnonymousUser);
-
-        /*
-        if(!p->st) {
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISReceivedBytesTotal) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISSentBytesTotal)) {
         }
 
-        // Convert to Celsius before to plot
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesReceivedTotal) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesSentTotal)) {
+        }
 
-        rrdset_done(p->st);
-        */
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentConnections)) {
+        }
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISConnAttemptsAllInstancesTotal)) {
+        }
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentAnonymousUser) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentNonAnonymousUsers)) {
+        }
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentISAPIExtRequests)) {
+        }
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISIPAPIExtRequestsTotal)) {
+        }
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISLockedErrorsTotal) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISNotFoundErrorsTotal)) {
+        }
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISLogonAttemptsTotal)) {
+        }
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISUptime)) {
+        }
     }
 
     return true;
