@@ -1,0 +1,207 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-nginxunit
+      plugin_name: go.d.plugin
+      module_name: nginxunit
+      monitored_instance:
+        name: NGINX Unit
+        link: https://unit.nginx.org/
+        categories:
+          - data-collection.web-servers-and-web-proxies
+        icon_filename: nginx.svg
+      related_resources:
+        integrations:
+          list: []
+      alternative_monitored_instances: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - nginx
+        - unit
+        - web
+        - appserver
+        - http
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the activity and performance of NGINX Unit servers, and collects metrics such as the number of connections, their status, and client requests.
+        method_description: |
+          It sends HTTP requests to the NGINX Unit [Status API](https://unit.nginx.org/statusapi/).
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector can automatically detect NGINX Unit instances running on:
+
+            - localhost that are listening on port 8000
+            - within Docker containers
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Enable HTTP Control API
+            description: |
+              See [Control API](https://unit.nginx.org/controlapi/#configuration-api) documentation.
+      configuration:
+        file:
+          name: go.d/nginxunit.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: The URL of the NGINX Unit HTTP Control API.
+              default_value: http://127.0.0.1:8000
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8000
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1::8000
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: NGINX Unit with enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8000
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8000
+                
+                  - name: remote
+                    url: http://192.0.2.1:8000
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: nginxunit.requests_rate
+              description: Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: nginxunit.connections_rate
+              description: Connections
+              unit: connections/s
+              chart_type: stacked
+              dimensions:
+                - name: accepted
+                - name: closed
+            - name: nginxunit.connections_current
+              description: Current Connections
+              unit: connections
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: idle

@@ -34,6 +34,11 @@
         "description": "If an endpoint does not return at least one metric with the specified prefix, the data is not processed.",
         "type": "string"
       },
+      "label_prefix": {
+        "title": "Label prefix",
+        "description": "An optional prefix that will be added to all labels of all charts. If set, the label names will be automatically formatted as `prefix_name` (the prefix followed by an underscore and the original name).",
+        "type": "string"
+      },
       "app": {
         "title": "Application",
         "description": "If set, this value will be used in the chart context as 'prometheus.{app}.{metric_name}'.",

@@ -4,14 +4,7 @@
 #include "aclk_tx_msgs.h"
 #include "../../web/server/web_client_cache.h"
 
-#define WEB_HDR_ACCEPT_ENC "Accept-Encoding:"
-
 static HTTP_ACL default_aclk_http_acl = HTTP_ACL_ALL_FEATURES;
-
-pthread_cond_t query_cond_wait = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
-#define QUERY_THREAD_LOCK pthread_mutex_lock(&query_lock_wait)
-#define QUERY_THREAD_UNLOCK pthread_mutex_unlock(&query_lock_wait)
 
 struct pending_req_list {
     const char *msg_id;

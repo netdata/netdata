@@ -5,7 +5,7 @@
 #include "daemon/common.h"
 
 #include "aclk_util.h"
-#include "aclk_rrdhost_state.h"
+//#include "aclk_rrdhost_state.h"
 
 // How many MQTT PUBACKs we need to get to consider connection
 // stable for the purposes of TBEB (truncated binary exponential backoff)

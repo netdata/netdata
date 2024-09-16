@@ -19,6 +19,7 @@
   "tls_skip_verify": true,
   "name": "ok",
   "app": "ok",
+  "label_prefix": "ok",
   "bearer_token_file": "ok",
   "selector": {
     "allow": [

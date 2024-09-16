@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package example
+package testrandom
 
 import (
 	_ "embed"
@@ -13,7 +13,7 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("example", module.Creator{
+	module.Register("testrandom", module.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: module.Defaults{
 			UpdateEvery: module.UpdateEvery,
@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Example {
-	return &Example{
+func New() *TestRandom {
+	return &TestRandom{
 		Config: Config{
 			Charts: ConfigCharts{
 				Num:  1,
@@ -58,7 +58,7 @@ type (
 	}
 )
 
-type Example struct {
+type TestRandom struct {
 	module.Base // should be embedded by every module
 	Config      `yaml:",inline"`
 
@@ -67,38 +67,38 @@ type Example struct {
 	collectedDims map[string]bool
 }
 
-func (e *Example) Configuration() any {
-	return e.Config
+func (tr *TestRandom) Configuration() any {
+	return tr.Config
 }
 
-func (e *Example) Init() error {
-	err := e.validateConfig()
+func (tr *TestRandom) Init() error {
+	err := tr.validateConfig()
 	if err != nil {
-		e.Errorf("config validation: %v", err)
+		tr.Errorf("config validation: %v", err)
 		return err
 	}
 
-	charts, err := e.initCharts()
+	charts, err := tr.initCharts()
 	if err != nil {
-		e.Errorf("charts init: %v", err)
+		tr.Errorf("charts init: %v", err)
 		return err
 	}
-	e.charts = charts
+	tr.charts = charts
 	return nil
 }
 
-func (e *Example) Check() error {
+func (tr *TestRandom) Check() error {
 	return nil
 }
 
-func (e *Example) Charts() *module.Charts {
-	return e.charts
+func (tr *TestRandom) Charts() *module.Charts {
+	return tr.charts
 }
 
-func (e *Example) Collect() map[string]int64 {
-	mx, err := e.collect()
+func (tr *TestRandom) Collect() map[string]int64 {
+	mx, err := tr.collect()
 	if err != nil {
-		e.Error(err)
+		tr.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -107,4 +107,4 @@ func (e *Example) Collect() map[string]int64 {
 	return mx
 }
 
-func (e *Example) Cleanup() {}
+func (tr *TestRandom) Cleanup() {}
