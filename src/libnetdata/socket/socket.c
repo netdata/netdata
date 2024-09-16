@@ -119,22 +119,17 @@ bool fd_is_socket(int fd) {
     return true;
 }
 
-bool sock_has_output_error(int fd) {
-    if(fd < 0) {
-        //internal_error(true, "invalid socket %d", fd);
-        return false;
-    }
+#ifdef POLLRDHUP
+bool is_socket_closed(int fd) {
+    if(fd < 0)
+        return true;
 
 //    if(!fd_is_socket(fd)) {
 //        //internal_error(true, "fd %d is not a socket", fd);
 //        return false;
 //    }
 
-    short int errors = POLLERR | POLLHUP | POLLNVAL;
-
-#ifdef POLLRDHUP
-    errors |= POLLRDHUP;
-#endif
+    short int errors = POLLERR | POLLHUP | POLLNVAL | POLLRDHUP;
 
     struct pollfd pfd = {
             .fd = fd,
@@ -149,6 +144,31 @@ bool sock_has_output_error(int fd) {
 
     return ((pfd.revents & errors) || !(pfd.revents & POLLOUT));
 }
+#else
+bool is_socket_closed(int fd) {
+    if(fd < 0)
+        return true;
+
+    char buffer;
+    ssize_t result = recv(fd, &buffer, 1, MSG_PEEK | MSG_DONTWAIT);
+    if (result == 0) {
+        // Connection closed
+        return true;
+    }
+    else if (result < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            // No data available, but socket is still open
+            return false;
+        } else {
+            // An error occurred
+            return true;
+        }
+    }
+
+    // Data is available, socket is open
+    return false;
+}
+#endif
 
 int sock_setnonblock(int fd) {
     int flags;

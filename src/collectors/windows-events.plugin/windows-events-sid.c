@@ -26,11 +26,9 @@ typedef struct {
 
 static struct {
     SPINLOCK spinlock;
-    bool initialized;
     struct simple_hashtable_SID hashtable;
 } sid_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-        .hashtable = { 0 },
 };
 
 static inline SID_KEY *sid_value_to_key(SID_VALUE *s) {
@@ -41,15 +39,19 @@ static inline bool sid_cache_compar(SID_KEY *a, SID_KEY *b) {
     return a->len == b->len && memcmp(&a->sid, &b->sid, a->len) == 0;
 }
 
+void sid_cache_init(void) {
+    simple_hashtable_init_SID(&sid_globals.hashtable, 100);
+}
+
 static bool update_user(SID_VALUE *found, TXT_UTF8 *dst) {
     if(found && found->user) {
-        txt_utf8_resize(dst, found->user_len + 1);
+        txt_utf8_resize(dst, found->user_len + 1, false);
         memcpy(dst->data, found->user, found->user_len + 1);
         dst->used = found->user_len + 1;
         return true;
     }
 
-    txt_utf8_resize(dst, 1);
+    txt_utf8_resize(dst, 1, false);
     dst->data[0] = '\0';
     dst->used = 1;
     return false;
@@ -62,7 +64,7 @@ static void lookup_user(PSID *sid, TXT_UTF8 *dst) {
     DWORD domain_name_size = sizeof(domain_unicode) / sizeof(domain_unicode[0]);
     SID_NAME_USE sid_type;
 
-    txt_utf8_resize(dst, 1024);
+    txt_utf8_resize(dst, 1024, false);
 
     if (LookupAccountSidW(NULL, sid, account_unicode, &account_name_size, domain_unicode, &domain_name_size, &sid_type)) {
         const char *user = account2utf8(account_unicode);
@@ -94,10 +96,6 @@ bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst) {
     tmp->key.len = size;
 
     spinlock_lock(&sid_globals.spinlock);
-    if(!sid_globals.initialized) {
-        simple_hashtable_init_SID(&sid_globals.hashtable, 100);
-        sid_globals.initialized = true;
-    }
     SID_VALUE *found = simple_hashtable_get_SID(&sid_globals.hashtable, &tmp->key, tmp_key_size);
     spinlock_unlock(&sid_globals.spinlock);
     if(found) return update_user(found, dst);

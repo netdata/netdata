@@ -44,7 +44,7 @@ ssize_t send_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int fla
 int wait_on_socket_or_cancel_with_timeout(NETDATA_SSL *ssl, int fd, int timeout_ms, short int poll_events, short int *revents);
 
 bool fd_is_socket(int fd);
-bool sock_has_output_error(int fd);
+bool is_socket_closed(int fd);
 
 int sock_setnonblock(int fd);
 int sock_delnonblock(int fd);

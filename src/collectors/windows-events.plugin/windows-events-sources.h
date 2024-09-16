@@ -8,6 +8,11 @@
 typedef enum {
     WEVTS_NONE               = 0,
     WEVTS_ALL                = (1 << 0),
+    WEVTS_ADMIN              = (1 << 1),
+    WEVTS_OPERATIONAL        = (1 << 2),
+    WEVTS_ANALYTIC           = (1 << 3),
+    WEVTS_DEBUG              = (1 << 4),
+    WEVTS_WINDOWS            = (1 << 5),
 } WEVT_SOURCE_TYPE;
 
 typedef struct {
@@ -30,7 +35,12 @@ typedef struct {
 extern DICTIONARY *wevt_sources;
 extern DICTIONARY *used_hashes_registry;
 
-#define WEVT_SOURCE_ALL_NAME "All"
+#define WEVT_SOURCE_ALL_NAME                "All"
+#define WEVT_SOURCE_ALL_ADMIN_NAME          "All-Admin"
+#define WEVT_SOURCE_ALL_OPERATIONAL_NAME    "All-Operational"
+#define WEVT_SOURCE_ALL_ANALYTIC_NAME       "All-Analytic"
+#define WEVT_SOURCE_ALL_DEBUG_NAME          "All-Debug"
+#define WEVT_SOURCE_ALL_WINDOWS_NAME        "All-Windows"
 
 void wevt_sources_init(void);
 void wevt_sources_scan(void);
