@@ -164,103 +164,23 @@ static void wevt_get_field_from_cache(
     field_cache_set(cache_type, provider, value, dst);
 }
 
-static const char *wevt_hardcoded_opcode(uint64_t level) {
+static inline const char *wevt_level_hardcoded(uint64_t level, size_t *len) {
     switch(level) {
-        case 0: return "Info";
-        case 1: return "Start";
-        case 2: return "Stop";
-        case 3: return "DC Start";
-        case 4: return "DC Stop";
-        case 5: return "Extension";
-        case 6: return "Reply";
-        case 7: return "Resume";
-        case 8: return "Suspend";
-        case 9: return "Send";
-        case 240: return "Receive";
-        default: return "";
+        case 0: *len = 4; return "None";
+        case 1: *len = 8; return "Critical";
+        case 2: *len = 5; return "Error";
+        case 3: *len = 7; return "Warning";
+        case 4: *len = 11; return "Information";
+        case 5: *len = 7; return "Verbose";
+        default: return NULL;
     }
 }
 
-static void wevt_get_opcode(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
-    TXT_UTF8 *dst = &log->ops.opcode;
-    uint64_t value = ev->opcode;
-
-    dst->used = 0; // empty our response
-    if(value <= 10 || value >= 240) {
-        txt_utf8_resize(dst, 128,  false);
-        strcpy(dst->data, wevt_hardcoded_opcode(value));
-        dst->used = strlen(dst->data) + 1;
-        dst->src = TXT_SOURCE_HARDCODED;
-        return;
-    }
-
-    EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageOpcode;
-    WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_OPCODE;
-    bool is_cacheable = publisher_opcodes_cacheable(h);
-    bool is_publisher = is_valid_publisher_opcode(value);
-
-    if(!is_cacheable) {
-        // we cannot cache this - we have to get it every time
-        wevt_get_field_from_events_log(log, h, log->bookmark, dst, flags, NULL);
-    }
-    else if(is_publisher) {
-        // we should be able to find this in the publisher manifest
-        if (!publisher_opcode(dst, h, value)) {
-            // not found in the manifest, get it from the cache
-            wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
-        }
-    }
-    else {
-        // we can cache this information
-        wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
-    }
-}
-
-static void wevt_get_task(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
-    TXT_UTF8 *dst = &log->ops.task;
-    uint64_t value = ev->task;
-
-    dst->used = 0; // empty our response
-    if(!value) {
-        txt_utf8_resize(dst, 5,  false);
-        strcpy(dst->data, "None");
-        dst->used = 5;
-        dst->src = TXT_SOURCE_HARDCODED;
-        return;
-    }
-
-    EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageTask;
-    WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_TASK;
-    bool is_cacheable = publisher_tasks_cacheable(h);
-    bool is_publisher = is_valid_publisher_task(value);
-
-    if(!is_cacheable) {
-        // we cannot cache this - we have to get it every time
-        wevt_get_field_from_events_log(log, h, log->bookmark, dst, flags, NULL);
-    }
-    else if(is_publisher) {
-        // we should be able to find this in the publisher manifest
-        if (!publisher_get_task(dst, h, value)) {
-            // not found in the manifest, get it from the cache
-            wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
-        }
-    }
-    else {
-        // we can cache this information
-        wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
-    }
-}
-
-static const char *wevt_hardcoded_level(uint64_t level) {
-    switch(level) {
-        case 0: return "None";
-        case 1: return "Critical";
-        case 2: return "Error";
-        case 3: return "Warning";
-        case 4: return "Information";
-        case 5: return "Verbose";
-        default: return "";
-    }
+static const char *wevt_level_default(uint64_t level, size_t *len) {
+    static __thread char buf[6 + UINT64_MAX_LENGTH + 1];
+    strcpy(buf, "Level ");
+    *len = 6 + print_uint64(&buf[6], level);
+    return buf;
 }
 
 static void wevt_get_level(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
@@ -268,68 +188,212 @@ static void wevt_get_level(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *
     uint64_t value = ev->level;
 
     dst->used = 0; // empty our response
-    if(value < 16) {
-        txt_utf8_resize(dst, 128,  false);
-        strcpy(dst->data, wevt_hardcoded_level(value));
-        dst->used = strlen(dst->data) + 1;
-        dst->src = TXT_SOURCE_HARDCODED;
-        return;
-    }
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageLevel;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_LEVEL;
-    bool is_cacheable = publisher_levels_cacheable(h);
-    bool is_publisher = is_valid_publisher_level(value);
+    bool is_publisher = is_valid_publisher_level(value, true);
 
-    if(!is_cacheable) {
-        // we cannot cache this - we have to get it every time
-        wevt_get_field_from_events_log(log, h, log->bookmark, dst, flags, NULL);
-    }
-    else if(is_publisher) {
-        // we should be able to find this in the publisher manifest
-        if (!publisher_get_level(dst, h, value)) {
-            // not found in the manifest, get it from the cache
+    if(!is_publisher) {
+        size_t len;
+        const char *hardcoded = wevt_level_hardcoded(value, &len);
+        if(hardcoded) {
+            txt_utf8_resize(dst, len + 1,  false);
+            memcpy(dst->data, hardcoded, len + 1);
+            dst->used = len + 1;
+            dst->src = TXT_SOURCE_HARDCODED;
+        }
+        else {
+            // since this is not a publisher value
+            // we expect to get the system description of it
             wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
         }
     }
-    else {
-        // we can cache this information
+    else if (!publisher_get_level(dst, h, value)) {
+        // not found in the manifest, get it from the cache
         wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
     }
+
+    if(dst->used <= 1) {
+        // an empty value, provide something meaningful
+        size_t len = 0;
+        const char *s = wevt_level_default(value, &len);
+        txt_utf8_resize(dst, len + 1,  false);
+        memcpy(dst->data, s, len + 1);
+        dst->used = len + 1;
+    }
+}
+
+static const char *wevt_opcode_hardcoded(uint64_t level, size_t *len) {
+    switch(level) {
+        case 0: *len = 4; return "Info";
+        case 1: *len = 5; return "Start";
+        case 2: *len = 4; return "Stop";
+        case 3: *len = 8; return "DC Start";
+        case 4: *len = 7; return "DC Stop";
+        case 5: *len = 9; return "Extension";
+        case 6: *len = 5; return "Reply";
+        case 7: *len = 6; return "Resume";
+        case 8: *len = 7; return "Suspend";
+        case 9: *len = 4; return "Send";
+        case 240: *len = 7; return "Receive";
+        default: *len = 0; return NULL;
+    }
+}
+
+static const char *wevt_opcode_default(uint64_t opcode, size_t *len) {
+    static __thread char buf[7 + UINT64_MAX_LENGTH + 1];
+    strcpy(buf, "Opcode ");
+    *len = 7 + print_uint64(&buf[7], opcode);
+    return buf;
+}
+
+static void wevt_get_opcode(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
+    TXT_UTF8 *dst = &log->ops.opcode;
+    uint64_t value = ev->opcode;
+
+    dst->used = 0; // empty our response
+
+    EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageOpcode;
+    WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_OPCODE;
+    bool is_publisher = is_valid_publisher_opcode(value, true);
+
+    if(!is_publisher) {
+        size_t len;
+        const char *hardcoded = wevt_opcode_hardcoded(value, &len);
+        if(hardcoded) {
+            txt_utf8_resize(dst, len + 1,  false);
+            memcpy(dst->data, hardcoded, len + 1);
+            dst->used = len + 1;
+            dst->src = TXT_SOURCE_HARDCODED;
+        }
+        else {
+            // since this is not a publisher value
+            // we expect to get the system description of it
+            wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+        }
+    }
+    else if (!publisher_get_opcode(dst, h, value)) {
+        // not found in the manifest, get it from the cache
+        wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+    }
+
+    if(dst->used <= 1) {
+        // an empty value, provide something meaningful
+        size_t len = 0;
+        const char *s = wevt_opcode_default(value, &len);
+        txt_utf8_resize(dst, len + 1,  false);
+        memcpy(dst->data, s, len + 1);
+        dst->used = len + 1;
+    }
+}
+
+static const char *wevt_task_hardcoded(uint64_t task, size_t *len) {
+    switch(task) {
+        case 0: *len = 4; return "None";
+        default: *len = 0; return NULL;
+    }
+}
+
+static const char *wevt_task_default(uint64_t task, size_t *len) {
+    static __thread char buf[5 + UINT64_MAX_LENGTH + 1];
+    strcpy(buf, "Task ");
+    *len = 5 + print_uint64(&buf[5], task);
+    return buf;
+}
+
+static void wevt_get_task(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
+    TXT_UTF8 *dst = &log->ops.task;
+    uint64_t value = ev->task;
+
+    dst->used = 0; // empty our response
+
+    EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageTask;
+    WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_TASK;
+    bool is_publisher = is_valid_publisher_task(value, true);
+
+    if(!is_publisher) {
+        size_t len;
+        const char *hardcoded = wevt_task_hardcoded(value, &len);
+        if(hardcoded) {
+            txt_utf8_resize(dst, len + 1,  false);
+            memcpy(dst->data, hardcoded, len + 1);
+            dst->used = len + 1;
+            dst->src = TXT_SOURCE_HARDCODED;
+        }
+        else {
+            // since this is not a publisher value
+            // we expect to get the system description of it
+            wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+        }
+    }
+    else if (!publisher_get_task(dst, h, value)) {
+        // not found in the manifest, get it from the cache
+        wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+    }
+
+    if(dst->used <= 1) {
+        // an empty value, provide something meaningful
+        size_t len = 0;
+        const char *s = wevt_task_default(value, &len);
+        txt_utf8_resize(dst, len + 1,  false);
+        memcpy(dst->data, s, len + 1);
+        dst->used = len + 1;
+    }
+}
+
+static const char *wevt_keywords_hardcoded(uint64_t keywords, size_t *len) {
+    switch(keywords) {
+        case 0: *len = 4; return "None";
+        default: *len = 0; return NULL;
+    }
+}
+
+static const char *wevt_keywords_default(uint64_t task, size_t *len) {
+    static __thread char buf[9 + UINT64_MAX_LENGTH + 1];
+    strcpy(buf, "Keywords ");
+    *len = 9 + print_uint64(&buf[9], task);
+    return buf;
 }
 
 static void wevt_get_keywords(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
     TXT_UTF8 *dst = &log->ops.keywords;
+
+    // microsoft suggests the high 16 bits are for internal use
     uint64_t value = ev->keywords & 0x0000FFFFFFFFFFFF;
 
     dst->used = 0; // empty our response
-    if(!value) {
-        txt_utf8_resize(dst, 5,  false);
-        strcpy(dst->data, "None");
-        dst->used = 5;
-        dst->src = TXT_SOURCE_HARDCODED;
-        return;
-    }
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageKeyword;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_KEYWORDS;
-    bool is_cacheable = publisher_keywords_cacheable(h);
-    bool is_publisher = is_valid_publisher_keywords(value);
+    bool is_publisher = is_valid_publisher_keywords(value, true);
 
-    if(!is_cacheable) {
-        // we cannot cache this - we have to get it every time
-        wevt_get_field_from_events_log(log, h, log->bookmark, dst, flags, NULL);
-    }
-    else if(is_publisher) {
-        // we should be able to find this in the publisher manifest
-        if (!publisher_get_keywords(dst, h, value)) {
-            // not found in the manifest, get it from the cache
+    if(!is_publisher) {
+        size_t len;
+        const char *hardcoded = wevt_keywords_hardcoded(value, &len);
+        if(hardcoded) {
+            txt_utf8_resize(dst, len + 1,  false);
+            memcpy(dst->data, hardcoded, len + 1);
+            dst->used = len + 1;
+            dst->src = TXT_SOURCE_HARDCODED;
+        }
+        else {
+            // since this is not a publisher value
+            // we expect to get the system description of it
             wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
         }
     }
-    else {
-        // we can cache this information
+    else if (!publisher_get_keywords(dst, h, value)) {
+        // not found in the manifest, get it from the cache
         wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+    }
+
+    if(dst->used <= 1) {
+        // an empty value, provide something meaningful
+        size_t len = 0;
+        const char *s = wevt_keywords_default(value, &len);
+        txt_utf8_resize(dst, len + 1,  false);
+        memcpy(dst->data, s, len + 1);
+        dst->used = len + 1;
     }
 }
 

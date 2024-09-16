@@ -26,6 +26,7 @@ struct provider_data {
 };
 
 struct provider_list {
+    uint64_t min, max;
     bool exceeds_data_type;             // true when the manifest values exceed the capacity of the EvtXXX() API
     uint32_t total;                     // the number of entries in the array
     struct provider_data *array;        // the array of entries, sorted (for binary search)
@@ -252,17 +253,13 @@ static int compare_ascending(const void *a, const void *b) {
 //    return 0;
 //}
 
-static bool is_valid_always(uint64_t value __maybe_unused) {
-    return true;
-}
-
 static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *unicode, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id) {
     if(!h || !h->hMetadata) return;
 
     EVT_PUBLISHER_METADATA_PROPERTY_ID name_id, message_id, value_id;
     uint8_t value_bits = 32;
     int (*compare_func)(const void *, const void *);
-    bool (*is_valid)(uint64_t);
+    bool (*is_valid)(uint64_t, bool);
 
     switch(property_id) {
         case EvtPublisherMetadataLevels:
@@ -297,7 +294,7 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
             message_id = EvtPublisherMetadataKeywordMessageID;
             value_id = EvtPublisherMetadataKeywordValue;
             value_bits = 64;
-            is_valid = is_valid_always;
+            is_valid = is_valid_publisher_keywords;
             compare_func = NULL;
             break;
 
@@ -343,6 +340,8 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
     l->array = callocz(itemCount, sizeof(struct provider_data));
     l->total = itemCount;
 
+    uint64_t min = UINT64_MAX, max = 0;
+
     // Iterate over the list and populate the entries
     for (DWORD i = 0; i < itemCount; ++i) {
         struct provider_data *d = &l->array[i];
@@ -359,7 +358,13 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
                     break;
             }
 
-            if(!is_valid(d->value))
+            if(d->value < min)
+                min = d->value;
+
+            if(d->value > max)
+                max = d->value;
+
+            if(!is_valid(d->value, false))
                 l->exceeds_data_type = true;
         }
 
@@ -389,6 +394,9 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
             d->hash = XXH3_64bits(d->name, d->len);
     }
 
+    l->min = min;
+    l->max = max;
+
     if(itemCount > 1 && compare_func != NULL) {
         // Sort the array based on the value (ascending for all except keywords, descending for keywords)
         qsort(l->array, itemCount, sizeof(struct provider_data), compare_func);
@@ -404,6 +412,9 @@ cleanup:
 
 // lookup bitmap metdata (returns a comma separated list of strings)
 static bool publisher_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
+    if(value < l->min || value > l->max || !l->total || !l->array || l->exceeds_data_type)
+        return false;
+
     dst->used = 0;
 
     for(size_t k = 0; value && k < l->total; k++) {
@@ -440,44 +451,47 @@ static bool publisher_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, ui
     return (dst->used > 0);
 }
 
-// lookup a single value (returns its string)
-static bool publisher_value_metadata_linear(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
-    dst->used = 0;
-
-    for(size_t k = 0; k < l->total; k++) {
-        struct provider_data *d = &l->array[k];
-
-        if(d->value == value && d->name && d->len) {
-            const char *s = d->name;
-            size_t slen = d->len;
-
-            txt_utf8_resize(dst, slen + 1, false);
-
-            memcpy(dst->data, s, slen);
-            dst->used = slen;
-            dst->src = TXT_SOURCE_PUBLISHER;
-
-            break;
-        }
-    }
-
-    if(dst->used) {
-        txt_utf8_resize(dst, dst->used + 1, true);
-        dst->data[dst->used++] = 0;
-    }
-
-    fatal_assert(dst->used <= dst->size);
-
-    return (dst->used > 0);
-}
+//// lookup a single value (returns its string)
+//static bool publisher_value_metadata_linear(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
+//    if(value < l->min || value > l->max || !l->total || !l->array || l->exceeds_data_type)
+//        return false;
+//
+//    dst->used = 0;
+//
+//    for(size_t k = 0; k < l->total; k++) {
+//        struct provider_data *d = &l->array[k];
+//
+//        if(d->value == value && d->name && d->len) {
+//            const char *s = d->name;
+//            size_t slen = d->len;
+//
+//            txt_utf8_resize(dst, slen + 1, false);
+//
+//            memcpy(dst->data, s, slen);
+//            dst->used = slen;
+//            dst->src = TXT_SOURCE_PUBLISHER;
+//
+//            break;
+//        }
+//    }
+//
+//    if(dst->used) {
+//        txt_utf8_resize(dst, dst->used + 1, true);
+//        dst->data[dst->used++] = 0;
+//    }
+//
+//    fatal_assert(dst->used <= dst->size);
+//
+//    return (dst->used > 0);
+//}
 
 static bool publisher_value_metadata(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
-    if(l->total < 3) return publisher_value_metadata_linear(dst, l, value);
+    if(value < l->min || value > l->max || !l->total || !l->array || l->exceeds_data_type)
+        return false;
+
+    // if(l->total < 3) return publisher_value_metadata_linear(dst, l, value);
 
     dst->used = 0;
-
-    if (!l->total || !l->array)
-        return false;
 
     size_t left = 0;
     size_t right = l->total - 1;
@@ -526,7 +540,7 @@ bool publisher_tasks_cacheable(PROVIDER_META_HANDLE *h) {
     return h && !h->publisher->tasks.exceeds_data_type;
 }
 
-bool publisher_levels_cacheable(PROVIDER_META_HANDLE *h) {
+bool is_useful_publisher_for_levels(PROVIDER_META_HANDLE *h) {
     return h && !h->publisher->levels.exceeds_data_type;
 }
 
@@ -549,7 +563,7 @@ bool publisher_get_task(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) 
     return publisher_value_metadata(dst, &h->publisher->tasks, value);
 }
 
-bool publisher_opcode(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
+bool publisher_get_opcode(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
     if(!h) return false;
     return publisher_value_metadata(dst, &h->publisher->opcodes, value);
 }

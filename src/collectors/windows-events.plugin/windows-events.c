@@ -261,6 +261,10 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
+            facets, WEVT_FIELD_USER,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
             facets, WEVT_FIELD_EVENTID,
             rq->default_facet |
             FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
@@ -270,8 +274,8 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             rq->default_facet | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_EXPANDED_FILTER);
 
     facets_register_key_name(
-            facets, WEVT_FIELD_USER,
-            rq->default_facet | FACET_KEY_OPTION_FTS);
+            facets, WEVT_FIELD_LEVEL "ID",
+            FACET_KEY_OPTION_NONE);
 
     facets_register_key_name(
             facets, WEVT_FIELD_PROCESSID,
@@ -294,16 +298,28 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
         rq->default_facet | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
+            facets, WEVT_FIELD_OPCODE,
+            rq->default_facet | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_VISIBLE);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_OPCODE "ID",
+            FACET_KEY_OPTION_NONE);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_TASK,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_TASK "ID",
+            FACET_KEY_OPTION_NONE);
+
+    facets_register_key_name(
         facets, WEVT_FIELD_KEYWORDS,
         rq->default_facet | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
-        facets, WEVT_FIELD_OPCODE,
-        rq->default_facet | FACET_KEY_OPTION_FTS);
-
-    facets_register_key_name(
-        facets, WEVT_FIELD_TASK,
-        rq->default_facet | FACET_KEY_OPTION_FTS);
+            facets, WEVT_FIELD_KEYWORDS "ID",
+            FACET_KEY_OPTION_NONE);
 
     facets_register_dynamic_key_name(
         facets, WEVT_FIELD_MESSAGE,
@@ -314,22 +330,6 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             facets, WEVT_FIELD_XML,
             FACET_KEY_OPTION_NEVER_FACET,
             wevt_render_xml, NULL);
-
-    facets_register_key_name(
-        facets, WEVT_FIELD_LEVEL "ID",
-        FACET_KEY_OPTION_NONE);
-
-    facets_register_key_name(
-        facets, WEVT_FIELD_KEYWORDS "ID",
-        FACET_KEY_OPTION_NONE);
-
-    facets_register_key_name(
-        facets, WEVT_FIELD_OPCODE "ID",
-        FACET_KEY_OPTION_NONE);
-
-    facets_register_key_name(
-        facets, WEVT_FIELD_TASK "ID",
-        FACET_KEY_OPTION_NONE);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     facets_register_key_name(

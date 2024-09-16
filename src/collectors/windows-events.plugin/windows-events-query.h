@@ -9,14 +9,14 @@
 
 typedef struct wevt_event {
     uint64_t id;                        // EventRecordId (unique and sequential per channel)
-    uint16_t event_id;                  // This is the template that defines the message to be shown
     uint8_t  version;
     uint8_t  level;                     // The severity of event
-    uint64_t keywords;                  // Categorization of the event
     uint8_t  opcode;                    // we receive this as 8bit, but publishers use 32bit
+    uint16_t event_id;                  // This is the template that defines the message to be shown
     uint16_t task;
     uint32_t process_id;
     uint32_t thread_id;
+    uint64_t keywords;                  // Categorization of the event
     ND_UUID  provider;
     ND_UUID  correlation_activity_id;
     nsec_t   created_ns;
@@ -205,29 +205,43 @@ static inline bool wevt_get_uuid_by_type(EVT_VARIANT *ev, ND_UUID *dst) {
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-severity-levels
-static inline bool is_valid_publisher_level(uint64_t level) {
-    // the spec says >= 16, but many publishers redefine the standard ones (<=5)
-    // so, we remove the lower bound
-    return level <= 255;
+static inline bool is_valid_publisher_level(uint64_t level, bool strict) {
+    if(strict)
+        // when checking if the name is publisher independent
+        return level >= 16 && level <= 255;
+    else
+        // when checking acceptable values in publisher manifests
+        return level <= 255;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-tasks-and-opcodes
-static inline bool is_valid_publisher_opcode(uint64_t opcode) {
-    // the spec says >= 16, but many publishers redefine the standard ones (<=10)
-    // so, we remove the lower bound
-    return opcode <= 239;
+static inline bool is_valid_publisher_opcode(uint64_t opcode, bool strict) {
+    if(strict)
+        // when checking if the name is publisher independent
+        return opcode >= 10 && opcode <= 239;
+    else
+        // when checking acceptable values in publisher manifests
+        return opcode <= 255;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-tasks-and-opcodes
-static inline bool is_valid_publisher_task(uint64_t task) {
-    // the spec says > 0, but publishers define zero too
-    // so, we remove the lower bound
-    return task <= 0xFFFF;
+static inline bool is_valid_publisher_task(uint64_t task, bool strict) {
+    if(strict)
+        // when checking if the name is publisher independent
+        return task > 0 && task <= 0xFFFF;
+    else
+        // when checking acceptable values in publisher manifests
+        return task <= 0xFFFF;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-keywords-used-to-classify-types-of-events
-static inline bool is_valid_publisher_keywords(uint64_t keyword) {
-    return keyword <= 0x0000FFFFFFFFFFFF;
+static inline bool is_valid_publisher_keywords(uint64_t keyword, bool strict) {
+    if(strict)
+        // when checking if the name is publisher independent
+        return keyword > 0 && keyword <= 0x0000FFFFFFFFFFFF;
+    else
+        // when checking acceptable values in publisher manifests
+        return true;
 }
 
 #endif //NETDATA_WINDOWS_EVENTS_QUERY_H
