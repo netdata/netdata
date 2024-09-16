@@ -51,17 +51,32 @@ void field_cache_init(void) {
 }
 
 static inline bool should_zero_provider(WEVT_FIELD_TYPE type, uint64_t value) {
-    return (value == 0 || (type == WEVT_FIELD_TYPE_LEVEL && value <= 5));
+    switch(type) {
+        case WEVT_FIELD_TYPE_LEVEL:
+            return !is_valid_publisher_level(value);
+
+        case WEVT_FIELD_TYPE_KEYWORDS:
+            return !is_valid_publisher_keywords(value);
+
+        case WEVT_FIELD_TYPE_OPCODE:
+            return !is_valid_publisher_opcode(value);
+
+        case WEVT_FIELD_TYPE_TASK:
+            return !is_valid_publisher_task(value);
+
+        default:
+            return false;
+    }
 }
 
-bool field_cache_get(WEVT_FIELD_TYPE type, ND_UUID uuid, uint64_t value, TXT_UTF8 *dst) {
+bool field_cache_get(WEVT_FIELD_TYPE type, const ND_UUID *uuid, uint64_t value, TXT_UTF8 *dst) {
     fatal_assert(type < WEVT_FIELD_TYPE_MAX);
 
     struct ht *ht = &fdc.ht[type];
 
     WEVT_FIELD_KEY t = {
             .value = value,
-            .provider = should_zero_provider(type, value) ? UUID_ZERO : uuid,
+            .provider = should_zero_provider(type, value) ? UUID_ZERO : *uuid,
     };
     XXH64_hash_t hash = XXH3_64bits(&t, sizeof(t));
 
@@ -74,20 +89,39 @@ bool field_cache_get(WEVT_FIELD_TYPE type, ND_UUID uuid, uint64_t value, TXT_UTF
         txt_utf8_resize(dst, v->name_size, false);
         memcpy(dst->data, v->name, v->name_size);
         dst->used = v->name_size;
+        dst->src = TXT_SOURCE_FIELD_CACHE;
         return true;
     }
 
     return false;
 }
 
-void field_cache_set(WEVT_FIELD_TYPE type, ND_UUID uuid, uint64_t value, TXT_UTF8 *name) {
+static WEVT_FIELD_VALUE *wevt_create_cache_entry(WEVT_FIELD_KEY *t, TXT_UTF8 *name, size_t *bytes) {
+    *bytes = sizeof(WEVT_FIELD_VALUE) + name->used;
+    WEVT_FIELD_VALUE *v = callocz(1, *bytes);
+    v->key = *t;
+    memcpy(v->name, name->data, name->used);
+    v->name_size = name->used;
+    return v;
+}
+
+//static bool is_numeric(const char *s) {
+//    while(*s) {
+//        if(!isdigit((uint8_t)*s++))
+//            return false;
+//    }
+//
+//    return true;
+//}
+
+void field_cache_set(WEVT_FIELD_TYPE type, const ND_UUID *uuid, uint64_t value, TXT_UTF8 *name) {
     fatal_assert(type < WEVT_FIELD_TYPE_MAX);
 
     struct ht *ht = &fdc.ht[type];
 
     WEVT_FIELD_KEY t = {
             .value = value,
-            .provider = should_zero_provider(type, value) ? UUID_ZERO : uuid,
+            .provider = should_zero_provider(type, value) ? UUID_ZERO : *uuid,
     };
     XXH64_hash_t hash = XXH3_64bits(&t, sizeof(t));
 
@@ -95,17 +129,29 @@ void field_cache_set(WEVT_FIELD_TYPE type, ND_UUID uuid, uint64_t value, TXT_UTF
     SIMPLE_HASHTABLE_SLOT_FIELDS_CACHE *slot = simple_hashtable_get_slot_FIELDS_CACHE(&ht->ht, hash, &t, true);
     WEVT_FIELD_VALUE *v = SIMPLE_HASHTABLE_SLOT_DATA(slot);
     if(!v) {
-        size_t bytes = sizeof(*v) + name->used;
-        v = callocz(1, bytes);
-        v->key = t;
-        memcpy(v->name, name->data, name->used);
-        v->name_size = name->used;
-
+        size_t bytes;
+        v = wevt_create_cache_entry(&t, name, &bytes);
         simple_hashtable_set_slot_FIELDS_CACHE(&ht->ht, slot, hash, v);
 
         ht->allocations++;
         ht->bytes += bytes;
     }
+//    else {
+//        if((v->name_size == 1 && name->used > 0) || is_numeric(v->name)) {
+//            size_t bytes;
+//            WEVT_FIELD_VALUE *nv = wevt_create_cache_entry(&t, name, &bytes);
+//            simple_hashtable_set_slot_FIELDS_CACHE(&ht->ht, slot, hash, nv);
+//            ht->bytes += name->used;
+//            ht->bytes -= v->name_size;
+//            freez(v);
+//        }
+//        else if(name->used > 2 && !is_numeric(name->data) && (v->name_size != name->used || strcasecmp(v->name, name->data) != 0)) {
+//            const char *a = v->name;
+//            const char *b = name->data;
+//            int x = 0;
+//            x++;
+//        }
+//    }
 
     spinlock_unlock(&ht->spinlock);
 }

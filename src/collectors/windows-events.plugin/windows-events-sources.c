@@ -10,6 +10,21 @@ WEVT_SOURCE_TYPE wevt_internal_source_type(const char *value) {
     if(strcmp(value, WEVT_SOURCE_ALL_NAME) == 0)
         return WEVTS_ALL;
 
+    if(strcmp(value, WEVT_SOURCE_ALL_ADMIN_NAME) == 0)
+        return WEVTS_ADMIN;
+
+    if(strcmp(value, WEVT_SOURCE_ALL_OPERATIONAL_NAME) == 0)
+        return WEVTS_OPERATIONAL;
+
+    if(strcmp(value, WEVT_SOURCE_ALL_ANALYTIC_NAME) == 0)
+        return WEVTS_ANALYTIC;
+
+    if(strcmp(value, WEVT_SOURCE_ALL_DEBUG_NAME) == 0)
+        return WEVTS_DEBUG;
+
+    if(strcmp(value, WEVT_SOURCE_ALL_WINDOWS_NAME) == 0)
+        return WEVTS_WINDOWS;
+
     return WEVTS_NONE;
 }
 
@@ -173,6 +188,21 @@ void wevt_sources_to_json_array(BUFFER *wb) {
 
         dictionary_set(dict, WEVT_SOURCE_ALL_NAME, &t, sizeof(t));
 
+        if(src->source_type & WEVTS_ADMIN)
+            dictionary_set(dict, WEVT_SOURCE_ALL_ADMIN_NAME, &t, sizeof(t));
+
+        if(src->source_type & WEVTS_OPERATIONAL)
+            dictionary_set(dict, WEVT_SOURCE_ALL_OPERATIONAL_NAME, &t, sizeof(t));
+
+        if(src->source_type & WEVTS_ANALYTIC)
+            dictionary_set(dict, WEVT_SOURCE_ALL_ANALYTIC_NAME, &t, sizeof(t));
+
+        if(src->source_type & WEVTS_DEBUG)
+            dictionary_set(dict, WEVT_SOURCE_ALL_DEBUG_NAME, &t, sizeof(t));
+
+        if(src->source_type & WEVTS_WINDOWS)
+            dictionary_set(dict, WEVT_SOURCE_ALL_WINDOWS_NAME, &t, sizeof(t));
+
         if(src->source)
             dictionary_set(dict, string2str(src->source), &t, sizeof(t));
     }
@@ -228,7 +258,27 @@ void wevt_sources_scan(void) {
             const char *name = channel2utf8(channel);
             const char *fullname = strdupz(name);
             char *slash = strchr(name, '/');
-            if(slash) *slash = '\0';
+            WEVT_SOURCE_TYPE sources = WEVTS_ALL;
+            if(slash) {
+                *slash++ = '\0';
+                if(strcasecmp(slash, "Admin") == 0)
+                    sources |= WEVTS_ADMIN;
+                if(strcasecmp(slash, "Operational") == 0)
+                    sources |= WEVTS_OPERATIONAL;
+                if(strcasecmp(slash, "Analytic") == 0)
+                    sources |= WEVTS_ANALYTIC;
+                if(strcasecmp(slash, "Debug") == 0)
+                    sources |= WEVTS_DEBUG;
+            }
+
+            if(strcasecmp(name, "Application") == 0)
+                sources |= WEVTS_WINDOWS;
+            if(strcasecmp(name, "Security") == 0)
+                sources |= WEVTS_WINDOWS;
+            if(strcasecmp(name, "Setup") == 0)
+                sources |= WEVTS_WINDOWS;
+            if(strcasecmp(name, "System") == 0)
+                sources |= WEVTS_WINDOWS;
 
             LOGS_QUERY_SOURCE src = {
                 .entries = retention.entries,
@@ -240,7 +290,7 @@ void wevt_sources_scan(void) {
                 .msg_first_ut = retention.first_event.created_ns / NSEC_PER_USEC,
                 .msg_last_ut = retention.last_event.created_ns / NSEC_PER_USEC,
                 .size = retention.size_bytes,
-                .source_type = WEVTS_ALL,
+                .source_type = sources,
                 .source = string_strdupz(name),
             };
 

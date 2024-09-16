@@ -7,10 +7,22 @@
 #include <windows.h>
 #include <wchar.h>
 
+typedef enum __attribute__((packed)) {
+    TXT_SOURCE_UNKNOWN = 0,
+    TXT_SOURCE_PUBLISHER,
+    TXT_SOURCE_FIELD_CACHE,
+    TXT_SOURCE_EVENT_LOG,
+    TXT_SOURCE_HARDCODED,
+
+    // terminator
+    TXT_SOURCE_MAX,
+} TXT_SOURCE;
+
 typedef struct {
     char *data;
     size_t size; // the allocated size of data buffer
     size_t used;  // the used size of the data buffer (including null terminators, if any)
+    TXT_SOURCE src;
 } TXT_UTF8;
 
 typedef struct {
@@ -77,5 +89,11 @@ wchar_t *channel2unicode(const char *utf8str);
 char *query2utf8(const wchar_t *query);
 
 char *unicode2utf8_strdupz(const wchar_t *src, size_t *utf8_len);
+
+static inline void wevt_utf8_empty(TXT_UTF8 *dst) {
+    txt_utf8_resize(dst, 1, false);
+    dst->data[0] = '\0';
+    dst->used = 1;
+}
 
 #endif //NETDATA_WINDOWS_EVENTS_UNICODE_H

@@ -314,7 +314,63 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             facets, WEVT_FIELD_XML,
             FACET_KEY_OPTION_NEVER_FACET,
             wevt_render_xml, NULL);
+
+    facets_register_key_name(
+        facets, WEVT_FIELD_LEVEL "ID",
+        FACET_KEY_OPTION_NONE);
+
+    facets_register_key_name(
+        facets, WEVT_FIELD_KEYWORDS "ID",
+        FACET_KEY_OPTION_NONE);
+
+    facets_register_key_name(
+        facets, WEVT_FIELD_OPCODE "ID",
+        FACET_KEY_OPTION_NONE);
+
+    facets_register_key_name(
+        facets, WEVT_FIELD_TASK "ID",
+        FACET_KEY_OPTION_NONE);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    facets_register_key_name(
+        facets, "z_level_source",
+        rq->default_facet);
+
+    facets_register_key_name(
+        facets, "z_keywords_source",
+        rq->default_facet);
+
+    facets_register_key_name(
+        facets, "z_opcode_source",
+        rq->default_facet);
+
+    facets_register_key_name(
+        facets, "z_task_source",
+        rq->default_facet);
+#endif
 }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+static const char *source_to_str(TXT_UTF8 *txt) {
+    switch(txt->src) {
+        default:
+        case TXT_SOURCE_UNKNOWN:
+            return "unknown";
+
+        case TXT_SOURCE_EVENT_LOG:
+            return "event-log";
+
+        case TXT_SOURCE_PUBLISHER:
+            return "publisher";
+
+        case TXT_SOURCE_FIELD_CACHE:
+            return "fields-cache";
+
+        case TXT_SOURCE_HARDCODED:
+            return "hardcoded";
+    }
+}
+#endif
 
 static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUERY_SOURCE *src, usec_t *msg_ut __maybe_unused, WEVT_EVENT *e) {
     size_t len, bytes = log->ops.content.used;
@@ -424,12 +480,51 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
             thread_id_str, len);
     }
 
+    {
+        static __thread char str[UINT64_MAX_LENGTH];
+        len = print_uint64(str, e->level);
+        bytes += len;
+        facets_add_key_value_length(
+            facets, WEVT_FIELD_LEVEL "ID", sizeof(WEVT_FIELD_LEVEL) + 2 - 1, str, len);
+    }
+
+    {
+        static __thread char str[UINT64_HEX_MAX_LENGTH];
+        len = print_uint64_hex_full(str, e->keywords);
+        bytes += len;
+        facets_add_key_value_length(
+            facets, WEVT_FIELD_KEYWORDS "ID", sizeof(WEVT_FIELD_KEYWORDS) + 2 - 1, str, len);
+    }
+
+    {
+        static __thread char str[UINT64_MAX_LENGTH];
+        len = print_uint64(str, e->opcode);
+        bytes += len;
+        facets_add_key_value_length(
+            facets, WEVT_FIELD_OPCODE "ID", sizeof(WEVT_FIELD_OPCODE) + 2 - 1, str, len);
+    }
+
+    {
+        static __thread char str[UINT64_MAX_LENGTH];
+        len = print_uint64(str, e->task);
+        bytes += len;
+        facets_add_key_value_length(
+            facets, WEVT_FIELD_TASK "ID", sizeof(WEVT_FIELD_TASK) + 2 - 1, str, len);
+    }
+
 //    bytes += log->ops.xml.used * 2;
 //    facets_add_key_value_length(
 //        facets, WEVT_FIELD_XML, sizeof(WEVT_FIELD_XML) - 1,
 //        log->ops.xml.data, log->ops.xml.used - 1);
 
     wevt_facets_register_bin_data(log, facets);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    facets_add_key_value(facets, "z_level_source", source_to_str(&log->ops.level));
+    facets_add_key_value(facets, "z_keywords_source", source_to_str(&log->ops.keywords));
+    facets_add_key_value(facets, "z_opcode_source", source_to_str(&log->ops.opcode));
+    facets_add_key_value(facets, "z_task_source", source_to_str(&log->ops.task));
+#endif
 
     return bytes;
 }

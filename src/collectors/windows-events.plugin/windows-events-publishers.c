@@ -18,23 +18,31 @@ struct provider_meta_handle {
     PROVIDER_META_HANDLE *next;
 };
 
-struct provider_keyword {
-    uint64_t mask;                      // the mask of the keyword
-    uint32_t name_len;                  // the length of the name
-    uint32_t message_len;               // the length of the message
+struct provider_data {
+    uint64_t value;                     // the mask of the keyword
+    XXH64_hash_t hash;                  // the hash of the name
+    uint32_t len;                       // the length of the name
     char *name;                         // the name of the keyword in UTF-8
-    char *message;                      // the message of the keyword in UTF-8
+};
+
+struct provider_list {
+    bool exceeds_data_type;             // true when the manifest values exceed the capacity of the EvtXXX() API
+    uint32_t total;                     // the number of entries in the array
+    struct provider_data *array;        // the array of entries, sorted (for binary search)
 };
 
 typedef struct publisher {
-    ND_UUID provider;                   // the Provider GUID
+    ND_UUID uuid;                       // the Provider GUID
+    const char *name;                   // the Provider name (UTF-8)
     uint32_t total_handles;             // the number of handles allocated
     uint32_t available_handles;         // the number of available handles
     uint32_t deleted_handles;           // the number of deleted handles
     PROVIDER_META_HANDLE *handles;      // a double linked list of all the handles
 
-    uint32_t total_keywords;            // the number of keywords in the array
-    struct provider_keyword *keywords;  // the array of keywords, sorted by importance
+    struct provider_list keywords;
+    struct provider_list tasks;
+    struct provider_list opcodes;
+    struct provider_list levels;
 } PUBLISHER;
 
 // A hashtable implementation for publishers
@@ -59,10 +67,10 @@ static struct {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
 };
 
-static void publisher_load_keywords(PUBLISHER *p, LPCWSTR providerName);
+static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *unicode, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id);
 
 static inline ND_UUID *publisher_value_to_key(PUBLISHER *p) {
-    return &p->provider;
+    return &p->uuid;
 }
 
 static inline bool publisher_cache_compar(ND_UUID *a, ND_UUID *b) {
@@ -87,12 +95,13 @@ PROVIDER_META_HANDLE *publisher_get(ND_UUID uuid, LPCWSTR providerName) {
     SIMPLE_HASHTABLE_SLOT_PROVIDER_GUID *slot =
             simple_hashtable_get_slot_PROVIDER_GUID(&pbc.hashtable, hash, &uuid, true);
 
+    bool load_it = false;
     PUBLISHER *p = SIMPLE_HASHTABLE_SLOT_DATA(slot);
     if(!p) {
         p = aral_callocz(pbc.aral_publishers);
-        p->provider = uuid;
+        p->uuid = uuid;
         simple_hashtable_set_slot_PROVIDER_GUID(&pbc.hashtable, slot, hash, p);
-        publisher_load_keywords(p, providerName);
+        load_it = true;
         pbc.total_publishers++;
     }
 
@@ -115,6 +124,7 @@ PROVIDER_META_HANDLE *publisher_get(ND_UUID uuid, LPCWSTR providerName) {
                 0,             // Locale (0 for default locale)
                 0              // Flags
         );
+
         // we put it at the beginning of the list
         // to find it first if the same owner needs more locks on it
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(p->handles, h, prev, next);
@@ -130,6 +140,21 @@ PROVIDER_META_HANDLE *publisher_get(ND_UUID uuid, LPCWSTR providerName) {
     }
 
     h->locks++;
+
+    if(load_it) {
+        WEVT_VARIANT content = { 0 };
+        WEVT_VARIANT property = { 0 };
+        TXT_UNICODE unicode = { 0 };
+
+        publisher_load_list(h, &content, &property, &unicode, &p->keywords, EvtPublisherMetadataKeywords);
+        publisher_load_list(h, &content, &property, &unicode, &p->levels, EvtPublisherMetadataLevels);
+        publisher_load_list(h, &content, &property, &unicode, &p->opcodes, EvtPublisherMetadataOpcodes);
+        publisher_load_list(h, &content, &property, &unicode, &p->tasks, EvtPublisherMetadataTasks);
+
+        txt_unicode_cleanup(&unicode);
+        wevt_variant_cleanup(&content);
+        wevt_variant_cleanup(&property);
+    }
 
     spinlock_unlock(&pbc.spinlock);
 
@@ -184,7 +209,7 @@ void publisher_release(PROVIDER_META_HANDLE *h) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// keywords handling
+// load publisher lists
 
 static bool wevt_get_property_from_array(WEVT_VARIANT *property, EVT_HANDLE handle, DWORD dwIndex, EVT_PUBLISHER_METADATA_PROPERTY_ID PropertyId) {
     DWORD used = 0;
@@ -207,30 +232,83 @@ static bool wevt_get_property_from_array(WEVT_VARIANT *property, EVT_HANDLE hand
     return true;
 }
 
-static void publisher_load_keywords(PUBLISHER *p, LPCWSTR providerName) {
-    EVT_HANDLE hMetadata = NULL;
-    EVT_HANDLE hKeywordArray = NULL;
-    DWORD bufferUsed = 0;
-    DWORD keywordCount = 0;
-    WEVT_VARIANT content = { 0 };
-    WEVT_VARIANT property = { 0 };
-    TXT_UNICODE unicode = { 0 };
+// Comparison function for ascending order (for Levels, Opcodes, Tasks)
+static int compare_ascending(const void *a, const void *b) {
+    struct provider_data *d1 = (struct provider_data *)a;
+    struct provider_data *d2 = (struct provider_data *)b;
 
-    // Open the publisher metadata
-    hMetadata = EvtOpenPublisherMetadata(
-            NULL,          // Local machine
-            providerName,  // Provider name
-            NULL,          // Log file path
-            0,             // Locale
-            0              // Flags
-    );
-    if (!hMetadata) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtOpenPublisherMetadata() failed");
-        return;
+    if (d1->value < d2->value) return -1;
+    if (d1->value > d2->value) return 1;
+    return 0;
+}
+
+// Comparison function for descending order (for Keywords)
+static int compare_descending(const void *a, const void *b) {
+    struct provider_data *d1 = (struct provider_data *)a;
+    struct provider_data *d2 = (struct provider_data *)b;
+
+    if (d1->value > d2->value) return -1;
+    if (d1->value < d2->value) return 1;
+    return 0;
+}
+
+static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *unicode, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id) {
+    if(!h || !h->hMetadata) return;
+
+    EVT_PUBLISHER_METADATA_PROPERTY_ID name_id, message_id, value_id;
+    uint8_t value_bits = 32;
+    int (*compare_func)(const void *, const void *);
+    bool (*is_valid)(uint64_t);
+
+    switch(property_id) {
+        case EvtPublisherMetadataLevels:
+            name_id = EvtPublisherMetadataLevelName;
+            message_id = EvtPublisherMetadataLevelMessageID;
+            value_id = EvtPublisherMetadataLevelValue;
+            value_bits = 32;
+            compare_func = compare_ascending;
+            is_valid = is_valid_publisher_level;
+            break;
+
+        case EvtPublisherMetadataOpcodes:
+            name_id = EvtPublisherMetadataOpcodeName;
+            message_id = EvtPublisherMetadataOpcodeMessageID;
+            value_id = EvtPublisherMetadataOpcodeValue;
+            value_bits = 32;
+            is_valid = is_valid_publisher_opcode;
+            compare_func = compare_ascending;
+            break;
+
+        case EvtPublisherMetadataTasks:
+            name_id = EvtPublisherMetadataTaskName;
+            message_id = EvtPublisherMetadataTaskMessageID;
+            value_id = EvtPublisherMetadataTaskValue;
+            value_bits = 32;
+            is_valid = is_valid_publisher_task;
+            compare_func = compare_ascending;
+            break;
+
+        case EvtPublisherMetadataKeywords:
+            name_id = EvtPublisherMetadataKeywordName;
+            message_id = EvtPublisherMetadataKeywordMessageID;
+            value_id = EvtPublisherMetadataKeywordValue;
+            value_bits = 64;
+            is_valid = is_valid_publisher_keywords;
+            compare_func = compare_descending;
+            break;
+
+        default:
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Internal Error: Can't handle property id %u", property_id);
+            return;
     }
 
-    // Get the array of keyword objects
-    if (!EvtGetPublisherMetadataProperty(hMetadata, EvtPublisherMetadataKeywords, 0, 0, NULL, &bufferUsed)) {
+    EVT_HANDLE hMetadata = h->hMetadata;
+    EVT_HANDLE hArray = NULL;
+    DWORD bufferUsed = 0;
+    DWORD itemCount = 0;
+
+    // Get the metadata array for the list (e.g., opcodes, tasks, or levels)
+    if (!EvtGetPublisherMetadataProperty(hMetadata, property_id, 0, 0, NULL, &bufferUsed)) {
         DWORD status = GetLastError();
         if (status != ERROR_INSUFFICIENT_BUFFER) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetPublisherMetadataProperty() failed");
@@ -238,101 +316,101 @@ static void publisher_load_keywords(PUBLISHER *p, LPCWSTR providerName) {
         }
     }
 
-    wevt_variant_resize(&content, bufferUsed);
-    if (!EvtGetPublisherMetadataProperty(hMetadata, EvtPublisherMetadataKeywords, 0, content.size, content.data, &bufferUsed)) {
+    wevt_variant_resize(content, bufferUsed);
+    if (!EvtGetPublisherMetadataProperty(hMetadata, property_id, 0, content->size, content->data, &bufferUsed)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetPublisherMetadataProperty() failed after resize");
         goto cleanup;
     }
 
-    // Get the number of keywords
-    hKeywordArray = content.data->EvtHandleVal;
-    if (!EvtGetObjectArraySize(hKeywordArray, &keywordCount)) {
+    // Get the number of items (e.g., levels, tasks, or opcodes)
+    hArray = content->data->EvtHandleVal;
+    if (!EvtGetObjectArraySize(hArray, &itemCount)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetObjectArraySize() failed");
         goto cleanup;
     }
 
-    if (keywordCount == 0) {
-        p->total_keywords = 0;
-        p->keywords = NULL;
+    if (itemCount == 0) {
+        l->total = 0;
+        l->array = NULL;
         goto cleanup;
     }
 
-    // Allocate memory for the keywords
-    p->keywords = callocz(keywordCount, sizeof(struct provider_keyword));
-    p->total_keywords = keywordCount;
+    // Allocate memory for the list items
+    l->array = callocz(itemCount, sizeof(struct provider_data));
+    l->total = itemCount;
 
-    // Iterate over the keywords
-    for (DWORD i = 0; i < keywordCount; ++i) {
-        struct provider_keyword* pk = &p->keywords[i];
+    // Iterate over the list and populate the entries
+    for (DWORD i = 0; i < itemCount; ++i) {
+        struct provider_data *d = &l->array[i];
 
-        // Get the keyword mask (value)
-        if(wevt_get_property_from_array(&property, hKeywordArray, i, EvtPublisherMetadataKeywordValue))
-            pk->mask = property.data->UInt64Val;
+        // Get the value (e.g., opcode, task, or level)
+        if (wevt_get_property_from_array(property, hArray, i, value_id)) {
+            switch(value_bits) {
+                case 64:
+                    d->value = wevt_field_get_uint64(property->data);
+                    break;
 
-        // Get the keyword name
-        if (wevt_get_property_from_array(&property, hKeywordArray, i, EvtPublisherMetadataKeywordName)) {
-            size_t len;
-            pk->name = unicode2utf8_strdupz(property.data->StringVal, &len);
-            pk->name_len = len;
+                case 32:
+                    d->value = wevt_field_get_uint32(property->data);
+                    break;
+            }
+
+            if(!is_valid(d->value))
+                l->exceeds_data_type = true;
         }
 
-        // Get the keyword message ID
-        if(wevt_get_property_from_array(&property, hKeywordArray, i, EvtPublisherMetadataKeywordMessageID)) {
-            DWORD messageID = property.data->UInt32Val;
-            if ((int) messageID < 0) continue;
+        // Get the message ID
+        if (wevt_get_property_from_array(property, hArray, i, message_id)) {
+            uint32_t messageID = wevt_field_get_uint32(property->data);
 
-            if (!wevt_get_message_unicode(&unicode, hMetadata, NULL, messageID, EvtFormatMessageId))
-                continue;
-
-            size_t len;
-            pk->message = unicode2utf8_strdupz(unicode.data, &len);
-            pk->message_len = len;
+            if (messageID != (uint32_t)-1) {
+                if (wevt_get_message_unicode(unicode, hMetadata, NULL, messageID, EvtFormatMessageId)) {
+                    size_t len;
+                    d->name = unicode2utf8_strdupz(unicode->data, &len);
+                    d->len = len;
+                }
+            }
         }
+
+        // Get the name if the message is missing
+        if (!d->name && wevt_get_property_from_array(property, hArray, i, name_id)) {
+            fatal_assert(property->data->Type == EvtVarTypeString);
+            size_t len;
+            d->name = unicode2utf8_strdupz(property->data->StringVal, &len);
+            d->len = len;
+        }
+
+        // Calculate the hash for the name
+        if (d->name)
+            d->hash = XXH3_64bits(d->name, d->len);
+    }
+
+    if(itemCount > 1) {
+        // Sort the array based on the value (ascending for all except keywords, descending for keywords)
+        qsort(l->array, itemCount, sizeof(struct provider_data), compare_func);
     }
 
 cleanup:
-    txt_unicode_cleanup(&unicode);
-
-    wevt_variant_cleanup(&content);
-    wevt_variant_cleanup(&property);
-
-    if (hKeywordArray)
-        EvtClose(hKeywordArray);
-
-    if (hMetadata)
-        EvtClose(hMetadata);
+    if (hArray)
+        EvtClose(hArray);
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// lookup functions
 
-bool publisher_keywords(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
-    if(!h) return false;
-
+// lookup bitmap metdata (returns a comma separated list of strings)
+static bool publisher_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
     dst->used = 0;
 
-    PUBLISHER *p = h->publisher;
-    for(size_t k = 0; k < p->total_keywords; k++) {
-        struct provider_keyword *pk = &p->keywords[k];
+    for(size_t k = 0; value && k < l->total; k++) {
+        struct provider_data *d = &l->array[k];
 
-        if(pk->mask && (value & pk->mask) == pk->mask && (pk->name || pk->message)) {
-            const char *s;
-            size_t slen;
-
-            // if the message is available, prefer it
-            // otherwise use the name
-            if(pk->message && *pk->message) {
-                s = pk->message;
-                slen = pk->message_len;
-            }
-            else {
-                s = pk->name;
-                slen = pk->name_len;
-            }
-
-            if(!s || !slen)
-                continue;
+        if(d->value && (value & d->value) == d->value && d->name && d->len) {
+            const char *s = d->name;
+            size_t slen = d->len;
 
             // remove the mask from the value
-            value &= ~(pk->mask);
+            value &= ~(d->value);
 
             txt_utf8_resize(dst, dst->used + slen + 2 + 1, true);
 
@@ -344,6 +422,7 @@ bool publisher_keywords(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) 
 
             memcpy(&dst->data[dst->used], s, slen);
             dst->used += slen;
+            dst->src = TXT_SOURCE_PUBLISHER;
         }
     }
 
@@ -352,5 +431,121 @@ bool publisher_keywords(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) 
         dst->data[dst->used++] = 0;
     }
 
+    fatal_assert(dst->used <= dst->size);
+
     return (dst->used > 0);
+}
+
+// lookup a single value (returns its string)
+static bool publisher_value_metadata_linear(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
+    dst->used = 0;
+
+    for(size_t k = 0; k < l->total; k++) {
+        struct provider_data *d = &l->array[k];
+
+        if(d->value == value && d->name && d->len) {
+            const char *s = d->name;
+            size_t slen = d->len;
+
+            txt_utf8_resize(dst, slen + 1, false);
+
+            memcpy(dst->data, s, slen);
+            dst->used = slen;
+            dst->src = TXT_SOURCE_PUBLISHER;
+
+            break;
+        }
+    }
+
+    if(dst->used) {
+        txt_utf8_resize(dst, dst->used + 1, true);
+        dst->data[dst->used++] = 0;
+    }
+
+    fatal_assert(dst->used <= dst->size);
+
+    return (dst->used > 0);
+}
+
+static bool publisher_value_metadata(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
+    if(l->total < 3) return publisher_value_metadata_linear(dst, l, value);
+
+    dst->used = 0;
+
+    if (!l->total || !l->array)
+        return false;
+
+    size_t left = 0;
+    size_t right = l->total - 1;
+
+    // Binary search within bounds
+    while (left <= right) {
+        size_t mid = left + (right - left) / 2;
+        struct provider_data *d = &l->array[mid];
+
+        if (d->value == value) {
+            // Value found, now check if it has a valid name and length
+            if (d->name && d->len) {
+                const char *s = d->name;
+                size_t slen = d->len;
+
+                txt_utf8_resize(dst, slen + 1, false);
+                memcpy(dst->data, s, slen);
+                dst->used = slen;
+                dst->data[dst->used++] = 0;
+                dst->src = TXT_SOURCE_PUBLISHER;
+            }
+            break;
+        }
+
+        if (d->value < value)
+            left = mid + 1;
+        else {
+            if (mid == 0) break;
+            right = mid - 1;
+        }
+    }
+
+    fatal_assert(dst->used <= dst->size);
+
+    return (dst->used > 0);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// public API to lookup metadata
+
+bool publisher_keywords_cacheable(PROVIDER_META_HANDLE *h) {
+    return h && !h->publisher->keywords.exceeds_data_type;
+}
+
+bool publisher_tasks_cacheable(PROVIDER_META_HANDLE *h) {
+    return h && !h->publisher->tasks.exceeds_data_type;
+}
+
+bool publisher_levels_cacheable(PROVIDER_META_HANDLE *h) {
+    return h && !h->publisher->levels.exceeds_data_type;
+}
+
+bool publisher_opcodes_cacheable(PROVIDER_META_HANDLE *h) {
+    return h && !h->publisher->opcodes.exceeds_data_type;
+}
+
+bool publisher_get_keywords(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
+    if(!h) return false;
+    return publisher_bitmap_metadata(dst, &h->publisher->keywords, value);
+}
+
+bool publisher_get_level(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
+    if(!h) return false;
+    return publisher_value_metadata(dst, &h->publisher->levels, value);
+}
+
+bool publisher_get_task(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
+    if(!h) return false;
+    return publisher_value_metadata(dst, &h->publisher->tasks, value);
+}
+
+bool publisher_opcode(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
+    if(!h) return false;
+    return publisher_value_metadata(dst, &h->publisher->opcodes, value);
 }

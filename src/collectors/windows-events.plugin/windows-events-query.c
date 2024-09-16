@@ -4,43 +4,43 @@
 
 static uint64_t wevt_log_file_size(const wchar_t *channel);
 
-#define FIELD_CHANNEL                       (0)
-#define FIELD_PROVIDER_NAME                 (1)
-#define FIELD_EVENT_SOURCE_NAME             (2)
-#define FIELD_PROVIDER_GUID                 (3)
-#define FIELD_RECORD_NUMBER                 (4)
-#define FIELD_EVENT_ID                      (5)
-#define FIELD_LEVEL                         (6)
-#define FIELD_KEYWORDS                      (7)
-#define FIELD_TIME_CREATED                  (8)
-#define FIELD_COMPUTER_NAME                 (9)
-#define FIELD_USER_ID                       (10)
-#define FIELD_CORRELATION_ACTIVITY_ID       (11)
-#define FIELD_OPCODE                        (12)
-#define FIELD_VERSION                       (13)
-#define FIELD_TASK                          (14)
-#define FIELD_PROCESS_ID                    (15)
-#define FIELD_THREAD_ID                     (16)
+#define FIELD_RECORD_NUMBER                 (0)
+#define FIELD_EVENT_ID                      (1)
+#define FIELD_LEVEL                         (2)
+#define FIELD_OPCODE                        (3)
+#define FIELD_KEYWORDS                      (4)
+#define FIELD_VERSION                       (5)
+#define FIELD_TASK                          (6)
+#define FIELD_PROCESS_ID                    (7)
+#define FIELD_THREAD_ID                     (8)
+#define FIELD_TIME_CREATED                  (9)
+#define FIELD_CHANNEL                       (10)
+#define FIELD_COMPUTER_NAME                 (11)
+#define FIELD_PROVIDER_NAME                 (12)
+#define FIELD_EVENT_SOURCE_NAME             (13)
+#define FIELD_PROVIDER_GUID                 (14)
+#define FIELD_CORRELATION_ACTIVITY_ID       (15)
+#define FIELD_USER_ID                       (16)
 
 // These are the fields we extract from the logs
 static const wchar_t *RENDER_ITEMS[] = {
-        L"/Event/System/Channel",
-        L"/Event/System/Provider/@Name",
-        L"/Event/System/Provider/@EventSourceName",
-        L"/Event/System/Provider/@Guid",
-        L"/Event/System/EventRecordID",
-        L"/Event/System/EventID",
-        L"/Event/System/Level",
-        L"/Event/System/Keywords",
-        L"/Event/System/TimeCreated/@SystemTime",
-        L"/Event/System/Computer",
-        L"/Event/System/Security/@UserID",
-        L"/Event/System/Correlation/@ActivityID",
-        L"/Event/System/Opcode",
-        L"/Event/System/Version",
-        L"/Event/System/Task",
-        L"/Event/System/Execution/@ProcessID",
-        L"/Event/System/Execution/@ThreadID",
+    L"/Event/System/EventRecordID",
+    L"/Event/System/EventID",
+    L"/Event/System/Level",
+    L"/Event/System/Opcode",
+    L"/Event/System/Keywords",
+    L"/Event/System/Version",
+    L"/Event/System/Task",
+    L"/Event/System/Execution/@ProcessID",
+    L"/Event/System/Execution/@ThreadID",
+    L"/Event/System/TimeCreated/@SystemTime",
+    L"/Event/System/Channel",
+    L"/Event/System/Computer",
+    L"/Event/System/Provider/@Name",
+    L"/Event/System/Provider/@EventSourceName",
+    L"/Event/System/Provider/@Guid",
+    L"/Event/System/Correlation/@ActivityID",
+    L"/Event/System/Security/@UserID",
 };
 
 static const char *wevt_extended_status(void) {
@@ -60,63 +60,6 @@ static const char *wevt_extended_status(void) {
         strncpyz(buf, "no additional information", sizeof(buf) - 1);
 
     return buf;
-}
-
-static bool wevt_GUID_to_ND_UUID(ND_UUID *nd_uuid, const GUID *guid) {
-    if(guid && sizeof(GUID) == sizeof(ND_UUID)) {
-        memcpy(nd_uuid->uuid, guid, sizeof(ND_UUID));
-        return true;
-    }
-    else {
-        *nd_uuid = UUID_ZERO;
-        return false;
-    }
-}
-
-static uint64_t wevt_get_unsigned_by_type(WEVT_LOG *log, size_t field) {
-    switch(log->ops.content.data[field].Type & EVT_VARIANT_TYPE_MASK) {
-        case EvtVarTypeHexInt64: return log->ops.content.data[field].UInt64Val;
-        case EvtVarTypeHexInt32: return log->ops.content.data[field].UInt32Val;
-        case EvtVarTypeUInt64: return log->ops.content.data[field].UInt64Val;
-        case EvtVarTypeUInt32: return log->ops.content.data[field].UInt32Val;
-        case EvtVarTypeUInt16: return log->ops.content.data[field].UInt16Val;
-        case EvtVarTypeInt64: return ABS(log->ops.content.data[field].Int64Val);
-        case EvtVarTypeInt32: return ABS(log->ops.content.data[field].Int32Val);
-        case EvtVarTypeByte:  return log->ops.content.data[field].ByteVal;
-        case EvtVarTypeInt16:  return ABS(log->ops.content.data[field].Int16Val);
-        case EvtVarTypeSByte: return ABS(log->ops.content.data[field].SByteVal);
-        case EvtVarTypeSingle: return ABS(log->ops.content.data[field].SingleVal);
-        case EvtVarTypeDouble: return ABS(log->ops.content.data[field].DoubleVal);
-        case EvtVarTypeBoolean: return log->ops.content.data[field].BooleanVal ? 1 : 0;
-        case EvtVarTypeSizeT: return log->ops.content.data[field].SizeTVal;
-        default: return 0;
-    }
-}
-
-static uint64_t wevt_get_filetime_to_ns_by_type(WEVT_LOG *log, size_t field) {
-    switch(log->ops.content.data[field].Type & EVT_VARIANT_TYPE_MASK) {
-        case EvtVarTypeFileTime:
-        case EvtVarTypeUInt64:
-            return os_windows_ulonglong_to_unix_epoch_ns(log->ops.content.data[field].FileTimeVal);
-
-        default: return 0;
-    }
-}
-
-static bool wevt_get_uuid_by_type(WEVT_LOG *log, size_t field, ND_UUID *dst) {
-    switch(log->ops.content.data[field].Type & EVT_VARIANT_TYPE_MASK) {
-        case EvtVarTypeGuid:
-            return wevt_GUID_to_ND_UUID(dst, log->ops.content.data[field].GuidVal);
-
-        default:
-            return wevt_GUID_to_ND_UUID(dst, NULL);
-    }
-}
-
-static void wevt_empty_utf8(TXT_UTF8 *dst) {
-    txt_utf8_resize(dst, 1, false);
-    dst->data[0] = '\0';
-    dst->used = 1;
 }
 
 bool wevt_get_message_unicode(TXT_UNICODE *unicode, EVT_HANDLE hMetadata, EVT_HANDLE bookmark, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags) {
@@ -163,68 +106,33 @@ cleanup:
     return false;
 }
 
-static bool wevt_get_level_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0, EvtFormatMessageLevel))
+static bool wevt_get_field_from_events_log(
+    WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle,
+    TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS flags, const char *empty) {
+
+    dst->src = TXT_SOURCE_EVENT_LOG;
+
+    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0, flags))
         return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
 
-    wevt_empty_utf8(dst);
-    return false;
-}
+    if(empty) {
+        txt_utf8_resize(dst, 128, false);
+        dst->used = snprintfz(dst->data, dst->size, "%s", empty);
+    }
+    else
+        wevt_utf8_empty(dst);
 
-static bool wevt_get_task_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0,EvtFormatMessageTask))
-        return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
-
-    wevt_empty_utf8(dst);
-    return false;
-}
-
-static bool wevt_get_opcode_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0, EvtFormatMessageOpcode))
-        return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
-
-    wevt_empty_utf8(dst);
     return false;
 }
 
 bool wevt_get_event_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0, EvtFormatMessageEvent))
-        return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
-
-    txt_utf8_resize(dst, 128, false);
-    dst->used = snprintfz(dst->data, dst->size, "No event message for this event.");
-    return false;
+    return wevt_get_field_from_events_log(
+        log, p, event_handle, dst, EvtFormatMessageEvent, "No event message for this event.");
 }
 
 bool wevt_get_xml_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0, EvtFormatMessageXml))
-        return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
-
-    txt_utf8_resize(dst, 128, false);
-    dst->used = snprintfz(dst->data, dst->size, "No XML in this event entry.");
-    return false;
-}
-
-static bool wevt_get_utf8_by_type(WEVT_LOG *log, size_t field, TXT_UTF8 *dst) {
-    switch(log->ops.content.data[field].Type & EVT_VARIANT_TYPE_MASK) {
-        case EvtVarTypeString:
-            return wevt_str_wchar_to_utf8(dst, log->ops.content.data[field].StringVal, -1);
-
-        default:
-            wevt_empty_utf8(dst);
-            return false;
-    }
-}
-
-static bool wevt_get_sid_by_type(WEVT_LOG *log, size_t field, TXT_UTF8 *dst) {
-    switch(log->ops.content.data[field].Type & EVT_VARIANT_TYPE_MASK) {
-        case EvtVarTypeSid:
-            return wevt_convert_user_id_to_name(log->ops.content.data[field].SidVal, dst);
-
-        default:
-            wevt_empty_utf8(dst);
-            return false;
-    }
+    return wevt_get_field_from_events_log(
+        log, p, event_handle, dst, EvtFormatMessageXml, "No XML in this event entry.");
 }
 
 static inline void wevt_event_done(WEVT_LOG *log) {
@@ -236,6 +144,192 @@ static inline void wevt_event_done(WEVT_LOG *log) {
     if (log->bookmark) {
         EvtClose(log->bookmark);
         log->bookmark = NULL;
+    }
+
+    log->ops.level.src = TXT_SOURCE_UNKNOWN;
+    log->ops.keywords.src = TXT_SOURCE_UNKNOWN;
+    log->ops.opcode.src = TXT_SOURCE_UNKNOWN;
+    log->ops.task.src = TXT_SOURCE_UNKNOWN;
+}
+
+static void wevt_get_field_from_cache(
+    WEVT_LOG *log, uint64_t value, PROVIDER_META_HANDLE *h,
+    TXT_UTF8 *dst, const ND_UUID *provider,
+    WEVT_FIELD_TYPE cache_type, EVT_FORMAT_MESSAGE_FLAGS flags) {
+
+    if (field_cache_get(cache_type, provider, value, dst))
+        return;
+
+    wevt_get_field_from_events_log(log, h, log->bookmark, dst, flags, NULL);
+    field_cache_set(cache_type, provider, value, dst);
+}
+
+static const char *wevt_hardcoded_opcode(uint64_t level) {
+    switch(level) {
+        case 0: return "Info";
+        case 1: return "Start";
+        case 2: return "Stop";
+        case 3: return "DC Start";
+        case 4: return "DC Stop";
+        case 5: return "Extension";
+        case 6: return "Reply";
+        case 7: return "Resume";
+        case 8: return "Suspend";
+        case 9: return "Send";
+        case 240: return "Receive";
+        default: return "";
+    }
+}
+
+static void wevt_get_opcode(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
+    TXT_UTF8 *dst = &log->ops.opcode;
+    uint64_t value = ev->opcode;
+
+    dst->used = 0; // empty our response
+    if(value <= 10 || value >= 240) {
+        txt_utf8_resize(dst, 128,  false);
+        strcpy(dst->data, wevt_hardcoded_opcode(value));
+        dst->used = strlen(dst->data) + 1;
+        dst->src = TXT_SOURCE_HARDCODED;
+        return;
+    }
+
+    EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageOpcode;
+    WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_OPCODE;
+    bool is_cacheable = publisher_opcodes_cacheable(h);
+    bool is_publisher = is_valid_publisher_opcode(value);
+
+    if(!is_cacheable) {
+        // we cannot cache this - we have to get it every time
+        wevt_get_field_from_events_log(log, h, log->bookmark, dst, flags, NULL);
+    }
+    else if(is_publisher) {
+        // we should be able to find this in the publisher manifest
+        if (!publisher_opcode(dst, h, value)) {
+            // not found in the manifest, get it from the cache
+            wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+        }
+    }
+    else {
+        // we can cache this information
+        wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+    }
+}
+
+static void wevt_get_task(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
+    TXT_UTF8 *dst = &log->ops.task;
+    uint64_t value = ev->task;
+
+    dst->used = 0; // empty our response
+    if(!value) {
+        txt_utf8_resize(dst, 5,  false);
+        strcpy(dst->data, "None");
+        dst->used = 5;
+        dst->src = TXT_SOURCE_HARDCODED;
+        return;
+    }
+
+    EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageTask;
+    WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_TASK;
+    bool is_cacheable = publisher_tasks_cacheable(h);
+    bool is_publisher = is_valid_publisher_task(value);
+
+    if(!is_cacheable) {
+        // we cannot cache this - we have to get it every time
+        wevt_get_field_from_events_log(log, h, log->bookmark, dst, flags, NULL);
+    }
+    else if(is_publisher) {
+        // we should be able to find this in the publisher manifest
+        if (!publisher_get_task(dst, h, value)) {
+            // not found in the manifest, get it from the cache
+            wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+        }
+    }
+    else {
+        // we can cache this information
+        wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+    }
+}
+
+static const char *wevt_hardcoded_level(uint64_t level) {
+    switch(level) {
+        case 0: return "None";
+        case 1: return "Critical";
+        case 2: return "Error";
+        case 3: return "Warning";
+        case 4: return "Information";
+        case 5: return "Verbose";
+        default: return "";
+    }
+}
+
+static void wevt_get_level(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
+    TXT_UTF8 *dst = &log->ops.level;
+    uint64_t value = ev->level;
+
+    dst->used = 0; // empty our response
+    if(value <= 5) {
+        txt_utf8_resize(dst, 128,  false);
+        strcpy(dst->data, wevt_hardcoded_level(value));
+        dst->used = strlen(dst->data) + 1;
+        dst->src = TXT_SOURCE_HARDCODED;
+        return;
+    }
+
+    EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageLevel;
+    WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_LEVEL;
+    bool is_cacheable = publisher_levels_cacheable(h);
+    bool is_publisher = is_valid_publisher_level(value);
+
+    if(!is_cacheable) {
+        // we cannot cache this - we have to get it every time
+        wevt_get_field_from_events_log(log, h, log->bookmark, dst, flags, NULL);
+    }
+    else if(is_publisher) {
+        // we should be able to find this in the publisher manifest
+        if (!publisher_get_level(dst, h, value)) {
+            // not found in the manifest, get it from the cache
+            wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+        }
+    }
+    else {
+        // we can cache this information
+        wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+    }
+}
+
+static void wevt_get_keywords(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
+    TXT_UTF8 *dst = &log->ops.keywords;
+    uint64_t value = ev->keywords & 0x0000FFFFFFFFFFFF;
+
+    dst->used = 0; // empty our response
+    if(!value) {
+        txt_utf8_resize(dst, 5,  false);
+        strcpy(dst->data, "None");
+        dst->used = 5;
+        dst->src = TXT_SOURCE_HARDCODED;
+        return;
+    }
+
+    EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageKeyword;
+    WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_KEYWORDS;
+    bool is_cacheable = publisher_keywords_cacheable(h);
+    bool is_publisher = is_valid_publisher_keywords(value);
+
+    if(!is_cacheable) {
+        // we cannot cache this - we have to get it every time
+        wevt_get_field_from_events_log(log, h, log->bookmark, dst, flags, NULL);
+    }
+    else if(is_publisher) {
+        // we should be able to find this in the publisher manifest
+        if (!publisher_get_keywords(dst, h, value)) {
+            // not found in the manifest, get it from the cache
+            wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
+        }
+    }
+    else {
+        // we can cache this information
+        wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
     }
 }
 
@@ -261,48 +355,35 @@ bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
     }
     log->ops.content.used = bytes_used;
 
-    ev->id = wevt_get_unsigned_by_type(log, FIELD_RECORD_NUMBER);
-    ev->event_id = wevt_get_unsigned_by_type(log, FIELD_EVENT_ID);
-    ev->level = wevt_get_unsigned_by_type(log, FIELD_LEVEL);
-    ev->keywords = wevt_get_unsigned_by_type(log, FIELD_KEYWORDS);
-    ev->created_ns = wevt_get_filetime_to_ns_by_type(log, FIELD_TIME_CREATED);
-    ev->opcode = wevt_get_unsigned_by_type(log, FIELD_OPCODE);
-    ev->version = wevt_get_unsigned_by_type(log, FIELD_VERSION);
-    ev->task = wevt_get_unsigned_by_type(log, FIELD_TASK);
-    ev->process_id = wevt_get_unsigned_by_type(log, FIELD_PROCESS_ID);
-    ev->thread_id = wevt_get_unsigned_by_type(log, FIELD_THREAD_ID);
+    EVT_VARIANT *content = log->ops.content.data;
+
+    ev->id          = wevt_field_get_uint64(&content[FIELD_RECORD_NUMBER]);
+    ev->event_id    = wevt_field_get_uint16(&content[FIELD_EVENT_ID]);
+    ev->level       = wevt_field_get_uint8(&content[FIELD_LEVEL]);
+    ev->opcode      = wevt_field_get_uint8(&content[FIELD_OPCODE]);
+    ev->keywords    = wevt_field_get_uint64_hex(&content[FIELD_KEYWORDS]);
+    ev->version     = wevt_field_get_uint8(&content[FIELD_VERSION]);
+    ev->task        = wevt_field_get_uint16(&content[FIELD_TASK]);
+    ev->process_id  = wevt_field_get_uint32(&content[FIELD_PROCESS_ID]);
+    ev->thread_id   = wevt_field_get_uint32(&content[FIELD_THREAD_ID]);
+    ev->created_ns  = wevt_field_get_filetime_to_ns(&content[FIELD_TIME_CREATED]);
 
     if(full) {
-        wevt_get_utf8_by_type(log, FIELD_CHANNEL, &log->ops.channel);
-        wevt_get_utf8_by_type(log, FIELD_PROVIDER_NAME, &log->ops.provider);
-        wevt_get_utf8_by_type(log, FIELD_COMPUTER_NAME, &log->ops.computer);
-        wevt_get_utf8_by_type(log, FIELD_EVENT_SOURCE_NAME, &log->ops.source);
+        wevt_field_get_string_utf8(&content[FIELD_CHANNEL], &log->ops.channel);
+        wevt_field_get_string_utf8(&content[FIELD_COMPUTER_NAME], &log->ops.computer);
+        wevt_field_get_string_utf8(&content[FIELD_PROVIDER_NAME], &log->ops.provider);
+        wevt_field_get_string_utf8(&content[FIELD_EVENT_SOURCE_NAME], &log->ops.source);
+        wevt_get_uuid_by_type(&content[FIELD_PROVIDER_GUID], &ev->provider);
+        wevt_get_uuid_by_type(&content[FIELD_CORRELATION_ACTIVITY_ID], &ev->correlation_activity_id);
+        wevt_field_get_sid(&content[FIELD_USER_ID], &log->ops.user);
 
-        wevt_get_uuid_by_type(log, FIELD_PROVIDER_GUID, &ev->provider);
-        wevt_get_uuid_by_type(log, FIELD_CORRELATION_ACTIVITY_ID, &ev->correlation_activity_id);
-
-        // User
-        wevt_get_sid_by_type(log, FIELD_USER_ID, &log->ops.user);
-
-        PROVIDER_META_HANDLE *p = log->publisher =
+        PROVIDER_META_HANDLE *h = log->publisher =
             publisher_get(ev->provider, log->ops.content.data[FIELD_PROVIDER_NAME].StringVal);
 
-        if(!field_cache_get(WEVT_FIELD_TYPE_LEVEL, ev->provider, ev->level, &log->ops.level)) {
-            wevt_get_level_utf8(log, p, log->bookmark, &log->ops.level);
-            field_cache_set(WEVT_FIELD_TYPE_LEVEL, ev->provider, ev->level, &log->ops.level);
-        }
-
-        if(!field_cache_get(WEVT_FIELD_TYPE_TASK, ev->provider, ev->task, &log->ops.task)) {
-            wevt_get_task_utf8(log, p, log->bookmark, &log->ops.task);
-            field_cache_set(WEVT_FIELD_TYPE_TASK, ev->provider, ev->task, &log->ops.task);
-        }
-
-        if(!field_cache_get(WEVT_FIELD_TYPE_OPCODE, ev->provider, ev->opcode, &log->ops.opcode)) {
-            wevt_get_opcode_utf8(log, p, log->bookmark, &log->ops.opcode);
-            field_cache_set(WEVT_FIELD_TYPE_OPCODE, ev->provider, ev->opcode, &log->ops.opcode);
-        }
-
-        publisher_keywords(&log->ops.keywords, p, ev->keywords);
+        wevt_get_level(log, ev, h);
+        wevt_get_task(log, ev, h);
+        wevt_get_opcode(log, ev, h);
+        wevt_get_keywords(log, ev, h);
     }
 
     ret = true;
@@ -321,7 +402,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
         if (log->batch.used >= log->batch.size) {
             log->batch.size = 0;
             log->batch.used = 0;
-            DWORD err = 0;
+            DWORD err;
             if(!EvtNext(log->event_query, size, log->batch.bk, INFINITE, 0, &log->batch.size)) {
                 err = GetLastError();
                 if(err == ERROR_NO_MORE_ITEMS)

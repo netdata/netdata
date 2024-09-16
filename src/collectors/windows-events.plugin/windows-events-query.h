@@ -9,11 +9,11 @@
 
 typedef struct wevt_event {
     uint64_t id;                        // EventRecordId (unique and sequential per channel)
+    uint16_t event_id;                  // This is the template that defines the message to be shown
     uint8_t  version;
     uint8_t  level;                     // The severity of event
-    uint16_t event_id;                  // This is the template that defines the message to be shown
-    uint64_t keywords;                   // Categorization of the event
-    uint16_t opcode;
+    uint64_t keywords;                  // Categorization of the event
+    uint8_t  opcode;                    // we receive this as 8bit, but publishers use 32bit
     uint16_t task;
     uint32_t process_id;
     uint32_t thread_id;
@@ -129,6 +129,103 @@ static inline void wevt_variant_resize(WEVT_VARIANT *v, size_t required_size) {
     wevt_variant_cleanup(v);
     v->size = compute_new_size(v->size, required_size);
     v->data = mallocz(v->size);
+}
+
+static inline uint8_t wevt_field_get_uint8(EVT_VARIANT *ev) {
+    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeByte);
+    return ev->ByteVal;
+}
+
+static inline uint16_t wevt_field_get_uint16(EVT_VARIANT *ev) {
+    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeUInt16);
+    return ev->UInt16Val;
+}
+
+static inline uint32_t wevt_field_get_uint32(EVT_VARIANT *ev) {
+    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeUInt32);
+    return ev->UInt32Val;
+}
+
+static inline uint64_t wevt_field_get_uint64(EVT_VARIANT *ev) {
+    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeUInt64);
+    return ev->UInt64Val;
+}
+
+static inline uint64_t wevt_field_get_uint64_hex(EVT_VARIANT *ev) {
+    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeHexInt64);
+    return ev->UInt64Val;
+}
+
+static inline bool wevt_field_get_string_utf8(EVT_VARIANT *ev, TXT_UTF8 *dst) {
+    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull) {
+        wevt_utf8_empty(dst);
+        return false;
+    }
+
+    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeString);
+    return wevt_str_wchar_to_utf8(dst, ev->StringVal, -1);
+}
+
+bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst);
+
+static inline bool wevt_field_get_sid(EVT_VARIANT *ev, TXT_UTF8 *dst) {
+    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull) {
+        wevt_utf8_empty(dst);
+        return false;
+    }
+
+    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeSid);
+    return wevt_convert_user_id_to_name(ev->SidVal, dst);
+}
+
+static inline uint64_t wevt_field_get_filetime_to_ns(EVT_VARIANT *ev) {
+    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeFileTime);
+    return os_windows_ulonglong_to_unix_epoch_ns(ev->FileTimeVal);
+}
+
+static inline bool wevt_GUID_to_ND_UUID(ND_UUID *nd_uuid, const GUID *guid) {
+    if(guid && sizeof(GUID) == sizeof(ND_UUID)) {
+        memcpy(nd_uuid->uuid, guid, sizeof(ND_UUID));
+        return true;
+    }
+    else {
+        *nd_uuid = UUID_ZERO;
+        return false;
+    }
+}
+
+static inline bool wevt_get_uuid_by_type(EVT_VARIANT *ev, ND_UUID *dst) {
+    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull) {
+        wevt_GUID_to_ND_UUID(dst, NULL);
+        return false;
+    }
+
+    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeGuid);
+    return wevt_GUID_to_ND_UUID(dst, ev->GuidVal);
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/wes/defining-severity-levels
+static inline bool is_valid_publisher_level(uint64_t level) {
+    // the spec says >= 16, but many publishers redefine the standard ones (<=5)
+    // so we remove the lower bound
+    return level <= 255;
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/wes/defining-tasks-and-opcodes
+static inline bool is_valid_publisher_opcode(uint64_t opcode) {
+    // the spec says >= 16, but many publishers redefine the standard ones (<=10)
+    // so we remove the lower bound
+    return opcode <= 239;
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/wes/defining-tasks-and-opcodes
+static inline bool is_valid_publisher_task(uint64_t task) {
+    return task > 0 && task <= 0xFFFF;
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/wes/defining-keywords-used-to-classify-types-of-events
+static inline bool is_valid_publisher_keywords(uint64_t keyword) {
+    return keyword > 0 && keyword <= 0x0000FFFFFFFFFFFF;
 }
 
 #endif //NETDATA_WINDOWS_EVENTS_QUERY_H
