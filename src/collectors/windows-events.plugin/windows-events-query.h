@@ -132,26 +132,41 @@ static inline void wevt_variant_resize(WEVT_VARIANT *v, size_t required_size) {
 }
 
 static inline uint8_t wevt_field_get_uint8(EVT_VARIANT *ev) {
+    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull)
+        return 0;
+
     fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeByte);
     return ev->ByteVal;
 }
 
 static inline uint16_t wevt_field_get_uint16(EVT_VARIANT *ev) {
+    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull)
+        return 0;
+
     fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeUInt16);
     return ev->UInt16Val;
 }
 
 static inline uint32_t wevt_field_get_uint32(EVT_VARIANT *ev) {
+    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull)
+        return 0;
+
     fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeUInt32);
     return ev->UInt32Val;
 }
 
 static inline uint64_t wevt_field_get_uint64(EVT_VARIANT *ev) {
+    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull)
+        return 0;
+
     fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeUInt64);
     return ev->UInt64Val;
 }
 
 static inline uint64_t wevt_field_get_uint64_hex(EVT_VARIANT *ev) {
+    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull)
+        return 0;
+
     fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeHexInt64);
     return ev->UInt64Val;
 }
@@ -179,6 +194,9 @@ static inline bool wevt_field_get_sid(EVT_VARIANT *ev, TXT_UTF8 *dst) {
 }
 
 static inline uint64_t wevt_field_get_filetime_to_ns(EVT_VARIANT *ev) {
+    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull)
+        return 0;
+
     fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeFileTime);
     return os_windows_ulonglong_to_unix_epoch_ns(ev->FileTimeVal);
 }
