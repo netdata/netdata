@@ -25,5 +25,6 @@ int do_PerflibProcessor(int update_every, usec_t dt);
 int do_PerflibMemory(int update_every, usec_t dt);
 int do_PerflibObjects(int update_every, usec_t dt);
 int do_PerflibThermalZone(int update_every, usec_t dt);
+int do_PerflibWebService(int update_every, usec_t dt);
 
 #endif //NETDATA_WINDOWS_PLUGIN_H

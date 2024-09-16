@@ -1444,6 +1444,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
+        src/collectors/windows.plugin/perflib-web-service.c
 )
 
 set(PROC_PLUGIN_FILES
