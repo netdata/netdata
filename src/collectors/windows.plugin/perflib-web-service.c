@@ -15,7 +15,6 @@ struct web_service {
 
     COUNTER_DATA IISReceivedBytesTotal;
     COUNTER_DATA IISSentBytesTotal;
-    COUNTER_DATA IISRequestsTotal;
     COUNTER_DATA IISIPAPIExtRequestsTotal;
     COUNTER_DATA IISConnAttemptsAllInstancesTotal;
     COUNTER_DATA IISFilesReceivedTotal;
@@ -25,8 +24,32 @@ struct web_service {
     COUNTER_DATA IISNotFoundErrorsTotal;
 };
 
+struct w3vc_w3wp {
+    COUNTER_DATA IISRequestsTotal;
+};
+
+struct w3vc_w3wp w3svc_conters;
+
 static inline void initialize_web_service_keys(struct web_service *p) {
     p->IISCurrentAnonymousUser.key = "Current Anonymous Users";
+    p->IISCurrentNonAnonymousUsers.key = "Current NonAnonymous Users";
+    p->IISCurrentConnections.key = "Current Connections";
+    p->IISCurrentISAPIExtRequests.key = "Current ISAPI Extension Requests";
+    p->IISUptime.key = "Service Uptime";
+
+    p->IISReceivedBytesTotal.key = "Total Bytes Received";
+    p->IISSentBytesTotal.key = "Total Bytes Sent";
+    p->IISIPAPIExtRequestsTotal.key = "Total ISAPI Extension Requests";
+    p->IISConnAttemptsAllInstancesTotal.key = "Total Connection Attempts (all instances)";
+    p->IISFilesReceivedTotal.key = "Total Files Received";
+    p->IISFilesSentTotal.key = "Total Files Sent";
+    p->IISLogonAttemptsTotal.key = "Total Logon Attempts";
+    p->IISLockedErrorsTotal.key = "Total Locked Errors";
+    p->IISNotFoundErrorsTotal.key = "Total Not Found Errors";
+}
+
+static inline void initialize_w3vc_w3wp_keys(struct w3vc_w3wp *p) {
+    p->IISRequestsTotal.key = "Total HTTP Requests Served";
 }
 
 void dict_web_service_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -41,6 +64,8 @@ static void initialize(void) {
                                                 DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct web_service));
 
     dictionary_register_insert_callback(web_services, dict_web_service_insert_cb, NULL);
+
+    initialize_w3vc_w3wp_keys(&w3svc_conters);
 }
 
 static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
