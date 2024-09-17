@@ -159,7 +159,8 @@ The following options can be defined globally: update_every, autodetection_retry
 | update_every | Data collection frequency. | 5 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | host | Remote host address in IPv4, IPv6 format, or DNS name. |  | yes |
-| ports | Remote host TCP ports. Must be specified in numeric format. |  | yes |
+| ports | Target TCP ports. Must be specified in numeric format. |  | no |
+| udp_ports | Target UDP ports. Must be specified in numeric format. |  | no |
 | timeout | HTTP request timeout. | 2 | no |
 
 </details>
