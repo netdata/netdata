@@ -726,7 +726,7 @@ static inline FACET_KEY *FACETS_KEY_CREATE(FACETS *facets, FACETS_HASH hash, con
     k->current_value.b = buffer_create(sizeof(FACET_VALUE_UNSET), NULL);
     k->default_selected_for_values = true;
 
-    if(!(k->options & FACET_KEY_OPTION_REORDER))
+    if(unlikely((k->options & (FACET_KEY_OPTION_REORDER | FACET_KEY_OPTION_REORDER_DONE)) == 0)) {
         k->order = facets->order++;
 
     if((k->options & FACET_KEY_OPTION_FTS) || (facets->options & FACETS_OPTION_ALL_KEYS_FTS))
@@ -761,9 +761,9 @@ static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH has
     facet_key_set_name(k, name, name_length);
     k->options |= options;
 
-    if(unlikely(k->options & FACET_KEY_OPTION_REORDER)) {
+    if(unlikely((k->options & (FACET_KEY_OPTION_REORDER | FACET_KEY_OPTION_REORDER_DONE)) == FACET_KEY_OPTION_REORDER)) {
         k->order = facets->order++;
-        k->options &= ~FACET_KEY_OPTION_REORDER;
+        k->options |= FACET_KEY_OPTION_REORDER_DONE;
     }
 
     return k;
