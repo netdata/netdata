@@ -794,6 +794,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/facets/logs_query_status.h
         src/libnetdata/os/timestamps.c
         src/libnetdata/os/timestamps.h
+        src/libnetdata/parsers/entries.c
+        src/libnetdata/parsers/entries.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

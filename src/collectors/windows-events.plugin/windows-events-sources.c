@@ -22,6 +22,15 @@ WEVT_SOURCE_TYPE wevt_internal_source_type(const char *value) {
     if(strcmp(value, WEVT_SOURCE_ALL_DEBUG_NAME) == 0)
         return WEVTS_DEBUG;
 
+    if(strcmp(value, WEVT_SOURCE_ALL_DIAGNOSTIC_NAME) == 0)
+        return WEVTS_DIAGNOSTIC;
+
+    if(strcmp(value, WEVT_SOURCE_ALL_TRACING_NAME) == 0)
+        return WEVTS_TRACING;
+
+    if(strcmp(value, WEVT_SOURCE_ALL_PERFORMANCE_NAME) == 0)
+        return WEVTS_PERFORMANCE;
+
     if(strcmp(value, WEVT_SOURCE_ALL_WINDOWS_NAME) == 0)
         return WEVTS_WINDOWS;
 
@@ -125,6 +134,7 @@ struct wevt_source {
     usec_t first_ut;
     usec_t last_ut;
     size_t count;
+    size_t entries;
     uint64_t size;
 };
 
@@ -143,9 +153,12 @@ static int wevt_source_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry
         duration_snprintf(duration_for_humans, sizeof(duration_for_humans),
                           (time_t)((s->last_ut - s->first_ut) / USEC_PER_SEC), "s", true);
 
+        char entries_for_humans[128];
+        entries_snprintf(entries_for_humans, sizeof(entries_for_humans), s->entries, "", false);
+
         char info[1024];
-        snprintfz(info, sizeof(info), "%zu channel%s, with a total size of %s, covering %s",
-                s->count, s->count > 1 ? "s":"", size_for_humans, duration_for_humans);
+        snprintfz(info, sizeof(info), "%zu channel%s, with a total size of %s, covering %s, having %s events",
+                s->count, s->count > 1 ? "s":"", size_for_humans, duration_for_humans, entries_for_humans);
 
         buffer_json_member_add_string(wb, "id", name);
         buffer_json_member_add_string(wb, "name", name);
@@ -163,6 +176,7 @@ static bool wevt_source_merge_sizes(const DICTIONARY_ITEM *item __maybe_unused, 
 
     old_v->count += new_v->count;
     old_v->size += new_v->size;
+    old_v->entries += new_v->entries;
 
     if(new_v->first_ut && new_v->first_ut < old_v->first_ut)
         old_v->first_ut = new_v->first_ut;
@@ -185,6 +199,7 @@ void wevt_sources_to_json_array(BUFFER *wb) {
         t.last_ut = src->msg_last_ut;
         t.count = 1;
         t.size = src->size;
+        t.entries = src->entries;
 
         dictionary_set(dict, WEVT_SOURCE_ALL_NAME, &t, sizeof(t));
 
@@ -200,6 +215,15 @@ void wevt_sources_to_json_array(BUFFER *wb) {
         if(src->source_type & WEVTS_DEBUG)
             dictionary_set(dict, WEVT_SOURCE_ALL_DEBUG_NAME, &t, sizeof(t));
 
+        if(src->source_type & WEVTS_DIAGNOSTIC)
+            dictionary_set(dict, WEVT_SOURCE_ALL_DIAGNOSTIC_NAME, &t, sizeof(t));
+
+        if(src->source_type & WEVTS_TRACING)
+            dictionary_set(dict, WEVT_SOURCE_ALL_TRACING_NAME, &t, sizeof(t));
+
+        if(src->source_type & WEVTS_PERFORMANCE)
+            dictionary_set(dict, WEVT_SOURCE_ALL_PERFORMANCE_NAME, &t, sizeof(t));
+
         if(src->source_type & WEVTS_WINDOWS)
             dictionary_set(dict, WEVT_SOURCE_ALL_WINDOWS_NAME, &t, sizeof(t));
 
@@ -209,6 +233,29 @@ void wevt_sources_to_json_array(BUFFER *wb) {
     dfe_done(jf);
 
     dictionary_sorted_walkthrough_read(dict, wevt_source_to_json_array_cb, wb);
+}
+
+static bool check_and_remove_suffix(char *name, size_t len, const char *suffix) {
+    char s[strlen(suffix) + 2];
+    s[0] = '/';
+    memcpy(&s[1], suffix, sizeof(s) - 1);
+    size_t slen = sizeof(s) - 1;
+
+    if(slen + 1 >= len) return false;
+
+    char *match = &name[len - slen];
+    if(strcasecmp(match, s) == 0) {
+        *match = '\0';
+        return true;
+    }
+
+    s[0] = '-';
+    if(strcasecmp(match, s) == 0) {
+        *match = '\0';
+        return true;
+    }
+
+    return false;
 }
 
 void wevt_sources_scan(void) {
@@ -257,19 +304,30 @@ void wevt_sources_scan(void) {
 
             const char *name = channel2utf8(channel);
             const char *fullname = strdupz(name);
-            char *slash = strchr(name, '/');
+
             WEVT_SOURCE_TYPE sources = WEVTS_ALL;
-            if(slash) {
-                *slash++ = '\0';
-                if(strcasecmp(slash, "Admin") == 0)
-                    sources |= WEVTS_ADMIN;
-                if(strcasecmp(slash, "Operational") == 0)
-                    sources |= WEVTS_OPERATIONAL;
-                if(strcasecmp(slash, "Analytic") == 0)
-                    sources |= WEVTS_ANALYTIC;
-                if(strcasecmp(slash, "Debug") == 0)
-                    sources |= WEVTS_DEBUG;
-            }
+            size_t len = strlen(fullname);
+            if(check_and_remove_suffix((char *)name, len, "Admin"))
+                sources |= WEVTS_ADMIN;
+            else if(check_and_remove_suffix((char *)name, len, "Operational"))
+                sources |= WEVTS_OPERATIONAL;
+            else if(check_and_remove_suffix((char *)name, len, "Analytic"))
+                sources |= WEVTS_ANALYTIC;
+            else if(check_and_remove_suffix((char *)name, len, "Debug") ||
+                    check_and_remove_suffix((char *)name, len, "Verbose"))
+                sources |= WEVTS_DEBUG;
+            else if(check_and_remove_suffix((char *)name, len, "Diagnostic"))
+                sources |= WEVTS_DIAGNOSTIC;
+            else if(check_and_remove_suffix((char *)name, len, "Trace") ||
+                    check_and_remove_suffix((char *)name, len, "Tracing"))
+                sources |= WEVTS_TRACING;
+            else if(check_and_remove_suffix((char *)name, len, "Performance") ||
+                    check_and_remove_suffix((char *)name, len, "Perf"))
+                sources |= WEVTS_PERFORMANCE;
+
+            char *slash = strchr(name, '/');
+            if(slash)
+                *slash = '\0';
 
             if(strcasecmp(name, "Application") == 0)
                 sources |= WEVTS_WINDOWS;
