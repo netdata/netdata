@@ -759,6 +759,7 @@ static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH has
     FACET_KEY *k = SIMPLE_HASHTABLE_SLOT_DATA(slot);
 
     facet_key_set_name(k, name, name_length);
+    k->options |= options;
 
     if(unlikely(k->options & FACET_KEY_OPTION_REORDER)) {
         k->order = facets->order++;
@@ -2658,15 +2659,9 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                     RRDF_FIELD_VISUAL visual = (k->options & FACET_KEY_OPTION_RICH_TEXT) ? RRDF_FIELD_VISUAL_RICH : RRDF_FIELD_VISUAL_VALUE;
                     RRDF_FIELD_TRANSFORM transform = RRDF_FIELD_TRANSFORM_NONE;
 
-                    bool visible = k->options & (FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_STICKY);
-
-                    if ((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE && k->values.enabled))
-                        visible = true;
-
-                    if (!visible)
-                        visible = simple_pattern_matches(facets->visible_keys, k->name);
-
-                    if (visible)
+                    if (k->options & (FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_STICKY) ||
+                         ((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE) && k->values.enabled) ||
+                         simple_pattern_matches(facets->visible_keys, k->name))
                         options |= RRDF_FIELD_OPTS_VISIBLE;
 
                     if (k->options & FACET_KEY_OPTION_MAIN_TEXT)
