@@ -510,7 +510,8 @@ int mqtt_wss_connect(
     int port,
     struct mqtt_connect_params *mqtt_params,
     int ssl_flags,
-    struct mqtt_wss_proxy *proxy)
+    struct mqtt_wss_proxy *proxy,
+    bool *fallback_ipv4)
 {
     if (!mqtt_params) {
         mws_error(client->log, "mqtt_params can't be null!");
@@ -566,7 +567,9 @@ int mqtt_wss_connect(
 
     char port_str[16];
     snprintf(port_str, sizeof(port_str) -1, "%d", client->port);
-    int fd = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, client->host, 0, port_str, NULL);
+
+    struct timeval timeout = { .tv_sec = 10, .tv_usec = 0 };
+    int fd = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, client->host, 0, port_str, &timeout, fallback_ipv4);
     if (fd < 0) {
         mws_error(client->log, "Could not connect to remote endpoint \"%s\", port %d.\n", client->host, port);
         return -3;
