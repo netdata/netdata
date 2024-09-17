@@ -72,7 +72,7 @@ bool wevt_get_message_unicode(TXT_UNICODE *unicode, EVT_HANDLE hMetadata, EVT_HA
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() to get message size failed.");
             goto cleanup;
         }
-        txt_unicode_resize(unicode, size);
+        txt_unicode_resize(unicode, size, false);
     }
 
     // First, try to get the message using the existing buffer
@@ -83,7 +83,7 @@ bool wevt_get_message_unicode(TXT_UNICODE *unicode, EVT_HANDLE hMetadata, EVT_HA
         }
 
         // Try again with the resized buffer
-        txt_unicode_resize(unicode, size);
+        txt_unicode_resize(unicode, size, false);
         if (!EvtFormatMessage(hMetadata, bookmark, dwMessageId, 0, NULL, flags, unicode->size, unicode->data, &size)) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed after resizing buffer.");
             goto cleanup;

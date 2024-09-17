@@ -18,19 +18,6 @@ typedef enum __attribute__((packed)) {
     TXT_SOURCE_MAX,
 } TXT_SOURCE;
 
-typedef struct {
-    char *data;
-    size_t size; // the allocated size of data buffer
-    size_t used;  // the used size of the data buffer (including null terminators, if any)
-    TXT_SOURCE src;
-} TXT_UTF8;
-
-typedef struct {
-    wchar_t *data;
-    size_t size; // the allocated size of data buffer
-    size_t used;  // the used size of the data buffer (including null terminators, if any)
-} TXT_UNICODE;
-
 static inline size_t compute_new_size(size_t old_size, size_t required_size) {
     size_t size = (required_size % 2048 == 0) ? required_size : required_size + 2048;
     size = (size / 2048) * 2048;
@@ -41,6 +28,16 @@ static inline size_t compute_new_size(size_t old_size, size_t required_size) {
     return size;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// TXT_UTF8
+
+typedef struct {
+    char *data;
+    size_t size; // the allocated size of data buffer
+    size_t used;  // the used size of the data buffer (including null terminators, if any)
+    TXT_SOURCE src;
+} TXT_UTF8;
+
 static inline void txt_utf8_cleanup(TXT_UTF8 *utf8) {
     freez(utf8->data);
     utf8->data = NULL;
@@ -48,20 +45,26 @@ static inline void txt_utf8_cleanup(TXT_UTF8 *utf8) {
 }
 
 static inline void txt_utf8_resize(TXT_UTF8 *utf8, size_t required_size, bool keep) {
-    if(required_size < utf8->size)
+    if(required_size <= utf8->size)
         return;
 
-    if(keep) {
-        size_t new_size = compute_new_size(utf8->size, required_size);
+    size_t new_size = compute_new_size(utf8->size, required_size);
+
+    if(keep && utf8->data)
         utf8->data = reallocz(utf8->data, new_size);
-        utf8->size = new_size;
-    }
     else {
         txt_utf8_cleanup(utf8);
-        utf8->size = compute_new_size(utf8->size, required_size);
         utf8->data = mallocz(utf8->size);
         utf8->used = 0;
     }
+
+    utf8->size = new_size;
+}
+
+static inline void wevt_utf8_empty(TXT_UTF8 *dst) {
+    txt_utf8_resize(dst, 1, false);
+    dst->data[0] = '\0';
+    dst->used = 1;
 }
 
 static inline void txt_utf8_set(TXT_UTF8 *dst, const char *txt, size_t txt_len) {
@@ -107,18 +110,59 @@ static inline void txt_utf8_set_hex_if_empty(TXT_UTF8 *dst, const char *prefix, 
     }
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// TXT_UNICODE
+
+typedef struct {
+    wchar_t *data;
+    size_t size; // the allocated size of data buffer
+    size_t used;  // the used size of the data buffer (including null terminators, if any)
+} TXT_UNICODE;
+
 static inline void txt_unicode_cleanup(TXT_UNICODE *unicode) {
     freez(unicode->data);
 }
 
-static inline void txt_unicode_resize(TXT_UNICODE *unicode, size_t required_size) {
-    if(required_size < unicode->size)
+static inline void txt_unicode_resize(TXT_UNICODE *unicode, size_t required_size, bool keep) {
+    if(required_size <= unicode->size)
         return;
 
-    txt_unicode_cleanup(unicode);
-    unicode->size = compute_new_size(unicode->size, required_size);
-    unicode->data = mallocz(unicode->size * sizeof(wchar_t));
+    size_t new_size = compute_new_size(unicode->size, required_size);
+
+    if (keep && unicode->data) {
+        unicode->data = reallocz(unicode->data, new_size * sizeof(wchar_t));
+    } else {
+        txt_unicode_cleanup(unicode);
+        unicode->data = mallocz(new_size * sizeof(wchar_t));
+        unicode->used = 0;
+    }
+
+    unicode->size = new_size;
 }
+
+static inline void txt_unicode_set(TXT_UNICODE *dst, const wchar_t *txt, size_t txt_len) {
+    txt_unicode_resize(dst, dst->used + txt_len + 1, true);
+    memcpy(dst->data, txt, txt_len * sizeof(wchar_t));
+    dst->used = txt_len + 1;
+    dst->data[dst->used - 1] = '\0';
+}
+
+static inline void txt_unicode_append(TXT_UNICODE *dst, const wchar_t *txt, size_t txt_len) {
+    if(dst->used <= 1) {
+        // the destination is empty
+        txt_unicode_set(dst, txt, txt_len);
+    }
+    else {
+        // there is something already in the buffer
+        txt_unicode_resize(dst, dst->used + txt_len, true);
+        memcpy(&dst->data[dst->used - 1], txt, txt_len * sizeof(wchar_t));
+        dst->used += txt_len; // the null was already counted
+        dst->data[dst->used - 1] = '\0';
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// conversions
 
 bool wevt_str_unicode_to_utf8(TXT_UTF8 *utf8, TXT_UNICODE *unicode);
 bool wevt_str_wchar_to_utf8(TXT_UTF8 *dst, const wchar_t *src, int src_len_with_null);
@@ -135,11 +179,5 @@ wchar_t *channel2unicode(const char *utf8str);
 char *query2utf8(const wchar_t *query);
 
 char *unicode2utf8_strdupz(const wchar_t *src, size_t *utf8_len);
-
-static inline void wevt_utf8_empty(TXT_UTF8 *dst) {
-    txt_utf8_resize(dst, 1, false);
-    dst->data[0] = '\0';
-    dst->used = 1;
-}
 
 #endif //NETDATA_WINDOWS_EVENTS_UNICODE_H
