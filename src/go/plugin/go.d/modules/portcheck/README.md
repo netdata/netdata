@@ -1,1 +1,1 @@
-integrations/tcp_endpoints.md
+integrations/tcp-udp_endpoints.md
