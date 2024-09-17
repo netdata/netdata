@@ -22,7 +22,8 @@
       "host": {
         "title": "Network host",
         "description": "The IP address or domain name of the network host.",
-        "type": "string"
+        "type": "string",
+        "default": "127.0.0.1"
       },
       "ports": {
         "title": "TCP ports",
