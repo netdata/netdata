@@ -25,7 +25,7 @@
         "type": "string"
       },
       "ports": {
-        "title": "Ports",
+        "title": "TCP ports",
         "description": "A list of ports to monitor for TCP service availability and response time.",
         "type": [
           "array",
@@ -36,13 +36,25 @@
           "type": "integer",
           "minimum": 1
         },
-        "minItems": 1,
+        "uniqueItems": true
+      },
+      "udp_ports": {
+        "title": "UDP ports",
+        "description": "A list of ports to monitor for UDP service availability.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Port",
+          "type": "integer",
+          "minimum": 1
+        },
         "uniqueItems": true
       }
     },
     "required": [
-      "host",
-      "ports"
+      "host"
     ],
     "additionalProperties": false,
     "patternProperties": {
@@ -60,6 +72,10 @@
       "ui:placeholder": "127.0.0.1"
     },
     "ports": {
+      "ui:listFlavour": "list"
+    },
+    "udp_ports": {
+      "ui:help": "The collector sends 0-byte UDP packets to each port on the target system. If an ICMP Destination Unreachable message is received, the port is considered closed. Otherwise, it is assumed to be open or filtered (if no response is received within the timeout). This approach is similar to the behavior of the `close`/`open/filtered` states reported by `nmap`. However, note that the `open/filtered` state is a best-effort determination, as the collector does not actually exchange data with the application on the target system.",
       "ui:listFlavour": "list"
     }
   }
