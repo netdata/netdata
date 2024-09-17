@@ -794,6 +794,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/facets/logs_query_status.h
         src/libnetdata/os/timestamps.c
         src/libnetdata/os/timestamps.h
+        src/libnetdata/parsers/entries.c
+        src/libnetdata/parsers/entries.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1415,6 +1417,8 @@ set(WINDOWS_EVENTS_PLUGIN_FILES
         src/collectors/windows-events.plugin/windows-events-publishers.h
         src/collectors/windows-events.plugin/windows-events-fields-cache.c
         src/collectors/windows-events.plugin/windows-events-fields-cache.h
+        src/collectors/windows-events.plugin/windows-events-query-builder.c
+        src/collectors/windows-events.plugin/windows-events-query-builder.h
 )
 
 set(WINDOWS_PLUGIN_FILES

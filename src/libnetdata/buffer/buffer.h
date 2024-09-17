@@ -1118,6 +1118,7 @@ typedef enum __attribute__((packed)) {
     RRDF_FIELD_TRANSFORM_DURATION_S,  // transform as duration in second to a human-readable duration
     RRDF_FIELD_TRANSFORM_DATETIME_MS,  // UNIX epoch timestamp in ms
     RRDF_FIELD_TRANSFORM_DATETIME_USEC,  // UNIX epoch timestamp in usec
+    RRDF_FIELD_TRANSFORM_XML,   // format the field with an XML prettifier
 } RRDF_FIELD_TRANSFORM;
 
 static inline const char *rrdf_field_transform_to_string(RRDF_FIELD_TRANSFORM transform) {
@@ -1137,6 +1138,9 @@ static inline const char *rrdf_field_transform_to_string(RRDF_FIELD_TRANSFORM tr
 
         case RRDF_FIELD_TRANSFORM_DATETIME_USEC:
             return "datetime_usec";
+
+        case RRDF_FIELD_TRANSFORM_XML:
+            return "xml";
     }
 }
 

@@ -46,7 +46,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
         bool cancelled = false;
         usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
-        // char buf[] = "systemd-journal after:-8640000 before:0 direction:backward last:200 data_only:false slice:true source:all";
+        // char buf[] = "systemd-journal after:1726573205 before:1726574105 last:200 facets:F9q1S4.MEeL,DHKucpqUoe1,MewN7JHJ.3X,LKWfxQdCIoc,IjWzTvQ9.4t,O6O.cgYOhns,KmQ1KSeTSfO,IIsT7Ytfxy6,EQD6.NflJQq,I6rMJzShJIE,DxoIlg6RTuM,AU4H2NMVPXJ,H4mcdIPho07,EDYhj5U8330,DloDtGMQHje,JHSbsQ2fXqr,AIRrOu._40Z,NFZXv8AEpS_,Iiic3t4NuxV,F2YCtRNSfDv,GOUMAmZiRrq,O0VYoHcyq49,FDQoaBH15Bp,ClBB5dSGmCc,GTwmQptJYkk,BWH4O3GPNSL,APv6JsKkF9X,IAURKhjtcRF,Jw1dz4fJmFr slice:true source:all";
         char buf[] = "systemd-journal after:-8640000 before:0 direction:backward last:200 data_only:false slice:true facets: source:all";
         // char buf[] = "systemd-journal after:1695332964 before:1695937764 direction:backward last:100 slice:true source:all DHKucpqUoe1:PtVoyIuX.MU";
         // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";

@@ -726,7 +726,7 @@ static inline FACET_KEY *FACETS_KEY_CREATE(FACETS *facets, FACETS_HASH hash, con
     k->current_value.b = buffer_create(sizeof(FACET_VALUE_UNSET), NULL);
     k->default_selected_for_values = true;
 
-    if(!(k->options & FACET_KEY_OPTION_REORDER))
+    if(unlikely((k->options & (FACET_KEY_OPTION_REORDER | FACET_KEY_OPTION_REORDER_DONE)) == 0))
         k->order = facets->order++;
 
     if((k->options & FACET_KEY_OPTION_FTS) || (facets->options & FACETS_OPTION_ALL_KEYS_FTS))
@@ -759,10 +759,11 @@ static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH has
     FACET_KEY *k = SIMPLE_HASHTABLE_SLOT_DATA(slot);
 
     facet_key_set_name(k, name, name_length);
+    k->options |= options;
 
-    if(unlikely(k->options & FACET_KEY_OPTION_REORDER)) {
+    if(unlikely((k->options & (FACET_KEY_OPTION_REORDER | FACET_KEY_OPTION_REORDER_DONE)) == FACET_KEY_OPTION_REORDER)) {
         k->order = facets->order++;
-        k->options &= ~FACET_KEY_OPTION_REORDER;
+        k->options |= FACET_KEY_OPTION_REORDER_DONE;
     }
 
     return k;
@@ -2655,15 +2656,12 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         FACET_KEY *k;
         foreach_key_in_facets(facets, k) {
                     RRDF_FIELD_OPTIONS options = RRDF_FIELD_OPTS_WRAP;
-                    bool visible = k->options & (FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_STICKY);
+                    RRDF_FIELD_VISUAL visual = (k->options & FACET_KEY_OPTION_RICH_TEXT) ? RRDF_FIELD_VISUAL_RICH : RRDF_FIELD_VISUAL_VALUE;
+                    RRDF_FIELD_TRANSFORM transform = RRDF_FIELD_TRANSFORM_NONE;
 
-                    if ((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE && k->values.enabled))
-                        visible = true;
-
-                    if (!visible)
-                        visible = simple_pattern_matches(facets->visible_keys, k->name);
-
-                    if (visible)
+                    if (k->options & (FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_STICKY) ||
+                         ((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE) && k->values.enabled) ||
+                         simple_pattern_matches(facets->visible_keys, k->name))
                         options |= RRDF_FIELD_OPTS_VISIBLE;
 
                     if (k->options & FACET_KEY_OPTION_MAIN_TEXT)
@@ -2672,14 +2670,16 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                     if (k->options & FACET_KEY_OPTION_EXPANDED_FILTER)
                         options |= RRDF_FIELD_OPTS_EXPANDED_FILTER;
 
+                    if (k->options & FACET_KEY_OPTION_PRETTY_XML)
+                        transform = RRDF_FIELD_TRANSFORM_XML;
+
                     const char *hash_str = hash_to_static_string(k->hash);
 
                     buffer_rrdf_table_add_field(
                             wb, field_id++,
                             hash_str, k->name ? k->name : hash_str,
                             RRDF_FIELD_TYPE_STRING,
-                            (k->options & FACET_KEY_OPTION_RICH_TEXT) ? RRDF_FIELD_VISUAL_RICH : RRDF_FIELD_VISUAL_VALUE,
-                            RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                            visual, transform, 0, NULL, NAN,
                             RRDF_FIELD_SORT_FIXED,
                             NULL,
                             RRDF_FIELD_SUMMARY_COUNT,

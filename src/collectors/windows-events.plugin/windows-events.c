@@ -5,117 +5,8 @@
 
 #include "windows-events.h"
 
-#define WINDOWS_EVENTS_WORKER_THREADS 5
-#define WINDOWS_EVENTS_DEFAULT_TIMEOUT 600
-#define WINDOWS_EVENTS_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
-#define WINDOWS_EVENTS_PROGRESS_EVERY_UT (250 * USEC_PER_MS)
-
-#define FUNCTION_PROGRESS_EVERY_ROWS (2000)
-#define FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS (1000)
-#define ANCHOR_DELTA_UT (10 * USEC_PER_SEC)
-
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
-
-#define WEVT_FUNCTION_DESCRIPTION    "View, search and analyze the Microsoft Windows Events log."
-#define WEVT_FUNCTION_NAME           "windows-events"
-
-// functions needed by LQS
-
-// structures needed by LQS
-struct lqs_extension {
-    wchar_t *query;
-
-    struct {
-        struct {
-            size_t completed;
-            size_t total;
-        } queries;
-
-        struct {
-            size_t current_query_total;
-            size_t completed;
-            size_t total;
-        } entries;
-
-        usec_t last_ut;
-    } progress;
-
-    // struct {
-    //     usec_t start_ut;
-    //     usec_t stop_ut;
-    //     usec_t first_msg_ut;
-    //
-    //     uint64_t first_msg_seqnum;
-    // } query_file;
-
-    // struct {
-    //     uint32_t enable_after_samples;
-    //     uint32_t slots;
-    //     uint32_t sampled;
-    //     uint32_t unsampled;
-    //     uint32_t estimated;
-    // } samples;
-
-    // struct {
-    //     uint32_t enable_after_samples;
-    //     uint32_t every;
-    //     uint32_t skipped;
-    //     uint32_t recalibrate;
-    //     uint32_t sampled;
-    //     uint32_t unsampled;
-    //     uint32_t estimated;
-    // } samples_per_file;
-
-    // struct {
-    //     usec_t start_ut;
-    //     usec_t end_ut;
-    //     usec_t step_ut;
-    //     uint32_t enable_after_samples;
-    //     uint32_t sampled[SYSTEMD_JOURNAL_SAMPLING_SLOTS];
-    //     uint32_t unsampled[SYSTEMD_JOURNAL_SAMPLING_SLOTS];
-    // } samples_per_time_slot;
-
-    // per file progress info
-    // size_t cached_count;
-
-    // progress statistics
-    usec_t matches_setup_ut;
-    size_t rows_useful;
-    size_t rows_read;
-    size_t bytes_read;
-    size_t files_matched;
-    size_t file_working;
-};
-
-// prepare LQS
-#define LQS_DEFAULT_SLICE_MODE      0
-#define LQS_FUNCTION_NAME           WEVT_FUNCTION_NAME
-#define LQS_FUNCTION_DESCRIPTION    WEVT_FUNCTION_DESCRIPTION
-#define LQS_DEFAULT_ITEMS_PER_QUERY 200
-#define LQS_DEFAULT_ITEMS_SAMPLING  1000000
-#define LQS_SOURCE_TYPE             WEVT_SOURCE_TYPE
-#define LQS_SOURCE_TYPE_ALL         WEVTS_ALL
-#define LQS_SOURCE_TYPE_NONE        WEVTS_NONE
-#define LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value) wevt_internal_source_type(value)
-#define LQS_FUNCTION_SOURCE_TO_JSON_ARRAY(wb) wevt_sources_to_json_array(wb)
-#include "libnetdata/facets/logs_query_status.h"
-
-#define WEVT_FIELD_COMPUTER             "Computer"
-#define WEVT_FIELD_CHANNEL              "Channel"
-#define WEVT_FIELD_PROVIDER             "Provider"
-#define WEVT_FIELD_SOURCE               "Source"
-#define WEVT_FIELD_EVENTRECORDID        "EventRecordID"
-#define WEVT_FIELD_EVENTID              "EventID"
-#define WEVT_FIELD_LEVEL                "Level"
-#define WEVT_FIELD_KEYWORDS             "Keywords"
-#define WEVT_FIELD_OPCODE               "Opcode"
-#define WEVT_FIELD_USER                 "User"
-#define WEVT_FIELD_TASK                 "Task"
-#define WEVT_FIELD_PROCESSID            "ProcessID"
-#define WEVT_FIELD_THREADID             "ThreadID"
-#define WEVT_FIELD_XML                  "XML"
-#define WEVT_FIELD_MESSAGE              "Message"
 
 #define WEVT_ALWAYS_VISIBLE_KEYS                NULL
 
@@ -157,18 +48,18 @@ FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused,
     int windows_event_level = str2i(buffer_tostring(levelid_rkv->wb));
 
     switch (windows_event_level) {
-        case WINEVENT_LEVEL_VERBOSE:
+        case WEVT_LEVEL_VERBOSE:
             return FACET_ROW_SEVERITY_DEBUG;
 
         default:
-        case WINEVENT_LEVEL_INFORMATION:
+        case WEVT_LEVEL_INFORMATION:
             return FACET_ROW_SEVERITY_NORMAL;
 
-        case WINEVENT_LEVEL_WARNING:
+        case WEVT_LEVEL_WARNING:
             return FACET_ROW_SEVERITY_WARNING;
 
-        case WINEVENT_LEVEL_ERROR:
-        case WINEVENT_LEVEL_CRITICAL:
+        case WEVT_LEVEL_ERROR:
+        case WEVT_LEVEL_CRITICAL:
             return FACET_ROW_SEVERITY_CRITICAL;
     }
 }
@@ -176,15 +67,15 @@ FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused,
 struct wevt_bin_data {
     bool rendered;
     WEVT_LOG *log;
-    EVT_HANDLE bookmark;
+    EVT_HANDLE hEvent;
     PROVIDER_META_HANDLE *publisher;
 };
 
 static void wevt_cleanup_bin_data(void *data) {
     struct wevt_bin_data *d = data;
 
-    if(d->bookmark)
-        EvtClose(d->bookmark);
+    if(d->hEvent)
+        EvtClose(d->hEvent);
 
     publisher_release(d->publisher);
     freez(d);
@@ -197,7 +88,7 @@ static inline void wevt_facets_register_bin_data(WEVT_LOG *log, FACETS *facets, 
     d->rendered = false;
 
     // take the bookmark
-    d->bookmark = log->bookmark; log->bookmark = NULL;
+    d->hEvent = log->hEvent; log->hEvent = NULL;
 
     // dup the publisher
     d->publisher = publisher_dup(log->publisher);
@@ -208,8 +99,8 @@ static inline void wevt_facets_register_bin_data(WEVT_LOG *log, FACETS *facets, 
 static void wevt_lazy_loading_event_and_xml(struct wevt_bin_data *d, FACET_ROW *row __maybe_unused) {
     if(d->rendered) return;
 
-    wevt_get_xml_utf8(d->log, d->publisher, d->bookmark, &d->log->ops.xml);
-    wevt_get_event_utf8(d->log, d->publisher, d->bookmark, &d->log->ops.event);
+    wevt_get_xml_utf8(d->log, d->publisher, d->hEvent, &d->log->ops.xml);
+    wevt_get_event_utf8(d->log, d->publisher, d->hEvent, &d->log->ops.event);
     d->rendered = true;
 }
 
@@ -392,7 +283,7 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 
     facets_register_dynamic_key_name(
             facets, WEVT_FIELD_XML,
-            FACET_KEY_OPTION_NEVER_FACET,
+            FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_PRETTY_XML,
             wevt_render_xml, NULL);
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -882,111 +773,13 @@ static bool source_is_mine(LOGS_QUERY_SOURCE *src, LOGS_QUERY_STATUS *lqs) {
     return false;
 }
 
-typedef struct static_utf8_8k {
-    char buffer[8192];
-    size_t size;
-    size_t len;
-} STATIC_BUF_8K;
-
-typedef struct static_unicode_16k {
-    wchar_t buffer[16384];
-    size_t size;
-    size_t len;
-} STATIC_UNI_16K;
-
-static bool wevt_foreach_selected_value_cb(FACETS *facets __maybe_unused, size_t id, const char *key, const char *value, void *data) {
-    STATIC_BUF_8K *b = data;
-
-    b->len += snprintfz(&b->buffer[b->len], b->size - b->len,
-                        "%s%s=%s",
-                        id ? " or " : "", key, value);
-
-    return b->len < b->size;
-}
-
-static wchar_t *wevt_generate_query(LOGS_QUERY_STATUS *lqs, BUFFER *wb) {
-    static __thread STATIC_UNI_16K q = {
-        .size = sizeof(q.buffer) / sizeof(wchar_t),
-        .len = 0,
-    };
-    static __thread STATIC_BUF_8K b = {
-        .size = sizeof(b.buffer) / sizeof(char),
-        .len = 0,
-    };
-
-    lqs_query_timeframe(lqs, ANCHOR_DELTA_UT);
-
-    usec_t seek_to = lqs->query.start_ut;
-    if(lqs->rq.direction == FACETS_ANCHOR_DIRECTION_BACKWARD)
-        // windows events queries are limited to millisecond resolution
-        // so, in order not to lose data, we have to add
-        // a millisecond when the direction is backward
-        seek_to += USEC_PER_MS;
-
-    // Convert the microseconds since Unix epoch to FILETIME (used in Windows APIs)
-    FILETIME fileTime = os_unix_epoch_ut_to_filetime(seek_to);
-
-    // Convert FILETIME to SYSTEMTIME for use in XPath
-    SYSTEMTIME systemTime;
-    if (!FileTimeToSystemTime(&fileTime, &systemTime)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "FileTimeToSystemTime() failed");
-        return NULL;
-    }
-
-    // Format SYSTEMTIME into ISO 8601 format (YYYY-MM-DDTHH:MM:SS.sssZ)
-    q.len = swprintf(q.buffer, q.size,
-                 L"Event/System[TimeCreated[@SystemTime%ls\"%04d-%02d-%02dT%02d:%02d:%02d.%03dZ\"]",
-                 lqs->rq.direction == FACETS_ANCHOR_DIRECTION_BACKWARD ? L"<=" : L">=",
-                 systemTime.wYear, systemTime.wMonth, systemTime.wDay,
-                 systemTime.wHour, systemTime.wMinute, systemTime.wSecond, systemTime.wMilliseconds);
-
-
-    if(lqs->rq.slice) {
-        b.len = snprintf(b.buffer, b.size, " and (");
-        if (facets_foreach_selected_value_in_key(
-                lqs->facets,
-                WEVT_FIELD_LEVEL,
-                sizeof(WEVT_FIELD_LEVEL) - 1,
-                used_hashes_registry,
-                wevt_foreach_selected_value_cb,
-                &b)) {
-            b.len += snprintf(&b.buffer[b.len], b.size - b.len, ")");
-            if (b.len < b.size) {
-                utf82unicode(&q.buffer[q.len], q.size - q.len, b.buffer);
-                q.len = wcslen(q.buffer);
-            }
-        }
-
-        b.len = snprintf(b.buffer, b.size, " and (");
-        if (facets_foreach_selected_value_in_key(
-                lqs->facets,
-                WEVT_FIELD_EVENTID,
-                sizeof(WEVT_FIELD_EVENTID) - 1,
-                used_hashes_registry,
-                wevt_foreach_selected_value_cb,
-                &b)) {
-            b.len += snprintf(&b.buffer[b.len], b.size - b.len, ")");
-            if (b.len < b.size) {
-                utf82unicode(&q.buffer[q.len], q.size - q.len, b.buffer);
-                q.len = wcslen(q.buffer);
-            }
-        }
-    }
-
-    q.len += swprintf(&q.buffer[q.len], q.size - q.len, L"]");
-
-    buffer_json_member_add_string(wb, "_query", channel2utf8(q.buffer));
-
-    return q.buffer;
-}
-
 static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs __maybe_unused) {
     // make sure the sources list is updated
     wevt_sources_scan();
 
-    lqs->c.query = wevt_generate_query(lqs, wb);
+    lqs->c.query = wevt_generate_query_no_xpath(lqs, wb);
     if(!lqs->c.query)
-        return rrd_call_function_error(wb, "failed to generate XPath query", HTTP_RESP_INTERNAL_SERVER_ERROR);
+        return rrd_call_function_error(wb, "failed to generate query", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
     FACETS *facets = lqs->facets;
 
@@ -1355,9 +1148,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         struct {
             const char *func;
         } array[] = {
+            { "windows-events after:-8640000 before:0 last:200 source:All" },
             //{ "windows-events after:-86400 before:0 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,JM3OPW3kHn6,H106l8MXSSr,HREiMN.4Ahu,ClaDGnYSQE7,ApYltST_icg,PtkRm91M0En data_only:false slice:true source:All" },
             //{ "windows-events after:1726055370 before:1726056270 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6,ClaDGnYSQE7,H106l8MXSSr,HREiMN.4Ahu data_only:false source:All HytMJ9kj82B:BlC24d5JBBV,PtVoyIuX.MU,HMj1B38kHTv KeCITtVD5AD:PY1JtCeWwSe,O9kz5J37nNl,JZoJURadhDb" },
-            { "windows-events after:1725738894 before:0 last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,JM3OPW3kHn6,H106l8MXSSr,HREiMN.4Ahu,ClaDGnYSQE7,ApYltST_icg,PtkRm91M0En source:All" },
             // { "windows-events after:1725636012 before:1726240812 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,JM3OPW3kHn6,H106l8MXSSr,HREiMN.4Ahu,ClaDGnYSQE7,ApYltST_icg,PtkRm91M0En data_only:false source:All PtkRm91M0En:LDzHbP5libb" },
             //{ "windows-events after:1725650386 before:1725736786 anchor:1725652420809461 direction:forward last:200 facets:HWNGeY7tg6c,LAnVlsIQfeD,BnPLNbA5VWT,Cq2r7mRUv4a,KeCITtVD5AD,I_Amz_APBm3,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6 if_modified_since:1725736649011085 data_only:true delta:true tail:true source:all Cq2r7mRUv4a:PPc9fUy.q6o No4kPTQbS.g:Dwo9PhK27v3 HytMJ9kj82B:KbbznGjt_9r LAnVlsIQfeD:OfU1t5cpjgG JM3OPW3kHn6:CS_0g5AEpy2" },
             //{ "windows-events info after:1725650420 before:1725736820" },
