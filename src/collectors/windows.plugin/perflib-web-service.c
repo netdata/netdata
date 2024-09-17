@@ -127,7 +127,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISSentBytesTotal)) {
             if (!p->st_traffic) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_traffic", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->st_traffic = rrdset_create_localhost("iis"
                                                         , id, NULL
                                                         , "traffic"
@@ -142,7 +141,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                         );
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_received_bytes_total", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_traffic_received  = rrddim_add(p->st_traffic,
                                                     id,
                                                     "received",
@@ -151,7 +149,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                     RRD_ALGORITHM_INCREMENTAL);
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_sent_bytes_total", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_traffic_sent  = rrddim_add(p->st_traffic,
                                                 id,
                                                 "sent",
@@ -177,7 +174,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesSentTotal)) {
             if (!p->st_file_transfer) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_ftp_file_transfer_rate", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->st_file_transfer = rrdset_create_localhost("iis"
                                                               , id, NULL
                                                               , "traffic"
@@ -192,12 +188,10 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                               );
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_received_bytes_total", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_files_received = rrddim_add(p->st_file_transfer, id, "received",
                                                   1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_sent_bytes_total", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_files_sent = rrddim_add(p->st_file_transfer, id, "sent",
                                               1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -219,7 +213,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentConnections)) {
             if (!p->st_curr_connections) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_active_connections_count", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->st_curr_connections = rrdset_create_localhost("iis"
                                                                  , id, NULL
                                                                  , "connections"
@@ -234,7 +227,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                                  );
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_current_connections", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_curr_connections = rrddim_add(p->st_curr_connections, id, "active",
                                                     1, 1, RRD_ALGORITHM_ABSOLUTE);
 
@@ -266,7 +258,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                                     );
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_current_connections", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_connections_attemps = rrddim_add(p->st_connections_attemps, id, "active",
                                                     1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -285,7 +276,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentNonAnonymousUsers)) {
             if (!p->st_user_count) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_users_count", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->st_user_count = rrdset_create_localhost("iis",
                                                            id,  NULL
                                                            ,"requests"
@@ -300,12 +290,10 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                            );
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_current_anonymous_users", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_user_anonymous = rrddim_add(p->st_user_count, id, "anonymous",
                                                   1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_current_non_anonymous_users", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_user_nonanonymous = rrddim_add(p->st_user_count, id, "non_anonymous",
                                                      1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -326,7 +314,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentISAPIExtRequests)) {
             if (!p->st_isapi_extension_request_count) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_isapi_extension_requests_count", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->st_isapi_extension_request_count = rrdset_create_localhost("iis"
                                                                               , id, NULL
                                                                               , "requests"
@@ -341,7 +328,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                                               );
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_current_isapi_extension_requests", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_isapi_extension_request_count = rrddim_add(p->st_isapi_extension_request_count, id, "isapi",
                                                        1, 1, RRD_ALGORITHM_ABSOLUTE);
 
@@ -359,7 +345,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISIPAPIExtRequestsTotal)) {
             if (!p->st_isapi_extension_request_rate) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_isapi_extension_requests_rate", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->st_isapi_extension_request_rate = rrdset_create_localhost("iis"
                                                                               , id, NULL
                                                                               , "requests"
@@ -374,7 +359,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                                               );
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_current_isapi_extension_requests", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_isapi_extension_request_rate = rrddim_add(p->st_isapi_extension_request_rate, id, "isapi",
                                                                  1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -393,7 +377,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISNotFoundErrorsTotal)) {
             if (!p->st_error_rate) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_errors_rate", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->st_error_rate = rrdset_create_localhost("iis",
                                                            id,  NULL
                                                            ,"requests"
@@ -408,12 +391,10 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                            );
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_locked_errors_total", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_error_rate_locked = rrddim_add(p->st_error_rate, id, "document_locked",
                                                   1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_not_found_errors_total", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_error_rate_not_found = rrddim_add(p->st_error_rate, id, "document_not_found",
                                                      1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -434,7 +415,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISLogonAttemptsTotal)) {
             if (!p->st_logon_attemps) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_logon_attempts_rate", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->st_logon_attemps = rrdset_create_localhost("iis"
                                                               , id, NULL
                                                               , "logon"
@@ -449,7 +429,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                               );
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_logon_attempts_total", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_logon_attemps = rrddim_add(p->st_logon_attemps, id, "logon",
                                                  1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -467,7 +446,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISUptime)) {
             if (!p->st_service_uptime) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_uptime", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->st_service_uptime = rrdset_create_localhost("iis"
                                                               , id, NULL
                                                               , "uptime"
@@ -482,7 +460,6 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                               );
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_logon_attempts_total", windows_shared_buffer);
-                netdata_fix_chart_name(id);
                 p->rd_service_uptime = rrddim_add(p->st_service_uptime, id, "uptime",
                                                   1, 1, RRD_ALGORITHM_ABSOLUTE);
 
