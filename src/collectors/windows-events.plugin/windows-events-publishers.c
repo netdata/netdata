@@ -68,7 +68,7 @@ static struct {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
 };
 
-static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *unicode, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id);
+static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *dst, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id);
 
 static inline ND_UUID *publisher_value_to_key(PUBLISHER *p) {
     return &p->uuid;
@@ -253,7 +253,7 @@ static int compare_ascending(const void *a, const void *b) {
 //    return 0;
 //}
 
-static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *unicode, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id) {
+static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *dst, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id) {
     if(!h || !h->hMetadata) return;
 
     EVT_PUBLISHER_METADATA_PROPERTY_ID name_id, message_id, value_id;
@@ -375,9 +375,9 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
             uint32_t messageID = wevt_field_get_uint32(property->data);
 
             if (messageID != (uint32_t)-1) {
-                if (wevt_get_message_unicode(unicode, hMetadata, NULL, messageID, EvtFormatMessageId)) {
+                if (wevt_get_message_unicode(dst, hMetadata, NULL, messageID, EvtFormatMessageId)) {
                     size_t len;
-                    d->name = unicode2utf8_strdupz(unicode->data, &len);
+                    d->name = unicode2utf8_strdupz(dst->data, &len);
                     d->len = len;
                 }
             }
@@ -450,7 +450,7 @@ static bool publisher_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, ui
         }
     }
 
-    if(dst->used) {
+    if(dst->used > 1) {
         txt_utf8_resize(dst, dst->used + 1, true);
         dst->data[dst->used++] = 0;
     }
@@ -533,7 +533,6 @@ static bool publisher_value_metadata(TXT_UTF8 *dst, struct provider_list *l, uin
     }
 
     fatal_assert(dst->used <= dst->size);
-
     return (dst->used > 0);
 }
 

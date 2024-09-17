@@ -3,7 +3,7 @@
 #ifndef NETDATA_WINDOWS_EVENTS_SOURCES_H
 #define NETDATA_WINDOWS_EVENTS_SOURCES_H
 
-#include "windows-events.h"
+#include "libnetdata/libnetdata.h"
 
 typedef enum {
     WEVTS_NONE               = 0,
@@ -21,6 +21,8 @@ typedef enum {
 typedef struct {
     const char *fullname;
     size_t fullname_len;
+
+    const wchar_t *custom_query;
 
     STRING *source;
     WEVT_SOURCE_TYPE source_type;

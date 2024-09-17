@@ -3,7 +3,7 @@
 #ifndef NETDATA_WINDOWS_EVENTS_QUERY_H
 #define NETDATA_WINDOWS_EVENTS_QUERY_H
 
-#include "windows-events.h"
+#include "libnetdata/libnetdata.h"
 
 #define BATCH_NEXT_EVENT 500
 
@@ -45,12 +45,12 @@ typedef struct wevt_log {
     struct {
         DWORD size;
         DWORD used;
-        EVT_HANDLE bk[BATCH_NEXT_EVENT];
+        EVT_HANDLE hEvents[BATCH_NEXT_EVENT];
     } batch;
 
-    EVT_HANDLE bookmark;
-    EVT_HANDLE event_query;
-    EVT_HANDLE render_context;
+    EVT_HANDLE hEvent;
+    EVT_HANDLE hQuery;
+    EVT_HANDLE hRenderContext;
     struct provider_meta_handle *publisher;
 
     struct {
@@ -105,18 +105,17 @@ typedef struct wevt_log {
 WEVT_LOG *wevt_openlog6(void);
 void wevt_closelog6(WEVT_LOG *log);
 
-bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, EVT_RETENTION *retention);
+bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, const wchar_t *query, EVT_RETENTION *retention);
 
 bool wevt_query(WEVT_LOG *log, LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS direction);
 void wevt_query_done(WEVT_LOG *log);
 
 bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full);
 
-bool wevt_get_message_unicode(TXT_UNICODE *unicode, EVT_HANDLE hMetadata, EVT_HANDLE bookmark, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags);
+bool wevt_get_message_unicode(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags);
 
-struct provider_meta_handle;
-bool wevt_get_event_utf8(WEVT_LOG *log, struct provider_meta_handle *p, EVT_HANDLE event_handle, TXT_UTF8 *dst);
-bool wevt_get_xml_utf8(WEVT_LOG *log, struct provider_meta_handle *p, EVT_HANDLE event_handle, TXT_UTF8 *dst);
+bool wevt_get_event_utf8(WEVT_LOG *log, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
+bool wevt_get_xml_utf8(WEVT_LOG *log, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
 
 static inline void wevt_variant_cleanup(WEVT_VARIANT *v) {
     freez(v->data);

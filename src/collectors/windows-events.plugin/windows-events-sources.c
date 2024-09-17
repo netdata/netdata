@@ -1,6 +1,141 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "windows-events-sources.h"
+#include "windows-events.h"
+
+//struct {
+//    const char *name;
+//    const wchar_t *query;
+//} custom_queries[] = {
+//    {
+//        .name = "All-Administrative-Events",
+//        .query = L"<QueryList>\n"
+//                 "  <Query Id=\"0\" Path=\"Application\">\n"
+//                 "    <Select Path=\"Application\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Security\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"System\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"HardwareEvents\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Internet Explorer\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Key Management Service\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-AppV-Client/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-AppV-Client/Virtual Applications\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-All-User-Install-Agent/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-AppHost/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Application Server-Applications/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-AppModel-Runtime/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-AppReadiness/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-AssignedAccess/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-AssignedAccessBroker/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Storage-ATAPort/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-BitLocker-DrivePreparationTool/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Client-Licensing-Platform/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-DataIntegrityScan/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-DataIntegrityScan/CrashRecovery\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-DSC/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Autopilot\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-DeviceSetupManager/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Dhcp-Client/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Dhcpv6-Client/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Diagnosis-Scripted/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Storage-Disk/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-DxgKrnl-Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-EDP-Application-Learning/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-EDP-Audit-Regular/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-EDP-Audit-TCB/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Client-License-Flexible-Platform/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-GenericRoaming/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Hyper-V-Guest-Drivers/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Hyper-V-Hypervisor-Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Hyper-V-VID-Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Kernel-EventTracing/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-KeyboardFilter/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-ModernDeployment-Diagnostics-Provider/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-ModernDeployment-Diagnostics-Provider/Autopilot\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-ModernDeployment-Diagnostics-Provider/Diagnostics\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-ModernDeployment-Diagnostics-Provider/ManagementService\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-MUI/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-PowerShell/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-PrintBRM/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-PrintService/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Provisioning-Diagnostics-Provider/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Provisioning-Diagnostics-Provider/AutoPilot\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Provisioning-Diagnostics-Provider/ManagementService\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-PushNotification-Platform/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-RemoteApp and Desktop Connections/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-RemoteAssistance/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-RetailDemo/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-SecurityMitigationsBroker/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-SmartCard-TPM-VCard-Module/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-SMBDirect/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-SMBWitnessClient/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Storage-Tiering/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Storage-ClassPnP/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Storage-Storport/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-ClientUSBDevices/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-LocalSessionManager/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-PnPDevices/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-Printers/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-RemoteConnectionManager/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-ServerUSBDevices/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Troubleshooting-Recommended/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-User Device Registration/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-VerifyHardwareSecurity/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-WindowsBackup/ActionCenter\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-Workplace Join/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"OAlerts\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"OneApp_IGCC\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"OpenSSH/Admin\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"USER_ESRV_SVC_QUEENCREEK\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Visual Studio\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "    <Select Path=\"Windows PowerShell\">*[System[(Level=1  or Level=2 or Level=3)]]</Select>\n"
+//                 "  </Query>\n"
+//                 "</QueryList>",
+//    },
+//    {
+//        .name = "All-Remote-Desktop-Services",
+//        .query = L"<QueryList>\n"
+//                 "  <Query Id=\"0\" Path=\"Microsoft-Rdms-UI/Admin\">\n"
+//                 "    <Select Path=\"Microsoft-Rdms-UI/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Rdms-UI/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Remote-Desktop-Management-Service/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Remote-Desktop-Management-Service/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-SessionBroker-Client/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-SessionBroker-Client/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-RemoteConnectionManager/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-PnPDevices/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-PnPDevices/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-RemoteApp and Desktop Connections/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-RemoteApp and Desktop Connection Management/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-RemoteApp and Desktop Connection Management/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-SessionBroker/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-SessionBroker/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-TSV-VmHostAgent/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-TSV-VmHostAgent/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-ServerUSBDevices/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-ServerUSBDevices/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-LocalSessionManager/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-LocalSessionManager/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-ClientUSBDevices/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-ClientUSBDevices/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-RDPClient/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-Licensing/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-Licensing/Operational\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-Gateway/Admin\">*</Select>\n"
+//                 "    <Select Path=\"Microsoft-Windows-TerminalServices-Gateway/Operational\">*</Select>\n"
+//                 "  </Query>\n"
+//                 "</QueryList>",
+//    },
+//    {
+//        .name = "All-Security-SPP",
+//        .query = L"<QueryList>\n"
+//                 "  <Query Id=\"0\" Path=\"Microsoft-Windows-HelloForBusiness/Operational\">\n"
+//                 "    <Select Path=\"Microsoft-Windows-HelloForBusiness/Operational\">*[System[(Level&gt;5 )]]</Select>\n"
+//                 "  </Query>\n"
+//                 "</QueryList>",
+//    }
+//};
 
 DICTIONARY *wevt_sources = NULL;
 DICTIONARY *used_hashes_registry = NULL;
@@ -157,8 +292,9 @@ static int wevt_source_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry
         entries_snprintf(entries_for_humans, sizeof(entries_for_humans), s->entries, "", false);
 
         char info[1024];
-        snprintfz(info, sizeof(info), "%zu channel%s, with a total size of %s, covering %s, having %s events",
-                s->count, s->count > 1 ? "s":"", size_for_humans, duration_for_humans, entries_for_humans);
+        snprintfz(info, sizeof(info), "%zu channel%s, with a total size of %s, covering %s%s%s%s",
+                s->count, s->count > 1 ? "s":"", size_for_humans, duration_for_humans,
+                s->entries ? ", having " : "", s->entries ? entries_for_humans : "", s->entries ? " entries" : "");
 
         buffer_json_member_add_string(wb, "id", name);
         buffer_json_member_add_string(wb, "name", name);
@@ -299,7 +435,7 @@ void wevt_sources_scan(void) {
             }
 
             EVT_RETENTION retention;
-            if(!wevt_channel_retention(log, channel, &retention))
+            if(!wevt_channel_retention(log, channel, NULL, &retention))
                 continue;
 
             const char *name = channel2utf8(channel);
@@ -355,6 +491,29 @@ void wevt_sources_scan(void) {
             dictionary_set(wevt_sources, src.fullname, &src, sizeof(src));
         }
 
+//        // add custom queries
+//        for(size_t i = 0; i < sizeof(custom_queries) / sizeof(custom_queries[0]) ;i++) {
+//            EVT_RETENTION retention;
+//            if(!wevt_channel_retention(log, NULL, custom_queries[i].query, &retention))
+//                continue;
+//
+//            LOGS_QUERY_SOURCE src = {
+//                    .entries = 0,
+//                    .fullname = strdupz(custom_queries[i].name),
+//                    .fullname_len = strlen(custom_queries[i].name),
+//                    .last_scan_monotonic_ut = now_monotonic_usec(),
+//                    .msg_first_id = retention.first_event.id,
+//                    .msg_last_id = retention.last_event.id,
+//                    .msg_first_ut = retention.first_event.created_ns / NSEC_PER_USEC,
+//                    .msg_last_ut = retention.last_event.created_ns / NSEC_PER_USEC,
+//                    .size = retention.size_bytes,
+//                    .source_type = WEVTS_ALL,
+//                    .source = string_strdupz(custom_queries[i].name),
+//            };
+//
+//            dictionary_set(wevt_sources, src.fullname, &src, sizeof(src));
+//        }
+//
         wevt_closelog6(log);
 
         LOGS_QUERY_SOURCE *src;

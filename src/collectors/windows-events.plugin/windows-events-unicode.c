@@ -41,7 +41,7 @@ char *unicode2utf8_strdupz(const wchar_t *src, size_t *utf8_len) {
 
 wchar_t *channel2unicode(const char *utf8str) {
     static __thread wchar_t buffer[1024];
-    utf82unicode(buffer, sizeof(buffer) / sizeof(buffer[0]), utf8str);
+    utf82unicode(buffer, sizeof(buffer) / sizeof(wchar_t), utf8str);
     return buffer;
 }
 
@@ -69,7 +69,7 @@ char *query2utf8(const wchar_t *query) {
     return buffer;
 }
 
-bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len_with_null) {
+bool wevt_str_wchar_to_utf8(TXT_UTF8 *dst, const wchar_t *src, int src_len_with_null) {
     if(!src || !src_len_with_null)
         goto cleanup;
 
@@ -78,11 +78,11 @@ bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len_with
     fatal_assert(src_len_with_null == -1 || (src_len_with_null >= 1 && src[src_len_with_null - 1] == 0));
 
     // Try to convert using the existing buffer (if it exists, otherwise get the required buffer size)
-    int size = WideCharToMultiByte(CP_UTF8, 0, src, src_len_with_null, utf8->data, (int)utf8->size, NULL, NULL);
-    if(size <= 0 || !utf8->data) {
+    int size = WideCharToMultiByte(CP_UTF8, 0, src, src_len_with_null, dst->data, (int)dst->size, NULL, NULL);
+    if(size <= 0 || !dst->data) {
         // we have to set a buffer, or increase it
 
-        if(utf8->data) {
+        if(dst->data) {
             // we need to increase it the buffer size
 
             if(GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
@@ -97,8 +97,8 @@ bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len_with
         }
 
         // Retry conversion with the new buffer
-        txt_utf8_resize(utf8, size, false);
-        size = WideCharToMultiByte(CP_UTF8, 0, src, src_len_with_null, utf8->data, (int)utf8->size, NULL, NULL);
+        txt_utf8_resize(dst, size, false);
+        size = WideCharToMultiByte(CP_UTF8, 0, src, src_len_with_null, dst->data, (int)dst->size, NULL, NULL);
         if (size <= 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "WideCharToMultiByte() failed after resizing.");
             goto cleanup;
@@ -106,34 +106,33 @@ bool wevt_str_wchar_to_utf8(TXT_UTF8 *utf8, const wchar_t *src, int src_len_with
     }
 
     // Make sure it is not zero padded at the end
-    while(size >= 2 && utf8->data[size - 2] == 0)
+    while(size >= 2 && dst->data[size - 2] == 0)
         size--;
 
-    utf8->used = (size_t)size;
+    dst->used = (size_t)size;
 
-    internal_fatal(strlen(utf8->data) + 1 != utf8->used,
+    internal_fatal(strlen(dst->data) + 1 != dst->used,
                    "Wrong UTF8 string length");
 
     return true;
 
 cleanup:
-    txt_utf8_resize(utf8, 128, false);
+    txt_utf8_resize(dst, 128, false);
     if(src)
-        utf8->used = snprintfz(utf8->data, utf8->size, "[failed conv.]") + 1;
+        dst->used = snprintfz(dst->data, dst->size, "[failed conv.]") + 1;
     else {
-        utf8->data[0] = '\0';
-        utf8->used = 1;
+        dst->data[0] = '\0';
+        dst->used = 1;
     }
 
     return false;
 }
 
-bool wevt_str_unicode_to_utf8(TXT_UTF8 *utf8, TXT_UNICODE *unicode) {
-    fatal_assert(utf8 && ((utf8->data && utf8->size) || (!utf8->data && !utf8->size)));
+bool wevt_str_unicode_to_utf8(TXT_UTF8 *dst, TXT_UNICODE *unicode) {
+    fatal_assert(dst && ((dst->data && dst->size) || (!dst->data && !dst->size)));
     fatal_assert(unicode && ((unicode->data && unicode->size) || (!unicode->data && !unicode->size)));
 
     // pass the entire unicode size, including the null terminator
     // so that the resulting utf8 message will be null terminated too.
-    return wevt_str_wchar_to_utf8(utf8, unicode->data, (int)unicode->used);
+    return wevt_str_wchar_to_utf8(dst, unicode->data, (int)unicode->used);
 }
-

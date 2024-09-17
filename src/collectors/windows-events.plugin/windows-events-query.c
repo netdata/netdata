@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "windows-events-query.h"
+#include "windows-events.h"
 
 static uint64_t wevt_log_file_size(const wchar_t *channel);
 
@@ -62,69 +62,70 @@ static const char *wevt_extended_status(void) {
     return buf;
 }
 
-bool wevt_get_message_unicode(TXT_UNICODE *unicode, EVT_HANDLE hMetadata, EVT_HANDLE bookmark, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags) {
-    unicode->used = 0;
+bool wevt_get_message_unicode(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags) {
+    dst->used = 0;
 
     DWORD size = 0;
-    if(!unicode->data) {
-        EvtFormatMessage(hMetadata, bookmark, dwMessageId, 0, NULL, flags, 0, NULL, &size);
+    if(!dst->data) {
+        EvtFormatMessage(hMetadata, hEvent, dwMessageId, 0, NULL, flags, 0, NULL, &size);
         if(!size) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() to get message size failed.");
             goto cleanup;
         }
-        txt_unicode_resize(unicode, size, false);
+        txt_unicode_resize(dst, size, false);
     }
 
     // First, try to get the message using the existing buffer
-    if (!EvtFormatMessage(hMetadata, bookmark, dwMessageId, 0, NULL, flags, unicode->size, unicode->data, &size) || !unicode->data) {
-        if (unicode->data && GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+    if (!EvtFormatMessage(hMetadata, hEvent, dwMessageId, 0, NULL, flags, dst->size, dst->data, &size) || !dst->data) {
+        if (dst->data && GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed.");
             goto cleanup;
         }
 
         // Try again with the resized buffer
-        txt_unicode_resize(unicode, size, false);
-        if (!EvtFormatMessage(hMetadata, bookmark, dwMessageId, 0, NULL, flags, unicode->size, unicode->data, &size)) {
+        txt_unicode_resize(dst, size, false);
+        if (!EvtFormatMessage(hMetadata, hEvent, dwMessageId, 0, NULL, flags, dst->size, dst->data, &size)) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed after resizing buffer.");
             goto cleanup;
         }
     }
 
     // make sure it is null terminated
-    if(size <= unicode->size)
-        unicode->data[size - 1] = 0;
+    if(size <= dst->size)
+        dst->data[size - 1] = 0;
     else
-        unicode->data[unicode->size - 1] = 0;
+        dst->data[dst->size - 1] = 0;
 
     // unfortunately we have to calculate the length every time
-    // the size returned may not be the length of the unicode string
-    unicode->used = wcslen(unicode->data) + 1;
+    // the size returned may not be the length of the dst string
+    dst->used = wcslen(dst->data) + 1;
+
     return true;
 
 cleanup:
-    unicode->used = 0;
+    dst->used = 0;
     return false;
 }
 
 static bool wevt_get_field_from_events_log(
-    WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle,
+    WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent,
     TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS flags) {
 
     dst->src = TXT_SOURCE_EVENT_LOG;
 
-    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), event_handle, 0, flags))
+    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), hEvent, 0, flags))
         return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
 
     wevt_utf8_empty(dst);
     return false;
 }
 
-bool wevt_get_event_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    return wevt_get_field_from_events_log(log, p, event_handle, dst, EvtFormatMessageEvent);
+bool wevt_get_event_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
+    return wevt_get_field_from_events_log(log, p, hEvent, dst, EvtFormatMessageEvent);
 }
 
-bool wevt_get_xml_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE event_handle, TXT_UTF8 *dst) {
-    return wevt_get_field_from_events_log(log, p, event_handle, dst, EvtFormatMessageXml);
+bool wevt_get_xml_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
+    return wevt_get_field_from_events_log(log, p, hEvent, dst, EvtFormatMessageXml);
 }
 
 static inline void wevt_event_done(WEVT_LOG *log) {
@@ -133,9 +134,9 @@ static inline void wevt_event_done(WEVT_LOG *log) {
         log->publisher = NULL;
     }
 
-    if (log->bookmark) {
-        EvtClose(log->bookmark);
-        log->bookmark = NULL;
+    if (log->hEvent) {
+        EvtClose(log->hEvent);
+        log->hEvent = NULL;
     }
 
     log->ops.level.src = TXT_SOURCE_UNKNOWN;
@@ -152,7 +153,7 @@ static void wevt_get_field_from_cache(
     if (field_cache_get(cache_type, provider, value, dst))
         return;
 
-    wevt_get_field_from_events_log(log, h, log->bookmark, dst, flags);
+    wevt_get_field_from_events_log(log, h, log->hEvent, dst, flags);
     field_cache_set(cache_type, provider, value, dst);
 }
 
@@ -160,12 +161,12 @@ static void wevt_get_field_from_cache(
 
 static inline const char *wevt_level_hardcoded(uint64_t level, size_t *len) {
     switch(level) {
-        case WINEVENT_LEVEL_NONE:        SET_LEN_AND_RETURN(WINEVENT_NAME_NONE);
-        case WINEVENT_LEVEL_CRITICAL:    SET_LEN_AND_RETURN(WINEVENT_NAME_CRITICAL);
-        case WINEVENT_LEVEL_ERROR:       SET_LEN_AND_RETURN(WINEVENT_NAME_ERROR);
-        case WINEVENT_LEVEL_WARNING:     SET_LEN_AND_RETURN(WINEVENT_NAME_WARNING);
-        case WINEVENT_LEVEL_INFORMATION: SET_LEN_AND_RETURN(WINEVENT_NAME_INFORMATION);
-        case WINEVENT_LEVEL_VERBOSE:     SET_LEN_AND_RETURN(WINEVENT_NAME_VERBOSE);
+        case WEVT_LEVEL_NONE:        SET_LEN_AND_RETURN(WEVT_LEVEL_NAME_NONE);
+        case WEVT_LEVEL_CRITICAL:    SET_LEN_AND_RETURN(WEVT_LEVEL_NAME_CRITICAL);
+        case WEVT_LEVEL_ERROR:       SET_LEN_AND_RETURN(WEVT_LEVEL_NAME_ERROR);
+        case WEVT_LEVEL_WARNING:     SET_LEN_AND_RETURN(WEVT_LEVEL_NAME_WARNING);
+        case WEVT_LEVEL_INFORMATION: SET_LEN_AND_RETURN(WEVT_LEVEL_NAME_INFORMATION);
+        case WEVT_LEVEL_VERBOSE:     SET_LEN_AND_RETURN(WEVT_LEVEL_NAME_VERBOSE);
         default: *len = 0; return NULL;
     }
 }
@@ -199,22 +200,22 @@ static void wevt_get_level(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *
     }
 
     txt_utf8_set_numeric_if_empty(
-        dst, WINEVENT_NAME_LEVEL_PREFIX, sizeof(WINEVENT_NAME_LEVEL_PREFIX) - 1, ev->level);
+            dst, WEVT_PREFIX_LEVEL, sizeof(WEVT_PREFIX_LEVEL) - 1, ev->level);
 }
 
 static inline const char *wevt_opcode_hardcoded(uint64_t opcode, size_t *len) {
     switch(opcode) {
-        case WINEVENT_OPCODE_INFO:      SET_LEN_AND_RETURN(WINEVENT_NAME_INFO);
-        case WINEVENT_OPCODE_START:     SET_LEN_AND_RETURN(WINEVENT_NAME_START);
-        case WINEVENT_OPCODE_STOP:      SET_LEN_AND_RETURN(WINEVENT_NAME_STOP);
-        case WINEVENT_OPCODE_DC_START:  SET_LEN_AND_RETURN(WINEVENT_NAME_DC_START);
-        case WINEVENT_OPCODE_DC_STOP:   SET_LEN_AND_RETURN(WINEVENT_NAME_DC_STOP);
-        case WINEVENT_OPCODE_EXTENSION: SET_LEN_AND_RETURN(WINEVENT_NAME_EXTENSION);
-        case WINEVENT_OPCODE_REPLY:     SET_LEN_AND_RETURN(WINEVENT_NAME_REPLY);
-        case WINEVENT_OPCODE_RESUME:    SET_LEN_AND_RETURN(WINEVENT_NAME_RESUME);
-        case WINEVENT_OPCODE_SUSPEND:   SET_LEN_AND_RETURN(WINEVENT_NAME_SUSPEND);
-        case WINEVENT_OPCODE_SEND:      SET_LEN_AND_RETURN(WINEVENT_NAME_SEND);
-        case WINEVENT_OPCODE_RECEIVE:   SET_LEN_AND_RETURN(WINEVENT_NAME_RECEIVE);
+        case WEVT_OPCODE_INFO:      SET_LEN_AND_RETURN(WEVT_OPCODE_NAME_INFO);
+        case WEVT_OPCODE_START:     SET_LEN_AND_RETURN(WEVT_OPCODE_NAME_START);
+        case WEVT_OPCODE_STOP:      SET_LEN_AND_RETURN(WEVT_OPCODE_NAME_STOP);
+        case WEVT_OPCODE_DC_START:  SET_LEN_AND_RETURN(WEVT_OPCODE_NAME_DC_START);
+        case WEVT_OPCODE_DC_STOP:   SET_LEN_AND_RETURN(WEVT_OPCODE_NAME_DC_STOP);
+        case WEVT_OPCODE_EXTENSION: SET_LEN_AND_RETURN(WEVT_OPCODE_NAME_EXTENSION);
+        case WEVT_OPCODE_REPLY:     SET_LEN_AND_RETURN(WEVT_OPCODE_NAME_REPLY);
+        case WEVT_OPCODE_RESUME:    SET_LEN_AND_RETURN(WEVT_OPCODE_NAME_RESUME);
+        case WEVT_OPCODE_SUSPEND:   SET_LEN_AND_RETURN(WEVT_OPCODE_NAME_SUSPEND);
+        case WEVT_OPCODE_SEND:      SET_LEN_AND_RETURN(WEVT_OPCODE_NAME_SEND);
+        case WEVT_OPCODE_RECEIVE:   SET_LEN_AND_RETURN(WEVT_OPCODE_NAME_RECEIVE);
         default: *len = 0; return NULL;
     }
 }
@@ -248,12 +249,12 @@ static void wevt_get_opcode(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE 
     }
 
     txt_utf8_set_numeric_if_empty(
-        dst, WINEVENT_NAME_OPCODE_PREFIX, sizeof(WINEVENT_NAME_OPCODE_PREFIX) - 1, ev->opcode);
+            dst, WEVT_PREFIX_OPCODE, sizeof(WEVT_PREFIX_OPCODE) - 1, ev->opcode);
 }
 
 static const char *wevt_task_hardcoded(uint64_t task, size_t *len) {
     switch(task) {
-        case WINEVENT_TASK_NONE: SET_LEN_AND_RETURN(WINEVENT_NAME_NONE);
+        case WEVT_TASK_NONE: SET_LEN_AND_RETURN(WEVT_TASK_NAME_NONE);
         default: *len = 0; return NULL;
     }
 }
@@ -287,7 +288,7 @@ static void wevt_get_task(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h
     }
 
     txt_utf8_set_numeric_if_empty(
-        dst, WINEVENT_NAME_TASK_PREFIX, sizeof(WINEVENT_NAME_TASK_PREFIX) - 1, ev->task);
+            dst, WEVT_PREFIX_TASK, sizeof(WEVT_PREFIX_TASK) - 1, ev->task);
 }
 
 #define SET_BITS(msk, txt) { .mask = msk, .name = txt, .len = sizeof(txt) - 1, }
@@ -298,14 +299,14 @@ static uint64_t wevt_keywords_handle_reserved(uint64_t value, TXT_UTF8 *dst) {
         const char *name;
         size_t len;
     } bits[] = {
-        SET_BITS(WINEVENT_KEYWORD_EVENTLOG_CLASSIC, WINEVENT_NAME_EVENTLOG_CLASSIC),
-        SET_BITS(WINEVENT_KEYWORD_CORRELATION_HINT, WINEVENT_NAME_CORRELATION_HINT),
-        SET_BITS(WINEVENT_KEYWORD_AUDIT_SUCCESS,    WINEVENT_NAME_AUDIT_SUCCESS),
-        SET_BITS(WINEVENT_KEYWORD_AUDIT_FAILURE,    WINEVENT_NAME_AUDIT_FAILURE),
-        SET_BITS(WINEVENT_KEYWORD_SQM,              WINEVENT_NAME_SQM),
-        SET_BITS(WINEVENT_KEYWORD_WDI_DIAG,         WINEVENT_NAME_WDI_DIAG),
-        SET_BITS(WINEVENT_KEYWORD_WDI_CONTEXT,      WINEVENT_NAME_WDI_CONTEXT),
-        SET_BITS(WINEVENT_KEYWORD_RESPONSE_TIME,    WINEVENT_NAME_RESPONSE_TIME),
+        SET_BITS(WEVT_KEYWORD_EVENTLOG_CLASSIC, WEVT_KEYWORD_NAME_EVENTLOG_CLASSIC),
+        SET_BITS(WEVT_KEYWORD_CORRELATION_HINT, WEVT_KEYWORD_NAME_CORRELATION_HINT),
+        SET_BITS(WEVT_KEYWORD_AUDIT_SUCCESS, WEVT_KEYWORD_NAME_AUDIT_SUCCESS),
+        SET_BITS(WEVT_KEYWORD_AUDIT_FAILURE, WEVT_KEYWORD_NAME_AUDIT_FAILURE),
+        SET_BITS(WEVT_KEYWORD_SQM, WEVT_KEYWORD_NAME_SQM),
+        SET_BITS(WEVT_KEYWORD_WDI_DIAG, WEVT_KEYWORD_NAME_WDI_DIAG),
+        SET_BITS(WEVT_KEYWORD_WDI_CONTEXT, WEVT_KEYWORD_NAME_WDI_CONTEXT),
+        SET_BITS(WEVT_KEYWORD_RESPONSE_TIME, WEVT_KEYWORD_NAME_RESPONSE_TIME),
     };
 
     wevt_utf8_empty(dst);
@@ -326,10 +327,8 @@ static uint64_t wevt_keywords_handle_reserved(uint64_t value, TXT_UTF8 *dst) {
 static void wevt_get_keywords(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
     TXT_UTF8 *dst = &log->ops.keywords;
 
-    if(ev->keywords == WINEVT_KEYWORD_NONE) {
-        txt_utf8_resize(dst, sizeof(WINEVENT_NAME_NONE),  false);
-        memcpy(dst->data, WINEVENT_NAME_NONE, sizeof(WINEVENT_NAME_NONE));
-        dst->used = sizeof(WINEVENT_NAME_NONE);
+    if(ev->keywords == WEVT_KEYWORD_NONE) {
+        txt_utf8_set(dst, WEVT_KEYWORD_NAME_NONE, sizeof(WEVT_KEYWORD_NAME_NONE) - 1);
         dst->src = TXT_SOURCE_HARDCODED;
     }
 
@@ -340,7 +339,7 @@ static void wevt_get_keywords(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDL
 
     if(!value && dst->used <= 1) {
         // no hardcoded info in the buffer, make it None
-        txt_utf8_set(dst, WINEVENT_NAME_NONE,  sizeof(WINEVENT_NAME_NONE) - 1);
+        txt_utf8_set(dst, WEVT_KEYWORD_NAME_NONE, sizeof(WEVT_KEYWORD_NAME_NONE) - 1);
         dst->src = TXT_SOURCE_HARDCODED;
     }
     else if (value && !publisher_get_keywords(dst, h, value) && dst->used <= 1) {
@@ -351,7 +350,7 @@ static void wevt_get_keywords(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDL
     }
 
     txt_utf8_set_hex_if_empty(
-        dst, WINEVENT_NAME_KEYWORDS_PREFIX, sizeof(WINEVENT_NAME_KEYWORDS_PREFIX) - 1, ev->keywords);
+            dst, WEVT_PREFIX_KEYWORDS, sizeof(WEVT_PREFIX_KEYWORDS) - 1, ev->keywords);
 }
 
 bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
@@ -359,16 +358,16 @@ bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
 
     // obtain the information from selected events
     DWORD bytes_used = 0, property_count = 0;
-    if (!EvtRender(log->render_context, log->bookmark, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
+    if (!EvtRender(log->hRenderContext, log->hEvent, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
         // information exceeds the allocated space
         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, render_context: 0x%lx, bookmark: 0x%lx, content: 0x%lx, size: %zu, extended info: %s",
-                   (uintptr_t)log->render_context, (uintptr_t)log->bookmark, (uintptr_t)log->ops.content.data, log->ops.content.size, wevt_extended_status());
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, hRenderContext: 0x%lx, hEvent: 0x%lx, content: 0x%lx, size: %zu, extended info: %s",
+                   (uintptr_t)log->hRenderContext, (uintptr_t)log->hEvent, (uintptr_t)log->ops.content.data, log->ops.content.size, wevt_extended_status());
             goto cleanup;
         }
 
         wevt_variant_resize(&log->ops.content, bytes_used);
-        if (!EvtRender(log->render_context, log->bookmark, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
+        if (!EvtRender(log->hRenderContext, log->hEvent, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, after bytes_used increase, extended info: %s",
                    wevt_extended_status());
             goto cleanup;
@@ -417,14 +416,14 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
     DWORD size = full ? BATCH_NEXT_EVENT : 1;
     DWORD max_failures = 10;
 
-    fatal_assert(log && log->event_query && log->render_context);
+    fatal_assert(log && log->hQuery && log->hRenderContext);
 
     while(max_failures > 0) {
         if (log->batch.used >= log->batch.size) {
             log->batch.size = 0;
             log->batch.used = 0;
             DWORD err;
-            if(!EvtNext(log->event_query, size, log->batch.bk, INFINITE, 0, &log->batch.size)) {
+            if(!EvtNext(log->hQuery, size, log->batch.hEvents, INFINITE, 0, &log->batch.size)) {
                 err = GetLastError();
                 if(err == ERROR_NO_MORE_ITEMS)
                     return false; // no data available, return failure
@@ -433,8 +432,8 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
             if(!log->batch.size) {
                 if(size == 1) {
                     nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                           "EvtNext() failed, event_query: 0x%lx, size: %zu, extended info: %s",
-                           (uintptr_t)log->event_query, (size_t)size, wevt_extended_status());
+                           "EvtNext() failed, hQuery: 0x%lx, size: %zu, extended info: %s",
+                           (uintptr_t)log->hQuery, (size_t)size, wevt_extended_status());
                     return false;
                 }
 
@@ -452,8 +451,8 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
         // cleanup any previous event data
         wevt_event_done(log);
 
-        log->bookmark = log->batch.bk[log->batch.used];
-        log->batch.bk[log->batch.used] = NULL;
+        log->hEvent = log->batch.hEvents[log->batch.used];
+        log->batch.hEvents[log->batch.used] = NULL;
         log->batch.used++;
 
         if(wevt_get_next_event_one(log, ev, full))
@@ -469,22 +468,22 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
 }
 
 void wevt_query_done(WEVT_LOG *log) {
-    // close the last working bookmark
+    // close the last working hEvent
     wevt_event_done(log);
 
-    // close all batched bookmarks
+    // close all batched hEvents
     for(DWORD i = log->batch.used; i < log->batch.size ;i++) {
-        if(log->batch.bk[i])
-            EvtClose(log->batch.bk[i]);
+        if(log->batch.hEvents[i])
+            EvtClose(log->batch.hEvents[i]);
 
-        log->batch.bk[i] = NULL;
+        log->batch.hEvents[i] = NULL;
     }
     log->batch.used = 0;
     log->batch.size = 0;
 
-    if (log->event_query) {
-        EvtClose(log->event_query);
-        log->event_query = NULL;
+    if (log->hQuery) {
+        EvtClose(log->hQuery);
+        log->hQuery = NULL;
     }
 
     log->query_stats.event_count = 0;
@@ -494,8 +493,8 @@ void wevt_query_done(WEVT_LOG *log) {
 void wevt_closelog6(WEVT_LOG *log) {
     wevt_query_done(log);
 
-    if (log->render_context)
-        EvtClose(log->render_context);
+    if (log->hRenderContext)
+        EvtClose(log->hRenderContext);
 
     wevt_variant_cleanup(&log->ops.content);
     txt_unicode_cleanup(&log->ops.unicode);
@@ -514,7 +513,7 @@ void wevt_closelog6(WEVT_LOG *log) {
     freez(log);
 }
 
-bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, EVT_RETENTION *retention) {
+bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, const wchar_t *query, EVT_RETENTION *retention) {
     bool ret = false;
 
     // get the number of the oldest record in the log
@@ -522,8 +521,8 @@ bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, EVT_RETENTION
     // we have to get it from the first EventRecordID
 
     // query the eventlog
-    log->event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath | EvtQueryForwardDirection);
-    if (!log->event_query) {
+    log->hQuery = EvtQuery(NULL, channel, query, EvtQueryChannelPath | EvtQueryForwardDirection | EvtQueryTolerateQueryErrors);
+    if (!log->hQuery) {
         if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() for retention failed, channel '%s' not found, cannot get retention, extended info: %s",
                    channel2utf8(channel), wevt_extended_status());
@@ -543,10 +542,10 @@ bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, EVT_RETENTION
         ret = true;
         goto cleanup;
     }
-    EvtClose(log->event_query);
+    EvtClose(log->hQuery);
 
-    log->event_query = EvtQuery(NULL, channel, NULL, EvtQueryChannelPath | EvtQueryReverseDirection);
-    if (!log->event_query) {
+    log->hQuery = EvtQuery(NULL, channel, query, EvtQueryChannelPath | EvtQueryReverseDirection | EvtQueryTolerateQueryErrors);
+    if (!log->hQuery) {
         if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() for retention failed, channel '%s' not found, extended info: %s",
                    channel2utf8(channel), wevt_extended_status());
@@ -568,7 +567,7 @@ cleanup:
     wevt_query_done(log);
 
     if(ret) {
-        retention->entries = retention->last_event.id - retention->first_event.id;
+        retention->entries = (channel && !query) ? retention->last_event.id - retention->first_event.id : 0;
 
         if(retention->last_event.created_ns >= retention->first_event.created_ns)
             retention->duration_ns = retention->last_event.created_ns - retention->first_event.created_ns;
@@ -589,8 +588,8 @@ WEVT_LOG *wevt_openlog6(void) {
     WEVT_LOG *log = callocz(1, sizeof(*log));
 
     // create the system render
-    log->render_context = EvtCreateRenderContext(RENDER_ITEMS_count, RENDER_ITEMS, EvtRenderContextValues);
-    if (!log->render_context) {
+    log->hRenderContext = EvtCreateRenderContext(RENDER_ITEMS_count, RENDER_ITEMS, EvtRenderContextValues);
+    if (!log->hRenderContext) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed, extended info: %s", wevt_extended_status());
         freez(log);
         log = NULL;
@@ -645,6 +644,6 @@ bool wevt_query(WEVT_LOG *log, LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS d
         return false;
     }
 
-    log->event_query = hQuery;
+    log->hQuery = hQuery;
     return true;
 }
