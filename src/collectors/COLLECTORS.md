@@ -1041,7 +1041,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Site 24x7](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/site_24x7.md)
 
-- [TCP Endpoints](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/portcheck/integrations/tcp_endpoints.md)
+- [TCP/UDP Endpoints](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/portcheck/integrations/tcp-udp_endpoints.md)
 
 - [Uptimerobot](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/uptimerobot.md)
 
