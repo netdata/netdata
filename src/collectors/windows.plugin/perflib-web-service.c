@@ -187,11 +187,11 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                               , RRDSET_TYPE_LINE
                                                               );
 
-                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_received_bytes_total", windows_shared_buffer);
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_files_received_total", windows_shared_buffer);
                 p->rd_files_received = rrddim_add(p->st_file_transfer, id, "received",
                                                   1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_sent_bytes_total", windows_shared_buffer);
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_files_sent_total", windows_shared_buffer);
                 p->rd_files_sent = rrddim_add(p->st_file_transfer, id, "sent",
                                               1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -257,7 +257,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                                     , RRDSET_TYPE_LINE
                                                                     );
 
-                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_current_connections", windows_shared_buffer);
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_connection_attempts_all_instances_total", windows_shared_buffer);
                 p->rd_connections_attemps = rrddim_add(p->st_connections_attemps, id, "active",
                                                     1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -358,7 +358,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                                               , RRDSET_TYPE_LINE
                                                                               );
 
-                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_current_isapi_extension_requests", windows_shared_buffer);
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_isapi_extension_requests_total", windows_shared_buffer);
                 p->rd_isapi_extension_request_rate = rrddim_add(p->st_isapi_extension_request_rate, id, "isapi",
                                                                  1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -459,7 +459,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                               , RRDSET_TYPE_LINE
                                                               );
 
-                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_logon_attempts_total", windows_shared_buffer);
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_service_uptime", windows_shared_buffer);
                 p->rd_service_uptime = rrddim_add(p->st_service_uptime, id, "uptime",
                                                   1, 1, RRD_ALGORITHM_ABSOLUTE);
 
