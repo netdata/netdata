@@ -4,8 +4,39 @@
 #include "windows-internals.h"
 
 struct web_service {
-    RRDSET *st;
-    RRDDIM *rd;
+    RRDSET *st_traffic;
+    RRDDIM *rd_traffic_received;
+    RRDDIM *rd_traffic_sent;
+
+    RRDSET *st_file_transfer;
+    RRDDIM *rd_files_received;
+    RRDDIM *rd_files_sent;
+
+    RRDSET *st_curr_connections;
+    RRDDIM *rd_curr_connections;
+
+    RRDSET *st_connections_attemps;
+    RRDDIM *rd_connections_attemps;
+
+    RRDSET *st_user_count;
+    RRDDIM *rd_user_anonymous;
+    RRDDIM *rd_user_nonanonymous;
+
+    RRDSET *st_isapi_extension_request_count;
+    RRDDIM *rd_isapi_extension_request_count;
+
+    RRDSET *st_isapi_extension_request_rate;
+    RRDDIM *rd_isapi_extension_request_rate;
+
+    RRDSET *st_error_rate;
+    RRDDIM *rd_error_rate_locked;
+    RRDDIM *rd_error_rate_not_found;
+
+    RRDSET *st_logon_attemps;
+    RRDDIM *rd_logon_attemps;
+
+    RRDSET *st_service_uptime;
+    RRDDIM *rd_service_uptime;
 
     COUNTER_DATA IISCurrentAnonymousUser;
     COUNTER_DATA IISCurrentNonAnonymousUsers;
@@ -25,6 +56,9 @@ struct web_service {
 };
 
 struct w3vc_w3wp {
+    RRDSET *st_request_rate;
+    RRDDIM *rd_request_rate;
+
     COUNTER_DATA IISRequestsTotal;
 };
 
@@ -69,6 +103,7 @@ static void initialize(void) {
 }
 
 static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
+    char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Web Service");
     if(!pObjectType) return false;
 
@@ -90,20 +125,202 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISReceivedBytesTotal) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISSentBytesTotal)) {
+            if (!p->st_traffic) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_traffic", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->st_traffic = rrdset_create_localhost("iis"
+                                                        , id, NULL
+                                                        , "traffic"
+                                                        , "iis.website_traffic"
+                                                        , "Website traffic"
+                                                        , "bytes/s"
+                                                        , PLUGIN_WINDOWS_NAME
+                                                        , "WebService"
+                                                        , PRIO_WEBSITE_IIS_TRAFFIC
+                                                        , update_every
+                                                        , RRDSET_TYPE_AREA
+                                                        );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_received_bytes_total", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->rd_traffic_received  = rrddim_add(p->st_traffic,
+                                                    id,
+                                                    "received",
+                                                    1,
+                                                    1,
+                                                    RRD_ALGORITHM_INCREMENTAL);
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_sent_bytes_total", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->rd_traffic_sent  = rrddim_add(p->st_traffic,
+                                                id,
+                                                "sent",
+                                                -1,
+                                                1,
+                                                RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_traffic->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_traffic,
+                                  p->rd_traffic_received,
+                                  (collected_number)&p->IISReceivedBytesTotal.current.Data);
+
+            rrddim_set_by_pointer(p->st_traffic,
+                                  p->rd_traffic_sent,
+                                  (collected_number)&p->IISSentBytesTotal.current.Data);
+
+            rrdset_done(p->st_traffic);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesReceivedTotal) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISFilesSentTotal)) {
+            if (!p->st_file_transfer) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_ftp_file_transfer_rate", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->st_file_transfer = rrdset_create_localhost("iis"
+                                                              , id, NULL
+                                                              , "traffic"
+                                                              , "iis.website_ftp_file_transfer_rate"
+                                                              , "Website FTP file transfer rate"
+                                                              , "files/s"
+                                                              , PLUGIN_WINDOWS_NAME
+                                                              , "WebService"
+                                                              , PRIO_WEBSITE_IIS_FTP_FILE_TRANSFER_RATE
+                                                              , update_every
+                                                              , RRDSET_TYPE_LINE
+                                                              );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_received_bytes_total", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->rd_files_received = rrddim_add(p->st_file_transfer, id, "received",
+                                                  1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_sent_bytes_total", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->rd_files_sent = rrddim_add(p->st_file_transfer, id, "sent",
+                                              1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_file_transfer->rrdlabels, "website",
+                              windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_file_transfer,
+                                  p->rd_files_received,
+                                  (collected_number)&p->IISFilesReceivedTotal.current.Data);
+
+            rrddim_set_by_pointer(p->st_file_transfer,
+                                  p->rd_files_sent,
+                                  (collected_number)&p->IISFilesSentTotal.current.Data);
+
+            rrdset_done(p->st_file_transfer);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentConnections)) {
+            if (!p->st_curr_connections) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_active_connections_count", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->st_curr_connections = rrdset_create_localhost("iis"
+                                                                 , id, NULL
+                                                                 , "connections"
+                                                                 , "iis.website_active_connections_count"
+                                                                 , "Website active connections"
+                                                                 , "connections"
+                                                                 , PLUGIN_WINDOWS_NAME
+                                                                 , "WebService"
+                                                                 , PRIO_WEBSITE_IIS_ACTIVE_CONNECTIONS_COUNT
+                                                                 , update_every
+                                                                 , RRDSET_TYPE_LINE
+                                                                 );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_current_connections", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->rd_curr_connections = rrddim_add(p->st_curr_connections, id, "active",
+                                                    1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_curr_connections->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_curr_connections,
+                                  p->rd_curr_connections,
+                                  (collected_number)&p->IISCurrentConnections.current.Data);
+
+            rrdset_done(p->st_curr_connections);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISConnAttemptsAllInstancesTotal)) {
+            if (!p->st_connections_attemps) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_connection_attempts_rate", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->st_connections_attemps = rrdset_create_localhost("iis"
+                                                                    , id, NULL
+                                                                    , "connections"
+                                                                    , "iis.website_connection_attempts_rate"
+                                                                    , "Website connections attempts"
+                                                                    , "attempts/s"
+                                                                    , PLUGIN_WINDOWS_NAME
+                                                                    , "WebService"
+                                                                    , PRIO_WEBSITE_IIS_CONNECTIONS_ATTEMP
+                                                                    , update_every
+                                                                    , RRDSET_TYPE_LINE
+                                                                    );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_current_connections", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->rd_connections_attemps = rrddim_add(p->st_connections_attemps, id, "active",
+                                                    1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_connections_attemps->rrdlabels, "website",
+                              windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_connections_attemps,
+                                  p->rd_connections_attemps,
+                                  (collected_number)&p->IISCurrentConnections.current.Data);
+
+            rrdset_done(p->st_connections_attemps);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentAnonymousUser) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentNonAnonymousUsers)) {
+            if (!p->st_user_count) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_users_count", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->st_user_count = rrdset_create_localhost("iis",
+                                                           id,  NULL
+                                                           ,"requests"
+                                                           , "iis.website_users_count"
+                                                           , "Website users with pending requests"
+                                                           , "users"
+                                                           , PLUGIN_WINDOWS_NAME
+                                                           , "WebService"
+                                                           , PRIO_WEBSITE_IIS_USERS
+                                                           , update_every
+                                                           , RRDSET_TYPE_STACKED
+                                                           );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_current_anonymous_users", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->rd_user_anonymous = rrddim_add(p->st_user_count, id, "anonymous",
+                                                  1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_current_non_anonymous_users", windows_shared_buffer);
+                netdata_fix_chart_name(id);
+                p->rd_user_nonanonymous = rrddim_add(p->st_user_count, id, "non_anonymous",
+                                                     1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_user_count->rrdlabels, "website", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_user_count,
+                                  p->rd_user_anonymous,
+                                  (collected_number)&p->IISCurrentAnonymousUser.current.Data);
+
+            rrddim_set_by_pointer(p->st_user_count,
+                                  p->rd_user_nonanonymous,
+                                  (collected_number)&p->IISCurrentNonAnonymousUsers.current.Data);
+
+            rrdset_done(p->st_user_count);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISCurrentISAPIExtRequests)) {
