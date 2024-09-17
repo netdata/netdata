@@ -1089,6 +1089,7 @@ typedef enum __attribute__((packed)) {
     RRDF_FIELD_VISUAL_BAR,          // show the value and a bar, respecting the max field to fill the bar at 100%
     RRDF_FIELD_VISUAL_PILL,         //
     RRDF_FIELD_VISUAL_RICH,         //
+    RRDF_FIELD_VISUAL_PRETTY_XML,   // format the field with an XML prettifier
     RRDR_FIELD_VISUAL_ROW_OPTIONS,  // this is a dummy column that is used for row options
 } RRDF_FIELD_VISUAL;
 
@@ -1106,6 +1107,9 @@ static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) 
 
         case RRDF_FIELD_VISUAL_RICH:
             return "richValue";
+
+        case RRDF_FIELD_VISUAL_PRETTY_XML:
+            return "prettyXML";
 
         case RRDR_FIELD_VISUAL_ROW_OPTIONS:
             return "rowOptions";

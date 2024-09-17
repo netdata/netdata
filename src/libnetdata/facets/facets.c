@@ -2655,6 +2655,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         FACET_KEY *k;
         foreach_key_in_facets(facets, k) {
                     RRDF_FIELD_OPTIONS options = RRDF_FIELD_OPTS_WRAP;
+                    RRDF_FIELD_VISUAL visual = (k->options & FACET_KEY_OPTION_RICH_TEXT) ? RRDF_FIELD_VISUAL_RICH : RRDF_FIELD_VISUAL_VALUE;
                     bool visible = k->options & (FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_STICKY);
 
                     if ((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE && k->values.enabled))
@@ -2672,13 +2673,16 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                     if (k->options & FACET_KEY_OPTION_EXPANDED_FILTER)
                         options |= RRDF_FIELD_OPTS_EXPANDED_FILTER;
 
+                    if (k->options & FACET_KEY_OPTION_PRETTY_XML)
+                        visual = RRDF_FIELD_VISUAL_PRETTY_XML;
+
                     const char *hash_str = hash_to_static_string(k->hash);
 
                     buffer_rrdf_table_add_field(
                             wb, field_id++,
                             hash_str, k->name ? k->name : hash_str,
                             RRDF_FIELD_TYPE_STRING,
-                            (k->options & FACET_KEY_OPTION_RICH_TEXT) ? RRDF_FIELD_VISUAL_RICH : RRDF_FIELD_VISUAL_VALUE,
+                            visual,
                             RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                             RRDF_FIELD_SORT_FIXED,
                             NULL,

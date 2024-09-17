@@ -392,7 +392,7 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 
     facets_register_dynamic_key_name(
             facets, WEVT_FIELD_XML,
-            FACET_KEY_OPTION_NEVER_FACET,
+            FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_PRETTY_XML,
             wevt_render_xml, NULL);
 
 #ifdef NETDATA_INTERNAL_CHECKS
