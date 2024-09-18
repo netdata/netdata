@@ -40,7 +40,7 @@ Possible TCP statuses:
 
 Possible UDP statuses:
 
-| TCP Status    | Description                                                                                                                                                           |
+| UDP Status    | Description                                                                                                                                                           |
 |---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | open/filtered | No response received within the configured timeout. This status indicates the port is either open or filtered, but the exact state cannot be determined definitively. |
 | closed        | Received an ICMP Destination Unreachable message, indicating the port is closed.                                                                                      |
@@ -84,8 +84,8 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| host | host |
-| port | port |
+| host | The hostname or IP address of the target system, as specified in the configuration. |
+| port | The TCP port being monitored, as defined in the 'ports' configuration parameter. |
 
 Metrics:
 
@@ -103,8 +103,8 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| host | host |
-| port | port |
+| host | The hostname or IP address of the target system, as specified in the configuration. |
+| port | The UDP port being monitored, as defined in the 'udp_ports' configuration parameter. |
 
 Metrics:
 
