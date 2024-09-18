@@ -77,9 +77,9 @@ func TestPortCheck_Collect(t *testing.T) {
 	require.NoError(t, job.Init())
 	require.NoError(t, job.Check())
 
-	copyLatency := func(dst, src map[string]int64) {
+	copyLatencyDuration := func(dst, src map[string]int64) {
 		for k := range dst {
-			if strings.HasSuffix(k, "latency") {
+			if strings.HasSuffix(k, "latency") || strings.HasSuffix(k, "duration") {
 				dst[k] = src[k]
 			}
 		}
@@ -97,10 +97,10 @@ func TestPortCheck_Collect(t *testing.T) {
 		"tcp_port_39002_success":                1,
 		"tcp_port_39002_timeout":                0,
 	}
-	collected := job.Collect()
-	copyLatency(expected, collected)
+	mx := job.Collect()
+	copyLatencyDuration(expected, mx)
 
-	assert.Equal(t, expected, collected)
+	assert.Equal(t, expected, mx)
 
 	expected = map[string]int64{
 		"tcp_port_39001_current_state_duration": int64(job.UpdateEvery) * 3,
@@ -114,10 +114,10 @@ func TestPortCheck_Collect(t *testing.T) {
 		"tcp_port_39002_success":                1,
 		"tcp_port_39002_timeout":                0,
 	}
-	collected = job.Collect()
-	copyLatency(expected, collected)
+	mx = job.Collect()
+	copyLatencyDuration(expected, mx)
 
-	assert.Equal(t, expected, collected)
+	assert.Equal(t, expected, mx)
 
 	job.dialTCP = testDial(errors.New("checkStateFailed"))
 
@@ -133,10 +133,10 @@ func TestPortCheck_Collect(t *testing.T) {
 		"tcp_port_39002_success":                0,
 		"tcp_port_39002_timeout":                0,
 	}
-	collected = job.Collect()
-	copyLatency(expected, collected)
+	mx = job.Collect()
+	copyLatencyDuration(expected, mx)
 
-	assert.Equal(t, expected, collected)
+	assert.Equal(t, expected, mx)
 
 	job.dialTCP = testDial(timeoutError{})
 
@@ -152,10 +152,10 @@ func TestPortCheck_Collect(t *testing.T) {
 		"tcp_port_39002_timeout":                1,
 		"tcp_port_39002_failed":                 0,
 	}
-	collected = job.Collect()
-	copyLatency(expected, collected)
+	mx = job.Collect()
+	copyLatencyDuration(expected, mx)
 
-	assert.Equal(t, expected, collected)
+	assert.Equal(t, expected, mx)
 }
 
 func testDial(err error) dialTCPFunc {
