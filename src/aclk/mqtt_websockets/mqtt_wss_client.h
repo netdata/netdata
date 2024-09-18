@@ -4,6 +4,7 @@
 #ifndef MQTT_WSS_CLIENT_H
 #define MQTT_WSS_CLIENT_H
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h> //size_t
 
@@ -69,7 +70,14 @@ struct mqtt_wss_proxy;
  * @param mqtt_params pointer to mqtt_connect_params structure which contains MQTT credentials and settings
  * @param ssl_flags parameters for OpenSSL, 0=MQTT_WSS_SSL_CERT_CHECK_FULL
  */
-int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params, int ssl_flags, struct mqtt_wss_proxy *proxy);
+int mqtt_wss_connect(
+    mqtt_wss_client client,
+    char *host,
+    int port,
+    struct mqtt_connect_params *mqtt_params,
+    int ssl_flags,
+    struct mqtt_wss_proxy *proxy,
+    bool *fallback_ipv4);
 int mqtt_wss_service(mqtt_wss_client client, int timeout_ms);
 void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms);
 
