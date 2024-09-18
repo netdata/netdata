@@ -161,11 +161,11 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
             rrddim_set_by_pointer(p->st_traffic,
                                   p->rd_traffic_received,
-                                  (collected_number)&p->IISReceivedBytesTotal.current.Data);
+                                  (collected_number)p->IISReceivedBytesTotal.current.Data);
 
             rrddim_set_by_pointer(p->st_traffic,
                                   p->rd_traffic_sent,
-                                  (collected_number)&p->IISSentBytesTotal.current.Data);
+                                  (collected_number)p->IISSentBytesTotal.current.Data);
 
             rrdset_done(p->st_traffic);
         }
@@ -201,11 +201,11 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
             rrddim_set_by_pointer(p->st_file_transfer,
                                   p->rd_files_received,
-                                  (collected_number)&p->IISFilesReceivedTotal.current.Data);
+                                  (collected_number)p->IISFilesReceivedTotal.current.Data);
 
             rrddim_set_by_pointer(p->st_file_transfer,
                                   p->rd_files_sent,
-                                  (collected_number)&p->IISFilesSentTotal.current.Data);
+                                  (collected_number)p->IISFilesSentTotal.current.Data);
 
             rrdset_done(p->st_file_transfer);
         }
@@ -235,7 +235,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
             rrddim_set_by_pointer(p->st_curr_connections,
                                   p->rd_curr_connections,
-                                  (collected_number)&p->IISCurrentConnections.current.Data);
+                                  (collected_number)p->IISCurrentConnections.current.Data);
 
             rrdset_done(p->st_curr_connections);
         }
@@ -267,7 +267,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
             rrddim_set_by_pointer(p->st_connections_attemps,
                                   p->rd_connections_attemps,
-                                  (collected_number)&p->IISCurrentConnections.current.Data);
+                                  (collected_number)p->IISCurrentConnections.current.Data);
 
             rrdset_done(p->st_connections_attemps);
         }
@@ -302,11 +302,11 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
             rrddim_set_by_pointer(p->st_user_count,
                                   p->rd_user_anonymous,
-                                  (collected_number)&p->IISCurrentAnonymousUser.current.Data);
+                                  (collected_number)p->IISCurrentAnonymousUser.current.Data);
 
             rrddim_set_by_pointer(p->st_user_count,
                                   p->rd_user_nonanonymous,
-                                  (collected_number)&p->IISCurrentNonAnonymousUsers.current.Data);
+                                  (collected_number)p->IISCurrentNonAnonymousUsers.current.Data);
 
             rrdset_done(p->st_user_count);
         }
@@ -337,7 +337,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
             rrddim_set_by_pointer(p->st_isapi_extension_request_count,
                                   p->rd_isapi_extension_request_count,
-                                  (collected_number)&p->IISCurrentISAPIExtRequests.current.Data);
+                                  (collected_number)p->IISCurrentISAPIExtRequests.current.Data);
 
             rrdset_done(p->st_isapi_extension_request_count);
         }
@@ -368,7 +368,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
             rrddim_set_by_pointer(p->st_isapi_extension_request_rate,
                                   p->rd_isapi_extension_request_rate,
-                                  (collected_number)&p->IISIPAPIExtRequestsTotal.current.Data);
+                                  (collected_number)p->IISIPAPIExtRequestsTotal.current.Data);
 
             rrdset_done(p->st_isapi_extension_request_rate);
         }
@@ -403,11 +403,11 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
             rrddim_set_by_pointer(p->st_error_rate,
                                   p->rd_error_rate_locked,
-                                  (collected_number)&p->IISLockedErrorsTotal.current.Data);
+                                  (collected_number)p->IISLockedErrorsTotal.current.Data);
 
             rrddim_set_by_pointer(p->st_error_rate,
                                   p->rd_error_rate_not_found,
-                                  (collected_number)&p->IISNotFoundErrorsTotal.current.Data);
+                                  (collected_number)p->IISNotFoundErrorsTotal.current.Data);
 
             rrdset_done(p->st_error_rate);
         }
@@ -438,7 +438,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
             rrddim_set_by_pointer(p->st_logon_attemps,
                                   p->rd_logon_attemps,
-                                  (collected_number)&p->IISLogonAttemptsTotal.current.Data);
+                                  (collected_number)p->IISLogonAttemptsTotal.current.Data);
 
             rrdset_done(p->st_logon_attemps);
         }
@@ -469,7 +469,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
             rrddim_set_by_pointer(p->st_service_uptime,
                                   p->rd_service_uptime,
-                                  (collected_number)&p->IISUptime.current.Data);
+                                  (collected_number)p->IISUptime.current.Data);
 
             rrdset_done(p->st_service_uptime);
         }
