@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	matcher2 "github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 
@@ -59,7 +59,7 @@ func TestPulsar_Init(t *testing.T) {
 		"bad syntax topic filer": {
 			config: Config{
 				HTTPConfig:  web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:8080/metrics"}},
-				TopicFilter: matcher.SimpleExpr{Includes: []string{"+"}}},
+				TopicFilter: matcher2.SimpleExpr{Includes: []string{"+"}}},
 			wantFail: true,
 		},
 		"empty URL": {
@@ -256,7 +256,7 @@ func prepareClientServerStdV250Topics(t *testing.T) (*Pulsar, *httptest.Server) 
 func prepareClientServerStdV250TopicsFiltered(t *testing.T) (*Pulsar, *httptest.Server) {
 	t.Helper()
 	pulsar, srv := prepareClientServerStdV250Topics(t)
-	pulsar.topicFilter = matcher.FALSE()
+	pulsar.topicFilter = matcher2.FALSE()
 
 	return pulsar, srv
 }
