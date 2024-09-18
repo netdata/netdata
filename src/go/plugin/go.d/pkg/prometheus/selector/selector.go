@@ -3,7 +3,7 @@
 package selector
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 
 	"github.com/prometheus/prometheus/model/labels"
 )
