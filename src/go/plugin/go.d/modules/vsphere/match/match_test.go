@@ -6,17 +6,17 @@ import (
 	"strings"
 	"testing"
 
-	matcher2 "github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/vsphere/resources"
 
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	trueHostDC  = hostDCMatcher{matcher2.TRUE()}
-	falseHostDC = hostDCMatcher{matcher2.FALSE()}
-	trueVMDC    = vmDCMatcher{matcher2.TRUE()}
-	falseVMDC   = vmDCMatcher{matcher2.FALSE()}
+	trueHostDC  = hostDCMatcher{matcher.TRUE()}
+	falseHostDC = hostDCMatcher{matcher.FALSE()}
+	trueVMDC    = vmDCMatcher{matcher.TRUE()}
+	falseVMDC   = vmDCMatcher{matcher.FALSE()}
 )
 
 func TestOrHostMatcher_Match(t *testing.T) {
@@ -118,7 +118,7 @@ func TestHostIncludes_Parse(t *testing.T) {
 			valid: true,
 			expected: andHostMatcher{
 				lhs: falseHostDC,
-				rhs: hostClusterMatcher{matcher2.FALSE()},
+				rhs: hostClusterMatcher{matcher.FALSE()},
 			},
 		},
 		"/DC1* DC2* !*/Cluster*": {
@@ -133,7 +133,7 @@ func TestHostIncludes_Parse(t *testing.T) {
 			expected: andHostMatcher{
 				lhs: andHostMatcher{
 					lhs: trueHostDC,
-					rhs: hostClusterMatcher{matcher2.TRUE()},
+					rhs: hostClusterMatcher{matcher.TRUE()},
 				},
 				rhs: hostHostMatcher{mustSP("HOST1*")},
 			},
@@ -143,7 +143,7 @@ func TestHostIncludes_Parse(t *testing.T) {
 			expected: andHostMatcher{
 				lhs: andHostMatcher{
 					lhs: trueHostDC,
-					rhs: hostClusterMatcher{matcher2.TRUE()},
+					rhs: hostClusterMatcher{matcher.TRUE()},
 				},
 				rhs: hostHostMatcher{mustSP("HOST1*")},
 			},
@@ -202,7 +202,7 @@ func TestVMIncludes_Parse(t *testing.T) {
 			valid: true,
 			expected: andVMMatcher{
 				lhs: falseVMDC,
-				rhs: vmClusterMatcher{matcher2.FALSE()},
+				rhs: vmClusterMatcher{matcher.FALSE()},
 			},
 		},
 		"/DC1* DC2* !*/Cluster*": {
@@ -217,7 +217,7 @@ func TestVMIncludes_Parse(t *testing.T) {
 			expected: andVMMatcher{
 				lhs: andVMMatcher{
 					lhs: trueVMDC,
-					rhs: vmClusterMatcher{matcher2.TRUE()},
+					rhs: vmClusterMatcher{matcher.TRUE()},
 				},
 				rhs: vmHostMatcher{mustSP("HOST1")},
 			},
@@ -228,11 +228,11 @@ func TestVMIncludes_Parse(t *testing.T) {
 				lhs: andVMMatcher{
 					lhs: andVMMatcher{
 						lhs: trueVMDC,
-						rhs: vmClusterMatcher{matcher2.TRUE()},
+						rhs: vmClusterMatcher{matcher.TRUE()},
 					},
 					rhs: vmHostMatcher{mustSP("HOST1*")},
 				},
-				rhs: vmVMMatcher{matcher2.TRUE()},
+				rhs: vmVMMatcher{matcher.TRUE()},
 			},
 		},
 		"[/DC1*,/DC2*]": {
@@ -282,6 +282,6 @@ func prepareIncludes(include string) []string {
 	return strings.Split(trimmed, ",")
 }
 
-func mustSP(expr string) matcher2.Matcher {
-	return matcher2.Must(matcher2.NewSimplePatternsMatcher(expr))
+func mustSP(expr string) matcher.Matcher {
+	return matcher.Must(matcher.NewSimplePatternsMatcher(expr))
 }
