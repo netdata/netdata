@@ -197,16 +197,10 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
         .puback_callback = puback_callback,
         .msg_callback = msg_callback
     };
-    if ( (client->mqtt = mqtt_ng_init(&settings)) == NULL ) {
-        mws_error(log, "Error initializing internal MQTT client");
-        goto fail_3;
-    }
+    client->mqtt = mqtt_ng_init(&settings);
 
     return client;
 
-fail_3:
-    close(client->write_notif_pipe[PIPE_WRITE_END]);
-    close(client->write_notif_pipe[PIPE_READ_END]);
 fail_2:
     ws_client_destroy(client->ws_client);
 fail_1:

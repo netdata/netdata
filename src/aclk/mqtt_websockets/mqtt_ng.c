@@ -568,18 +568,14 @@ static int transaction_buffer_grow(struct transaction_buffer *buf, mqtt_wss_log_
     return 0;
 }
 
-inline static int transaction_buffer_init(struct transaction_buffer *to_init, size_t size)
+inline static void transaction_buffer_init(struct transaction_buffer *to_init, size_t size)
 {
     spinlock_init(&to_init->spinlock);
 
     to_init->hdr_buffer.size = size;
     to_init->hdr_buffer.data = mallocz(size);
-    if (to_init->hdr_buffer.data == NULL)
-        return 1;
-
     to_init->hdr_buffer.tail = to_init->hdr_buffer.data;
     to_init->hdr_buffer.tail_frag = NULL;
-    return 0;
 }
 
 static void transaction_buffer_destroy(struct transaction_buffer *to_init)
@@ -621,19 +617,14 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
 {
     struct mqtt_ng_client *client = callocz(1, sizeof(struct mqtt_ng_client));
 
-    if (transaction_buffer_init(&client->main_buffer, HEADER_BUFFER_SIZE))
-        goto err_free_client;
+    transaction_buffer_init(&client->main_buffer, HEADER_BUFFER_SIZE);
 
     client->rx_aliases = RX_ALIASES_INITIALIZE();
-    if (client->rx_aliases == NULL)
-        goto err_free_trx_buf;
 
     spinlock_init(&client->stats_spinlock);
     spinlock_init(&client->tx_topic_aliases.spinlock);
 
     client->tx_topic_aliases.stoi_dict = TX_ALIASES_INITIALIZE();
-    if (client->tx_topic_aliases.stoi_dict == NULL)
-        goto err_free_rx_alias;
     client->tx_topic_aliases.idx_max = UINT16_MAX;
 
     // TODO just embed the struct into mqtt_ng_client
@@ -648,14 +639,6 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
     client->msg_callback = settings->msg_callback;
 
     return client;
-
-err_free_rx_alias:
-    c_rhash_destroy(client->rx_aliases);
-err_free_trx_buf:
-    transaction_buffer_destroy(&client->main_buffer);
-err_free_client:
-    freez(client);
-    return NULL;
 }
 
 static inline uint8_t get_control_packet_type(uint8_t first_hdr_byte)
@@ -711,10 +694,6 @@ int frag_set_external_data(mqtt_wss_log_ctx_t log, struct buffer_fragment *frag,
     switch (ptr2memory_mode(data_free_fnc)) {
         case MEMCPY:
             frag->data = mallocz(data_len);
-            if (frag->data == NULL) {
-                mws_error(log, UNIT_LOG_PREFIX "OOM while malloc @_optimized_add");
-                return 1;
-            }
             memcpy(frag->data, data, data_len);
             break;
         case EXTERNAL_FREE_AFTER_USE:
@@ -1017,18 +996,13 @@ int mqtt_ng_connect(struct mqtt_ng_client *client,
     // according to MQTT spec topic aliases should not be persisted
     // even if clean session is true
     mqtt_ng_destroy_tx_alias_hash(client->tx_topic_aliases.stoi_dict);
+
     client->tx_topic_aliases.stoi_dict = TX_ALIASES_INITIALIZE();
-    if (client->tx_topic_aliases.stoi_dict == NULL) {
-        spinlock_unlock(&client->tx_topic_aliases.spinlock);
-        return 1;
-    }
     client->tx_topic_aliases.idx_assigned = 0;
     spinlock_unlock(&client->tx_topic_aliases.spinlock);
 
     mqtt_ng_destroy_rx_alias_hash(client->rx_aliases);
     client->rx_aliases = RX_ALIASES_INITIALIZE();
-    if (client->rx_aliases == NULL)
-        return 1;
 
     client->connect_msg = mqtt_ng_generate_connect(&client->main_buffer, client->log, auth, lwt, clean_start, keep_alive);
     if (client->connect_msg == NULL)
@@ -1350,7 +1324,6 @@ int mqtt_ng_ping(struct mqtt_ng_client *client)
 #define MQTT_NG_CLIENT_PROTOCOL_ERROR         -1
 #define MQTT_NG_CLIENT_SERVER_RETURNED_ERROR  -2
 #define MQTT_NG_CLIENT_NOT_IMPL_YET           -3
-#define MQTT_NG_CLIENT_OOM                    -4
 #define MQTT_NG_CLIENT_INTERNAL_ERROR         -5
 
 #define BUF_READ_CHECK_AT_LEAST(buf, x)                 \
@@ -1741,8 +1714,6 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
                 break;
             }
             publish->topic = callocz(1, publish->topic_len + 1 /* add 0x00 */);
-            if (publish->topic == NULL)
-                return MQTT_NG_CLIENT_OOM;
             parser->varhdr_state = MQTT_PARSE_VARHDR_TOPICNAME;
             /* FALLTHROUGH */
         case MQTT_PARSE_VARHDR_TOPICNAME:
@@ -1789,12 +1760,6 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
             BUF_READ_CHECK_AT_LEAST(parser->received_data, publish->data_len);
 
             publish->data = mallocz(publish->data_len);
-            if (publish->data == NULL) {
-                freez(publish->topic);
-                publish->topic = NULL;
-                return MQTT_NG_CLIENT_OOM;
-            }
-
             rbuf_pop(parser->received_data, publish->data, publish->data_len);
             parser->mqtt_parsed_len += publish->data_len;
 

@@ -8,9 +8,6 @@ c_rhash c_rhash_new(size_t bin_count) {
         bin_count = 1000;
 
     c_rhash hash = callocz(1, sizeof(struct c_rhash_s) + (bin_count * sizeof(struct bin_ll*)) );
-    if (hash == NULL)
-        return NULL;
-
     hash->bin_count = bin_count;
     hash->bins = (c_rhash_bin *)((char*)hash + sizeof(struct c_rhash_s));
 
