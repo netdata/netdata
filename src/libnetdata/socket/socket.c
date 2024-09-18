@@ -857,7 +857,15 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
 // service     the service name or port to connect to
 // timeout     the timeout for establishing a connection
 
-int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout) {
+int connect_to_this_ip46(
+    int protocol,
+    int socktype,
+    const char *host,
+    uint32_t scope_id,
+    const char *service,
+    struct timeval *timeout,
+    bool *fallback_ipv4)
+{
     struct addrinfo hints;
     struct addrinfo *ai_head = NULL, *ai = NULL;
 
@@ -889,6 +897,9 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
     int fd = -1;
     for (ai = ai_head; ai != NULL && fd == -1; ai = ai->ai_next) {
         if(nd_thread_signaled_to_cancel()) break;
+
+        if (fallback_ipv4 && *fallback_ipv4 && ai->ai_family == PF_INET6)
+            continue;
 
         if (ai->ai_family == PF_INET6) {
             struct sockaddr_in6 *pSadrIn6 = (struct sockaddr_in6 *) ai->ai_addr;
@@ -969,6 +980,9 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
 
                             close(fd);
                             fd = -1;
+
+                            if (fallback_ipv4 && ai->ai_family == PF_INET6)
+                                *fallback_ipv4 = true;
                             break;
 
                         default:
@@ -1090,7 +1104,7 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         service = default_service;
 
 
-    return connect_to_this_ip46(protocol, socktype, host, scope_id, service, timeout);
+    return connect_to_this_ip46(protocol, socktype, host, scope_id, service, timeout,NULL);
 }
 
 void foreach_entry_in_connection_string(const char *destination, bool (*callback)(char *entry, void *data), void *data) {

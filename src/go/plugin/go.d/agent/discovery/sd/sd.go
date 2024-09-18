@@ -9,9 +9,9 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/multipath"
 
 	"gopkg.in/yaml.v2"
 )

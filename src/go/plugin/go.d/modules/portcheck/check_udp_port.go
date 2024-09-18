@@ -19,9 +19,9 @@ const (
 )
 
 type udpPort struct {
-	number  int
-	state   string
-	inState int
+	number         int
+	status         string
+	statusChangeTs time.Time
 
 	err error
 }
@@ -48,11 +48,11 @@ func (pc *PortCheck) checkUDPPort(port *udpPort) {
 }
 
 func (pc *PortCheck) setUDPPortCheckState(port *udpPort, state string) {
-	if port.state == state {
-		port.inState += pc.UpdateEvery
-	} else {
-		port.inState = pc.UpdateEvery
-		port.state = state
+	if port.status != state {
+		port.status = state
+		port.statusChangeTs = time.Now()
+	} else if port.statusChangeTs.IsZero() {
+		port.statusChangeTs = time.Now()
 	}
 }
 

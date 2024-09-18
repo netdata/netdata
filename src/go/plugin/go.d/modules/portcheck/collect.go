@@ -28,9 +28,9 @@ func (pc *PortCheck) collect() (map[string]int64, error) {
 
 	wg.Wait()
 
-	// FIXME: in state time calculation
-
 	mx := make(map[string]int64)
+
+	now := time.Now()
 
 	for _, p := range pc.tcpPorts {
 		if !pc.seenTcpPorts[p.number] {
@@ -40,12 +40,12 @@ func (pc *PortCheck) collect() (map[string]int64, error) {
 
 		px := fmt.Sprintf("tcp_port_%d_", p.number)
 
-		mx[px+"current_state_duration"] = int64(p.inState)
+		mx[px+"current_state_duration"] = int64(now.Sub(p.statusChangeTs).Seconds())
 		mx[px+"latency"] = int64(p.latency)
 		mx[px+tcpPortCheckStateSuccess] = 0
 		mx[px+tcpPortCheckStateTimeout] = 0
 		mx[px+tcpPortCheckStateFailed] = 0
-		mx[px+p.state] = 1
+		mx[px+p.status] = 1
 	}
 
 	if pc.doUdpPorts {
@@ -65,10 +65,10 @@ func (pc *PortCheck) collect() (map[string]int64, error) {
 
 			px := fmt.Sprintf("udp_port_%d_", p.number)
 
-			mx[px+"current_status_duration"] = int64(p.inState)
+			mx[px+"current_status_duration"] = int64(now.Sub(p.statusChangeTs).Seconds())
 			mx[px+udpPortCheckStateOpenFiltered] = 0
 			mx[px+udpPortCheckStateClosed] = 0
-			mx[px+p.state] = 1
+			mx[px+p.status] = 1
 		}
 	}
 

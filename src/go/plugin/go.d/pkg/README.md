@@ -13,7 +13,7 @@ learn_rel_path: "Developers/External plugins/go.d.plugin/Helper Packages"
 - if you parse an application log files, then [`log`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/logs) is
   handy.
 - if you need filtering
-  check [`matcher`](/src/go/plugin/go.d/pkg/matcher).
+  check [`matcher`](/src/go/pkg/matcher).
 - if you collect metrics from an HTTP endpoint use [`web`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/web).
 - if you collect metrics from a prometheus endpoint,
   then [`prometheus`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus)

@@ -13,10 +13,10 @@ const (
 )
 
 type tcpPort struct {
-	number  int
-	state   string
-	inState int
-	latency int
+	number         int
+	status         string
+	statusChangeTs time.Time
+	latency        int
 }
 
 func (pc *PortCheck) checkTCPPort(port *tcpPort) {
@@ -47,10 +47,10 @@ func (pc *PortCheck) checkTCPPort(port *tcpPort) {
 }
 
 func (pc *PortCheck) setTcpPortCheckState(port *tcpPort, state string) {
-	if port.state == state {
-		port.inState += pc.UpdateEvery
-	} else {
-		port.inState = pc.UpdateEvery
-		port.state = state
+	if port.status != state {
+		port.status = state
+		port.statusChangeTs = time.Now()
+	} else if port.statusChangeTs.IsZero() {
+		port.statusChangeTs = time.Now()
 	}
 }
