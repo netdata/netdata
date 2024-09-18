@@ -63,6 +63,26 @@
     }
   },
   "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "timeout",
+            "host"
+          ]
+        },
+        {
+          "title": "Checks",
+          "fields": [
+            "ports",
+            "udp_ports"
+          ]
+        }
+      ]
+    },
     "uiOptions": {
       "fullPage": true
     },
