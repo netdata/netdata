@@ -78,7 +78,7 @@ void https_req_response_free(https_req_response_t *res);
         .proxy_port = 8080                          \
     }
 
-int https_request(https_req_t *request, https_req_response_t *response);
+int https_request(https_req_t *request, https_req_response_t *response, bool *fallback_ipv4);
 
 // we expose previously internal parser as this is usefull also from
 // other parts of the code
