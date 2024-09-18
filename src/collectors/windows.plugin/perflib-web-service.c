@@ -38,6 +38,9 @@ struct web_service {
     RRDSET *st_service_uptime;
     RRDDIM *rd_service_uptime;
 
+    RRDSET *st_request_rate;
+    RRDDIM *rd_request_rate;
+
     COUNTER_DATA IISCurrentAnonymousUser;
     COUNTER_DATA IISCurrentNonAnonymousUsers;
     COUNTER_DATA IISCurrentConnections;
@@ -53,16 +56,24 @@ struct web_service {
     COUNTER_DATA IISLogonAttemptsTotal;
     COUNTER_DATA IISLockedErrorsTotal;
     COUNTER_DATA IISNotFoundErrorsTotal;
+
+    COUNTER_DATA IISRequestsOptions;
+    COUNTER_DATA IISRequestsGet;
+    COUNTER_DATA IISRequestsPost;
+    COUNTER_DATA IISRequestsHead;
+    COUNTER_DATA IISRequestsPut;
+    COUNTER_DATA IISRequestsDelete;
+    COUNTER_DATA IISRequestsTrace;
+    COUNTER_DATA IISRequestsMove;
+    COUNTER_DATA IISRequestsCopy;
+    COUNTER_DATA IISRequestsMkcol;
+    COUNTER_DATA IISRequestsPropfind;
+    COUNTER_DATA IISRequestsProppatch;
+    COUNTER_DATA IISRequestsSearch;
+    COUNTER_DATA IISRequestsLock;
+    COUNTER_DATA IISRequestsUnlock;
+    COUNTER_DATA IISRequestsOther;
 };
-
-struct w3vc_w3wp {
-    RRDSET *st_request_rate;
-    RRDDIM *rd_request_rate;
-
-    COUNTER_DATA IISRequestsTotal;
-};
-
-struct w3vc_w3wp w3svc_conters;
 
 static inline void initialize_web_service_keys(struct web_service *p) {
     p->IISCurrentAnonymousUser.key = "Current Anonymous Users";
@@ -80,10 +91,23 @@ static inline void initialize_web_service_keys(struct web_service *p) {
     p->IISLogonAttemptsTotal.key = "Total Logon Attempts";
     p->IISLockedErrorsTotal.key = "Total Locked Errors";
     p->IISNotFoundErrorsTotal.key = "Total Not Found Errors";
-}
 
-static inline void initialize_w3vc_w3wp_keys(struct w3vc_w3wp *p) {
-    p->IISRequestsTotal.key = "Total HTTP Requests Served";
+    p->IISRequestsOptions.key = "Options Requests/sec";
+    p->IISRequestsGet.key = "Get Requests/sec";
+    p->IISRequestsPost.key = "Post Requests/sec";
+    p->IISRequestsHead.key = "Head Requests/sec";
+    p->IISRequestsPut.key = "Put Requests/sec";
+    p->IISRequestsDelete.key = "Delete Requests/sec";
+    p->IISRequestsTrace.key = "Trace Requests/sec";
+    p->IISRequestsMove.key = "Move Requests/sec";
+    p->IISRequestsCopy.key = "Copy Requests/sec";
+    p->IISRequestsMkcol.key = "Mkcol Requests/sec";
+    p->IISRequestsPropfind.key = "Propfind Requests/sec";
+    p->IISRequestsProppatch.key = "Proppatch Requests/sec";
+    p->IISRequestsSearch.key = "Search Requests/sec";
+    p->IISRequestsLock.key = "Lock Requests/sec";
+    p->IISRequestsUnlock.key = "Unlock Requests/sec";
+    p->IISRequestsOther.key = "Other Request Methods/sec";
 }
 
 void dict_web_service_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -98,8 +122,6 @@ static void initialize(void) {
                                                 DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct web_service));
 
     dictionary_register_insert_callback(web_services, dict_web_service_insert_cb, NULL);
-
-    initialize_w3vc_w3wp_keys(&w3svc_conters);
 }
 
 static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
@@ -472,6 +494,61 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                   (collected_number)p->IISUptime.current.Data);
 
             rrdset_done(p->st_service_uptime);
+        }
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsOptions) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsGet) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsPost) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsHead) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsPut) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsDelete) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsTrace) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsMove) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsCopy) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsMkcol) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsPropfind) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsProppatch) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsSearch) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsLock) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsUnlock) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->IISRequestsOther)) {
+            if (!p->st_request_rate) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "website_%s_requests_rate", windows_shared_buffer);
+                p->st_request_rate = rrdset_create_localhost("iis"
+                                                             , id, NULL
+                                                             , "requests"
+                                                             , "iis.website_requests_rate"
+                                                             , "Website requests rate"
+                                                             , "requests/s"
+                                                             , PLUGIN_WINDOWS_NAME
+                                                             , "WebService"
+                                                             , PRIO_WEBSITE_IIS_REQUESTS_RATE
+                                                             , update_every
+                                                             , RRDSET_TYPE_LINE
+                                                             );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_requests_total", windows_shared_buffer);
+                p->rd_request_rate = rrddim_add(p->st_request_rate, id, "requests",
+                                                1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                rrdlabels_add(p->st_request_rate->rrdlabels, "website",
+                              windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            uint64_t requests = p->IISRequestsOptions.current.Data + p->IISRequestsGet.current.Data +
+                                p->IISRequestsPost.current.Data + p->IISRequestsHead.current.Data +
+                                p->IISRequestsPut.current.Data + p->IISRequestsDelete.current.Data +
+                                p->IISRequestsTrace.current.Data + p->IISRequestsMove.current.Data +
+                                p->IISRequestsCopy.current.Data + p->IISRequestsMkcol.current.Data +
+                                p->IISRequestsPropfind.current.Data + p->IISRequestsProppatch.current.Data +
+                                p->IISRequestsSearch.current.Data + p->IISRequestsLock.current.Data +
+                                p->IISRequestsUnlock.current.Data + p->IISRequestsOther.current.Data;
+
+            rrddim_set_by_pointer(p->st_request_rate,
+                                  p->rd_request_rate,
+                                  (collected_number)requests);
+
+            rrdset_done(p->st_request_rate);
         }
     }
 
