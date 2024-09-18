@@ -976,6 +976,12 @@ static size_t registered_results_to_json_multinode_group_by(
     BUFFER *key = buffer_create(0, NULL);
     BUFFER *name = buffer_create(0, NULL);
     dfe_start_read(results, t) {
+        char node_uuid[UUID_STR_LEN];
+
+        if(UUIDiszero(t->host->node_id))
+            uuid_unparse_lower(t->host->host_id.uuid, node_uuid);
+        else
+            uuid_unparse_lower(t->host->node_id.uuid, node_uuid);
 
         buffer_flush(key);
         buffer_flush(name);
@@ -996,7 +1002,7 @@ static size_t registered_results_to_json_multinode_group_by(
             if(!(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_NODE)) {
                 buffer_fast_strcat(key, "@", 1);
                 buffer_fast_strcat(name, "@", 1);
-                buffer_strcat(key, t->host->machine_guid);
+                buffer_strcat(key, node_uuid);
                 buffer_strcat(name, rrdhost_hostname(t->host));
             }
         }
@@ -1006,7 +1012,7 @@ static size_t registered_results_to_json_multinode_group_by(
                 buffer_fast_strcat(name, ",", 1);
             }
 
-            buffer_strcat(key, t->host->machine_guid);
+            buffer_strcat(key, node_uuid);
             buffer_strcat(name, rrdhost_hostname(t->host));
         }
         if(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_CONTEXT) {
