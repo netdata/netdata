@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18574](https://github.com/netdata/netdata/pull/18574) ([netdatabot](https://github.com/netdatabot))
+- go.d portcheck update meta [\#18573](https://github.com/netdata/netdata/pull/18573) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18571](https://github.com/netdata/netdata/pull/18571) ([netdatabot](https://github.com/netdatabot))
+- go.d sd docker: remove unnecessary info message [\#18570](https://github.com/netdata/netdata/pull/18570) ([ilyam8](https://github.com/ilyam8))
+- go.d/portcheck: add UDP support [\#18569](https://github.com/netdata/netdata/pull/18569) ([ilyam8](https://github.com/ilyam8))
+- Windows Events Log improvements 4 [\#18567](https://github.com/netdata/netdata/pull/18567) ([ktsaou](https://github.com/ktsaou))
 - Windows Events Log Explorer improvements 3 [\#18564](https://github.com/netdata/netdata/pull/18564) ([ktsaou](https://github.com/ktsaou))
 - Windows Events Improvements 2 [\#18563](https://github.com/netdata/netdata/pull/18563) ([ktsaou](https://github.com/ktsaou))
 - add cpu model to host labels [\#18562](https://github.com/netdata/netdata/pull/18562) ([ilyam8](https://github.com/ilyam8))
@@ -413,12 +419,6 @@
 - Regenerate integrations.js [\#18016](https://github.com/netdata/netdata/pull/18016) ([netdatabot](https://github.com/netdatabot))
 - go.d snmp: add collecting network interface stats [\#18014](https://github.com/netdata/netdata/pull/18014) ([ilyam8](https://github.com/ilyam8))
 - rrdlabels: allow uppercase A-Z in label name [\#18013](https://github.com/netdata/netdata/pull/18013) ([ilyam8](https://github.com/ilyam8))
-- Fix Slack error reporting for packaging workflows. [\#18011](https://github.com/netdata/netdata/pull/18011) ([Ferroin](https://github.com/Ferroin))
-- Enforce proper include ordering for vendored libraries. [\#18008](https://github.com/netdata/netdata/pull/18008) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#18006](https://github.com/netdata/netdata/pull/18006) ([netdatabot](https://github.com/netdatabot))
-- docs: add Troubleshoot-\>Getting Logs section to collectors [\#18005](https://github.com/netdata/netdata/pull/18005) ([ilyam8](https://github.com/ilyam8))
-- apps.plugin: remove "Normalization Ratio" internal charts [\#18004](https://github.com/netdata/netdata/pull/18004) ([ilyam8](https://github.com/ilyam8))
-- Fix RPM repoconfig naming [\#18003](https://github.com/netdata/netdata/pull/18003) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
