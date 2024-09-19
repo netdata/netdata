@@ -5,7 +5,7 @@ modules:
       plugin_name: go.d.plugin
       module_name: portcheck
       monitored_instance:
-        name: TCP Endpoints
+        name: TCP/UDP Endpoints
         link: ""
         icon_filename: globe.svg
         categories:
@@ -20,7 +20,29 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors TCP services availability and response time.
+          Collector for monitoring service availability and response time. It can be used to check if specific ports are open or reachable on a target system.
+
+          It supports both TCP and UDP protocols over IPv4 and IPv6 networks.
+
+          | Protocol | Check Description                                                                                                           |
+          |----------|-----------------------------------------------------------------------------------------------------------------------------|
+          | TCP      | Attempts to establish a TCP connection to the specified ports on the target system.                                         |
+          | UDP      | Sends a 0-byte UDP packet to the specified ports on the target system and analyzes ICMP responses to determine port status. |
+
+          Possible TCP statuses:
+
+          | TCP Status | Description                                                 |
+          |------------|-------------------------------------------------------------|
+          | success    | Connection established successfully.                        |
+          | timeout    | Connection timed out after waiting for configured duration. |
+          | failed     | An error occurred during the connection attempt.            |
+
+          Possible UDP statuses:
+
+          | UDP Status    | Description                                                                                                                                                           |
+          |---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+          | open/filtered | No response received within the configured timeout. This status indicates the port is either open or filtered, but the exact state cannot be determined definitively. |
+          | closed        | Received an ICMP Destination Unreachable message, indicating the port is closed.                                                                                      |
         method_description: ""
       supported_platforms:
         include: []
@@ -61,9 +83,13 @@ modules:
               default_value: ""
               required: true
             - name: ports
-              description: Remote host ports. Must be specified in numeric format.
+              description: Target TCP ports. Must be specified in numeric format.
               default_value: ""
-              required: true
+              required: false
+            - name: udp_ports
+              description: Target UDP ports. Must be specified in numeric format.
+              default_value: ""
+              required: false
             - name: timeout
               description: HTTP request timeout.
               default_value: 2
@@ -73,24 +99,42 @@ modules:
             title: Config
             enabled: true
           list:
-            - name: Check SSH and telnet
+            - name: Check TCP ports (IPv4)
               description: An example configuration.
               config: |
                 jobs:
-                  - name: server1
+                  - name: local
                     host: 127.0.0.1
                     ports:
                       - 22
                       - 23
-            - name: Check webserver with IPv6 address
+            - name: Check TCP ports (IPv6)
               description: An example configuration.
               config: |
                 jobs:
-                  - name: server2
+                  - name: local
                     host: "[2001:DB8::1]"
                     ports:
                       - 80
                       - 8080
+            - name: Check UDP ports (IPv4)
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    host: 127.0.0.1
+                    udp_ports:
+                      - 3120
+                      - 3121
+            - name: Check UDP ports (IPv6)
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    host: [::1]
+                    udp_ports:
+                      - 3120
+                      - 3121
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
@@ -132,13 +176,13 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: tcp endpoint
+        - name: TCP endpoint
           description: These metrics refer to the TCP endpoint.
           labels:
             - name: host
-              description: host
+              description: The hostname or IP address of the target system, as specified in the configuration.
             - name: port
-              description: port
+              description: The TCP port being monitored, as defined in the 'ports' configuration parameter.
           metrics:
             - name: portcheck.status
               description: TCP Check Status
@@ -157,6 +201,27 @@ modules:
             - name: portcheck.latency
               description: TCP Connection Latency
               unit: ms
+              chart_type: line
+              dimensions:
+                - name: time
+        - name: UDP endpoint
+          description: These metrics refer to the UDP endpoint.
+          labels:
+            - name: host
+              description: The hostname or IP address of the target system, as specified in the configuration.
+            - name: port
+              description: The UDP port being monitored, as defined in the 'udp_ports' configuration parameter.
+          metrics:
+            - name: portcheck.udp_port_status
+              description: UDP Port Check Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: open/filtered
+                - name: closed
+            - name: portcheck.udp_port_status_duration
+              description: UDP Port Current Status Duration
+              unit: seconds
               chart_type: line
               dimensions:
                 - name: time

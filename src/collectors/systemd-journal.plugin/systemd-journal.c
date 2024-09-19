@@ -336,10 +336,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
     LOGS_QUERY_STATUS *fqs) {
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
-
-    usec_t start_ut = ((fqs->rq.data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->rq.before_ut) + anchor_delta;
-    usec_t stop_ut = (fqs->rq.data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->rq.after_ut;
-    bool stop_when_full = (fqs->rq.data_only && !fqs->anchor.stop_ut);
+    lqs_query_timeframe(fqs, anchor_delta);
+    usec_t start_ut = fqs->query.start_ut;
+    usec_t stop_ut = fqs->query.stop_ut;
+    bool stop_when_full = fqs->query.stop_when_full;
 
     fqs->c.query_file.start_ut = start_ut;
     fqs->c.query_file.stop_ut = stop_ut;
@@ -451,10 +451,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
     LOGS_QUERY_STATUS *fqs) {
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
-
-    usec_t start_ut = (fqs->rq.data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->rq.after_ut;
-    usec_t stop_ut = ((fqs->rq.data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->rq.before_ut) + anchor_delta;
-    bool stop_when_full = (fqs->rq.data_only && !fqs->anchor.stop_ut);
+    lqs_query_timeframe(fqs, anchor_delta);
+    usec_t start_ut = fqs->query.start_ut;
+    usec_t stop_ut = fqs->query.stop_ut;
+    bool stop_when_full = fqs->query.stop_when_full;
 
     fqs->c.query_file.start_ut = start_ut;
     fqs->c.query_file.stop_ut = stop_ut;
@@ -747,8 +747,13 @@ static int netdata_systemd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
 
     lqs->c.files_matched = files_used;
 
-    if(lqs->rq.if_modified_since && !files_are_newer)
+    if(lqs->rq.if_modified_since && !files_are_newer) {
+        // release the files
+        for(size_t f = 0; f < files_used ;f++)
+            dictionary_acquired_item_release(journal_files_registry, file_items[f]);
+
         return rrd_call_function_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
+    }
 
     // sort the files, so that they are optimal for facets
     if(files_used >= 2) {

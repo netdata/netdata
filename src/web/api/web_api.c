@@ -121,10 +121,13 @@ RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
 bool web_client_interrupt_callback(void *data) {
     struct web_client *w = data;
 
+    bool ret;
     if(w->interrupt.callback)
-        return w->interrupt.callback(w, w->interrupt.callback_data);
+        ret = w->interrupt.callback(w, w->interrupt.callback_data);
+    else
+        ret = is_socket_closed(w->ofd);
 
-    return sock_has_output_error(w->ofd);
+    return ret;
 }
 
 void nd_web_api_init(void) {

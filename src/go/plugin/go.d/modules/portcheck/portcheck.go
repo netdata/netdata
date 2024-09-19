@@ -4,6 +4,7 @@ package portcheck
 
 import (
 	_ "embed"
+	"errors"
 	"net"
 	"time"
 
@@ -30,7 +31,15 @@ func New() *PortCheck {
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
-		dial: net.DialTimeout,
+		charts: &module.Charts{},
+
+		dialTCP: net.DialTimeout,
+
+		scanUDP:    scanUDPPort,
+		doUdpPorts: true,
+
+		seenUdpPorts: make(map[int]bool),
+		seenTcpPorts: make(map[int]bool),
 	}
 }
 
@@ -38,6 +47,7 @@ type Config struct {
 	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
 	Host        string           `yaml:"host" json:"host"`
 	Ports       []int            `yaml:"ports" json:"ports"`
+	UDPPorts    []int            `yaml:"udp_ports,omitempty" json:"udp_ports"`
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
@@ -47,9 +57,15 @@ type PortCheck struct {
 
 	charts *module.Charts
 
-	dial dialFunc
+	dialTCP dialTCPFunc
+	scanUDP func(address string, timeout time.Duration) (bool, error)
 
-	ports []*port
+	tcpPorts     []*tcpPort
+	seenTcpPorts map[int]bool
+
+	udpPorts     []*udpPort
+	seenUdpPorts map[int]bool
+	doUdpPorts   bool
 }
 
 func (pc *PortCheck) Configuration() any {
@@ -62,23 +78,25 @@ func (pc *PortCheck) Init() error {
 		return err
 	}
 
-	charts, err := pc.initCharts()
-	if err != nil {
-		pc.Errorf("init charts: %v", err)
-		return err
-	}
-	pc.charts = charts
-
-	pc.ports = pc.initPorts()
+	pc.tcpPorts, pc.udpPorts = pc.initPorts()
 
 	pc.Debugf("using host: %s", pc.Host)
-	pc.Debugf("using ports: %v", pc.Ports)
-	pc.Debugf("using TCP connection timeout: %s", pc.Timeout)
+	pc.Debugf("using ports: tcp %v udp %v", pc.Ports, pc.UDPPorts)
+	pc.Debugf("using connection timeout: %s", pc.Timeout)
 
 	return nil
 }
 
 func (pc *PortCheck) Check() error {
+	mx, err := pc.collect()
+	if err != nil {
+		return err
+	}
+
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+
 	return nil
 }
 
@@ -95,6 +113,7 @@ func (pc *PortCheck) Collect() map[string]int64 {
 	if len(mx) == 0 {
 		return nil
 	}
+
 	return mx
 }
 

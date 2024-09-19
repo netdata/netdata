@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 )
 
 type confFile struct {

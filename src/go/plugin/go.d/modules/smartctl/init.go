@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
 func (s *Smartctl) validateConfig() error {

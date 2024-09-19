@@ -1143,6 +1143,7 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->host_os_detection);
         freez(system_info->host_cores);
         freez(system_info->host_cpu_freq);
+        freez(system_info->host_cpu_model);
         freez(system_info->host_ram_total);
         freez(system_info->host_disk_space);
         freez(system_info->container_os_name);
@@ -1338,6 +1339,7 @@ struct rrdhost_system_info *rrdhost_labels_to_system_info(RRDLABELS *labels) {
     rrdlabels_get_value_strdup_or_null(labels, &info->kernel_version, "_kernel_version");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_cores, "_system_cores");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_cpu_freq, "_system_cpu_freq");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_cpu_model, "_system_cpu_model");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_ram_total, "_system_ram_total");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_disk_space, "_system_disk_space");
     rrdlabels_get_value_strdup_or_null(labels, &info->architecture, "_architecture");
@@ -1379,6 +1381,9 @@ static void rrdhost_load_auto_labels(void) {
 
     if (localhost->system_info->host_cpu_freq)
         rrdlabels_add(labels, "_system_cpu_freq", localhost->system_info->host_cpu_freq, RRDLABEL_SRC_AUTO);
+
+    if (localhost->system_info->host_cpu_model)
+        rrdlabels_add(labels, "_system_cpu_model", localhost->system_info->host_cpu_model, RRDLABEL_SRC_AUTO);
 
     if (localhost->system_info->host_ram_total)
         rrdlabels_add(labels, "_system_ram_total", localhost->system_info->host_ram_total, RRDLABEL_SRC_AUTO);
@@ -1604,6 +1609,10 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
         freez(system_info->host_cpu_freq);
         system_info->host_cpu_freq = strdupz(value);
     }
+    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_MODEL")){
+        freez(system_info->host_cpu_model);
+        system_info->host_cpu_model = strdupz(value);
+    } 
     else if(!strcmp(name, "NETDATA_SYSTEM_TOTAL_RAM")){
         freez(system_info->host_ram_total);
         system_info->host_ram_total = strdupz(value);
@@ -1641,8 +1650,6 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
         system_info->is_k8s_node = strdupz(value);
     }
     else if (!strcmp(name, "NETDATA_SYSTEM_CPU_VENDOR"))
-        return res;
-    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_MODEL"))
         return res;
     else if (!strcmp(name, "NETDATA_SYSTEM_CPU_DETECTION"))
         return res;

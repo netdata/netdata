@@ -14,7 +14,7 @@ type globMatcher string
 
 var (
 	errBadGlobPattern = errors.New("bad glob pattern")
-	erGlobPattern     = regexp.MustCompile(`(?s)^(?:[*?]|\[\^?([^\\-\]]|\\.|.-.)+\]|\\.|[^\*\?\\\[])*$`)
+	erGlobPattern     = regexp.MustCompile(`(?s)^(?:[*?]|\[\^?([^\\-\]]|\\.|.-.)+]|\\.|[^*?\\\[])*$`)
 )
 
 // NewGlobMatcher create a new matcher with glob format

@@ -33,8 +33,10 @@ typedef enum __attribute__((packed)) {
     FACET_KEY_OPTION_MAIN_TEXT      = (1 << 6), // full width and wrap
     FACET_KEY_OPTION_RICH_TEXT      = (1 << 7),
     FACET_KEY_OPTION_REORDER        = (1 << 8), // give the key a new order id on first encounter
-    FACET_KEY_OPTION_TRANSFORM_VIEW = (1 << 9), // when registering the transformation, do it only at the view, not on all data
-    FACET_KEY_OPTION_EXPANDED_FILTER = (1 << 10), // the presentation should have this filter expanded by default
+    FACET_KEY_OPTION_REORDER_DONE   = (1 << 9), // done re-ordering for this field
+    FACET_KEY_OPTION_TRANSFORM_VIEW = (1 << 10), // when registering the transformation, do it only at the view, not on all data
+    FACET_KEY_OPTION_EXPANDED_FILTER = (1 << 11), // the presentation should have this filter expanded by default
+    FACET_KEY_OPTION_PRETTY_XML     = (1 << 12), // instruct the UI to parse this as an XML document
 } FACET_KEY_OPTIONS;
 
 typedef enum __attribute__((packed)) {
@@ -52,10 +54,18 @@ typedef struct facet_row_key_value {
     BUFFER *wb;
 } FACET_ROW_KEY_VALUE;
 
+typedef struct facet_row_bin_data {
+    void (*cleanup_cb)(void *data);
+    void *data;
+} FACET_ROW_BIN_DATA;
+
+#define FACET_ROW_BIN_DATA_EMPTY (FACET_ROW_BIN_DATA){.data = NULL, .cleanup_cb = NULL}
+
 typedef struct facet_row {
     usec_t usec;
     DICTIONARY *dict;
     FACET_ROW_SEVERITY severity;
+    FACET_ROW_BIN_DATA bin_data;
     struct facet_row *prev, *next;
 } FACET_ROW;
 
@@ -131,5 +141,11 @@ uint32_t facets_rows(FACETS *facets);
 void facets_table_config(BUFFER *wb);
 
 const char *facets_severity_to_string(FACET_ROW_SEVERITY severity);
+
+typedef bool (*facets_foreach_selected_value_in_key_t)(FACETS *facets, size_t id, const char *key, const char *value, void *data);
+bool facets_foreach_selected_value_in_key(FACETS *facets, const char *key, size_t key_length, DICTIONARY *used_hashes_registry, facets_foreach_selected_value_in_key_t cb, void *data);
+
+void facets_row_bin_data_set(FACETS *facets, void (*cleanup_cb)(void *data), void *data);
+void *facets_row_bin_data_get(FACETS *facets __maybe_unused, FACET_ROW *row);
 
 #endif

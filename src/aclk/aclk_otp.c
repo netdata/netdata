@@ -4,7 +4,7 @@
 #include "aclk_util.h"
 #include "aclk.h"
 
-static int aclk_https_request(https_req_t *request, https_req_response_t *response) {
+static int aclk_https_request(https_req_t *request, https_req_response_t *response, bool *fallback_ipv4) {
     int rc;
     // wrapper for ACLK only which loads ACLK specific proxy settings
     // then only calls https_request
@@ -18,7 +18,7 @@ static int aclk_https_request(https_req_t *request, https_req_response_t *respon
         request->proxy_password = proxy_conf.password;
     }
 
-    rc = https_request(request, response);
+    rc = https_request(request, response, fallback_ipv4);
     freez((char*)proxy_conf.host);
     freez((char*)proxy_conf.username);
     freez((char*)proxy_conf.password);
@@ -303,7 +303,7 @@ inline static int base64_decode_helper(unsigned char *out, int *outl, const unsi
 }
 
 #define OTP_URL_PREFIX "/api/v1/auth/node/"
-int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **challenge, int *challenge_bytes)
+int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **challenge, int *challenge_bytes, bool *fallback_ipv4)
 {
     int rc = 1;
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
@@ -316,7 +316,7 @@ int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **
     buffer_sprintf(url, "%s/node/%s/challenge", target->path, agent_id);
     req.url = (char *)buffer_tostring(url);
 
-    if (aclk_https_request(&req, &resp)) {
+    if (aclk_https_request(&req, &resp, fallback_ipv4)) {
         netdata_log_error("ACLK_OTP Challenge failed");
         buffer_free(url);
         return 1;
@@ -373,7 +373,7 @@ cleanup_resp:
     return rc;
 }
 
-int aclk_send_otp_response(const char *agent_id, const unsigned char *response, int response_bytes, url_t *target, struct auth_data *mqtt_auth)
+int aclk_send_otp_response(const char *agent_id, const unsigned char *response, int response_bytes, url_t *target, struct auth_data *mqtt_auth, bool *fallback_ipv4)
 {
     int len;
     int rc = 1;
@@ -399,7 +399,7 @@ int aclk_send_otp_response(const char *agent_id, const unsigned char *response, 
     req.payload = (char *)buffer_tostring(resp_json);
     req.payload_size = strlen(req.payload);
 
-    if (aclk_https_request(&req, &resp)) {
+    if (aclk_https_request(&req, &resp, fallback_ipv4)) {
         netdata_log_error("ACLK_OTP Password error trying to post result to password");
         goto cleanup_buffers;
     }
@@ -475,9 +475,9 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
 }
 
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
-int aclk_get_mqtt_otp(EVP_PKEY *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target)
+int aclk_get_mqtt_otp(EVP_PKEY *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target, bool *fallback_ipv4)
 #else
-int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target)
+int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_pass, url_t *target, bool *fallback_ipv4)
 #endif
 {
     unsigned char *challenge = NULL;
@@ -490,7 +490,7 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     }
 
     // Get Challenge
-    if (aclk_get_otp_challenge(target, claim_id.str, &challenge, &challenge_bytes)) {
+    if (aclk_get_otp_challenge(target, claim_id.str, &challenge, &challenge_bytes, fallback_ipv4)) {
         netdata_log_error("Error getting challenge");
         return 1;
     }
@@ -508,7 +508,7 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
 
     // Encode and Send Challenge
     struct auth_data data = { .client_id = NULL, .passwd = NULL, .username = NULL };
-    if (aclk_send_otp_response(claim_id.str, response_plaintext, response_plaintext_bytes, target, &data)) {
+    if (aclk_send_otp_response(claim_id.str, response_plaintext, response_plaintext_bytes, target, &data, fallback_ipv4)) {
         netdata_log_error("Error getting response");
         freez(response_plaintext);
         return 1;
@@ -814,7 +814,7 @@ exit:
     return 1;
 }
 
-int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
+int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port, bool *fallback_ipv4) {
     BUFFER *buf = buffer_create(1024, &netdata_buffers_statistics.buffers_aclk);
 
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
@@ -834,7 +834,7 @@ int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
     req.host = (char*)aclk_hostname;
     req.port = aclk_port;
     req.url = buf->buffer;
-    if (aclk_https_request(&req, &resp)) {
+    if (aclk_https_request(&req, &resp, fallback_ipv4)) {
         netdata_log_error("Error trying to contact env endpoint");
         https_req_response_free(&resp);
         buffer_free(buf);
