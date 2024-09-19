@@ -77,7 +77,6 @@ see the appropriate collector readme.
 | [dovecot](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/dovecot)                       |            Dovecot            |
 | [elasticsearch](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/elasticsearch)           |   Elasticsearch/OpenSearch    |
 | [envoy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/envoy)                           |             Envoy             |
-| [example](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/example)                       |               -               |
 | [exim](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/exim)                             |             Exim              |
 | [fail2ban](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/fail2ban)                     |        Fail2Ban Jails         |
 | [filecheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/filecheck)                   |     Files and Directories     |

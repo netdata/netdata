@@ -3,75 +3,92 @@
 package portcheck
 
 import (
+	"errors"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
-)
-
-type checkState string
-
-const (
-	checkStateSuccess checkState = "success"
-	checkStateTimeout checkState = "timeout"
-	checkStateFailed  checkState = "failed"
 )
 
 func (pc *PortCheck) collect() (map[string]int64, error) {
 	wg := &sync.WaitGroup{}
 
-	for _, p := range pc.ports {
+	for _, port := range pc.tcpPorts {
 		wg.Add(1)
-		go func(p *port) { pc.checkPort(p); wg.Done() }(p)
+		port := port
+		go func() { defer wg.Done(); pc.checkTCPPort(port) }()
 	}
+	for _, port := range pc.udpPorts {
+		wg.Add(1)
+		port := port
+		go func() { defer wg.Done(); pc.checkUDPPort(port) }()
+	}
+
 	wg.Wait()
 
 	mx := make(map[string]int64)
 
-	for _, p := range pc.ports {
-		mx[fmt.Sprintf("port_%d_current_state_duration", p.number)] = int64(p.inState)
-		mx[fmt.Sprintf("port_%d_latency", p.number)] = int64(p.latency)
-		mx[fmt.Sprintf("port_%d_%s", p.number, checkStateSuccess)] = 0
-		mx[fmt.Sprintf("port_%d_%s", p.number, checkStateTimeout)] = 0
-		mx[fmt.Sprintf("port_%d_%s", p.number, checkStateFailed)] = 0
-		mx[fmt.Sprintf("port_%d_%s", p.number, p.state)] = 1
+	now := time.Now()
+
+	for _, p := range pc.tcpPorts {
+		if !pc.seenTcpPorts[p.number] {
+			pc.seenTcpPorts[p.number] = true
+			pc.addTCPPortCharts(p)
+		}
+
+		px := fmt.Sprintf("tcp_port_%d_", p.number)
+
+		mx[px+"current_state_duration"] = int64(now.Sub(p.statusChangeTs).Seconds())
+		mx[px+"latency"] = int64(p.latency)
+		mx[px+tcpPortCheckStateSuccess] = 0
+		mx[px+tcpPortCheckStateTimeout] = 0
+		mx[px+tcpPortCheckStateFailed] = 0
+		mx[px+p.status] = 1
+	}
+
+	if pc.doUdpPorts {
+		for _, p := range pc.udpPorts {
+			if p.err != nil {
+				if isListenOpNotPermittedError(p.err) {
+					pc.doUdpPorts = false
+					break
+				}
+				continue
+			}
+
+			if !pc.seenUdpPorts[p.number] {
+				pc.seenUdpPorts[p.number] = true
+				pc.addUDPPortCharts(p)
+			}
+
+			px := fmt.Sprintf("udp_port_%d_", p.number)
+
+			mx[px+"current_status_duration"] = int64(now.Sub(p.statusChangeTs).Seconds())
+			mx[px+udpPortCheckStateOpenFiltered] = 0
+			mx[px+udpPortCheckStateClosed] = 0
+			mx[px+p.status] = 1
+		}
 	}
 
 	return mx, nil
 }
 
-func (pc *PortCheck) checkPort(p *port) {
-	start := time.Now()
-	conn, err := pc.dial("tcp", fmt.Sprintf("%s:%d", pc.Host, p.number), pc.Timeout.Duration())
-	dur := time.Since(start)
-
-	defer func() {
-		if conn != nil {
-			_ = conn.Close()
-		}
-	}()
-
-	if err != nil {
-		v, ok := err.(interface{ Timeout() bool })
-		if ok && v.Timeout() {
-			pc.setPortState(p, checkStateTimeout)
-		} else {
-			pc.setPortState(p, checkStateFailed)
-		}
-		return
-	}
-	pc.setPortState(p, checkStateSuccess)
-	p.latency = durationToMs(dur)
-}
-
-func (pc *PortCheck) setPortState(p *port, s checkState) {
-	if p.state != s {
-		p.inState = pc.UpdateEvery
-		p.state = s
-	} else {
-		p.inState += pc.UpdateEvery
-	}
+func (pc *PortCheck) address(port int) string {
+	// net.JoinHostPort expects literal IPv6 address, it adds []
+	host := strings.Trim(pc.Host, "[]")
+	return net.JoinHostPort(host, strconv.Itoa(port))
 }
 
 func durationToMs(duration time.Duration) int {
 	return int(duration) / (int(time.Millisecond) / int(time.Nanosecond))
+}
+
+func isListenOpNotPermittedError(err error) bool {
+	// icmp.ListenPacket failed (socket: operation not permitted)
+	var opErr *net.OpError
+	return errors.As(err, &opErr) &&
+		opErr.Op == "listen" &&
+		strings.Contains(opErr.Error(), "operation not permitted")
 }

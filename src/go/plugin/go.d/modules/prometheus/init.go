@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )

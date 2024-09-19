@@ -1,3 +1,9 @@
+@PKG_NAME@ (3-5) unstable; urgency=medium
+
+  * Swithc DEB packages to fetch repo metadata by hash.
+
+ -- Austin Hemmelgarn <austin@netdata.cloud>  Thu, 12 Sep 2024 07:27:00 -0400
+
 @PKG_NAME@ (3-4) unstable; urgency=medium
 
   * Convert sources to DEB822 format

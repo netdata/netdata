@@ -13,54 +13,103 @@ const (
 	prioCheckStatus = module.Priority + iota
 	prioCheckInStatusDuration
 	prioCheckLatency
+
+	prioUDPCheckStatus
+	prioUDPCheckInStatusDuration
 )
 
-var chartsTmpl = module.Charts{
-	checkStatusChartTmpl.Copy(),
-	checkInStateDurationChartTmpl.Copy(),
-	checkConnectionLatencyChartTmpl.Copy(),
+var tcpPortChartsTmpl = module.Charts{
+	tcpPortCheckStatusChartTmpl.Copy(),
+	tcpPortCheckInStateDurationChartTmpl.Copy(),
+	tcpPortCheckConnectionLatencyChartTmpl.Copy(),
 }
 
-var checkStatusChartTmpl = module.Chart{
-	ID:       "port_%d_status",
-	Title:    "TCP Check Status",
-	Units:    "boolean",
-	Fam:      "status",
-	Ctx:      "portcheck.status",
-	Priority: prioCheckStatus,
-	Dims: module.Dims{
-		{ID: "port_%d_success", Name: "success"},
-		{ID: "port_%d_failed", Name: "failed"},
-		{ID: "port_%d_timeout", Name: "timeout"},
-	},
+var udpPortChartsTmpl = module.Charts{
+	udpPortCheckStatusChartTmpl.Copy(),
+	udpPortCheckInStatusDurationChartTmpl.Copy(),
 }
 
-var checkInStateDurationChartTmpl = module.Chart{
-	ID:       "port_%d_current_state_duration",
-	Title:    "Current State Duration",
-	Units:    "seconds",
-	Fam:      "status duration",
-	Ctx:      "portcheck.state_duration",
-	Priority: prioCheckInStatusDuration,
-	Dims: module.Dims{
-		{ID: "port_%d_current_state_duration", Name: "time"},
-	},
+var (
+	tcpPortCheckStatusChartTmpl = module.Chart{
+		ID:       "port_%d_status",
+		Title:    "TCP Check Status",
+		Units:    "boolean",
+		Fam:      "status",
+		Ctx:      "portcheck.status",
+		Priority: prioCheckStatus,
+		Dims: module.Dims{
+			{ID: "tcp_port_%d_success", Name: "success"},
+			{ID: "tcp_port_%d_failed", Name: "failed"},
+			{ID: "tcp_port_%d_timeout", Name: "timeout"},
+		},
+	}
+	tcpPortCheckInStateDurationChartTmpl = module.Chart{
+		ID:       "port_%d_current_state_duration",
+		Title:    "Current State Duration",
+		Units:    "seconds",
+		Fam:      "status duration",
+		Ctx:      "portcheck.state_duration",
+		Priority: prioCheckInStatusDuration,
+		Dims: module.Dims{
+			{ID: "tcp_port_%d_current_state_duration", Name: "time"},
+		},
+	}
+	tcpPortCheckConnectionLatencyChartTmpl = module.Chart{
+		ID:       "port_%d_connection_latency",
+		Title:    "TCP Connection Latency",
+		Units:    "ms",
+		Fam:      "latency",
+		Ctx:      "portcheck.latency",
+		Priority: prioCheckLatency,
+		Dims: module.Dims{
+			{ID: "tcp_port_%d_latency", Name: "time"},
+		},
+	}
+)
+
+var (
+	udpPortCheckStatusChartTmpl = module.Chart{
+		ID:       "udp_port_%d_check_status",
+		Title:    "UDP Port Check Status",
+		Units:    "status",
+		Fam:      "status",
+		Ctx:      "portcheck.udp_port_status",
+		Priority: prioUDPCheckStatus,
+		Dims: module.Dims{
+			{ID: "udp_port_%d_open_filtered", Name: "open/filtered"},
+			{ID: "udp_port_%d_closed", Name: "closed"},
+		},
+	}
+	udpPortCheckInStatusDurationChartTmpl = module.Chart{
+		ID:       "udp_port_%d_current_status_duration",
+		Title:    "UDP Port Current Status Duration",
+		Units:    "seconds",
+		Fam:      "status duration",
+		Ctx:      "portcheck.udp_port_status_duration",
+		Priority: prioUDPCheckInStatusDuration,
+		Dims: module.Dims{
+			{ID: "udp_port_%d_current_status_duration", Name: "time"},
+		},
+	}
+)
+
+func (pc *PortCheck) addTCPPortCharts(port *tcpPort) {
+	charts := newPortCharts(pc.Host, port.number, tcpPortChartsTmpl.Copy())
+
+	if err := pc.Charts().Add(*charts...); err != nil {
+		pc.Warning(err)
+	}
 }
 
-var checkConnectionLatencyChartTmpl = module.Chart{
-	ID:       "port_%d_connection_latency",
-	Title:    "TCP Connection Latency",
-	Units:    "ms",
-	Fam:      "latency",
-	Ctx:      "portcheck.latency",
-	Priority: prioCheckLatency,
-	Dims: module.Dims{
-		{ID: "port_%d_latency", Name: "time"},
-	},
+func (pc *PortCheck) addUDPPortCharts(port *udpPort) {
+	charts := newPortCharts(pc.Host, port.number, udpPortChartsTmpl.Copy())
+
+	if err := pc.Charts().Add(*charts...); err != nil {
+		pc.Warning(err)
+	}
 }
 
-func newPortCharts(host string, port int) *module.Charts {
-	charts := chartsTmpl.Copy()
+func newPortCharts(host string, port int, charts *module.Charts) *module.Charts {
 	for _, chart := range *charts {
 		chart.Labels = []module.Label{
 			{Key: "host", Value: host},

@@ -156,8 +156,10 @@ option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
 cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
+cmake_dependent_option(ENABLE_PLUGIN_CHARTS "Enable metric collectors written in Bash" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 cmake_dependent_option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 
 cmake_dependent_option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD" False)
@@ -792,6 +794,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/facets/logs_query_status.h
         src/libnetdata/os/timestamps.c
         src/libnetdata/os/timestamps.h
+        src/libnetdata/parsers/entries.c
+        src/libnetdata/parsers/entries.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1409,6 +1413,12 @@ set(WINDOWS_EVENTS_PLUGIN_FILES
         src/collectors/windows-events.plugin/windows-events-unicode.h
         src/collectors/windows-events.plugin/windows-events-xml.c
         src/collectors/windows-events.plugin/windows-events-xml.h
+        src/collectors/windows-events.plugin/windows-events-publishers.c
+        src/collectors/windows-events.plugin/windows-events-publishers.h
+        src/collectors/windows-events.plugin/windows-events-fields-cache.c
+        src/collectors/windows-events.plugin/windows-events-fields-cache.h
+        src/collectors/windows-events.plugin/windows-events-query-builder.c
+        src/collectors/windows-events.plugin/windows-events-query-builder.h
 )
 
 set(WINDOWS_PLUGIN_FILES
@@ -2482,9 +2492,7 @@ install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/cloud.d)
 install(DIRECTORY COMPONENT netdata DESTINATION var/run/netdata)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/custom-plugins.d)
-install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/go.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/health.d)
-install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/python.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/ssl)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/statsd.d)
 install(DIRECTORY COMPONENT netdata DESTINATION usr/lib/netdata/conf.d)
@@ -2839,60 +2847,66 @@ endif()
 # charts.d plugin
 #
 
-install(DIRECTORY COMPONENT plugin-chartsd DESTINATION etc/netdata/charts.d)
+if(ENABLE_PLUGIN_CHARTS)
+  install(DIRECTORY COMPONENT plugin-chartsd DESTINATION etc/netdata/charts.d)
 
-configure_file(src/collectors/charts.d.plugin/charts.d.plugin.in src/collectors/charts.d.plugin/charts.d.plugin @ONLY)
-install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/src/collectors/charts.d.plugin/charts.d.plugin
-        COMPONENT plugin-chartsd
-        DESTINATION usr/libexec/netdata/plugins.d)
+  configure_file(src/collectors/charts.d.plugin/charts.d.plugin.in src/collectors/charts.d.plugin/charts.d.plugin @ONLY)
+  install(PROGRAMS
+          ${CMAKE_BINARY_DIR}/src/collectors/charts.d.plugin/charts.d.plugin
+          COMPONENT plugin-chartsd
+          DESTINATION usr/libexec/netdata/plugins.d)
 
-install(PROGRAMS
-        src/collectors/charts.d.plugin/charts.d.dryrun-helper.sh
-        COMPONENT plugin-chartsd
-        DESTINATION usr/libexec/netdata/plugins.d)
+  install(PROGRAMS
+          src/collectors/charts.d.plugin/charts.d.dryrun-helper.sh
+          COMPONENT plugin-chartsd
+          DESTINATION usr/libexec/netdata/plugins.d)
 
-# loopsleepms is used by the tc.plugin -> ship it in the netdata component
-install(FILES
-        src/collectors/charts.d.plugin/loopsleepms.sh.inc
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata/plugins.d)
+  install(FILES
+          src/collectors/charts.d.plugin/charts.d.conf
+          COMPONENT plugin-chartsd
+          DESTINATION usr/lib/netdata/conf.d)
 
-install(FILES
-        src/collectors/charts.d.plugin/charts.d.conf
-        COMPONENT plugin-chartsd
-        DESTINATION usr/lib/netdata/conf.d)
+  install(PROGRAMS
+          src/collectors/charts.d.plugin/example/example.chart.sh
+          src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
+          src/collectors/charts.d.plugin/opensips/opensips.chart.sh
+          COMPONENT plugin-chartsd
+          DESTINATION usr/libexec/netdata/charts.d)
 
-install(PROGRAMS
-        src/collectors/charts.d.plugin/example/example.chart.sh
-        src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
-        src/collectors/charts.d.plugin/opensips/opensips.chart.sh
-        COMPONENT plugin-chartsd
-        DESTINATION usr/libexec/netdata/charts.d)
+  install(FILES
+          src/collectors/charts.d.plugin/example/example.conf
+          src/collectors/charts.d.plugin/libreswan/libreswan.conf
+          src/collectors/charts.d.plugin/opensips/opensips.conf
+          COMPONENT plugin-chartsd
+          DESTINATION usr/lib/netdata/conf.d/charts.d)
 
-install(FILES
-        src/collectors/charts.d.plugin/example/example.conf
-        src/collectors/charts.d.plugin/libreswan/libreswan.conf
-        src/collectors/charts.d.plugin/opensips/opensips.conf
-        COMPONENT plugin-chartsd
-        DESTINATION usr/lib/netdata/conf.d/charts.d)
+  if(BUILD_FOR_PACKAGING)
+    install(FILES
+            ${PKG_FILES_PATH}/copyright
+            COMPONENT plugin-chartsd
+            DESTINATION usr/share/doc/netdata-plugin-chartsd)
+  endif()
+endif()
 
-if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-chartsd
-                DESTINATION usr/share/doc/netdata-plugin-chartsd)
+# This is needed both by the TC plugin (which only gets built on Linux) and the charts plugin.
+if(OS_LINUX OR ENABLE_PLUGIN_CHARTS)
+  install(FILES
+          src/collectors/charts.d.plugin/loopsleepms.sh.inc
+          COMPONENT netdata
+          DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
 #
 # tc-qos-helper
 #
 
-configure_file(src/collectors/tc.plugin/tc-qos-helper.sh.in src/collectors/tc.plugin/tc-qos-helper.sh @ONLY)
-install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/src/collectors/tc.plugin/tc-qos-helper.sh
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata/plugins.d)
+if(OS_LINUX)
+  configure_file(src/collectors/tc.plugin/tc-qos-helper.sh.in src/collectors/tc.plugin/tc-qos-helper.sh @ONLY)
+  install(PROGRAMS
+          ${CMAKE_BINARY_DIR}/src/collectors/tc.plugin/tc-qos-helper.sh
+          COMPONENT netdata
+          DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 
 # confs
 install(FILES
@@ -2905,52 +2919,56 @@ install(FILES
 # python.d plugin
 #
 
-configure_file(src/collectors/python.d.plugin/python.d.plugin.in src/collectors/python.d.plugin/python.d.plugin @ONLY)
-install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/python.d.plugin/python.d.plugin
-        COMPONENT plugin-pythond
-        DESTINATION usr/libexec/netdata/plugins.d)
+if(ENABLE_PLUGIN_PYTHON)
+  install(DIRECTORY COMPONENT plugin-pythond DESTINATION etc/netdata/python.d)
 
-install(DIRECTORY src/collectors/python.d.plugin/python_modules
-        COMPONENT plugin-pythond
-        DESTINATION usr/libexec/netdata/python.d)
+  configure_file(src/collectors/python.d.plugin/python.d.plugin.in src/collectors/python.d.plugin/python.d.plugin @ONLY)
+  install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/python.d.plugin/python.d.plugin
+          COMPONENT plugin-pythond
+          DESTINATION usr/libexec/netdata/plugins.d)
 
-install(FILES src/collectors/python.d.plugin/python.d.conf
-        COMPONENT plugin-pythond
-        DESTINATION usr/lib/netdata/conf.d)
+  install(DIRECTORY src/collectors/python.d.plugin/python_modules
+          COMPONENT plugin-pythond
+          DESTINATION usr/libexec/netdata/python.d)
 
-install(FILES
-        src/collectors/python.d.plugin/am2320/am2320.conf
-        src/collectors/python.d.plugin/ceph/ceph.conf
-        src/collectors/python.d.plugin/go_expvar/go_expvar.conf
-        src/collectors/python.d.plugin/haproxy/haproxy.conf
-        src/collectors/python.d.plugin/openldap/openldap.conf
-        src/collectors/python.d.plugin/oracledb/oracledb.conf
-        src/collectors/python.d.plugin/pandas/pandas.conf
-        src/collectors/python.d.plugin/spigotmc/spigotmc.conf
-        src/collectors/python.d.plugin/traefik/traefik.conf
-        src/collectors/python.d.plugin/zscores/zscores.conf
-        COMPONENT plugin-pythond
-        DESTINATION usr/lib/netdata/conf.d/python.d)
+  install(FILES src/collectors/python.d.plugin/python.d.conf
+          COMPONENT plugin-pythond
+          DESTINATION usr/lib/netdata/conf.d)
 
-install(FILES
-        src/collectors/python.d.plugin/am2320/am2320.chart.py
-        src/collectors/python.d.plugin/ceph/ceph.chart.py
-        src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
-        src/collectors/python.d.plugin/haproxy/haproxy.chart.py
-        src/collectors/python.d.plugin/openldap/openldap.chart.py
-        src/collectors/python.d.plugin/oracledb/oracledb.chart.py
-        src/collectors/python.d.plugin/pandas/pandas.chart.py
-        src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
-        src/collectors/python.d.plugin/traefik/traefik.chart.py
-        src/collectors/python.d.plugin/zscores/zscores.chart.py
-        COMPONENT plugin-pythond
-        DESTINATION usr/libexec/netdata/python.d)
+  install(FILES
+          src/collectors/python.d.plugin/am2320/am2320.conf
+          src/collectors/python.d.plugin/ceph/ceph.conf
+          src/collectors/python.d.plugin/go_expvar/go_expvar.conf
+          src/collectors/python.d.plugin/haproxy/haproxy.conf
+          src/collectors/python.d.plugin/openldap/openldap.conf
+          src/collectors/python.d.plugin/oracledb/oracledb.conf
+          src/collectors/python.d.plugin/pandas/pandas.conf
+          src/collectors/python.d.plugin/spigotmc/spigotmc.conf
+          src/collectors/python.d.plugin/traefik/traefik.conf
+          src/collectors/python.d.plugin/zscores/zscores.conf
+          COMPONENT plugin-pythond
+          DESTINATION usr/lib/netdata/conf.d/python.d)
 
-if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-pythond
-                DESTINATION usr/share/doc/netdata-plugin-pythond)
+  install(FILES
+          src/collectors/python.d.plugin/am2320/am2320.chart.py
+          src/collectors/python.d.plugin/ceph/ceph.chart.py
+          src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
+          src/collectors/python.d.plugin/haproxy/haproxy.chart.py
+          src/collectors/python.d.plugin/openldap/openldap.chart.py
+          src/collectors/python.d.plugin/oracledb/oracledb.chart.py
+          src/collectors/python.d.plugin/pandas/pandas.chart.py
+          src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
+          src/collectors/python.d.plugin/traefik/traefik.chart.py
+          src/collectors/python.d.plugin/zscores/zscores.chart.py
+          COMPONENT plugin-pythond
+          DESTINATION usr/libexec/netdata/python.d)
+
+  if(BUILD_FOR_PACKAGING)
+    install(FILES
+            ${PKG_FILES_PATH}/copyright
+            COMPONENT plugin-pythond
+            DESTINATION usr/share/doc/netdata-plugin-pythond)
+  endif()
 endif()
 
 #
@@ -2966,6 +2984,8 @@ install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
 # go.d.plugin
 #
 if(ENABLE_PLUGIN_GO)
+    install(DIRECTORY COMPONENT plugin-go DESTINATION etc/netdata/go.d)
+
     install(FILES src/go/plugin/go.d/config/go.d.conf
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d)

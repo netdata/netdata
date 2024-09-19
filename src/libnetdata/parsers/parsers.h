@@ -5,6 +5,7 @@
 
 #include "../libnetdata.h"
 #include "size.h"
+#include "entries.h"
 #include "duration.h"
 #include "timeframe.h"
 
