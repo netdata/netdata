@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package example
+package testrandom
 
 import (
 	"os"
@@ -26,23 +26,15 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestExample_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Example{}, dataConfigJSON, dataConfigYAML)
+func TestTestRandom_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &TestRandom{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
-	// We want to ensure that module is a reference type, nothing more.
-
-	assert.IsType(t, (*Example)(nil), New())
+	assert.IsType(t, (*TestRandom)(nil), New())
 }
 
-func TestExample_Init(t *testing.T) {
-	// 'Init() bool' initializes the module with an appropriate config, so to test it we need:
-	// - provide the config.
-	// - set module.Config field with the config.
-	// - call Init() and compare its return value with the expected value.
-
-	// 'test' map contains different test cases.
+func TestTestRandom_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -113,106 +105,87 @@ func TestExample_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			example := New()
-			example.Config = test.config
+			tr := New()
+			tr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, example.Init())
+				assert.Error(t, tr.Init())
 			} else {
-				assert.NoError(t, example.Init())
+				assert.NoError(t, tr.Init())
 			}
 		})
 	}
 }
 
-func TestExample_Check(t *testing.T) {
-	// 'Check() bool' reports whether the module is able to collect any data, so to test it we need:
-	// - provide the module with a specific config.
-	// - initialize the module (call Init()).
-	// - call Check() and compare its return value with the expected value.
-
-	// 'test' map contains different test cases.
+func TestTestRandom_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *Example
+		prepare  func() *TestRandom
 		wantFail bool
 	}{
-		"success on default":                            {prepare: prepareExampleDefault},
-		"success when only 'charts' set":                {prepare: prepareExampleOnlyCharts},
-		"success when only 'hidden_charts' set":         {prepare: prepareExampleOnlyHiddenCharts},
-		"success when 'charts' and 'hidden_charts' set": {prepare: prepareExampleChartsAndHiddenCharts},
+		"success on default":                            {prepare: prepareTRDefault},
+		"success when only 'charts' set":                {prepare: prepareTROnlyCharts},
+		"success when only 'hidden_charts' set":         {prepare: prepareTROnlyHiddenCharts},
+		"success when 'charts' and 'hidden_charts' set": {prepare: prepareTRChartsAndHiddenCharts},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			example := test.prepare()
-			require.NoError(t, example.Init())
+			tr := test.prepare()
+			require.NoError(t, tr.Init())
 
 			if test.wantFail {
-				assert.Error(t, example.Check())
+				assert.Error(t, tr.Check())
 			} else {
-				assert.NoError(t, example.Check())
+				assert.NoError(t, tr.Check())
 			}
 		})
 	}
 }
 
-func TestExample_Charts(t *testing.T) {
-	// We want to ensure that initialized module does not return 'nil'.
-	// If it is not 'nil' we are ok.
-
-	// 'test' map contains different test cases.
+func TestTestRandom_Charts(t *testing.T) {
 	tests := map[string]struct {
-		prepare func(t *testing.T) *Example
+		prepare func(t *testing.T) *TestRandom
 		wantNil bool
 	}{
 		"not initialized collector": {
 			wantNil: true,
-			prepare: func(t *testing.T) *Example {
+			prepare: func(t *testing.T) *TestRandom {
 				return New()
 			},
 		},
 		"initialized collector": {
-			prepare: func(t *testing.T) *Example {
-				example := New()
-				require.NoError(t, example.Init())
-				return example
+			prepare: func(t *testing.T) *TestRandom {
+				tr := New()
+				require.NoError(t, tr.Init())
+				return tr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			example := test.prepare(t)
+			tr := test.prepare(t)
 
 			if test.wantNil {
-				assert.Nil(t, example.Charts())
+				assert.Nil(t, tr.Charts())
 			} else {
-				assert.NotNil(t, example.Charts())
+				assert.NotNil(t, tr.Charts())
 			}
 		})
 	}
 }
 
-func TestExample_Cleanup(t *testing.T) {
-	// Since this module has nothing to clean up,
-	// we want just to ensure that Cleanup() not panics.
-
+func TestTestRandom_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestExample_Collect(t *testing.T) {
-	// 'Collect() map[string]int64' returns collected data, so to test it we need:
-	// - provide the module with a specific config.
-	// - initialize the module (call Init()).
-	// - call Collect() and compare its return value with the expected value.
-
-	// 'test' map contains different test cases.
+func TestTestRandom_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() *Example
+		prepare       func() *TestRandom
 		wantCollected map[string]int64
 	}{
 		"default config": {
-			prepare: prepareExampleDefault,
+			prepare: prepareTRDefault,
 			wantCollected: map[string]int64{
 				"random_0_random0": 1,
 				"random_0_random1": -1,
@@ -221,7 +194,7 @@ func TestExample_Collect(t *testing.T) {
 			},
 		},
 		"only 'charts' set": {
-			prepare: prepareExampleOnlyCharts,
+			prepare: prepareTROnlyCharts,
 			wantCollected: map[string]int64{
 				"random_0_random0": 1,
 				"random_0_random1": -1,
@@ -236,7 +209,7 @@ func TestExample_Collect(t *testing.T) {
 			},
 		},
 		"only 'hidden_charts' set": {
-			prepare: prepareExampleOnlyHiddenCharts,
+			prepare: prepareTROnlyHiddenCharts,
 			wantCollected: map[string]int64{
 				"hidden_random_0_random0": 1,
 				"hidden_random_0_random1": -1,
@@ -251,7 +224,7 @@ func TestExample_Collect(t *testing.T) {
 			},
 		},
 		"'charts' and 'hidden_charts' set": {
-			prepare: prepareExampleChartsAndHiddenCharts,
+			prepare: prepareTRChartsAndHiddenCharts,
 			wantCollected: map[string]int64{
 				"hidden_random_0_random0": 1,
 				"hidden_random_0_random1": -1,
@@ -279,41 +252,23 @@ func TestExample_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			example := test.prepare()
-			require.NoError(t, example.Init())
+			tr := test.prepare()
+			require.NoError(t, tr.Init())
 
-			collected := example.Collect()
+			mx := tr.Collect()
 
-			assert.Equal(t, test.wantCollected, collected)
-			ensureCollectedHasAllChartsDimsVarsIDs(t, example, collected)
+			assert.Equal(t, test.wantCollected, mx)
+			module.TestMetricsHasAllChartsDims(t, tr.Charts(), mx)
 		})
 	}
 }
 
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, e *Example, collected map[string]int64) {
-	for _, chart := range *e.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok,
-				"collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok,
-				"collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
-	}
+func prepareTRDefault() *TestRandom {
+	return prepareTR(New().Config)
 }
 
-func prepareExampleDefault() *Example {
-	return prepareExample(New().Config)
-}
-
-func prepareExampleOnlyCharts() *Example {
-	return prepareExample(Config{
+func prepareTROnlyCharts() *TestRandom {
+	return prepareTR(Config{
 		Charts: ConfigCharts{
 			Num:  2,
 			Dims: 5,
@@ -321,8 +276,8 @@ func prepareExampleOnlyCharts() *Example {
 	})
 }
 
-func prepareExampleOnlyHiddenCharts() *Example {
-	return prepareExample(Config{
+func prepareTROnlyHiddenCharts() *TestRandom {
+	return prepareTR(Config{
 		HiddenCharts: ConfigCharts{
 			Num:  2,
 			Dims: 5,
@@ -330,8 +285,8 @@ func prepareExampleOnlyHiddenCharts() *Example {
 	})
 }
 
-func prepareExampleChartsAndHiddenCharts() *Example {
-	return prepareExample(Config{
+func prepareTRChartsAndHiddenCharts() *TestRandom {
+	return prepareTR(Config{
 		Charts: ConfigCharts{
 			Num:  2,
 			Dims: 5,
@@ -343,9 +298,9 @@ func prepareExampleChartsAndHiddenCharts() *Example {
 	})
 }
 
-func prepareExample(cfg Config) *Example {
-	example := New()
-	example.Config = cfg
-	example.randInt = func() int64 { return 1 }
-	return example
+func prepareTR(cfg Config) *TestRandom {
+	tr := New()
+	tr.Config = cfg
+	tr.randInt = func() int64 { return 1 }
+	return tr
 }

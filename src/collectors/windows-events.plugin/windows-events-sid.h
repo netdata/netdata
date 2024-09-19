@@ -7,5 +7,6 @@
 
 struct wevt_log;
 bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst);
+void sid_cache_init(void);
 
 #endif //NETDATA_WINDOWS_EVENTS_SID_H

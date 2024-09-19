@@ -10,7 +10,7 @@ list(APPEND DEB_DISTROS debian ubuntu)
 set(DEB_GPG_KEY_SOURCE "https://repo.netdata.cloud/netdatabot.gpg.key")
 
 set(PACKAGE_VERSION 3)
-set(PACKAGE_RELEASE 4)
+set(PACKAGE_RELEASE 5)
 
 set(CPACK_THREADS 0)
 set(CPACK_STRIP_FILES NO)

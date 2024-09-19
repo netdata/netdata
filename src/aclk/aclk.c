@@ -566,6 +566,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
     url_t mqtt_url;
 #endif
 
+    bool fallback_ipv4 = false;
     while (service_running(SERVICE_ACLK)) {
         aclk_cloud_base_url = cloud_config_url_get();
         if (aclk_cloud_base_url == NULL) {
@@ -612,7 +613,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         }
         aclk_env = callocz(1, sizeof(aclk_env_t));
 
-        ret = aclk_get_env(aclk_env, base_url.host, base_url.port);
+        ret = aclk_get_env(aclk_env, base_url.host, base_url.port, &fallback_ipv4);
         url_t_destroy(&base_url);
         if(ret) switch(ret) {
             case 1:
@@ -680,7 +681,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             continue;
         }
 
-        ret = aclk_get_mqtt_otp(aclk_private_key, (char **)&mqtt_conn_params.clientid, (char **)&mqtt_conn_params.username, (char **)&mqtt_conn_params.password, &auth_url);
+        ret = aclk_get_mqtt_otp(aclk_private_key, (char **)&mqtt_conn_params.clientid, (char **)&mqtt_conn_params.username, (char **)&mqtt_conn_params.password, &auth_url, &fallback_ipv4);
         url_t_destroy(&auth_url);
         if (ret) {
             aclk_status = ACLK_STATUS_INVALID_OTP;
@@ -725,7 +726,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         ret = mqtt_wss_connect(client, base_url.host, base_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf);
         url_t_destroy(&base_url);
 #else
-        ret = mqtt_wss_connect(client, mqtt_url.host, mqtt_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf);
+        ret = mqtt_wss_connect(client, mqtt_url.host, mqtt_url.port, &mqtt_conn_params, ACLK_SSL_FLAGS, &proxy_conf, &fallback_ipv4);
         url_t_destroy(&mqtt_url);
 
         freez((char*)mqtt_conn_params.clientid);
@@ -744,6 +745,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             aclk_status = ACLK_STATUS_CONNECTED;
             nd_log(NDLS_ACCESS, NDLP_INFO, "ACLK CONNECTED");
             mqtt_connected_actions(client);
+            fallback_ipv4 = false;
             return 0;
         }
 

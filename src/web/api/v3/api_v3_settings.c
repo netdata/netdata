@@ -219,7 +219,7 @@ static inline bool is_settings_file_valid(char *file) {
         return false;
 
     while(*s) {
-        if(!isalnum(*s) && *s != '-' && *s != '_')
+        if(!isalnum((uint8_t)*s) && *s != '-' && *s != '_')
             return false;
         s++;
     }

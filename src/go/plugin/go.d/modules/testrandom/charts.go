@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package example
+package testrandom
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ var chartTemplate = module.Chart{
 	Title: "A Random Number",
 	Units: "random",
 	Fam:   "random",
-	Ctx:   "example.random",
+	Ctx:   "testrandom.random",
 }
 
 var hiddenChartTemplate = module.Chart{
@@ -21,7 +21,7 @@ var hiddenChartTemplate = module.Chart{
 	Title: "A Random Number",
 	Units: "random",
 	Fam:   "random",
-	Ctx:   "example.random",
+	Ctx:   "testrandom.random",
 	Opts: module.Opts{
 		Hidden: true,
 	},
@@ -36,8 +36,8 @@ func newChart(num, ctx, labels int, typ module.ChartType) *module.Chart {
 	}
 	for i := 0; i < labels; i++ {
 		chart.Labels = append(chart.Labels, module.Label{
-			Key:   fmt.Sprintf("example_name_%d", i),
-			Value: fmt.Sprintf("example_value_%d_%d", num, i),
+			Key:   fmt.Sprintf("random_name_%d", i),
+			Value: fmt.Sprintf("random_value_%d_%d", num, i),
 		})
 	}
 	return chart
@@ -52,8 +52,8 @@ func newHiddenChart(num, ctx, labels int, typ module.ChartType) *module.Chart {
 	}
 	for i := 0; i < labels; i++ {
 		chart.Labels = append(chart.Labels, module.Label{
-			Key:   fmt.Sprintf("example_name_%d", i),
-			Value: fmt.Sprintf("example_value_%d_%d", num, i),
+			Key:   fmt.Sprintf("random_name_%d", i),
+			Value: fmt.Sprintf("random_value_%d_%d", num, i),
 		})
 	}
 	return chart

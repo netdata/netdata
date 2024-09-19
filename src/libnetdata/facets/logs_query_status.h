@@ -107,7 +107,14 @@ typedef struct {
     struct {
         usec_t start_ut;
         usec_t stop_ut;
+        usec_t delta_ut;
     } anchor;
+
+    struct {
+        usec_t start_ut;
+        usec_t stop_ut;
+        bool stop_when_full;
+    } query;
 
     usec_t last_modified;
 
@@ -142,6 +149,21 @@ static inline void lqs_log_error(LOGS_QUERY_STATUS *lqs, const char *msg) {
            , lqs->rq.delta ? "true" : "false"
            , lqs->rq.tail ? "tail" : "false"
            , lqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
+}
+
+static inline void lqs_query_timeframe(LOGS_QUERY_STATUS *lqs, usec_t anchor_delta_ut) {
+    lqs->anchor.delta_ut = anchor_delta_ut;
+
+    if(lqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD) {
+        lqs->query.start_ut = (lqs->rq.data_only && lqs->anchor.start_ut) ? lqs->anchor.start_ut : lqs->rq.after_ut;
+        lqs->query.stop_ut = ((lqs->rq.data_only && lqs->anchor.stop_ut) ? lqs->anchor.stop_ut : lqs->rq.before_ut) + lqs->anchor.delta_ut;
+    }
+    else {
+        lqs->query.start_ut = ((lqs->rq.data_only && lqs->anchor.start_ut) ? lqs->anchor.start_ut : lqs->rq.before_ut) + lqs->anchor.delta_ut;
+        lqs->query.stop_ut = (lqs->rq.data_only && lqs->anchor.stop_ut) ? lqs->anchor.stop_ut : lqs->rq.after_ut;
+    }
+
+    lqs->query.stop_when_full = (lqs->rq.data_only && !lqs->anchor.stop_ut);
 }
 
 static inline void lqs_function_help(LOGS_QUERY_STATUS *lqs, BUFFER *wb) {

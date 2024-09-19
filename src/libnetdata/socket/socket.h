@@ -33,7 +33,14 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets);
 void listen_sockets_close(LISTEN_SOCKETS *sockets);
 
 void foreach_entry_in_connection_string(const char *destination, bool (*callback)(char *entry, void *data), void *data);
-int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout);
+int connect_to_this_ip46(
+    int protocol,
+    int socktype,
+    const char *host,
+    uint32_t scope_id,
+    const char *service,
+    struct timeval *timeout,
+    bool *fallback_ipv4);
 int connect_to_this(const char *definition, int default_port, struct timeval *timeout);
 int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
 int connect_to_one_of_urls(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
@@ -44,7 +51,7 @@ ssize_t send_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int fla
 int wait_on_socket_or_cancel_with_timeout(NETDATA_SSL *ssl, int fd, int timeout_ms, short int poll_events, short int *revents);
 
 bool fd_is_socket(int fd);
-bool sock_has_output_error(int fd);
+bool is_socket_closed(int fd);
 
 int sock_setnonblock(int fd);
 int sock_delnonblock(int fd);

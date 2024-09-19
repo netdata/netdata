@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package example
+package testrandom
 
 import (
 	"fmt"
@@ -8,40 +8,40 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-func (e *Example) collect() (map[string]int64, error) {
+func (tr *TestRandom) collect() (map[string]int64, error) {
 	collected := make(map[string]int64)
 
-	for _, chart := range *e.Charts() {
-		e.collectChart(collected, chart)
+	for _, chart := range *tr.Charts() {
+		tr.collectChart(collected, chart)
 	}
 	return collected, nil
 }
 
-func (e *Example) collectChart(collected map[string]int64, chart *module.Chart) {
+func (tr *TestRandom) collectChart(collected map[string]int64, chart *module.Chart) {
 	var num int
 	if chart.Opts.Hidden {
-		num = e.Config.HiddenCharts.Dims
+		num = tr.Config.HiddenCharts.Dims
 	} else {
-		num = e.Config.Charts.Dims
+		num = tr.Config.Charts.Dims
 	}
 
 	for i := 0; i < num; i++ {
 		name := fmt.Sprintf("random%d", i)
 		id := fmt.Sprintf("%s_%s", chart.ID, name)
 
-		if !e.collectedDims[id] {
-			e.collectedDims[id] = true
+		if !tr.collectedDims[id] {
+			tr.collectedDims[id] = true
 
 			dim := &module.Dim{ID: id, Name: name}
 			if err := chart.AddDim(dim); err != nil {
-				e.Warning(err)
+				tr.Warning(err)
 			}
 			chart.MarkNotCreated()
 		}
 		if i%2 == 0 {
-			collected[id] = e.randInt()
+			collected[id] = tr.randInt()
 		} else {
-			collected[id] = -e.randInt()
+			collected[id] = -tr.randInt()
 		}
 	}
 }

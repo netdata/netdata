@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
 func (b *Bind) validateConfig() error {

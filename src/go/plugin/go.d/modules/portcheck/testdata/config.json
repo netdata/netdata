@@ -4,5 +4,8 @@
   "ports": [
     123
   ],
+  "udp_ports": [
+    123
+  ],
   "timeout": 123.123
 }
