@@ -75,10 +75,13 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         time_t needed = now + rc->config.before + rc->config.after;
 
         if(needed + update_every < first || needed - update_every > last) {
-            netdata_log_debug(D_HEALTH
-                              , "Health not examining alarm '%s.%s' yet (not enough data yet - we need %lu but got %lu - %lu)."
-                              , rrdcalc_chart_name(rc), rrdcalc_name(rc), (unsigned long) needed, (unsigned long) first
-                              , (unsigned long) last);
+            netdata_log_info(
+                "Health not examining alarm '%s.%s' yet (not enough data yet - we need %lu but got %lu - %lu).",
+                rrdcalc_chart_name(rc),
+                rrdcalc_name(rc),
+                (unsigned long) needed,
+                (unsigned long) first,
+                (unsigned long) last);
             return 0;
         }
     }
