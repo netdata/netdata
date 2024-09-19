@@ -6,11 +6,17 @@
 
 **Merged pull requests:**
 
+- go.d move packages [\#18580](https://github.com/netdata/netdata/pull/18580) ([ilyam8](https://github.com/ilyam8))
+- WEIGHTS: use node\_id when available, otherwise host\_id [\#18579](https://github.com/netdata/netdata/pull/18579) ([ktsaou](https://github.com/ktsaou))
+- go.d/portcheck: update status duration calculation [\#18577](https://github.com/netdata/netdata/pull/18577) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18576](https://github.com/netdata/netdata/pull/18576) ([netdatabot](https://github.com/netdatabot))
+- go.d/portcheck schema add tabs [\#18575](https://github.com/netdata/netdata/pull/18575) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18574](https://github.com/netdata/netdata/pull/18574) ([netdatabot](https://github.com/netdatabot))
 - go.d portcheck update meta [\#18573](https://github.com/netdata/netdata/pull/18573) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18571](https://github.com/netdata/netdata/pull/18571) ([netdatabot](https://github.com/netdatabot))
 - go.d sd docker: remove unnecessary info message [\#18570](https://github.com/netdata/netdata/pull/18570) ([ilyam8](https://github.com/ilyam8))
 - go.d/portcheck: add UDP support [\#18569](https://github.com/netdata/netdata/pull/18569) ([ilyam8](https://github.com/ilyam8))
+- Reduce connection timeout and fallback to IPV4 for ACLK connections [\#18568](https://github.com/netdata/netdata/pull/18568) ([stelfrag](https://github.com/stelfrag))
 - Windows Events Log improvements 4 [\#18567](https://github.com/netdata/netdata/pull/18567) ([ktsaou](https://github.com/ktsaou))
 - Windows Events Log Explorer improvements 3 [\#18564](https://github.com/netdata/netdata/pull/18564) ([ktsaou](https://github.com/ktsaou))
 - Windows Events Improvements 2 [\#18563](https://github.com/netdata/netdata/pull/18563) ([ktsaou](https://github.com/ktsaou))
@@ -414,11 +420,6 @@
 - Regenerate integrations.js [\#18022](https://github.com/netdata/netdata/pull/18022) ([netdatabot](https://github.com/netdatabot))
 - fix grep warning in kickstart [\#18021](https://github.com/netdata/netdata/pull/18021) ([ilyam8](https://github.com/ilyam8))
 - ping meta fix configuring ping\_group\_range [\#18020](https://github.com/netdata/netdata/pull/18020) ([ilyam8](https://github.com/ilyam8))
-- Improve global statistics thread shutdown [\#18018](https://github.com/netdata/netdata/pull/18018) ([stelfrag](https://github.com/stelfrag))
-- Fix proxy connect response [\#18017](https://github.com/netdata/netdata/pull/18017) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#18016](https://github.com/netdata/netdata/pull/18016) ([netdatabot](https://github.com/netdatabot))
-- go.d snmp: add collecting network interface stats [\#18014](https://github.com/netdata/netdata/pull/18014) ([ilyam8](https://github.com/ilyam8))
-- rrdlabels: allow uppercase A-Z in label name [\#18013](https://github.com/netdata/netdata/pull/18013) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
