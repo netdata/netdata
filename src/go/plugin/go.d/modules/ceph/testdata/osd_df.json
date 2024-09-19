@@ -1,0 +1,38 @@
+{
+    "nodes": [
+        {
+            "id": 0,
+            "device_class": "ssd",
+            "name": "osd.0",
+            "type": "osd",
+            "type_id": 0,
+            "crush_weight": 0.0009918212890625,
+            "depth": 2,
+            "pool_weights": {},
+            "reweight": 1,
+            "kb": 1048576,
+            "kb_used": 34800,
+            "kb_used_data": 3624,
+            "kb_used_omap": 1,
+            "kb_used_meta": 31166,
+            "kb_avail": 1013776,
+            "utilization": 3.31878662109375,
+            "var": 1,
+            "pgs": 32,
+            "status": "up"
+        }
+    ],
+    "stray": [],
+    "summary": {
+        "total_kb": 1048576,
+        "total_kb_used": 34800,
+        "total_kb_used_data": 3624,
+        "total_kb_used_omap": 1,
+        "total_kb_used_meta": 31166,
+        "total_kb_avail": 1013776,
+        "average_utilization": 3.31878662109375,
+        "min_var": 1,
+        "max_var": 1,
+        "dev": 0
+    }
+}

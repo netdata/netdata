@@ -1,0 +1,35 @@
+{
+    "stats": {
+        "total_bytes": 1073741824,
+        "total_avail_bytes": 1038106624,
+        "total_used_bytes": 35635200,
+        "total_used_raw_bytes": 35635200,
+        "total_used_raw_ratio": 0.0331878662109375,
+        "num_osds": 1,
+        "num_per_pool_osds": 1,
+        "num_per_pool_omap_osds": 1
+    },
+    "stats_by_class": {
+        "ssd": {
+            "total_bytes": 1073741824,
+            "total_avail_bytes": 1038106624,
+            "total_used_bytes": 35635200,
+            "total_used_raw_bytes": 35635200,
+            "total_used_raw_ratio": 0.0331878662109375
+        }
+    },
+    "pools": [
+        {
+            "name": "testpool",
+            "id": 1,
+            "stats": {
+                "stored": 10,
+                "objects": 2,
+                "kb_used": 8,
+                "bytes_used": 8192,
+                "percent_used": 8.3215863924124278e-06,
+                "max_avail": 984419520
+            }
+        }
+    ]
+}
