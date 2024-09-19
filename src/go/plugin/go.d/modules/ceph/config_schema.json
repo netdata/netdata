@@ -11,6 +11,12 @@
         "minimum": 1,
         "default": 10
       },
+      "binary_path": {
+        "title": "Binary path",
+        "description": "Path to the `ceph` binary.",
+        "type": "string",
+        "default": "/usr/bin/ceph"
+      },
       "timeout": {
         "title": "Timeout",
         "description": "Timeout for executing the binary, specified in seconds.",
