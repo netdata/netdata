@@ -2930,7 +2930,7 @@ if(ENABLE_PLUGIN_PYTHON)
   install(DIRECTORY src/collectors/python.d.plugin/python_modules
           COMPONENT plugin-pythond
           DESTINATION usr/libexec/netdata/python.d)
-  
+
   install(FILES src/collectors/python.d.plugin/python.d.conf
           COMPONENT plugin-pythond
           DESTINATION usr/lib/netdata/conf.d)
