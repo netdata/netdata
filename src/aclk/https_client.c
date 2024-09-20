@@ -592,7 +592,7 @@ err_exit:
     return rc;
 }
 
-static int cert_verify_callback(int preverify_ok, const X509_STORE_CTX *ctx)
+static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
 {
     X509 *err_cert;
     int err, depth;

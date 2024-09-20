@@ -7,58 +7,17 @@
 
 #ifdef OS_WINDOWS
 #include <windows.h>
-#include <wincrypt.h>
+#include <bcrypt.h>  // For BCryptGenRandom
 #endif
 
-// Define a structure to hold platform-specific resources
-typedef struct {
-    bool initialized;
-#ifdef OS_WINDOWS
-    HCRYPTPROV hCryptProv; // Windows cryptographic provider
-#else
-    int urandom_fd;        // File descriptor for /dev/urandom
-#endif
-} RandomContext;
-
-static bool init_random_context(RandomContext *ctx) {
-#ifdef OS_WINDOWS
-    if (!CryptAcquireContext(&ctx->hCryptProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
-        return false;
-#else
-    ctx->urandom_fd = open("/dev/urandom", O_RDONLY);
-    if (ctx->urandom_fd < 0)
-        return false;
-#endif
-
-    ctx->initialized = true;
-    return true;
-}
-
-// Generate a random 32-bit unsigned integer
-static uint32_t generate_random_32bit(RandomContext *ctx) {
+static uint32_t generate_random_32bit(void) {
     uint32_t random_number = 0;
 
-#ifdef OS_WINDOWS
-    if (!CryptGenRandom(ctx->hCryptProv, sizeof(random_number), (BYTE*)&random_number))
+    if (RAND_bytes((unsigned char *)&random_number, sizeof(random_number)) != 1) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to generate a random uint32 mask");
-#else
-    if (read(ctx->urandom_fd, &random_number, sizeof(random_number)) != sizeof(random_number))
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to generate a random uint32 mask");
-#endif
+    }
 
     return random_number;
-}
-
-static void cleanup_random_context(RandomContext *ctx) {
-    if (!ctx->initialized)
-        return;
-#ifdef OS_WINDOWS
-    (void) CryptReleaseContext(ctx->hCryptProv, 0);
-#else
-    if (ctx->urandom_fd >= 0)
-        close(ctx->urandom_fd);
-    ctx->initialized = false;
-#endif
 }
 
 const char *websocket_upgrage_hdr = "GET /mqtt HTTP/1.1\x0D\x0A"
@@ -66,19 +25,17 @@ const char *websocket_upgrage_hdr = "GET /mqtt HTTP/1.1\x0D\x0A"
                               "Upgrade: websocket\x0D\x0A"
                               "Connection: Upgrade\x0D\x0A"
                               "Sec-WebSocket-Key: %s\x0D\x0A"
-                              "Origin: http://example.com\x0D\x0A"
+                              "Origin: \x0D\x0A"
                               "Sec-WebSocket-Protocol: mqtt\x0D\x0A"
                               "Sec-WebSocket-Version: 13\x0D\x0A\x0D\x0A";
 
 const char *mqtt_protoid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-RandomContext ctx = { 0 };
-
 #define DEFAULT_RINGBUFFER_SIZE (1024*128)
 
 ws_client *ws_client_new(size_t buf_size, char **host)
 {
-    if(!host || !init_random_context(&ctx))
+    if(!host)
         return NULL;
 
     ws_client *client = callocz(1, sizeof(ws_client));
@@ -110,7 +67,6 @@ void ws_client_destroy(ws_client *client)
     ws_client_free_headers(client);
     freez(client->hs.nonce_reply);
     freez(client->hs.http_reply_msg);
-    cleanup_random_context(&ctx);
     rbuf_free(client->buf_read);
     rbuf_free(client->buf_write);
     rbuf_free(client->buf_to_mqtt);
@@ -163,73 +119,88 @@ int ws_client_want_write(const ws_client *client)
 #define TEMP_BUF_SIZE 4096
 int ws_client_start_handshake(ws_client *client)
 {
-    nd_uuid_t nonce;
+    unsigned char nonce[WEBSOCKET_NONCE_SIZE];
     char nonce_b64[256];
     char second[TEMP_BUF_SIZE];
     unsigned int md_len;
-    unsigned char *digest;
+    unsigned char digest[EVP_MAX_MD_SIZE];  // EVP_MAX_MD_SIZE ensures enough space
     EVP_MD_CTX *md_ctx;
     const EVP_MD *md;
+    int rc = 1;
 
     if(!client->host || !*client->host) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Hostname has not been set. We should not be able to come here!");
         return 1;
     }
 
-    uuid_generate_random(nonce);
-    EVP_EncodeBlock((unsigned char *)nonce_b64, (const unsigned char *)nonce, WEBSOCKET_NONCE_SIZE);
-    snprintf(second, TEMP_BUF_SIZE, websocket_upgrage_hdr, *client->host, nonce_b64);
-
-    if(rbuf_bytes_free(client->buf_write) < strlen(second)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Write buffer capacity too low.");
+    // Generate a random 16-byte nonce
+    if (!RAND_bytes(nonce, WEBSOCKET_NONCE_SIZE)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to generate nonce");
         return 1;
     }
 
+    // Base64 encode the nonce
+    EVP_EncodeBlock((unsigned char *)nonce_b64, nonce, WEBSOCKET_NONCE_SIZE);
+
+    // Format and push the upgrade header to the write buffer
+    size_t bytes = snprintf(second, TEMP_BUF_SIZE, websocket_upgrage_hdr, *client->host, nonce_b64);
+    if(rbuf_bytes_free(client->buf_write) < bytes) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Write buffer capacity too low.");
+        return 1;
+    }
     rbuf_push(client->buf_write, second, strlen(second));
+
     client->state = WS_HANDSHAKE;
 
-    //Calculating expected Sec-WebSocket-Accept reply
-    snprintf(second, TEMP_BUF_SIZE, "%s%s", nonce_b64, mqtt_protoid);
+    // Create the expected Sec-WebSocket-Accept value
+    snprintf(second, TEMP_BUF_SIZE, "%s%s", nonce_b64, mqtt_protoid);  // Concatenate nonce and WebSocket GUID
 
+    // Initialize the digest context
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
     md_ctx = EVP_MD_CTX_create();
 #else
     md_ctx = EVP_MD_CTX_new();
 #endif
     if (md_ctx == NULL) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cant create EVP_MD Context");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Can't create EVP_MD context");
         return 1;
     }
 
-    md = EVP_get_digestbyname("sha1");
+    md = EVP_sha1();  // Use SHA-1 for WebSocket handshake
     if (!md) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Unknown message digest");
-        return 1;
+        goto exit_with_error;
     }
 
-    if ((digest = (unsigned char *)OPENSSL_malloc(EVP_MD_size(EVP_sha256()))) == NULL) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cant alloc digest");
-        return 1;
+    if (!EVP_DigestInit_ex(md_ctx, md, NULL)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to initialize digest context");
+        goto exit_with_error;
     }
 
-    EVP_DigestInit_ex(md_ctx, md, NULL);
-    EVP_DigestUpdate(md_ctx, second, strlen(second));
-    EVP_DigestFinal_ex(md_ctx, digest, &md_len);
+    if (!EVP_DigestUpdate(md_ctx, second, strlen(second))) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to update digest");
+        goto exit_with_error;
+    }
 
-    EVP_EncodeBlock((unsigned char *)nonce_b64, digest, (int) md_len);
+    if (!EVP_DigestFinal_ex(md_ctx, digest, &md_len)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to finalize digest");
+        goto exit_with_error;
+    }
+
+    EVP_EncodeBlock((unsigned char *)nonce_b64, digest, md_len);
 
     freez(client->hs.nonce_reply);
     client->hs.nonce_reply = strdupz(nonce_b64);
+    rc = 0;
 
-    OPENSSL_free(digest);
-
+exit_with_error:
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
     EVP_MD_CTX_destroy(md_ctx);
 #else
     EVP_MD_CTX_free(md_ctx);
 #endif
 
-    return 0;
+    return rc;
 }
 
 #define BUF_READ_MEMCMP_CONST(const, err)                                                                              \
@@ -449,7 +420,7 @@ int ws_client_send(const ws_client *client, enum websocket_opcode frame_type, co
         *ptr++ |= size;
 
     char *mask = ptr;
-    uint32_t mask32 = generate_random_32bit(&ctx);
+    uint32_t mask32 = generate_random_32bit();
     if (!mask32) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Unable to get mask to XOR websocket payload");
         return -2;
