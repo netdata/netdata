@@ -77,7 +77,7 @@ static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_obj
 
     int rc = mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish5b, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
-    if (rc == MQTT_WSS_ERR_TOO_BIG_FOR_SERVER)
+    if (rc == MQTT_WSS_ERR_MSG_TOO_BIG)
         return HTTP_RESP_CONTENT_TOO_LONG;
 
     return 0;

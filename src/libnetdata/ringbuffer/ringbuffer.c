@@ -6,9 +6,6 @@
 rbuf_t rbuf_create(size_t size)
 {
     rbuf_t buffer = mallocz(sizeof(struct rbuf) + size);
-    if (!buffer)
-        return NULL;
-
     memset(buffer, 0, sizeof(struct rbuf));
 
     buffer->data = ((char*)buffer) + sizeof(struct rbuf);

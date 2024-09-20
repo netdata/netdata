@@ -226,30 +226,6 @@ static int wait_till_agent_claim_ready()
     return 1;
 }
 
-void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
-{
-    switch(log_type) {
-        case MQTT_WSS_LOG_ERROR:
-        case MQTT_WSS_LOG_FATAL:
-            nd_log(NDLS_DAEMON, NDLP_ERR, "%s", str);
-            return;
-
-        case MQTT_WSS_LOG_WARN:
-            nd_log(NDLS_DAEMON, NDLP_WARNING, "%s", str);
-            return;
-
-        case MQTT_WSS_LOG_INFO:
-            nd_log(NDLS_DAEMON, NDLP_INFO, "%s", str);
-            return;
-
-        case MQTT_WSS_LOG_DEBUG:
-            return;
-
-        default:
-            nd_log(NDLS_DAEMON, NDLP_ERR, "Unknown log type from mqtt_wss");
-    }
-}
-
 static void msg_callback(const char *topic, const void *msg, size_t msglen, int qos)
 {
     UNUSED(qos);
@@ -783,7 +759,7 @@ void *aclk_main(void *ptr)
     if (wait_till_agent_claim_ready())
         goto exit;
 
-    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback))) {
+    if (!(mqttwss_client = mqtt_wss_new(msg_callback, puback_callback))) {
         netdata_log_error("Couldn't initialize MQTT_WSS network library");
         goto exit;
     }

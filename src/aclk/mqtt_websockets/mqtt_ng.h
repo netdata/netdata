@@ -67,7 +67,6 @@ int mqtt_ng_ping(struct mqtt_ng_client *client);
 typedef ssize_t (*mqtt_ng_send_fnc_t)(void *user_ctx, const void* buf, size_t len);
 
 struct mqtt_ng_init {
-    mqtt_wss_log_ctx_t log;
     rbuf_t data_in;
     mqtt_ng_send_fnc_t data_out_fnc;
     void *user_ctx;

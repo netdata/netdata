@@ -1555,8 +1555,6 @@ endif()
 set(MQTT_WEBSOCKETS_FILES
         src/aclk/mqtt_websockets/mqtt_wss_client.c
         src/aclk/mqtt_websockets/mqtt_wss_client.h
-        src/aclk/mqtt_websockets/mqtt_wss_log.c
-        src/aclk/mqtt_websockets/mqtt_wss_log.h
         src/aclk/mqtt_websockets/ws_client.c
         src/aclk/mqtt_websockets/ws_client.h
         src/aclk/mqtt_websockets/mqtt_ng.c
