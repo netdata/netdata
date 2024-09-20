@@ -36,6 +36,21 @@ struct mssql_instance {
     RRDSET *st_process_blocked;
     RRDDIM *rd_process_blocked;
 
+    RRDSET *st_stats_auto_param;
+    RRDDIM *rd_stats_auto_param;
+
+    RRDSET *st_stats_batch_request;
+    RRDDIM *rd_stats_batch_request;
+
+    RRDSET *st_stats_safe_auto;
+    RRDDIM *rd_stats_safe_auto;
+
+    RRDSET *st_stats_compilation;
+    RRDDIM *rd_stats_compilation;
+
+    RRDSET *st_stats_recompiles;
+    RRDDIM *rd_stats_recompiles;
+
     COUNTER_DATA MSSQLAccessMethodPageSplits;
     COUNTER_DATA MSSQLBufferCacheHits;
     COUNTER_DATA MSSQLBufferCacheLookups;
@@ -112,6 +127,12 @@ static inline void initialize_mssql_keys(struct mssql_instance *p) {
     p->MSSQLUserConnections.key = "User Connections";
     p->MSSQLBlockedProcesses.key = "Processes blocked";
 
+    p->MSSQLStatsAutoParameterization.key = "Auto-Param Attempts/sec";
+    p->MSSQLStatsBatchRequests.key = "Batch Requests/sec";
+    p->MSSQLStatSafeAutoParameterization.key = "Safe Auto-Params/sec";
+    p->MSSQLCompilations.key = "SQL Compilations/sec";
+    p->MSSQLRecompilations.key = "SQL Re-Compilations/sec";
+
     /*
     p->MSSQLAccessMethodPageSplits.key = "";
     p->MSSQLBufferCacheHits.key = "";
@@ -127,11 +148,6 @@ static inline void initialize_mssql_keys(struct mssql_instance *p) {
     p->MSSQLPendingMemoryGrants.key = "";
     p->MSSQLSQLErrorsTotal.key = "";
     p->MSSQLTotalServerMemory.key = "";
-    p->MSSQLStatsAutoParameterization.key = "";
-    p->MSSQLStatsBatchRequests.key = "";
-    p->MSSQLStatSafeAutoParameterization.key = "";
-    p->MSSQLCompilations.key = "";
-    p->MSSQLRecompilations.key = "";
 
     p->MSSQLDatabaseActiveTransactions.key = "";
     p->MSSQLDatabaseBackupRestoreOperations.key = "";
@@ -239,7 +255,7 @@ static inline void do_MSSQL_GENERAL_STATS(PERF_DATA_BLOCK *pDataBlock, struct ms
                                                 1,
                                                 RRD_ALGORITHM_ABSOLUTE);
 
-            rrdlabels_add(p->st_file_transfer->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_user_connections->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(p->st_user_connections,
@@ -272,13 +288,186 @@ static inline void do_MSSQL_GENERAL_STATS(PERF_DATA_BLOCK *pDataBlock, struct ms
                                                  1,
                                                  RRD_ALGORITHM_ABSOLUTE);
 
-            rrdlabels_add(p->st_file_transfer->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_process_blocked->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(p->st_process_blocked,
                               p->rd_process_blocked,
                               (collected_number)p->MSSQLBlockedProcesses.current.Data);
         rrdset_done(p->st_process_blocked);
+    }
+}
+
+static inline void do_MSSQL_SQL_Statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->sqlStatistics);
+    if (!pObjectType)
+        return;
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLStatsAutoParameterization)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_auto_parameterization_attempts", p->instanceID);
+        if (!p->st_stats_auto_param) {
+            p->st_stats_auto_param = rrdset_create_localhost("mssql"
+                                                             , id, NULL
+                                                             , "sql activity"
+                                                             , "mssql.instance_sqlstats_auto_parameterization_attempts"
+                                                             , "Failed auto-parameterization attempts"
+                                                             , "attempts/s"
+                                                             , PLUGIN_WINDOWS_NAME
+                                                             , "MSSQL"
+                                                             , PRIO_MSSQL_STATS_AUTO_PARAMETRIZATION
+                                                             , update_every
+                                                             , RRDSET_TYPE_LINE
+                                                             );
+
+            snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_sqlstats_auto_parameterization_attempts", p->instanceID);
+            p->rd_stats_auto_param  = rrddim_add(p->st_stats_auto_param,
+                                                 id,
+                                                 "failed",
+                                                 1,
+                                                 1,
+                                                 RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_stats_auto_param->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(p->st_stats_auto_param,
+                              p->rd_stats_auto_param,
+                              (collected_number)p->MSSQLStatsAutoParameterization.current.Data);
+        rrdset_done(p->st_stats_auto_param);
+    }
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLStatsBatchRequests)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_batch_requests", p->instanceID);
+        if (!p->st_stats_batch_request) {
+            p->st_stats_batch_request = rrdset_create_localhost("mssql"
+                                                                , id, NULL
+                                                                , "sql activity"
+                                                                , "mssql.instance_sqlstats_batch_requests"
+                                                                , "Total of batches requests"
+                                                                , "requests/s"
+                                                                , PLUGIN_WINDOWS_NAME
+                                                                , "MSSQL"
+                                                                , PRIO_MSSQL_STATS_BATCH_REQUEST
+                                                                , update_every
+                                                                , RRDSET_TYPE_LINE
+                                                                );
+
+            snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_sqlstats_batch_requests", p->instanceID);
+            p->rd_stats_batch_request  = rrddim_add(p->st_stats_batch_request,
+                                                   id,
+                                                   "batch",
+                                                   1,
+                                                   1,
+                                                   RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_stats_batch_request->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(p->st_stats_batch_request,
+                              p->rd_stats_batch_request,
+                              (collected_number)p->MSSQLStatsBatchRequests.current.Data);
+        rrdset_done(p->st_stats_batch_request);
+    }
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLStatSafeAutoParameterization)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_safe_auto_parameterization_attempts", p->instanceID);
+        if (!p->st_stats_safe_auto) {
+            p->st_stats_safe_auto = rrdset_create_localhost("mssql"
+                                                            , id, NULL
+                                                            , "sql activity"
+                                                            , "mssql.instance_sqlstats_safe_auto_parameterization_attempts"
+                                                            , "Safe auto-parameterization attempts"
+                                                            , "attempts/s"
+                                                            , PLUGIN_WINDOWS_NAME
+                                                            , "MSSQL"
+                                                            , PRIO_MSSQL_STATS_SAFE_AUTO_PARAMETRIZATION
+                                                            , update_every
+                                                            , RRDSET_TYPE_LINE
+                                                            );
+
+            snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_sqlstats_safe_auto_parameterization_attempts", p->instanceID);
+            p->rd_stats_safe_auto  = rrddim_add(p->st_stats_safe_auto,
+                                               id,
+                                               "safe",
+                                               1,
+                                               1,
+                                               RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_stats_safe_auto->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(p->st_stats_safe_auto,
+                              p->rd_stats_safe_auto,
+                              (collected_number)p->MSSQLStatSafeAutoParameterization.current.Data);
+        rrdset_done(p->st_stats_safe_auto);
+    }
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLCompilations)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_sql_compilations", p->instanceID);
+        if (!p->st_stats_compilation) {
+            p->st_stats_compilation = rrdset_create_localhost("mssql"
+                                                              , id, NULL
+                                                              , "sql activity"
+                                                              , "mssql.instance_sqlstats_sql_compilations"
+                                                              , "SQL compilations"
+                                                              , "compilations/s"
+                                                              , PLUGIN_WINDOWS_NAME
+                                                              , "MSSQL"
+                                                              , PRIO_MSSQL_STATS_COMPILATIONS
+                                                              , update_every
+                                                              , RRDSET_TYPE_LINE
+                                                              );
+
+            snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_sqlstats_sql_compilations", p->instanceID);
+            p->rd_stats_compilation  = rrddim_add(p->st_stats_compilation,
+                                                id,
+                                                "compilations",
+                                                1,
+                                                1,
+                                                RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_stats_compilation->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(p->st_stats_compilation,
+                              p->rd_stats_compilation,
+                              (collected_number)p->MSSQLCompilations.current.Data);
+        rrdset_done(p->st_stats_compilation);
+    }
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLRecompilations)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_sql_recompilations", p->instanceID);
+        if (!p->st_stats_recompiles) {
+            p->st_stats_recompiles = rrdset_create_localhost("mssql"
+                                                             , id, NULL
+                                                             , "sql activity"
+                                                             , "mssql.instance_sqlstats_sql_recompilations"
+                                                             , "SQL re-compilations"
+                                                             , "recompiles/"
+                                                             , PLUGIN_WINDOWS_NAME
+                                                             , "MSSQL"
+                                                             , PRIO_MSSQL_STATS_RECOMPILATIONS
+                                                             , update_every
+                                                             , RRDSET_TYPE_LINE
+                                                             );
+
+            snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_sqlstats_sql_recompilations", p->instanceID);
+            p->rd_stats_recompiles  = rrddim_add(p->st_stats_recompiles,
+                                                  id,
+                                                  "recompiles",
+                                                  1,
+                                                  1,
+                                                  RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_stats_recompiles->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(p->st_stats_recompiles,
+                              p->rd_stats_recompiles,
+                              (collected_number)p->MSSQLRecompilations.current.Data);
+        rrdset_done(p->st_stats_recompiles);
     }
 }
 
@@ -305,6 +494,7 @@ static bool do_MSSQL(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *instanc
             break;
         }
         case NETDATA_MSSQL_SQL_STATS: {
+            do_MSSQL_SQL_Statistics(pDataBlock, instance, update_every);
             break;
         }
         case NETDATA_MSSQL_TRANSACTIONS: {
