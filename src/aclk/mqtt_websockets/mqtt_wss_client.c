@@ -332,47 +332,6 @@ static int http_parse_reply(rbuf_t buf)
     return 0;
 }
 
-#if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
-static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)
-{
-	EVP_ENCODE_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
-
-	if (ctx != NULL) {
-		memset(ctx, 0, sizeof(*ctx));
-	}
-	return ctx;
-}
-static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
-{
-	OPENSSL_free(ctx);
-	return;
-}
-#endif
-
-inline static int base64_encode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
-{
-    int len;
-    unsigned char *str = out;
-    EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
-    EVP_EncodeInit(ctx);
-    EVP_EncodeUpdate(ctx, str, outl, in, in_len);
-    str += *outl;
-    EVP_EncodeFinal(ctx, str, &len);
-    *outl += len;
-
-    str = out;
-    while(*str) {
-        if (*str != 0x0D && *str != 0x0A)
-            *out++ = *str++;
-        else
-            str++;
-    }
-    *out = 0;
-
-    EVP_ENCODE_CTX_free(ctx);
-    return 0;
-}
-
 static int http_proxy_connect(mqtt_wss_client client)
 {
     int rc;
@@ -415,8 +374,7 @@ static int http_proxy_connect(mqtt_wss_client client)
         *ptr++ = ':';
         strcpy(ptr, client->proxy_passwd);
 
-        int b64_len;
-        base64_encode_helper((unsigned char*)creds_base64, &b64_len, (unsigned char*)creds_plain, strlen(creds_plain));
+        (void) netdata_base64_encode((unsigned char*)creds_base64, (unsigned char*)creds_plain, strlen(creds_plain));
         freez(creds_plain);
 
         r_buf_ptr = rbuf_get_linear_insert_range(r_buf, &r_buf_linear_insert_capacity);
@@ -665,7 +623,7 @@ int mqtt_wss_connect(
 #define NSEC_PER_MSEC   1000000ULL
 #define NSEC_PER_SEC    1000000000ULL
 
-static inline uint64_t boottime_usec(void) {
+static uint64_t boottime_usec(void) {
     struct timespec ts;
 #if defined(__APPLE__) || defined(__FreeBSD__)
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
@@ -681,7 +639,7 @@ static inline uint64_t boottime_usec(void) {
 #define MWS_TIMED_OUT 1
 #define MWS_ERROR 2
 #define MWS_OK 0
-static inline const char *mqtt_wss_error_tos(int ec)
+static const char *mqtt_wss_error_tos(int ec)
 {
     switch(ec) {
         case MWS_TIMED_OUT:
@@ -694,12 +652,12 @@ static inline const char *mqtt_wss_error_tos(int ec)
 
 }
 
-static inline int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
+static int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
 {
     uint64_t exit_by = boottime_usec() + (timeout_ms * NSEC_PER_MSEC);
     client->poll_fds[POLLFD_SOCKET].events |= POLLOUT; // TODO when entering mwtt_wss_service use out buffer size to arm POLLOUT
     while (rbuf_bytes_available(client->ws_client->buf_write)) {
-        uint64_t now = boottime_usec();
+        const uint64_t now = boottime_usec();
         if (now >= exit_by)
             return MWS_TIMED_OUT;
         if (mqtt_wss_service(client, exit_by - now))
@@ -756,19 +714,19 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
     client->sockfd = -1;
 }
 
-static inline void mqtt_wss_wakeup(mqtt_wss_client client)
+static void mqtt_wss_wakeup(mqtt_wss_client client)
 {
     write(client->write_notif_pipe[PIPE_WRITE_END], " ", 1);
 }
 
 #define THROWAWAY_BUF_SIZE 32
 char throwaway[THROWAWAY_BUF_SIZE];
-static inline void util_clear_pipe(int fd)
+static void util_clear_pipe(int fd)
 {
     (void)read(fd, throwaway, THROWAWAY_BUF_SIZE);
 }
 
-static inline void set_socket_pollfds(mqtt_wss_client client, int ssl_ret) {
+static void set_socket_pollfds(mqtt_wss_client client, int ssl_ret) {
     if (ssl_ret == SSL_ERROR_WANT_WRITE)
         client->poll_fds[POLLFD_SOCKET].events |= POLLOUT;
     if (ssl_ret == SSL_ERROR_WANT_READ)
@@ -787,7 +745,7 @@ static int handle_mqtt_internal(mqtt_wss_client client)
 }
 
 #define SEC_TO_MSEC 1000
-static inline long long int t_till_next_keepalive_ms(mqtt_wss_client client)
+static long long int t_till_next_keepalive_ms(mqtt_wss_client client)
 {
     time_t last_send = mqtt_ng_last_send_time(client->mqtt);
     long long int next_mqtt_keep_alive = (last_send * SEC_TO_MSEC)
@@ -796,7 +754,7 @@ static inline long long int t_till_next_keepalive_ms(mqtt_wss_client client)
 }
 
 #ifdef MQTT_WSS_CPUSTATS
-static inline uint64_t mqtt_wss_now_usec(void) {
+static uint64_t mqtt_wss_now_usec(void) {
     struct timespec ts;
     if(clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "clock_gettime(CLOCK_MONOTONIC, &timespec) failed.");

@@ -1570,52 +1570,93 @@ bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_
     return (absolute_period_requested != 1);
 }
 
-int netdata_base64_decode(const char *encoded, char *decoded, size_t decoded_size) {
-    static const unsigned char base64_table[256] = {
-            ['A'] = 0, ['B'] = 1, ['C'] = 2, ['D'] = 3, ['E'] = 4, ['F'] = 5, ['G'] = 6, ['H'] = 7,
-            ['I'] = 8, ['J'] = 9, ['K'] = 10, ['L'] = 11, ['M'] = 12, ['N'] = 13, ['O'] = 14, ['P'] = 15,
-            ['Q'] = 16, ['R'] = 17, ['S'] = 18, ['T'] = 19, ['U'] = 20, ['V'] = 21, ['W'] = 22, ['X'] = 23,
-            ['Y'] = 24, ['Z'] = 25, ['a'] = 26, ['b'] = 27, ['c'] = 28, ['d'] = 29, ['e'] = 30, ['f'] = 31,
-            ['g'] = 32, ['h'] = 33, ['i'] = 34, ['j'] = 35, ['k'] = 36, ['l'] = 37, ['m'] = 38, ['n'] = 39,
-            ['o'] = 40, ['p'] = 41, ['q'] = 42, ['r'] = 43, ['s'] = 44, ['t'] = 45, ['u'] = 46, ['v'] = 47,
-            ['w'] = 48, ['x'] = 49, ['y'] = 50, ['z'] = 51, ['0'] = 52, ['1'] = 53, ['2'] = 54, ['3'] = 55,
-            ['4'] = 56, ['5'] = 57, ['6'] = 58, ['7'] = 59, ['8'] = 60, ['9'] = 61, ['+'] = 62, ['/'] = 63,
-            [0 ... '+' - 1] = 255,
-            ['+' + 1 ... '/' - 1] = 255,
-            ['9' + 1 ... 'A' - 1] = 255,
-            ['Z' + 1 ... 'a' - 1] = 255,
-            ['z' + 1 ... 255] = 255
-    };
 
-    size_t count = 0;
-    unsigned int tmp = 0;
-    int i, bit;
+#if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)
+{
+	EVP_ENCODE_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
 
-    if (decoded_size < 1)
-        return 0; // Buffer size must be at least 1 for null termination
-
-    for (i = 0, bit = 0; encoded[i]; i++) {
-        unsigned char value = base64_table[(unsigned char)encoded[i]];
-        if (value > 63)
-            return -1; // Invalid character in input
-
-        tmp = tmp << 6 | value;
-        if (++bit == 4) {
-            if (count + 3 >= decoded_size) break; // Stop decoding if buffer is full
-            decoded[count++] = (tmp >> 16) & 0xFF;
-            decoded[count++] = (tmp >> 8) & 0xFF;
-            decoded[count++] = tmp & 0xFF;
-            tmp = 0;
-            bit = 0;
-        }
-    }
-
-    if (bit > 0 && count + 1 < decoded_size) {
-        tmp <<= 6 * (4 - bit);
-        if (bit > 2 && count + 1 < decoded_size) decoded[count++] = (tmp >> 16) & 0xFF;
-        if (bit > 3 && count + 1 < decoded_size) decoded[count++] = (tmp >> 8) & 0xFF;
-    }
-
-    decoded[count] = '\0'; // Null terminate the output string
-    return count;
+	if (ctx != NULL) {
+		memset(ctx, 0, sizeof(*ctx));
+	}
+	return ctx;
 }
+static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+	return;
+}
+#endif
+
+int netdata_base64_decode(unsigned char *out, const unsigned char *in, const int in_len)
+{
+    int outl;
+    unsigned char remaining_data[256];
+
+    EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
+    EVP_DecodeInit(ctx);
+    EVP_DecodeUpdate(ctx, out, &outl, in, in_len);
+    int remainder = 0;
+    EVP_DecodeFinal(ctx, remaining_data, &remainder);
+    EVP_ENCODE_CTX_free(ctx);
+    if (remainder)
+        return -1;
+
+    return outl;
+}
+
+int netdata_base64_encode(unsigned char *encoded, const unsigned char *input, size_t input_size)
+{
+    return EVP_EncodeBlock(encoded, input, input_size);
+}
+
+// Keep internal implementation
+// int netdata_base64_decode_internal(const char *encoded, char *decoded, size_t decoded_size) {
+//     static const unsigned char base64_table[256] = {
+//             ['A'] = 0, ['B'] = 1, ['C'] = 2, ['D'] = 3, ['E'] = 4, ['F'] = 5, ['G'] = 6, ['H'] = 7,
+//             ['I'] = 8, ['J'] = 9, ['K'] = 10, ['L'] = 11, ['M'] = 12, ['N'] = 13, ['O'] = 14, ['P'] = 15,
+//             ['Q'] = 16, ['R'] = 17, ['S'] = 18, ['T'] = 19, ['U'] = 20, ['V'] = 21, ['W'] = 22, ['X'] = 23,
+//             ['Y'] = 24, ['Z'] = 25, ['a'] = 26, ['b'] = 27, ['c'] = 28, ['d'] = 29, ['e'] = 30, ['f'] = 31,
+//             ['g'] = 32, ['h'] = 33, ['i'] = 34, ['j'] = 35, ['k'] = 36, ['l'] = 37, ['m'] = 38, ['n'] = 39,
+//             ['o'] = 40, ['p'] = 41, ['q'] = 42, ['r'] = 43, ['s'] = 44, ['t'] = 45, ['u'] = 46, ['v'] = 47,
+//             ['w'] = 48, ['x'] = 49, ['y'] = 50, ['z'] = 51, ['0'] = 52, ['1'] = 53, ['2'] = 54, ['3'] = 55,
+//             ['4'] = 56, ['5'] = 57, ['6'] = 58, ['7'] = 59, ['8'] = 60, ['9'] = 61, ['+'] = 62, ['/'] = 63,
+//             [0 ... '+' - 1] = 255,
+//             ['+' + 1 ... '/' - 1] = 255,
+//             ['9' + 1 ... 'A' - 1] = 255,
+//             ['Z' + 1 ... 'a' - 1] = 255,
+//             ['z' + 1 ... 255] = 255
+//     };
+//
+//     size_t count = 0;
+//     unsigned int tmp = 0;
+//     int i, bit;
+//
+//     if (decoded_size < 1)
+//         return 0; // Buffer size must be at least 1 for null termination
+//
+//     for (i = 0, bit = 0; encoded[i]; i++) {
+//         unsigned char value = base64_table[(unsigned char)encoded[i]];
+//         if (value > 63)
+//             return -1; // Invalid character in input
+//
+//         tmp = tmp << 6 | value;
+//         if (++bit == 4) {
+//             if (count + 3 >= decoded_size) break; // Stop decoding if buffer is full
+//             decoded[count++] = (tmp >> 16) & 0xFF;
+//             decoded[count++] = (tmp >> 8) & 0xFF;
+//             decoded[count++] = tmp & 0xFF;
+//             tmp = 0;
+//             bit = 0;
+//         }
+//     }
+//
+//     if (bit > 0 && count + 1 < decoded_size) {
+//         tmp <<= 6 * (4 - bit);
+//         if (bit > 2 && count + 1 < decoded_size) decoded[count++] = (tmp >> 16) & 0xFF;
+//         if (bit > 3 && count + 1 < decoded_size) decoded[count++] = (tmp >> 8) & 0xFF;
+//     }
+//
+//     decoded[count] = '\0'; // Null terminate the output string
+//     return count;
+// }

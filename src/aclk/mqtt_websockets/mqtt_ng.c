@@ -389,7 +389,7 @@ enum memory_mode {
     CALLER_RESPONSIBLE
 };
 
-static inline enum memory_mode ptr2memory_mode(void * ptr) {
+static enum memory_mode ptr2memory_mode(void * ptr) {
     if (ptr == NULL)
         return MEMCPY;
     if (ptr == CALLER_RESPONSIBILITY)
@@ -614,7 +614,7 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
     return client;
 }
 
-static inline uint8_t get_control_packet_type(uint8_t first_hdr_byte)
+static uint8_t get_control_packet_type(uint8_t first_hdr_byte)
 {
     return first_hdr_byte >> 4;
 }
@@ -1002,7 +1002,7 @@ uint16_t get_unused_packet_id() {
     return packet_id ? packet_id : ++packet_id;
 }
 
-static inline size_t mqtt_ng_publish_size(
+static size_t mqtt_ng_publish_size(
     const char *topic,
     size_t msg_len,
     uint16_t topic_id)
@@ -1129,7 +1129,7 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
     TRY_GENERATE_MESSAGE(mqtt_ng_generate_publish, topic, topic_free, msg, msg_free, msg_len, publish_flags, packet_id, topic_id);
 }
 
-static inline size_t mqtt_ng_subscribe_size(struct mqtt_sub *subs, size_t sub_count)
+static size_t mqtt_ng_subscribe_size(struct mqtt_sub *subs, size_t sub_count)
 {
     size_t len = 2 /* Packet Identifier */ + 1 /* Properties Length TODO for now fixed 0 */;
     len += sub_count * (2 /* topic filter string length */ + 1 /* [MQTT-3.8.3.1] Subscription Options Byte */);
@@ -1912,7 +1912,7 @@ static void try_send_all(struct mqtt_ng_client *client) {
     } while(send_all_message_fragments(client) >= 0);
 }
 
-static inline void mark_message_for_gc(struct buffer_fragment *frag)
+static void mark_message_for_gc(struct buffer_fragment *frag)
 {
     while (frag) {
         frag->flags |= BUFFER_FRAG_GARBAGE_COLLECT;

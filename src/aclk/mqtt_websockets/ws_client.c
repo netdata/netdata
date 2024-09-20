@@ -139,22 +139,6 @@ int ws_client_start_handshake(ws_client *client)
         return 1;
     }
 
-    // Base64 encode the nonce
-    EVP_EncodeBlock((unsigned char *)nonce_b64, nonce, WEBSOCKET_NONCE_SIZE);
-
-    // Format and push the upgrade header to the write buffer
-    size_t bytes = snprintf(second, TEMP_BUF_SIZE, websocket_upgrage_hdr, *client->host, nonce_b64);
-    if(rbuf_bytes_free(client->buf_write) < bytes) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Write buffer capacity too low.");
-        return 1;
-    }
-    rbuf_push(client->buf_write, second, strlen(second));
-
-    client->state = WS_HANDSHAKE;
-
-    // Create the expected Sec-WebSocket-Accept value
-    snprintf(second, TEMP_BUF_SIZE, "%s%s", nonce_b64, mqtt_protoid);  // Concatenate nonce and WebSocket GUID
-
     // Initialize the digest context
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
     md_ctx = EVP_MD_CTX_create();
@@ -168,16 +152,31 @@ int ws_client_start_handshake(ws_client *client)
 
     md = EVP_sha1();  // Use SHA-1 for WebSocket handshake
     if (!md) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Unknown message digest");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Unknown message digest SHA-1");
         goto exit_with_error;
     }
+
+    (void) netdata_base64_encode((unsigned char *) nonce_b64, nonce, WEBSOCKET_NONCE_SIZE);
+
+    // Format and push the upgrade header to the write buffer
+    size_t bytes = snprintf(second, TEMP_BUF_SIZE, websocket_upgrage_hdr, *client->host, nonce_b64);
+    if(rbuf_bytes_free(client->buf_write) < bytes) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Write buffer capacity too low.");
+        goto exit_with_error;
+    }
+    rbuf_push(client->buf_write, second, bytes);
+
+    client->state = WS_HANDSHAKE;
+
+    // Create the expected Sec-WebSocket-Accept value
+    bytes = snprintf(second, TEMP_BUF_SIZE, "%s%s", nonce_b64, mqtt_protoid);
 
     if (!EVP_DigestInit_ex(md_ctx, md, NULL)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to initialize digest context");
         goto exit_with_error;
     }
 
-    if (!EVP_DigestUpdate(md_ctx, second, strlen(second))) {
+    if (!EVP_DigestUpdate(md_ctx, second, bytes)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to update digest");
         goto exit_with_error;
     }
@@ -187,7 +186,7 @@ int ws_client_start_handshake(ws_client *client)
         goto exit_with_error;
     }
 
-    EVP_EncodeBlock((unsigned char *)nonce_b64, digest, md_len);
+    (void) netdata_base64_encode((unsigned char *) nonce_b64, digest, md_len);
 
     freez(client->hs.nonce_reply);
     client->hs.nonce_reply = strdupz(nonce_b64);
@@ -364,7 +363,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
 #define WS_FINAL_FRAG     BYTE_MSB
 #define WS_PAYLOAD_MASKED BYTE_MSB
 
-static inline size_t get_ws_hdr_size(size_t payload_size)
+static size_t get_ws_hdr_size(size_t payload_size)
 {
     size_t hdr_len = 2 + 4 /*mask*/;
     if(payload_size > 125)
@@ -472,21 +471,21 @@ static int check_opcode(enum websocket_opcode oc)
     }
 }
 
-static inline void ws_client_rx_post_hdr_state(ws_client *client)
+static void ws_client_rx_post_hdr_state(ws_client *client)
 {
     switch(client->rx.opcode) {
         case WS_OP_BINARY_FRAME:
             client->rx.parse_state = WS_PAYLOAD_DATA;
-            return;
+            break;
         case WS_OP_CONNECTION_CLOSE:
             client->rx.parse_state = WS_PAYLOAD_CONNECTION_CLOSE;
-            return;
+            break;
         case WS_OP_PING:
             client->rx.parse_state = WS_PAYLOAD_PING_REQ_PAYLOAD;
-            return;
+            break;
         default:
             client->rx.parse_state = WS_PAYLOAD_SKIP_UNKNOWN_PAYLOAD;
-            return;
+            break;
     }
 }
 

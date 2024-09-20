@@ -556,7 +556,7 @@ static int handle_http_request(https_req_ctx_t *ctx) {
         // we remove those but during encoding we need that space in the buffer
         creds_base64_len += (1+(creds_base64_len/64)) * strlen("\n");
         char *creds_base64 = callocz(1, creds_base64_len + 1);
-        base64_encode_helper((unsigned char*)creds_base64, &creds_base64_len, (unsigned char*)creds_plain, creds_plain_len);
+        (void) netdata_base64_encode((unsigned char *)creds_base64, (unsigned char *)creds_plain, creds_plain_len);
         buffer_sprintf(hdr, "Proxy-Authorization: Basic %s\x0D\x0A", creds_base64);
         freez(creds_plain);
     }
@@ -584,7 +584,6 @@ static int handle_http_request(https_req_ctx_t *ctx) {
         if (ctx->parse_ctx.chunked_response)
             freez(ctx->parse_ctx.chunked_response);
         rc = 4;
-        goto err_exit;
     }
 
 err_exit:
