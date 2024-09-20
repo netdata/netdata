@@ -236,7 +236,7 @@ static int initialize(void) {
     return 0;
 }
 
-static inline void do_MSSQL_GENERAL_STATS(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+static inline void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->genStats);
@@ -310,7 +310,7 @@ static inline void do_MSSQL_GENERAL_STATS(PERF_DATA_BLOCK *pDataBlock, struct ms
     }
 }
 
-static inline void do_MSSQL_SQL_Statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+static inline void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->sqlStatistics);
@@ -483,7 +483,7 @@ static inline void do_MSSQL_SQL_Statistics(PERF_DATA_BLOCK *pDataBlock, struct m
     }
 }
 
-static inline void do_MSSQL_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+static inline void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->buffMan);
@@ -635,11 +635,11 @@ static inline void do_MSSQL_buffer_management(PERF_DATA_BLOCK *pDataBlock, struc
         rrdset_done(p->st_buff_page_iops);
     }
 }
-static bool do_MSSQL(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *instance, int update_every, int caller_idx)
+static bool do_mssql(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *instance, int update_every, int caller_idx)
 {
     switch(caller_idx) {
         case NETDATA_MSSQL_GENERAL_STATS: {
-            do_MSSQL_GENERAL_STATS(pDataBlock, instance, update_every);
+            do_mssql_general_stats(pDataBlock, instance, update_every);
             break;
         }
         case NETDATA_MSSQL_SQL_ERRORS: {
@@ -655,11 +655,11 @@ static bool do_MSSQL(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *instanc
             break;
         }
         case NETDATA_MSSQL_BUFFER_MANAGEMENT: {
-            do_MSSQL_buffer_management(pDataBlock, instance, update_every);
+            do_mssql_buffer_management(pDataBlock, instance, update_every);
             break;
         }
         case NETDATA_MSSQL_SQL_STATS: {
-            do_MSSQL_SQL_Statistics(pDataBlock, instance, update_every);
+            do_mssql_sql_statistics(pDataBlock, instance, update_every);
             break;
         }
         case NETDATA_MSSQL_TRANSACTIONS: {
@@ -695,7 +695,7 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
         if(!pDataBlock) return -1;
 
-        do_MSSQL(pDataBlock, p, *update_every, i);
+        do_mssql(pDataBlock, p, *update_every, i);
     }
 
     return 1;
