@@ -15,7 +15,8 @@ enum netdata_mssql_metrics {
     NETDATA_MSSQL_MEMORY,
     NETDATA_MSSQL_BUFFER_MANAGEMENT,
     NETDATA_MSSQL_SQL_STATS,
-    NETDATA_MSSQL_TRANSACTIONS
+    NETDATA_MSSQL_TRANSACTIONS,
+    NETDATA_MSSQL_ACCESS_METHODS
 };
 
 struct mssql_instance {
@@ -29,6 +30,7 @@ struct mssql_instance {
     char *buffMan;
     char *memmgr;
     char *locks;
+    char *accessMethods;
 
     RRDSET *st_user_connections;
     RRDDIM *rd_user_connections;
@@ -63,6 +65,9 @@ struct mssql_instance {
     RRDSET *st_buff_page_iops;
     RRDDIM *rd_buff_page_reads;
     RRDDIM *rd_buff_page_writes;
+
+    RRDSET *st_access_method_page_splits;
+    RRDDIM *rd_access_method_page_splits;
 
     COUNTER_DATA MSSQLAccessMethodPageSplits;
     COUNTER_DATA MSSQLBufferCacheHits;
@@ -130,6 +135,9 @@ static inline void initialize_mssql_objects(struct mssql_instance *p, const char
     strncpyz(&name[length], "Locks", sizeof(name) - length);
     p->locks = strdup(name);
 
+    strncpyz(&name[length], "Access Methods", sizeof(name) - length);
+    p->accessMethods =  strdup(name);
+
     p->instanceID = strdup(instance);
     netdata_fix_chart_name(p->instanceID);
 }
@@ -139,20 +147,24 @@ static inline void initialize_mssql_keys(struct mssql_instance *p) {
     p->MSSQLUserConnections.key = "User Connections";
     p->MSSQLBlockedProcesses.key = "Processes blocked";
 
+    // SQL Statistics
     p->MSSQLStatsAutoParameterization.key = "Auto-Param Attempts/sec";
     p->MSSQLStatsBatchRequests.key = "Batch Requests/sec";
     p->MSSQLStatSafeAutoParameterization.key = "Safe Auto-Params/sec";
     p->MSSQLCompilations.key = "SQL Compilations/sec";
     p->MSSQLRecompilations.key = "SQL Re-Compilations/sec";
 
+    // Buffer Management
     p->MSSQLBufferCacheHits.key = "Buffer cache hit ratio";
     p->MSSQLBufferPageLifeExpectancy.key = "Page life expectancy";
     p->MSSQLBufferCheckpointPages.key = "Checkpoint pages/sec";
     p->MSSQLBufferPageReads.key = "Page reads/sec";
     p->MSSQLBufferPageWrites.key = "Page writes/sec";
 
+    // Access Methods
+    p->MSSQLAccessMethodPageSplits.key = "Page Splits/sec";
+
     /*
-    p->MSSQLAccessMethodPageSplits.key = "";
     p->MSSQLLockWait.key = "";
     p->MSSQLDeadlocks.key = "";
     p->MSSQLConnectionMemoryBytes.key = "";
@@ -635,8 +647,51 @@ static inline void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struc
         rrdset_done(p->st_buff_page_iops);
     }
 }
+
+static inline void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->accessMethods);
+    if (!pObjectType)
+        return;
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLAccessMethodPageSplits)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_accessmethods_page_splits", p->instanceID);
+        if (!p->st_access_method_page_splits) {
+            p->st_access_method_page_splits = rrdset_create_localhost("mssql"
+                                                             , id, NULL
+                                                             , "buffer cache"
+                                                             , "mssql.instance_accessmethods_page_splits"
+                                                             , "Page splits"
+                                                             , "splits/s"
+                                                             , PLUGIN_WINDOWS_NAME
+                                                             , "MSSQL"
+                                                             , PRIO_MSSQL_BUFF_METHODS_PAGE_SPLIT
+                                                             , update_every
+                                                             , RRDSET_TYPE_LINE
+                                                             );
+
+            snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_accessmethods_page_splits", p->instanceID);
+            p->rd_access_method_page_splits  = rrddim_add(p->st_access_method_page_splits,
+                                                 id,
+                                                 "page",
+                                                 1,
+                                                 1,
+                                                 RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_access_method_page_splits->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(p->st_access_method_page_splits,
+                              p->rd_access_method_page_splits,
+                              (collected_number)p->MSSQLAccessMethodPageSplits.current.Data);
+        rrdset_done(p->st_access_method_page_splits);
+    }
+}
+
 static bool do_mssql(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *instance, int update_every, int caller_idx)
 {
+    // TODO: change to function pointer
     switch(caller_idx) {
         case NETDATA_MSSQL_GENERAL_STATS: {
             do_mssql_general_stats(pDataBlock, instance, update_every);
@@ -663,6 +718,10 @@ static bool do_mssql(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *instanc
             break;
         }
         case NETDATA_MSSQL_TRANSACTIONS: {
+            break;
+        }
+        case NETDATA_MSSQL_ACCESS_METHODS: {
+            do_mssql_access_methods(pDataBlock, instance, update_every);
             break;
         }
     }
