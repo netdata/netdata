@@ -63,6 +63,10 @@ struct mssql_instance {
     RRDSET *st_access_method_page_splits;
     RRDDIM *rd_access_method_page_splits;
 
+    RRDSET *st_sql_errors;
+    RRDDIM *rd_sql_errors;
+
+
     COUNTER_DATA MSSQLAccessMethodPageSplits;
     COUNTER_DATA MSSQLBufferCacheHits;
     COUNTER_DATA MSSQLBufferCheckpointPages;
@@ -158,13 +162,15 @@ static inline void initialize_mssql_keys(struct mssql_instance *p) {
     // Access Methods
     p->MSSQLAccessMethodPageSplits.key = "Page Splits/sec";
 
+    // Errors
+    p->MSSQLSQLErrorsTotal.key = "Errors/sec";
+
     /*
     p->MSSQLLockWait.key = "";
     p->MSSQLDeadlocks.key = "";
     p->MSSQLConnectionMemoryBytes.key = "";
     p->MSSQLExternalBenefitOfMemory.key = "";
     p->MSSQLPendingMemoryGrants.key = "";
-    p->MSSQLSQLErrorsTotal.key = "";
     p->MSSQLTotalServerMemory.key = "";
 
     p->MSSQLDatabaseActiveTransactions.key = "";
@@ -683,12 +689,58 @@ static inline void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct m
     }
 }
 
+static void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_SQL_ERRORS]);
+    if (!pObjectType)
+        return;
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLSQLErrorsTotal)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sql_errors_total", p->instanceID);
+        if (!p->st_sql_errors) {
+            p->st_sql_errors = rrdset_create_localhost("mssql"
+                                                       , id, NULL
+                                                       , "Errors"
+                                                       , "mssql.instance_sql_errors"
+                                                       , "Errors"
+                                                       , "errors/s"
+                                                       , PLUGIN_WINDOWS_NAME
+                                                       , "MSSQL"
+                                                       , PRIO_MSSQL_SQL_ERRORS
+                                                       , update_every
+                                                       , RRDSET_TYPE_LINE
+                                                       );
+
+            snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_sql_errors_total", p->instanceID);
+            p->rd_sql_errors  = rrddim_add(p->st_sql_errors,
+                                          id,
+                                          "error",
+                                          1,
+                                          1,
+                                          RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_sql_errors->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(p->st_sql_errors,
+                              p->rd_sql_errors,
+                              (collected_number)p->MSSQLAccessMethodPageSplits.current.Data);
+        rrdset_done(p->st_sql_errors);
+    }
+}
+
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_instance *p = value;
     int *update_every = data;
 
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
-        do_mssql_general_stats, NULL, NULL, NULL, NULL, do_mssql_buffer_management, do_mssql_sql_statistics, NULL,
+        do_mssql_general_stats,
+        do_mssql_errors,
+        NULL, NULL, NULL,
+        do_mssql_buffer_management,
+        do_mssql_sql_statistics,
+        NULL,
         do_mssql_access_methods
     };
 
