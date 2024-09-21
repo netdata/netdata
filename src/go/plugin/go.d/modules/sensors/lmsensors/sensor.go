@@ -1,92 +1,177 @@
 package lmsensors
 
 import (
-	"sort"
-	"strings"
+	"time"
 )
 
-// A Device is a physical or virtual device which may have zero or
-// more Sensors.
-type Device struct {
-	// The name of the device.
-	Name string
-
-	// Any Sensors that belong to this Device.  Use type assertions to
-	// check for specific Sensor types and fetch their data.
-	Sensors []Sensor
+// A Chip is a physical or virtual device which may have zero or more Sensors.
+type Chip struct {
+	Name       string
+	UniqueName string
+	SysDevice  string
+	Sensors    Sensors
 }
 
-type SensorType string
-
-const (
-	SensorTypeCurrent     SensorType = "current"
-	SensorTypeFan         SensorType = "fan"
-	SensorTypeIntrusion   SensorType = "intrusion"
-	SensorTypePower       SensorType = "power"
-	SensorTypeTemperature SensorType = "temperature"
-	SensorTypeVoltage     SensorType = "voltage"
-)
-
-// A Sensor is a hardware sensor, used to retrieve device temperatures, fan speeds, voltages, etc.
-// Use type assertions to check for specific
-// Sensor types and fetch their data.
-type Sensor interface {
-	Type() SensorType
+type Sensors struct {
+	// https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface
+	Voltage     []*VoltageSensor
+	Fan         []*FanSensor
+	Temperature []*TemperatureSensor
+	Current     []*CurrentSensor
+	Power       []*PowerSensor
+	Energy      []*EnergySensor
+	Humidity    []*HumiditySensor
+	Intrusion   []*IntrusionSensor
 }
 
-// parseSensors parses all Sensors from an input raw data slice, produced during a filesystem walk.
-func parseSensors(raw map[string]map[string]string) ([]Sensor, error) {
-	sensors := make([]Sensor, 0, len(raw))
-	for k, v := range raw {
-		var sn Sensor
-		var err error
+// A VoltageSensor is a Sensor that detects voltage.
+type VoltageSensor struct {
+	ReadTime time.Duration
 
-		switch {
-		case strings.HasPrefix(k, "curr"):
-			s := &CurrentSensor{Name: k}
-			sn = s
-			err = s.parse(v)
-		case strings.HasPrefix(k, "intrusion"):
-			s := &IntrusionSensor{Name: k}
-			sn = s
-			err = s.parse(v)
-		case strings.HasPrefix(k, "in"):
-			s := &VoltageSensor{Name: k}
-			sn = s
-			err = s.parse(v)
-		case strings.HasPrefix(k, "fan"):
-			s := &FanSensor{Name: k}
-			sn = s
-			err = s.parse(v)
-		case strings.HasPrefix(k, "power"):
-			s := &PowerSensor{Name: k}
-			sn = s
-			err = s.parse(v)
-		case strings.HasPrefix(k, "temp"):
-			s := &TemperatureSensor{Name: k}
-			sn = s
-			err = s.parse(v)
-		default:
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
+	Name  string
+	Label string
 
-		if sn == nil {
-			continue
-		}
+	Alarm *bool
 
-		sensors = append(sensors, sn)
+	Input   *float64
+	Average *float64
+
+	Lowest  *float64
+	Highest *float64
+
+	Min     *float64
+	Max     *float64
+	CritMin *float64
+	CritMax *float64
+}
+
+// A FanSensor is a Sensor that detects fan speeds in rotations per minute.
+type FanSensor struct {
+	ReadTime time.Duration
+
+	Name  string
+	Label string
+
+	Alarm *bool
+
+	Input  *float64
+	Min    *float64
+	Max    *float64
+	Target *float64
+}
+
+// A TemperatureSensor is a Sensor that detects temperatures in degrees Celsius.
+type TemperatureSensor struct {
+	ReadTime time.Duration
+
+	Name        string
+	Label       string
+	TempTypeRaw int
+
+	Alarm *bool
+
+	Input     *float64
+	Lowest    *float64
+	Highest   *float64
+	Min       *float64
+	Max       *float64
+	CritMin   *float64
+	CritMax   *float64
+	Emergency *float64
+}
+
+func (s TemperatureSensor) TempType() string {
+	switch s.TempTypeRaw {
+	case 1:
+		return "CPU embedded diode"
+	case 2:
+		return "3904 transistor"
+	case 3:
+		return "thermal diode"
+	case 4:
+		return "thermistor"
+	case 5:
+		return "AMD AMDSI"
+	case 6:
+		return "Intel PECI"
+	default:
+		return ""
 	}
+}
 
-	type namer interface{ name() string }
+// A CurrentSensor is a Sensor that detects current in Amperes.
+type CurrentSensor struct {
+	ReadTime time.Duration
 
-	sort.Slice(sensors, func(i, j int) bool {
-		v1, ok1 := sensors[i].(namer)
-		v2, ok2 := sensors[j].(namer)
-		return ok1 && ok2 && v1.name() < v2.name()
-	})
+	Name  string
+	Label string
 
-	return sensors, nil
+	Alarm *bool
+
+	Input   *float64
+	Lowest  *float64
+	Highest *float64
+	Min     *float64
+	Max     *float64
+	CritMin *float64
+	CritMax *float64
+
+	Average *float64
+}
+
+// A PowerSensor is a Sensor that detects average electrical power consumption in watts.
+type PowerSensor struct {
+	ReadTime time.Duration
+
+	Name  string
+	Label string
+
+	Alarm *bool
+
+	Input        *float64
+	InputLowest  *float64
+	InputHighest *float64
+	Cap          *float64
+	CapMin       *float64
+	CapMax       *float64
+	Max          *float64
+	CritMax      *float64
+
+	Average        *float64
+	AverageMin     *float64
+	AverageMax     *float64
+	AverageLowest  *float64
+	AverageHighest *float64
+
+	Accuracy *float64
+}
+
+// A EnergySensor is a Sensor that detects energy in microJoule.
+type EnergySensor struct {
+	ReadTime time.Duration
+
+	Name  string
+	Label string
+
+	Input *float64
+}
+
+// A HumiditySensor is a Sensor that detects humidity in milli-percent.
+type HumiditySensor struct {
+	ReadTime time.Duration
+
+	Name  string
+	Label string
+
+	Input *float64
+}
+
+// An IntrusionSensor is a Sensor that detects when the machine's chassis has been opened.
+type IntrusionSensor struct {
+	ReadTime time.Duration
+
+	Name  string
+	Label string
+
+	Alarm *bool
 }
