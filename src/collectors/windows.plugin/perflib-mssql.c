@@ -99,7 +99,7 @@ struct mssql_instance {
 
 static DICTIONARY *mssql_instances = NULL;
 
-static inline void initialize_mssql_objects(struct mssql_instance *p, const char *instance) {
+static void initialize_mssql_objects(struct mssql_instance *p, const char *instance) {
     char prefix[NETDATA_MAX_INSTANCE_NAME];
     if (!strcmp(instance, "MSSQLSERVER")) {
         strncpyz(prefix, "SQLServer:", sizeof(prefix) -1);
@@ -248,7 +248,7 @@ static int initialize(void) {
     return 0;
 }
 
-static inline void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+static void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_GENERAL_STATS]);
@@ -322,7 +322,7 @@ static inline void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct ms
     }
 }
 
-static inline void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_SQL_STATS]);
@@ -495,7 +495,7 @@ static inline void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct m
     }
 }
 
-static inline void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_BUFFER_MANAGEMENT]);
@@ -648,7 +648,7 @@ static inline void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struc
     }
 }
 
-static inline void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+static void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_ACCESS_METHODS]);
