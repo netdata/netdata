@@ -485,7 +485,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Intelligent Platform Management Interface (IPMI)](https://github.com/netdata/netdata/blob/master/src/collectors/freeipmi.plugin/integrations/intelligent_platform_management_interface_ipmi.md)
 
-- [Linux Sensors (lm-sensors)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/sensors/integrations/linux_sensors_lm-sensors.md)
+- [Linux Sensors](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/sensors/integrations/linux_sensors.md)
 
 - [NVML](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/nvml.md)
 
