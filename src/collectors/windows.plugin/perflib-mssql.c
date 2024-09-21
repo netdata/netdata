@@ -16,21 +16,15 @@ enum netdata_mssql_metrics {
     NETDATA_MSSQL_BUFFER_MANAGEMENT,
     NETDATA_MSSQL_SQL_STATS,
     NETDATA_MSSQL_TRANSACTIONS,
-    NETDATA_MSSQL_ACCESS_METHODS
+    NETDATA_MSSQL_ACCESS_METHODS,
+
+    NETDATA_MSSQL_METRICS_END
 };
 
 struct mssql_instance {
     char *instanceID;
 
-    char *genStats;
-    char *sqlErrors;
-    char *databases;
-    char *transactions;
-    char *sqlStatistics;
-    char *buffMan;
-    char *memmgr;
-    char *locks;
-    char *accessMethods;
+    char *objectName[NETDATA_MSSQL_METRICS_END];
 
     RRDSET *st_user_connections;
     RRDDIM *rd_user_connections;
@@ -112,31 +106,31 @@ static inline void initialize_mssql_objects(struct mssql_instance *p, const char
     size_t length = strlen(prefix);
     char name[NETDATA_MAX_INSTANCE_OBJECT];
     snprintfz(name, sizeof(name) -1, "%s%s", prefix, "General Statistics");
-    p->genStats = strdup(name);
+    p->objectName[NETDATA_MSSQL_GENERAL_STATS] = strdup(name);
 
     strncpyz(&name[length], "SQL Errors", sizeof(name) - length);
-    p->sqlErrors = strdup(name);
+    p->objectName[NETDATA_MSSQL_SQL_ERRORS] = strdup(name);
 
     strncpyz(&name[length], "Databases", sizeof(name) - length);
-    p->databases = strdup(name);
+    p->objectName[NETDATA_MSSQL_DATABASE] = strdup(name);
 
     strncpyz(&name[length], "Transactions", sizeof(name) - length);
-    p->transactions = strdup(name);
+    p->objectName[NETDATA_MSSQL_TRANSACTIONS] = strdup(name);
 
     strncpyz(&name[length], "SQL Statistics", sizeof(name) - length);
-    p->sqlStatistics = strdup(name);
+    p->objectName[NETDATA_MSSQL_SQL_STATS] = strdup(name);
 
     strncpyz(&name[length], "Buffer Manager", sizeof(name) - length);
-    p->buffMan = strdup(name);
+    p->objectName[NETDATA_MSSQL_BUFFER_MANAGEMENT] = strdup(name);
 
     strncpyz(&name[length], "Memory Manager", sizeof(name) - length);
-    p->memmgr = strdup(name);
+    p->objectName[NETDATA_MSSQL_MEMORY] = strdup(name);
 
     strncpyz(&name[length], "Locks", sizeof(name) - length);
-    p->locks = strdup(name);
+    p->objectName[NETDATA_MSSQL_LOCKS] = strdup(name);
 
     strncpyz(&name[length], "Access Methods", sizeof(name) - length);
-    p->accessMethods =  strdup(name);
+    p->objectName[NETDATA_MSSQL_ACCESS_METHODS] = strdup(name);
 
     p->instanceID = strdup(instance);
     netdata_fix_chart_name(p->instanceID);
@@ -251,7 +245,7 @@ static int initialize(void) {
 static inline void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->genStats);
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_GENERAL_STATS]);
     if (!pObjectType)
         return;
 
@@ -325,7 +319,7 @@ static inline void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct ms
 static inline void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->sqlStatistics);
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_SQL_STATS]);
     if (!pObjectType)
         return;
 
@@ -498,7 +492,7 @@ static inline void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct m
 static inline void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->buffMan);
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_BUFFER_MANAGEMENT]);
     if (!pObjectType)
         return;
 
@@ -651,7 +645,7 @@ static inline void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struc
 static inline void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->accessMethods);
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_ACCESS_METHODS]);
     if (!pObjectType)
         return;
 
@@ -689,73 +683,28 @@ static inline void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct m
     }
 }
 
-static bool do_mssql(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *instance, int update_every, int caller_idx)
-{
-    // TODO: change to function pointer
-    switch(caller_idx) {
-        case NETDATA_MSSQL_GENERAL_STATS: {
-            do_mssql_general_stats(pDataBlock, instance, update_every);
-            break;
-        }
-        case NETDATA_MSSQL_SQL_ERRORS: {
-            break;
-        }
-        case NETDATA_MSSQL_DATABASE: {
-            break;
-        }
-        case NETDATA_MSSQL_LOCKS: {
-            break;
-        }
-        case NETDATA_MSSQL_MEMORY: {
-            break;
-        }
-        case NETDATA_MSSQL_BUFFER_MANAGEMENT: {
-            do_mssql_buffer_management(pDataBlock, instance, update_every);
-            break;
-        }
-        case NETDATA_MSSQL_SQL_STATS: {
-            do_mssql_sql_statistics(pDataBlock, instance, update_every);
-            break;
-        }
-        case NETDATA_MSSQL_TRANSACTIONS: {
-            break;
-        }
-        case NETDATA_MSSQL_ACCESS_METHODS: {
-            do_mssql_access_methods(pDataBlock, instance, update_every);
-            break;
-        }
-    }
-
-    return true;
-}
-
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_instance *p = value;
     int *update_every = data;
 
-    char *loop_through_data[] = {
-        p->genStats,
-        p->sqlErrors,
-        p->databases,
-        p->locks,
-        p->memmgr,
-        p->buffMan,
-        p->sqlStatistics,
-        p->transactions,
-        p->accessMethods,
-        NULL
+    static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
+        do_mssql_general_stats, NULL, NULL, NULL, NULL, do_mssql_buffer_management, do_mssql_sql_statistics, NULL,
+        do_mssql_access_methods
     };
 
     DWORD i;
-    for (i = 0; loop_through_data[i] ; i++) {
-        DWORD id = RegistryFindIDByName(loop_through_data[i]);
+    for (i = 0; i <  NETDATA_MSSQL_METRICS_END; i++) {
+        if (!doMSSQL[i])
+            continue;
+
+        DWORD id = RegistryFindIDByName(p->objectName[i]);
         if(id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
             return -1;
 
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
         if(!pDataBlock) return -1;
 
-        do_mssql(pDataBlock, p, *update_every, i);
+        doMSSQL[i](pDataBlock, p, *update_every);
     }
 
     return 1;
