@@ -742,6 +742,7 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         p->buffMan,
         p->sqlStatistics,
         p->transactions,
+        p->accessMethods,
         NULL
     };
 
