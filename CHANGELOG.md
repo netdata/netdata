@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Bump go.mongodb.org/mongo-driver from 1.16.1 to 1.17.0 in /src/go [\#18589](https://github.com/netdata/netdata/pull/18589) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/docker/docker from 27.2.1+incompatible to 27.3.0+incompatible in /src/go [\#18588](https://github.com/netdata/netdata/pull/18588) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Update kickstart.sh [\#18587](https://github.com/netdata/netdata/pull/18587) ([eya46](https://github.com/eya46))
 - go.d move packages [\#18580](https://github.com/netdata/netdata/pull/18580) ([ilyam8](https://github.com/ilyam8))
 - WEIGHTS: use node\_id when available, otherwise host\_id [\#18579](https://github.com/netdata/netdata/pull/18579) ([ktsaou](https://github.com/ktsaou))
 - go.d/portcheck: update status duration calculation [\#18577](https://github.com/netdata/netdata/pull/18577) ([ilyam8](https://github.com/ilyam8))
@@ -417,9 +420,6 @@
 - alert prototype: set default "after" to -600 [\#18025](https://github.com/netdata/netdata/pull/18025) ([ilyam8](https://github.com/ilyam8))
 - Fix Coverity scan CI. [\#18024](https://github.com/netdata/netdata/pull/18024) ([Ferroin](https://github.com/Ferroin))
 - go.d snmp: add config options to filter interfaces by name and type [\#18023](https://github.com/netdata/netdata/pull/18023) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18022](https://github.com/netdata/netdata/pull/18022) ([netdatabot](https://github.com/netdatabot))
-- fix grep warning in kickstart [\#18021](https://github.com/netdata/netdata/pull/18021) ([ilyam8](https://github.com/ilyam8))
-- ping meta fix configuring ping\_group\_range [\#18020](https://github.com/netdata/netdata/pull/18020) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
