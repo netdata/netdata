@@ -115,11 +115,16 @@ void aggregate_pid_fds_on_targets(struct pid_stat *p) {
         return;
     }
 
-    struct target *w = p->target, *u = p->user_target, *g = p->group_target;
+    struct target
+        *w = p->target,
+        *u = p->uid_target,
+        *g = p->gid_target,
+        *t = p->tree_target;
 
     reallocate_target_fds(w);
     reallocate_target_fds(u);
     reallocate_target_fds(g);
+    reallocate_target_fds(t);
 
     p->openfds.files = 0;
     p->openfds.pipes = 0;
@@ -131,7 +136,6 @@ void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     p->openfds.eventpolls = 0;
     p->openfds.other = 0;
 
-    long currentfds = 0;
     uint32_t c, size = p->fds_size;
     struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
@@ -140,12 +144,12 @@ void aggregate_pid_fds_on_targets(struct pid_stat *p) {
         if(likely(fd <= 0 || (uint32_t)fd >= all_files_size))
             continue;
 
-        currentfds++;
         aggregage_fd_type_on_openfds(all_files[fd].type, &p->openfds);
 
         aggregate_fd_on_target(fd, w);
         aggregate_fd_on_target(fd, u);
         aggregate_fd_on_target(fd, g);
+        aggregate_fd_on_target(fd, t);
     }
 }
 

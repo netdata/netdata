@@ -172,16 +172,25 @@ struct pid_on_target {
     struct pid_on_target *next;
 };
 
+typedef enum __attribute__((packed)) {
+    TARGET_TYPE_APP_GROUP = 1,
+    TARGET_TYPE_UID = 2,
+    TARGET_TYPE_GID = 3,
+    TARGET_TYPE_TREE = 4,
+} TARGET_TYPE;
+
 struct target {
-    STRING *compare;
+    STRING *id;
+    STRING *name;
+    STRING *clean_name;
 
-    char id[MAX_NAME + 1];
-    uint32_t idhash;
-
-    char name[MAX_NAME + 1];
-    char clean_name[MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
-    uid_t uid;
-    gid_t gid;
+    TARGET_TYPE type;
+    union {
+        STRING *compare;
+        STRING *pid_comm;
+        uid_t uid;
+        gid_t gid;
+    };
 
     kernel_uint_t minflt;
     kernel_uint_t cminflt;
@@ -309,8 +318,9 @@ struct pid_stat {
     struct pid_stat *parent;
 
     struct target *target;          // app_groups.conf targets
-    struct target *user_target;     // uid based targets
-    struct target *group_target;    // gid based targets
+    struct target *uid_target;      // uid based targets
+    struct target *gid_target;      // gid based targets
+    struct target *tree_target;     // tree based target
 
     STRING *comm;
     STRING *cmdline;
@@ -463,7 +473,8 @@ extern struct target
     *apps_groups_default_target,
     *apps_groups_root_target,
     *users_root_target,
-    *groups_root_target;
+    *groups_root_target,
+    *tree_root_target;
 
 struct pid_stat *root_of_pids(void);
 size_t all_pids_count(void);
@@ -481,8 +492,9 @@ void function_processes(const char *transaction, char *function,
 
 struct target *find_target_by_name(struct target *base, const char *name);
 
-struct target *get_users_target(uid_t uid);
-struct target *get_groups_target(gid_t gid);
+struct target *get_uid_target(uid_t uid);
+struct target *get_gid_target(gid_t gid);
+struct target *get_tree_target(struct pid_stat *p);
 int read_apps_groups_conf(const char *path, const char *file);
 
 void users_and_groups_init(void);

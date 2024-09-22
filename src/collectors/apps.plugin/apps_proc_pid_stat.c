@@ -4,7 +4,7 @@
 
 // ----------------------------------------------------------------------------
 
-static inline void assign_target_to_pid(struct pid_stat *p) {
+static inline void assign_app_group_target_to_pid(struct pid_stat *p) {
     targets_assignment_counter++;
 
     struct target *w;
@@ -49,7 +49,7 @@ static inline void update_pid_comm(struct pid_stat *p, const char *comm) {
         if(likely(proc_pid_cmdline_is_needed))
             managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
 
-        assign_target_to_pid(p);
+        assign_app_group_target_to_pid(p);
     }
 }
 
@@ -264,7 +264,7 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __may
 
     if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
         debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d",
-                      netdata_configured_host_prefix, p->pid, pid_stat_comm(p), (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+                      netdata_configured_host_prefix, p->pid, pid_stat_comm(p), (p->target)?string2str(p->target->name):"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
     if(unlikely(global_iterations_counter == 1))
         clear_pid_stat(p, false);

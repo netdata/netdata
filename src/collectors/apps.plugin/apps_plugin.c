@@ -133,7 +133,8 @@ struct target
         *apps_groups_default_target = NULL, // the default target
         *apps_groups_root_target = NULL,    // apps_groups.conf defined
         *users_root_target = NULL,          // users
-        *groups_root_target = NULL;         // user groups
+        *groups_root_target = NULL,         // user groups
+        *tree_root_target = NULL;
 
 size_t pagesize;
 
@@ -463,9 +464,10 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     }
 }
 
-static void calculate_netdata_statistics(void) {
+static void aggregate_processes_to_targets(void) {
     apply_apps_groups_targets_inheritance();
 
+    zero_all_targets(tree_root_target);
     zero_all_targets(users_root_target);
     zero_all_targets(groups_root_target);
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
@@ -486,14 +488,14 @@ static void calculate_netdata_statistics(void) {
         // --------------------------------------------------------------------
         // user target
 
-        o = p->user_target;
-        if(likely(p->user_target && p->user_target->uid == p->uid))
-            w = p->user_target;
+        o = p->uid_target;
+        if(likely(p->uid_target && p->uid_target->uid == p->uid))
+            w = p->uid_target;
         else {
-            if(unlikely(debug_enabled && p->user_target))
-                debug_log("pid %d (%s) switched user from %u (%s) to %u.", p->pid, pid_stat_comm(p), p->user_target->uid, p->user_target->name, p->uid);
+            if(unlikely(debug_enabled && p->uid_target))
+                debug_log("pid %d (%s) switched user from %u (%s) to %u.", p->pid, pid_stat_comm(p), p->uid_target->uid, p->uid_target->name, p->uid);
 
-            w = p->user_target = get_users_target(p->uid);
+            w = p->uid_target = get_uid_target(p->uid);
         }
 
         aggregate_pid_on_target(w, p, o);
@@ -502,14 +504,30 @@ static void calculate_netdata_statistics(void) {
         // --------------------------------------------------------------------
         // user group target
 
-        o = p->group_target;
-        if(likely(p->group_target && p->group_target->gid == p->gid))
-            w = p->group_target;
+        o = p->gid_target;
+        if(likely(p->gid_target && p->gid_target->gid == p->gid))
+            w = p->gid_target;
         else {
-            if(unlikely(debug_enabled && p->group_target))
-                debug_log("pid %d (%s) switched group from %u (%s) to %u.", p->pid, pid_stat_comm(p), p->group_target->gid, p->group_target->name, p->gid);
+            if(unlikely(debug_enabled && p->gid_target))
+                debug_log("pid %d (%s) switched group from %u (%s) to %u.", p->pid, pid_stat_comm(p), p->gid_target->gid, p->gid_target->name, p->gid);
 
-            w = p->group_target = get_groups_target(p->gid);
+            w = p->gid_target = get_gid_target(p->gid);
+        }
+
+        aggregate_pid_on_target(w, p, o);
+
+
+        // --------------------------------------------------------------------
+        // top target
+
+        o = p->tree_target;
+        if(likely(p->tree_target && p->tree_target->pid_comm == p->comm))
+            w = p->tree_target;
+        else {
+            w = p->tree_target = get_tree_target(p);
+
+            if(unlikely(debug_enabled && o))
+                debug_log("pid %d (%s) switched top target from '%s' to '%s'.", p->pid, pid_stat_comm(p), string2str(o->pid_comm), string2str(p->gid_target->pid_comm));
         }
 
         aggregate_pid_on_target(w, p, o);
@@ -938,16 +956,6 @@ static int check_capabilities() {
 
 static netdata_mutex_t apps_and_stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 
-struct target *find_target_by_name(struct target *base, const char *name) {
-    struct target *t;
-    for(t = base; t ; t = t->next) {
-        if (strcmp(t->name, name) == 0)
-            return t;
-    }
-
-    return NULL;
-}
-
 static bool apps_plugin_exit = false;
 
 int main(int argc, char **argv) {
@@ -1088,23 +1096,26 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
-        calculate_netdata_statistics();
+        aggregate_processes_to_targets();
         normalize_utilization(apps_groups_root_target);
 
         if(send_resource_usage)
             send_resource_usage_to_netdata(dt);
 
         send_proc_states_count(dt);
-        send_charts_updates_to_netdata(apps_groups_root_target, "app", "app_group", "Apps");
+        send_charts_updates_to_netdata(apps_groups_root_target, "app", "app_group", "Processes Custom Groups");
         send_collected_data_to_netdata(apps_groups_root_target, "app", dt);
 
+        send_charts_updates_to_netdata(tree_root_target, "process_tree", "top_process", "Processes Tree");
+        send_collected_data_to_netdata(tree_root_target, "process_tree", dt);
+
         if (enable_users_charts) {
-            send_charts_updates_to_netdata(users_root_target, "user", "user", "Users");
+            send_charts_updates_to_netdata(users_root_target, "user", "user", "User Processes");
             send_collected_data_to_netdata(users_root_target, "user", dt);
         }
 
         if (enable_groups_charts) {
-            send_charts_updates_to_netdata(groups_root_target, "usergroup", "user_group", "User Groups");
+            send_charts_updates_to_netdata(groups_root_target, "usergroup", "user_group", "User Group Processes");
             send_collected_data_to_netdata(groups_root_target, "usergroup", dt);
         }
 

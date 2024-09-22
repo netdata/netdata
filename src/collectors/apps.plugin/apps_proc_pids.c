@@ -240,7 +240,7 @@ static inline void link_all_processes_to_their_parents(void) {
 
             if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
                 debug_log_int("child %d (%s, %s) on target '%s' has parent %d (%s, %s). Parent: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "",
-                              p->pid, pid_stat_comm(p), p->updated?"running":"exited", (p->target)?p->target->name:"UNSET", pp->pid, pid_stat_comm(pp), pp->updated?"running":"exited", pp->utime, pp->stime, pp->gtime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cgtime, pp->cminflt, pp->cmajflt);
+                              p->pid, pid_stat_comm(p), p->updated?"running":"exited", (p->target)?string2str(p->target->name):"UNSET", pp->pid, pid_stat_comm(pp), pp->updated?"running":"exited", pp->utime, pp->stime, pp->gtime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cgtime, pp->cminflt, pp->cmajflt);
         }
         else {
             p->parent = NULL;

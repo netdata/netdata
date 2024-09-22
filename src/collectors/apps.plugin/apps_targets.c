@@ -2,25 +2,35 @@
 
 #include "apps_plugin.h"
 
+static STRING *get_clean_name(STRING *name) {
+    char buf[string_strlen(name) + 1];
+    memcpy(buf, string2str(name), string_strlen(name) + 1);
+    netdata_fix_chart_name(buf);
+    for (char *d = buf; *d ; d++) {
+        if (*d == '.') *d = '_';
+    }
+    return string_strdupz(buf);
+}
+
+static STRING *get_numeric_string(uint64_t n) {
+    char buf[UINT64_MAX_LENGTH];
+    print_uint64(buf, n);
+    return string_strdupz(buf);
+}
+
 // ----------------------------------------------------------------------------
 // apps_groups.conf
 // aggregate all processes in groups, to have a limited number of dimensions
 
-struct target *get_users_target(uid_t uid) {
+struct target *get_uid_target(uid_t uid) {
     struct target *w;
     for(w = users_root_target ; w ; w = w->next)
         if(w->uid == uid) return w;
 
     w = callocz(sizeof(struct target), 1);
-
-    {
-        char buf[100];
-        snprintfz(buf, sizeof(buf), "%u", uid);
-        w->compare = string_strdupz(buf);
-    }
-
-    snprintfz(w->id, MAX_NAME, "%u", uid);
-    w->idhash = simple_hash(w->id);
+    w->type = TARGET_TYPE_UID;
+    w->uid = uid;
+    w->id = get_numeric_string(uid);
 
     struct user_or_group_id user_id_to_find = {
         .id = {
@@ -30,44 +40,34 @@ struct target *get_users_target(uid_t uid) {
     struct user_or_group_id *user_or_group_id = user_id_find(&user_id_to_find);
 
     if(user_or_group_id && user_or_group_id->name && *user_or_group_id->name)
-        snprintfz(w->name, MAX_NAME, "%s", user_or_group_id->name);
-
+        w->name = string_strdupz(user_or_group_id->name);
     else {
         struct passwd *pw = getpwuid(uid);
         if(!pw || !pw->pw_name || !*pw->pw_name)
-            snprintfz(w->name, MAX_NAME, "%u", uid);
+            w->name = get_numeric_string(uid);
         else
-            snprintfz(w->name, MAX_NAME, "%s", pw->pw_name);
+            w->name = string_strdupz(pw->pw_name);
     }
 
-    strncpyz(w->clean_name, w->name, MAX_NAME);
-    netdata_fix_chart_name(w->clean_name);
-
-    w->uid = uid;
+    w->clean_name = get_clean_name(w->name);
 
     w->next = users_root_target;
     users_root_target = w;
 
-    debug_log("added uid %u ('%s') target", w->uid, w->name);
+    debug_log("added uid %u ('%s') target", w->uid, string2str(w->name));
 
     return w;
 }
 
-struct target *get_groups_target(gid_t gid) {
+struct target *get_gid_target(gid_t gid) {
     struct target *w;
     for(w = groups_root_target ; w ; w = w->next)
         if(w->gid == gid) return w;
 
     w = callocz(sizeof(struct target), 1);
-
-    {
-        char buf[100];
-        snprintfz(buf, sizeof(buf), "%u", gid);
-        w->compare = string_strdupz(buf);
-    }
-
-    snprintfz(w->id, MAX_NAME, "%u", gid);
-    w->idhash = simple_hash(w->id);
+    w->type = TARGET_TYPE_GID;
+    w->gid = gid;
+    w->id = get_numeric_string(gid);
 
     struct user_or_group_id group_id_to_find = {
         .id = {
@@ -76,21 +76,17 @@ struct target *get_groups_target(gid_t gid) {
     };
     struct user_or_group_id *group_id = group_id_find(&group_id_to_find);
 
-    if(group_id && group_id->name && *group_id->name) {
-        snprintfz(w->name, MAX_NAME, "%s", group_id->name);
-    }
+    if(group_id && group_id->name)
+        w->name = string_strdupz(group_id->name);
     else {
         struct group *gr = getgrgid(gid);
         if(!gr || !gr->gr_name || !*gr->gr_name)
-            snprintfz(w->name, MAX_NAME, "%u", gid);
+            w->name = get_numeric_string(gid);
         else
-            snprintfz(w->name, MAX_NAME, "%s", gr->gr_name);
+            w->name = string_strdupz(gr->gr_name);
     }
 
-    strncpyz(w->clean_name, w->name, MAX_NAME);
-    netdata_fix_chart_name(w->clean_name);
-
-    w->gid = gid;
+    w->clean_name = get_clean_name(w->name);
 
     w->next = groups_root_target;
     groups_root_target = w;
@@ -100,85 +96,178 @@ struct target *get_groups_target(gid_t gid) {
     return w;
 }
 
+static void id_cleanup_txt(char *buf) {
+    char *s = buf;
+    while(*s) {
+        if (!isalnum((uint8_t)*s) && *s != '-' && *s != '_')
+            *s = ' ';
+        s++;
+    }
+
+    trim_all(buf);
+}
+
+static STRING *id_cleanup_string(STRING *s) {
+    char buf[string_strlen(s) + 1];
+    memcpy(buf, string2str(s), sizeof(buf));
+    id_cleanup_txt(buf);
+    return string_strdupz(buf);
+}
+
+static STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
+    if(!cmdline) return id_cleanup_string(comm);
+
+    char buf_cmd[string_strlen(cmdline) + 1];
+    memcpy(buf_cmd, string2str(cmdline), sizeof(buf_cmd));
+
+    char *start = buf_cmd;
+    for(char *s = start; *s ;s++) {
+        if(*s == '/' || *s == '\\')
+            start = s + 1;
+
+        if(*s == ' ') {
+            *s = '\0';
+            break;
+        }
+    }
+
+    id_cleanup_txt(start);
+
+    // we replace the string only when the extracted one is a longer version
+    // of comm. The problem is all the interpreters. We don't want to replace
+    // xyz with "python".
+    if(*start && strncmp(string2str(comm), start, string_strlen(comm)) == 0)
+        return string_strdupz(trim_all(start));
+    else
+        return id_cleanup_string(comm);
+}
+
+struct target *get_tree_target(struct pid_stat *p) {
+    const char *p_comm0 = string2str(p->comm);
+
+    // skip fast all the children that are more than 3 levels down
+    while(p->parent && p->parent->parent && p->parent->parent->parent)
+        p = p->parent;
+
+    // keep the children of INIT_PID, "systemd" and "init"
+    while(p->parent && p->parent->parent &&
+           p->parent->pid != INIT_PID &&
+           string_strcmp(p->parent->comm, "systemd") != 0 &&
+           string_strcmp(p->parent->comm, "init") != 0)
+        p = p->parent;
+
+    // merge all kernel threads into kthread
+    if(p->parent && string_strcmp(p->parent->comm, "kthreadd") == 0)
+        p = p->parent;
+
+    struct target *w;
+    for(w = tree_root_target; w ; w = w->next)
+        if(w->pid_comm == p->comm) return w;
+
+    const char *w_pid_comm = w ? string2str(w->pid_comm) : NULL;
+    const char *p_comm = string2str(p->comm);
+
+    w = callocz(sizeof(struct target), 1);
+    w->type = TARGET_TYPE_TREE;
+    w->pid_comm = string_dup(p->comm);
+    w->id = string_dup(p->comm);
+    w->name = comm_from_cmdline(p->comm, p->cmdline);
+    w->clean_name = get_clean_name(w->name);
+
+    const char *w_name = string2str(w->name);
+
+    w->next = tree_root_target;
+    tree_root_target = w;
+
+    debug_log("added uid %u ('%s') target", w->uid, w->name);
+
+    return w;
+}
+
 // find or create a new target
 // there are targets that are just aggregated to other target (the second argument)
 static struct target *get_apps_groups_target(const char *id, struct target *target, const char *name) {
-    bool tdebug = false, thidden = target ? target->hidden : false, ends_with = false;
-    const char *nid = id;
+    bool tdebug = false, thidden = target ? target->hidden : false, ends_with = false, starts_with = false;
 
-    // extract the options
-    while(nid[0] == '-' || nid[0] == '+' || nid[0] == '*') {
-        if(nid[0] == '-') thidden = 1;
-        if(nid[0] == '+') tdebug = 1;
-        if(nid[0] == '*') ends_with = 1;
-        nid++;
+    STRING *id_lookup = NULL;
+    STRING *name_lookup = NULL;
+
+    // extract the options from the id
+    {
+        size_t len = strlen(id);
+        char buf[len + 1];
+        memcpy(buf, id, sizeof(buf));
+
+        if(buf[len - 1] == '*') {
+            buf[--len] = '\0';
+            starts_with = true;
+        }
+
+        const char *nid = buf;
+        while (nid[0] == '-' || nid[0] == '+' || nid[0] == '*') {
+            if (nid[0] == '-') thidden = true;
+            if (nid[0] == '+') tdebug = true;
+            if (nid[0] == '*') ends_with = true;
+            nid++;
+        }
+
+        id_lookup = string_strdupz(nid);
     }
-    uint32_t hash = simple_hash(id);
+
+    // extract the options from the name
+    {
+        size_t len = strlen(name);
+        char buf[len + 1];
+        memcpy(buf, name, sizeof(buf));
+
+        const char *nn = buf;
+        while (nn[0] == '-' || nn[0] == '+') {
+            if (nn[0] == '-') thidden = true;
+            if (nn[0] == '+') tdebug = true;
+            nn++;
+        }
+
+        name_lookup = string_strdupz(nn);
+    }
 
     // find if it already exists
     struct target *w, *last = apps_groups_root_target;
     for(w = apps_groups_root_target ; w ; w = w->next) {
-        if(w->idhash == hash && strncmp(nid, w->id, MAX_NAME) == 0)
+        if(w->id == id_lookup) {
+            string_freez(id_lookup);
+            string_freez(name_lookup);
             return w;
+        }
 
         last = w;
     }
 
     // find an existing target
     if(unlikely(!target)) {
-        while(*name == '-') {
-            if(*name == '-') thidden = true;
-            name++;
-        }
-
-        for(target = apps_groups_root_target ; target != NULL ; target = target->next) {
-            if(!target->target && strcmp(name, target->name) == 0)
+        for(target = apps_groups_root_target ; target ; target = target->next) {
+            if(!target->target && name_lookup == target->name)
                 break;
-        }
-
-        if(unlikely(debug_enabled)) {
-            if(unlikely(target))
-                debug_log("REUSING TARGET NAME '%s' on ID '%s'", target->name, target->id);
-            else
-                debug_log("NEW TARGET NAME '%s' on ID '%s'", name, id);
         }
     }
 
     if(target && target->target)
-        fatal("Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'", id, target->id, target->target->id);
+        fatal("Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'",
+              id, string2str(target->id), string2str(target->target->id));
 
     w = callocz(sizeof(struct target), 1);
-    strncpyz(w->id, nid, MAX_NAME);
-    w->idhash = simple_hash(w->id);
+    w->type = TARGET_TYPE_APP_GROUP;
+    w->compare = string_dup(id_lookup);
+    w->starts_with = starts_with;
+    w->ends_with = ends_with;
+    w->id = string_dup(id_lookup);
 
     if(unlikely(!target))
-        // copy the name
-        strncpyz(w->name, name, MAX_NAME);
+        w->name = string_dup(name_lookup); // copy the name
     else
-        // copy the id
-        strncpyz(w->name, nid, MAX_NAME);
+        w->name = string_dup(id_lookup); // copy the id
 
     // dots are used to distinguish chart type and id in streaming, so we should replace them
-    strncpyz(w->clean_name, w->name, MAX_NAME);
-    netdata_fix_chart_name(w->clean_name);
-    for (char *d = w->clean_name; *d; d++) {
-        if (*d == '.')
-            *d = '_';
-    }
-
-    {
-        size_t len = strlen(nid);
-        char buf[len + 1];
-        memcpy(buf, nid, sizeof(buf));
-
-        if (buf[len - 1] == '*') {
-            buf[--len] = '\0';
-            w->starts_with = true;
-        }
-        w->ends_with = ends_with;
-
-        w->compare = string_strdupz(buf);
-    }
+    w->clean_name = get_clean_name(w->name);
 
     if(w->starts_with && w->ends_with)
         proc_pid_cmdline_is_needed = true;
@@ -197,13 +286,16 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
     else apps_groups_root_target = w;
 
     debug_log("ADDING TARGET ID '%s', process name '%s' (%s), aggregated on target '%s', options: %s %s"
-              , w->id
+              , string2str(w->id)
               , string2str(w->compare)
               , (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
               , w->target?w->target->name:w->name
               , (w->hidden)?"hidden":"-"
               , (w->debug_enabled)?"debug":"-"
     );
+
+    string_freez(id_lookup);
+    string_freez(name_lookup);
 
     return w;
 }
@@ -273,4 +365,14 @@ int read_apps_groups_conf(const char *path, const char *file) {
         apps_groups_default_target = apps_groups_default_target->target;
 
     return 0;
+}
+
+struct target *find_target_by_name(struct target *base, const char *name) {
+    struct target *t;
+    for(t = base; t ; t = t->next) {
+        if (string_strcmp(t->name, name) == 0)
+            return t;
+    }
+
+    return NULL;
 }

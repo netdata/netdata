@@ -215,10 +215,10 @@ void function_processes(const char *transaction, char *function,
         if(category && p->target != category)
             continue;
 
-        if(user && p->user_target != user)
+        if(user && p->uid_target != user)
             continue;
 
-        if(group && p->group_target != group)
+        if(group && p->gid_target != group)
             continue;
 
         if(process_name && ((strcmp(pid_stat_comm(p), process_name) != 0 && !p->parent) || (p->parent && strcmp(pid_stat_comm(p), process_name) != 0 && strcmp(pid_stat_comm(p->parent), process_name) != 0)))
@@ -255,16 +255,16 @@ void function_processes(const char *transaction, char *function,
         buffer_json_add_array_item_uint64(wb, p->ppid);
 
         // category
-        buffer_json_add_array_item_string(wb, p->target ? p->target->name : "-");
+        buffer_json_add_array_item_string(wb, p->target ? string2str(p->target->name) : "-");
 
         // user
-        buffer_json_add_array_item_string(wb, p->user_target ? p->user_target->name : "-");
+        buffer_json_add_array_item_string(wb, p->uid_target ? string2str(p->uid_target->name) : "-");
 
         // uid
         buffer_json_add_array_item_uint64(wb, p->uid);
 
         // group
-        buffer_json_add_array_item_string(wb, p->group_target ? p->group_target->name : "-");
+        buffer_json_add_array_item_string(wb, p->gid_target ? string2str(p->gid_target->name) : "-");
 
         // gid
         buffer_json_add_array_item_uint64(wb, p->gid);
