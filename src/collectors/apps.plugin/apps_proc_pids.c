@@ -170,7 +170,7 @@ static inline int collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     struct pid_stat *pp = p->parent;
     if(unlikely(include_exited_childs && pp && !pp->read))
         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-               "Read process %d (%s) sortlisted %zu, but its parent %d (%s) sortlisted %zu, is not read",
+               "Read process %d (%s) sortlisted %"PRIu32", but its parent %d (%s) sortlisted %"PRIu32", is not read",
                p->pid, pid_stat_comm(p), p->sortlist, pp->pid, pid_stat_comm(pp), pp->sortlist);
 #endif
 
