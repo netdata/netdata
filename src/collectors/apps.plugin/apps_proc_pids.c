@@ -35,6 +35,7 @@ struct {
         size_t count;               // the number of processes running
         struct pid_stat *root;
         SIMPLE_HASHTABLE_PID ht;
+        ARAL *aral;
     } all_pids;
 } pids = { 0 };
 
@@ -47,6 +48,7 @@ size_t all_pids_count(void) {
 }
 
 void pids_init(void) {
+    pids.all_pids.aral = aral_create("pid_stat", sizeof(struct pid_stat), 1, 65536, NULL, NULL, NULL, false, true);
     simple_hashtable_init_PID(&pids.all_pids.ht, 1024);
 }
 
@@ -71,7 +73,7 @@ static inline struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
     if(likely(p))
         return p;
 
-    p = callocz(sizeof(struct pid_stat), 1);
+    p = aral_callocz(pids.all_pids.aral);
     p->fds = mallocz(sizeof(struct pid_fd) * MAX_SPARE_FDS);
     p->fds_size = MAX_SPARE_FDS;
     init_pid_fds(p, 0, p->fds_size);
@@ -118,7 +120,7 @@ static inline void del_pid_entry(pid_t pid) {
     freez(p->io_filename);
     freez(p->cmdline_filename);
     freez(p->cmdline);
-    freez(p);
+    aral_freez(pids.all_pids.aral, p);
 
     pids.all_pids.count--;
 }
