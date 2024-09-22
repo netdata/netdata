@@ -248,7 +248,7 @@ void function_processes(const char *transaction, char *function,
 
         // cmdline
         if (show_cmdline) {
-            buffer_json_add_array_item_string(wb, (p->cmdline && *p->cmdline) ? p->cmdline : pid_stat_comm(p));
+            buffer_json_add_array_item_string(wb, (string_strlen(p->cmdline)) ? pid_stat_cmdline(p) : pid_stat_comm(p));
         }
 
         // ppid

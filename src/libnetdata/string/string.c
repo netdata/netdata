@@ -347,14 +347,28 @@ void string_freez(STRING *string) {
     string_stats_atomic_increment(partition, releases);
 }
 
-inline size_t string_strlen(STRING *string) {
+inline size_t string_strlen(const STRING *string) {
     if(unlikely(!string)) return 0;
     return string->length - 1;
 }
 
-inline const char *string2str(STRING *string) {
+inline const char *string2str(const STRING *string) {
     if(unlikely(!string)) return "";
     return string->str;
+}
+
+bool string_ends_with_string(const STRING *whole, const STRING *end) {
+    if(end->length > whole->length) return false;
+    if(end->length == whole->length) return strcmp(string2str(whole), string2str(end)) == 0;
+    const char *we = string2str(whole);
+    we = &we[string_strlen(whole) - string_strlen(end)];
+    return strncmp(we, end->str, string_strlen(end)) == 0;
+}
+
+bool string_starts_with_string(const STRING *whole, const STRING *end) {
+    if(end->length > whole->length) return false;
+    if(end->length == whole->length) return strcmp(string2str(whole), string2str(end)) == 0;
+    return strncmp(string2str(whole), string2str(end), string_strlen(end)) == 0;
 }
 
 STRING *string_2way_merge(STRING *a, STRING *b) {

@@ -115,16 +115,14 @@ int read_proc_pid_cmdline(struct pid_stat *p) {
     if(unlikely(!get_cmdline_per_os(p, cmdline, sizeof(cmdline))))
         goto cleanup;
 
-    if(p->cmdline) freez(p->cmdline);
-    p->cmdline = strdupz(cmdline);
-
-    debug_log("Read file '%s' contents: %s", p->cmdline_filename, p->cmdline);
+    string_freez(p->cmdline);
+    p->cmdline = string_strdupz(cmdline);
 
     return 1;
 
 cleanup:
     // copy the command to the command line
-    if(p->cmdline) freez(p->cmdline);
-    p->cmdline = strdupz(p->comm);
+    string_freez(p->cmdline);
+    p->cmdline = string_dup(p->comm);
     return 0;
 }

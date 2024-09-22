@@ -7,23 +7,18 @@
 static inline void assign_target_to_pid(struct pid_stat *p) {
     targets_assignment_counter++;
 
-    uint32_t hash = simple_hash(p->comm);
-    size_t pclen  = strlen(p->comm);
-
     struct target *w;
     for(w = apps_groups_root_target; w ; w = w->next) {
-        // if(debug_enabled || (p->target && p->target->debug_enabled)) debug_log_int("\t\tcomparing '%s' with '%s'", w->compare, pid_stat_comm(p));
-
         // find it - 4 cases:
         // 1. the target is not a pattern
         // 2. the target has the prefix
         // 3. the target has the suffix
         // 4. the target is something inside cmdline
 
-        if(unlikely(( (!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, pid_stat_comm(p)))
-                      || (w->starts_with && !w->ends_with && !strncmp(w->compare, pid_stat_comm(p), w->comparelen))
-                      || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &(pid_stat_comm(p)[pclen - w->comparelen])))
-                      || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && p->cmdline && strstr(p->cmdline, w->compare))
+        if(unlikely(( (!w->starts_with && !w->ends_with && w->compare == p->comm)
+                      || (w->starts_with && !w->ends_with && string_starts_with_string(p->comm, w->compare))
+                      || (!w->starts_with && w->ends_with && string_ends_with_string(p->comm, w->compare))
+                      || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(pid_stat_cmdline(p), string2str(w->compare)))
                           ))) {
 
             p->matched_by_config = true;
@@ -39,15 +34,16 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
 }
 
 static inline void update_pid_comm(struct pid_stat *p, const char *comm) {
-    if(strcmp(p->comm, comm) != 0) {
+    if(strcmp(pid_stat_comm(p), comm) != 0) {
         if(unlikely(debug_enabled)) {
-            if(p->comm[0])
+            if(string_strlen(p->comm))
                 debug_log("\tpid %d (%s) changed name to '%s'", p->pid, pid_stat_comm(p), comm);
             else
                 debug_log("\tJust added %d (%s)", p->pid, comm);
         }
 
-        strncpyz(p->comm, comm, sizeof(p->comm) - 1);
+        string_freez(p->comm);
+        p->comm = string_strdupz(comm);
 
         // /proc/<pid>/cmdline
         if(likely(proc_pid_cmdline_is_needed))

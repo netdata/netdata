@@ -76,7 +76,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
             "SET inode_changes = %zu\n"
             "SET link_changes = %zu\n"
             "SET pids = %zu\n"
-            "SET fds = %d\n"
+            "SET fds = %"PRIu32"\n"
             "SET targets = %zu\n"
             "SET new_pids = %zu\n"
             "END\n"

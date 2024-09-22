@@ -71,10 +71,12 @@ extern size_t
     apps_groups_targets_count;
 
 extern int
-    all_files_len,
-    all_files_size,
     show_guest_time,
     show_guest_time_old;
+
+extern uint32_t
+    all_files_len,
+    all_files_size;
 
 extern kernel_uint_t
     global_utime,
@@ -105,7 +107,6 @@ extern size_t pagesize;
 // ----------------------------------------------------------------------------
 // string lengths
 
-#define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
 #define MAX_CMDLINE 65536
 
@@ -172,9 +173,7 @@ struct pid_on_target {
 };
 
 struct target {
-    char compare[MAX_COMPARE_NAME + 1];
-    uint32_t comparehash;
-    size_t comparelen;
+    STRING *compare;
 
     char id[MAX_NAME + 1];
     uint32_t idhash;
@@ -293,7 +292,8 @@ struct pid_fd {
 #endif
 };
 
-#define pid_stat_comm(p) (p->comm)
+#define pid_stat_comm(p) (string2str(p->comm))
+#define pid_stat_cmdline(p) (string2str(p->cmdline))
 
 struct pid_stat {
     int32_t pid;
@@ -304,13 +304,16 @@ struct pid_stat {
     // int32_t tpgid;
     // uint64_t flags;
 
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-    size_t sortlist;                // higher numbers = top on the process tree
-                                    // each process gets a unique number (non-sequential though)
-#endif
+    struct pid_stat *prev;
+    struct pid_stat *next;
+    struct pid_stat *parent;
 
-    char comm[MAX_COMPARE_NAME + 1];
-    char *cmdline;
+    struct target *target;          // app_groups.conf targets
+    struct target *user_target;     // uid based targets
+    struct target *group_target;    // gid based targets
+
+    STRING *comm;
+    STRING *cmdline;
 
     // these are raw values collected
     kernel_uint_t minflt_raw;
@@ -365,6 +368,11 @@ struct pid_stat {
     uid_t uid;
     gid_t gid;
 
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
+    uint32_t sortlist;              // higher numbers = top on the process tree
+                       // each process gets a unique number (non-sequential though)
+#endif
+
     kernel_uint_t status_voluntary_ctxt_switches_raw;
     kernel_uint_t status_nonvoluntary_ctxt_switches_raw;
 
@@ -418,10 +426,6 @@ struct pid_stat {
     bool read:1;                    // true when we have already read this process for this iteration
     bool matched_by_config:1;
 
-    struct target *target;          // app_groups.conf targets
-    struct target *user_target;     // uid based targets
-    struct target *group_target;    // gid based targets
-
     usec_t stat_collected_usec;
     usec_t last_stat_collected_usec;
 
@@ -436,10 +440,6 @@ struct pid_stat {
     char *io_filename;
     char *cmdline_filename;
     char *limits_filename;
-
-    struct pid_stat *parent;
-    struct pid_stat *prev;
-    struct pid_stat *next;
 };
 
 // ----------------------------------------------------------------------------

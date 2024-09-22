@@ -119,7 +119,8 @@ static inline void del_pid_entry(pid_t pid) {
     freez(p->limits_filename);
     freez(p->io_filename);
     freez(p->cmdline_filename);
-    freez(p->cmdline);
+    string_freez(p->comm);
+    string_freez(p->cmdline);
     aral_freez(pids.all_pids.aral, p);
 
     pids.all_pids.count--;
@@ -695,7 +696,7 @@ static inline bool collect_data_for_all_pids_per_os(void) {
 
         size_t slc = 0;
         struct pid_stat *p = NULL;
-        size_t sortlist = 1;
+        uint32_t sortlist = 1;
         for(p = root_of_pids(); p && slc < pids.sorted.size ; p = p->next) {
             mark_pid_as_unread(p);
             pids.sorted.array[slc++] = p;

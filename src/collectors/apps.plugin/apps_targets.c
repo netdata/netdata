@@ -12,9 +12,12 @@ struct target *get_users_target(uid_t uid) {
         if(w->uid == uid) return w;
 
     w = callocz(sizeof(struct target), 1);
-    snprintfz(w->compare, sizeof(w->compare), "%u", uid);
-    w->comparehash = simple_hash(w->compare);
-    w->comparelen = strlen(w->compare);
+
+    {
+        char buf[100];
+        snprintfz(buf, sizeof(buf), "%u", uid);
+        w->compare = string_strdupz(buf);
+    }
 
     snprintfz(w->id, MAX_NAME, "%u", uid);
     w->idhash = simple_hash(w->id);
@@ -56,9 +59,12 @@ struct target *get_groups_target(gid_t gid) {
         if(w->gid == gid) return w;
 
     w = callocz(sizeof(struct target), 1);
-    snprintfz(w->compare, sizeof(w->compare), "%u", gid);
-    w->comparehash = simple_hash(w->compare);
-    w->comparelen = strlen(w->compare);
+
+    {
+        char buf[100];
+        snprintfz(buf, sizeof(buf), "%u", gid);
+        w->compare = string_strdupz(buf);
+    }
 
     snprintfz(w->id, MAX_NAME, "%u", gid);
     w->idhash = simple_hash(w->id);
@@ -160,19 +166,22 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
             *d = '_';
     }
 
-    strncpyz(w->compare, nid, sizeof(w->compare) - 1);
-    size_t len = strlen(w->compare);
-    if(w->compare[len - 1] == '*') {
-        w->compare[len - 1] = '\0';
-        w->starts_with = true;
+    {
+        size_t len = strlen(nid);
+        char buf[len + 1];
+        memcpy(buf, nid, sizeof(buf));
+
+        if (buf[len - 1] == '*') {
+            buf[--len] = '\0';
+            w->starts_with = true;
+        }
+        w->ends_with = ends_with;
+
+        w->compare = string_strdupz(buf);
     }
-    w->ends_with = ends_with;
 
     if(w->starts_with && w->ends_with)
         proc_pid_cmdline_is_needed = true;
-
-    w->comparehash = simple_hash(w->compare);
-    w->comparelen = strlen(w->compare);
 
     w->hidden = thidden;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -189,8 +198,9 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
 
     debug_log("ADDING TARGET ID '%s', process name '%s' (%s), aggregated on target '%s', options: %s %s"
               , w->id
-              , w->compare, (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
-                  , w->target?w->target->name:w->name
+              , string2str(w->compare)
+              , (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
+              , w->target?w->target->name:w->name
               , (w->hidden)?"hidden":"-"
               , (w->debug_enabled)?"debug":"-"
     );

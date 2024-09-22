@@ -54,10 +54,12 @@ size_t
     apps_groups_targets_count = 0;       // # of apps_groups.conf targets
 
 int
-    all_files_len = 0,
-    all_files_size = 0,
     show_guest_time = 0,            // 1 when guest values are collected
     show_guest_time_old = 0;
+
+uint32_t
+    all_files_len = 0,
+    all_files_size = 0;
 
 #if defined(__FreeBSD__) || defined(__APPLE__)
 usec_t system_current_time_ut;

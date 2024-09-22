@@ -11,7 +11,7 @@
 #define FILE_DESCRIPTORS_INCREASE_STEP 100
 
 // types for struct file_descriptor->type
-typedef enum fd_filetype {
+typedef enum __attribute__((packed)) fd_filetype {
     FILETYPE_OTHER,
     FILETYPE_FILE,
     FILETYPE_PIPE,
@@ -32,10 +32,9 @@ struct file_descriptor {
 
     const char *name;
     uint32_t hash;
-
+    uint32_t count;
+    uint32_t pos;
     FD_FILETYPE type;
-    int count;
-    int pos;
 } *all_files = NULL;
 
 // ----------------------------------------------------------------------------
@@ -138,7 +137,7 @@ void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     for(c = 0; c < size ;c++) {
         int fd = fds[c].fd;
 
-        if(likely(fd <= 0 || fd >= all_files_size))
+        if(likely(fd <= 0 || (uint32_t)fd >= all_files_size))
             continue;
 
         currentfds++;
@@ -194,7 +193,7 @@ static struct file_descriptor *file_descriptor_find(const char *name, uint32_t h
 // ----------------------------------------------------------------------------
 
 void file_descriptor_not_used(int id) {
-    if(id > 0 && id < all_files_size) {
+    if(id > 0 && (uint32_t)id < all_files_size) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
         if(all_files[id].magic != 0x0BADCAFE) {
@@ -222,43 +221,34 @@ void file_descriptor_not_used(int id) {
         }
         else
             netdata_log_error("Request to decrease counter of fd %d (%s), while the use counter is 0",
-                              id,
-                              all_files[id].name);
+                              id, all_files[id].name);
     }
     else
-        netdata_log_error("Request to decrease counter of fd %d, which is outside the array size (1 to %d)",
-                          id,
-                          all_files_size);
+        netdata_log_error("Request to decrease counter of fd %d, which is outside the array size (1 to %"PRIu32")",
+                          id, all_files_size);
 }
 
 static inline void all_files_grow() {
     void *old = all_files;
-    int i;
 
     // there is no empty slot
-    debug_log("extending fd array to %d entries", all_files_size + FILE_DESCRIPTORS_INCREASE_STEP);
-
     all_files = reallocz(all_files, (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP) * sizeof(struct file_descriptor));
 
     // if the address changed, we have to rebuild the index
     // since all pointers are now invalid
 
     if(unlikely(old && old != (void *)all_files)) {
-        debug_log("  >> re-indexing.");
-
         all_files_index.root = NULL;
-        for(i = 0; i < all_files_size; i++) {
+        for(uint32_t i = 0; i < all_files_size; i++) {
             if(!all_files[i].count) continue;
             if(unlikely(file_descriptor_add(&all_files[i]) != (void *)&all_files[i]))
                 netdata_log_error("INTERNAL ERROR: duplicate indexing of fd during realloc.");
         }
-
-        debug_log("  >> re-indexing done.");
     }
 
     // initialize the newly added entries
 
-    for(i = all_files_size; i < (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP); i++) {
+    for(uint32_t i = all_files_size; i < (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP); i++) {
         all_files[i].count = 0;
         all_files[i].name = NULL;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -271,7 +261,7 @@ static inline void all_files_grow() {
     all_files_size += FILE_DESCRIPTORS_INCREASE_STEP;
 }
 
-static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t hash, FD_FILETYPE type) {
+static inline uint32_t file_descriptor_set_on_empty_slot(const char *name, uint32_t hash, FD_FILETYPE type) {
     // check we have enough memory to add it
     if(!all_files || all_files_len == all_files_size)
         all_files_grow();
@@ -281,7 +271,7 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
     // search for an empty slot
 
     static int last_pos = 0;
-    int i, c;
+    uint32_t i, c;
     for(i = 0, c = last_pos ; i < all_files_size ; i++, c++) {
         if(c >= all_files_size) c = 0;
         if(c == 0) continue;
@@ -291,7 +281,7 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
 
 #ifdef NETDATA_INTERNAL_CHECKS
             if(all_files[c].magic == 0x0BADCAFE && all_files[c].name && file_descriptor_find(all_files[c].name, all_files[c].hash))
-                netdata_log_error("fd on position %d is not cleared properly. It still has %s in it.", c, all_files[c].name);
+                netdata_log_error("fd on position %"PRIu32" is not cleared properly. It still has %s in it.", c, all_files[c].name);
 #endif /* NETDATA_INTERNAL_CHECKS */
 
             debug_log("  >> %s fd position %d for %s (last name: %s)", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
@@ -324,12 +314,10 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
     if(unlikely(file_descriptor_add(&all_files[c]) != (void *)&all_files[c]))
         netdata_log_error("INTERNAL ERROR: duplicate indexing of fd.");
 
-    debug_log("using fd position %d (name: %s)", c, all_files[c].name);
-
     return c;
 }
 
-static inline int file_descriptor_find_or_add(const char *name, uint32_t hash) {
+static inline uint32_t file_descriptor_find_or_add(const char *name, uint32_t hash) {
     if(unlikely(!hash))
         hash = simple_hash(name);
 
@@ -708,7 +696,7 @@ static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __may
 
             // if another process already has this, we will get
             // the same id
-            p->fds[fdid].fd = file_descriptor_find_or_add(linkname, link_hash);
+            p->fds[fdid].fd = (int)file_descriptor_find_or_add(linkname, link_hash);
             p->fds[fdid].inode = de->d_ino;
             p->fds[fdid].link_hash = link_hash;
         }
