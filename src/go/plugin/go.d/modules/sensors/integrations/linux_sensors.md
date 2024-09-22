@@ -21,7 +21,9 @@ Module: sensors
 
 ## Overview
 
-This collector gathers real-time system sensor statistics,  including temperature, voltage, current, power, fan speed, energy consumption, and humidity,  utilizing the [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) interface.
+This collector gathers real-time system sensor statistics using the [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) interface.
+Supported sensors:
+- Temperature - Voltage - Fan - Current - Power - Energy - Humidity - Intrusion
 
 
 
@@ -35,16 +37,7 @@ This collector only supports collecting metrics from a single instance of this i
 
 #### Auto-Detection
 
-The following type of sensors are auto-detected:
-
-- temperature
-- voltage
-- fan
-- current
-- power
-- energy
-- humidity
-- intrusion
+Automatically discovers and exposes all available sensors on the system through the [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) interface.
 
 
 #### Limits
