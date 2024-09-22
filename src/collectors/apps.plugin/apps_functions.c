@@ -208,7 +208,7 @@ void function_processes(const char *transaction, char *function,
 #endif // !__FreeBSD__ !__APPLE_
 
     int rows= 0;
-    for(p = root_of_pids; p ; p = p->next) {
+    for(p = root_of_pids(); p ; p = p->next) {
         if(!p->updated)
             continue;
 

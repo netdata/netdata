@@ -2,34 +2,72 @@
 
 #include "apps_plugin.h"
 
-static struct pid_stat **all_pids = NULL;
-size_t all_pids_count = 0; // the number of processes running
+#define SIMPLE_HASHTABLE_NAME _PID
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct pid_stat
+#define SIMPLE_HASHTABLE_KEY_TYPE int32_t
+#define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION pid_stat_to_pid_ptr
+#define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION pid_ptr_eq
+#define SIMPLE_HASHTABLE_SAMPLE_IMPLEMENTATION 0
+#include "libnetdata/simple_hashtable.h"
 
-struct pid_stat *root_of_pids = NULL;   // global linked list of all processes running
+static inline int32_t *pid_stat_to_pid_ptr(struct pid_stat *p) {
+    return &p->pid;
+}
 
+static inline bool pid_ptr_eq(int32_t *a, int32_t *b) {
+    return *a == *b;
+}
+
+struct {
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-// Another pre-allocated list of all possible pids.
-// We need it to assign them a unique sortlist id, so that we
-// read parents before children. This is needed to prevent a situation where
-// a child is found running, but until we read its parent, it has exited and
-// its parent has accumulated its resources.
-pid_t *all_pids_sortlist = NULL;
+    // Another pre-allocated list of all possible pids.
+    // We need it to assign them a unique sortlist id, so that we
+    // read parents before children. This is needed to prevent a situation where
+    // a child is found running, but until we read its parent, it has exited and
+    // its parent has accumulated its resources.
+    struct {
+        size_t size;
+        struct pid_stat **array;
+    } sorted;
 #endif
+
+    struct {
+        size_t count;               // the number of processes running
+        struct pid_stat *root;
+        SIMPLE_HASHTABLE_PID ht;
+    } all_pids;
+} pids = { 0 };
+
+struct pid_stat *root_of_pids(void) {
+    return pids.all_pids.root;
+}
+
+size_t all_pids_count(void) {
+    return pids.all_pids.count;
+}
 
 void pids_init(void) {
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-    all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max + 1);
-#endif
+    simple_hashtable_init_PID(&pids.all_pids.ht, 1024);
+}
 
-    all_pids = callocz(sizeof(struct pid_stat *), (size_t) pid_max + 1);
+static inline uint64_t pid_hash(pid_t pid) {
+    return ((uint64_t)pid << 31) + (uint64_t)pid; // we remove 1 bit when shifting to make it different
 }
 
 inline struct pid_stat *find_pid_entry(pid_t pid) {
-    return all_pids[pid];
+    if(pid <= 0) return NULL;
+
+    uint64_t hash = pid_hash(pid);
+    int32_t key = pid;
+    SIMPLE_HASHTABLE_SLOT_PID *sl = simple_hashtable_get_slot_PID(&pids.all_pids.ht, hash, &key, true);
+    return(SIMPLE_HASHTABLE_SLOT_DATA(sl));
 }
 
 static inline struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
-    struct pid_stat *p = find_pid_entry(pid);
+    uint64_t hash = pid_hash(pid);
+    int32_t key = pid;
+    SIMPLE_HASHTABLE_SLOT_PID *sl = simple_hashtable_get_slot_PID(&pids.all_pids.ht, hash, &key, true);
+    struct pid_stat *p = SIMPLE_HASHTABLE_SLOT_DATA(sl);
     if(likely(p))
         return p;
 
@@ -39,15 +77,18 @@ static inline struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
     init_pid_fds(p, 0, p->fds_size);
     p->pid = pid;
 
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(root_of_pids, p, prev, next);
-    all_pids[pid] = p;
-    all_pids_count++;
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pids.all_pids.root, p, prev, next);
+    simple_hashtable_set_slot_PID(&pids.all_pids.ht, sl, hash, p);
+    pids.all_pids.count++;
 
     return p;
 }
 
 static inline void del_pid_entry(pid_t pid) {
-    struct pid_stat *p = find_pid_entry(pid);
+    uint64_t hash = pid_hash(pid);
+    int32_t key = pid;
+    SIMPLE_HASHTABLE_SLOT_PID *sl = simple_hashtable_get_slot_PID(&pids.all_pids.ht, hash, &key, true);
+    struct pid_stat *p = SIMPLE_HASHTABLE_SLOT_DATA(sl);
 
     if(unlikely(!p)) {
         netdata_log_error("attempted to free pid %d that is not allocated.", pid);
@@ -56,7 +97,8 @@ static inline void del_pid_entry(pid_t pid) {
 
     debug_log("process %d %s exited, deleting it.", pid, p->comm);
 
-    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(root_of_pids, p, prev, next);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(pids.all_pids.root, p, prev, next);
+    simple_hashtable_del_slot_PID(&pids.all_pids.ht, sl);
 
 #if !defined(__FreeBSD__) && !defined(__APPLE__)
     {
@@ -78,21 +120,12 @@ static inline void del_pid_entry(pid_t pid) {
     freez(p->cmdline);
     freez(p);
 
-    all_pids[pid] = NULL;
-    all_pids_count--;
+    pids.all_pids.count--;
 }
 
-static inline int collect_data_for_pid(pid_t pid, void *ptr) {
-    if(unlikely(pid < 0 || pid > pid_max)) {
-        netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
-        return 0;
-    }
-
-    struct pid_stat *p = get_or_allocate_pid_entry(pid);
-    if(unlikely(!p || p->read)) return 0;
+static inline int collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
+    if(unlikely(p->read)) return 0;
     p->read = true;
-
-    // debug_log("Reading process %d (%s), sortlist %d", p->pid, p->comm, p->sortlist);
 
     // --------------------------------------------------------------------
     // /proc/<pid>/stat
@@ -103,7 +136,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
 
     // check its parent pid
     if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-        netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
+        netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", p->pid, p->comm, p->ppid);
         p->ppid = 0;
     }
 
@@ -130,8 +163,13 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     // --------------------------------------------------------------------
     // done!
 
-    if(unlikely(debug_enabled && include_exited_childs && all_pids_count && p->ppid && all_pids[p->ppid] && !all_pids[p->ppid]->read))
-        debug_log("Read process %d (%s) sortlisted %d, but its parent %d (%s) sortlisted %d, is not read", p->pid, p->comm, p->sortlist, all_pids[p->ppid]->pid, all_pids[p->ppid]->comm, all_pids[p->ppid]->sortlist);
+#ifdef NETDATA_INTERNAL_CHECKS
+    struct pid_stat *pp = p->parent;
+    if(unlikely(include_exited_childs && pp && !pp->read))
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+               "Read process %d (%s) sortlisted %zu, but its parent %d (%s) sortlisted %zu, is not read",
+               p->pid, p->comm, p->sortlist, pp->pid, pp->comm, pp->sortlist);
+#endif
 
     // mark it as updated
     p->updated = true;
@@ -141,11 +179,23 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     return 1;
 }
 
+static inline int collect_data_for_pid(pid_t pid, void *ptr) {
+    if(unlikely(pid < 0 || pid > pid_max)) {
+        netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
+        return 0;
+    }
+
+    struct pid_stat *p = get_or_allocate_pid_entry(pid);
+    if(unlikely(!p)) return 0;
+
+    return collect_data_for_pid_stat(p, ptr);
+}
+
 void cleanup_exited_pids(void) {
     size_t c;
     struct pid_stat *p = NULL;
 
-    for(p = root_of_pids; p ;) {
+    for(p = root_of_pids(); p ;) {
         if(!p->updated && (!p->keep || p->keeploops > 0)) {
             if(unlikely(debug_enabled && (p->keep || p->keeploops)))
                 debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, p->comm);
@@ -171,23 +221,16 @@ void cleanup_exited_pids(void) {
 // ----------------------------------------------------------------------------
 
 static inline void link_all_processes_to_their_parents(void) {
-    struct pid_stat *p, *pp;
-
     // link all children to their parents
     // and update children count on parents
-    for(p = root_of_pids; p ; p = p->next) {
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
         // for each process found
 
-        p->sortlist = 0;
         p->parent = NULL;
-
-        if(unlikely(!p->ppid)) {
-            //unnecessary code from apps_plugin.c
-            //p->parent = NULL;
+        if(unlikely(!p->ppid))
             continue;
-        }
 
-        pp = all_pids[p->ppid];
+        struct pid_stat *pp = find_pid_entry(p->ppid);
         if(likely(pp)) {
             p->parent = pp;
             pp->children_count++;
@@ -252,7 +295,7 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
     int found = 0;
     struct pid_stat *p = NULL;
 
-    for(p = root_of_pids; p ; p = p->next) {
+    for(p = root_of_pids(); p ; p = p->next) {
         if(p == pe) continue;
 
         switch(type) {
@@ -338,7 +381,7 @@ static inline kernel_uint_t remove_exited_child_from_parent(kernel_uint_t *field
 static inline void process_exited_pids() {
     struct pid_stat *p;
 
-    for(p = root_of_pids; p ; p = p->next) {
+    for(p = root_of_pids(); p ; p = p->next) {
         if(p->updated || !p->stat_collected_usec)
             continue;
 
@@ -480,8 +523,8 @@ static inline void get_current_time(void) {
 static inline bool collect_data_for_all_pids_per_os(void) {
     // Mark all processes as unread before collecting new data
     struct pid_stat *p = NULL;
-    if(all_pids_count) {
-        for(p = root_of_pids; p ; p = p->next)
+    if(pids.all_pids.count) {
+        for(p = root_of_pids;() p ; p = p->next)
             mark_pid_as_unread(p);
     }
 
@@ -538,8 +581,8 @@ static inline bool collect_data_for_all_pids_per_os(void) {
 static inline bool collect_data_for_all_pids_per_os(void) {
     // Mark all processes as unread before collecting new data
     struct pid_stat *p;
-    if(all_pids_count) {
-        for(p = root_of_pids; p; p = p->next)
+    if(pids.all_pids.count) {
+        for(p = root_of_pids(); p; p = p->next)
             mark_pid_as_unread(p);
     }
 
@@ -615,10 +658,19 @@ static inline bool collect_data_for_all_pids_per_os(void) {
 #endif // __APPLE__
 
 #if !defined(__FreeBSD__) && !defined(__APPLE__)
-static int compar_pid(const void *pid1, const void *pid2) {
+static inline size_t compute_new_sorted_size(size_t old_size, size_t required_size) {
+    size_t size = (required_size % 1024 == 0) ? required_size : required_size + 1024;
+    size = (size / 1024) * 1024;
 
-    struct pid_stat *p1 = all_pids[*((pid_t *)pid1)];
-    struct pid_stat *p2 = all_pids[*((pid_t *)pid2)];
+    if(size < old_size * 2)
+        size = old_size * 2;
+
+    return size;
+}
+
+static int compar_pid_sortlist(const void *a, const void *b) {
+    const struct pid_stat *p1 = *(struct pid_stat **)a;
+    const struct pid_stat *p2 = *(struct pid_stat **)b;
 
     if(p1->sortlist > p2->sortlist)
         return -1;
@@ -627,37 +679,55 @@ static int compar_pid(const void *pid1, const void *pid2) {
 }
 
 static inline bool collect_data_for_all_pids_per_os(void) {
-    struct pid_stat *p = NULL;
-
     // clear process state counter
     memset(proc_state_count, 0, sizeof proc_state_count);
 
-    if(all_pids_count) {
+    if(pids.all_pids.count) {
+        if(pids.all_pids.count > pids.sorted.size) {
+            size_t new_size = compute_new_sorted_size(pids.sorted.size, pids.all_pids.count);
+            freez(pids.sorted.array);
+            pids.sorted.array = mallocz(new_size * sizeof(struct pid_stat *));
+            pids.sorted.size = new_size;
+        }
+
         size_t slc = 0;
-        for(p = root_of_pids; p ; p = p->next) {
+        struct pid_stat *p = NULL;
+        size_t sortlist = 1;
+        for(p = root_of_pids(); p && slc < pids.sorted.size ; p = p->next) {
             mark_pid_as_unread(p);
-            all_pids_sortlist[slc++] = p->pid;
+            pids.sorted.array[slc++] = p;
+
+            // assign a sortlist id to all it and its parents
+            for (struct pid_stat *pp = p; pp ; pp = pp->parent) {
+                pp->sortlist = sortlist++;
+                if(pp->ppid && !pp->parent) pp->parent = find_pid_entry(pp->ppid);
+            }
+        }
+        size_t sorted = slc;
+
+        static bool logged = false;
+        if(unlikely(p && !logged)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "Internal error: I was thinking I had %zu processes in my arrays, but it seems there are more.",
+                   pids.all_pids.count);
+            logged = true;
         }
 
-        if(unlikely(slc != all_pids_count)) {
-            netdata_log_error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are %zu.", all_pids_count, slc);
-            all_pids_count = slc;
-        }
-
-        if(include_exited_childs) {
+        if(include_exited_childs && sorted) {
             // Read parents before childs
             // This is needed to prevent a situation where
             // a child is found running, but until we read
             // its parent, it has exited and its parent
             // has accumulated its resources.
 
-            qsort((void *)all_pids_sortlist, (size_t)all_pids_count, sizeof(pid_t), compar_pid);
+            qsort((void *)pids.sorted.array, sorted, sizeof(struct pid_stat *), compar_pid_sortlist);
 
             // we forward read all running processes
             // collect_data_for_pid() is smart enough,
             // not to read the same pid twice per iteration
-            for(slc = 0; slc < all_pids_count; slc++) {
-                collect_data_for_pid(all_pids_sortlist[slc], NULL);
+            for(slc = 0; slc < sorted; slc++) {
+                p = pids.sorted.array[slc];
+                collect_data_for_pid_stat(p, NULL);
             }
         }
     }
@@ -700,7 +770,7 @@ bool collect_data_for_all_pids(void) {
     if(!collect_data_for_all_pids_per_os())
         return false;
 
-    if(!all_pids_count)
+    if(!pids.all_pids.count)
         return false;
 
     // we need /proc/stat to normalize the cpu consumption of the exited childs

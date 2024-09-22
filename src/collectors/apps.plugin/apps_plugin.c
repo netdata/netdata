@@ -228,7 +228,7 @@ static void apply_apps_groups_targets_inheritance(void) {
     while(found) {
         if(unlikely(debug_enabled)) loops++;
         found = 0;
-        for(p = root_of_pids; p ; p = p->next) {
+        for(p = root_of_pids(); p ; p = p->next) {
             // if this process does not have a target,
             // and it has a parent
             // and its parent has a target
@@ -245,16 +245,12 @@ static void apply_apps_groups_targets_inheritance(void) {
 
     // find all the procs with 0 childs and merge them to their parents
     // repeat, until nothing more can be done.
-    int sortlist = 1;
     found = 1;
     while(found) {
         if(unlikely(debug_enabled)) loops++;
         found = 0;
 
-        for(p = root_of_pids; p ; p = p->next) {
-            if(unlikely(!p->sortlist && !p->children_count))
-                p->sortlist = sortlist++;
-
+        for(p = root_of_pids(); p ; p = p->next) {
             if(unlikely(
                     !p->children_count            // if this process does not have any children
                     && !p->merged                 // and is not already merged
@@ -296,27 +292,20 @@ static void apply_apps_groups_targets_inheritance(void) {
 
     // give a default target on all top level processes
     if(unlikely(debug_enabled)) loops++;
-    for(p = root_of_pids; p ; p = p->next) {
+
+    for(p = root_of_pids(); p ; p = p->next) {
         // if the process is not merged itself
         // then it is a top level process
         if(unlikely(!p->merged && !p->target))
             p->target = apps_groups_default_target;
-
-        // make sure all processes have a sortlist
-        if(unlikely(!p->sortlist))
-            p->sortlist = sortlist++;
     }
-
-    pi = find_pid_entry(1);
-    if(pi)
-        pi->sortlist = sortlist++;
 
     // give a target to all merged child processes
     found = 1;
     while(found) {
         if(unlikely(debug_enabled)) loops++;
         found = 0;
-        for(p = root_of_pids; p ; p = p->next) {
+        for(p = root_of_pids(); p ; p = p->next) {
             if(unlikely(!p->target && p->merged && p->parent && p->parent->target)) {
                 p->target = p->parent->target;
                 found++;
@@ -480,7 +469,7 @@ static void calculate_netdata_statistics(void) {
     struct target *w = NULL, *o = NULL;
 
     // concentrate everything on the targets
-    for(p = root_of_pids; p ; p = p->next) {
+    for(p = root_of_pids(); p ; p = p->next) {
 
         // --------------------------------------------------------------------
         // apps_groups target

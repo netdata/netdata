@@ -68,7 +68,6 @@ extern size_t
     inodes_changed_counter,
     links_changed_counter,
     targets_assignment_counter,
-    all_pids_count,
     apps_groups_targets_count;
 
 extern int
@@ -304,6 +303,11 @@ struct pid_stat {
     // int32_t tpgid;
     // uint64_t flags;
 
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
+    size_t sortlist;                // higher numbers = top on the process tree
+                                    // each process gets a unique number (non-sequential though)
+#endif
+
     char state;
 
     char comm[MAX_COMPARE_NAME + 1];
@@ -403,9 +407,6 @@ struct pid_stat {
 
     NETDATA_DOUBLE openfds_limits_percent;
 
-    int sortlist;                   // higher numbers = top on the process tree
-                  // each process gets a unique number
-
     int children_count;             // number of processes directly referencing this
     int keeploops;                  // increases by 1 every time keep is 1 and updated 0
 
@@ -464,15 +465,12 @@ extern struct target
     *users_root_target,
     *groups_root_target;
 
-extern struct pid_stat *root_of_pids;
+struct pid_stat *root_of_pids(void);
+size_t all_pids_count(void);
 
 extern int update_every;
 extern unsigned int time_factor;
 extern kernel_uint_t MemTotal;
-
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-extern pid_t *all_pids_sortlist;
-#endif
 
 #define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
 

@@ -89,7 +89,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
             , filenames_allocated_counter
             , inodes_changed_counter
             , links_changed_counter
-            , all_pids_count
+            , all_pids_count()
             , all_files_len
             , apps_groups_targets_count
             , targets_assignment_counter
