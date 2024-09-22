@@ -571,4 +571,6 @@ void send_resource_usage_to_netdata(usec_t dt);
 void pids_init(void);
 struct pid_stat *find_pid_entry(pid_t pid);
 
+void update_pid_comm(struct pid_stat *p, const char *comm);
+
 #endif //NETDATA_APPS_PLUGIN_H

@@ -662,8 +662,132 @@ static inline bool collect_data_for_all_pids_per_os(void) {
 
 #if defined(OS_WINDOWS)
 static inline bool collect_data_for_all_pids_per_os(void) {
-    // TODO: get perflib information
-    return false;
+    for(struct pid_stat *p = root_of_pids(); p; p = p->next)
+        mark_pid_as_unread(p);
+
+    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(RegistryFindIDByName("Process"));
+    if(!pDataBlock) return false;
+
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Process");
+    if(!pObjectType) {
+        perflibFreePerformanceData();
+        return false;
+    }
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for(LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if(!pi) break;
+
+        char name[MAX_PATH];
+        if(!getInstanceName(pDataBlock, pObjectType, pi, name, sizeof(name)))
+            strncpyz(name, "unknown", sizeof(name) - 1);
+
+        COUNTER_DATA processId = {.key = "ID Process"};
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &processId);
+        DWORD pid = (DWORD)processId.current.Data;
+        if(pid <= 0) continue; // pid 0 is the Idle, which is not useful for us
+
+        // Get or create pid_stat structure
+        struct pid_stat *p = get_or_allocate_pid_entry(pid);
+        p->updated = true;
+
+        // Parent Process ID
+        COUNTER_DATA ppid = {.key = "Creating Process ID"};
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &ppid);
+        p->ppid = ppid.current.Data;
+
+        // Update process name
+        update_pid_comm(p, name);
+
+        // CPU time
+        COUNTER_DATA userTime = {.key = "% User Time"};
+        COUNTER_DATA kernelTime = {.key = "% Privileged Time"};
+        COUNTER_DATA totalTime = {.key = "% Processor Time"};
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &userTime);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &kernelTime);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &totalTime);
+        p->utime = userTime.current.Data;
+        p->stime = kernelTime.current.Data;
+        p->gtime = totalTime.current.Data - (userTime.current.Data + kernelTime.current.Data); // Guest time (if any)
+
+        // Memory
+        COUNTER_DATA workingSet = {.key = "Working Set"};
+        COUNTER_DATA privateBytes = {.key = "Private Bytes"};
+        COUNTER_DATA virtualBytes = {.key = "Virtual Bytes"};
+        COUNTER_DATA pageFileBytes = {.key = "Page File Bytes"};
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &workingSet);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &privateBytes);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &virtualBytes);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &pageFileBytes);
+        p->status_vmrss = workingSet.current.Data / 1024;  // Convert to KB
+        p->status_vmsize = virtualBytes.current.Data / 1024;  // Convert to KB
+        p->status_vmswap = pageFileBytes.current.Data / 1024;  // Page File Bytes in KB
+
+        // I/O
+        COUNTER_DATA ioReadBytes = {.key = "IO Read Bytes/sec"};
+        COUNTER_DATA ioWriteBytes = {.key = "IO Write Bytes/sec"};
+        COUNTER_DATA ioReadOps = {.key = "IO Read Operations/sec"};
+        COUNTER_DATA ioWriteOps = {.key = "IO Write Operations/sec"};
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &ioReadBytes);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &ioWriteBytes);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &ioReadOps);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &ioWriteOps);
+        p->io_logical_bytes_read = ioReadBytes.current.Data;
+        p->io_logical_bytes_written = ioWriteBytes.current.Data;
+        p->io_read_calls = ioReadOps.current.Data;
+        p->io_write_calls = ioWriteOps.current.Data;
+
+        // Threads
+        COUNTER_DATA threadCount = {.key = "Thread Count"};
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &threadCount);
+        p->num_threads = threadCount.current.Data;
+
+        // Handle count (as a proxy for file descriptors)
+        COUNTER_DATA handleCount = {.key = "Handle Count"};
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &handleCount);
+        p->openfds.files = handleCount.current.Data;
+
+        // Page faults
+        COUNTER_DATA pageFaults = {.key = "Page Faults/sec"};
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &pageFaults);
+        p->minflt = pageFaults.current.Data;  // Windows doesn't distinguish between minor and major page faults
+
+        // Process uptime
+        COUNTER_DATA elapsedTime = {.key = "Elapsed Time"};
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &elapsedTime);
+        p->uptime = elapsedTime.current.Data / 10000000;  // Convert 100-nanosecond units to seconds
+
+        // // Priority
+        // COUNTER_DATA priority = {.key = "Priority Base"};
+        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &priority);
+        // p->priority = priority.current.Data;
+
+        // // Pool memory
+        // COUNTER_DATA poolPaged = {.key = "Pool Paged Bytes"};
+        // COUNTER_DATA poolNonPaged = {.key = "Pool Nonpaged Bytes"};
+        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &poolPaged);
+        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &poolNonPaged);
+        // p->status_pool_paged = poolPaged.current.Data / 1024;  // Convert to KB
+        // p->status_pool_nonpaged = poolNonPaged.current.Data / 1024;  // Convert to KB
+
+        // Windows doesn't provide direct equivalents for these Linux-specific fields:
+        // p->status_voluntary_ctxt_switches
+        // p->status_nonvoluntary_ctxt_switches
+        // We could potentially use "Context Switches/sec" as a total, but it's not split into voluntary/nonvoluntary
+
+        // UID and GID don't have direct equivalents in Windows
+        // You might want to use a constant value or implement a mapping to Windows SIDs if needed
+        p->uid = 0;  // Placeholder
+        p->gid = 0;  // Placeholder
+    }
+
+    perflibFreePerformanceData();
+
+    // Clean up processes that are no longer running
+    cleanup_exited_pids();
+
+    return true;
 }
 #endif
 

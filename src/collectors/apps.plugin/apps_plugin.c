@@ -1017,12 +1017,15 @@ int main(int argc, char **argv) {
 #endif
 #if defined(OS_WINDOWS)
     time_factor = 1000000ULL / RATES_DETAIL;
+    PerflibNamesRegistryInitialize();
 #endif
 
     os_get_system_pid_max();
     os_get_system_cpus_uncached();
 
+#if !defined(NETDATA_INTERNAL_CHECKS)
     parse_args(argc, argv);
+#endif
 
     if(!check_capabilities() && !am_i_running_as_root() && !check_proc_1_io()) {
         uid_t uid = getuid(), euid = geteuid();

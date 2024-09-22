@@ -33,7 +33,7 @@ static inline void assign_app_group_target_to_pid(struct pid_stat *p) {
     }
 }
 
-static inline void update_pid_comm(struct pid_stat *p, const char *comm) {
+void update_pid_comm(struct pid_stat *p, const char *comm) {
     if(strcmp(pid_stat_comm(p), comm) != 0) {
         if(unlikely(debug_enabled)) {
             if(string_strlen(p->comm))
