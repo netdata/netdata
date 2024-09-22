@@ -156,7 +156,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                         , "Website traffic"
                                                         , "bytes/s"
                                                         , PLUGIN_WINDOWS_NAME
-                                                        , "WebService"
+                                                        , "PerflibWebService"
                                                         , PRIO_WEBSITE_IIS_TRAFFIC
                                                         , update_every
                                                         , RRDSET_TYPE_AREA
@@ -203,7 +203,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                               , "Website FTP file transfer rate"
                                                               , "files/s"
                                                               , PLUGIN_WINDOWS_NAME
-                                                              , "WebService"
+                                                              , "PerflibWebService"
                                                               , PRIO_WEBSITE_IIS_FTP_FILE_TRANSFER_RATE
                                                               , update_every
                                                               , RRDSET_TYPE_LINE
@@ -242,7 +242,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                                  , "Website active connections"
                                                                  , "connections"
                                                                  , PLUGIN_WINDOWS_NAME
-                                                                 , "WebService"
+                                                                 , "PerflibWebService1"
                                                                  , PRIO_WEBSITE_IIS_ACTIVE_CONNECTIONS_COUNT
                                                                  , update_every
                                                                  , RRDSET_TYPE_LINE
@@ -273,7 +273,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                                     , "Website connections attempts"
                                                                     , "attempts/s"
                                                                     , PLUGIN_WINDOWS_NAME
-                                                                    , "WebService"
+                                                                    , "PerflibWebService"
                                                                     , PRIO_WEBSITE_IIS_CONNECTIONS_ATTEMP
                                                                     , update_every
                                                                     , RRDSET_TYPE_LINE
@@ -305,7 +305,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                            , "Website users with pending requests"
                                                            , "users"
                                                            , PLUGIN_WINDOWS_NAME
-                                                           , "WebService"
+                                                           , "PerflibWebService"
                                                            , PRIO_WEBSITE_IIS_USERS
                                                            , update_every
                                                            , RRDSET_TYPE_STACKED
@@ -343,7 +343,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                                               , "ISAPI extension requests"
                                                                               , "requests"
                                                                               , PLUGIN_WINDOWS_NAME
-                                                                              , "WebService"
+                                                                              , "PerflibWebService"
                                                                               , PRIO_WEBSITE_IIS_ISAPI_EXT_REQUEST_COUNT
                                                                               , update_every
                                                                               , RRDSET_TYPE_LINE
@@ -374,7 +374,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                                               , "Website extensions request"
                                                                               , "requests/s"
                                                                               , PLUGIN_WINDOWS_NAME
-                                                                              , "WebService"
+                                                                              , "PerflibWebService"
                                                                               , PRIO_WEBSITE_IIS_ISAPI_EXT_REQUEST_RATE
                                                                               , update_every
                                                                               , RRDSET_TYPE_LINE
@@ -406,7 +406,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                            , "Website errors"
                                                            , "errors/s"
                                                            , PLUGIN_WINDOWS_NAME
-                                                           , "WebService"
+                                                           , "PerflibWebService"
                                                            , PRIO_WEBSITE_IIS_USERS
                                                            , update_every
                                                            , RRDSET_TYPE_STACKED
@@ -444,7 +444,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                               , "Website logon attempts"
                                                               , "attempts/s"
                                                               , PLUGIN_WINDOWS_NAME
-                                                              , "WebService"
+                                                              , "PerflibWebService"
                                                               , PRIO_WEBSITE_IIS_LOGON_ATTEMPTS
                                                               , update_every
                                                               , RRDSET_TYPE_LINE
@@ -475,7 +475,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                               , "Website uptime"
                                                               , "seconds"
                                                               , PLUGIN_WINDOWS_NAME
-                                                              , "WebService"
+                                                              , "PerflibWebService"
                                                               , PRIO_WEBSITE_IIS_UPTIME
                                                               , update_every
                                                               , RRDSET_TYPE_LINE
@@ -521,7 +521,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                              , "Website requests rate"
                                                              , "requests/s"
                                                              , PLUGIN_WINDOWS_NAME
-                                                             , "WebService"
+                                                             , "PerflibWebService"
                                                              , PRIO_WEBSITE_IIS_REQUESTS_RATE
                                                              , update_every
                                                              , RRDSET_TYPE_LINE
