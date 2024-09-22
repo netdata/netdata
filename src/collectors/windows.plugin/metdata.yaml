@@ -91,3 +91,149 @@ modules:
                 chart_type: line
                 dimensions:
                   - name: switches
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibWebService
+      monitored_instance:
+        name: IIS Web service
+        link: "https://learn.microsoft.com/en-us/iis/"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: [ ]
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - web services
+        - iis
+        - bandwidth
+        - http
+        - https
+      most_popular: false
+      overview:
+        data_collection:
+          metrics_description: |
+            Perflib provides different statistical methods about Microsoft Windows environment. This collector query for
+            Object 'Web Service' to show IIS runtime information.
+          method_description: ""
+        supported_platforms:
+          include: [ "windows" ]
+          exclude: [ ]
+        multi_instance: false
+        additional_permissions:
+          description: ""
+        default_behavior:
+          auto_detection:
+            description: |
+              The collector auto-detects all metrics. No configuration is needed.
+          limits:
+            description: ""
+          performance_impact:
+            description: ""
+      setup:
+        prerequisites:
+          list: [ ]
+        configuration:
+          file:
+            section_name: "plugin:windows"
+            name: "netdata.conf"
+            description: ""
+          options:
+            description: ""
+            folding:
+              title: ""
+              enabled: true
+            list: [ ]
+          examples:
+            folding:
+              enabled: true
+              title: ""
+            list: [ ]
+      troubleshooting:
+        problems:
+          list: [ ]
+      alerts:
+      metrics:
+        folding:
+          title: Metrics
+          enabled: false
+        description: ""
+        availability: [ ]
+        scopes:
+          - name: iis
+            description: ""
+            labels: [ ]
+            metrics:
+              - name: iis.website_traffic
+                description: Website traffic
+                unit: bytes/s
+                chart_type: area
+                dimensions:
+                  - name: received
+                  - name: sent
+              - name: iis.website_requests_rate
+                description: Website requests rate
+                unit: requests/s
+                chart_type: line
+                dimensions:
+                  - name: requests
+              - name: iis.website_active_connections_count
+                description: Website active connections
+                unit: connections
+                chart_type: line
+                dimensions:
+                  - name: active
+              - name: iis.website_users_count
+                description: Website users with pending requests
+                unit: users
+                chart_type: stacked
+                dimensions:
+                  - name: anonymous
+                  - name: non_anonymous
+              - name: iis.website_connection_attempts_rate
+                description: Website connections attempts
+                unit: attempts/s
+                chart_type: line
+                dimensions:
+                  - name: connection
+              - name: iis.website_isapi_extension_requests_count
+                description: ISAPI extension requests
+                unit: requests
+                chart_type: line
+                dimensions:
+                  - name: isapi
+              - name: iis.website_isapi_extension_requests_rate
+                description: Website extensions request
+                unit: requests/s
+                chart_type: line
+                dimensions:
+                  - name: isapi
+              - name: iis.website_ftp_file_transfer_rate
+                description: Website FTP file transfer rate
+                unit: files/s
+                chart_type: line
+                dimensions:
+                  - name: received
+                  - name: sent
+              - name: iis.website_logon_attempts_rate
+                description: Website logon attempts
+                unit: attempts/s
+                chart_type: line
+                dimensions:
+                  - name: logon
+              - name: iis.website_errors_rate
+                description: Website errors
+                unit: errors/s
+                chart_type: stacked
+                dimensions:
+                  - name: document_locked
+                  - name: document_not_found
+              - name: iis.website_uptime
+                description: Website uptime
+                unit: seconds
+                chart_type: line
+                dimensions:
+                  - name: document_locked
+                  - name: document_not_found

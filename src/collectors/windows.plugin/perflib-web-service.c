@@ -280,7 +280,7 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                                                                     );
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "iis_website_%s_connection_attempts_all_instances_total", windows_shared_buffer);
-                p->rd_connections_attemps = rrddim_add(p->st_connections_attemps, id, "active",
+                p->rd_connections_attemps = rrddim_add(p->st_connections_attemps, id, "connection",
                                                     1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 rrdlabels_add(p->st_connections_attemps->rrdlabels, "website",
