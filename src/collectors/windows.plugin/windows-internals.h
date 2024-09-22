@@ -12,7 +12,6 @@ static inline ULONGLONG FileTimeToULL(FILETIME ft) {
     return ul.QuadPart;
 }
 
-#include "perflib.h"
 #include "perflib-rrd.h"
 
 #endif //NETDATA_WINDOWS_INTERNALS_H

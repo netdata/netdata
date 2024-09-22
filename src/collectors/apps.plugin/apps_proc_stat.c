@@ -2,7 +2,7 @@
 
 #include "apps_plugin.h"
 
-#if defined(__APPLE__)
+#if defined(OS_MACOS)
 int read_global_time(void) {
     static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
     static usec_t collected_usec = 0, last_collected_usec = 0;
@@ -44,10 +44,10 @@ cleanup:
     global_gtime = 0;
     return 0;
 }
-#endif // __APPLE__
+#endif
 
 
-#if defined(__FreeBSD__)
+#if defined(OS_MACOS)
 int read_global_time(void) {
     static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
     static usec_t collected_usec = 0, last_collected_usec = 0;
@@ -91,9 +91,16 @@ cleanup:
     global_gtime = 0;
     return 0;
 }
-#endif // __APPLE__
+#endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_WINDOWS)
+int read_global_time(void) {
+    // TODO: fix for windows
+    return 0;
+}
+#endif
+
+#if defined(OS_LINUX)
 int read_global_time(void) {
     static char filename[FILENAME_MAX + 1] = "";
     static procfile *ff = NULL;

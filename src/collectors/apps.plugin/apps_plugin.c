@@ -34,9 +34,9 @@ bool enable_groups_charts = true;
 bool include_exited_childs = true;
 bool proc_pid_cmdline_is_needed = false; // true when we need to read /proc/cmdline
 
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(OS_FREEBSD) || defined(OS_MACOS) || defined(OS_WINDOWS)
 bool enable_file_charts = false;
-#else
+#elif defined(OS_WINDOWS)
 bool enable_file_charts = true;
 #endif
 
@@ -61,9 +61,9 @@ uint32_t
     all_files_len = 0,
     all_files_size = 0;
 
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(OS_FREEBSD) || defined(OS_MACOS) || defined (OS_WINDOWS)
 usec_t system_current_time_ut;
-#else
+#elif defined(OS_LINUX)
 kernel_uint_t system_uptime_secs;
 #endif
 
@@ -109,11 +109,11 @@ unsigned int time_factor = 0;
 
 int update_every = 1;
 
-#if defined(__APPLE__)
+#if defined(OS_MACOS)
 mach_timebase_info_data_t mach_info;
 #endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
 int max_fds_cache_seconds = 60;
 proc_state proc_state_count[PROC_STATUS_END];
 const char *proc_states[] = {
@@ -751,7 +751,7 @@ static void parse_args(int argc, char **argv)
             continue;
         }
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
         if(strcmp("fds-cache-secs", argv[i]) == 0) {
             if(argc <= i + 1) {
                 fprintf(stderr, "Parameter 'fds-cache-secs' requires a number as argument.\n");
@@ -853,7 +853,7 @@ static void parse_args(int argc, char **argv)
                     "\n"
                     " with-detailed-uptime   enable reporting min/avg/max uptime charts\n"
                     "\n"
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
                     " fds-cache-secs N       cache the files of processed for N seconds\n"
                     "                        caching is adaptive per file (when a file\n"
                     "                        is found, it starts at 0 and while the file\n"
@@ -865,7 +865,7 @@ static void parse_args(int argc, char **argv)
                     " version or -v or -V print program version and exit\n"
                     "\n"
                     , NETDATA_VERSION
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
                     , max_fds_cache_seconds
 #endif
             );
@@ -1005,15 +1005,18 @@ int main(int argc, char **argv) {
     procfile_adaptive_initial_allocation = 1;
 
     os_get_system_HZ();
-#if defined(__FreeBSD__)
+#if defined(OS_FREEBSD)
     time_factor = 1000000ULL / RATES_DETAIL; // FreeBSD uses usecs
 #endif
-#if defined(__APPLE__)
+#if defined(OS_MACOS)
     mach_timebase_info(&mach_info);
     time_factor = 1000000ULL / RATES_DETAIL;
 #endif
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
     time_factor = system_hz; // Linux uses clock ticks
+#endif
+#if defined(OS_WINDOWS)
+    time_factor = 1000000ULL / RATES_DETAIL;
 #endif
 
     os_get_system_pid_max();

@@ -21,13 +21,13 @@ static inline kernel_uint_t get_proc_pid_limits_limit(char *buf, const char *key
     return str2ull(v, NULL);
 }
 
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(OS_FREEBSD) || defined(OS_MACOS) || defined(OS_WINDOWS)
 int read_proc_pid_limits_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     return false;
 }
 #endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
 static inline bool read_proc_pid_limits_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     static char proc_pid_limits_buffer[MAX_PROC_PID_LIMITS + 1];
     bool ret = false;

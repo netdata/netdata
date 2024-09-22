@@ -6,11 +6,11 @@
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 
-#ifdef __FreeBSD__
+#if defined(OS_FREEBSD)
 #include <sys/user.h>
 #endif
 
-#ifdef __APPLE__
+#if defined(OS_MACOS)
 #include <mach/mach.h>
 #include <mach/mach_host.h>
 #include <libproc.h>
@@ -19,6 +19,10 @@
 #include <mach/mach_time.h> // For mach_timebase_info_data_t and mach_timebase_info
 
 extern mach_timebase_info_data_t mach_info;
+#endif
+
+#if defined(OS_WINDOWS)
+#include <windows.h>
 #endif
 
 // ----------------------------------------------------------------------------
@@ -33,13 +37,13 @@ extern mach_timebase_info_data_t mach_info;
 // set this to 1
 // when set to 0, apps.plugin builds a sort list of processes, in order
 // to process children processes, before parent processes
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(OS_FREEBSD) || defined(OS_MACOS) || defined(OS_WINDOWS)
 #define ALL_PIDS_ARE_READ_INSTANTLY 1
-#else
+#elif defined(OS_LINUX)
 #define ALL_PIDS_ARE_READ_INSTANTLY 0
 #endif
 
-#if defined(__APPLE__)
+#if defined(OS_MACOS)
 struct pid_info {
     struct kinfo_proc proc;
     struct proc_taskinfo taskinfo;
@@ -117,7 +121,7 @@ extern size_t pagesize;
 // having a lot of spares, increases the CPU utilization of the plugin.
 #define MAX_SPARE_FDS 1
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
 extern int max_fds_cache_seconds;
 #endif
 
@@ -292,7 +296,7 @@ struct pid_limits {
 struct pid_fd {
     int fd;
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
     ino_t inode;
     char *filename;
     uint32_t link_hash;
@@ -394,7 +398,7 @@ struct pid_stat {
     kernel_uint_t status_vmswap;
     kernel_uint_t status_voluntary_ctxt_switches;
     kernel_uint_t status_nonvoluntary_ctxt_switches;
-#ifndef __FreeBSD__
+#if defined(OS_FREEBSD)
     ARL_BASE *status_arl;
 #endif
 

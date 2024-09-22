@@ -3,7 +3,6 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
-
 #define ADD_PACKET_IF_KEY(p, packets, pDataBlock, pObjectType, counter)                                                \
     do {                                                                                                               \
         if ((p)->packets.counter.key) {                                                                                \

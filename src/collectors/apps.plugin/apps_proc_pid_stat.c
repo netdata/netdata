@@ -7,8 +7,7 @@
 static inline void assign_app_group_target_to_pid(struct pid_stat *p) {
     targets_assignment_counter++;
 
-    struct target *w;
-    for(w = apps_groups_root_target; w ; w = w->next) {
+    for(struct target *w = apps_groups_root_target; w ; w = w->next) {
         // find it - 4 cases:
         // 1. the target is not a pattern
         // 2. the target has the prefix
@@ -72,7 +71,7 @@ static inline void clear_pid_stat(struct pid_stat *p, bool threads) {
     // p->rss              = 0;
 }
 
-#if defined(__FreeBSD__)
+#if defined(OS_FREEBSD)
 static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
     if (unlikely(proc_info->ki_tdflags & TDF_IDLETD))
@@ -115,9 +114,9 @@ cleanup:
     clear_pid_stat(p, true);
     return false;
 }
-#endif // __FreeBSD__
+#endif
 
-#ifdef __APPLE__
+#if defined(OS_MACOS)
 static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     struct pid_info *pi = ptr;
 
@@ -160,9 +159,16 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
 
     return true;
 }
-#endif // __APPLE__
+#endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_WINDOWS)
+static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
+    // TODO: get these statistics from perflib
+    return false;
+}
+#endif
+
+#if defined(OS_LINUX)
 static inline void update_proc_state_count(char proc_stt) {
     switch (proc_stt) {
         case 'S':

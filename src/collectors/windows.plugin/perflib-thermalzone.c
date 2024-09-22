@@ -3,7 +3,7 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
-typedef struct thermal_zone {
+struct thermal_zone {
     RRDSET *st;
     RRDDIM *rd;
 

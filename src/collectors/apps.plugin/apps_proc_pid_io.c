@@ -12,7 +12,7 @@ static inline void clear_pid_io(struct pid_stat *p) {
     p->io_cancelled_write_bytes     = 0;
 }
 
-#if defined(__FreeBSD__)
+#if defined(OS_FREEBSD)
 static inline bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
 
@@ -29,7 +29,7 @@ static inline bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
 }
 #endif
 
-#ifdef __APPLE__
+#if defined(OS_MACOS)
 static inline bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
     struct pid_info *pi = ptr;
 
@@ -46,9 +46,16 @@ static inline bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
 
     return true;
 }
-#endif // __APPLE__
+#endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_WINDOWS)
+static inline bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
+    // TODO: get I/O throughput per process from perflib
+    return false;
+}
+#endif
+
+#if defined(OS_LINUX)
 static inline int read_proc_pid_io_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     static procfile *ff = NULL;
 

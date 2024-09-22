@@ -366,7 +366,7 @@ static inline uint32_t file_descriptor_find_or_add(const char *name, uint32_t ha
 void clear_pid_fd(struct pid_fd *pfd) {
     pfd->fd = 0;
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
     pfd->link_hash = 0;
     pfd->inode = 0;
     pfd->cache_iterations_counter = 0;
@@ -401,7 +401,7 @@ void init_pid_fds(struct pid_stat *p, size_t first, size_t size) {
     struct pid_fd *pfd = &p->fds[first], *pfdend = &p->fds[first + size];
 
     while(pfd < pfdend) {
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
         pfd->filename = NULL;
 #endif
         clear_pid_fd(pfd);
@@ -409,7 +409,7 @@ void init_pid_fds(struct pid_stat *p, size_t first, size_t size) {
     }
 }
 
-#ifdef __APPLE__
+#if defined(OS_MACOS)
 static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     static struct proc_fdinfo *fds = NULL;
     static int fdsCapacity = 0;
@@ -463,9 +463,9 @@ static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __may
 
     return true;
 }
-#endif // __APPLE__
+#endif
 
-#if defined(__FreeBSD__)
+#if defined(OS_FREEBSD)
 static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr) {
     int mib[4];
     size_t size;
@@ -600,9 +600,16 @@ static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr) {
 
     return true;
 }
-#endif // __FreeBSD__
+#endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_WINDOWS)
+static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr) {
+    // TODO: get file descriptors per process, if available
+    return false;
+}
+#endif
+
+#if defined(OS_LINUX)
 static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     if(unlikely(!p->fds_dirname)) {
         char dirname[FILENAME_MAX+1];
@@ -735,7 +742,7 @@ static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __may
 
     return true;
 }
-#endif // !__FreeBSD__ !__APPLE
+#endif
 
 int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     bool ret = read_pid_file_descriptors_per_os(p, ptr);

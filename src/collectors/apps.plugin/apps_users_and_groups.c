@@ -68,7 +68,7 @@ struct user_or_group_ids all_group_ids = {
 };
 
 int file_changed(const struct stat *statbuf __maybe_unused, struct timespec *last_modification_time __maybe_unused) {
-#if defined(__APPLE__)
+#if defined(OS_MACOS)
     return 0;
 #else
     if(likely(statbuf->st_mtim.tv_sec == last_modification_time->tv_sec &&

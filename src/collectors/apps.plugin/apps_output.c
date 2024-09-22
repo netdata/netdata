@@ -119,7 +119,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_SET("system", (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cstime * cstime_fix_ratio)) : 0ULL));
         send_END();
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
         if (enable_guest_charts) {
             send_BEGIN(type, string2str(w->clean_name), "cpu_guest_utilization", dt);
             send_SET("guest", (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cgtime * cgtime_fix_ratio)) : 0ULL));
@@ -140,7 +140,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_SET("rss", w->status_vmrss);
         send_END();
 
-#if !defined(__APPLE__)
+#if defined(OS_LINUX) || defined(OS_FREEBSD)
         send_BEGIN(type, string2str(w->clean_name), "vmem_usage", dt);
         send_SET("vmem", w->status_vmsize);
         send_END();
@@ -151,7 +151,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_SET("major", (kernel_uint_t)(w->majflt * majflt_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cmajflt * cmajflt_fix_ratio)) : 0ULL));
         send_END();
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
         send_BEGIN(type, string2str(w->clean_name), "swap_usage", dt);
         send_SET("swap", w->status_vmswap);
         send_END();
@@ -188,12 +188,13 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_SET("writes", w->io_storage_bytes_written);
         send_END();
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
         send_BEGIN(type, string2str(w->clean_name), "disk_logical_io", dt);
         send_SET("reads", w->io_logical_bytes_read);
         send_SET("writes", w->io_logical_bytes_written);
         send_END();
 #endif
+
         if (enable_file_charts) {
             send_BEGIN(type, string2str(w->clean_name), "fds_open_limit", dt);
             send_SET("limit", w->max_open_files_percent * 100.0);
@@ -247,7 +248,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         fprintf(stdout, "DIMENSION user '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
         fprintf(stdout, "DIMENSION system '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
         if (enable_guest_charts) {
             fprintf(stdout, "CHART %s.%s_cpu_guest_utilization '' '%s CPU guest utlization (100%% = 1 core)' 'percentage' cpu %s.cpu_guest_utilization line 20005 %d\n",
                     type, string2str(w->clean_name), title, type, update_every);
@@ -276,7 +277,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L);
 
-#if !defined(__APPLE__)
+#if defined(OS_LINUX) || defined(OS_FREEBSD)
         fprintf(stdout, "CHART %s.%s_vmem_usage '' '%s virtual memory size' 'MiB' mem %s.vmem_usage line 20065 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
@@ -291,7 +292,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         fprintf(stdout, "DIMENSION major '' absolute 1 %llu\n", RATES_DETAIL);
         fprintf(stdout, "DIMENSION minor '' absolute 1 %llu\n", RATES_DETAIL);
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
         fprintf(stdout, "CHART %s.%s_swap_usage '' '%s swap usage' 'MiB' mem %s.swap_usage area 20065 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
@@ -299,7 +300,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         fprintf(stdout, "DIMENSION swap '' absolute %ld %ld\n", 1L, 1024L);
 #endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
         fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'KiB/s' disk %s.disk_physical_io area 20100 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
@@ -375,7 +376,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 }
 
 void send_proc_states_count(usec_t dt __maybe_unused) {
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
     static bool chart_added = false;
     // create chart for count of processes in different states
     if (!chart_added) {

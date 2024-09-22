@@ -4,7 +4,7 @@
 
 kernel_uint_t MemTotal = 0;
 
-#ifdef __FreeBSD__
+#if defined(OS_FREEBSD)
 static inline bool get_MemTotal_per_os(void) {
     int mib[2] = {CTL_HW, HW_PHYSMEM};
     size_t size = sizeof(MemTotal);
@@ -18,7 +18,7 @@ static inline bool get_MemTotal_per_os(void) {
 }
 #endif // __FreeBSD__
 
-#ifdef __APPLE__
+#if defined(OS_MACOS)
 static inline bool get_MemTotal_per_os(void) {
     int mib[2] = {CTL_HW, HW_MEMSIZE};
     size_t size = sizeof(MemTotal);
@@ -32,7 +32,7 @@ static inline bool get_MemTotal_per_os(void) {
 }
 #endif // __APPLE__
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
 static inline bool get_MemTotal_per_os(void) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/meminfo", netdata_configured_host_prefix);
@@ -58,6 +58,21 @@ static inline bool get_MemTotal_per_os(void) {
 
     procfile_close(ff);
 
+    return true;
+}
+#endif
+
+#if defined(OS_WINDOWS)
+static inline bool get_MemTotal_per_os(void) {
+    MEMORYSTATUSEX memStat = { 0 };
+    memStat.dwLength = sizeof(memStat);
+
+    if (!GlobalMemoryStatusEx(&memStat)) {
+        netdata_log_error("GlobalMemoryStatusEx() failed.");
+        return false;
+    }
+
+    MemTotal = memStat.ullTotalPhys;
     return true;
 }
 #endif

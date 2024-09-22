@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "perflib-rrd.h"
+#include <windows.h>
 
 #define COLLECTED_NUMBER_PRECISION 10000
 

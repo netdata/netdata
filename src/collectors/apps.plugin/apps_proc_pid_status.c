@@ -2,7 +2,7 @@
 
 #include "apps_plugin.h"
 
-#if defined(__FreeBSD__)
+#if defined(OS_FREEBSD)
 static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
 
@@ -15,7 +15,7 @@ static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
 }
 #endif
 
-#ifdef __APPLE__
+#if defined(OS_MACOS)
 static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
     struct pid_info *pi = ptr;
 
@@ -29,9 +29,16 @@ static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
 
     return true;
 }
-#endif // __APPLE__
+#endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_WINDOWS)
+static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
+    // TODO: get these statistics from perflib
+    return false;
+}
+#endif
+
+#if defined(OS_LINUX)
 struct arl_callback_ptr {
     struct pid_stat *p;
     procfile *ff;

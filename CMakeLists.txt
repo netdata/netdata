@@ -158,7 +158,7 @@ option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
-cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
+cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD OR OS_MACOS OR OS_WINDOWS" False)
 cmake_dependent_option(ENABLE_PLUGIN_CHARTS "Enable metric collectors written in Bash" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 cmake_dependent_option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 
@@ -763,6 +763,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/close_range.h
         src/libnetdata/os/setproctitle.c
         src/libnetdata/os/setproctitle.h
+        src/libnetdata/os/windows-perflib/perflib.c
+        src/libnetdata/os/windows-perflib/perflib.h
+        src/libnetdata/os/windows-perflib/perflib-names.c
+        src/libnetdata/os/windows-perflib/perflib-dump.c
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
         src/libnetdata/json/json-c-parser-inline.c
@@ -1427,12 +1431,8 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetSystemUptime.c
         src/collectors/windows.plugin/GetSystemRAM.c
         src/collectors/windows.plugin/GetSystemCPU.c
-        src/collectors/windows.plugin/perflib.c
-        src/collectors/windows.plugin/perflib.h
         src/collectors/windows.plugin/perflib-rrd.c
         src/collectors/windows.plugin/perflib-rrd.h
-        src/collectors/windows.plugin/perflib-names.c
-        src/collectors/windows.plugin/perflib-dump.c
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
         src/collectors/windows.plugin/perflib-thermalzone.c

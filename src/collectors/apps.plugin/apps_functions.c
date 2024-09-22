@@ -200,12 +200,12 @@ void function_processes(const char *transaction, char *function,
         , FDs_max = 0
         ;
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
     unsigned long long
-        LReads_max = 0
+          LReads_max = 0
         , LWrites_max = 0
         ;
-#endif // !__FreeBSD__ !__APPLE_
+#endif
 
     int rows= 0;
     for(p = root_of_pids(); p ; p = p->next) {
@@ -287,7 +287,7 @@ void function_processes(const char *transaction, char *function,
 
         add_value_field_ndd_with_max(wb, RSS, (NETDATA_DOUBLE)p->status_vmrss / memory_divisor);
         add_value_field_ndd_with_max(wb, Shared, (NETDATA_DOUBLE)p->status_vmshared / memory_divisor);
-#if !defined(__APPLE__)
+#if defined(OS_LINUX) || defined(OS_FREEBSD)
         add_value_field_ndd_with_max(wb, VMSize, (NETDATA_DOUBLE)p->status_vmsize / memory_divisor);
 #endif
         add_value_field_ndd_with_max(wb, Swap, (NETDATA_DOUBLE)p->status_vmswap / memory_divisor);
@@ -296,8 +296,8 @@ void function_processes(const char *transaction, char *function,
         add_value_field_llu_with_max(wb, PReads, p->io_storage_bytes_read / io_divisor);
         add_value_field_llu_with_max(wb, PWrites, p->io_storage_bytes_written / io_divisor);
 
+#if defined(OS_LINUX)
         // Logical I/O
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
         add_value_field_llu_with_max(wb, LReads, p->io_logical_bytes_read / io_divisor);
         add_value_field_llu_with_max(wb, LWrites, p->io_logical_bytes_written / io_divisor);
 #endif
@@ -468,7 +468,7 @@ void function_processes(const char *transaction, char *function,
                                     "MiB", Shared_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
-#if !defined(__APPLE__)
+#if defined(OS_LINUX) || defined(OS_FREEBSD)
         buffer_rrdf_table_add_field(wb, field_id++, "Virtual", "Virtual Memory Size", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 2, "MiB", VMSize_max, RRDF_FIELD_SORT_DESCENDING, NULL,
@@ -494,8 +494,8 @@ void function_processes(const char *transaction, char *function,
                                     NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
+#if defined(OS_LINUX)
         // Logical I/O
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
         buffer_rrdf_table_add_field(wb, field_id++, "LReads", "Logical I/O Reads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                                     2, "KiB/s", LReads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
@@ -703,7 +703,7 @@ void function_processes(const char *transaction, char *function,
             buffer_json_object_close(wb);
         }
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
         // I/O Reads chart
         buffer_json_member_add_object(wb, "Reads");
         {

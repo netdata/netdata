@@ -2,7 +2,7 @@
 
 #include "apps_plugin.h"
 
-#ifdef __APPLE__
+#if defined(OS_MACOS)
 bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t maxBytes) {
     int mib[3] = {CTL_KERN, KERN_PROCARGS2, p->pid};
     static char *args = NULL;
@@ -61,9 +61,9 @@ bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t maxBytes) {
 
     return true;
 }
-#endif // __APPLE__
+#endif
 
-#if defined(__FreeBSD__)
+#if defined(OS_FREEBSD)
 static inline bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
     size_t i, b = bytes - 1;
     int mib[4];
@@ -81,9 +81,9 @@ static inline bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t 
 
     return true;
 }
-#endif // __FreeBSD__
+#endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
 static inline bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
     if(unlikely(!p->cmdline_filename)) {
         char filename[FILENAME_MAX];
@@ -107,7 +107,14 @@ static inline bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t 
 
     return true;
 }
-#endif // !__FreeBSD__ !__APPLE__
+#endif
+
+#if defined(OS_WINDOWS)
+static inline bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
+    // TODO: get the command line from perflib, if available
+    return false;
+}
+#endif
 
 int read_proc_pid_cmdline(struct pid_stat *p) {
     static char cmdline[MAX_CMDLINE];

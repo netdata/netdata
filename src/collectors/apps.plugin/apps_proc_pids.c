@@ -102,7 +102,7 @@ static inline void del_pid_entry(pid_t pid) {
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(pids.all_pids.root, p, prev, next);
     simple_hashtable_del_slot_PID(&pids.all_pids.ht, sl);
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
     {
         size_t i;
         for(i = 0; i < p->fds_size; i++)
@@ -166,7 +166,7 @@ static inline int collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     // --------------------------------------------------------------------
     // done!
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#if defined(NETDATA_INTERNAL_CHECKS) && (ALL_PIDS_ARE_READ_INSTANTLY == 0)
     struct pid_stat *pp = p->parent;
     if(unlikely(include_exited_childs && pp && !pp->read))
         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
@@ -195,7 +195,6 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
 }
 
 void cleanup_exited_pids(void) {
-    size_t c;
     struct pid_stat *p = NULL;
 
     for(p = root_of_pids(); p ;) {
@@ -203,13 +202,13 @@ void cleanup_exited_pids(void) {
             if(unlikely(debug_enabled && (p->keep || p->keeploops)))
                 debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, pid_stat_comm(p));
 
-            for(c = 0; c < p->fds_size; c++)
+            for(size_t c = 0; c < p->fds_size; c++)
                 if(p->fds[c].fd > 0) {
                     file_descriptor_not_used(p->fds[c].fd);
                     clear_pid_fd(&p->fds[c]);
                 }
 
-            pid_t r = p->pid;
+            const pid_t r = p->pid;
             p = p->next;
             del_pid_entry(r);
         }
@@ -515,7 +514,7 @@ static inline void mark_pid_as_unread(struct pid_stat *p) {
     p->parent = NULL;
 }
 
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
 static inline void get_current_time(void) {
     struct timeval current_time;
     gettimeofday(&current_time, NULL);
@@ -523,7 +522,7 @@ static inline void get_current_time(void) {
 }
 #endif
 
-#if defined(__FreeBSD__)
+#if defined(OS_FREEBSD)
 static inline bool collect_data_for_all_pids_per_os(void) {
     // Mark all processes as unread before collecting new data
     struct pid_stat *p = NULL;
@@ -579,9 +578,9 @@ static inline bool collect_data_for_all_pids_per_os(void) {
 
     return true;
 }
-#endif // __FreeBSD__
+#endif
 
-#if defined(__APPLE__)
+#if defined(OS_MACOS)
 static inline bool collect_data_for_all_pids_per_os(void) {
     // Mark all processes as unread before collecting new data
     struct pid_stat *p;
@@ -659,9 +658,16 @@ static inline bool collect_data_for_all_pids_per_os(void) {
 
     return true;
 }
-#endif // __APPLE__
+#endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_WINDOWS)
+static inline bool collect_data_for_all_pids_per_os(void) {
+    // TODO: get perflib information
+    return false;
+}
+#endif
+
+#if defined(OS_LINUX)
 static inline size_t compute_new_sorted_size(size_t old_size, size_t required_size) {
     size_t size = (required_size % 1024 == 0) ? required_size : required_size + 1024;
     size = (size / 1024) * 1024;
@@ -768,7 +774,7 @@ static inline bool collect_data_for_all_pids_per_os(void) {
 
     return true;
 }
-#endif // !__FreeBSD__ && !__APPLE__
+#endif
 
 bool collect_data_for_all_pids(void) {
     if(!collect_data_for_all_pids_per_os())
