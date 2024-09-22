@@ -36,7 +36,7 @@ bool proc_pid_cmdline_is_needed = false; // true when we need to read /proc/cmdl
 
 #if defined(OS_FREEBSD) || defined(OS_MACOS) || defined(OS_WINDOWS)
 bool enable_file_charts = false;
-#elif defined(OS_WINDOWS)
+#elif defined(OS_LINUX)
 bool enable_file_charts = true;
 #endif
 

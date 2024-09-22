@@ -398,7 +398,7 @@ struct pid_stat {
     kernel_uint_t status_vmswap;
     kernel_uint_t status_voluntary_ctxt_switches;
     kernel_uint_t status_nonvoluntary_ctxt_switches;
-#if defined(OS_FREEBSD)
+#if defined(OS_LINUX)
     ARL_BASE *status_arl;
 #endif
 
