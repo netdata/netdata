@@ -28,7 +28,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: >
+        metrics_description: |
           This collector gathers real-time system sensor statistics using the [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) interface.
 
           Supported sensors:
