@@ -1,11 +1,11 @@
 plugin_name: windows.plugin
 modules:
   - meta:
-      plugin_name: proc.plugin
+      plugin_name: windows.plugin
       module_name: PerflibProcesses
       monitored_instance:
         name: System statistics
-        link: ""
+        link: "https://www.microsoft.com/en-us/windows"
         categories:
           - data-collection.windows-systems
         icon_filename: "windows.svg"
@@ -17,6 +17,7 @@ modules:
       keywords:
         - process counts
         - threads
+        - context switch
       most_popular: false
       overview:
         data_collection:
@@ -43,8 +44,8 @@ modules:
           list: [ ]
         configuration:
           file:
-            section_name: ""
-            name: ""
+            section_name: "plugin:windows"
+            name: "netdata.conf"
             description: ""
           options:
             description: ""
