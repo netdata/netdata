@@ -242,7 +242,7 @@ static void apply_apps_groups_targets_inheritance(void) {
 
                 if(debug_enabled || (p->target && p->target->debug_enabled))
                     debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s).",
-                                  p->target->name, p->pid, pid_stat_comm(p), p->parent->pid, pid_stat_comm(p->parent));
+                                  string2str(p->target->name), p->pid, pid_stat_comm(p), p->parent->pid, pid_stat_comm(p->parent));
             }
         }
     }
@@ -275,7 +275,7 @@ static void apply_apps_groups_targets_inheritance(void) {
 
                     if(debug_enabled || (p->target && p->target->debug_enabled))
                         debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its child %d (%s).",
-                                      p->target->name, p->parent->pid, pid_stat_comm(p->parent), p->pid, pid_stat_comm(p));
+                                      string2str(p->target->name), p->parent->pid, pid_stat_comm(p->parent), p->pid, pid_stat_comm(p));
                 }
 
                 found++;
@@ -317,7 +317,7 @@ static void apply_apps_groups_targets_inheritance(void) {
 
                 if(debug_enabled || (p->target && p->target->debug_enabled))
                     debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s) at phase 2.",
-                                  p->target->name, p->pid, pid_stat_comm(p), p->parent->pid, pid_stat_comm(p->parent));
+                                  string2str(p->target->name), p->pid, pid_stat_comm(p), p->parent->pid, pid_stat_comm(p->parent));
             }
         }
     }

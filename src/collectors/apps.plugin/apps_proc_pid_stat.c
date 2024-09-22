@@ -26,7 +26,8 @@ static inline void assign_app_group_target_to_pid(struct pid_stat *p) {
             else p->target = w;
 
             if(debug_enabled || (p->target && p->target->debug_enabled))
-                debug_log_int("%s linked to target %s", pid_stat_comm(p), p->target->name);
+                debug_log_int("%s linked to target %s",
+                              pid_stat_comm(p), string2str(p->target->name));
 
             break;
         }
@@ -102,7 +103,8 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     }
 
     if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
-        debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d", netdata_configured_host_prefix, p->pid, pid_stat_comm(p), (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+        debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d",
+                      netdata_configured_host_prefix, p->pid, pid_stat_comm(p), (p->target)?string2str(p->target->name):"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
     if(unlikely(global_iterations_counter == 1))
         clear_pid_stat(p, false);
@@ -147,7 +149,7 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
 
     if(unlikely(debug_enabled || (p->target && p->target->debug_enabled))) {
         debug_log_int("READ PROC/PID/STAT for MacOS: process: '%s' on target '%s' VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", threads=%d",
-                      pid_stat_comm(p), (p->target) ? p->target->name : "UNSET", p->utime, p->stime, p->minflt, p->majflt, p->num_threads);
+                      pid_stat_comm(p), (p->target) ? string2str(p->target->name) : "UNSET", p->utime, p->stime, p->minflt, p->majflt, p->num_threads);
     }
 
     if(unlikely(global_iterations_counter == 1))
