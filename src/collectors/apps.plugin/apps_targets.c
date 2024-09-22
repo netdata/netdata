@@ -143,8 +143,6 @@ static STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
 }
 
 struct target *get_tree_target(struct pid_stat *p) {
-    const char *p_comm0 = string2str(p->comm);
-
     // skip fast all the children that are more than 3 levels down
     while(p->parent && p->parent->parent && p->parent->parent->parent)
         p = p->parent;
@@ -164,17 +162,12 @@ struct target *get_tree_target(struct pid_stat *p) {
     for(w = tree_root_target; w ; w = w->next)
         if(w->pid_comm == p->comm) return w;
 
-    const char *w_pid_comm = w ? string2str(w->pid_comm) : NULL;
-    const char *p_comm = string2str(p->comm);
-
     w = callocz(sizeof(struct target), 1);
     w->type = TARGET_TYPE_TREE;
     w->pid_comm = string_dup(p->comm);
     w->id = string_dup(p->comm);
     w->name = comm_from_cmdline(p->comm, p->cmdline);
     w->clean_name = get_clean_name(w->name);
-
-    const char *w_name = string2str(w->name);
 
     w->next = tree_root_target;
     tree_root_target = w;
