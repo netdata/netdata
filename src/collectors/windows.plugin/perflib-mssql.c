@@ -715,7 +715,7 @@ static void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *
             snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_sql_errors_total", p->instanceID);
             p->rd_sql_errors  = rrddim_add(p->st_sql_errors,
                                           id,
-                                          "error",
+                                              "errors",
                                           1,
                                           1,
                                           RRD_ALGORITHM_INCREMENTAL);
