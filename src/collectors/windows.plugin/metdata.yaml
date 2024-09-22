@@ -91,3 +91,82 @@ modules:
                 chart_type: line
                 dimensions:
                   - name: switches
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibThermalZone
+      monitored_instance:
+        name: System thermal zone
+        link: "https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/design-guide"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: [ ]
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - process counts
+        - threads
+        - context switch
+      most_popular: false
+      overview:
+        data_collection:
+          metrics_description: |
+            Perflib provides different statistical methods about Microsoft Windows environment. This collector query for
+            Object 'Thermal Zone Information' to show actual temperature per zone.
+          method_description: ""
+        supported_platforms:
+          include: [ "windows" ]
+          exclude: [ ]
+        multi_instance: false
+        additional_permissions:
+          description: ""
+        default_behavior:
+          auto_detection:
+            description: |
+              The collector auto-detects all metrics. No configuration is needed.
+          limits:
+            description: ""
+          performance_impact:
+            description: ""
+      setup:
+        prerequisites:
+          list: [ ]
+        configuration:
+          file:
+            section_name: "plugin:windows"
+            name: "netdata.conf"
+            description: ""
+          options:
+            description: ""
+            folding:
+              title: ""
+              enabled: false
+            list: [ ]
+          examples:
+            folding:
+              enabled: false
+              title: ""
+            list: [ ]
+      troubleshooting:
+        problems:
+          list: [ ]
+      alerts:
+      metrics:
+        folding:
+          title: Metrics
+          enabled: false
+        description: ""
+        availability: [ ]
+        scopes:
+          - name: global
+            description: ""
+            labels: [ ]
+            metrics:
+              - name: system.thermalzone_temperature
+                description: Thermal zone temperature
+                unit: "Celsius"
+                chart_type: line
+                dimensions:
+                  - name: temperature
