@@ -11,8 +11,6 @@ import (
 
 const precision = 1000
 
-func ptr[T any](v T) *T { return &v }
-
 func (s *Sensors) collect() (map[string]int64, error) {
 	if s.sc == nil {
 		return nil, errors.New("sysfs scanner is not initialized")

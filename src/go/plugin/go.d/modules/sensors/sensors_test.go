@@ -306,6 +306,8 @@ func (m *mockScanner) Scan() ([]*lmsensors.Chip, error) {
 	return m.scanData, nil
 }
 
+func ptr[T any](v T) *T { return &v }
+
 func mockChips() []*lmsensors.Chip {
 	return []*lmsensors.Chip{
 		{
