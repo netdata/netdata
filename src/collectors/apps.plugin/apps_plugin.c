@@ -147,33 +147,33 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status) {
                 switch(log) {
                     case PID_LOG_IO:
                         #if defined(__FreeBSD__) || defined(__APPLE__)
-                        netdata_log_error("Cannot fetch process %d I/O info (command '%s')", p->pid, p->comm);
+                        netdata_log_error("Cannot fetch process %d I/O info (command '%s')", p->pid, pid_stat_comm(p));
                         #else
-                        netdata_log_error("Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
                         #endif
                         break;
 
                     case PID_LOG_STATUS:
                         #if defined(__FreeBSD__) || defined(__APPLE__)
-                        netdata_log_error("Cannot fetch process %d status info (command '%s')", p->pid, p->comm);
+                        netdata_log_error("Cannot fetch process %d status info (command '%s')", p->pid, pid_stat_comm(p));
                         #else
-                        netdata_log_error("Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
                         #endif
                         break;
 
                     case PID_LOG_CMDLINE:
                         #if defined(__FreeBSD__) || defined(__APPLE__)
-                        netdata_log_error("Cannot fetch process %d command line (command '%s')", p->pid, p->comm);
+                        netdata_log_error("Cannot fetch process %d command line (command '%s')", p->pid, pid_stat_comm(p));
                         #else
-                        netdata_log_error("Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
                         #endif
                         break;
 
                     case PID_LOG_FDS:
                         #if defined(__FreeBSD__) || defined(__APPLE__)
-                        netdata_log_error("Cannot fetch process %d files (command '%s')", p->pid, p->comm);
+                        netdata_log_error("Cannot fetch process %d files (command '%s')", p->pid, pid_stat_comm(p));
                         #else
-                        netdata_log_error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
                         #endif
                         break;
 
@@ -181,14 +181,14 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status) {
                         #if defined(__FreeBSD__) || defined(__APPLE__)
                         ;
                         #else
-                        netdata_log_error("Cannot process %s/proc/%d/limits (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process %s/proc/%d/limits (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
                         #endif
 
                     case PID_LOG_STAT:
                         break;
 
                     default:
-                        netdata_log_error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
+                        netdata_log_error("unhandled error for pid %d, command '%s'", p->pid, pid_stat_comm(p));
                         break;
                 }
             }
@@ -238,7 +238,8 @@ static void apply_apps_groups_targets_inheritance(void) {
                 found++;
 
                 if(debug_enabled || (p->target && p->target->debug_enabled))
-                    debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s).", p->target->name, p->pid, p->comm, p->parent->pid, p->parent->comm);
+                    debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s).",
+                                  p->target->name, p->pid, pid_stat_comm(p), p->parent->pid, pid_stat_comm(p->parent));
             }
         }
     }
@@ -270,7 +271,8 @@ static void apply_apps_groups_targets_inheritance(void) {
                     p->parent->target = p->target;
 
                     if(debug_enabled || (p->target && p->target->debug_enabled))
-                        debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its child %d (%s).", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
+                        debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its child %d (%s).",
+                                      p->target->name, p->parent->pid, pid_stat_comm(p->parent), p->pid, pid_stat_comm(p));
                 }
 
                 found++;
@@ -311,7 +313,8 @@ static void apply_apps_groups_targets_inheritance(void) {
                 found++;
 
                 if(debug_enabled || (p->target && p->target->debug_enabled))
-                    debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s) at phase 2.", p->target->name, p->pid, p->comm, p->parent->pid, p->parent->comm);
+                    debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s) at phase 2.",
+                                  p->target->name, p->pid, pid_stat_comm(p), p->parent->pid, pid_stat_comm(p->parent));
             }
         }
     }
@@ -402,7 +405,7 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     }
 
     if(unlikely(!w)) {
-        netdata_log_error("pid %d %s was left without a target!", p->pid, p->comm);
+        netdata_log_error("pid %d %s was left without a target!", p->pid, pid_stat_comm(p));
         return;
     }
 
@@ -448,7 +451,8 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->uptime_sum += p->uptime;
 
     if(unlikely(debug_enabled || w->debug_enabled)) {
-        debug_log_int("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+        debug_log_int("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "",
+                      pid_stat_comm(p), p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 
         struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
         pid_on_target->pid = p->pid;
@@ -485,7 +489,7 @@ static void calculate_netdata_statistics(void) {
             w = p->user_target;
         else {
             if(unlikely(debug_enabled && p->user_target))
-                debug_log("pid %d (%s) switched user from %u (%s) to %u.", p->pid, p->comm, p->user_target->uid, p->user_target->name, p->uid);
+                debug_log("pid %d (%s) switched user from %u (%s) to %u.", p->pid, pid_stat_comm(p), p->user_target->uid, p->user_target->name, p->uid);
 
             w = p->user_target = get_users_target(p->uid);
         }
@@ -501,7 +505,7 @@ static void calculate_netdata_statistics(void) {
             w = p->group_target;
         else {
             if(unlikely(debug_enabled && p->group_target))
-                debug_log("pid %d (%s) switched group from %u (%s) to %u.", p->pid, p->comm, p->group_target->gid, p->group_target->name, p->gid);
+                debug_log("pid %d (%s) switched group from %u (%s) to %u.", p->pid, pid_stat_comm(p), p->group_target->gid, p->group_target->name, p->gid);
 
             w = p->group_target = get_groups_target(p->gid);
         }

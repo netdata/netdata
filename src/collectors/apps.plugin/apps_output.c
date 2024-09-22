@@ -225,7 +225,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         for (w = root; w; w = w->next) {
             if (unlikely(!w->target && w->processes)) {
                 struct pid_on_target *pid_on_target;
-                fprintf(stderr, "apps.plugin: target '%s' has aggregated %u process(es):", w->name, w->processes);
+                fprintf(stderr, "apps.plugin: target '%s' has aggregated %"PRIu32" process(es):", w->name, w->processes);
                 for (pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {
                     fprintf(stderr, " %d", pid_on_target->pid);
                 }
@@ -238,7 +238,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         if (likely(w->exposed || (!w->processes && !w->is_other)))
             continue;
 
-        w->exposed = 1;
+        w->exposed = true;
 
         fprintf(stdout, "CHART %s.%s_cpu_utilization '' '%s CPU utilization (100%% = 1 core)' 'percentage' cpu %s.cpu_utilization stacked 20001 %d\n", type, w->clean_name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);

@@ -12,7 +12,7 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
 
     struct target *w;
     for(w = apps_groups_root_target; w ; w = w->next) {
-        // if(debug_enabled || (p->target && p->target->debug_enabled)) debug_log_int("\t\tcomparing '%s' with '%s'", w->compare, p->comm);
+        // if(debug_enabled || (p->target && p->target->debug_enabled)) debug_log_int("\t\tcomparing '%s' with '%s'", w->compare, pid_stat_comm(p));
 
         // find it - 4 cases:
         // 1. the target is not a pattern
@@ -20,9 +20,9 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
         // 3. the target has the suffix
         // 4. the target is something inside cmdline
 
-        if(unlikely(( (!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
-                      || (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))
-                      || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen]))
+        if(unlikely(( (!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, pid_stat_comm(p)))
+                      || (w->starts_with && !w->ends_with && !strncmp(w->compare, pid_stat_comm(p), w->comparelen))
+                      || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &(pid_stat_comm(p)[pclen - w->comparelen])))
                       || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && p->cmdline && strstr(p->cmdline, w->compare))
                           ))) {
 
@@ -31,7 +31,7 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
             else p->target = w;
 
             if(debug_enabled || (p->target && p->target->debug_enabled))
-                debug_log_int("%s linked to target %s", p->comm, p->target->name);
+                debug_log_int("%s linked to target %s", pid_stat_comm(p), p->target->name);
 
             break;
         }
@@ -42,12 +42,12 @@ static inline void update_pid_comm(struct pid_stat *p, const char *comm) {
     if(strcmp(p->comm, comm) != 0) {
         if(unlikely(debug_enabled)) {
             if(p->comm[0])
-                debug_log("\tpid %d (%s) changed name to '%s'", p->pid, p->comm, comm);
+                debug_log("\tpid %d (%s) changed name to '%s'", p->pid, pid_stat_comm(p), comm);
             else
                 debug_log("\tJust added %d (%s)", p->pid, comm);
         }
 
-        strncpyz(p->comm, comm, MAX_COMPARE_NAME);
+        strncpyz(p->comm, comm, sizeof(p->comm) - 1);
 
         // /proc/<pid>/cmdline
         if(likely(proc_pid_cmdline_is_needed))
@@ -106,7 +106,7 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     }
 
     if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
-        debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d", netdata_configured_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+        debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d", netdata_configured_host_prefix, p->pid, pid_stat_comm(p), (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
     if(unlikely(global_iterations_counter == 1))
         clear_pid_stat(p, false);
@@ -151,7 +151,7 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
 
     if(unlikely(debug_enabled || (p->target && p->target->debug_enabled))) {
         debug_log_int("READ PROC/PID/STAT for MacOS: process: '%s' on target '%s' VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", threads=%d",
-                      p->comm, (p->target) ? p->target->name : "UNSET", p->utime, p->stime, p->minflt, p->majflt, p->num_threads);
+                      pid_stat_comm(p), (p->target) ? p->target->name : "UNSET", p->utime, p->stime, p->minflt, p->majflt, p->num_threads);
     }
 
     if(unlikely(global_iterations_counter == 1))
@@ -267,7 +267,8 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __may
     }
 
     if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
-        debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d", netdata_configured_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+        debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d",
+                      netdata_configured_host_prefix, p->pid, pid_stat_comm(p), (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
     if(unlikely(global_iterations_counter == 1))
         clear_pid_stat(p, false);

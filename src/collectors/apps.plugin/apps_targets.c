@@ -12,7 +12,7 @@ struct target *get_users_target(uid_t uid) {
         if(w->uid == uid) return w;
 
     w = callocz(sizeof(struct target), 1);
-    snprintfz(w->compare, MAX_COMPARE_NAME, "%u", uid);
+    snprintfz(w->compare, sizeof(w->compare), "%u", uid);
     w->comparehash = simple_hash(w->compare);
     w->comparelen = strlen(w->compare);
 
@@ -56,7 +56,7 @@ struct target *get_groups_target(gid_t gid) {
         if(w->gid == gid) return w;
 
     w = callocz(sizeof(struct target), 1);
-    snprintfz(w->compare, MAX_COMPARE_NAME, "%u", gid);
+    snprintfz(w->compare, sizeof(w->compare), "%u", gid);
     w->comparehash = simple_hash(w->compare);
     w->comparelen = strlen(w->compare);
 
@@ -97,7 +97,7 @@ struct target *get_groups_target(gid_t gid) {
 // find or create a new target
 // there are targets that are just aggregated to other target (the second argument)
 static struct target *get_apps_groups_target(const char *id, struct target *target, const char *name) {
-    int tdebug = 0, thidden = target?target->hidden:0, ends_with = 0;
+    bool tdebug = false, thidden = target ? target->hidden : false, ends_with = false;
     const char *nid = id;
 
     // extract the options
@@ -121,7 +121,7 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
     // find an existing target
     if(unlikely(!target)) {
         while(*name == '-') {
-            if(*name == '-') thidden = 1;
+            if(*name == '-') thidden = true;
             name++;
         }
 
@@ -160,11 +160,11 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
             *d = '_';
     }
 
-    strncpyz(w->compare, nid, MAX_COMPARE_NAME);
+    strncpyz(w->compare, nid, sizeof(w->compare) - 1);
     size_t len = strlen(w->compare);
     if(w->compare[len - 1] == '*') {
         w->compare[len - 1] = '\0';
-        w->starts_with = 1;
+        w->starts_with = true;
     }
     w->ends_with = ends_with;
 

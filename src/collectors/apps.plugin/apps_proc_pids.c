@@ -97,7 +97,7 @@ static inline void del_pid_entry(pid_t pid) {
         return;
     }
 
-    debug_log("process %d %s exited, deleting it.", pid, p->comm);
+    debug_log("process %d %s exited, deleting it.", pid, pid_stat_comm(p));
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(pids.all_pids.root, p, prev, next);
     simple_hashtable_del_slot_PID(&pids.all_pids.ht, sl);
@@ -138,7 +138,7 @@ static inline int collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
 
     // check its parent pid
     if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-        netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", p->pid, p->comm, p->ppid);
+        netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", p->pid, pid_stat_comm(p), p->ppid);
         p->ppid = 0;
     }
 
@@ -170,7 +170,7 @@ static inline int collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     if(unlikely(include_exited_childs && pp && !pp->read))
         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                "Read process %d (%s) sortlisted %zu, but its parent %d (%s) sortlisted %zu, is not read",
-               p->pid, p->comm, p->sortlist, pp->pid, pp->comm, pp->sortlist);
+               p->pid, pid_stat_comm(p), p->sortlist, pp->pid, pid_stat_comm(pp), pp->sortlist);
 #endif
 
     // mark it as updated
@@ -200,7 +200,7 @@ void cleanup_exited_pids(void) {
     for(p = root_of_pids(); p ;) {
         if(!p->updated && (!p->keep || p->keeploops > 0)) {
             if(unlikely(debug_enabled && (p->keep || p->keeploops)))
-                debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, p->comm);
+                debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, pid_stat_comm(p));
 
             for(c = 0; c < p->fds_size; c++)
                 if(p->fds[c].fd > 0) {
@@ -238,11 +238,12 @@ static inline void link_all_processes_to_their_parents(void) {
             pp->children_count++;
 
             if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
-                debug_log_int("child %d (%s, %s) on target '%s' has parent %d (%s, %s). Parent: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->pid, p->comm, p->updated?"running":"exited", (p->target)?p->target->name:"UNSET", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->gtime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cgtime, pp->cminflt, pp->cmajflt);
+                debug_log_int("child %d (%s, %s) on target '%s' has parent %d (%s, %s). Parent: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "",
+                              p->pid, pid_stat_comm(p), p->updated?"running":"exited", (p->target)?p->target->name:"UNSET", pp->pid, pid_stat_comm(pp), pp->updated?"running":"exited", pp->utime, pp->stime, pp->gtime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cgtime, pp->cminflt, pp->cmajflt);
         }
         else {
             p->parent = NULL;
-            netdata_log_error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
+            netdata_log_error("pid %d %s states parent %d, but the later does not exist.", p->pid, pid_stat_comm(p), p->ppid);
         }
     }
 }
@@ -267,7 +268,7 @@ static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t tim
     fprintf(stderr, "  %s %s%s (%d %s %"PRIu64""
             , buffer
             , prefix
-            , p->comm
+            , pid_stat_comm(p)
             , p->pid
             , p->updated?"running":"exited"
             , p->stat_collected_usec - time
@@ -289,7 +290,7 @@ static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t tim
 }
 
 static inline void debug_print_process_tree(struct pid_stat *p, char *msg __maybe_unused) {
-    debug_log("%s: process %s (%d, %s) with parents:", msg, p->comm, p->pid, p->updated?"running":"exited");
+    debug_log("%s: process %s (%d, %s) with parents:", msg, pid_stat_comm(p), p->pid, p->updated?"running":"exited");
     debug_print_process_and_parents(p, p->stat_collected_usec);
 }
 
@@ -303,35 +304,35 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
         switch(type) {
             case 1:
                 if(p->cminflt > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
                 break;
 
             case 2:
                 if(p->cmajflt > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
                 break;
 
             case 3:
                 if(p->cutime > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
                 break;
 
             case 4:
                 if(p->cstime > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
                 break;
 
             case 5:
                 if(p->cgtime > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
                 break;
@@ -341,23 +342,23 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
     if(!found) {
         switch(type) {
             case 1:
-                fprintf(stderr, " > cannot find any process to use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pe->comm);
+                fprintf(stderr, " > cannot find any process to use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pid_stat_comm(pe));
                 break;
 
             case 2:
-                fprintf(stderr, " > cannot find any process to use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pe->comm);
+                fprintf(stderr, " > cannot find any process to use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pid_stat_comm(pe));
                 break;
 
             case 3:
-                fprintf(stderr, " > cannot find any process to use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pe->comm);
+                fprintf(stderr, " > cannot find any process to use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pid_stat_comm(pe));
                 break;
 
             case 4:
-                fprintf(stderr, " > cannot find any process to use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pe->comm);
+                fprintf(stderr, " > cannot find any process to use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pid_stat_comm(pe));
                 break;
 
             case 5:
-                fprintf(stderr, " > cannot find any process to use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pe->comm);
+                fprintf(stderr, " > cannot find any process to use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pid_stat_comm(pe));
                 break;
         }
     }
@@ -398,7 +399,7 @@ static inline void process_exited_pids() {
 
         if(unlikely(debug_enabled)) {
             debug_log("Absorb %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")"
-                      , p->comm
+                      , pid_stat_comm(p)
                       , p->pid
                       , p->updated?"running":"exited"
                       , utime
@@ -417,23 +418,23 @@ static inline void process_exited_pids() {
             kernel_uint_t absorbed;
             absorbed = remove_exited_child_from_parent(&utime,  &pp->cutime);
             if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " utime (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, utime);
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " utime (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, utime);
 
             absorbed = remove_exited_child_from_parent(&stime,  &pp->cstime);
             if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " stime (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, stime);
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " stime (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, stime);
 
             absorbed = remove_exited_child_from_parent(&gtime,  &pp->cgtime);
             if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " gtime (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, gtime);
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " gtime (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, gtime);
 
             absorbed = remove_exited_child_from_parent(&minflt, &pp->cminflt);
             if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " minflt (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, minflt);
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " minflt (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, minflt);
 
             absorbed = remove_exited_child_from_parent(&majflt, &pp->cmajflt);
             if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " majflt (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, majflt);
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " majflt (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, majflt);
         }
 
         if(unlikely(utime + stime + gtime + minflt + majflt > 0)) {
@@ -448,7 +449,7 @@ static inline void process_exited_pids() {
             p->keep = true;
 
             debug_log(" > remaining resources - KEEP - for another loop: %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")"
-                      , p->comm
+                      , pid_stat_comm(p)
                       , p->pid
                       , p->updated?"running":"exited"
                       , utime
@@ -463,7 +464,7 @@ static inline void process_exited_pids() {
                 pp->keep = true;
 
                 debug_log(" > - KEEP - parent for another loop: %s (%d %s)"
-                          , pp->comm
+                          , pid_stat_comm(pp)
                           , pp->pid
                           , pp->updated?"running":"exited"
                 );
@@ -480,7 +481,7 @@ static inline void process_exited_pids() {
         }
         else
             debug_log(" > totally absorbed - DONE - %s (%d %s)"
-                      , p->comm
+                      , pid_stat_comm(p)
                       , p->pid
                       , p->updated?"running":"exited"
             );

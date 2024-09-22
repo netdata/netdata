@@ -121,7 +121,7 @@ cleanup:
                 "), open fds limit = %"PRIu64", "
                 "%s, "
                 "original line [%s]",
-                p->pid, p->comm, p->openfds_limits_percent, all_fds,
+                p->pid, pid_stat_comm(p), p->openfds_limits_percent, all_fds,
                 p->openfds.files,
                 p->openfds.pipes,
                 p->openfds.sockets,

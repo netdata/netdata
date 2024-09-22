@@ -184,8 +184,6 @@ struct target {
     uid_t uid;
     gid_t gid;
 
-    bool is_other;
-
     kernel_uint_t minflt;
     kernel_uint_t cminflt;
     kernel_uint_t majflt;
@@ -216,24 +214,25 @@ struct target {
     kernel_uint_t io_storage_bytes_written;
     kernel_uint_t io_cancelled_write_bytes;
 
-    int *target_fds;
-    int target_fds_size;
+    kernel_uint_t uptime_min;
+    kernel_uint_t uptime_sum;
+    kernel_uint_t uptime_max;
 
     struct openfds openfds;
 
     NETDATA_DOUBLE max_open_files_percent;
 
-    kernel_uint_t uptime_min;
-    kernel_uint_t uptime_sum;
-    kernel_uint_t uptime_max;
+    int *target_fds;
+    uint32_t target_fds_size;
 
-    unsigned int processes; // how many processes have been merged to this
-    int exposed;            // if set, we have sent this to netdata
-    int hidden;             // if set, we set the hidden flag on the dimension
-    int debug_enabled;
-    int ends_with;
-    int starts_with;        // if set, the compare string matches only the
-                     // beginning of the command
+    uint32_t processes;     // how many processes have been merged to this
+    bool is_other:1;
+    bool exposed:1;         // if set, we have sent this to netdata
+    bool hidden:1;          // if set, we set the hidden flag on the dimension
+    bool debug_enabled:1;
+    bool ends_with:1;
+    bool starts_with:1;     // if set, the compare string matches only the
+                            // beginning of the command
 
     struct pid_on_target *root_pid; // list of aggregated pids for target debugging
 
@@ -294,6 +293,8 @@ struct pid_fd {
 #endif
 };
 
+#define pid_stat_comm(p) (p->comm)
+
 struct pid_stat {
     int32_t pid;
     int32_t ppid;
@@ -307,8 +308,6 @@ struct pid_stat {
     size_t sortlist;                // higher numbers = top on the process tree
                                     // each process gets a unique number (non-sequential though)
 #endif
-
-    char state;
 
     char comm[MAX_COMPARE_NAME + 1];
     char *cmdline;
@@ -399,24 +398,25 @@ struct pid_stat {
 
     kernel_uint_t uptime;
 
-    struct pid_fd *fds;             // array of fds it uses
-    size_t fds_size;                // the size of the fds array
-
     struct openfds openfds;
     struct pid_limits limits;
 
     NETDATA_DOUBLE openfds_limits_percent;
 
-    int children_count;             // number of processes directly referencing this
-    int keeploops;                  // increases by 1 every time keep is 1 and updated 0
+    struct pid_fd *fds;             // array of fds it uses
+    uint32_t fds_size;              // the size of the fds array
+
+    uint32_t children_count;        // number of processes directly referencing this
+    uint32_t keeploops;             // increases by 1 every time keep is 1 and updated 0
 
     PID_LOG log_thrown;
 
-    bool keep;                      // true when we need to keep this process in memory even after it exited
-    bool updated;                   // true when the process is currently running
-    bool merged;                    // true when it has been merged to its parent
-    bool read;                      // true when we have already read this process for this iteration
-    bool matched_by_config;
+    char state;
+    bool keep:1;                    // true when we need to keep this process in memory even after it exited
+    bool updated:1;                 // true when the process is currently running
+    bool merged:1;                  // true when it has been merged to its parent
+    bool read:1;                    // true when we have already read this process for this iteration
+    bool matched_by_config:1;
 
     struct target *target;          // app_groups.conf targets
     struct target *user_target;     // uid based targets

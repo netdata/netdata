@@ -53,16 +53,16 @@ static inline void reallocate_target_fds(struct target *w) {
 
 static void aggregage_fd_type_on_openfds(FD_FILETYPE type, struct openfds *openfds) {
     switch(type) {
+        case FILETYPE_SOCKET:
+            openfds->sockets++;
+            break;
+
         case FILETYPE_FILE:
             openfds->files++;
             break;
 
         case FILETYPE_PIPE:
             openfds->pipes++;
-            break;
-
-        case FILETYPE_SOCKET:
-            openfds->sockets++;
             break;
 
         case FILETYPE_INOTIFY:
@@ -133,7 +133,7 @@ void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     p->openfds.other = 0;
 
     long currentfds = 0;
-    size_t c, size = p->fds_size;
+    uint32_t c, size = p->fds_size;
     struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
         int fd = fds[c].fd;
@@ -526,7 +526,7 @@ static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr) {
         if (unlikely(fdid >= p->fds_size)) {
             // it is small, extend it
 
-            debug_log("extending fd memory slots for %s from %d to %d", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
+            debug_log("extending fd memory slots for %s from %d to %d", pid_stat_comm(p), p->fds_size, fdid + MAX_SPARE_FDS);
 
             p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(struct pid_fd));
 
@@ -644,7 +644,7 @@ static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __may
             // it is small, extend it
 
             debug_log("extending fd memory slots for %s from %d to %d"
-                      , p->comm
+                      , pid_stat_comm(p)
                       , p->fds_size
                       , fdid + MAX_SPARE_FDS
             );
