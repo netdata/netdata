@@ -265,7 +265,7 @@ static void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_ins
                                                              , "User connections"
                                                              , "connections"
                                                              , PLUGIN_WINDOWS_NAME
-                                                             , "MSSQL"
+                                                             , "PerflibMSSQL"
                                                              , PRIO_MSSQL_USER_CONNECTIONS
                                                              , update_every
                                                              , RRDSET_TYPE_LINE
@@ -298,7 +298,7 @@ static void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_ins
                                                             , "Blocked processes"
                                                             , "process"
                                                             , PLUGIN_WINDOWS_NAME
-                                                            , "MSSQL"
+                                                            , "PerflibMSSQL"
                                                             , PRIO_MSSQL_BLOCKED_PROCESSES
                                                             , update_every
                                                             , RRDSET_TYPE_LINE
@@ -339,7 +339,7 @@ static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
                                                              , "Failed auto-parameterization attempts"
                                                              , "attempts/s"
                                                              , PLUGIN_WINDOWS_NAME
-                                                             , "MSSQL"
+                                                             , "PerflibMSSQL"
                                                              , PRIO_MSSQL_STATS_AUTO_PARAMETRIZATION
                                                              , update_every
                                                              , RRDSET_TYPE_LINE
@@ -372,7 +372,7 @@ static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
                                                                 , "Total of batches requests"
                                                                 , "requests/s"
                                                                 , PLUGIN_WINDOWS_NAME
-                                                                , "MSSQL"
+                                                                , "PerflibMSSQL"
                                                                 , PRIO_MSSQL_STATS_BATCH_REQUEST
                                                                 , update_every
                                                                 , RRDSET_TYPE_LINE
@@ -405,7 +405,7 @@ static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
                                                             , "Safe auto-parameterization attempts"
                                                             , "attempts/s"
                                                             , PLUGIN_WINDOWS_NAME
-                                                            , "MSSQL"
+                                                            , "PerflibMSSQL"
                                                             , PRIO_MSSQL_STATS_SAFE_AUTO_PARAMETRIZATION
                                                             , update_every
                                                             , RRDSET_TYPE_LINE
@@ -438,7 +438,7 @@ static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
                                                               , "SQL compilations"
                                                               , "compilations/s"
                                                               , PLUGIN_WINDOWS_NAME
-                                                              , "MSSQL"
+                                                              , "PerflibMSSQL"
                                                               , PRIO_MSSQL_STATS_COMPILATIONS
                                                               , update_every
                                                               , RRDSET_TYPE_LINE
@@ -471,7 +471,7 @@ static void do_mssql_sql_statistics(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
                                                              , "SQL re-compilations"
                                                              , "recompiles/"
                                                              , PLUGIN_WINDOWS_NAME
-                                                             , "MSSQL"
+                                                             , "PerflibMSSQL"
                                                              , PRIO_MSSQL_STATS_RECOMPILATIONS
                                                              , update_every
                                                              , RRDSET_TYPE_LINE
@@ -512,7 +512,7 @@ static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql
                                                              , "Buffer Cache hit ratio"
                                                              , "percentage"
                                                              , PLUGIN_WINDOWS_NAME
-                                                             , "MSSQL"
+                                                             , "PerflibMSSQL"
                                                              , PRIO_MSSQL_BUFF_CACHE_HIT_RATIO
                                                              , update_every
                                                              , RRDSET_TYPE_LINE
@@ -545,7 +545,7 @@ static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql
                                                                   , "Flushed pages"
                                                                   , "pages/s"
                                                                   , PLUGIN_WINDOWS_NAME
-                                                                  , "MSSQL"
+                                                                  , "PerflibMSSQL"
                                                                   , PRIO_MSSQL_BUFF_CHECKPOINT_PAGES
                                                                   , update_every
                                                                   , RRDSET_TYPE_LINE
@@ -578,7 +578,7 @@ static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql
                                                                             , "Page life expectancy"
                                                                             , "seconds"
                                                                             , PLUGIN_WINDOWS_NAME
-                                                                            , "MSSQL"
+                                                                            , "PerflibMSSQL"
                                                                             , PRIO_MSSQL_BUFF_PAGE_LIFE_EXPECTANCY
                                                                             , update_every
                                                                             , RRDSET_TYPE_LINE
@@ -612,7 +612,7 @@ static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql
                                                            , "Number of pages input and output"
                                                            , "pages/s"
                                                            , PLUGIN_WINDOWS_NAME
-                                                           , "MSSQL"
+                                                           , "PerflibMSSQL"
                                                            , PRIO_MSSQL_BUFF_MAN_IOPS
                                                            , update_every
                                                            , RRDSET_TYPE_LINE
@@ -665,7 +665,7 @@ static void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
                                                              , "Page splits"
                                                              , "splits/s"
                                                              , PLUGIN_WINDOWS_NAME
-                                                             , "MSSQL"
+                                                             , "PerflibMSSQL"
                                                              , PRIO_MSSQL_BUFF_METHODS_PAGE_SPLIT
                                                              , update_every
                                                              , RRDSET_TYPE_LINE
@@ -706,7 +706,7 @@ static void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *
                                                        , "Errors"
                                                        , "errors/s"
                                                        , PLUGIN_WINDOWS_NAME
-                                                       , "MSSQL"
+                                                       , "PerflibMSSQL"
                                                        , PRIO_MSSQL_SQL_ERRORS
                                                        , update_every
                                                        , RRDSET_TYPE_LINE
