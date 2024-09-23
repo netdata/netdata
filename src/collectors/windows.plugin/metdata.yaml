@@ -11,7 +11,7 @@ modules:
         icon_filename: "windows.svg"
       related_resources:
         integrations:
-          list: [ ]
+          list: []
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -27,7 +27,7 @@ modules:
           method_description: ""
         supported_platforms:
           include: [ "windows" ]
-          exclude: [ ]
+          exclude: []
         multi_instance: false
         additional_permissions:
           description: ""
@@ -41,7 +41,7 @@ modules:
             description: ""
       setup:
         prerequisites:
-          list: [ ]
+          list: []
         configuration:
           file:
             section_name: "plugin:windows"
@@ -52,26 +52,26 @@ modules:
             folding:
               title: ""
               enabled: true
-            list: [ ]
+            list: []
           examples:
             folding:
               enabled: true
               title: ""
-            list: [ ]
+            list: []
       troubleshooting:
         problems:
-          list: [ ]
+          list: []
       alerts:
       metrics:
         folding:
           title: Metrics
           enabled: false
         description: ""
-        availability: [ ]
+        availability: []
         scopes:
           - name: global
             description: ""
-            labels: [ ]
+            labels: []
             metrics:
               - name: system.processes
                 description: System Processes
@@ -102,7 +102,7 @@ modules:
         icon_filename: "windows.svg"
       related_resources:
         integrations:
-          list: [ ]
+          list: []
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -117,7 +117,7 @@ modules:
           method_description: ""
         supported_platforms:
           include: [ "windows" ]
-          exclude: [ ]
+          exclude: []
         multi_instance: false
         additional_permissions:
           description: ""
@@ -131,7 +131,7 @@ modules:
             description: ""
       setup:
         prerequisites:
-          list: [ ]
+          list: []
         configuration:
           file:
             section_name: "plugin:windows"
@@ -142,26 +142,26 @@ modules:
             folding:
               title: ""
               enabled: true
-            list: [ ]
+            list: []
           examples:
             folding:
               enabled: true
               title: ""
-            list: [ ]
+            list: []
       troubleshooting:
         problems:
-          list: [ ]
+          list: []
       alerts:
       metrics:
         folding:
           title: Metrics
           enabled: false
         description: ""
-        availability: [ ]
+        availability: []
         scopes:
           - name: memory
             description: ""
-            labels: [ ]
+            labels: []
             metrics:
               - name: mem.swap_iops
                 description: Swap Operations
@@ -195,7 +195,7 @@ modules:
         icon_filename: "windows.svg"
       related_resources:
         integrations:
-          list: [ ]
+          list: []
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -211,7 +211,7 @@ modules:
           method_description: ""
         supported_platforms:
           include: [ "windows" ]
-          exclude: [ ]
+          exclude: []
         multi_instance: false
         additional_permissions:
           description: ""
@@ -225,7 +225,7 @@ modules:
             description: ""
       setup:
         prerequisites:
-          list: [ ]
+          list: []
         configuration:
           file:
             section_name: "plugin:windows"
@@ -236,26 +236,26 @@ modules:
             folding:
               title: ""
               enabled: false
-            list: [ ]
+            list: []
           examples:
             folding:
               enabled: false
               title: ""
-            list: [ ]
+            list: []
       troubleshooting:
         problems:
-          list: [ ]
+          list: []
       alerts:
       metrics:
         folding:
           title: Metrics
           enabled: false
         description: ""
-        availability: [ ]
+        availability: []
         scopes:
           - name: global
             description: ""
-            labels: [ ]
+            labels: []
             metrics:
               - name: system.thermalzone_temperature
                 description: Thermal zone temperature
