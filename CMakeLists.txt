@@ -3083,6 +3083,10 @@ if(NOT OS_WINDOWS)
 endif()
 
 if(OS_WINDOWS)
+        install(FILES /usr/bin/msys-protobuf-32.dll
+                      /usr/bin/msys-uv-1.dll
+                      DESTINATION "${BINDIR}")
+
         # Make bash & netdata happy
         install(DIRECTORY DESTINATION tmp)
 
