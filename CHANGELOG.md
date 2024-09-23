@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18598](https://github.com/netdata/netdata/pull/18598) ([netdatabot](https://github.com/netdatabot))
+- go.d/sensors fix meta [\#18597](https://github.com/netdata/netdata/pull/18597) ([ilyam8](https://github.com/ilyam8))
+- go.d/sensors update meta [\#18595](https://github.com/netdata/netdata/pull/18595) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18592](https://github.com/netdata/netdata/pull/18592) ([netdatabot](https://github.com/netdatabot))
 - Bump go.mongodb.org/mongo-driver from 1.16.1 to 1.17.0 in /src/go [\#18589](https://github.com/netdata/netdata/pull/18589) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/docker/docker from 27.2.1+incompatible to 27.3.0+incompatible in /src/go [\#18588](https://github.com/netdata/netdata/pull/18588) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -416,9 +419,6 @@
 - fix installing netdata-updater svc/timer for native packages [\#18032](https://github.com/netdata/netdata/pull/18032) ([ilyam8](https://github.com/ilyam8))
 - Troubleshooter must be assigned to rooms docs [\#18031](https://github.com/netdata/netdata/pull/18031) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#18030](https://github.com/netdata/netdata/pull/18030) ([netdatabot](https://github.com/netdatabot))
-- go.d/postfix: simplify and fix tests [\#18029](https://github.com/netdata/netdata/pull/18029) ([ilyam8](https://github.com/ilyam8))
-- go.d k8state: skip jobs/cronjobs Pods [\#18028](https://github.com/netdata/netdata/pull/18028) ([ilyam8](https://github.com/ilyam8))
-- Port postfix collector from python to go [\#18026](https://github.com/netdata/netdata/pull/18026) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
