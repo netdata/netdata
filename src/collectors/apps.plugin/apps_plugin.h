@@ -372,13 +372,10 @@ struct pid_stat {
     STRING *comm;
     STRING *cmdline;
 
-    // these are raw values collected
-    kernel_uint_t minflt_raw;
-    kernel_uint_t cminflt_raw;
-    kernel_uint_t majflt_raw;
-    kernel_uint_t cmajflt_raw;
     kernel_uint_t utime_raw;
     kernel_uint_t stime_raw;
+    kernel_uint_t utime;        // user CPU time
+    kernel_uint_t stime;        // system CPU time
 
 #if(PROCESSES_HAVE_CPU_GUEST_TIME == 1)
     kernel_uint_t gtime_raw;
@@ -396,13 +393,14 @@ struct pid_stat {
 #endif
 #endif
 
-    // these are rates
+    kernel_uint_t minflt_raw;
+    kernel_uint_t cminflt_raw;
+    kernel_uint_t majflt_raw;
+    kernel_uint_t cmajflt_raw;
     kernel_uint_t minflt;
     kernel_uint_t cminflt;
     kernel_uint_t majflt;
     kernel_uint_t cmajflt;
-    kernel_uint_t utime;        // user CPU time
-    kernel_uint_t stime;        // system CPU time
 
     // int64_t priority;
     // int64_t nice;
@@ -438,8 +436,12 @@ struct pid_stat {
                         // each process gets a unique number (non-sequential though)
 #endif
 
+#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
     kernel_uint_t status_voluntary_ctxt_switches_raw;
     kernel_uint_t status_nonvoluntary_ctxt_switches_raw;
+    kernel_uint_t status_voluntary_ctxt_switches;
+    kernel_uint_t status_nonvoluntary_ctxt_switches;
+#endif
 
     kernel_uint_t status_vmsize;
     kernel_uint_t status_vmrss;
@@ -447,8 +449,7 @@ struct pid_stat {
     kernel_uint_t status_rssfile;
     kernel_uint_t status_rssshmem;
     kernel_uint_t status_vmswap;
-    kernel_uint_t status_voluntary_ctxt_switches;
-    kernel_uint_t status_nonvoluntary_ctxt_switches;
+
 #if defined(OS_LINUX)
     ARL_BASE *status_arl;
 #endif
@@ -630,5 +631,6 @@ void pids_init(void);
 struct pid_stat *find_pid_entry(pid_t pid);
 
 void update_pid_comm(struct pid_stat *p, const char *comm);
+void aggregate_processes_to_targets(void);
 
 #endif //NETDATA_APPS_PLUGIN_H

@@ -1894,6 +1894,7 @@ if(ENABLE_PLUGIN_APPS)
             src/collectors/apps.plugin/apps_proc_pid_fd.c
             src/collectors/apps.plugin/apps_proc_pids.c
             src/collectors/apps.plugin/apps_proc_meminfo.c
+            src/collectors/apps.plugin/apps_aggregations.c
     )
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
