@@ -11,7 +11,7 @@ modules:
         icon_filename: "windows.svg"
       related_resources:
         integrations:
-          list: [ ]
+          list: []
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -27,7 +27,7 @@ modules:
           method_description: ""
         supported_platforms:
           include: [ "windows" ]
-          exclude: [ ]
+          exclude: []
         multi_instance: false
         additional_permissions:
           description: ""
@@ -41,7 +41,7 @@ modules:
             description: ""
       setup:
         prerequisites:
-          list: [ ]
+          list: []
         configuration:
           file:
             section_name: "plugin:windows"
@@ -52,26 +52,26 @@ modules:
             folding:
               title: ""
               enabled: true
-            list: [ ]
+            list: []
           examples:
             folding:
               enabled: true
               title: ""
-            list: [ ]
+            list: []
       troubleshooting:
         problems:
-          list: [ ]
+          list: []
       alerts:
       metrics:
         folding:
           title: Metrics
           enabled: false
         description: ""
-        availability: [ ]
+        availability: []
         scopes:
           - name: global
             description: ""
-            labels: [ ]
+            labels: []
             metrics:
               - name: system.processes
                 description: System Processes
@@ -102,7 +102,7 @@ modules:
         icon_filename: "windows.svg"
       related_resources:
         integrations:
-          list: [ ]
+          list: []
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -120,7 +120,7 @@ modules:
           method_description: ""
         supported_platforms:
           include: [ "windows" ]
-          exclude: [ ]
+          exclude: []
         multi_instance: false
         additional_permissions:
           description: ""
@@ -134,7 +134,7 @@ modules:
             description: ""
       setup:
         prerequisites:
-          list: [ ]
+          list: []
         configuration:
           file:
             section_name: "plugin:windows"
@@ -145,26 +145,26 @@ modules:
             folding:
               title: ""
               enabled: true
-            list: [ ]
+            list: []
           examples:
             folding:
               enabled: true
               title: ""
-            list: [ ]
+            list: []
       troubleshooting:
         problems:
-          list: [ ]
+          list: []
       alerts:
       metrics:
         folding:
           title: Metrics
           enabled: false
         description: ""
-        availability: [ ]
+        availability: []
         scopes:
           - name: iis
             description: ""
-            labels: [ ]
+            labels: []
             metrics:
               - name: iis.website_traffic
                 description: Website traffic
