@@ -1,7 +1,6 @@
 [netdata]
 name=Netdata
-baseurl=https://repo.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/@DIST_VERSION@/$basearch
-        https://repo2.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/@DIST_VERSION@/$basearch
+mirrorlist=file:///usr/share/netdata/repoconfig/netdata-@VARIANT@.mirrors
 repo_gpgcheck=1
 pkg_gpgcheck=1
 gpgkey=https://repo.netdata.cloud/netdatabot.gpg.key
@@ -12,8 +11,7 @@ autorefresh=1
 
 [netdata-repoconfig]
 name=Netdata Repoconfig
-baseurl=https://repo.netdata.cloud/repos/repoconfig/@DIST_NAME@/@DIST_VERSION@/$basearch
-        https://repo2.netdata.cloud/repos/repoconfig/@DIST_NAME@/@DIST_VERSION@/$basearch
+mirrorlist=file:///usr/share/netdata/repoconfig/netdata-repoconfig.mirrors
 repo_gpgcheck=1
 pkg_gpgcheck=1
 gpgkey=https://repo.netdata.cloud/netdatabot.gpg.key
