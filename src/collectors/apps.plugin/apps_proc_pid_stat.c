@@ -60,10 +60,16 @@ static inline void clear_pid_stat(struct pid_stat *p, bool threads) {
     p->cmajflt          = 0;
     p->utime            = 0;
     p->stime            = 0;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
     p->gtime            = 0;
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
     p->cutime           = 0;
     p->cstime           = 0;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
     p->cgtime           = 0;
+#endif
+#endif
 
     if(threads)
         p->num_threads      = 0;
@@ -163,7 +169,10 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
 
 #if defined(OS_WINDOWS)
 static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
+    struct perflib_data *d = ptr;
+
     // TODO: get these statistics from perflib
+
     return false;
 }
 #endif
@@ -266,7 +275,7 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __may
         if (show_guest_time || p->gtime || p->cgtime) {
             p->utime -= (p->utime >= p->gtime) ? p->gtime : p->utime;
             p->cutime -= (p->cutime >= p->cgtime) ? p->cgtime : p->cutime;
-            show_guest_time = 1;
+            show_guest_time = true;
         }
     }
 

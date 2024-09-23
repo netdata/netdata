@@ -114,25 +114,36 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         if (unlikely(!w->processes && !w->is_other))
             continue;
 
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME)
         send_BEGIN(type, string2str(w->clean_name), "cpu_utilization", dt);
         send_SET("user", (kernel_uint_t)(w->utime * utime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cutime * cutime_fix_ratio)) : 0ULL));
         send_SET("system", (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cstime * cstime_fix_ratio)) : 0ULL));
         send_END();
+#else
+        send_BEGIN(type, string2str(w->clean_name), "cpu_utilization", dt);
+        send_SET("user", (kernel_uint_t)(w->utime * utime_fix_ratio));
+        send_SET("system", (kernel_uint_t)(w->stime * stime_fix_ratio));
+        send_END();
+#endif
 
-#if defined(OS_LINUX)
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         if (enable_guest_charts) {
             send_BEGIN(type, string2str(w->clean_name), "cpu_guest_utilization", dt);
             send_SET("guest", (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cgtime * cgtime_fix_ratio)) : 0ULL));
             send_END();
         }
+#endif
 
+#if defined(OS_LINUX)
+        send_BEGIN(type, string2str(w->clean_name), "mem_private_usage", dt);
+        send_SET("mem", (w->status_vmrss > w->status_vmshared)?(w->status_vmrss - w->status_vmshared) : 0ULL);
+        send_END();
+#endif
+
+#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
         send_BEGIN(type, string2str(w->clean_name), "cpu_context_switches", dt);
         send_SET("voluntary", w->status_voluntary_ctxt_switches);
         send_SET("involuntary", w->status_nonvoluntary_ctxt_switches);
-        send_END();
-
-        send_BEGIN(type, string2str(w->clean_name), "mem_private_usage", dt);
-        send_SET("mem", (w->status_vmrss > w->status_vmshared)?(w->status_vmrss - w->status_vmshared) : 0ULL);
         send_END();
 #endif
 
@@ -183,12 +194,14 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
             }
         }
 
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
         send_BEGIN(type, string2str(w->clean_name), "disk_physical_io", dt);
         send_SET("reads", w->io_storage_bytes_read);
         send_SET("writes", w->io_storage_bytes_written);
         send_END();
+#endif
 
-#if defined(OS_LINUX)
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
         send_BEGIN(type, string2str(w->clean_name), "disk_logical_io", dt);
         send_SET("reads", w->io_logical_bytes_read);
         send_SET("writes", w->io_logical_bytes_written);
@@ -248,7 +261,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         fprintf(stdout, "DIMENSION user '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
         fprintf(stdout, "DIMENSION system '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
 
-#if defined(OS_LINUX)
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         if (enable_guest_charts) {
             fprintf(stdout, "CHART %s.%s_cpu_guest_utilization '' '%s CPU guest utlization (100%% = 1 core)' 'percentage' cpu %s.cpu_guest_utilization line 20005 %d\n",
                     type, string2str(w->clean_name), title, type, update_every);
@@ -256,19 +269,23 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             fprintf(stdout, "CLABEL_COMMIT\n");
             fprintf(stdout, "DIMENSION guest '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
         }
+#endif
 
+#if defined(OS_LINUX)
+        fprintf(stdout, "CHART %s.%s_mem_private_usage '' '%s memory usage without shared' 'MiB' mem %s.mem_private_usage area 20050 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
+        fprintf(stdout, "CLABEL_COMMIT\n");
+        fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L);
+#endif
+
+#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
         fprintf(stdout, "CHART %s.%s_cpu_context_switches '' '%s CPU context switches' 'switches/s' cpu %s.cpu_context_switches stacked 20010 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION voluntary '' absolute 1 %llu\n", RATES_DETAIL);
         fprintf(stdout, "DIMENSION involuntary '' absolute 1 %llu\n", RATES_DETAIL);
-
-        fprintf(stdout, "CHART %s.%s_mem_private_usage '' '%s memory usage without shared' 'MiB' mem %s.mem_private_usage area 20050 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L);
 #endif
 
         fprintf(stdout, "CHART %s.%s_mem_usage '' '%s memory RSS usage' 'MiB' mem %s.mem_usage area 20055 %d\n",
@@ -300,15 +317,9 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         fprintf(stdout, "DIMENSION swap '' absolute %ld %ld\n", 1L, 1024L);
 #endif
 
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
 #if defined(OS_LINUX)
         fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'KiB/s' disk %s.disk_physical_io area 20100 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
-        fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", 1024LLU * RATES_DETAIL);
-
-        fprintf(stdout, "CHART %s.%s_disk_logical_io '' '%s disk logical IO' 'KiB/s' disk %s.disk_logical_io area 20105 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
@@ -321,6 +332,16 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", RATES_DETAIL);
         fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", RATES_DETAIL);
+#endif
+#endif
+
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+        fprintf(stdout, "CHART %s.%s_disk_logical_io '' '%s disk logical IO' 'KiB/s' disk %s.disk_logical_io area 20105 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
+        fprintf(stdout, "CLABEL_COMMIT\n");
+        fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
+        fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", 1024LLU * RATES_DETAIL);
 #endif
 
         fprintf(stdout, "CHART %s.%s_processes '' '%s processes' 'processes' processes %s.processes line 20150 %d\n",

@@ -3,13 +3,19 @@
 #include "apps_plugin.h"
 
 static inline void clear_pid_io(struct pid_stat *p) {
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
     p->io_logical_bytes_read        = 0;
     p->io_logical_bytes_written     = 0;
-    p->io_read_calls                = 0;
-    p->io_write_calls               = 0;
+#endif
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
     p->io_storage_bytes_read        = 0;
     p->io_storage_bytes_written     = 0;
     p->io_cancelled_write_bytes     = 0;
+#endif
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+    p->io_read_calls                = 0;
+    p->io_write_calls               = 0;
+#endif
 }
 
 #if defined(OS_FREEBSD)

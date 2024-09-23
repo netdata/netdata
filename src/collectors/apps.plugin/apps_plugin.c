@@ -27,7 +27,7 @@
 // options
 
 bool debug_enabled = false;
-bool enable_guest_charts = false;
+
 bool enable_detailed_uptime_charts = false;
 bool enable_users_charts = true;
 bool enable_groups_charts = true;
@@ -53,9 +53,10 @@ size_t
     targets_assignment_counter = 0,
     apps_groups_targets_count = 0;       // # of apps_groups.conf targets
 
-int
-    show_guest_time = 0,            // 1 when guest values are collected
-    show_guest_time_old = 0;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+bool enable_guest_charts = false;
+bool show_guest_time = false;            // set when guest values are collected
+#endif
 
 uint32_t
     all_files_len = 0,
@@ -334,14 +335,24 @@ static size_t zero_all_targets(struct target *root) {
 
         w->minflt = 0;
         w->majflt = 0;
-        w->utime = 0;
-        w->stime = 0;
-        w->gtime = 0;
         w->cminflt = 0;
         w->cmajflt = 0;
+
+        w->utime = 0;
+        w->stime = 0;
+
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+        w->gtime = 0;
+#endif
+
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
         w->cutime = 0;
         w->cstime = 0;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         w->cgtime = 0;
+#endif
+#endif
+
         w->num_threads = 0;
         // w->rss = 0;
         w->processes = 0;
@@ -355,13 +366,19 @@ static size_t zero_all_targets(struct target *root) {
         w->status_voluntary_ctxt_switches = 0;
         w->status_nonvoluntary_ctxt_switches = 0;
 
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
         w->io_logical_bytes_read = 0;
         w->io_logical_bytes_written = 0;
-        w->io_read_calls = 0;
-        w->io_write_calls = 0;
+#endif
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
         w->io_storage_bytes_read = 0;
         w->io_storage_bytes_written = 0;
         w->io_cancelled_write_bytes = 0;
+#endif
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+        w->io_read_calls = 0;
+        w->io_write_calls = 0;
+#endif
 
         // zero file counters
         if(w->target_fds) {
@@ -415,17 +432,25 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     if(p->openfds_limits_percent > w->max_open_files_percent)
         w->max_open_files_percent = p->openfds_limits_percent;
 
-    w->cutime  += p->cutime;
-    w->cstime  += p->cstime;
-    w->cgtime  += p->cgtime;
-    w->cminflt += p->cminflt;
-    w->cmajflt += p->cmajflt;
-
     w->utime  += p->utime;
     w->stime  += p->stime;
+
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
     w->gtime  += p->gtime;
+#endif
+
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+    w->cutime  += p->cutime;
+    w->cstime  += p->cstime;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    w->cgtime  += p->cgtime;
+#endif
+#endif
+
     w->minflt += p->minflt;
     w->majflt += p->majflt;
+    w->cminflt += p->cminflt;
+    w->cmajflt += p->cmajflt;
 
     // w->rss += p->rss;
 
@@ -438,13 +463,19 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->status_voluntary_ctxt_switches += p->status_voluntary_ctxt_switches;
     w->status_nonvoluntary_ctxt_switches += p->status_nonvoluntary_ctxt_switches;
 
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
     w->io_logical_bytes_read    += p->io_logical_bytes_read;
     w->io_logical_bytes_written += p->io_logical_bytes_written;
-    w->io_read_calls            += p->io_read_calls;
-    w->io_write_calls           += p->io_write_calls;
+#endif
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
     w->io_storage_bytes_read    += p->io_storage_bytes_read;
     w->io_storage_bytes_written += p->io_storage_bytes_written;
     w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
+#endif
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+    w->io_read_calls            += p->io_read_calls;
+    w->io_write_calls           += p->io_write_calls;
+#endif
 
     w->processes++;
     w->num_threads += p->num_threads;
@@ -454,9 +485,6 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->uptime_sum += p->uptime;
 
     if(unlikely(debug_enabled || w->debug_enabled)) {
-        debug_log_int("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "",
-                      pid_stat_comm(p), p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
-
         struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
         pid_on_target->pid = p->pid;
         pid_on_target->next = w->root_pid;
@@ -546,6 +574,7 @@ static void aggregate_processes_to_targets(void) {
 // ----------------------------------------------------------------------------
 // update chart dimensions
 
+#if defined(OS_LINUX)
 static void normalize_utilization(struct target *root) {
     struct target *w;
 
@@ -696,6 +725,7 @@ static void normalize_utilization(struct target *root) {
             , (kernel_uint_t)(cgtime * cgtime_fix_ratio)
     );
 }
+#endif // OS_LINUX
 
 // ----------------------------------------------------------------------------
 // parse command line arguments
@@ -774,6 +804,7 @@ static void parse_args(int argc, char **argv)
             continue;
         }
 
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         if(strcmp("with-guest", argv[i]) == 0) {
             enable_guest_charts = true;
             continue;
@@ -783,6 +814,7 @@ static void parse_args(int argc, char **argv)
             enable_guest_charts = false;
             continue;
         }
+#endif
 
         if(strcmp("with-files", argv[i]) == 0) {
             enable_file_charts = 1;
@@ -1016,7 +1048,7 @@ int main(int argc, char **argv) {
     time_factor = system_hz; // Linux uses clock ticks
 #endif
 #if defined(OS_WINDOWS)
-    time_factor = 1000000ULL / RATES_DETAIL;
+    time_factor = 10000000ULL / RATES_DETAIL; // Windows uses 100-nanosecond intervals
     PerflibNamesRegistryInitialize();
 #endif
 
@@ -1103,7 +1135,10 @@ int main(int argc, char **argv) {
         }
 
         aggregate_processes_to_targets();
+
+#if defined(OS_LINUX)
         normalize_utilization(apps_groups_root_target);
+#endif
 
         if(send_resource_usage)
             send_resource_usage_to_netdata(dt);
@@ -1126,8 +1161,6 @@ int main(int argc, char **argv) {
         }
 
         fflush(stdout);
-
-        show_guest_time_old = show_guest_time;
 
         debug_log("done Loop No %zu", global_iterations_counter);
     }

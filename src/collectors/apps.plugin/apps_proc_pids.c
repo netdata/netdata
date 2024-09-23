@@ -236,10 +236,6 @@ static inline void link_all_processes_to_their_parents(void) {
         if(likely(pp)) {
             p->parent = pp;
             pp->children_count++;
-
-            if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
-                debug_log_int("child %d (%s, %s) on target '%s' has parent %d (%s, %s). Parent: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "",
-                              p->pid, pid_stat_comm(p), p->updated?"running":"exited", (p->target)?string2str(p->target->name):"UNSET", pp->pid, pid_stat_comm(pp), pp->updated?"running":"exited", pp->utime, pp->stime, pp->gtime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cgtime, pp->cminflt, pp->cmajflt);
         }
         else {
             p->parent = NULL;
@@ -276,10 +272,16 @@ static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t tim
 
     if(p->utime)   fprintf(stderr, " utime=" KERNEL_UINT_FORMAT,   p->utime);
     if(p->stime)   fprintf(stderr, " stime=" KERNEL_UINT_FORMAT,   p->stime);
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
     if(p->gtime)   fprintf(stderr, " gtime=" KERNEL_UINT_FORMAT,   p->gtime);
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
     if(p->cutime)  fprintf(stderr, " cutime=" KERNEL_UINT_FORMAT,  p->cutime);
     if(p->cstime)  fprintf(stderr, " cstime=" KERNEL_UINT_FORMAT,  p->cstime);
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
     if(p->cgtime)  fprintf(stderr, " cgtime=" KERNEL_UINT_FORMAT,  p->cgtime);
+#endif
+#endif
     if(p->minflt)  fprintf(stderr, " minflt=" KERNEL_UINT_FORMAT,  p->minflt);
     if(p->cminflt) fprintf(stderr, " cminflt=" KERNEL_UINT_FORMAT, p->cminflt);
     if(p->majflt)  fprintf(stderr, " majflt=" KERNEL_UINT_FORMAT,  p->majflt);
@@ -317,24 +319,30 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
                 break;
 
             case 3:
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
                 if(p->cutime > lost) {
                     fprintf(stderr, " > process %d (%s) could use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
+#endif
                 break;
 
             case 4:
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
                 if(p->cstime > lost) {
                     fprintf(stderr, " > process %d (%s) could use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
+#endif
                 break;
 
             case 5:
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1) && (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
                 if(p->cgtime > lost) {
                     fprintf(stderr, " > process %d (%s) could use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
+#endif
                 break;
         }
     }
@@ -388,9 +396,24 @@ static inline void process_exited_pids() {
         if(p->updated || !p->stat_collected_usec)
             continue;
 
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
         kernel_uint_t utime  = (p->utime_raw + p->cutime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
         kernel_uint_t stime  = (p->stime_raw + p->cstime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         kernel_uint_t gtime  = (p->gtime_raw + p->cgtime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+#else
+        kernel_uint_t gtime = 0;
+#endif
+#else
+        kernel_uint_t utime  = (p->utime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t stime  = (p->stime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+        kernel_uint_t gtime  = (p->gtime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+#else
+        kernel_uint_t gtime = 0;
+#endif
+#endif
+
         kernel_uint_t minflt = (p->minflt_raw + p->cminflt_raw) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
         kernel_uint_t majflt = (p->majflt_raw + p->cmajflt_raw) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
@@ -416,6 +439,7 @@ static inline void process_exited_pids() {
             if(!pp->updated) continue;
 
             kernel_uint_t absorbed;
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
             absorbed = remove_exited_child_from_parent(&utime,  &pp->cutime);
             if(unlikely(debug_enabled && absorbed))
                 debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " utime (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, utime);
@@ -424,9 +448,12 @@ static inline void process_exited_pids() {
             if(unlikely(debug_enabled && absorbed))
                 debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " stime (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, stime);
 
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
             absorbed = remove_exited_child_from_parent(&gtime,  &pp->cgtime);
             if(unlikely(debug_enabled && absorbed))
                 debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " gtime (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, gtime);
+#endif
+#endif
 
             absorbed = remove_exited_child_from_parent(&minflt, &pp->cminflt);
             if(unlikely(debug_enabled && absorbed))
@@ -472,10 +499,18 @@ static inline void process_exited_pids() {
 
             p->utime_raw   = utime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
             p->stime_raw   = stime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
             p->gtime_raw   = gtime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
+#endif
             p->minflt_raw  = minflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
             p->majflt_raw  = majflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
-            p->cutime_raw = p->cstime_raw = p->cgtime_raw = p->cminflt_raw = p->cmajflt_raw = 0;
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+            p->cutime_raw = p->cstime_raw =
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+                    p->cgtime_raw =
+#endif
+                    p->cminflt_raw = p->cmajflt_raw = 0;
+#endif
 
             debug_log(" ");
         }
@@ -665,61 +700,62 @@ static inline bool collect_data_for_all_pids_per_os(void) {
     for(struct pid_stat *p = root_of_pids(); p; p = p->next)
         mark_pid_as_unread(p);
 
-    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(RegistryFindIDByName("Process"));
-    if(!pDataBlock) return false;
+    struct perflib_data d = { 0 };
+    d.pDataBlock = perflibGetPerformanceData(RegistryFindIDByName("Process"));
+    if(!d.pDataBlock) return false;
 
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Process");
-    if(!pObjectType) {
+    d.pObjectType = perflibFindObjectTypeByName(d.pDataBlock, "Process");
+    if(!d.pObjectType) {
         perflibFreePerformanceData();
         return false;
     }
 
-    PERF_INSTANCE_DEFINITION *pi = NULL;
-    for(LONG i = 0; i < pObjectType->NumInstances; i++) {
-        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
-        if(!pi) break;
+    d.pi = NULL;
+    for(LONG i = 0; i < d.pObjectType->NumInstances; i++) {
+        d.pi = perflibForEachInstance(d.pDataBlock, d.pObjectType, d.pi);
+        if(!d.pi) break;
 
-        char name[MAX_PATH];
-        if(!getInstanceName(pDataBlock, pObjectType, pi, name, sizeof(name)))
-            strncpyz(name, "unknown", sizeof(name) - 1);
+        if(!getInstanceName(d.pDataBlock, d.pObjectType, d.pi, d.name, sizeof(d.name)))
+            strncpyz(d.name, "unknown", sizeof(d.name) - 1);
 
         COUNTER_DATA processId = {.key = "ID Process"};
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &processId);
-        DWORD pid = (DWORD)processId.current.Data;
-        if(pid <= 0) continue; // pid 0 is the Idle, which is not useful for us
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &processId);
+        d.pid = (DWORD)processId.current.Data;
+        if(d.pid <= 0) continue; // pid 0 is the Idle, which is not useful for us
 
         // Get or create pid_stat structure
-        struct pid_stat *p = get_or_allocate_pid_entry(pid);
+        struct pid_stat *p = get_or_allocate_pid_entry((pid_t)d.pid);
         p->updated = true;
 
         // Parent Process ID
         COUNTER_DATA ppid = {.key = "Creating Process ID"};
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &ppid);
-        p->ppid = ppid.current.Data;
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ppid);
+        p->ppid = (pid_t)ppid.current.Data;
 
         // Update process name
-        update_pid_comm(p, name);
+        update_pid_comm(p, d.name);
+
+        collect_data_for_pid_stat(p, &d);
 
         // CPU time
         COUNTER_DATA userTime = {.key = "% User Time"};
         COUNTER_DATA kernelTime = {.key = "% Privileged Time"};
         COUNTER_DATA totalTime = {.key = "% Processor Time"};
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &userTime);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &kernelTime);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &totalTime);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &userTime);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &kernelTime);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &totalTime);
         p->utime = userTime.current.Data;
         p->stime = kernelTime.current.Data;
-        p->gtime = totalTime.current.Data - (userTime.current.Data + kernelTime.current.Data); // Guest time (if any)
 
         // Memory
         COUNTER_DATA workingSet = {.key = "Working Set"};
         COUNTER_DATA privateBytes = {.key = "Private Bytes"};
         COUNTER_DATA virtualBytes = {.key = "Virtual Bytes"};
         COUNTER_DATA pageFileBytes = {.key = "Page File Bytes"};
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &workingSet);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &privateBytes);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &virtualBytes);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &pageFileBytes);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &workingSet);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &privateBytes);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &virtualBytes);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &pageFileBytes);
         p->status_vmrss = workingSet.current.Data / 1024;  // Convert to KB
         p->status_vmsize = virtualBytes.current.Data / 1024;  // Convert to KB
         p->status_vmswap = pageFileBytes.current.Data / 1024;  // Page File Bytes in KB
@@ -729,10 +765,10 @@ static inline bool collect_data_for_all_pids_per_os(void) {
         COUNTER_DATA ioWriteBytes = {.key = "IO Write Bytes/sec"};
         COUNTER_DATA ioReadOps = {.key = "IO Read Operations/sec"};
         COUNTER_DATA ioWriteOps = {.key = "IO Write Operations/sec"};
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &ioReadBytes);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &ioWriteBytes);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &ioReadOps);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &ioWriteOps);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ioReadBytes);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ioWriteBytes);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ioReadOps);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ioWriteOps);
         p->io_logical_bytes_read = ioReadBytes.current.Data;
         p->io_logical_bytes_written = ioWriteBytes.current.Data;
         p->io_read_calls = ioReadOps.current.Data;
@@ -740,22 +776,22 @@ static inline bool collect_data_for_all_pids_per_os(void) {
 
         // Threads
         COUNTER_DATA threadCount = {.key = "Thread Count"};
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &threadCount);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &threadCount);
         p->num_threads = threadCount.current.Data;
 
         // Handle count (as a proxy for file descriptors)
         COUNTER_DATA handleCount = {.key = "Handle Count"};
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &handleCount);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &handleCount);
         p->openfds.files = handleCount.current.Data;
 
         // Page faults
         COUNTER_DATA pageFaults = {.key = "Page Faults/sec"};
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &pageFaults);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &pageFaults);
         p->minflt = pageFaults.current.Data;  // Windows doesn't distinguish between minor and major page faults
 
         // Process uptime
         COUNTER_DATA elapsedTime = {.key = "Elapsed Time"};
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &elapsedTime);
+        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &elapsedTime);
         p->uptime = elapsedTime.current.Data / 10000000;  // Convert 100-nanosecond units to seconds
 
         // // Priority

@@ -8,6 +8,15 @@
 
 #if defined(OS_FREEBSD)
 #include <sys/user.h>
+
+#define INIT_PID                            1
+#define ALL_PIDS_ARE_READ_INSTANTLY         1
+#define PROCESSES_HAVE_CPU_GUEST_TIME       0
+#define PROCESSES_HAVE_CPU_CHILDREN_TIME    0
+#define PROCESSES_HAVE_CONTEXT_SWITCHES     0
+#define PROCESSES_HAVE_PHYSICAL_IO          1
+#define PROCESSES_HAVE_LOGICAL_IO           0
+#define PROCESSES_HAVE_IO_CALLS             0
 #endif
 
 #if defined(OS_MACOS)
@@ -19,43 +28,60 @@
 #include <mach/mach_time.h> // For mach_timebase_info_data_t and mach_timebase_info
 
 extern mach_timebase_info_data_t mach_info;
-#endif
 
-#if defined(OS_WINDOWS)
-#include <windows.h>
-#endif
-
-// ----------------------------------------------------------------------------
-// per O/S configuration
-
-// the minimum PID of the system
-// this is also the pid of the init process
-#define INIT_PID 1
-
-// if the way apps.plugin will work, will read the entire process list,
-// including the resource utilization of each process, instantly
-// set this to 1
-// when set to 0, apps.plugin builds a sort list of processes, in order
-// to process children processes, before parent processes
-#if defined(OS_FREEBSD) || defined(OS_MACOS) || defined(OS_WINDOWS)
-#define ALL_PIDS_ARE_READ_INSTANTLY 1
-#elif defined(OS_LINUX)
-#define ALL_PIDS_ARE_READ_INSTANTLY 0
-#endif
-
-#if defined(OS_MACOS)
 struct pid_info {
     struct kinfo_proc proc;
     struct proc_taskinfo taskinfo;
     struct proc_bsdinfo bsdinfo;
     struct rusage_info_v4 rusageinfo;
 };
+
+#define INIT_PID                            1
+#define ALL_PIDS_ARE_READ_INSTANTLY         1
+#define PROCESSES_HAVE_CPU_GUEST_TIME       1
+#define PROCESSES_HAVE_CPU_CHILDREN_TIME    0
+#define PROCESSES_HAVE_CONTEXT_SWITCHES     0
+#define PROCESSES_HAVE_PHYSICAL_IO          1
+#define PROCESSES_HAVE_LOGICAL_IO           0
+#define PROCESSES_HAVE_IO_CALLS             0
+#endif
+
+#if defined(OS_WINDOWS)
+#include <windows.h>
+
+struct perflib_data {
+    PERF_DATA_BLOCK *pDataBlock;
+    PERF_OBJECT_TYPE *pObjectType;
+    PERF_INSTANCE_DEFINITION *pi;
+    char name[MAX_PATH];
+    DWORD pid;
+};
+
+#define INIT_PID                            0
+#define ALL_PIDS_ARE_READ_INSTANTLY         1
+#define PROCESSES_HAVE_CPU_GUEST_TIME       0
+#define PROCESSES_HAVE_CPU_CHILDREN_TIME    0
+#define PROCESSES_HAVE_CONTEXT_SWITCHES     0
+#define PROCESSES_HAVE_PHYSICAL_IO          0
+#define PROCESSES_HAVE_LOGICAL_IO           1
+#define PROCESSES_HAVE_IO_CALLS             1
+#endif
+
+#if defined(OS_LINUX)
+#define INIT_PID 1
+#define ALL_PIDS_ARE_READ_INSTANTLY         0
+#define PROCESSES_HAVE_CPU_GUEST_TIME       1
+#define PROCESSES_HAVE_CPU_CHILDREN_TIME    1
+#define PROCESSES_HAVE_CONTEXT_SWITCHES     1
+#define PROCESSES_HAVE_PHYSICAL_IO          1
+#define PROCESSES_HAVE_LOGICAL_IO           1
+#define PROCESSES_HAVE_IO_CALLS             1
 #endif
 
 // ----------------------------------------------------------------------------
 
 extern bool debug_enabled;
-extern bool enable_guest_charts;
+
 extern bool enable_detailed_uptime_charts;
 extern bool enable_users_charts;
 extern bool enable_groups_charts;
@@ -74,9 +100,10 @@ extern size_t
     targets_assignment_counter,
     apps_groups_targets_count;
 
-extern int
-    show_guest_time,
-    show_guest_time_old;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+extern bool enable_guest_charts;
+extern bool show_guest_time;
+#endif
 
 extern uint32_t
     all_files_len,
@@ -111,7 +138,6 @@ extern size_t pagesize;
 // ----------------------------------------------------------------------------
 // string lengths
 
-#define MAX_NAME 100
 #define MAX_CMDLINE 65536
 
 // ----------------------------------------------------------------------------
@@ -200,12 +226,21 @@ struct target {
     kernel_uint_t cminflt;
     kernel_uint_t majflt;
     kernel_uint_t cmajflt;
+
     kernel_uint_t utime;
     kernel_uint_t stime;
+
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
     kernel_uint_t gtime;
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
     kernel_uint_t cutime;
     kernel_uint_t cstime;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
     kernel_uint_t cgtime;
+#endif
+#endif
+
     kernel_uint_t num_threads;
     // kernel_uint_t rss;
 
@@ -218,13 +253,21 @@ struct target {
     kernel_uint_t status_voluntary_ctxt_switches;
     kernel_uint_t status_nonvoluntary_ctxt_switches;
 
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
     kernel_uint_t io_logical_bytes_read;
     kernel_uint_t io_logical_bytes_written;
-    kernel_uint_t io_read_calls;
-    kernel_uint_t io_write_calls;
+#endif
+
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
     kernel_uint_t io_storage_bytes_read;
     kernel_uint_t io_storage_bytes_written;
     kernel_uint_t io_cancelled_write_bytes;
+#endif
+
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+    kernel_uint_t io_read_calls;
+    kernel_uint_t io_write_calls;
+#endif
 
     kernel_uint_t uptime_min;
     kernel_uint_t uptime_sum;
@@ -336,22 +379,30 @@ struct pid_stat {
     kernel_uint_t cmajflt_raw;
     kernel_uint_t utime_raw;
     kernel_uint_t stime_raw;
-    kernel_uint_t gtime_raw; // guest_time
+
+#if(PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    kernel_uint_t gtime_raw;
+    kernel_uint_t gtime;
+#endif
+
+#if(PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
     kernel_uint_t cutime_raw;
     kernel_uint_t cstime_raw;
-    kernel_uint_t cgtime_raw; // cguest_time
+    kernel_uint_t cutime;
+    kernel_uint_t cstime;
+#if(PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    kernel_uint_t cgtime_raw;
+    kernel_uint_t cgtime;
+#endif
+#endif
 
     // these are rates
     kernel_uint_t minflt;
     kernel_uint_t cminflt;
     kernel_uint_t majflt;
     kernel_uint_t cmajflt;
-    kernel_uint_t utime;
-    kernel_uint_t stime;
-    kernel_uint_t gtime;
-    kernel_uint_t cutime;
-    kernel_uint_t cstime;
-    kernel_uint_t cgtime;
+    kernel_uint_t utime;        // user CPU time
+    kernel_uint_t stime;        // system CPU time
 
     // int64_t priority;
     // int64_t nice;
@@ -383,8 +434,8 @@ struct pid_stat {
     gid_t gid;
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-    uint32_t sortlist;              // higher numbers = top on the process tree
-                       // each process gets a unique number (non-sequential though)
+    uint32_t sortlist;  // higher numbers = top on the process tree
+                        // each process gets a unique number (non-sequential though)
 #endif
 
     kernel_uint_t status_voluntary_ctxt_switches_raw;
@@ -402,21 +453,28 @@ struct pid_stat {
     ARL_BASE *status_arl;
 #endif
 
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
     kernel_uint_t io_logical_bytes_read_raw;
     kernel_uint_t io_logical_bytes_written_raw;
-    kernel_uint_t io_read_calls_raw;
-    kernel_uint_t io_write_calls_raw;
-    kernel_uint_t io_storage_bytes_read_raw;
-    kernel_uint_t io_storage_bytes_written_raw;
-    kernel_uint_t io_cancelled_write_bytes_raw;
-
     kernel_uint_t io_logical_bytes_read;
     kernel_uint_t io_logical_bytes_written;
-    kernel_uint_t io_read_calls;
-    kernel_uint_t io_write_calls;
+#endif
+
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+    kernel_uint_t io_storage_bytes_read_raw;
+    kernel_uint_t io_storage_bytes_written_raw;
     kernel_uint_t io_storage_bytes_read;
     kernel_uint_t io_storage_bytes_written;
+    kernel_uint_t io_cancelled_write_bytes_raw;
     kernel_uint_t io_cancelled_write_bytes;
+#endif
+
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+    kernel_uint_t io_read_calls_raw;
+    kernel_uint_t io_write_calls_raw;
+    kernel_uint_t io_read_calls;
+    kernel_uint_t io_write_calls;
+#endif
 
     kernel_uint_t uptime;
 

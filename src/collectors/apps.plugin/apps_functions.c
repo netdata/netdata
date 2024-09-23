@@ -72,9 +72,7 @@ void function_processes(const char *transaction, char *function,
     struct pid_stat *p;
 
     bool show_cmdline = http_access_user_has_enough_access_level_for_endpoint(
-                            access,
-                            HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA |
-                                HTTP_ACCESS_VIEW_AGENT_CONFIG) || enable_function_cmdline;
+            access, HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA | HTTP_ACCESS_VIEW_AGENT_CONFIG) || enable_function_cmdline;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
@@ -157,12 +155,18 @@ void function_processes(const char *transaction, char *function,
         goto close_and_send;
 
     NETDATA_DOUBLE
-    UserCPU_max = 0.0
+          UserCPU_max = 0.0
         , SysCPU_max = 0.0
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         , GuestCPU_max = 0.0
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
         , CUserCPU_max = 0.0
         , CSysCPU_max = 0.0
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         , CGuestCPU_max = 0.0
+#endif
+#endif
         , CPU_max = 0.0
         , VMSize_max = 0.0
         , RSS_max = 0.0
@@ -175,8 +179,10 @@ void function_processes(const char *transaction, char *function,
     unsigned long long
         Processes_max = 0
         , Threads_max = 0
+#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
         , VoluntaryCtxtSwitches_max = 0
         , NonVoluntaryCtxtSwitches_max = 0
+#endif
         , Uptime_max = 0
         , MinFlt_max = 0
         , CMinFlt_max = 0
@@ -184,10 +190,18 @@ void function_processes(const char *transaction, char *function,
         , MajFlt_max = 0
         , CMajFlt_max = 0
         , TMajFlt_max = 0
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+        , LReads_max = 0
+        , LWrites_max = 0
+#endif
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
         , PReads_max = 0
         , PWrites_max = 0
+#endif
+#if (PROCESSES_HAVE_IO_CALLS == 1)
         , RCalls_max = 0
         , WCalls_max = 0
+#endif
         , Files_max = 0
         , Pipes_max = 0
         , Sockets_max = 0
@@ -199,13 +213,6 @@ void function_processes(const char *transaction, char *function,
         , OtherFDs_max = 0
         , FDs_max = 0
         ;
-
-#if defined(OS_LINUX)
-    unsigned long long
-          LReads_max = 0
-        , LWrites_max = 0
-        ;
-#endif
 
     int rows= 0;
     for(p = root_of_pids(); p ; p = p->next) {
@@ -270,16 +277,34 @@ void function_processes(const char *transaction, char *function,
         buffer_json_add_array_item_uint64(wb, p->gid);
 
         // CPU utilization %
-        add_value_field_ndd_with_max(wb, CPU, (NETDATA_DOUBLE)(p->utime + p->stime + p->gtime + p->cutime + p->cstime + p->cgtime) / cpu_divisor);
+        kernel_uint_t total_cpu = p->utime + p->stime;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME)
+        total_cpu += p->gtime;
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME)
+        total_cpu += p->cutime + p->cstime;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME)
+        total_cpu += p->cgtime;
+#endif
+#endif
+        add_value_field_ndd_with_max(wb, CPU, (NETDATA_DOUBLE)(total_cpu) / cpu_divisor);
         add_value_field_ndd_with_max(wb, UserCPU, (NETDATA_DOUBLE)(p->utime) / cpu_divisor);
         add_value_field_ndd_with_max(wb, SysCPU, (NETDATA_DOUBLE)(p->stime) / cpu_divisor);
+#if (PROCESSES_HAVE_CPU_GUEST_TIME)
         add_value_field_ndd_with_max(wb, GuestCPU, (NETDATA_DOUBLE)(p->gtime) / cpu_divisor);
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME)
         add_value_field_ndd_with_max(wb, CUserCPU, (NETDATA_DOUBLE)(p->cutime) / cpu_divisor);
         add_value_field_ndd_with_max(wb, CSysCPU, (NETDATA_DOUBLE)(p->cstime) / cpu_divisor);
+#if (PROCESSES_HAVE_CPU_GUEST_TIME)
         add_value_field_ndd_with_max(wb, CGuestCPU, (NETDATA_DOUBLE)(p->cgtime) / cpu_divisor);
+#endif
+#endif
 
+#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
         add_value_field_llu_with_max(wb, VoluntaryCtxtSwitches, p->status_voluntary_ctxt_switches / RATES_DETAIL);
         add_value_field_llu_with_max(wb, NonVoluntaryCtxtSwitches, p->status_nonvoluntary_ctxt_switches / RATES_DETAIL);
+#endif
 
         // memory MiB
         if(MemTotal)
@@ -292,19 +317,23 @@ void function_processes(const char *transaction, char *function,
 #endif
         add_value_field_ndd_with_max(wb, Swap, (NETDATA_DOUBLE)p->status_vmswap / memory_divisor);
 
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
         // Physical I/O
         add_value_field_llu_with_max(wb, PReads, p->io_storage_bytes_read / io_divisor);
         add_value_field_llu_with_max(wb, PWrites, p->io_storage_bytes_written / io_divisor);
+#endif
 
-#if defined(OS_LINUX)
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
         // Logical I/O
         add_value_field_llu_with_max(wb, LReads, p->io_logical_bytes_read / io_divisor);
         add_value_field_llu_with_max(wb, LWrites, p->io_logical_bytes_written / io_divisor);
 #endif
 
+#if (PROCESSES_HAVE_IO_CALLS == 1)
         // I/O calls
         add_value_field_llu_with_max(wb, RCalls, p->io_read_calls / RATES_DETAIL);
         add_value_field_llu_with_max(wb, WCalls, p->io_write_calls / RATES_DETAIL);
+#endif
 
         // minor page faults
         add_value_field_llu_with_max(wb, MinFlt, p->minflt / RATES_DETAIL);
@@ -416,11 +445,14 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", SysCPU_max,
                                     RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "GuestCPU", "Guest CPU Time (100% = 1 core)",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", GuestCPU_max,
                                     RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "CUserCPU", "Children User CPU Time (100% = 1 core)",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", CUserCPU_max, RRDF_FIELD_SORT_DESCENDING, NULL,
@@ -431,12 +463,16 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", CSysCPU_max, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "CGuestCPU", "Children Guest CPU Time (100% = 1 core)",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", CGuestCPU_max, RRDF_FIELD_SORT_DESCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+#endif
 
+#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
         // CPU context switches
         buffer_rrdf_table_add_field(wb, field_id++, "vCtxSwitch", "Voluntary Context Switches",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
@@ -448,6 +484,7 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "switches/s",
                                     NonVoluntaryCtxtSwitches_max, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
+#endif
 
         // memory
         if (MemTotal)
@@ -482,6 +519,7 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
         // Physical I/O
         buffer_rrdf_table_add_field(wb, field_id++, "PReads", "Physical I/O Reads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
@@ -493,8 +531,9 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 2, "KiB/s", PWrites_max, RRDF_FIELD_SORT_DESCENDING,
                                     NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
+#endif
 
-#if defined(OS_LINUX)
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
         // Logical I/O
         buffer_rrdf_table_add_field(wb, field_id++, "LReads", "Logical I/O Reads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
@@ -509,6 +548,7 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 #endif
 
+#if (PROCESSES_HAVE_IO_CALLS == 1)
         // I/O calls
         buffer_rrdf_table_add_field(wb, field_id++, "RCalls", "I/O Read Calls", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
@@ -520,6 +560,7 @@ void function_processes(const char *transaction, char *function,
                                     "calls/s", WCalls_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+#endif
 
         // minor page faults
         buffer_rrdf_table_add_field(wb, field_id++, "MinFlt", "Minor Page Faults/s", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
@@ -650,15 +691,22 @@ void function_processes(const char *transaction, char *function,
             {
                 buffer_json_add_array_item_string(wb, "UserCPU");
                 buffer_json_add_array_item_string(wb, "SysCPU");
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
                 buffer_json_add_array_item_string(wb, "GuestCPU");
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
                 buffer_json_add_array_item_string(wb, "CUserCPU");
                 buffer_json_add_array_item_string(wb, "CSysCPU");
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
                 buffer_json_add_array_item_string(wb, "CGuestCPU");
+#endif
+#endif
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
+#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
         buffer_json_member_add_object(wb, "CPUCtxSwitches");
         {
             buffer_json_member_add_string(wb, "name", "CPU Context Switches");
@@ -671,6 +719,7 @@ void function_processes(const char *transaction, char *function,
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
+#endif
 
         // Memory chart
         buffer_json_member_add_object(wb, "Memory");
@@ -703,7 +752,7 @@ void function_processes(const char *transaction, char *function,
             buffer_json_object_close(wb);
         }
 
-#if defined(OS_LINUX)
+#if (PROCESSES_HAVE_LOGICAL_IO == 1) || (PROCESSES_HAVE_PHYSICAL_IO == 1)
         // I/O Reads chart
         buffer_json_member_add_object(wb, "Reads");
         {
@@ -711,8 +760,12 @@ void function_processes(const char *transaction, char *function,
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
                 buffer_json_add_array_item_string(wb, "LReads");
+#endif
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
                 buffer_json_add_array_item_string(wb, "PReads");
+#endif
             }
             buffer_json_array_close(wb);
         }
@@ -725,13 +778,19 @@ void function_processes(const char *transaction, char *function,
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
                 buffer_json_add_array_item_string(wb, "LWrites");
+#endif
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
                 buffer_json_add_array_item_string(wb, "PWrites");
+#endif
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
+#endif
 
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
         // Logical I/O chart
         buffer_json_member_add_object(wb, "LogicalIO");
         {
@@ -747,6 +806,7 @@ void function_processes(const char *transaction, char *function,
         buffer_json_object_close(wb);
 #endif
 
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
         // Physical I/O chart
         buffer_json_member_add_object(wb, "PhysicalIO");
         {
@@ -760,7 +820,9 @@ void function_processes(const char *transaction, char *function,
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
+#endif
 
+#if (PROCESSES_HAVE_IO_CALLS == 1)
         // I/O Calls chart
         buffer_json_member_add_object(wb, "IOCalls");
         {
@@ -774,6 +836,7 @@ void function_processes(const char *transaction, char *function,
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
+#endif
 
         // Minor Page Faults chart
         buffer_json_member_add_object(wb, "MinFlt");

@@ -2,7 +2,7 @@
 
 #include "apps_plugin.h"
 
-#if defined(OS_MACOS)
+#if defined(OS_FREEBSD)
 int read_global_time(void) {
     static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
     static usec_t collected_usec = 0, last_collected_usec = 0;
