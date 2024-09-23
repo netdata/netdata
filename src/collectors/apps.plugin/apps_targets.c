@@ -12,7 +12,7 @@ static STRING *get_clean_name(STRING *name) {
     return string_strdupz(buf);
 }
 
-static STRING *get_numeric_string(uint64_t n) {
+static inline STRING *get_numeric_string(uint64_t n) {
     char buf[UINT64_MAX_LENGTH];
     print_uint64(buf, n);
     return string_strdupz(buf);
@@ -22,6 +22,7 @@ static STRING *get_numeric_string(uint64_t n) {
 // apps_groups.conf
 // aggregate all processes in groups, to have a limited number of dimensions
 
+#if (PROCESSES_HAVE_UID == 1)
 struct target *get_uid_target(uid_t uid) {
     struct target *w;
     for(w = users_root_target ; w ; w = w->next)
@@ -58,7 +59,9 @@ struct target *get_uid_target(uid_t uid) {
 
     return w;
 }
+#endif
 
+#if (PROCESSES_HAVE_GID == 1)
 struct target *get_gid_target(gid_t gid) {
     struct target *w;
     for(w = groups_root_target ; w ; w = w->next)
@@ -95,6 +98,7 @@ struct target *get_gid_target(gid_t gid) {
 
     return w;
 }
+#endif
 
 static void id_cleanup_txt(char *buf) {
     char *s = buf;
@@ -171,8 +175,6 @@ struct target *get_tree_target(struct pid_stat *p) {
 
     w->next = tree_root_target;
     tree_root_target = w;
-
-    debug_log("added uid %u ('%s') target", w->uid, w->name);
 
     return w;
 }

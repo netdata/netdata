@@ -255,8 +255,10 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->status_rssfile  += p->status_rssfile;
     w->status_rssshmem += p->status_rssshmem;
     w->status_vmswap   += p->status_vmswap;
+#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
     w->status_voluntary_ctxt_switches += p->status_voluntary_ctxt_switches;
     w->status_nonvoluntary_ctxt_switches += p->status_nonvoluntary_ctxt_switches;
+#endif
 
 #if (PROCESSES_HAVE_LOGICAL_IO == 1)
     w->io_logical_bytes_read    += p->io_logical_bytes_read;
@@ -291,8 +293,12 @@ void aggregate_processes_to_targets(void) {
     apply_apps_groups_targets_inheritance();
 
     zero_all_targets(tree_root_target);
+#if (PROCESSES_HAVE_UID == 1)
     zero_all_targets(users_root_target);
+#endif
+#if (PROCESSES_HAVE_GID == 1)
     zero_all_targets(groups_root_target);
+#endif
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 
     // this has to be done, before the cleanup
@@ -311,6 +317,7 @@ void aggregate_processes_to_targets(void) {
         // --------------------------------------------------------------------
         // user target
 
+#if (PROCESSES_HAVE_UID == 1)
         o = p->uid_target;
         if(likely(p->uid_target && p->uid_target->uid == p->uid))
             w = p->uid_target;
@@ -322,11 +329,12 @@ void aggregate_processes_to_targets(void) {
         }
 
         aggregate_pid_on_target(w, p, o);
-
+#endif
 
         // --------------------------------------------------------------------
         // user group target
 
+#if (PROCESSES_HAVE_GID == 1)
         o = p->gid_target;
         if(likely(p->gid_target && p->gid_target->gid == p->gid))
             w = p->gid_target;
@@ -338,10 +346,11 @@ void aggregate_processes_to_targets(void) {
         }
 
         aggregate_pid_on_target(w, p, o);
+#endif
 
 
         // --------------------------------------------------------------------
-        // top target
+        // tree target
 
         o = p->tree_target;
         if(likely(p->tree_target && p->tree_target->pid_comm == p->comm))
@@ -350,7 +359,7 @@ void aggregate_processes_to_targets(void) {
             w = p->tree_target = get_tree_target(p);
 
             if(unlikely(debug_enabled && o))
-                debug_log("pid %d (%s) switched top target from '%s' to '%s'.", p->pid, pid_stat_comm(p), string2str(o->pid_comm), string2str(p->gid_target->pid_comm));
+                debug_log("pid %d (%s) switched top target from '%s' to '%s'.", p->pid, pid_stat_comm(p), string2str(o->pid_comm), string2str(w->pid_comm));
         }
 
         aggregate_pid_on_target(w, p, o);

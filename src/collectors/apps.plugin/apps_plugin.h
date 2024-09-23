@@ -17,6 +17,8 @@
 #define PROCESSES_HAVE_PHYSICAL_IO          1
 #define PROCESSES_HAVE_LOGICAL_IO           0
 #define PROCESSES_HAVE_IO_CALLS             0
+#define PROCESSES_HAVE_UID                  1
+#define PROCESSES_HAVE_GID                  1
 #endif
 
 #if defined(OS_MACOS)
@@ -44,6 +46,8 @@ struct pid_info {
 #define PROCESSES_HAVE_PHYSICAL_IO          1
 #define PROCESSES_HAVE_LOGICAL_IO           0
 #define PROCESSES_HAVE_IO_CALLS             0
+#define PROCESSES_HAVE_UID                  1
+#define PROCESSES_HAVE_GID                  1
 #endif
 
 #if defined(OS_WINDOWS)
@@ -65,6 +69,8 @@ struct perflib_data {
 #define PROCESSES_HAVE_PHYSICAL_IO          0
 #define PROCESSES_HAVE_LOGICAL_IO           1
 #define PROCESSES_HAVE_IO_CALLS             1
+#define PROCESSES_HAVE_UID                  0
+#define PROCESSES_HAVE_GID                  0
 #endif
 
 #if defined(OS_LINUX)
@@ -76,6 +82,8 @@ struct perflib_data {
 #define PROCESSES_HAVE_PHYSICAL_IO          1
 #define PROCESSES_HAVE_LOGICAL_IO           1
 #define PROCESSES_HAVE_IO_CALLS             1
+#define PROCESSES_HAVE_UID                  1
+#define PROCESSES_HAVE_GID                  1
 #endif
 
 // ----------------------------------------------------------------------------
@@ -204,9 +212,13 @@ struct pid_on_target {
 
 typedef enum __attribute__((packed)) {
     TARGET_TYPE_APP_GROUP = 1,
-    TARGET_TYPE_UID = 2,
-    TARGET_TYPE_GID = 3,
-    TARGET_TYPE_TREE = 4,
+#if (PROCESSES_HAVE_UID == 1)
+    TARGET_TYPE_UID,
+#endif
+#if (PROCESSES_HAVE_GID == 1)
+    TARGET_TYPE_GID,
+#endif
+    TARGET_TYPE_TREE,
 } TARGET_TYPE;
 
 struct target {
@@ -218,8 +230,12 @@ struct target {
     union {
         STRING *compare;
         STRING *pid_comm;
+#if (PROCESSES_HAVE_UID == 1)
         uid_t uid;
+#endif
+#if (PROCESSES_HAVE_GID == 1)
         gid_t gid;
+#endif
     };
 
     kernel_uint_t minflt;
@@ -365,8 +381,12 @@ struct pid_stat {
     struct pid_stat *parent;
 
     struct target *target;          // app_groups.conf targets
+#if (PROCESSES_HAVE_UID == 1)
     struct target *uid_target;      // uid based targets
+#endif
+#if (PROCESSES_HAVE_GID == 1)
     struct target *gid_target;      // gid based targets
+#endif
     struct target *tree_target;     // tree based target
 
     STRING *comm;
@@ -428,8 +448,12 @@ struct pid_stat {
     // uint32_t policy;
     // kernel_uint_t delayacct_blkio_ticks;
 
+#if (PROCESSES_HAVE_UID == 1)
     uid_t uid;
+#endif
+#if (PROCESSES_HAVE_GID == 1)
     gid_t gid;
+#endif
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
     uint32_t sortlist;  // higher numbers = top on the process tree
@@ -517,12 +541,17 @@ struct pid_stat {
 
 // ----------------------------------------------------------------------------
 
+#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_GID == 1)
 struct user_or_group_id {
     avl_t avl;
 
     union {
+#if (PROCESSES_HAVE_UID == 1)
         uid_t uid;
+#endif
+#if (PROCESSES_HAVE_GID == 1)
         gid_t gid;
+#endif
     } id;
 
     char *name;
@@ -531,12 +560,17 @@ struct user_or_group_id {
 
     struct user_or_group_id * next;
 };
+#endif
 
 extern struct target
     *apps_groups_default_target,
     *apps_groups_root_target,
+#if (PROCESSES_HAVE_UID == 1)
     *users_root_target,
+#endif
+#if (PROCESSES_HAVE_GID == 1)
     *groups_root_target,
+#endif
     *tree_root_target;
 
 struct pid_stat *root_of_pids(void);
@@ -555,8 +589,14 @@ void function_processes(const char *transaction, char *function,
 
 struct target *find_target_by_name(struct target *base, const char *name);
 
+#if (PROCESSES_HAVE_UID == 1)
 struct target *get_uid_target(uid_t uid);
+#endif
+
+#if (PROCESSES_HAVE_GID == 1)
 struct target *get_gid_target(gid_t gid);
+#endif
+
 struct target *get_tree_target(struct pid_stat *p);
 int read_apps_groups_conf(const char *path, const char *file);
 

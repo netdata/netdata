@@ -19,7 +19,8 @@ struct user_or_group_ids {
     char filename[FILENAME_MAX + 1];
 };
 
-int user_id_compare(void* a, void* b) {
+#if (PROCESSES_HAVE_UID == 1)
+static int user_id_compare(void* a, void* b) {
     if(((struct user_or_group_id *)a)->id.uid < ((struct user_or_group_id *)b)->id.uid)
         return -1;
 
@@ -30,7 +31,7 @@ int user_id_compare(void* a, void* b) {
         return 0;
 }
 
-struct user_or_group_ids all_user_ids = {
+static struct user_or_group_ids all_user_ids = {
     .type = USER_ID,
 
     .index = {
@@ -42,8 +43,10 @@ struct user_or_group_ids all_user_ids = {
 
     .filename = "",
 };
+#endif
 
-int group_id_compare(void* a, void* b) {
+#if (PROCESSES_HAVE_GID == 1)
+static int group_id_compare(void* a, void* b) {
     if(((struct user_or_group_id *)a)->id.gid < ((struct user_or_group_id *)b)->id.gid)
         return -1;
 
@@ -54,7 +57,7 @@ int group_id_compare(void* a, void* b) {
         return 0;
 }
 
-struct user_or_group_ids all_group_ids = {
+static struct user_or_group_ids all_group_ids = {
     .type = GROUP_ID,
 
     .index = {
@@ -66,6 +69,7 @@ struct user_or_group_ids all_group_ids = {
 
     .filename = "",
 };
+#endif
 
 int file_changed(const struct stat *statbuf __maybe_unused, struct timespec *last_modification_time __maybe_unused) {
 #if defined(OS_MACOS)
@@ -81,7 +85,8 @@ int file_changed(const struct stat *statbuf __maybe_unused, struct timespec *las
 #endif
 }
 
-int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_modification_time) {
+#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_GID == 1)
+static int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_modification_time) {
     struct stat statbuf;
     if(unlikely(stat(ids->filename, &statbuf)))
         return 1;
@@ -109,10 +114,14 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
 
         struct user_or_group_id *user_or_group_id = callocz(1, sizeof(struct user_or_group_id));
 
+#if (PROCESSES_HAVE_UID == 1)
         if(ids->type == USER_ID)
             user_or_group_id->id.uid = (uid_t) str2ull(id_string, NULL);
-        else
+#endif
+#if (PROCESSES_HAVE_GID == 1)
+        if(ids->type == GROUP_ID)
             user_or_group_id->id.gid = (uid_t) str2ull(id_string, NULL);
+#endif
 
         user_or_group_id->name = strdupz(name);
         user_or_group_id->updated = 1;
@@ -171,7 +180,9 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
 
     return 0;
 }
+#endif
 
+#if (PROCESSES_HAVE_UID == 1)
 struct user_or_group_id *user_id_find(struct user_or_group_id *user_id_to_find) {
     if(*netdata_configured_host_prefix) {
         static struct timespec last_passwd_modification_time;
@@ -183,7 +194,9 @@ struct user_or_group_id *user_id_find(struct user_or_group_id *user_id_to_find) 
 
     return NULL;
 }
+#endif
 
+#if (PROCESSES_HAVE_GID == 1)
 struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find) {
     if(*netdata_configured_host_prefix) {
         static struct timespec last_group_modification_time;
@@ -195,12 +208,17 @@ struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find
 
     return NULL;
 }
+#endif
 
 void users_and_groups_init(void) {
+#if (PROCESSES_HAVE_UID == 1)
     snprintfz(all_user_ids.filename, FILENAME_MAX, "%s/etc/passwd", netdata_configured_host_prefix);
     debug_log("passwd file: '%s'", all_user_ids.filename);
+#endif
 
+#if (PROCESSES_HAVE_GID == 1)
     snprintfz(all_group_ids.filename, FILENAME_MAX, "%s/etc/group", netdata_configured_host_prefix);
     debug_log("group file: '%s'", all_group_ids.filename);
+#endif
 }
 

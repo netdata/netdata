@@ -814,8 +814,6 @@ static inline bool collect_data_for_all_pids_per_os(void) {
 
         // UID and GID don't have direct equivalents in Windows
         // You might want to use a constant value or implement a mapping to Windows SIDs if needed
-        p->uid = 0;  // Placeholder
-        p->gid = 0;  // Placeholder
     }
 
     perflibFreePerformanceData();

@@ -24,24 +24,32 @@ static void apps_plugin_function_processes_help(const char *transaction) {
                    "   category:NAME\n"
                    "      Shows only processes that are assigned the category `NAME` in apps_groups.conf\n"
                    "\n"
+#if (PROCESSES_HAVE_UID == 1)
                    "   user:NAME\n"
                    "      Shows only processes that are running as user name `NAME`.\n"
                    "\n"
+#endif
+#if (PROCESSES_HAVE_GID == 1)
                    "   group:NAME\n"
                    "      Shows only processes that are running as group name `NAME`.\n"
                    "\n"
+#endif
                    "   process:NAME\n"
                    "      Shows only processes that their Command is `NAME` or their parent's Command is `NAME`.\n"
                    "\n"
                    "   pid:NUMBER\n"
                    "      Shows only processes that their PID is `NUMBER` or their parent's PID is `NUMBER`\n"
                    "\n"
+#if (PROCESSES_HAVE_UID == 1)
                    "   uid:NUMBER\n"
                    "      Shows only processes that their UID is `NUMBER`\n"
                    "\n"
+#endif
+#if (PROCESSES_HAVE_GID == 1)
                    "   gid:NUMBER\n"
                    "      Shows only processes that their GID is `NUMBER`\n"
                    "\n"
+#endif
                    "Filters can be combined. Each filter can be given only one time.\n"
     );
 
@@ -98,6 +106,7 @@ void function_processes(const char *transaction, char *function,
                 return;
             }
         }
+#if (PROCESSES_HAVE_UID == 1)
         else if(!user && strncmp(keyword, PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
             user = find_target_by_name(users_root_target, &keyword[strlen(PROCESS_FILTER_USER)]);
             if(!user) {
@@ -106,6 +115,8 @@ void function_processes(const char *transaction, char *function,
                 return;
             }
         }
+#endif
+#if (PROCESSES_HAVE_GID == 1)
         else if(strncmp(keyword, PROCESS_FILTER_GROUP, strlen(PROCESS_FILTER_GROUP)) == 0) {
             group = find_target_by_name(groups_root_target, &keyword[strlen(PROCESS_FILTER_GROUP)]);
             if(!group) {
@@ -114,6 +125,7 @@ void function_processes(const char *transaction, char *function,
                 return;
             }
         }
+#endif
         else if(!process_name && strncmp(keyword, PROCESS_FILTER_PROCESS, strlen(PROCESS_FILTER_PROCESS)) == 0) {
             process_name = &keyword[strlen(PROCESS_FILTER_PROCESS)];
         }
@@ -121,14 +133,18 @@ void function_processes(const char *transaction, char *function,
             pid = str2i(&keyword[strlen(PROCESS_FILTER_PID)]);
             filter_pid = true;
         }
+#if (PROCESSES_HAVE_UID == 1)
         else if(!uid && strncmp(keyword, PROCESS_FILTER_UID, strlen(PROCESS_FILTER_UID)) == 0) {
             uid = str2i(&keyword[strlen(PROCESS_FILTER_UID)]);
             filter_uid = true;
         }
+#endif
+#if (PROCESSES_HAVE_GID == 1)
         else if(!gid && strncmp(keyword, PROCESS_FILTER_GID, strlen(PROCESS_FILTER_GID)) == 0) {
             gid = str2i(&keyword[strlen(PROCESS_FILTER_GID)]);
             filter_gid = true;
         }
+#endif
         else if(strcmp(keyword, "help") == 0) {
             apps_plugin_function_processes_help(transaction);
             return;
@@ -222,11 +238,15 @@ void function_processes(const char *transaction, char *function,
         if(category && p->target != category)
             continue;
 
+#if (PROCESSES_HAVE_UID == 1)
         if(user && p->uid_target != user)
             continue;
+#endif
 
+#if (PROCESSES_HAVE_GID == 1)
         if(group && p->gid_target != group)
             continue;
+#endif
 
         if(process_name && ((strcmp(pid_stat_comm(p), process_name) != 0 && !p->parent) || (p->parent && strcmp(pid_stat_comm(p), process_name) != 0 && strcmp(pid_stat_comm(p->parent), process_name) != 0)))
             continue;
@@ -234,11 +254,15 @@ void function_processes(const char *transaction, char *function,
         if(filter_pid && p->pid != pid && p->ppid != pid)
             continue;
 
+#if (PROCESSES_HAVE_UID == 1)
         if(filter_uid && p->uid != uid)
             continue;
+#endif
 
+#if (PROCESSES_HAVE_GID == 1)
         if(filter_gid && p->gid != gid)
             continue;
+#endif
 
         rows++;
 
@@ -264,17 +288,21 @@ void function_processes(const char *transaction, char *function,
         // category
         buffer_json_add_array_item_string(wb, p->target ? string2str(p->target->name) : "-");
 
+#if (PROCESSES_HAVE_UID == 1)
         // user
         buffer_json_add_array_item_string(wb, p->uid_target ? string2str(p->uid_target->name) : "-");
 
         // uid
         buffer_json_add_array_item_uint64(wb, p->uid);
+#endif
 
+#if (PROCESSES_HAVE_GID == 1)
         // group
         buffer_json_add_array_item_string(wb, p->gid_target ? string2str(p->gid_target->name) : "-");
 
         // gid
         buffer_json_add_array_item_uint64(wb, p->gid);
+#endif
 
         // CPU utilization %
         kernel_uint_t total_cpu = p->utime + p->stime;
@@ -408,6 +436,8 @@ void function_processes(const char *transaction, char *function,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
+#if (PROCESSES_HAVE_UID == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "User", "User Owner", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
@@ -418,6 +448,9 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+
+#if (PROCESSES_HAVE_GID == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "Group", "Group Owner", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
@@ -428,6 +461,7 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+#endif
 
         // CPU utilization
         buffer_rrdf_table_add_field(wb, field_id++, "CPU", "Total CPU Time (100% = 1 core)",
@@ -956,6 +990,7 @@ void function_processes(const char *transaction, char *function,
         }
         buffer_json_object_close(wb);
 
+#if (PROCESSES_HAVE_UID == 1)
         // group by User
         buffer_json_member_add_object(wb, "User");
         {
@@ -968,7 +1003,9 @@ void function_processes(const char *transaction, char *function,
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
+#endif
 
+#if (PROCESSES_HAVE_GID == 1)
         // group by Group
         buffer_json_member_add_object(wb, "Group");
         {
@@ -981,6 +1018,7 @@ void function_processes(const char *transaction, char *function,
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
+#endif
     }
     buffer_json_object_close(wb); // group_by
 

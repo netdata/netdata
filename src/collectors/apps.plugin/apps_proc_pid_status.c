@@ -192,8 +192,10 @@ int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     p->status_rssfile          = 0;
     p->status_rssshmem         = 0;
     p->status_vmswap           = 0;
+#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
     p->status_voluntary_ctxt_switches = 0;
     p->status_nonvoluntary_ctxt_switches = 0;
+#endif
 
     return read_proc_pid_status_per_os(p, ptr) ? 1 : 0;
 }

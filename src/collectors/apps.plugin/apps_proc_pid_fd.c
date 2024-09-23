@@ -117,13 +117,21 @@ void aggregate_pid_fds_on_targets(struct pid_stat *p) {
 
     struct target
         *w = p->target,
+#if (PROCESSES_HAVE_UID == 1)
         *u = p->uid_target,
+#endif
+#if (PROCESSES_HAVE_GID == 1)
         *g = p->gid_target,
+#endif
         *t = p->tree_target;
 
     reallocate_target_fds(w);
+#if (PROCESSES_HAVE_UID == 1)
     reallocate_target_fds(u);
+#endif
+#if (PROCESSES_HAVE_GID == 1)
     reallocate_target_fds(g);
+#endif
     reallocate_target_fds(t);
 
     p->openfds.files = 0;
@@ -147,8 +155,12 @@ void aggregate_pid_fds_on_targets(struct pid_stat *p) {
         aggregage_fd_type_on_openfds(all_files[fd].type, &p->openfds);
 
         aggregate_fd_on_target(fd, w);
+#if (PROCESSES_HAVE_UID == 1)
         aggregate_fd_on_target(fd, u);
+#endif
+#if (PROCESSES_HAVE_GID == 1)
         aggregate_fd_on_target(fd, g);
+#endif
         aggregate_fd_on_target(fd, t);
     }
 }
