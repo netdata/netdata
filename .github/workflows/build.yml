@@ -275,12 +275,118 @@ jobs:
             && needs.file-check.outputs.run == 'true'
           }}
 
+  windows-build: # Test building on Windows
+    name: Test building on Windows
+    runs-on: windows-latest
+    needs:
+      - file-check
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: Write-Output "SKIPPED"
+      - name: Checkout
+        uses: actions/checkout@v4
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        with:
+          submodules: recursive
+          lfs: true
+      - name: Set Up Go
+        id: golang
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "^1.22"
+      - name: Set Up Dependencies
+        id: deps
+        if: needs.file-check.outputs.run == 'true'
+        run: ./packaging/windows/install-dependencies.ps1
+      - name: Build Netdata
+        id: build
+        if: needs.file-check.outputs.run == 'true'
+        env:
+          BUILD_DIR: ${{ github.workspace }}\build
+        run: ./packaging/windows/build.ps1
+      - name: Sign Agent Code
+        id: sign-agent
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
+        uses: azure/trusted-signing-action@v0.4.0
+        with:
+          azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
+          azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
+          endpoint: "https://eus.codesigning.azure.net/"
+          trusted-signing-account-name: Netdata
+          certificate-profile-name: Netdata
+          files-folder: ${{ github.workspace }}\build
+          files-folder-filter: exe,dll
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
+          timestamp-digest: SHA256
+      - name: Package Netdata
+        id: package
+        if: needs.file-check.outputs.run == 'true'
+        env:
+          BUILD_DIR: ${{ github.workspace }}\build
+        run: ./packaging/windows/package.ps1
+      - name: Sign Installer
+        id: sign-installer
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
+        uses: azure/trusted-signing-action@v0.4.0
+        with:
+          azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
+          azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
+          endpoint: "https://eus.codesigning.azure.net/"
+          trusted-signing-account-name: Netdata
+          certificate-profile-name: Netdata
+          files: ${{ github.workspace }}\packaging\windows\netdata-installer.exe
+          file-digest: SHA256
+          timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
+          timestamp-digest: SHA256
+      - name: Upload Installer
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64-installer
+          path: packaging\windows\netdata-installer.exe
+          retention-days: 30
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Windows build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Updater checks for ${{ matrix.distro }} failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Set Up Dependencies: ${{ steps.deps.outcome }}
+              Build Netdata: ${{ steps.build.outcome }}
+              Sign Agent Code: ${{ steps.sign-agent.outcome }}
+              Package Netdata: ${{ steps.package.outcome }}
+              Sign Installer: ${{ steps.sign-installer.outcome }}
+              Upload Installer: ${{ steps.upload.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
+          }}
+
   prepare-upload: # Consolidate the artifacts for uploading or releasing.
     name: Prepare Artifacts
     runs-on: ubuntu-latest
     needs:
       - build-dist
       - build-static
+      - windows-build
       - file-check
     steps:
       - name: Skip Check
@@ -303,6 +409,18 @@ jobs:
           action: actions/download-artifact@v4
           with: |
             pattern: dist-*
+            path: dist-artifacts
+            merge-multiple: true
+          attempt_limit: 3
+          attempt_delay: 2000
+      - name: Retrieve Windows Artifacts
+        id: fetch-windows
+        if: needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly'
+        uses: Wandalen/wretry.action@v3
+        with:
+          action: actions/download-artifact@v4
+          with: |
+            pattern: windows-*-installer
             path: dist-artifacts
             merge-multiple: true
           attempt_limit: 3
@@ -338,7 +456,8 @@ jobs:
               ${{ github.repository }}: Failed to prepare release artifacts for upload.
               Checkout: ${{ steps.checkout.outcome }}
               Prepare environment: ${{ steps.prepare.outcome }}
-              Fetch dist tarball: ${{ steps.fetch-dist.outcome }}
+              Fetch dist artifacts: ${{ steps.fetch-dist.outcome }}
+              Fetch Windows installers: ${{ steps.fetch-windows.outcome }}
               Consolidate artifacts: ${{ steps.consolidate.outcome }}
               Store: ${{ steps.store.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -489,68 +608,12 @@ jobs:
             && needs.file-check.outputs.run == 'true'
           }}
 
-  upload-nightly: # Upload the nightly build artifacts to GCS.
-    name: Upload Nightly Artifacts
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
-    needs:
-      - artifact-verification-dist
-      - artifact-verification-static
-    steps:
-      - name: Retrieve Artifacts
-        id: fetch
-        uses: Wandalen/wretry.action@v3
-        with:
-          action: actions/download-artifact@v4
-          with: |
-            name: final-artifacts
-            path: final-artifacts
-          attempt_limit: 3
-          attempt_delay: 2000
-      - name: Authenticate to GCS
-        id: gcs-auth
-        uses: google-github-actions/auth@v2
-        with:
-          project_id: ${{ secrets.GCP_NIGHTLY_STORAGE_PROJECT }}
-          credentials_json: ${{ secrets.GCS_STORAGE_SERVICE_KEY_JSON }}
-      - name: Setup GCS
-        id: gcs-setup
-        uses: google-github-actions/setup-gcloud@v2.1.1
-      - name: Upload Artifacts
-        id: upload
-        uses: google-github-actions/upload-cloud-storage@v2.2.0
-        with:
-          destination: ${{ secrets.GCP_NIGHTLY_STORAGE_BUCKET }}
-          gzip: false
-          path: ./final-artifacts/latest-version.txt
-          parent: false
-      - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_COLOR: 'danger'
-          SLACK_FOOTER: ''
-          SLACK_ICON_EMOJI: ':github-actions:'
-          SLACK_TITLE: 'Failed to upload nightly release artifacts:'
-          SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: |-
-              ${{ github.repository }}: Failed to upload nightly release artifacts.
-              Fetch artifacts: ${{ steps.fetch.outcome }}
-              Authenticatie GCS: ${{ steps.gcs-auth.outcome }}
-              Setup GCS: ${{ steps.gcs-setup.outcome }}
-              Upload artifacts: ${{ steps.upload.outcome }}
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-        if: >-
-          ${{
-            failure()
-            && startsWith(github.ref, 'refs/heads/master')
-            && github.event_name != 'pull_request'
-          }}
-
   create-nightly: # Create a nightly build release in netdata/netdata-nightlies
     name: Create Nightly Release
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
     needs:
+      - prepare-upload
       - artifact-verification-dist
       - artifact-verification-static
     steps:
@@ -955,8 +1018,7 @@ jobs:
               Checkout: ${{ steps.checkout.outcome }}
               Fetch test environment: ${{ steps.fetch.outcome }}
               Load test environment: ${{ steps.load.outcome }}
-              netdata-installer, disable cloud: ${{ steps.build-no-cloud.outcome }}
-              netdata-installer, require cloud: ${{ steps.build-cloud.outcome }}
+              netdata-installer: ${{ steps.build-cloud.outcome }}
               netdata-installer, no JSON-C: ${{ steps.build-no-jsonc.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
@@ -1038,112 +1100,6 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
-          }}
-
-  windows-build: # Test building on Windows
-    name: Test building on Windows
-    runs-on: windows-latest
-    if: github.event_name != 'workflow_dispatch'
-    needs:
-      - file-check
-    steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: Write-Output "SKIPPED"
-      - name: Checkout
-        uses: actions/checkout@v4
-        id: checkout
-        if: needs.file-check.outputs.run == 'true'
-        with:
-          submodules: recursive
-          lfs: true
-      - name: Set Up Go
-        id: golang
-        if: needs.file-check.outputs.run == 'true'
-        uses: actions/setup-go@v5
-        with:
-          go-version: "^1.22"
-      - name: Set Up Dependencies
-        id: deps
-        if: needs.file-check.outputs.run == 'true'
-        run: ./packaging/windows/install-dependencies.ps1
-      - name: Build Netdata
-        id: build
-        if: needs.file-check.outputs.run == 'true'
-        env:
-          BUILD_DIR: ${{ github.workspace }}\build
-        run: ./packaging/windows/build.ps1
-      - name: Sign Agent Code
-        id: sign-agent
-        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/trusted-signing-action@v0.4.0
-        with:
-          azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
-          azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
-          azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
-          endpoint: "https://eus.codesigning.azure.net/"
-          trusted-signing-account-name: Netdata
-          certificate-profile-name: Netdata
-          files-folder: ${{ github.workspace }}\build
-          files-folder-filter: exe,dll
-          files-folder-recurse: true
-          file-digest: SHA256
-          timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
-          timestamp-digest: SHA256
-      - name: Package Netdata
-        id: package
-        if: needs.file-check.outputs.run == 'true'
-        env:
-          BUILD_DIR: ${{ github.workspace }}\build
-        run: ./packaging/windows/package.ps1
-      - name: Sign Installer
-        id: sign-installer
-        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/trusted-signing-action@v0.4.0
-        with:
-          azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
-          azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
-          azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
-          endpoint: "https://eus.codesigning.azure.net/"
-          trusted-signing-account-name: Netdata
-          certificate-profile-name: Netdata
-          files: ${{ github.workspace }}\packaging\windows\netdata-installer.exe
-          file-digest: SHA256
-          timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
-          timestamp-digest: SHA256
-      - name: Upload Installer
-        id: upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-x86_64-installer
-          path: packaging\windows\netdata-installer.exe
-          retention-days: 30
-      - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_COLOR: 'danger'
-          SLACK_FOOTER: ''
-          SLACK_ICON_EMOJI: ':github-actions:'
-          SLACK_TITLE: 'Windows build failed:'
-          SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: |-
-              ${{ github.repository }}: Updater checks for ${{ matrix.distro }} failed.
-              Checkout: ${{ steps.checkout.outcome }}
-              Set Up Dependencies: ${{ steps.deps.outcome }}
-              Build Netdata: ${{ steps.build.outcome }}
-              Sign Agent Code: ${{ steps.sign-agent.outcome }}
-              Package Netdata: ${{ steps.package.outcome }}
-              Sign Installer: ${{ steps.sign-installer.outcome }}
-              Upload Installer: ${{ steps.upload.outcome }}
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-        if: >-
-          ${{
-            failure()
-            && startsWith(github.ref, 'refs/heads/master')
-            && github.event_name != 'pull_request'
-            && github.repository == 'netdata/netdata'
-            && needs.file-check.outputs.run == 'true'
           }}
 
   updater-check: # Test the generated dist archive using the updater code.
