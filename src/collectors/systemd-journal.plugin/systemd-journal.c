@@ -1166,7 +1166,7 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
     LOGS_QUERY_STATUS tmp_fqs = {
         .facets = lqs_facets_create(
             LQS_DEFAULT_ITEMS_PER_QUERY,
-            FACETS_OPTION_ALL_KEYS_FTS,
+            FACETS_OPTION_ALL_KEYS_FTS | FACETS_OPTION_HASH_IDS,
             SYSTEMD_ALWAYS_VISIBLE_KEYS,
             SYSTEMD_KEYS_INCLUDED_IN_FACETS,
             SYSTEMD_KEYS_EXCLUDED_FROM_FACETS,
