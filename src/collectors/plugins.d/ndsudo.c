@@ -14,6 +14,42 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "ceph-osd-perf",
+        .params = "osd perf --format json ",
+        .search =
+            {
+                [0] = "ceph",
+                [1] = NULL,
+            },
+    },
+    {
+        .name = "ceph-osd-df",
+        .params = "osd df --format json ",
+        .search =
+            {
+                [0] = "ceph",
+                [1] = NULL,
+            },
+    },
+    {
+        .name = "ceph-osd-pool-stats",
+        .params = "osd pool stats --format json ",
+        .search =
+            {
+                [0] = "ceph",
+                [1] = NULL,
+            },
+    },
+    {
+        .name = "ceph-df",
+        .params = "df --format json",
+        .search =
+            {
+                [0] = "ceph",
+                [1] = NULL,
+            },
+    },
+    {
         .name = "varnishadm-backend-list",
         .params = "backend.list",
         .search =
