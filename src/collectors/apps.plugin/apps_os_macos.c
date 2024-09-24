@@ -136,8 +136,8 @@ bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
 
     // On MacOS, the proc_pid_rusage provides disk_io_statistics which includes io bytes read and written
     // but does not provide the same level of detail as Linux, like separating logical and physical I/O bytes.
-    pid_incremental_rate(io, p->io_storage_bytes_read, pi->rusageinfo.ri_diskio_bytesread);
-    pid_incremental_rate(io, p->io_storage_bytes_written, pi->rusageinfo.ri_diskio_byteswritten);
+    pid_incremental_rate(io, p->values[PDF_PREAD], pi->rusageinfo.ri_diskio_bytesread);
+    pid_incremental_rate(io, p->values[PDF_PWRITE], pi->rusageinfo.ri_diskio_byteswritten);
 
     return true;
 }
@@ -151,11 +151,11 @@ bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
 
     p->uid = pi->bsdinfo.pbi_uid;
     p->gid = pi->bsdinfo.pbi_gid;
-    p->status_vmsize = pi->taskinfo.pti_virtual_size / 1024; // Convert bytes to KiB
-    p->status_vmrss = pi->taskinfo.pti_resident_size / 1024; // Convert bytes to KiB
-    // p->status_vmswap = rusageinfo.ri_swapins + rusageinfo.ri_swapouts; // This is not directly available, consider an alternative representation
-    p->status_voluntary_ctxt_switches = pi->taskinfo.pti_csw;
-    // p->status_nonvoluntary_ctxt_switches = taskinfo.pti_nivcsw;
+    p->values[PDF_VMSIZE] = pi->taskinfo.pti_virtual_size / 1024; // Convert bytes to KiB
+    p->values[PDF_VMRSS] = pi->taskinfo.pti_resident_size / 1024; // Convert bytes to KiB
+    // p->values[PDF_VMSWAP] = rusageinfo.ri_swapins + rusageinfo.ri_swapouts; // This is not directly available, consider an alternative representation
+    p->values[PDF_VOLCTX] = pi->taskinfo.pti_csw;
+    // p->values[PDF_NVOLCTX] = taskinfo.pti_nivcsw;
 
     return true;
 }
@@ -227,21 +227,26 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     kernel_uint_t systemCPU = (pi->taskinfo.pti_total_system * mach_info.numer) / mach_info.denom / NSEC_PER_USEC / 10000;
 
     // Map the values from taskinfo to the pid_stat structure
-    pid_incremental_rate(stat, p->minflt, pi->taskinfo.pti_faults);
-    pid_incremental_rate(stat, p->majflt, pi->taskinfo.pti_pageins);
-    pid_incremental_rate(stat, p->utime, userCPU);
-    pid_incremental_rate(stat, p->stime, systemCPU);
-    p->num_threads = pi->taskinfo.pti_threadnum;
+    pid_incremental_rate(stat, p->values[PDF_MINFLT], pi->taskinfo.pti_faults);
+    pid_incremental_rate(stat, p->values[PDF_MAJFLT], pi->taskinfo.pti_pageins);
+    pid_incremental_rate(stat, p->values[PDF_UTIME], userCPU);
+    pid_incremental_rate(stat, p->values[PDF_STIME], systemCPU);
+    p->values[PDF_THREADS] = pi->taskinfo.pti_threadnum;
 
     usec_t started_ut = timeval_usec(&pi->proc.kp_proc.p_starttime);
-    p->uptime = (system_current_time_ut > started_ut) ? (system_current_time_ut - started_ut) / USEC_PER_SEC : 0;
+    p->values[PDF_UPTIME] = (system_current_time_ut > started_ut) ? (system_current_time_ut - started_ut) / USEC_PER_SEC : 0;
 
     // Note: Some values such as guest time, cutime, cstime, etc., are not directly available in MacOS.
     // You might need to approximate or leave them unset depending on your needs.
 
     if(unlikely(debug_enabled || (p->target && p->target->debug_enabled))) {
         debug_log_int("READ PROC/PID/STAT for MacOS: process: '%s' on target '%s' VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", threads=%d",
-                      pid_stat_comm(p), (p->target) ? string2str(p->target->name) : "UNSET", p->utime, p->stime, p->minflt, p->majflt, p->num_threads);
+                      pid_stat_comm(p), (p->target) ? string2str(p->target->name) : "UNSET",
+                      p->values[PDF_UTIME],
+                      p->values[PDF_STIME],
+                      p->values[PDF_MINFLT],
+                      p->values[PDF_MAJFLT],
+                      p->values[PDF_THREADS]);
     }
 
     if(unlikely(global_iterations_counter == 1))

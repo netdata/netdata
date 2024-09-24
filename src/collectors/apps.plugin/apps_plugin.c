@@ -220,19 +220,19 @@ static void normalize_utilization(struct target *root) {
     if(global_gtime > max_time) global_gtime = max_time;
 
     for(w = root; w ; w = w->next) {
-        if(w->target || (!w->processes && !w->exposed)) continue;
+        if(w->target || (!w->values[PDF_PROCESSES] && !w->exposed)) continue;
 
-        utime   += w->utime;
-        stime   += w->stime;
-        gtime   += w->gtime;
-        cutime  += w->cutime;
-        cstime  += w->cstime;
-        cgtime  += w->cgtime;
+        utime   += w->values[PDF_UTIME];
+        stime   += w->values[PDF_STIME];
+        gtime   += w->values[PDF_GTIME];
+        cutime  += w->values[PDF_CUTIME];
+        cstime  += w->values[PDF_CSTIME]
+        cgtime  += w->values[PDF_CGTIME]
 
-        minflt  += w->minflt;
-        majflt  += w->majflt;
-        cminflt += w->cminflt;
-        cmajflt += w->cmajflt;
+        minflt  += w->values[PDF_MINFLT];
+        majflt  += w->values[PDF_MAJFLT];
+        cminflt += w->values[PDF_CMINFLT];
+        cmajflt += w->values[PDF_CMAJFLT];
     }
 
     if(global_utime || global_stime || global_gtime) {

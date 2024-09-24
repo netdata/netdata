@@ -78,6 +78,7 @@ struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
     p->fds_size = MAX_SPARE_FDS;
     init_pid_fds(p, 0, p->fds_size);
     p->pid = pid;
+    p->values[PDF_PROCESSES] = 1;
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pids.all_pids.root, p, prev, next);
     simple_hashtable_set_slot_PID(&pids.all_pids.ht, sl, hash, p);
@@ -323,22 +324,22 @@ static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t tim
             , p->stat_collected_usec - time
     );
 
-    if(p->utime)   fprintf(stderr, " utime=" KERNEL_UINT_FORMAT,   p->utime);
-    if(p->stime)   fprintf(stderr, " stime=" KERNEL_UINT_FORMAT,   p->stime);
+    if(p->values[PDF_UTIME])   fprintf(stderr, " utime=" KERNEL_UINT_FORMAT,   p->values[PDF_UTIME]);
+    if(p->values[PDF_STIME])   fprintf(stderr, " stime=" KERNEL_UINT_FORMAT,   p->values[PDF_STIME]);
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    if(p->gtime)   fprintf(stderr, " gtime=" KERNEL_UINT_FORMAT,   p->gtime);
+    if(p->values[PDF_GTIME])   fprintf(stderr, " gtime=" KERNEL_UINT_FORMAT,   p->values[PDF_GTIME]);
 #endif
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-    if(p->cutime)  fprintf(stderr, " cutime=" KERNEL_UINT_FORMAT,  p->cutime);
-    if(p->cstime)  fprintf(stderr, " cstime=" KERNEL_UINT_FORMAT,  p->cstime);
+    if(p->values[PDF_CUTIME])  fprintf(stderr, " cutime=" KERNEL_UINT_FORMAT,  p->values[PDF_CUTIME]);
+    if(p->values[PDF_CSTIME])  fprintf(stderr, " cstime=" KERNEL_UINT_FORMAT,  p->values[PDF_CSTIME]);
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    if(p->cgtime)  fprintf(stderr, " cgtime=" KERNEL_UINT_FORMAT,  p->cgtime);
+    if(p->values[PDF_CGTIME])  fprintf(stderr, " cgtime=" KERNEL_UINT_FORMAT,  p->values[PDF_CGTIME]);
 #endif
 #endif
-    if(p->minflt)  fprintf(stderr, " minflt=" KERNEL_UINT_FORMAT,  p->minflt);
-    if(p->cminflt) fprintf(stderr, " cminflt=" KERNEL_UINT_FORMAT, p->cminflt);
-    if(p->majflt)  fprintf(stderr, " majflt=" KERNEL_UINT_FORMAT,  p->majflt);
-    if(p->cmajflt) fprintf(stderr, " cmajflt=" KERNEL_UINT_FORMAT, p->cmajflt);
+    if(p->values[PDF_MINFLT])  fprintf(stderr, " minflt=" KERNEL_UINT_FORMAT,  p->values[PDF_MINFLT]);
+    if(p->values[PDF_CMINFLT]) fprintf(stderr, " cminflt=" KERNEL_UINT_FORMAT, p->values[PDF_CMINFLT]);
+    if(p->values[PDF_MAJFLT])  fprintf(stderr, " majflt=" KERNEL_UINT_FORMAT,  p->values[PDF_MAJFLT]);
+    if(p->values[PDF_CMAJFLT]) fprintf(stderr, " cmajflt=" KERNEL_UINT_FORMAT, p->values[PDF_CMAJFLT]);
     fprintf(stderr, ")\n");
 
     return indent + 1;
@@ -358,23 +359,26 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
 
         switch(type) {
             case 1:
-                if(p->cminflt > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
+                if(p->values[PDF_CMINFLT] > lost) {
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
                 break;
 
             case 2:
-                if(p->cmajflt > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
+                if(p->values[PDF_CMAJFLT] > lost) {
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
                 break;
 
             case 3:
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-                if(p->cutime > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
+                if(p->values[PDF_CUTIME] > lost) {
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
 #endif
@@ -382,8 +386,9 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
 
             case 4:
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-                if(p->cstime > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
+                if(p->values[PDF_CSTIME] > lost) {
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
 #endif
@@ -391,8 +396,9 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
 
             case 5:
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1) && (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-                if(p->cgtime > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
+                if(p->values[PDF_CGTIME] > lost) {
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
 #endif
@@ -426,41 +432,39 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
 }
 
 void clear_pid_stat(struct pid_stat *p, bool threads) {
-    p->minflt           = 0;
-    p->cminflt          = 0;
-    p->majflt           = 0;
-    p->cmajflt          = 0;
-    p->utime            = 0;
-    p->stime            = 0;
+    p->values[PDF_MINFLT]   = 0;
+    p->values[PDF_CMINFLT]  = 0;
+    p->values[PDF_MAJFLT]   = 0;
+    p->values[PDF_CMAJFLT]  = 0;
+    p->values[PDF_UTIME]    = 0;
+    p->values[PDF_STIME]    = 0;
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    p->gtime            = 0;
+    p->values[PDF_GTIME]    = 0;
 #endif
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-    p->cutime           = 0;
-    p->cstime           = 0;
+    p->values[PDF_CUTIME]   = 0;
+    p->values[PDF_CSTIME]   = 0;
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    p->cgtime           = 0;
+    p->values[PDF_CGTIME]   = 0;
 #endif
 #endif
 
     if(threads)
-        p->num_threads      = 0;
-
-    // p->rss              = 0;
+        p->values[PDF_THREADS] = 0;
 }
 
 void clear_pid_io(struct pid_stat *p) {
 #if (PROCESSES_HAVE_LOGICAL_IO == 1)
-    p->io_logical_bytes_read        = 0;
-    p->io_logical_bytes_written     = 0;
+    p->values[PDF_LREAD]   = 0;
+    p->values[PDF_LWRITE]  = 0;
 #endif
 #if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-    p->io_storage_bytes_read        = 0;
-    p->io_storage_bytes_written     = 0;
+    p->values[PDF_PREAD]   = 0;
+    p->values[PDF_PWRITE]  = 0;
 #endif
 #if (PROCESSES_HAVE_IO_CALLS == 1)
-    p->io_read_calls                = 0;
-    p->io_write_calls               = 0;
+    p->values[PDF_CREAD]   = 0;
+    p->values[PDF_CWRITE]  = 0;
 #endif
 }
 
@@ -538,25 +542,25 @@ static inline void process_exited_pids() {
             continue;
 
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-        kernel_uint_t utime  = (p->utime_raw + p->cutime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        kernel_uint_t stime  = (p->stime_raw + p->cstime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t utime  = (p->raw[PDF_UTIME] + p->raw[PDF_CUTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t stime  = (p->raw[PDF_STIME] + p->raw[PDF_CSTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        kernel_uint_t gtime  = (p->gtime_raw + p->cgtime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t gtime  = (p->raw[PDF_GTIME] + p->raw[PDF_CGTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #else
         kernel_uint_t gtime = 0;
 #endif
 #else
-        kernel_uint_t utime  = (p->utime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        kernel_uint_t stime  = (p->stime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t utime  = (p->raw[PDF_UTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t stime  = (p->raw[PDF_STIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        kernel_uint_t gtime  = (p->gtime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t gtime  = (p->raw[PDF_GTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #else
         kernel_uint_t gtime = 0;
 #endif
 #endif
 
-        kernel_uint_t minflt = (p->minflt_raw + p->cminflt_raw) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        kernel_uint_t majflt = (p->majflt_raw + p->cmajflt_raw) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t minflt = (p->raw[PDF_MINFLT] + p->raw[PDF_CMINFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t majflt = (p->raw[PDF_MAJFLT] + p->raw[PDF_CMAJFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
         if(utime + stime + gtime + minflt + majflt == 0)
             continue;
@@ -581,28 +585,33 @@ static inline void process_exited_pids() {
 
             kernel_uint_t absorbed;
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-            absorbed = remove_exited_child_from_parent(&utime,  &pp->cutime);
+            absorbed = remove_exited_child_from_parent(&utime,  &pp->values[PDF_CUTIME]);
             if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " utime (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, utime);
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " utime (remaining: " KERNEL_UINT_FORMAT ")",
+                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, utime);
 
-            absorbed = remove_exited_child_from_parent(&stime,  &pp->cstime);
+            absorbed = remove_exited_child_from_parent(&stime,  &pp->values[PDF_CSTIME]);
             if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " stime (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, stime);
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " stime (remaining: " KERNEL_UINT_FORMAT ")",
+                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, stime);
 
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-            absorbed = remove_exited_child_from_parent(&gtime,  &pp->cgtime);
+            absorbed = remove_exited_child_from_parent(&gtime,  &pp->values[PDF_CGTIME]);
             if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " gtime (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, gtime);
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " gtime (remaining: " KERNEL_UINT_FORMAT ")",
+                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, gtime);
 #endif
 #endif
 
-            absorbed = remove_exited_child_from_parent(&minflt, &pp->cminflt);
+            absorbed = remove_exited_child_from_parent(&minflt, &pp->values[PDF_CMINFLT]);
             if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " minflt (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, minflt);
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " minflt (remaining: " KERNEL_UINT_FORMAT ")",
+                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, minflt);
 
-            absorbed = remove_exited_child_from_parent(&majflt, &pp->cmajflt);
+            absorbed = remove_exited_child_from_parent(&majflt, &pp->values[PDF_CMAJFLT]);
             if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " majflt (remaining: " KERNEL_UINT_FORMAT ")", pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, majflt);
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " majflt (remaining: " KERNEL_UINT_FORMAT ")",
+                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, majflt);
         }
 
         if(unlikely(utime + stime + gtime + minflt + majflt > 0)) {
@@ -638,19 +647,19 @@ static inline void process_exited_pids() {
                 );
             }
 
-            p->utime_raw   = utime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
-            p->stime_raw   = stime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
+            p->raw[PDF_UTIME]   = utime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
+            p->raw[PDF_STIME]   = stime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-            p->gtime_raw   = gtime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
+            p->raw[PDF_GTIME]   = gtime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
 #endif
-            p->minflt_raw  = minflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
-            p->majflt_raw  = majflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
+            p->raw[PDF_MINFLT]  = minflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
+            p->raw[PDF_MAJFLT]  = majflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-            p->cutime_raw = p->cstime_raw =
+            p->raw[PDF_CUTIME] = p->raw[PDF_CSTIME] =
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-                    p->cgtime_raw =
+                    p->raw[PDF_CGTIME] =
 #endif
-                    p->cminflt_raw = p->cmajflt_raw = 0;
+                    p->raw[PDF_CMINFLT] = p->raw[PDF_CMAJFLT] = 0;
 #endif
 
             debug_log(" ");
@@ -684,15 +693,22 @@ int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 }
 
 int read_proc_pid_status(struct pid_stat *p, void *ptr) {
-    p->status_vmsize           = 0;
-    p->status_vmrss            = 0;
-    p->status_vmshared         = 0;
-    p->status_rssfile          = 0;
-    p->status_rssshmem         = 0;
-    p->status_vmswap           = 0;
-#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
-    p->status_voluntary_ctxt_switches = 0;
-    p->status_nonvoluntary_ctxt_switches = 0;
+    p->values[PDF_VMSIZE]   = 0;
+    p->values[PDF_VMRSS]    = 0;
+    p->values[PDF_VMSHARED] = 0;
+    p->values[PDF_RSSFILE]  = 0;
+    p->values[PDF_RSSSHMEM] = 0;
+
+#if (PROCESSES_HAVE_VMSWAP == 1)
+    p->values[PDF_VMSWAP]   = 0;
+#endif
+
+#if (PROCESSES_HAVE_VOLCTX == 1)
+    p->values[PDF_VOLCTX]   = 0;
+#endif
+
+#if (PROCESSES_HAVE_NVOLCTX == 1)
+    p->values[PDF_NVOLCTX]  = 0;
 #endif
 
     return read_proc_pid_status_per_os(p, ptr) ? 1 : 0;

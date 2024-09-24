@@ -19,16 +19,19 @@
 #if defined(OS_FREEBSD)
 #include <sys/user.h>
 
-#define INIT_PID                            1
-#define ALL_PIDS_ARE_READ_INSTANTLY         1
-#define PROCESSES_HAVE_CPU_GUEST_TIME       0
-#define PROCESSES_HAVE_CPU_CHILDREN_TIME    0
-#define PROCESSES_HAVE_CONTEXT_SWITCHES     0
-#define PROCESSES_HAVE_PHYSICAL_IO          1
-#define PROCESSES_HAVE_LOGICAL_IO           0
-#define PROCESSES_HAVE_IO_CALLS             0
-#define PROCESSES_HAVE_UID                  1
-#define PROCESSES_HAVE_GID                  1
+#define INIT_PID                             1
+#define ALL_PIDS_ARE_READ_INSTANTLY          1
+#define PROCESSES_HAVE_CPU_GUEST_TIME        0
+#define PROCESSES_HAVE_CPU_CHILDREN_TIME     1
+#define PROCESSES_HAVE_VOLCTX                0
+#define PROCESSES_HAVE_NVOLCTX               0
+#define PROCESSES_HAVE_PHYSICAL_IO           1
+#define PROCESSES_HAVE_LOGICAL_IO            0
+#define PROCESSES_HAVE_IO_CALLS              0
+#define PROCESSES_HAVE_UID                   1
+#define PROCESSES_HAVE_GID                   1
+#define PROCESSES_HAVE_MAJFLT                1
+#define PROCESSES_HAVE_VMSWAP                0
 #endif
 
 #if defined(OS_MACOS)
@@ -48,16 +51,19 @@ struct pid_info {
     struct rusage_info_v4 rusageinfo;
 };
 
-#define INIT_PID                            1
-#define ALL_PIDS_ARE_READ_INSTANTLY         1
-#define PROCESSES_HAVE_CPU_GUEST_TIME       1
-#define PROCESSES_HAVE_CPU_CHILDREN_TIME    0
-#define PROCESSES_HAVE_CONTEXT_SWITCHES     0
-#define PROCESSES_HAVE_PHYSICAL_IO          1
-#define PROCESSES_HAVE_LOGICAL_IO           0
-#define PROCESSES_HAVE_IO_CALLS             0
-#define PROCESSES_HAVE_UID                  1
-#define PROCESSES_HAVE_GID                  1
+#define INIT_PID                             1
+#define ALL_PIDS_ARE_READ_INSTANTLY          1
+#define PROCESSES_HAVE_CPU_GUEST_TIME        1
+#define PROCESSES_HAVE_CPU_CHILDREN_TIME     0
+#define PROCESSES_HAVE_VOLCTX                1
+#define PROCESSES_HAVE_NVOLCTX               0
+#define PROCESSES_HAVE_PHYSICAL_IO           1
+#define PROCESSES_HAVE_LOGICAL_IO            0
+#define PROCESSES_HAVE_IO_CALLS              0
+#define PROCESSES_HAVE_UID                   1
+#define PROCESSES_HAVE_GID                   1
+#define PROCESSES_HAVE_MAJFLT                1
+#define PROCESSES_HAVE_VMSWAP                0
 #endif
 
 #if defined(OS_WINDOWS)
@@ -71,29 +77,35 @@ struct perflib_data {
     DWORD pid;
 };
 
-#define INIT_PID                            0
-#define ALL_PIDS_ARE_READ_INSTANTLY         1
-#define PROCESSES_HAVE_CPU_GUEST_TIME       0
-#define PROCESSES_HAVE_CPU_CHILDREN_TIME    0
-#define PROCESSES_HAVE_CONTEXT_SWITCHES     0
-#define PROCESSES_HAVE_PHYSICAL_IO          0
-#define PROCESSES_HAVE_LOGICAL_IO           1
-#define PROCESSES_HAVE_IO_CALLS             1
-#define PROCESSES_HAVE_UID                  0
-#define PROCESSES_HAVE_GID                  0
+#define INIT_PID                             0
+#define ALL_PIDS_ARE_READ_INSTANTLY          1
+#define PROCESSES_HAVE_CPU_GUEST_TIME        0
+#define PROCESSES_HAVE_CPU_CHILDREN_TIME     0
+#define PROCESSES_HAVE_VOLCTX                1
+#define PROCESSES_HAVE_NVOLCTX               0
+#define PROCESSES_HAVE_PHYSICAL_IO           0
+#define PROCESSES_HAVE_LOGICAL_IO            1
+#define PROCESSES_HAVE_IO_CALLS              1
+#define PROCESSES_HAVE_UID                   0
+#define PROCESSES_HAVE_GID                   0
+#define PROCESSES_HAVE_MAJFLT                0
+#define PROCESSES_HAVE_VMSWAP                1
 #endif
 
 #if defined(OS_LINUX)
 #define INIT_PID 1
-#define ALL_PIDS_ARE_READ_INSTANTLY         0
-#define PROCESSES_HAVE_CPU_GUEST_TIME       1
-#define PROCESSES_HAVE_CPU_CHILDREN_TIME    1
-#define PROCESSES_HAVE_CONTEXT_SWITCHES     1
-#define PROCESSES_HAVE_PHYSICAL_IO          1
-#define PROCESSES_HAVE_LOGICAL_IO           1
-#define PROCESSES_HAVE_IO_CALLS             1
-#define PROCESSES_HAVE_UID                  1
-#define PROCESSES_HAVE_GID                  1
+#define ALL_PIDS_ARE_READ_INSTANTLY          0
+#define PROCESSES_HAVE_CPU_GUEST_TIME        1
+#define PROCESSES_HAVE_CPU_CHILDREN_TIME     1
+#define PROCESSES_HAVE_VOLCTX                1
+#define PROCESSES_HAVE_NVOLCTX               1
+#define PROCESSES_HAVE_PHYSICAL_IO           1
+#define PROCESSES_HAVE_LOGICAL_IO            1
+#define PROCESSES_HAVE_IO_CALLS              1
+#define PROCESSES_HAVE_UID                   1
+#define PROCESSES_HAVE_GID                   1
+#define PROCESSES_HAVE_MAJFLT                1
+#define PROCESSES_HAVE_VMSWAP                1
 #endif
 
 // ----------------------------------------------------------------------------
@@ -231,6 +243,70 @@ typedef enum __attribute__((packed)) {
     TARGET_TYPE_TREE,
 } TARGET_TYPE;
 
+typedef enum __attribute__((packed)) {
+    PDF_UTIME, // CPU user time
+    PDF_STIME, // CPU system time
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    PDF_GTIME, // CPU guest time
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+    PDF_CUTIME, // exited children CPU user time
+    PDF_CSTIME, // exited children CPU system time
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    PDF_CGTIME, // exited children CPU guest time
+#endif
+#endif
+
+    PDF_MINFLT,
+
+#if (PROCESSES_HAVE_MAJFLT == 1)
+    PDF_MAJFLT,
+#endif
+
+    PDF_CMINFLT,
+    PDF_CMAJFLT,
+
+    PDF_VMSIZE,     // the current virtual memory used by the process, in bytes
+    PDF_VMRSS,      // the resident memory used by the process, in bytes
+    PDF_VMSHARED,   // the shared memory used by the process, in bytes
+    PDF_RSSFILE,
+    PDF_RSSSHMEM,
+
+#if (PROCESSES_HAVE_VMSWAP == 1)
+    PDF_VMSWAP,     // the swap memory used by the process, in bytes
+#endif
+
+#if (PROCESSES_HAVE_VOLCTX == 1)
+    PDF_VOLCTX,
+#endif
+
+#if (PROCESSES_HAVE_NVOLCTX == 1)
+    PDF_NVOLCTX,
+#endif
+
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+    PDF_LREAD,      // logical read bytes
+    PDF_LWRITE,     // logical write bytes
+#endif
+
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+    PDF_PREAD,      // physical read bytes
+    PDF_PWRITE,     // physical write bytes
+#endif
+
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+    PDF_CREAD,      // read calls
+    PDF_CWRITE,     // write calls
+#endif
+
+    PDF_UPTIME,
+    PDF_THREADS,
+    PDF_PROCESSES,  // the number of processes
+
+    // terminator
+    PDF_MAX
+} PID_FIELD;
+
 struct target {
     STRING *id;
     STRING *name;
@@ -248,54 +324,9 @@ struct target {
 #endif
     };
 
-    kernel_uint_t minflt;
-    kernel_uint_t cminflt;
-    kernel_uint_t majflt;
-    kernel_uint_t cmajflt;
-
-    kernel_uint_t utime;
-    kernel_uint_t stime;
-
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    kernel_uint_t gtime;
-#endif
-#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-    kernel_uint_t cutime;
-    kernel_uint_t cstime;
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    kernel_uint_t cgtime;
-#endif
-#endif
-
-    kernel_uint_t num_threads;
-    // kernel_uint_t rss;
-
-    kernel_uint_t status_vmsize;
-    kernel_uint_t status_vmrss;
-    kernel_uint_t status_vmshared;
-    kernel_uint_t status_rssfile;
-    kernel_uint_t status_rssshmem;
-    kernel_uint_t status_vmswap;
-    kernel_uint_t status_voluntary_ctxt_switches;
-    kernel_uint_t status_nonvoluntary_ctxt_switches;
-
-#if (PROCESSES_HAVE_LOGICAL_IO == 1)
-    kernel_uint_t io_logical_bytes_read;
-    kernel_uint_t io_logical_bytes_written;
-#endif
-
-#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-    kernel_uint_t io_storage_bytes_read;
-    kernel_uint_t io_storage_bytes_written;
-#endif
-
-#if (PROCESSES_HAVE_IO_CALLS == 1)
-    kernel_uint_t io_read_calls;
-    kernel_uint_t io_write_calls;
-#endif
+    kernel_uint_t values[PDF_MAX];
 
     kernel_uint_t uptime_min;
-    kernel_uint_t uptime_sum;
     kernel_uint_t uptime_max;
 
     struct openfds openfds;
@@ -305,7 +336,6 @@ struct target {
     int *target_fds;
     uint32_t target_fds_size;
 
-    uint32_t processes;     // how many processes have been merged to this
     bool is_other:1;
     bool exposed:1;         // if set, we have sent this to netdata
     bool hidden:1;          // if set, we set the hidden flag on the dimension
@@ -401,61 +431,8 @@ struct pid_stat {
     STRING *comm;
     STRING *cmdline;
 
-    kernel_uint_t utime_raw;
-    kernel_uint_t stime_raw;
-    kernel_uint_t utime;        // user CPU time
-    kernel_uint_t stime;        // system CPU time
-
-#if(PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    kernel_uint_t gtime_raw;
-    kernel_uint_t gtime;
-#endif
-
-#if(PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-    kernel_uint_t cutime_raw;
-    kernel_uint_t cstime_raw;
-    kernel_uint_t cutime;
-    kernel_uint_t cstime;
-#if(PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    kernel_uint_t cgtime_raw;
-    kernel_uint_t cgtime;
-#endif
-#endif
-
-    kernel_uint_t minflt_raw;
-    kernel_uint_t cminflt_raw;
-    kernel_uint_t majflt_raw;
-    kernel_uint_t cmajflt_raw;
-    kernel_uint_t minflt;
-    kernel_uint_t cminflt;
-    kernel_uint_t majflt;
-    kernel_uint_t cmajflt;
-
-    // int64_t priority;
-    // int64_t nice;
-    int32_t num_threads;
-    // int64_t itrealvalue;
-    // kernel_uint_t collected_starttime;
-    // kernel_uint_t vsize;
-    // kernel_uint_t rss;
-    // kernel_uint_t rsslim;
-    // kernel_uint_t starcode;
-    // kernel_uint_t endcode;
-    // kernel_uint_t startstack;
-    // kernel_uint_t kstkesp;
-    // kernel_uint_t kstkeip;
-    // uint64_t signal;
-    // uint64_t blocked;
-    // uint64_t sigignore;
-    // uint64_t sigcatch;
-    // uint64_t wchan;
-    // uint64_t nswap;
-    // uint64_t cnswap;
-    // int32_t exit_signal;
-    // int32_t processor;
-    // uint32_t rt_priority;
-    // uint32_t policy;
-    // kernel_uint_t delayacct_blkio_ticks;
+    kernel_uint_t raw[PDF_MAX];
+    kernel_uint_t values[PDF_MAX];
 
 #if (PROCESSES_HAVE_UID == 1)
     uid_t uid;
@@ -469,46 +446,9 @@ struct pid_stat {
                         // each process gets a unique number (non-sequential though)
 #endif
 
-#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
-    kernel_uint_t status_voluntary_ctxt_switches_raw;
-    kernel_uint_t status_nonvoluntary_ctxt_switches_raw;
-    kernel_uint_t status_voluntary_ctxt_switches;
-    kernel_uint_t status_nonvoluntary_ctxt_switches;
-#endif
-
-    kernel_uint_t status_vmsize;
-    kernel_uint_t status_vmrss;
-    kernel_uint_t status_vmshared;
-    kernel_uint_t status_rssfile;
-    kernel_uint_t status_rssshmem;
-    kernel_uint_t status_vmswap;
-
 #if defined(OS_LINUX)
     ARL_BASE *status_arl;
 #endif
-
-#if (PROCESSES_HAVE_LOGICAL_IO == 1)
-    kernel_uint_t io_logical_bytes_read_raw;
-    kernel_uint_t io_logical_bytes_written_raw;
-    kernel_uint_t io_logical_bytes_read;
-    kernel_uint_t io_logical_bytes_written;
-#endif
-
-#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-    kernel_uint_t io_storage_bytes_read_raw;
-    kernel_uint_t io_storage_bytes_written_raw;
-    kernel_uint_t io_storage_bytes_read;
-    kernel_uint_t io_storage_bytes_written;
-#endif
-
-#if (PROCESSES_HAVE_IO_CALLS == 1)
-    kernel_uint_t io_read_calls_raw;
-    kernel_uint_t io_write_calls_raw;
-    kernel_uint_t io_read_calls;
-    kernel_uint_t io_write_calls;
-#endif
-
-    kernel_uint_t uptime;
 
     struct openfds openfds;
     struct pid_limits limits;

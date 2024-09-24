@@ -195,15 +195,19 @@ void function_processes(const char *transaction, char *function,
     unsigned long long
         Processes_max = 0
         , Threads_max = 0
-#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
+#if (PROCESSES_HAVE_VOLCTX == 1)
         , VoluntaryCtxtSwitches_max = 0
+#endif
+#if (PROCESSES_HAVE_NVOLCTX == 1)
         , NonVoluntaryCtxtSwitches_max = 0
 #endif
         , Uptime_max = 0
         , MinFlt_max = 0
         , CMinFlt_max = 0
         , TMinFlt_max = 0
+#if (PROCESSES_HAVE_MAJFLT == 1)
         , MajFlt_max = 0
+#endif
         , CMajFlt_max = 0
         , TMajFlt_max = 0
 #if (PROCESSES_HAVE_LOGICAL_IO == 1)
@@ -305,73 +309,79 @@ void function_processes(const char *transaction, char *function,
 #endif
 
         // CPU utilization %
-        kernel_uint_t total_cpu = p->utime + p->stime;
+        kernel_uint_t total_cpu = p->values[PDF_UTIME] + p->values[PDF_STIME];
+
 #if (PROCESSES_HAVE_CPU_GUEST_TIME)
-        total_cpu += p->gtime;
+        total_cpu += p->values[PDF_GTIME];
 #endif
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME)
-        total_cpu += p->cutime + p->cstime;
+        total_cpu += p->values[PDF_CUTIME] + p->values[PDF_CSTIME];
 #if (PROCESSES_HAVE_CPU_GUEST_TIME)
-        total_cpu += p->cgtime;
+        total_cpu += p->values[PDF_CGTIME];
 #endif
 #endif
         add_value_field_ndd_with_max(wb, CPU, (NETDATA_DOUBLE)(total_cpu) / cpu_divisor);
-        add_value_field_ndd_with_max(wb, UserCPU, (NETDATA_DOUBLE)(p->utime) / cpu_divisor);
-        add_value_field_ndd_with_max(wb, SysCPU, (NETDATA_DOUBLE)(p->stime) / cpu_divisor);
+        add_value_field_ndd_with_max(wb, UserCPU, (NETDATA_DOUBLE)(p->values[PDF_UTIME]) / cpu_divisor);
+        add_value_field_ndd_with_max(wb, SysCPU, (NETDATA_DOUBLE)(p->values[PDF_STIME]) / cpu_divisor);
 #if (PROCESSES_HAVE_CPU_GUEST_TIME)
-        add_value_field_ndd_with_max(wb, GuestCPU, (NETDATA_DOUBLE)(p->gtime) / cpu_divisor);
+        add_value_field_ndd_with_max(wb, GuestCPU, (NETDATA_DOUBLE)(p->values[PDF_GTIME]) / cpu_divisor);
 #endif
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME)
-        add_value_field_ndd_with_max(wb, CUserCPU, (NETDATA_DOUBLE)(p->cutime) / cpu_divisor);
-        add_value_field_ndd_with_max(wb, CSysCPU, (NETDATA_DOUBLE)(p->cstime) / cpu_divisor);
+        add_value_field_ndd_with_max(wb, CUserCPU, (NETDATA_DOUBLE)(p->values[PDF_CUTIME]) / cpu_divisor);
+        add_value_field_ndd_with_max(wb, CSysCPU, (NETDATA_DOUBLE)(p->values[PDF_CSTIME]) / cpu_divisor);
 #if (PROCESSES_HAVE_CPU_GUEST_TIME)
-        add_value_field_ndd_with_max(wb, CGuestCPU, (NETDATA_DOUBLE)(p->cgtime) / cpu_divisor);
+        add_value_field_ndd_with_max(wb, CGuestCPU, (NETDATA_DOUBLE)(p->values[PDF_CGTIME]) / cpu_divisor);
 #endif
 #endif
 
-#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
-        add_value_field_llu_with_max(wb, VoluntaryCtxtSwitches, p->status_voluntary_ctxt_switches / RATES_DETAIL);
-        add_value_field_llu_with_max(wb, NonVoluntaryCtxtSwitches, p->status_nonvoluntary_ctxt_switches / RATES_DETAIL);
+#if (PROCESSES_HAVE_VOLCTX == 1)
+        add_value_field_llu_with_max(wb, VoluntaryCtxtSwitches, p->values[PDF_VOLCTX] / RATES_DETAIL);
+#endif
+#if (PROCESSES_HAVE_NVOLCTX == 1)
+        add_value_field_llu_with_max(wb, NonVoluntaryCtxtSwitches, p->values[PDF_NVOLCTX] / RATES_DETAIL);
 #endif
 
         // memory MiB
         if(MemTotal)
-            add_value_field_ndd_with_max(wb, Memory, (NETDATA_DOUBLE)p->status_vmrss * 100.0 / (NETDATA_DOUBLE)MemTotal);
+            add_value_field_ndd_with_max(wb, Memory, (NETDATA_DOUBLE)p->values[PDF_VMRSS] * 100.0 / (NETDATA_DOUBLE)MemTotal);
 
-        add_value_field_ndd_with_max(wb, RSS, (NETDATA_DOUBLE)p->status_vmrss / memory_divisor);
-        add_value_field_ndd_with_max(wb, Shared, (NETDATA_DOUBLE)p->status_vmshared / memory_divisor);
-#if defined(OS_LINUX) || defined(OS_FREEBSD)
-        add_value_field_ndd_with_max(wb, VMSize, (NETDATA_DOUBLE)p->status_vmsize / memory_divisor);
+        add_value_field_ndd_with_max(wb, RSS, (NETDATA_DOUBLE)p->values[PDF_VMRSS] / memory_divisor);
+        add_value_field_ndd_with_max(wb, Shared, (NETDATA_DOUBLE)p->values[PDF_VMSHARED] / memory_divisor);
+        add_value_field_ndd_with_max(wb, VMSize, (NETDATA_DOUBLE)p->values[PDF_VMSIZE] / memory_divisor);
+#if (PROCESSES_HAVE_VMSWAP == 1)
+        add_value_field_ndd_with_max(wb, Swap, (NETDATA_DOUBLE)p->values[PDF_VMSWAP] / memory_divisor);
 #endif
-        add_value_field_ndd_with_max(wb, Swap, (NETDATA_DOUBLE)p->status_vmswap / memory_divisor);
 
 #if (PROCESSES_HAVE_PHYSICAL_IO == 1)
         // Physical I/O
-        add_value_field_llu_with_max(wb, PReads, p->io_storage_bytes_read / io_divisor);
-        add_value_field_llu_with_max(wb, PWrites, p->io_storage_bytes_written / io_divisor);
+        add_value_field_llu_with_max(wb, PReads, p->values[PDF_PREAD] / io_divisor);
+        add_value_field_llu_with_max(wb, PWrites, p->values[PDF_PWRITE] / io_divisor);
 #endif
 
 #if (PROCESSES_HAVE_LOGICAL_IO == 1)
         // Logical I/O
-        add_value_field_llu_with_max(wb, LReads, p->io_logical_bytes_read / io_divisor);
-        add_value_field_llu_with_max(wb, LWrites, p->io_logical_bytes_written / io_divisor);
+        add_value_field_llu_with_max(wb, LReads, p->values[PDF_LREAD] / io_divisor);
+        add_value_field_llu_with_max(wb, LWrites, p->values[PDF_LWRITE] / io_divisor);
 #endif
 
 #if (PROCESSES_HAVE_IO_CALLS == 1)
         // I/O calls
-        add_value_field_llu_with_max(wb, RCalls, p->io_read_calls / RATES_DETAIL);
-        add_value_field_llu_with_max(wb, WCalls, p->io_write_calls / RATES_DETAIL);
+        add_value_field_llu_with_max(wb, RCalls, p->values[PDF_CREAD] / RATES_DETAIL);
+        add_value_field_llu_with_max(wb, WCalls, p->values[PDF_CWRITE] / RATES_DETAIL);
 #endif
 
         // minor page faults
-        add_value_field_llu_with_max(wb, MinFlt, p->minflt / RATES_DETAIL);
-        add_value_field_llu_with_max(wb, CMinFlt, p->cminflt / RATES_DETAIL);
-        add_value_field_llu_with_max(wb, TMinFlt, (p->minflt + p->cminflt) / RATES_DETAIL);
+        add_value_field_llu_with_max(wb, MinFlt, p->values[PDF_MINFLT] / RATES_DETAIL);
+        add_value_field_llu_with_max(wb, CMinFlt, p->values[PDF_CMINFLT] / RATES_DETAIL);
+        add_value_field_llu_with_max(wb, TMinFlt, (p->values[PDF_MINFLT] + p->values[PDF_CMINFLT]) / RATES_DETAIL);
 
+#if (PROCESSES_HAVE_MAJFLT == 1)
         // major page faults
-        add_value_field_llu_with_max(wb, MajFlt, p->majflt / RATES_DETAIL);
-        add_value_field_llu_with_max(wb, CMajFlt, p->cmajflt / RATES_DETAIL);
-        add_value_field_llu_with_max(wb, TMajFlt, (p->majflt + p->cmajflt) / RATES_DETAIL);
+        add_value_field_llu_with_max(wb, MajFlt, p->values[PDF_MAJFLT] / RATES_DETAIL);
+#endif
+
+        add_value_field_llu_with_max(wb, CMajFlt, p->values[PDF_CMAJFLT] / RATES_DETAIL);
+        add_value_field_llu_with_max(wb, TMajFlt, (p->values[PDF_MAJFLT] + p->values[PDF_CMAJFLT]) / RATES_DETAIL);
 
         // open file descriptors
         add_value_field_ndd_with_max(wb, FDsLimitPercent, p->openfds_limits_percent);
@@ -386,11 +396,10 @@ void function_processes(const char *transaction, char *function,
         add_value_field_llu_with_max(wb, EvPollFDs, p->openfds.eventpolls);
         add_value_field_llu_with_max(wb, OtherFDs, p->openfds.other);
 
-
         // processes, threads, uptime
         add_value_field_llu_with_max(wb, Processes, p->children_count);
-        add_value_field_llu_with_max(wb, Threads, p->num_threads);
-        add_value_field_llu_with_max(wb, Uptime, p->uptime);
+        add_value_field_llu_with_max(wb, Threads, p->values[PDF_THREADS]);
+        add_value_field_llu_with_max(wb, Uptime, p->values[PDF_UPTIME]);
 
         buffer_json_array_close(wb); // for each pid
     }
@@ -506,13 +515,15 @@ void function_processes(const char *transaction, char *function,
 #endif
 #endif
 
-#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
+#if (PROCESSES_HAVE_VOLCTX == 1)
         // CPU context switches
         buffer_rrdf_table_add_field(wb, field_id++, "vCtxSwitch", "Voluntary Context Switches",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "switches/s",
                                     VoluntaryCtxtSwitches_max, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+#if (PROCESSES_HAVE_NVOLCTX == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "iCtxSwitch", "Involuntary Context Switches",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "switches/s",
@@ -539,19 +550,20 @@ void function_processes(const char *transaction, char *function,
                                     "MiB", Shared_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
-#if defined(OS_LINUX) || defined(OS_FREEBSD)
         buffer_rrdf_table_add_field(wb, field_id++, "Virtual", "Virtual Memory Size", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 2, "MiB", VMSize_max, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
-#endif
+
+#if (PROCESSES_HAVE_VMSWAP == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "Swap", "Swap Memory", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
                                     "MiB",
                                     Swap_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+#endif
 
 #if (PROCESSES_HAVE_PHYSICAL_IO == 1)
         // Physical I/O
@@ -615,6 +627,7 @@ void function_processes(const char *transaction, char *function,
                                     NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
+#if (PROCESSES_HAVE_MAJFLT == 1)
         // major page faults
         buffer_rrdf_table_add_field(wb, field_id++, "MajFlt", "Major Page Faults/s", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR,
@@ -622,6 +635,8 @@ void function_processes(const char *transaction, char *function,
                                     2, "pgflts/s", MajFlt_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+
         buffer_rrdf_table_add_field(wb, field_id++, "CMajFlt", "Children Major Page Faults/s",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR,
@@ -740,15 +755,19 @@ void function_processes(const char *transaction, char *function,
         }
         buffer_json_object_close(wb);
 
-#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
+#if (PROCESSES_HAVE_VOLCTX == 1) || (PROCESSES_HAVE_NVOLCTX == 1)
         buffer_json_member_add_object(wb, "CPUCtxSwitches");
         {
             buffer_json_member_add_string(wb, "name", "CPU Context Switches");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
+#if (PROCESSES_HAVE_VOLCTX == 1)
                 buffer_json_add_array_item_string(wb, "vCtxSwitch");
+#endif
+#if (PROCESSES_HAVE_NVOLCTX == 1)
                 buffer_json_add_array_item_string(wb, "iCtxSwitch");
+#endif
             }
             buffer_json_array_close(wb);
         }

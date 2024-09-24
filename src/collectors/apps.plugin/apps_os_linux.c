@@ -228,12 +228,12 @@ bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) goto cleanup;
 
-    pid_incremental_rate(io, p->io_logical_bytes_read,       str2kernel_uint_t(procfile_lineword(ff, 0,  1)));
-    pid_incremental_rate(io, p->io_logical_bytes_written,    str2kernel_uint_t(procfile_lineword(ff, 1,  1)));
-    pid_incremental_rate(io, p->io_read_calls,               str2kernel_uint_t(procfile_lineword(ff, 2,  1)));
-    pid_incremental_rate(io, p->io_write_calls,              str2kernel_uint_t(procfile_lineword(ff, 3,  1)));
-    pid_incremental_rate(io, p->io_storage_bytes_read,       str2kernel_uint_t(procfile_lineword(ff, 4,  1)));
-    pid_incremental_rate(io, p->io_storage_bytes_written,    str2kernel_uint_t(procfile_lineword(ff, 5,  1)));
+    pid_incremental_rate(io, p->values[PDF_LREAD],     str2kernel_uint_t(procfile_lineword(ff, 0,  1)));
+    pid_incremental_rate(io, p->values[PDF_LWRITE],    str2kernel_uint_t(procfile_lineword(ff, 1,  1)));
+    pid_incremental_rate(io, p->values[PDF_CREAD],     str2kernel_uint_t(procfile_lineword(ff, 2,  1)));
+    pid_incremental_rate(io, p->values[PDF_CWRITE],    str2kernel_uint_t(procfile_lineword(ff, 3,  1)));
+    pid_incremental_rate(io, p->values[PDF_PREAD],     str2kernel_uint_t(procfile_lineword(ff, 4,  1)));
+    pid_incremental_rate(io, p->values[PDF_PWRITE],    str2kernel_uint_t(procfile_lineword(ff, 5,  1)));
 
     return true;
 
@@ -412,7 +412,7 @@ void arl_callback_status_vmsize(const char *name, uint32_t hash, const char *val
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->status_vmsize = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
+    aptr->p->values[PDF_VMSIZE] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
 
 void arl_callback_status_vmswap(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -420,7 +420,7 @@ void arl_callback_status_vmswap(const char *name, uint32_t hash, const char *val
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->status_vmswap = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
+    aptr->p->values[PDF_VMSWAP] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
 
 void arl_callback_status_vmrss(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -428,7 +428,7 @@ void arl_callback_status_vmrss(const char *name, uint32_t hash, const char *valu
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->status_vmrss = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
+    aptr->p->values[PDF_VMRSS] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
 
 void arl_callback_status_rssfile(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -436,7 +436,7 @@ void arl_callback_status_rssfile(const char *name, uint32_t hash, const char *va
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->status_rssfile = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
+    aptr->p->values[PDF_RSSFILE] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
 
 void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -444,7 +444,7 @@ void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *v
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->status_rssshmem = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
+    aptr->p->values[PDF_RSSSHMEM] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
 
 void arl_callback_status_voluntary_ctxt_switches(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -453,7 +453,7 @@ void arl_callback_status_voluntary_ctxt_switches(const char *name, uint32_t hash
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 2)) return;
 
     struct pid_stat *p = aptr->p;
-    pid_incremental_rate(stat, p->status_voluntary_ctxt_switches, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
+    pid_incremental_rate(stat, p->values[PDF_VOLCTX], str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
 }
 
 void arl_callback_status_nonvoluntary_ctxt_switches(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -462,7 +462,7 @@ void arl_callback_status_nonvoluntary_ctxt_switches(const char *name, uint32_t h
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 2)) return;
 
     struct pid_stat *p = aptr->p;
-    pid_incremental_rate(stat, p->status_nonvoluntary_ctxt_switches, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
+    pid_incremental_rate(stat, p->values[PDF_NVOLCTX], str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
 }
 
 bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
@@ -511,10 +511,7 @@ bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
                                procfile_lineword(ff, l, 1)))) break;
     }
 
-    p->status_vmshared = p->status_rssfile + p->status_rssshmem;
-
-    // debug_log("%s uid %d, gid %d, VmSize %zu, VmRSS %zu, RssFile %zu, RssShmem %zu, shared %zu", p->comm, (int)p->uid, (int)p->gid, p->status_vmsize, p->status_vmrss, p->status_rssfile, p->status_rssshmem, p->status_vmshared);
-
+    p->values[PDF_VMSHARED] = p->values[PDF_RSSFILE] + p->values[PDF_RSSSHMEM];
     return true;
 }
 
@@ -637,20 +634,20 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
 
     update_pid_comm(p, comm);
 
-    pid_incremental_rate(stat, p->minflt,  str2kernel_uint_t(procfile_lineword(ff, 0,  9)));
-    pid_incremental_rate(stat, p->cminflt, str2kernel_uint_t(procfile_lineword(ff, 0, 10)));
-    pid_incremental_rate(stat, p->majflt,  str2kernel_uint_t(procfile_lineword(ff, 0, 11)));
-    pid_incremental_rate(stat, p->cmajflt, str2kernel_uint_t(procfile_lineword(ff, 0, 12)));
-    pid_incremental_rate(stat, p->utime,   str2kernel_uint_t(procfile_lineword(ff, 0, 13)));
-    pid_incremental_rate(stat, p->stime,   str2kernel_uint_t(procfile_lineword(ff, 0, 14)));
-    pid_incremental_rate(stat, p->cutime,  str2kernel_uint_t(procfile_lineword(ff, 0, 15)));
-    pid_incremental_rate(stat, p->cstime,  str2kernel_uint_t(procfile_lineword(ff, 0, 16)));
+    pid_incremental_rate(stat, p->values[PDF_MINFLT],  str2kernel_uint_t(procfile_lineword(ff, 0,  9)));
+    pid_incremental_rate(stat, p->values[PDF_CMINFLT], str2kernel_uint_t(procfile_lineword(ff, 0, 10)));
+    pid_incremental_rate(stat, p->values[PDF_MAJFLT],  str2kernel_uint_t(procfile_lineword(ff, 0, 11)));
+    pid_incremental_rate(stat, p->values[PDF_CMAJFLT], str2kernel_uint_t(procfile_lineword(ff, 0, 12)));
+    pid_incremental_rate(stat, p->values[PDF_UTIME],   str2kernel_uint_t(procfile_lineword(ff, 0, 13)));
+    pid_incremental_rate(stat, p->values[PDF_STIME],   str2kernel_uint_t(procfile_lineword(ff, 0, 14)));
+    pid_incremental_rate(stat, p->values[PDF_CUTIME],  str2kernel_uint_t(procfile_lineword(ff, 0, 15)));
+    pid_incremental_rate(stat, p->values[PDF_CSTIME],  str2kernel_uint_t(procfile_lineword(ff, 0, 16)));
     // p->priority      = str2kernel_uint_t(procfile_lineword(ff, 0, 17));
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
-    p->num_threads      = (int32_t) str2uint32_t(procfile_lineword(ff, 0, 19), NULL);
+    p->values[PDF_THREADS] = (int32_t) str2uint32_t(procfile_lineword(ff, 0, 19), NULL);
     // p->itrealvalue   = str2kernel_uint_t(procfile_lineword(ff, 0, 20));
     kernel_uint_t collected_starttime = str2kernel_uint_t(procfile_lineword(ff, 0, 21)) / system_hz;
-    p->uptime           = (system_uptime_secs > collected_starttime)?(system_uptime_secs - collected_starttime):0;
+    p->values[PDF_UPTIME] = (system_uptime_secs > collected_starttime)?(system_uptime_secs - collected_starttime):0;
     // p->vsize         = str2kernel_uint_t(procfile_lineword(ff, 0, 22));
     // p->rss           = str2kernel_uint_t(procfile_lineword(ff, 0, 23));
     // p->rsslim        = str2kernel_uint_t(procfile_lineword(ff, 0, 24));
@@ -673,19 +670,28 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     // p->delayacct_blkio_ticks = str2kernel_uint_t(procfile_lineword(ff, 0, 41));
 
     if(enable_guest_charts) {
-        pid_incremental_rate(stat, p->gtime,  str2kernel_uint_t(procfile_lineword(ff, 0, 42)));
-        pid_incremental_rate(stat, p->cgtime, str2kernel_uint_t(procfile_lineword(ff, 0, 43)));
+        pid_incremental_rate(stat, p->values[PDF_GTIME],  str2kernel_uint_t(procfile_lineword(ff, 0, 42)));
+        pid_incremental_rate(stat, p->values[PDF_CGTIME], str2kernel_uint_t(procfile_lineword(ff, 0, 43)));
 
-        if (show_guest_time || p->gtime || p->cgtime) {
-            p->utime -= (p->utime >= p->gtime) ? p->gtime : p->utime;
-            p->cutime -= (p->cutime >= p->cgtime) ? p->cgtime : p->cutime;
+        if (show_guest_time || p->values[PDF_GTIME] || p->values[PDF_CGTIME]) {
+            p->values[PDF_UTIME] -= (p->values[PDF_UTIME] >= p->values[PDF_GTIME]) ? p->values[PDF_GTIME] : p->values[PDF_UTIME];
+            p->values[PDF_CUTIME] -= (p->values[PDF_CUTIME] >= p->values[PDF_CGTIME]) ? p->values[PDF_CGTIME] : p->values[PDF_CUTIME];
             show_guest_time = true;
         }
     }
 
     if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
         debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d",
-                      netdata_configured_host_prefix, p->pid, pid_stat_comm(p), (p->target)?string2str(p->target->name):"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+                      netdata_configured_host_prefix, p->pid, pid_stat_comm(p), (p->target)?string2str(p->target->name):"UNSET", p->stat_collected_usec - p->last_stat_collected_usec,
+                      p->values[PDF_UTIME],
+                      p->values[PDF_STIME],
+                      p->values[PDF_CUTIME],
+                      p->values[PDF_CSTIME],
+                      p->values[PDF_MINFLT],
+                      p->values[PDF_MAJFLT],
+                      p->values[PDF_CMINFLT],
+                      p->values[PDF_CMAJFLT],
+                      p->values[PDF_THREADS]);
 
     if(unlikely(global_iterations_counter == 1))
         clear_pid_stat(p, false);

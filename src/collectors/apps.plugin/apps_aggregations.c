@@ -128,51 +128,11 @@ static size_t zero_all_targets(struct target *root) {
     for (w = root; w ; w = w->next) {
         count++;
 
-        w->minflt = 0;
-        w->majflt = 0;
-        w->cminflt = 0;
-        w->cmajflt = 0;
+        for(size_t f = 0; f < PDF_MAX ;f++)
+            w->values[f] = 0;
 
-        w->utime = 0;
-        w->stime = 0;
-
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        w->gtime = 0;
-#endif
-
-#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-        w->cutime = 0;
-        w->cstime = 0;
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        w->cgtime = 0;
-#endif
-#endif
-
-        w->num_threads = 0;
-        // w->rss = 0;
-        w->processes = 0;
-
-        w->status_vmsize = 0;
-        w->status_vmrss = 0;
-        w->status_vmshared = 0;
-        w->status_rssfile = 0;
-        w->status_rssshmem = 0;
-        w->status_vmswap = 0;
-        w->status_voluntary_ctxt_switches = 0;
-        w->status_nonvoluntary_ctxt_switches = 0;
-
-#if (PROCESSES_HAVE_LOGICAL_IO == 1)
-        w->io_logical_bytes_read = 0;
-        w->io_logical_bytes_written = 0;
-#endif
-#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-        w->io_storage_bytes_read = 0;
-        w->io_storage_bytes_written = 0;
-#endif
-#if (PROCESSES_HAVE_IO_CALLS == 1)
-        w->io_read_calls = 0;
-        w->io_write_calls = 0;
-#endif
+        w->uptime_min = 0;
+        w->uptime_max = 0;
 
         // zero file counters
         if(w->target_fds) {
@@ -189,10 +149,6 @@ static size_t zero_all_targets(struct target *root) {
 
             w->max_open_files_percent = 0.0;
         }
-
-        w->uptime_min = 0;
-        w->uptime_sum = 0;
-        w->uptime_max = 0;
 
         if(unlikely(w->root_pid)) {
             struct pid_on_target *pid_on_target = w->root_pid;
@@ -226,58 +182,11 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     if(p->openfds_limits_percent > w->max_open_files_percent)
         w->max_open_files_percent = p->openfds_limits_percent;
 
-    w->utime  += p->utime;
-    w->stime  += p->stime;
+    for(size_t f = 0; f < PDF_MAX ;f++)
+        w->values[f] += p->values[f];
 
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    w->gtime  += p->gtime;
-#endif
-
-#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-    w->cutime  += p->cutime;
-    w->cstime  += p->cstime;
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    w->cgtime  += p->cgtime;
-#endif
-#endif
-
-    w->minflt += p->minflt;
-    w->majflt += p->majflt;
-    w->cminflt += p->cminflt;
-    w->cmajflt += p->cmajflt;
-
-    // w->rss += p->rss;
-
-    w->status_vmsize   += p->status_vmsize;
-    w->status_vmrss    += p->status_vmrss;
-    w->status_vmshared += p->status_vmshared;
-    w->status_rssfile  += p->status_rssfile;
-    w->status_rssshmem += p->status_rssshmem;
-    w->status_vmswap   += p->status_vmswap;
-#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
-    w->status_voluntary_ctxt_switches += p->status_voluntary_ctxt_switches;
-    w->status_nonvoluntary_ctxt_switches += p->status_nonvoluntary_ctxt_switches;
-#endif
-
-#if (PROCESSES_HAVE_LOGICAL_IO == 1)
-    w->io_logical_bytes_read    += p->io_logical_bytes_read;
-    w->io_logical_bytes_written += p->io_logical_bytes_written;
-#endif
-#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-    w->io_storage_bytes_read    += p->io_storage_bytes_read;
-    w->io_storage_bytes_written += p->io_storage_bytes_written;
-#endif
-#if (PROCESSES_HAVE_IO_CALLS == 1)
-    w->io_read_calls            += p->io_read_calls;
-    w->io_write_calls           += p->io_write_calls;
-#endif
-
-    w->processes++;
-    w->num_threads += p->num_threads;
-
-    if(!w->uptime_min || p->uptime < w->uptime_min) w->uptime_min = p->uptime;
-    if(!w->uptime_max || w->uptime_max < p->uptime) w->uptime_max = p->uptime;
-    w->uptime_sum += p->uptime;
+    if(!w->uptime_min || p->values[PDF_UPTIME] < w->uptime_min) w->uptime_min = p->values[PDF_UPTIME];
+    if(!w->uptime_max || w->uptime_max < p->values[PDF_UPTIME]) w->uptime_max = p->values[PDF_UPTIME];
 
     if(unlikely(debug_enabled || w->debug_enabled)) {
         struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
