@@ -359,6 +359,28 @@ uint32_t facets_rows(FACETS *facets) {
     return facets->items_to_return;
 }
 
+static const char *facets_key_id(FACET_KEY *k) {
+    if(k->facets->options & FACETS_OPTION_HASH_IDS)
+        return hash_to_static_string(k->hash);
+    else
+        return k->name ? k->name : hash_to_static_string(k->hash);
+}
+
+static const char *facets_key_value_id(FACET_KEY *k, FACET_VALUE *v) {
+    if(k->facets->options & FACETS_OPTION_HASH_IDS)
+        return hash_to_static_string(v->hash);
+    else
+        return v->name ? v->name : hash_to_static_string(v->hash);
+}
+
+void facets_use_hashes_for_ids(FACETS *facets, bool set) {
+    netdata_log_info("FACETS_OPTION_HASH_IDS = %s", set ? "true" : "false");
+    if(set)
+        facets->options |= FACETS_OPTION_HASH_IDS;
+    else
+        facets->options &= ~(FACETS_OPTION_HASH_IDS);
+}
+
 // ----------------------------------------------------------------------------
 
 static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);
@@ -2346,7 +2368,7 @@ void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool w
                 if (!k->values.enabled)
                     continue;
 
-                buffer_json_add_array_item_string(wb, hash_to_static_string(k->hash));
+                buffer_json_add_array_item_string(wb, facets_key_id(k));
             }
             foreach_key_in_facets_done(k);
         }
@@ -2526,8 +2548,8 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
     return ret;
 }
 
-void facets_table_config(BUFFER *wb) {
-    buffer_json_member_add_boolean(wb, "show_ids", false);   // do not show the column ids to the user
+void facets_table_config(FACETS *facets, BUFFER *wb) {
+    buffer_json_member_add_boolean(wb, "show_ids", (facets->options & FACETS_OPTION_HASH_IDS) ? false : true);
     buffer_json_member_add_boolean(wb, "has_history", true); // enable date-time picker with after-before
 
     buffer_json_member_add_object(wb, "pagination");
@@ -2543,8 +2565,9 @@ void facets_table_config(BUFFER *wb) {
 void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry) {
     facets->report.used_hashes_registry = used_hashes_registry;
 
+    facets_table_config(facets, wb);
+
     if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
-        facets_table_config(wb);
         facets_accepted_parameters_to_json_array(facets, wb, true);
     }
 
@@ -2577,7 +2600,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                 buffer_json_add_array_item_object(wb); // key
                 {
                     buffer_json_member_add_string(
-                        wb, "id", hash_to_static_string(k->hash));
+                        wb, "id", facets_key_id(k));
 
                     buffer_json_member_add_string(
                         wb, "name",
@@ -2600,7 +2623,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
 
                             buffer_json_add_array_item_object(wb);
                             {
-                                buffer_json_member_add_string(wb, "id", hash_to_static_string(v->hash));
+                                buffer_json_member_add_string(wb, "id", facets_key_value_id(k, v));
 
                                 facets_key_value_transformed(facets, k, v, tb, FACETS_TRANSFORM_FACET);
                                 buffer_json_member_add_string(wb, "name", buffer_tostring(tb));
@@ -2673,11 +2696,11 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                     if (k->options & FACET_KEY_OPTION_PRETTY_XML)
                         transform = RRDF_FIELD_TRANSFORM_XML;
 
-                    const char *hash_str = hash_to_static_string(k->hash);
+                    const char *key_id = facets_key_id(k);
 
                     buffer_rrdf_table_add_field(
                             wb, field_id++,
-                            hash_str, k->name ? k->name : hash_str,
+                            key_id, k->name ? k->name : key_id,
                             RRDF_FIELD_TYPE_STRING,
                             visual, transform, 0, NULL, NAN,
                             RRDF_FIELD_SORT_FIXED,
@@ -2771,7 +2794,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                     first_histogram_hash = k->hash;
 
                 buffer_json_add_array_item_object(wb);
-                buffer_json_member_add_string(wb, "id", hash_to_static_string(k->hash));
+                buffer_json_member_add_string(wb, "id", facets_key_id(k));
                 buffer_json_member_add_string(wb, "name", k->name);
                 buffer_json_member_add_uint64(wb, "order", k->order);
                 buffer_json_object_close(wb);
@@ -2799,7 +2822,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
             }
 
             if(show_histogram) {
-                buffer_json_member_add_string(wb, "id", k ? hash_to_static_string(k->hash) : "");
+                buffer_json_member_add_string(wb, "id", k ? facets_key_id(k) : "");
                 buffer_json_member_add_string(wb, "name", k ? k->name : "");
                 buffer_json_member_add_object(wb, "chart");
                 {
