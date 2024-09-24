@@ -86,7 +86,7 @@ static inline struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
     return p;
 }
 
-static inline void del_pid_entry(pid_t pid) {
+void del_pid_entry(pid_t pid) {
     uint64_t hash = pid_hash(pid);
     int32_t key = pid;
     SIMPLE_HASHTABLE_SLOT_PID *sl = simple_hashtable_get_slot_PID(&pids.all_pids.ht, hash, &key, true);
@@ -126,7 +126,7 @@ static inline void del_pid_entry(pid_t pid) {
     pids.all_pids.count--;
 }
 
-static inline int collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
+int collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     if(unlikely(p->read)) return 0;
     p->read = true;
 
@@ -182,7 +182,7 @@ static inline int collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     return 1;
 }
 
-static inline int collect_data_for_pid(pid_t pid, void *ptr) {
+int collect_data_for_pid(pid_t pid, void *ptr) {
     if(unlikely(pid < 0 || pid > pid_max)) {
         netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
         return 0;
@@ -194,30 +194,81 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     return collect_data_for_pid_stat(p, ptr);
 }
 
-void cleanup_exited_pids(void) {
+static inline size_t compute_new_sorted_size(size_t old_size, size_t required_size) {
+    size_t size = (required_size % 1024 == 0) ? required_size : required_size + 1024;
+    size = (size / 1024) * 1024;
+
+    if(size < old_size * 2)
+        size = old_size * 2;
+
+    return size;
+}
+
+static int compar_pid_sortlist(const void *a, const void *b) {
+    const struct pid_stat *p1 = *(struct pid_stat **)a;
+    const struct pid_stat *p2 = *(struct pid_stat **)b;
+
+    if(p1->sortlist > p2->sortlist)
+        return -1;
+    else
+        return 1;
+}
+
+bool collect_parents_before_children(void) {
+    if (!pids.all_pids.count) return false;
+
+    if (pids.all_pids.count > pids.sorted.size) {
+        size_t new_size = compute_new_sorted_size(pids.sorted.size, pids.all_pids.count);
+        freez(pids.sorted.array);
+        pids.sorted.array = mallocz(new_size * sizeof(struct pid_stat *));
+        pids.sorted.size = new_size;
+    }
+
+    size_t slc = 0;
     struct pid_stat *p = NULL;
+    uint32_t sortlist = 1;
+    for (p = root_of_pids(); p && slc < pids.sorted.size; p = p->next) {
+        mark_pid_as_unread(p);
+        pids.sorted.array[slc++] = p;
 
-    for(p = root_of_pids(); p ;) {
-        if(!p->updated && (!p->keep || p->keeploops > 0)) {
-            if(unlikely(debug_enabled && (p->keep || p->keeploops)))
-                debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, pid_stat_comm(p));
-
-            for(size_t c = 0; c < p->fds_size; c++)
-                if(p->fds[c].fd > 0) {
-                    file_descriptor_not_used(p->fds[c].fd);
-                    clear_pid_fd(&p->fds[c]);
-                }
-
-            const pid_t r = p->pid;
-            p = p->next;
-            del_pid_entry(r);
-        }
-        else {
-            if(unlikely(p->keep)) p->keeploops++;
-            p->keep = false;
-            p = p->next;
+        // assign a sortlist id to all it and its parents
+        for (struct pid_stat *pp = p; pp; pp = pp->parent) {
+            pp->sortlist = sortlist++;
+            if (pp->ppid && !pp->parent)
+                pp->parent = find_pid_entry(pp->ppid);
         }
     }
+    size_t sorted = slc;
+
+    static bool logged = false;
+    if (unlikely(p && !logged)) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "Internal error: I was thinking I had %zu processes in my arrays, but it seems there are more.",
+            pids.all_pids.count);
+        logged = true;
+    }
+
+    if (include_exited_childs && sorted) {
+        // Read parents before childs
+        // This is needed to prevent a situation where
+        // a child is found running, but until we read
+        // its parent, it has exited and its parent
+        // has accumulated its resources.
+
+        qsort((void *)pids.sorted.array, sorted, sizeof(struct pid_stat *), compar_pid_sortlist);
+
+        // we forward read all running processes
+        // collect_data_for_pid() is smart enough,
+        // not to read the same pid twice per iteration
+        for (slc = 0; slc < sorted; slc++) {
+            p = pids.sorted.array[slc];
+            collect_data_for_pid_stat(p, NULL);
+        }
+    }
+
+    return true;
 }
 
 // ----------------------------------------------------------------------------
@@ -372,6 +423,94 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
     }
 }
 
+void clear_pid_stat(struct pid_stat *p, bool threads) {
+    p->minflt           = 0;
+    p->cminflt          = 0;
+    p->majflt           = 0;
+    p->cmajflt          = 0;
+    p->utime            = 0;
+    p->stime            = 0;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    p->gtime            = 0;
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+    p->cutime           = 0;
+    p->cstime           = 0;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    p->cgtime           = 0;
+#endif
+#endif
+
+    if(threads)
+        p->num_threads      = 0;
+
+    // p->rss              = 0;
+}
+
+void clear_pid_io(struct pid_stat *p) {
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+    p->io_logical_bytes_read        = 0;
+    p->io_logical_bytes_written     = 0;
+#endif
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+    p->io_storage_bytes_read        = 0;
+    p->io_storage_bytes_written     = 0;
+#endif
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+    p->io_read_calls                = 0;
+    p->io_write_calls               = 0;
+#endif
+}
+
+static inline void assign_app_group_target_to_pid(struct pid_stat *p) {
+    targets_assignment_counter++;
+
+    for(struct target *w = apps_groups_root_target; w ; w = w->next) {
+        // find it - 4 cases:
+        // 1. the target is not a pattern
+        // 2. the target has the prefix
+        // 3. the target has the suffix
+        // 4. the target is something inside cmdline
+
+        if(unlikely(( (!w->starts_with && !w->ends_with && w->compare == p->comm)
+                      || (w->starts_with && !w->ends_with && string_starts_with_string(p->comm, w->compare))
+                      || (!w->starts_with && w->ends_with && string_ends_with_string(p->comm, w->compare))
+                      || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(pid_stat_cmdline(p), string2str(w->compare)))
+                          ))) {
+
+            p->matched_by_config = true;
+            if(w->target) p->target = w->target;
+            else p->target = w;
+
+            if(debug_enabled || (p->target && p->target->debug_enabled))
+                debug_log_int("%s linked to target %s",
+                              pid_stat_comm(p), string2str(p->target->name));
+
+            break;
+        }
+    }
+}
+
+void update_pid_comm(struct pid_stat *p, const char *comm) {
+    if(strcmp(pid_stat_comm(p), comm) != 0) {
+        if(unlikely(debug_enabled)) {
+            if(string_strlen(p->comm))
+                debug_log("\tpid %d (%s) changed name to '%s'", p->pid, pid_stat_comm(p), comm);
+            else
+                debug_log("\tJust added %d (%s)", p->pid, comm);
+        }
+
+        string_freez(p->comm);
+        p->comm = string_strdupz(comm);
+
+        // /proc/<pid>/cmdline
+        if(likely(proc_pid_cmdline_is_needed))
+            managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
+
+        assign_app_group_target_to_pid(p);
+    }
+}
+
 static inline kernel_uint_t remove_exited_child_from_parent(kernel_uint_t *field, kernel_uint_t *pfield) {
     kernel_uint_t absorbed = 0;
 
@@ -523,25 +662,7 @@ static inline void process_exited_pids() {
     }
 }
 
-// ----------------------------------------------------------------------------
-
-// 1. read all files in /proc
-// 2. for each numeric directory:
-//    i.   read /proc/pid/stat
-//    ii.  read /proc/pid/status
-//    iii. read /proc/pid/io (requires root access)
-//    iii. read the entries in directory /proc/pid/fd (requires root access)
-//         for each entry:
-//         a. find or create a struct file_descriptor
-//         b. cleanup any old/unused file_descriptors
-
-// after all these, some pids may be linked to targets, while others may not
-
-// in case of errors, only 1 every 1000 errors is printed
-// to avoid filling up all disk space
-// if debug is enabled, all errors are printed
-
-static inline void mark_pid_as_unread(struct pid_stat *p) {
+void mark_pid_as_unread(struct pid_stat *p) {
     p->read = false; // mark it as not read, so that collect_data_for_pid() will read it
     p->updated = false;
     p->merged = false;
@@ -549,400 +670,83 @@ static inline void mark_pid_as_unread(struct pid_stat *p) {
     p->parent = NULL;
 }
 
-#if defined(OS_FREEBSD) || defined(OS_MACOS)
-static inline void get_current_time(void) {
-    struct timeval current_time;
-    gettimeofday(&current_time, NULL);
-    system_current_time_ut = timeval_usec(&current_time);
+int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
+    p->last_stat_collected_usec = p->stat_collected_usec;
+    p->stat_collected_usec = now_monotonic_usec();
+    calls_counter++;
+
+    if(!read_proc_pid_stat_per_os(p, ptr))
+        return 0;
+
+    return 1;
 }
+
+int read_proc_pid_status(struct pid_stat *p, void *ptr) {
+    p->status_vmsize           = 0;
+    p->status_vmrss            = 0;
+    p->status_vmshared         = 0;
+    p->status_rssfile          = 0;
+    p->status_rssshmem         = 0;
+    p->status_vmswap           = 0;
+#if (PROCESSES_HAVE_CONTEXT_SWITCHES == 1)
+    p->status_voluntary_ctxt_switches = 0;
+    p->status_nonvoluntary_ctxt_switches = 0;
 #endif
 
-#if defined(OS_FREEBSD)
-static inline bool collect_data_for_all_pids_per_os(void) {
-    // Mark all processes as unread before collecting new data
-    struct pid_stat *p = NULL;
-    if(pids.all_pids.count) {
-        for(p = root_of_pids;() p ; p = p->next)
-            mark_pid_as_unread(p);
-    }
-
-    int i, procnum;
-
-    static size_t procbase_size = 0;
-    static struct kinfo_proc *procbase = NULL;
-
-    size_t new_procbase_size;
-
-    int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC };
-    if (unlikely(sysctl(mib, 3, NULL, &new_procbase_size, NULL, 0))) {
-        netdata_log_error("sysctl error: Can't get processes data size");
-        return false;
-    }
-
-    // give it some air for processes that may be started
-    // during this little time.
-    new_procbase_size += 100 * sizeof(struct kinfo_proc);
-
-    // increase the buffer if needed
-    if(new_procbase_size > procbase_size) {
-        procbase_size = new_procbase_size;
-        procbase = reallocz(procbase, procbase_size);
-    }
-
-    // sysctl() gets from new_procbase_size the buffer size
-    // and also returns to it the amount of data filled in
-    new_procbase_size = procbase_size;
-
-    // get the processes from the system
-    if (unlikely(sysctl(mib, 3, procbase, &new_procbase_size, NULL, 0))) {
-        netdata_log_error("sysctl error: Can't get processes data");
-        return false;
-    }
-
-    // based on the amount of data filled in
-    // calculate the number of processes we got
-    procnum = new_procbase_size / sizeof(struct kinfo_proc);
-
-    get_current_time();
-
-    for (i = 0 ; i < procnum ; ++i) {
-        pid_t pid = procbase[i].ki_pid;
-        if (pid <= 0) continue;
-        collect_data_for_pid(pid, &procbase[i]);
-    }
-
-    return true;
-}
-#endif
-
-#if defined(OS_MACOS)
-static inline bool collect_data_for_all_pids_per_os(void) {
-    // Mark all processes as unread before collecting new data
-    struct pid_stat *p;
-    if(pids.all_pids.count) {
-        for(p = root_of_pids(); p; p = p->next)
-            mark_pid_as_unread(p);
-    }
-
-    static pid_t *pids = NULL;
-    static int allocatedProcessCount = 0;
-
-    // Get the number of processes
-    int numberOfProcesses = proc_listpids(PROC_ALL_PIDS, 0, NULL, 0);
-    if (numberOfProcesses <= 0) {
-        netdata_log_error("Failed to retrieve the process count");
-        return false;
-    }
-
-    // Allocate or reallocate space to hold all the process IDs if necessary
-    if (numberOfProcesses > allocatedProcessCount) {
-        // Allocate additional space to avoid frequent reallocations
-        allocatedProcessCount = numberOfProcesses + 100;
-        pids = reallocz(pids, allocatedProcessCount * sizeof(pid_t));
-    }
-
-    // this is required, otherwise the PIDs become totally random
-    memset(pids, 0, allocatedProcessCount * sizeof(pid_t));
-
-    // get the list of PIDs
-    numberOfProcesses = proc_listpids(PROC_ALL_PIDS, 0, pids, allocatedProcessCount * sizeof(pid_t));
-    if (numberOfProcesses <= 0) {
-        netdata_log_error("Failed to retrieve the process IDs");
-        return false;
-    }
-
-    get_current_time();
-
-    // Collect data for each process
-    for (int i = 0; i < numberOfProcesses; ++i) {
-        pid_t pid = pids[i];
-        if (pid <= 0) continue;
-
-        struct pid_info pi = { 0 };
-
-        int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, pid};
-
-        size_t procSize = sizeof(pi.proc);
-        if(sysctl(mib, 4, &pi.proc, &procSize, NULL, 0) == -1) {
-            netdata_log_error("Failed to get proc for PID %d", pid);
-            continue;
-        }
-        if(procSize == 0) // no such process
-            continue;
-
-        int st = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &pi.taskinfo, sizeof(pi.taskinfo));
-        if (st <= 0) {
-            netdata_log_error("Failed to get task info for PID %d", pid);
-            continue;
-        }
-
-        st = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &pi.bsdinfo, sizeof(pi.bsdinfo));
-        if (st <= 0) {
-            netdata_log_error("Failed to get BSD info for PID %d", pid);
-            continue;
-        }
-
-        st = proc_pid_rusage(pid, RUSAGE_INFO_V4, (rusage_info_t *)&pi.rusageinfo);
-        if (st < 0) {
-            netdata_log_error("Failed to get resource usage info for PID %d", pid);
-            continue;
-        }
-
-        collect_data_for_pid(pid, &pi);
-    }
-
-    return true;
-}
-#endif
-
-#if defined(OS_WINDOWS)
-static inline bool collect_data_for_all_pids_per_os(void) {
-    for(struct pid_stat *p = root_of_pids(); p; p = p->next)
-        mark_pid_as_unread(p);
-
-    struct perflib_data d = { 0 };
-    d.pDataBlock = perflibGetPerformanceData(RegistryFindIDByName("Process"));
-    if(!d.pDataBlock) return false;
-
-    d.pObjectType = perflibFindObjectTypeByName(d.pDataBlock, "Process");
-    if(!d.pObjectType) {
-        perflibFreePerformanceData();
-        return false;
-    }
-
-    d.pi = NULL;
-    for(LONG i = 0; i < d.pObjectType->NumInstances; i++) {
-        d.pi = perflibForEachInstance(d.pDataBlock, d.pObjectType, d.pi);
-        if(!d.pi) break;
-
-        if(!getInstanceName(d.pDataBlock, d.pObjectType, d.pi, d.name, sizeof(d.name)))
-            strncpyz(d.name, "unknown", sizeof(d.name) - 1);
-
-        COUNTER_DATA processId = {.key = "ID Process"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &processId);
-        d.pid = (DWORD)processId.current.Data;
-        if(d.pid <= 0) continue; // pid 0 is the Idle, which is not useful for us
-
-        // Get or create pid_stat structure
-        struct pid_stat *p = get_or_allocate_pid_entry((pid_t)d.pid);
-        p->updated = true;
-
-        // Parent Process ID
-        COUNTER_DATA ppid = {.key = "Creating Process ID"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ppid);
-        p->ppid = (pid_t)ppid.current.Data;
-
-        // Update process name
-        update_pid_comm(p, d.name);
-
-        collect_data_for_pid_stat(p, &d);
-
-        // CPU time
-        COUNTER_DATA userTime = {.key = "% User Time"};
-        COUNTER_DATA kernelTime = {.key = "% Privileged Time"};
-        COUNTER_DATA totalTime = {.key = "% Processor Time"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &userTime);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &kernelTime);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &totalTime);
-        p->utime = userTime.current.Data;
-        p->stime = kernelTime.current.Data;
-
-        // Memory
-        COUNTER_DATA workingSet = {.key = "Working Set"};
-        COUNTER_DATA privateBytes = {.key = "Private Bytes"};
-        COUNTER_DATA virtualBytes = {.key = "Virtual Bytes"};
-        COUNTER_DATA pageFileBytes = {.key = "Page File Bytes"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &workingSet);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &privateBytes);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &virtualBytes);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &pageFileBytes);
-        p->status_vmrss = workingSet.current.Data / 1024;  // Convert to KB
-        p->status_vmsize = virtualBytes.current.Data / 1024;  // Convert to KB
-        p->status_vmswap = pageFileBytes.current.Data / 1024;  // Page File Bytes in KB
-
-        // I/O
-        COUNTER_DATA ioReadBytes = {.key = "IO Read Bytes/sec"};
-        COUNTER_DATA ioWriteBytes = {.key = "IO Write Bytes/sec"};
-        COUNTER_DATA ioReadOps = {.key = "IO Read Operations/sec"};
-        COUNTER_DATA ioWriteOps = {.key = "IO Write Operations/sec"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ioReadBytes);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ioWriteBytes);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ioReadOps);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ioWriteOps);
-        p->io_logical_bytes_read = ioReadBytes.current.Data;
-        p->io_logical_bytes_written = ioWriteBytes.current.Data;
-        p->io_read_calls = ioReadOps.current.Data;
-        p->io_write_calls = ioWriteOps.current.Data;
-
-        // Threads
-        COUNTER_DATA threadCount = {.key = "Thread Count"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &threadCount);
-        p->num_threads = threadCount.current.Data;
-
-        // Handle count (as a proxy for file descriptors)
-        COUNTER_DATA handleCount = {.key = "Handle Count"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &handleCount);
-        p->openfds.files = handleCount.current.Data;
-
-        // Page faults
-        COUNTER_DATA pageFaults = {.key = "Page Faults/sec"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &pageFaults);
-        p->minflt = pageFaults.current.Data;  // Windows doesn't distinguish between minor and major page faults
-
-        // Process uptime
-        COUNTER_DATA elapsedTime = {.key = "Elapsed Time"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &elapsedTime);
-        p->uptime = elapsedTime.current.Data / 10000000;  // Convert 100-nanosecond units to seconds
-
-        // // Priority
-        // COUNTER_DATA priority = {.key = "Priority Base"};
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &priority);
-        // p->priority = priority.current.Data;
-
-        // // Pool memory
-        // COUNTER_DATA poolPaged = {.key = "Pool Paged Bytes"};
-        // COUNTER_DATA poolNonPaged = {.key = "Pool Nonpaged Bytes"};
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &poolPaged);
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &poolNonPaged);
-        // p->status_pool_paged = poolPaged.current.Data / 1024;  // Convert to KB
-        // p->status_pool_nonpaged = poolNonPaged.current.Data / 1024;  // Convert to KB
-
-        // Windows doesn't provide direct equivalents for these Linux-specific fields:
-        // p->status_voluntary_ctxt_switches
-        // p->status_nonvoluntary_ctxt_switches
-        // We could potentially use "Context Switches/sec" as a total, but it's not split into voluntary/nonvoluntary
-
-        // UID and GID don't have direct equivalents in Windows
-        // You might want to use a constant value or implement a mapping to Windows SIDs if needed
-    }
-
-    perflibFreePerformanceData();
-
-    // Clean up processes that are no longer running
-    cleanup_exited_pids();
-
-    return true;
-}
-#endif
-
-#if defined(OS_LINUX)
-static inline size_t compute_new_sorted_size(size_t old_size, size_t required_size) {
-    size_t size = (required_size % 1024 == 0) ? required_size : required_size + 1024;
-    size = (size / 1024) * 1024;
-
-    if(size < old_size * 2)
-        size = old_size * 2;
-
-    return size;
+    return read_proc_pid_status_per_os(p, ptr) ? 1 : 0;
 }
 
-static int compar_pid_sortlist(const void *a, const void *b) {
-    const struct pid_stat *p1 = *(struct pid_stat **)a;
-    const struct pid_stat *p2 = *(struct pid_stat **)b;
-
-    if(p1->sortlist > p2->sortlist)
-        return -1;
-    else
-        return 1;
+int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
+    return read_proc_pid_limits_per_os(p, ptr) ? 1 : 0;
 }
 
-static inline bool collect_data_for_all_pids_per_os(void) {
-    // clear process state counter
-    memset(proc_state_count, 0, sizeof proc_state_count);
+int read_proc_pid_io(struct pid_stat *p, void *ptr) {
+    p->last_io_collected_usec = p->io_collected_usec;
+    p->io_collected_usec = now_monotonic_usec();
+    calls_counter++;
 
-    if(pids.all_pids.count) {
-        if(pids.all_pids.count > pids.sorted.size) {
-            size_t new_size = compute_new_sorted_size(pids.sorted.size, pids.all_pids.count);
-            freez(pids.sorted.array);
-            pids.sorted.array = mallocz(new_size * sizeof(struct pid_stat *));
-            pids.sorted.size = new_size;
-        }
+    bool ret = read_proc_pid_io_per_os(p, ptr);
 
-        size_t slc = 0;
-        struct pid_stat *p = NULL;
-        uint32_t sortlist = 1;
-        for(p = root_of_pids(); p && slc < pids.sorted.size ; p = p->next) {
-            mark_pid_as_unread(p);
-            pids.sorted.array[slc++] = p;
+    if(unlikely(global_iterations_counter == 1))
+        clear_pid_io(p);
 
-            // assign a sortlist id to all it and its parents
-            for (struct pid_stat *pp = p; pp ; pp = pp->parent) {
-                pp->sortlist = sortlist++;
-                if(pp->ppid && !pp->parent) pp->parent = find_pid_entry(pp->ppid);
-            }
-        }
-        size_t sorted = slc;
-
-        static bool logged = false;
-        if(unlikely(p && !logged)) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Internal error: I was thinking I had %zu processes in my arrays, but it seems there are more.",
-                   pids.all_pids.count);
-            logged = true;
-        }
-
-        if(include_exited_childs && sorted) {
-            // Read parents before childs
-            // This is needed to prevent a situation where
-            // a child is found running, but until we read
-            // its parent, it has exited and its parent
-            // has accumulated its resources.
-
-            qsort((void *)pids.sorted.array, sorted, sizeof(struct pid_stat *), compar_pid_sortlist);
-
-            // we forward read all running processes
-            // collect_data_for_pid() is smart enough,
-            // not to read the same pid twice per iteration
-            for(slc = 0; slc < sorted; slc++) {
-                p = pids.sorted.array[slc];
-                collect_data_for_pid_stat(p, NULL);
-            }
-        }
-    }
-
-    static char uptime_filename[FILENAME_MAX + 1] = "";
-    if(*uptime_filename == '\0')
-        snprintfz(uptime_filename, FILENAME_MAX, "%s/proc/uptime", netdata_configured_host_prefix);
-
-    system_uptime_secs = (kernel_uint_t)(uptime_msec(uptime_filename) / MSEC_PER_SEC);
-
-    char dirname[FILENAME_MAX + 1];
-
-    snprintfz(dirname, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
-    DIR *dir = opendir(dirname);
-    if(!dir) return false;
-
-    struct dirent *de = NULL;
-
-    while((de = readdir(dir))) {
-        char *endptr = de->d_name;
-
-        if(unlikely(de->d_type != DT_DIR || de->d_name[0] < '0' || de->d_name[0] > '9'))
-            continue;
-
-        pid_t pid = (pid_t) strtoul(de->d_name, &endptr, 10);
-
-        // make sure we read a valid number
-        if(unlikely(endptr == de->d_name || *endptr != '\0'))
-            continue;
-
-        collect_data_for_pid(pid, NULL);
-    }
-    closedir(dir);
-
-    return true;
+    return ret ? 1 : 0;
 }
-#endif
+
+int read_proc_pid_cmdline(struct pid_stat *p) {
+    static char cmdline[MAX_CMDLINE];
+
+    if(unlikely(!get_cmdline_per_os(p, cmdline, sizeof(cmdline))))
+        goto cleanup;
+
+    string_freez(p->cmdline);
+    p->cmdline = string_strdupz(cmdline);
+
+    return 1;
+
+cleanup:
+    // copy the command to the command line
+    string_freez(p->cmdline);
+    p->cmdline = string_dup(p->comm);
+    return 0;
+}
+
+kernel_uint_t MemTotal = 0;
+
+void get_MemTotal(void) {
+    if(!get_MemTotal_per_os())
+        MemTotal = 0;
+}
 
 bool collect_data_for_all_pids(void) {
-    if(!collect_data_for_all_pids_per_os())
+    if(!apps_os_collect())
         return false;
 
     if(!pids.all_pids.count)
         return false;
 
     // we need /proc/stat to normalize the cpu consumption of the exited childs
-    read_global_time();
+    apps_os_read_global_time();
 
     // build the process tree
     link_all_processes_to_their_parents();

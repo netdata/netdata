@@ -62,12 +62,6 @@ uint32_t
     all_files_len = 0,
     all_files_size = 0;
 
-#if defined(OS_FREEBSD) || defined(OS_MACOS) || defined (OS_WINDOWS)
-usec_t system_current_time_ut;
-#elif defined(OS_LINUX)
-kernel_uint_t system_uptime_secs;
-#endif
-
 // ----------------------------------------------------------------------------
 // Normalization
 //

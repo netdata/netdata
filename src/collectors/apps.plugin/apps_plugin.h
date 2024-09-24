@@ -6,6 +6,16 @@
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 
+// debug - enable all O/S to find usages of things
+//#undef OS_LINUX
+//#define OS_LINUX 1
+//#undef OS_FREEBSD
+//#define OS_FREEBSD 1
+//#undef OS_MACOS
+//#define OS_MACOS 1
+//#undef OS_WINDOWS
+//#define OS_WINDOWS 1
+
 #if defined(OS_FREEBSD)
 #include <sys/user.h>
 
@@ -277,7 +287,6 @@ struct target {
 #if (PROCESSES_HAVE_PHYSICAL_IO == 1)
     kernel_uint_t io_storage_bytes_read;
     kernel_uint_t io_storage_bytes_written;
-    kernel_uint_t io_cancelled_write_bytes;
 #endif
 
 #if (PROCESSES_HAVE_IO_CALLS == 1)
@@ -490,8 +499,6 @@ struct pid_stat {
     kernel_uint_t io_storage_bytes_written_raw;
     kernel_uint_t io_storage_bytes_read;
     kernel_uint_t io_storage_bytes_written;
-    kernel_uint_t io_cancelled_write_bytes_raw;
-    kernel_uint_t io_cancelled_write_bytes;
 #endif
 
 #if (PROCESSES_HAVE_IO_CALLS == 1)
@@ -651,11 +658,10 @@ int read_proc_pid_status(struct pid_stat *p, void *ptr);
 int read_proc_pid_cmdline(struct pid_stat *p);
 int read_proc_pid_io(struct pid_stat *p, void *ptr);
 int read_pid_file_descriptors(struct pid_stat *p, void *ptr);
-int read_global_time(void);
+bool apps_os_read_global_time(void);
 void get_MemTotal(void);
 
 bool collect_data_for_all_pids(void);
-void cleanup_exited_pids(void);
 
 void clear_pid_fd(struct pid_fd *pfd);
 void file_descriptor_not_used(int id);
@@ -672,5 +678,26 @@ struct pid_stat *find_pid_entry(pid_t pid);
 
 void update_pid_comm(struct pid_stat *p, const char *comm);
 void aggregate_processes_to_targets(void);
+
+void del_pid_entry(pid_t pid);
+void mark_pid_as_unread(struct pid_stat *p);
+bool apps_os_collect(void);
+bool collect_parents_before_children(void);
+
+void clear_pid_stat(struct pid_stat *p, bool threads);
+void clear_pid_io(struct pid_stat *p);
+void make_all_pid_fds_negative(struct pid_stat *p);
+uint32_t file_descriptor_find_or_add(const char *name, uint32_t hash);
+
+int collect_data_for_pid(pid_t pid, void *ptr);
+int collect_data_for_pid_stat(struct pid_stat *p, void *ptr);
+
+bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr);
+bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr);
+bool read_proc_pid_limits_per_os(struct pid_stat *p, void *ptr);
+bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr);
+bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr);
+bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes);
+bool get_MemTotal_per_os(void);
 
 #endif //NETDATA_APPS_PLUGIN_H

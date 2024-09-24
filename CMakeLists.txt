@@ -1885,16 +1885,13 @@ if(ENABLE_PLUGIN_APPS)
             src/collectors/apps.plugin/apps_targets.c
             src/collectors/apps.plugin/apps_users_and_groups.c
             src/collectors/apps.plugin/apps_output.c
-            src/collectors/apps.plugin/apps_proc_pid_status.c
-            src/collectors/apps.plugin/apps_proc_pid_limits.c
-            src/collectors/apps.plugin/apps_proc_pid_stat.c
-            src/collectors/apps.plugin/apps_proc_pid_cmdline.c
-            src/collectors/apps.plugin/apps_proc_pid_io.c
-            src/collectors/apps.plugin/apps_proc_stat.c
-            src/collectors/apps.plugin/apps_proc_pid_fd.c
-            src/collectors/apps.plugin/apps_proc_pids.c
-            src/collectors/apps.plugin/apps_proc_meminfo.c
+            src/collectors/apps.plugin/apps_pid_files.c
+            src/collectors/apps.plugin/apps_pid.c
             src/collectors/apps.plugin/apps_aggregations.c
+            src/collectors/apps.plugin/apps_os_linux.c
+            src/collectors/apps.plugin/apps_os_freebsd.c
+            src/collectors/apps.plugin/apps_os_macos.c
+            src/collectors/apps.plugin/apps_os_windows.c
     )
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})

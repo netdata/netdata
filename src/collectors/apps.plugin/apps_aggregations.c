@@ -168,7 +168,6 @@ static size_t zero_all_targets(struct target *root) {
 #if (PROCESSES_HAVE_PHYSICAL_IO == 1)
         w->io_storage_bytes_read = 0;
         w->io_storage_bytes_written = 0;
-        w->io_cancelled_write_bytes = 0;
 #endif
 #if (PROCESSES_HAVE_IO_CALLS == 1)
         w->io_read_calls = 0;
@@ -267,7 +266,6 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
 #if (PROCESSES_HAVE_PHYSICAL_IO == 1)
     w->io_storage_bytes_read    += p->io_storage_bytes_read;
     w->io_storage_bytes_written += p->io_storage_bytes_written;
-    w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
 #endif
 #if (PROCESSES_HAVE_IO_CALLS == 1)
     w->io_read_calls            += p->io_read_calls;
@@ -286,6 +284,32 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
         pid_on_target->pid = p->pid;
         pid_on_target->next = w->root_pid;
         w->root_pid = pid_on_target;
+    }
+}
+
+static inline void cleanup_exited_pids(void) {
+    struct pid_stat *p = NULL;
+
+    for(p = root_of_pids(); p ;) {
+        if(!p->updated && (!p->keep || p->keeploops > 0)) {
+            if(unlikely(debug_enabled && (p->keep || p->keeploops)))
+                debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, pid_stat_comm(p));
+
+            for(size_t c = 0; c < p->fds_size; c++)
+                if(p->fds[c].fd > 0) {
+                    file_descriptor_not_used(p->fds[c].fd);
+                    clear_pid_fd(&p->fds[c]);
+                }
+
+            const pid_t r = p->pid;
+            p = p->next;
+            del_pid_entry(r);
+        }
+        else {
+            if(unlikely(p->keep)) p->keeploops++;
+            p->keep = false;
+            p = p->next;
+        }
     }
 }
 
