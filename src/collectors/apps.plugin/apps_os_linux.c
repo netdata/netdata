@@ -521,7 +521,7 @@ bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
 // --------------------------------------------------------------------------------------------------------------------
 // global timestamp
 
-bool apps_os_read_global_time(void) {
+bool apps_os_read_global_cpu_utilization(void) {
     static char filename[FILENAME_MAX + 1] = "";
     static procfile *ff = NULL;
     static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0;

@@ -4,12 +4,18 @@
 
 #if defined(OS_WINDOWS)
 
-bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
+bool apps_os_read_global_cpu_utilization(void) {
+    return false;
+}
+
+bool read_proc_pid_status_per_os(struct pid_stat *p __maybe_unused, void *ptr) {
+    struct perflib_data *d = ptr;
+
     // TODO: get these statistics from perflib
     return false;
 }
 
-bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
+bool read_proc_pid_stat_per_os(struct pid_stat *p __maybe_unused, void *ptr) {
     struct perflib_data *d = ptr;
 
     // TODO: get these statistics from perflib
@@ -17,12 +23,19 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     return false;
 }
 
-bool read_proc_pid_limits_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
+bool read_proc_pid_limits_per_os(struct pid_stat *p __maybe_unused, void *ptr) {
+    struct perflib_data *d = ptr;
+
+    // TODO: get process limits from perflib
+
     return false;
 }
 
 bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
+    struct perflib_data *d = ptr;
+
     // TODO: get I/O throughput per process from perflib
+
     return false;
 }
 
@@ -32,7 +45,10 @@ bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
 }
 
 bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr) {
+    struct perflib_data *d = ptr;
+
     // TODO: get file descriptors per process, if available
+
     return false;
 }
 

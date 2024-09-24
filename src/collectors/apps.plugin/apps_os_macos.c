@@ -139,11 +139,6 @@ bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
     pid_incremental_rate(io, p->io_storage_bytes_read, pi->rusageinfo.ri_diskio_bytesread);
     pid_incremental_rate(io, p->io_storage_bytes_written, pi->rusageinfo.ri_diskio_byteswritten);
 
-    p->io_logical_bytes_read = 0;
-    p->io_logical_bytes_written = 0;
-    p->io_read_calls = 0;
-    p->io_write_calls = 0;
-
     return true;
 }
 
@@ -171,7 +166,7 @@ static inline void get_current_time(void) {
     system_current_time_ut = timeval_usec(&current_time);
 }
 
-bool apps_os_read_global_time(void) {
+bool apps_os_read_global_cpu_utilization(void) {
     static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
     static usec_t collected_usec = 0, last_collected_usec = 0;
     long cp_time[CPUSTATES];

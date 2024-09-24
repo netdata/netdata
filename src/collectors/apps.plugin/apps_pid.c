@@ -65,7 +65,7 @@ inline struct pid_stat *find_pid_entry(pid_t pid) {
     return(SIMPLE_HASHTABLE_SLOT_DATA(sl));
 }
 
-static inline struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
+struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
     uint64_t hash = pid_hash(pid);
     int32_t key = pid;
     SIMPLE_HASHTABLE_SLOT_PID *sl = simple_hashtable_get_slot_PID(&pids.all_pids.ht, hash, &key, true);
@@ -194,6 +194,7 @@ int collect_data_for_pid(pid_t pid, void *ptr) {
     return collect_data_for_pid_stat(p, ptr);
 }
 
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static inline size_t compute_new_sorted_size(size_t old_size, size_t required_size) {
     size_t size = (required_size % 1024 == 0) ? required_size : required_size + 1024;
     size = (size / 1024) * 1024;
@@ -270,6 +271,7 @@ bool collect_parents_before_children(void) {
 
     return true;
 }
+#endif
 
 // ----------------------------------------------------------------------------
 
@@ -746,7 +748,7 @@ bool collect_data_for_all_pids(void) {
         return false;
 
     // we need /proc/stat to normalize the cpu consumption of the exited childs
-    apps_os_read_global_time();
+    apps_os_read_global_cpu_utilization();
 
     // build the process tree
     link_all_processes_to_their_parents();

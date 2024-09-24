@@ -658,7 +658,7 @@ int read_proc_pid_status(struct pid_stat *p, void *ptr);
 int read_proc_pid_cmdline(struct pid_stat *p);
 int read_proc_pid_io(struct pid_stat *p, void *ptr);
 int read_pid_file_descriptors(struct pid_stat *p, void *ptr);
-bool apps_os_read_global_time(void);
+bool apps_os_read_global_cpu_utilization(void);
 void get_MemTotal(void);
 
 bool collect_data_for_all_pids(void);
@@ -680,6 +680,8 @@ void update_pid_comm(struct pid_stat *p, const char *comm);
 void aggregate_processes_to_targets(void);
 
 void del_pid_entry(pid_t pid);
+struct pid_stat *get_or_allocate_pid_entry(pid_t pid);
+
 void mark_pid_as_unread(struct pid_stat *p);
 bool apps_os_collect(void);
 bool collect_parents_before_children(void);
