@@ -60,6 +60,12 @@ Function .onInit
         IfErrors +2 0
             SetSilent silent
         ClearErrors
+
+        ${GetOptionsS} $R0 "/t" $0
+        IfErrors +2 0
+            StrCpy $startMsys ${BST_CHECKED}
+        ClearErrors
+FunctionEnd
 FunctionEnd
 
 Function NetdataConfigPage
@@ -209,6 +215,11 @@ Section "Install Netdata"
         IfSilent runcmds goodbye
         runcmds:
            nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
+
+           ${If} $startMsys == ${BST_CHECKED}
+                   nsExec::ExecToLog '$INSTDIR\msys2.exe'
+                   pop $0
+           ${EndIf}
         goodbye:
 SectionEnd
 
