@@ -15,7 +15,7 @@ The minimum requirements for Netdata-Cloud are:
 - 15GiB of memory
 - Cloud services are ephemeral
 
-Requirements for non-production Dependencies helm chart:
+The requirements for the non-production Dependencies helm chart:
 - 8 CPU cores
 - 14GiB of memory
 - 160GiB for PVCs (SSD)
