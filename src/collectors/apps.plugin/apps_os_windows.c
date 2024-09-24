@@ -446,55 +446,42 @@
 #if defined(OS_WINDOWS)
 
 uint64_t apps_os_time_factor(void) {
-    time_factor = 10000000ULL / RATES_DETAIL; // Windows uses 100-nanosecond intervals
     PerflibNamesRegistryInitialize();
+    return 10000000ULL / RATES_DETAIL; // Windows uses 100-nanosecond intervals
 }
 
 bool apps_os_read_global_cpu_utilization(void) {
+    // dummy - not needed
     return false;
 }
 
-bool read_proc_pid_status_per_os(struct pid_stat *p __maybe_unused, void *ptr) {
-    struct perflib_data *d = ptr;
-
-    // TODO: get these statistics from perflib
+bool read_proc_pid_status_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
+    // dummy - not needed
     return false;
 }
 
-bool read_proc_pid_stat_per_os(struct pid_stat *p __maybe_unused, void *ptr) {
-    struct perflib_data *d = ptr;
-
-    // TODO: get these statistics from perflib
-
+bool read_proc_pid_stat_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
+    // dummy - not needed
     return false;
 }
 
-bool read_proc_pid_limits_per_os(struct pid_stat *p __maybe_unused, void *ptr) {
-    struct perflib_data *d = ptr;
-
-    // TODO: get process limits from perflib
-
+bool read_proc_pid_limits_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
+    // dummy - not needed
     return false;
 }
 
-bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
-    struct perflib_data *d = ptr;
-
-    // TODO: get I/O throughput per process from perflib
-
+bool read_proc_pid_io_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
+    // dummy - not needed
     return false;
 }
 
-bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
-    // TODO: get the command line from perflib, if available
+bool get_cmdline_per_os(struct pid_stat *p __maybe_unused, char *cmdline __maybe_unused, size_t bytes __maybe_unused) {
+    // dummy - not needed
     return false;
 }
 
-bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr) {
-    struct perflib_data *d = ptr;
-
-    // TODO: get file descriptors per process, if available
-
+bool read_pid_file_descriptors_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
+    // dummy - not needed
     return false;
 }
 
@@ -511,6 +498,46 @@ bool get_MemTotal_per_os(void) {
     return true;
 }
 
+static inline kernel_uint_t perflib_timer(COUNTER_DATA *d) {
+    internal_fatal(d->current.CounterType != PERF_100NSEC_TIMER,
+                   "Wrong timer type");
+
+    ULONGLONG data1 = d->current.Data;
+    ULONGLONG data0 = d->previous.Data;
+    LONGLONG time1 = d->current.Time;
+    LONGLONG time0 = d->previous.Time;
+
+    return RATES_DETAIL * 100ULL * (data1 - data0) / (time1 - time0);
+}
+
+static inline kernel_uint_t perflib_rate(COUNTER_DATA *d) {
+    ULONGLONG data1 = d->current.Data;
+    ULONGLONG data0 = d->previous.Data;
+    LONGLONG time1 = d->current.Time;
+    LONGLONG time0 = d->previous.Time;
+
+    return (RATES_DETAIL * (data1 - data0)) / ((time1 - time0) / d->current.Frequency);
+}
+
+static inline kernel_uint_t perflib_value(COUNTER_DATA *d) {
+    internal_fatal(d->current.CounterType != PERF_COUNTER_LARGE_RAWCOUNT &&
+                   d->current.CounterType != PERF_COUNTER_RAWCOUNT,
+                   "Wrong gauge type");
+
+    return d->current.Data;
+}
+
+static inline kernel_uint_t perflib_elapsed(COUNTER_DATA *d) {
+    ULONGLONG data1 = d->current.Data;
+    LONGLONG time1 = d->current.Time;
+    LONGLONG freq1 = d->current.Frequency;
+
+    internal_fatal(d->current.CounterType != PERF_ELAPSED_TIME || !freq1,
+                   "Wrong gauge type");
+
+    return (time1 - data1) / freq1;
+}
+
 bool apps_os_collect(void) {
     for(struct pid_stat *p = root_of_pids(); p; p = p->next)
         mark_pid_as_unread(p);
@@ -525,110 +552,98 @@ bool apps_os_collect(void) {
         return false;
     }
 
+    // we need these outside the loop to avoid searching by name all the time
+    // (our perflib library caches the id inside the COUNTER_DATA).
+    COUNTER_DATA processId = {.key = "ID Process"};
+    COUNTER_DATA ppid = {.key = "Creating Process ID"};
+
     d.pi = NULL;
     for(LONG i = 0; i < d.pObjectType->NumInstances; i++) {
         d.pi = perflibForEachInstance(d.pDataBlock, d.pObjectType, d.pi);
-        if(!d.pi) break;
+        if (!d.pi) break;
 
-        if(!getInstanceName(d.pDataBlock, d.pObjectType, d.pi, d.name, sizeof(d.name)))
+        if (!getInstanceName(d.pDataBlock, d.pObjectType, d.pi, d.name, sizeof(d.name)))
             strncpyz(d.name, "unknown", sizeof(d.name) - 1);
 
-        COUNTER_DATA processId = {.key = "ID Process"};
         perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &processId);
-        d.pid = (DWORD)processId.current.Data;
-        if(d.pid <= 0) continue; // pid 0 is the Idle, which is not useful for us
+        d.pid = (DWORD) processId.current.Data;
+        if (d.pid <= 0) continue; // pid 0 is the Idle, which is not useful for us
 
         // Get or create pid_stat structure
-        struct pid_stat *p = get_or_allocate_pid_entry((pid_t)d.pid);
+        struct pid_stat *p = get_or_allocate_pid_entry((pid_t) d.pid);
+        bool first_run_for_this_pid = false;
+        if (!p->perflib[PDF_UTIME].key) {
+            // a new pid, let's set our keys
+            first_run_for_this_pid = true;
+
+            p->perflib[PDF_UTIME].key = "% User Time";
+            p->perflib[PDF_STIME].key = "% Privileged Time";
+            p->perflib[PDF_VMSIZE].key = "Virtual Bytes";
+            p->perflib[PDF_VMRSS].key = "Working Set";
+            p->perflib[PDF_VMSWAP].key = "Page File Bytes";
+            p->perflib[PDF_LREAD].key = "IO Read Bytes/sec";
+            p->perflib[PDF_LWRITE].key = "IO Write Bytes/sec";
+            p->perflib[PDF_CREAD].key = "IO Read Operations/sec";
+            p->perflib[PDF_CWRITE].key = "IO Write Operations/sec";
+            p->perflib[PDF_THREADS].key = "Thread Count";
+            p->perflib[PDF_HANDLES].key = "Handle Count";
+            p->perflib[PDF_MINFLT].key = "Page Faults/sec";
+            p->perflib[PDF_UPTIME].key = "Elapsed Time";
+        }
+
+        // get all data from perflib
+        size_t ok = 0, failed = 0, invalid = 0;
+        for (PID_FIELD f = 0; f < PDF_MAX; f++) {
+            if (p->perflib[f].key) {
+                if (!perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &p->perflib[f])) {
+                    failed++;
+                    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                           "Cannot find field '%s' in processes data", p->perflib[f].key);
+                } else
+                    ok++;
+            } else
+                invalid++;
+        }
+
         p->updated = true;
 
-        // Parent Process ID
-        COUNTER_DATA ppid = {.key = "Creating Process ID"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ppid);
-        p->ppid = (pid_t)ppid.current.Data;
+        if (first_run_for_this_pid) {
+            // Parent Process ID
+            perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ppid);
+            p->ppid = (pid_t) ppid.current.Data;
 
-        // Update process name
-        update_pid_comm(p, d.name);
-
-        collect_data_for_pid_stat(p, &d);
+            // Update process name
+            update_pid_comm(p, d.name);
+        }
 
         // CPU time
-        COUNTER_DATA userTime = {.key = "% User Time"};
-        COUNTER_DATA kernelTime = {.key = "% Privileged Time"};
-        COUNTER_DATA totalTime = {.key = "% Processor Time"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &userTime);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &kernelTime);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &totalTime);
-        p->values[PDF_UTIME] = userTime.current.Data;
-        p->values[PDF_STIME] = kernelTime.current.Data;
+        p->values[PDF_UTIME] = perflib_timer(&p->perflib[PDF_UTIME]);
+        p->values[PDF_STIME] = perflib_timer(&p->perflib[PDF_STIME]);
 
         // Memory
-        COUNTER_DATA workingSet = {.key = "Working Set"};
-        COUNTER_DATA privateBytes = {.key = "Private Bytes"};
-        COUNTER_DATA virtualBytes = {.key = "Virtual Bytes"};
-        COUNTER_DATA pageFileBytes = {.key = "Page File Bytes"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &workingSet);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &privateBytes);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &virtualBytes);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &pageFileBytes);
-        p->values[PDF_VMRSS] = workingSet.current.Data / 1024;  // Convert to KB
-        p->values[PDF_VMSIZE] = virtualBytes.current.Data / 1024;  // Convert to KB
-        p->values[PDF_VMSWAP] = pageFileBytes.current.Data / 1024;  // Page File Bytes in KB
+        p->values[PDF_VMRSS] = perflib_value(&p->perflib[PDF_VMRSS]);
+        p->values[PDF_VMSIZE] = perflib_value(&p->perflib[PDF_VMSIZE]);
+        p->values[PDF_VMSWAP] = perflib_value(&p->perflib[PDF_VMSWAP]);
 
         // I/O
-        COUNTER_DATA ioReadBytes = {.key = "IO Read Bytes/sec"};
-        COUNTER_DATA ioWriteBytes = {.key = "IO Write Bytes/sec"};
-        COUNTER_DATA ioReadOps = {.key = "IO Read Operations/sec"};
-        COUNTER_DATA ioWriteOps = {.key = "IO Write Operations/sec"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ioReadBytes);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ioWriteBytes);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ioReadOps);
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ioWriteOps);
-        p->values[PDF_LREAD] = ioReadBytes.current.Data;
-        p->values[PDF_LWRITE] = ioWriteBytes.current.Data;
-        p->values[PDF_CREAD] = ioReadOps.current.Data;
-        p->values[PDF_CWRITE] = ioWriteOps.current.Data;
+        p->values[PDF_LREAD] = perflib_rate(&p->perflib[PDF_LREAD]);
+        p->values[PDF_LWRITE] = perflib_rate(&p->perflib[PDF_LWRITE]);
+        p->values[PDF_CREAD] = perflib_rate(&p->perflib[PDF_CREAD]);
+        p->values[PDF_CWRITE] = perflib_rate(&p->perflib[PDF_CWRITE]);
 
         // Threads
-        COUNTER_DATA threadCount = {.key = "Thread Count"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &threadCount);
-        p->values[PDF_THREADS] = threadCount.current.Data;
+        p->values[PDF_THREADS] = perflib_value(&p->perflib[PDF_THREADS]);
 
         // Handle count (as a proxy for file descriptors)
-        COUNTER_DATA handleCount = {.key = "Handle Count"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &handleCount);
-        p->openfds.files = handleCount.current.Data;
+        p->openfds.files = perflib_value(&p->perflib[PDF_HANDLES]);
 
         // Page faults
-        COUNTER_DATA pageFaults = {.key = "Page Faults/sec"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &pageFaults);
-        p->values[PDF_MINFLT] = pageFaults.current.Data;  // Windows doesn't distinguish between minor and major page faults
+        // Windows doesn't distinguish between minor and major page faults
+        p->values[PDF_MINFLT] = perflib_rate(&p->perflib[PDF_MINFLT]);
 
         // Process uptime
-        COUNTER_DATA elapsedTime = {.key = "Elapsed Time"};
-        perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &elapsedTime);
-        p->values[PDF_UPTIME] = elapsedTime.current.Data / 10000000;  // Convert 100-nanosecond units to seconds
-
-        // // Priority
-        // COUNTER_DATA priority = {.key = "Priority Base"};
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &priority);
-        // p->priority = priority.current.Data;
-
-        // // Pool memory
-        // COUNTER_DATA poolPaged = {.key = "Pool Paged Bytes"};
-        // COUNTER_DATA poolNonPaged = {.key = "Pool Nonpaged Bytes"};
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &poolPaged);
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &poolNonPaged);
-        // p->status_pool_paged = poolPaged.current.Data / 1024;  // Convert to KB
-        // p->status_pool_nonpaged = poolNonPaged.current.Data / 1024;  // Convert to KB
-
-        // Windows doesn't provide direct equivalents for these Linux-specific fields:
-        // p->values[PDF_VOLCTX]
-        // p->values[PDF_NVOLCTX]
-        // We could potentially use "Context Switches/sec" as a total, but it's not split into voluntary/nonvoluntary
-
-        // UID and GID don't have direct equivalents in Windows
-        // You might want to use a constant value or implement a mapping to Windows SIDs if needed
+        // Convert 100-nanosecond units to seconds
+        p->values[PDF_UPTIME] = perflib_elapsed(&p->perflib[PDF_UPTIME]) / 10000000ULL;
     }
 
     perflibFreePerformanceData();

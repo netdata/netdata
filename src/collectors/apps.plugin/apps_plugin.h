@@ -89,7 +89,7 @@ struct perflib_data {
 #define ALL_PIDS_ARE_READ_INSTANTLY          1
 #define PROCESSES_HAVE_CPU_GUEST_TIME        0
 #define PROCESSES_HAVE_CPU_CHILDREN_TIME     0
-#define PROCESSES_HAVE_VOLCTX                1
+#define PROCESSES_HAVE_VOLCTX                0
 #define PROCESSES_HAVE_NVOLCTX               0
 #define PROCESSES_HAVE_PHYSICAL_IO           0
 #define PROCESSES_HAVE_LOGICAL_IO            1
@@ -330,6 +330,10 @@ typedef enum __attribute__((packed)) {
     PDF_THREADS,
     PDF_PROCESSES,  // the number of processes
 
+#if defined(OS_WINDOWS)
+    PDF_HANDLES,
+#endif
+
     // terminator
     PDF_MAX
 } PID_FIELD;
@@ -458,7 +462,12 @@ struct pid_stat {
     STRING *comm;
     STRING *cmdline;
 
+#if defined(OS_WINDOWS)
+    COUNTER_DATA perflib[PDF_MAX];
+#else
     kernel_uint_t raw[PDF_MAX];
+#endif
+
     kernel_uint_t values[PDF_MAX];
 
 #if (PROCESSES_HAVE_UID == 1)
