@@ -65,6 +65,26 @@ Function .onInit
         IfErrors +2 0
             StrCpy $startMsys ${BST_CHECKED}
         ClearErrors
+
+        ${GetOptionsS} $R0 "/i" $0
+        IfErrors +2 0
+            StrCpy $insecure ${BST_CHECKED}
+        ClearErrors
+
+        ${GetOptionsS} $R0 "/token=" $0
+        IfErrors +2 0
+            StrCpy $cloudToken $0
+        ClearErrors
+
+        ${GetOptionsS} $R0 "/rooms=" $0
+        IfErrors +2 0
+            StrCpy $cloudRooms $0
+        ClearErrors
+
+        ${GetOptionsS} $R0 "/proxy=" $0
+        IfErrors +2 0
+            StrCpy $proxy $0
+        ClearErrors
 FunctionEnd
 
 Function NetdataConfigPage
