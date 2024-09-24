@@ -66,7 +66,6 @@ Function .onInit
             StrCpy $startMsys ${BST_CHECKED}
         ClearErrors
 FunctionEnd
-FunctionEnd
 
 Function NetdataConfigPage
         !insertmacro MUI_HEADER_TEXT "Netdata configuration" "Claim your agent on Netdata Cloud"
