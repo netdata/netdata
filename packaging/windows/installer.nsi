@@ -59,6 +59,11 @@ Function .onInit
         ${GetOptionsS} $R0 "/s" $0
         IfErrors +2 0
             SetSilent silent
+            System::Call 'kernel32::AttachConsole(i -1)i.r0'
+            ${If} $0 != 0
+                System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+                FileWrite $0 "Starting netdata installation in Silent mode.\n"
+            ${EndIf}
         ClearErrors
 FunctionEnd
 
