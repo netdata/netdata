@@ -484,6 +484,8 @@ static inline bool lqs_request_parse_POST(LOGS_QUERY_STATUS *lqs, BUFFER *wb, BU
     FACETS *facets = lqs->facets;
     LOGS_QUERY_REQUEST *rq = &lqs->rq;
 
+    buffer_json_member_add_object(wb, "_request");
+
     struct logs_query_data qd = {
         .transaction = transaction,
         .facets = facets,
@@ -506,7 +508,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
     buffer_json_member_add_object(wb, "_request");
 
     char func_copy[strlen(function) + 1];
-    strcpy(func_copy, function);
+    memcpy(func_copy, function, sizeof(func_copy));
 
     char *words[LQS_MAX_PARAMS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(func_copy, words, LQS_MAX_PARAMS);

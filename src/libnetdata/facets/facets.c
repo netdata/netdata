@@ -2606,7 +2606,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                         wb, "name",
                         facets_key_name_cached(k, facets->report.used_hashes_registry));
 
-                    buffer_json_member_add_string(wb, "raw", k->name);
+                    // buffer_json_member_add_string(wb, "raw", k->name);
 
                     if(!k->order) k->order = facets->order++;
                     buffer_json_member_add_uint64(wb, "order", k->order);
@@ -2627,7 +2627,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
 
                                 facets_key_value_transformed(facets, k, v, tb, FACETS_TRANSFORM_FACET);
                                 buffer_json_member_add_string(wb, "name", buffer_tostring(tb));
-                                buffer_json_member_add_string(wb, "raw", v->name);
+                                // buffer_json_member_add_string(wb, "raw", v->name);
                                 buffer_json_member_add_uint64(wb, "count", v->final_facet_value_counter);
                                 buffer_json_member_add_uint64(wb, "order", v->order);
                             }
