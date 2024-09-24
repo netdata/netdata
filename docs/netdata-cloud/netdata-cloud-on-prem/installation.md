@@ -10,7 +10,7 @@ The following components are required to install Netdata Cloud On-Prem:
 - **Helm** version 3.12+ with OCI Configuration (explained in the installation section)
 - **Kubectl**
 
-Minimum requirements for Netdata-Cloud are below:
+The minimum requirements for Netdata-Cloud are:
 - 4 CPU cores
 - 15GiB of memory
 - Cloud services are ephemeral
