@@ -206,8 +206,10 @@ Section "Install Netdata"
 
         Call NetdataUninstallRegistry
 
-        IfSilent 0 +2
+        IfSilent runcmds goodbye
+        runcmds:
            nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
+        goodbye:
 SectionEnd
 
 Section "Uninstall"
