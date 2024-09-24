@@ -6,10 +6,13 @@
 
 **Merged pull requests:**
 
+- Publish Windows installers on nightly builds. [\#18603](https://github.com/netdata/netdata/pull/18603) ([Ferroin](https://github.com/Ferroin))
+- Bump github.com/docker/docker from 27.3.0+incompatible to 27.3.1+incompatible in /src/go [\#18600](https://github.com/netdata/netdata/pull/18600) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations.js [\#18598](https://github.com/netdata/netdata/pull/18598) ([netdatabot](https://github.com/netdatabot))
 - go.d/sensors fix meta [\#18597](https://github.com/netdata/netdata/pull/18597) ([ilyam8](https://github.com/ilyam8))
 - go.d/sensors update meta [\#18595](https://github.com/netdata/netdata/pull/18595) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18592](https://github.com/netdata/netdata/pull/18592) ([netdatabot](https://github.com/netdatabot))
+- Add DLLs to CmakeLists.txt [\#18590](https://github.com/netdata/netdata/pull/18590) ([thiagoftsm](https://github.com/thiagoftsm))
 - Bump go.mongodb.org/mongo-driver from 1.16.1 to 1.17.0 in /src/go [\#18589](https://github.com/netdata/netdata/pull/18589) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/docker/docker from 27.2.1+incompatible to 27.3.0+incompatible in /src/go [\#18588](https://github.com/netdata/netdata/pull/18588) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Update kickstart.sh [\#18587](https://github.com/netdata/netdata/pull/18587) ([eya46](https://github.com/eya46))
@@ -415,10 +418,6 @@
 - Regenerate integrations.js [\#18038](https://github.com/netdata/netdata/pull/18038) ([netdatabot](https://github.com/netdatabot))
 - docs: fix go.d/weblog parser config [\#18037](https://github.com/netdata/netdata/pull/18037) ([ilyam8](https://github.com/ilyam8))
 - fix diskspace plugin in Docker [\#18035](https://github.com/netdata/netdata/pull/18035) ([ilyam8](https://github.com/ilyam8))
-- Bump repository config fetched by kickstart to latest version. [\#18034](https://github.com/netdata/netdata/pull/18034) ([Ferroin](https://github.com/Ferroin))
-- fix installing netdata-updater svc/timer for native packages [\#18032](https://github.com/netdata/netdata/pull/18032) ([ilyam8](https://github.com/ilyam8))
-- Troubleshooter must be assigned to rooms docs [\#18031](https://github.com/netdata/netdata/pull/18031) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations.js [\#18030](https://github.com/netdata/netdata/pull/18030) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
