@@ -109,6 +109,13 @@ static void id_cleanup_txt(char *buf) {
     }
 
     trim_all(buf);
+
+    s = buf;
+    while(*s) {
+        if (isspace((uint8_t)*s))
+            *s = '-';
+        s++;
+    }
 }
 
 static STRING *id_cleanup_string(STRING *s) {
@@ -124,26 +131,17 @@ static STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
     char buf_cmd[string_strlen(cmdline) + 1];
     memcpy(buf_cmd, string2str(cmdline), sizeof(buf_cmd));
 
-    char *start = buf_cmd;
-    for(char *s = start; *s ;s++) {
-        if(*s == '/' || *s == '\\')
-            start = s + 1;
+    char *start = strstr(buf_cmd, string2str(comm));
+    if(start) {
+        char *end = start + string_strlen(comm);
+        while(*end && !isspace((uint8_t)*end) && *end != '/' && *end != '\\') end++;
+        *end = '\0';
 
-        if(*s == ' ') {
-            *s = '\0';
-            break;
-        }
+        id_cleanup_txt(start);
+        return string_strdupz(start);
     }
 
-    id_cleanup_txt(start);
-
-    // we replace the string only when the extracted one is a longer version
-    // of comm. The problem is all the interpreters. We don't want to replace
-    // xyz with "python".
-    if(*start && strncmp(string2str(comm), start, string_strlen(comm)) == 0)
-        return string_strdupz(trim_all(start));
-    else
-        return id_cleanup_string(comm);
+    return id_cleanup_string(comm);
 }
 
 struct target *get_tree_target(struct pid_stat *p) {

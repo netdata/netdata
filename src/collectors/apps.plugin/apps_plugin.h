@@ -589,8 +589,8 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status);
     } while(0)
 
 // the same macro for struct pid members
-#define pid_incremental_rate(type, var, value) \
-    incremental_rate(var, var##_raw, value, p->type##_collected_usec, p->last_##type##_collected_usec)
+#define pid_incremental_rate(type, idx, value) \
+    incremental_rate(p->values[idx], p->raw[idx], value, p->type##_collected_usec, p->last_##type##_collected_usec)
 
 int read_proc_pid_stat(struct pid_stat *p, void *ptr);
 int read_proc_pid_limits(struct pid_stat *p, void *ptr);

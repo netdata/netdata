@@ -228,12 +228,12 @@ bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) goto cleanup;
 
-    pid_incremental_rate(io, p->values[PDF_LREAD],     str2kernel_uint_t(procfile_lineword(ff, 0,  1)));
-    pid_incremental_rate(io, p->values[PDF_LWRITE],    str2kernel_uint_t(procfile_lineword(ff, 1,  1)));
-    pid_incremental_rate(io, p->values[PDF_CREAD],     str2kernel_uint_t(procfile_lineword(ff, 2,  1)));
-    pid_incremental_rate(io, p->values[PDF_CWRITE],    str2kernel_uint_t(procfile_lineword(ff, 3,  1)));
-    pid_incremental_rate(io, p->values[PDF_PREAD],     str2kernel_uint_t(procfile_lineword(ff, 4,  1)));
-    pid_incremental_rate(io, p->values[PDF_PWRITE],    str2kernel_uint_t(procfile_lineword(ff, 5,  1)));
+    pid_incremental_rate(io, PDF_LREAD,     str2kernel_uint_t(procfile_lineword(ff, 0,  1)));
+    pid_incremental_rate(io, PDF_LWRITE,    str2kernel_uint_t(procfile_lineword(ff, 1,  1)));
+    pid_incremental_rate(io, PDF_CREAD,     str2kernel_uint_t(procfile_lineword(ff, 2,  1)));
+    pid_incremental_rate(io, PDF_CWRITE,    str2kernel_uint_t(procfile_lineword(ff, 3,  1)));
+    pid_incremental_rate(io, PDF_PREAD,     str2kernel_uint_t(procfile_lineword(ff, 4,  1)));
+    pid_incremental_rate(io, PDF_PWRITE,    str2kernel_uint_t(procfile_lineword(ff, 5,  1)));
 
     return true;
 
@@ -453,7 +453,7 @@ void arl_callback_status_voluntary_ctxt_switches(const char *name, uint32_t hash
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 2)) return;
 
     struct pid_stat *p = aptr->p;
-    pid_incremental_rate(stat, p->values[PDF_VOLCTX], str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
+    pid_incremental_rate(stat, PDF_VOLCTX, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
 }
 
 void arl_callback_status_nonvoluntary_ctxt_switches(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -462,7 +462,7 @@ void arl_callback_status_nonvoluntary_ctxt_switches(const char *name, uint32_t h
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 2)) return;
 
     struct pid_stat *p = aptr->p;
-    pid_incremental_rate(stat, p->values[PDF_NVOLCTX], str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
+    pid_incremental_rate(stat, PDF_NVOLCTX, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
 }
 
 bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
@@ -634,14 +634,14 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
 
     update_pid_comm(p, comm);
 
-    pid_incremental_rate(stat, p->values[PDF_MINFLT],  str2kernel_uint_t(procfile_lineword(ff, 0,  9)));
-    pid_incremental_rate(stat, p->values[PDF_CMINFLT], str2kernel_uint_t(procfile_lineword(ff, 0, 10)));
-    pid_incremental_rate(stat, p->values[PDF_MAJFLT],  str2kernel_uint_t(procfile_lineword(ff, 0, 11)));
-    pid_incremental_rate(stat, p->values[PDF_CMAJFLT], str2kernel_uint_t(procfile_lineword(ff, 0, 12)));
-    pid_incremental_rate(stat, p->values[PDF_UTIME],   str2kernel_uint_t(procfile_lineword(ff, 0, 13)));
-    pid_incremental_rate(stat, p->values[PDF_STIME],   str2kernel_uint_t(procfile_lineword(ff, 0, 14)));
-    pid_incremental_rate(stat, p->values[PDF_CUTIME],  str2kernel_uint_t(procfile_lineword(ff, 0, 15)));
-    pid_incremental_rate(stat, p->values[PDF_CSTIME],  str2kernel_uint_t(procfile_lineword(ff, 0, 16)));
+    pid_incremental_rate(stat, PDF_MINFLT,  str2kernel_uint_t(procfile_lineword(ff, 0,  9)));
+    pid_incremental_rate(stat, PDF_CMINFLT, str2kernel_uint_t(procfile_lineword(ff, 0, 10)));
+    pid_incremental_rate(stat, PDF_MAJFLT,  str2kernel_uint_t(procfile_lineword(ff, 0, 11)));
+    pid_incremental_rate(stat, PDF_CMAJFLT, str2kernel_uint_t(procfile_lineword(ff, 0, 12)));
+    pid_incremental_rate(stat, PDF_UTIME,   str2kernel_uint_t(procfile_lineword(ff, 0, 13)));
+    pid_incremental_rate(stat, PDF_STIME,   str2kernel_uint_t(procfile_lineword(ff, 0, 14)));
+    pid_incremental_rate(stat, PDF_CUTIME,  str2kernel_uint_t(procfile_lineword(ff, 0, 15)));
+    pid_incremental_rate(stat, PDF_CSTIME,  str2kernel_uint_t(procfile_lineword(ff, 0, 16)));
     // p->priority      = str2kernel_uint_t(procfile_lineword(ff, 0, 17));
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
     p->values[PDF_THREADS] = (int32_t) str2uint32_t(procfile_lineword(ff, 0, 19), NULL);
@@ -670,8 +670,8 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     // p->delayacct_blkio_ticks = str2kernel_uint_t(procfile_lineword(ff, 0, 41));
 
     if(enable_guest_charts) {
-        pid_incremental_rate(stat, p->values[PDF_GTIME],  str2kernel_uint_t(procfile_lineword(ff, 0, 42)));
-        pid_incremental_rate(stat, p->values[PDF_CGTIME], str2kernel_uint_t(procfile_lineword(ff, 0, 43)));
+        pid_incremental_rate(stat, PDF_GTIME,  str2kernel_uint_t(procfile_lineword(ff, 0, 42)));
+        pid_incremental_rate(stat, PDF_CGTIME, str2kernel_uint_t(procfile_lineword(ff, 0, 43)));
 
         if (show_guest_time || p->values[PDF_GTIME] || p->values[PDF_CGTIME]) {
             p->values[PDF_UTIME] -= (p->values[PDF_UTIME] >= p->values[PDF_GTIME]) ? p->values[PDF_GTIME] : p->values[PDF_UTIME];

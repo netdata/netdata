@@ -180,8 +180,8 @@ bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
 bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
 
-    pid_incremental_rate(io, p->values[PDF_PREAD],  proc_info->ki_rusage.ru_inblock);
-    pid_incremental_rate(io, p->values[PDF_PWRITE], proc_info->ki_rusage.ru_oublock);
+    pid_incremental_rate(io, PDF_PREAD,  proc_info->ki_rusage.ru_inblock);
+    pid_incremental_rate(io, PDF_PWRITE, proc_info->ki_rusage.ru_oublock);
 
     return true;
 }
@@ -253,14 +253,14 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
 
     update_pid_comm(p, comm);
 
-    pid_incremental_rate(stat, p->values[PDF_MINFLT],  (kernel_uint_t)proc_info->ki_rusage.ru_minflt);
-    pid_incremental_rate(stat, p->values[PDF_CMINFLT], (kernel_uint_t)proc_info->ki_rusage_ch.ru_minflt);
-    pid_incremental_rate(stat, p->values[PDF_MAJFLT],  (kernel_uint_t)proc_info->ki_rusage.ru_majflt);
-    pid_incremental_rate(stat, p->values[PDF_CMAJFLT], (kernel_uint_t)proc_info->ki_rusage_ch.ru_majflt);
-    pid_incremental_rate(stat, p->values[PDF_UTIME],   (kernel_uint_t)proc_info->ki_rusage.ru_utime.tv_sec * 100 + proc_info->ki_rusage.ru_utime.tv_usec / 10000);
-    pid_incremental_rate(stat, p->values[PDF_STIME],   (kernel_uint_t)proc_info->ki_rusage.ru_stime.tv_sec * 100 + proc_info->ki_rusage.ru_stime.tv_usec / 10000);
-    pid_incremental_rate(stat, p->values[PDF_CUTIME],  (kernel_uint_t)proc_info->ki_rusage_ch.ru_utime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_utime.tv_usec / 10000);
-    pid_incremental_rate(stat, p->values[PDF_CSTIME],  (kernel_uint_t)proc_info->ki_rusage_ch.ru_stime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_stime.tv_usec / 10000);
+    pid_incremental_rate(stat, PDF_MINFLT,  (kernel_uint_t)proc_info->ki_rusage.ru_minflt);
+    pid_incremental_rate(stat, PDF_CMINFLT, (kernel_uint_t)proc_info->ki_rusage_ch.ru_minflt);
+    pid_incremental_rate(stat, PDF_MAJFLT,  (kernel_uint_t)proc_info->ki_rusage.ru_majflt);
+    pid_incremental_rate(stat, PDF_CMAJFLT, (kernel_uint_t)proc_info->ki_rusage_ch.ru_majflt);
+    pid_incremental_rate(stat, PDF_UTIME,   (kernel_uint_t)proc_info->ki_rusage.ru_utime.tv_sec * 100 + proc_info->ki_rusage.ru_utime.tv_usec / 10000);
+    pid_incremental_rate(stat, PDF_STIME,   (kernel_uint_t)proc_info->ki_rusage.ru_stime.tv_sec * 100 + proc_info->ki_rusage.ru_stime.tv_usec / 10000);
+    pid_incremental_rate(stat, PDF_CUTIME,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_utime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_utime.tv_usec / 10000);
+    pid_incremental_rate(stat, PDF_CSTIME,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_stime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_stime.tv_usec / 10000);
 
     p->values[PDF_THREADS] = proc_info->ki_numthreads;
 

@@ -136,8 +136,8 @@ bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
 
     // On MacOS, the proc_pid_rusage provides disk_io_statistics which includes io bytes read and written
     // but does not provide the same level of detail as Linux, like separating logical and physical I/O bytes.
-    pid_incremental_rate(io, p->values[PDF_PREAD], pi->rusageinfo.ri_diskio_bytesread);
-    pid_incremental_rate(io, p->values[PDF_PWRITE], pi->rusageinfo.ri_diskio_byteswritten);
+    pid_incremental_rate(io, PDF_PREAD, pi->rusageinfo.ri_diskio_bytesread);
+    pid_incremental_rate(io, PDF_PWRITE, pi->rusageinfo.ri_diskio_byteswritten);
 
     return true;
 }
@@ -227,10 +227,10 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     kernel_uint_t systemCPU = (pi->taskinfo.pti_total_system * mach_info.numer) / mach_info.denom / NSEC_PER_USEC / 10000;
 
     // Map the values from taskinfo to the pid_stat structure
-    pid_incremental_rate(stat, p->values[PDF_MINFLT], pi->taskinfo.pti_faults);
-    pid_incremental_rate(stat, p->values[PDF_MAJFLT], pi->taskinfo.pti_pageins);
-    pid_incremental_rate(stat, p->values[PDF_UTIME], userCPU);
-    pid_incremental_rate(stat, p->values[PDF_STIME], systemCPU);
+    pid_incremental_rate(stat, PDF_MINFLT, pi->taskinfo.pti_faults);
+    pid_incremental_rate(stat, PDF_MAJFLT, pi->taskinfo.pti_pageins);
+    pid_incremental_rate(stat, PDF_UTIME, userCPU);
+    pid_incremental_rate(stat, PDF_STIME, systemCPU);
     p->values[PDF_THREADS] = pi->taskinfo.pti_threadnum;
 
     usec_t started_ut = timeval_usec(&pi->proc.kp_proc.p_starttime);

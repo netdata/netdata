@@ -32,7 +32,7 @@ bool enable_detailed_uptime_charts = false;
 bool enable_users_charts = true;
 bool enable_groups_charts = true;
 bool include_exited_childs = true;
-bool proc_pid_cmdline_is_needed = false; // true when we need to read /proc/cmdline
+bool proc_pid_cmdline_is_needed = true; // true when we need to read /proc/cmdline
 
 #if defined(OS_FREEBSD) || defined(OS_MACOS) || defined(OS_WINDOWS)
 bool enable_file_charts = false;
@@ -226,8 +226,8 @@ static void normalize_utilization(struct target *root) {
         stime   += w->values[PDF_STIME];
         gtime   += w->values[PDF_GTIME];
         cutime  += w->values[PDF_CUTIME];
-        cstime  += w->values[PDF_CSTIME]
-        cgtime  += w->values[PDF_CGTIME]
+        cstime  += w->values[PDF_CSTIME];
+        cgtime  += w->values[PDF_CGTIME];
 
         minflt  += w->values[PDF_MINFLT];
         majflt  += w->values[PDF_MAJFLT];
