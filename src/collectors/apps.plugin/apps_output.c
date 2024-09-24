@@ -129,7 +129,11 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         if (enable_guest_charts) {
             send_BEGIN(type, string2str(w->clean_name), "cpu_guest_utilization", dt);
-            send_SET("guest", (kernel_uint_t)(w->values[PDF_GTIME] * gtime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->values[PDF_CGTIME] * cgtime_fix_ratio)) : 0ULL));
+            send_SET("guest", (kernel_uint_t)(w->values[PDF_GTIME] * gtime_fix_ratio)
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+                                  + (include_exited_childs ? ((kernel_uint_t)(w->values[PDF_CGTIME] * cgtime_fix_ratio)) : 0ULL)
+#endif
+                     );
             send_END();
         }
 #endif
