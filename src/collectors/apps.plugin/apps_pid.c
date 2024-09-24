@@ -552,44 +552,32 @@ static inline kernel_uint_t remove_exited_child_from_parent(kernel_uint_t *field
     return absorbed;
 }
 
-static inline void process_exited_pids() {
+static inline void process_exited_pids(void) {
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1) || (PROCESSES_HAVE_CHILDREN_FLTS == 1)
     struct pid_stat *p;
 
     for(p = root_of_pids(); p ; p = p->next) {
         if(p->updated || !p->stat_collected_usec)
             continue;
 
+        kernel_uint_t utime = 0;
+        kernel_uint_t stime = 0;
+        kernel_uint_t gtime = 0;
+        kernel_uint_t minflt = 0;
+        kernel_uint_t majflt = 0;
+
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-        kernel_uint_t utime  = (p->raw[PDF_UTIME] + p->raw[PDF_CUTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        kernel_uint_t stime  = (p->raw[PDF_STIME] + p->raw[PDF_CSTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        utime  = (p->raw[PDF_UTIME] + p->raw[PDF_CUTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        stime  = (p->raw[PDF_STIME] + p->raw[PDF_CSTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        kernel_uint_t gtime  = (p->raw[PDF_GTIME] + p->raw[PDF_CGTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-#else
-        kernel_uint_t gtime = 0;
-#endif
-#else
-        kernel_uint_t utime  = (p->raw[PDF_UTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        kernel_uint_t stime  = (p->raw[PDF_STIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        kernel_uint_t gtime  = (p->raw[PDF_GTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-#else
-        kernel_uint_t gtime = 0;
+        gtime  = (p->raw[PDF_GTIME] + p->raw[PDF_CGTIME])   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #endif
 #endif
 
 #if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
-        kernel_uint_t minflt = (p->raw[PDF_MINFLT] + p->raw[PDF_CMINFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        minflt = (p->raw[PDF_MINFLT] + p->raw[PDF_CMINFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #if (PROCESSES_HAVE_MAJFLT == 1)
-        kernel_uint_t majflt = (p->raw[PDF_MAJFLT] + p->raw[PDF_CMAJFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-#else
-        kernel_uint_t majflt = 0;
-#endif
-#else
-        kernel_uint_t minflt = (p->raw[PDF_MINFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-#if (PROCESSES_HAVE_MAJFLT == 1)
-        kernel_uint_t majflt = (p->raw[PDF_MAJFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-#else
-        kernel_uint_t majflt = 0;
+        majflt = (p->raw[PDF_MAJFLT] + p->raw[PDF_CMAJFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #endif
 #endif
 
@@ -634,15 +622,19 @@ static inline void process_exited_pids() {
 #endif
 #endif
 
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
             absorbed = remove_exited_child_from_parent(&minflt, &pp->values[PDF_CMINFLT]);
             if(unlikely(debug_enabled && absorbed))
                 debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " minflt (remaining: " KERNEL_UINT_FORMAT ")",
                           pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, minflt);
 
+#if (PROCESSES_HAVE_MAJFLT == 1)
             absorbed = remove_exited_child_from_parent(&majflt, &pp->values[PDF_CMAJFLT]);
             if(unlikely(debug_enabled && absorbed))
                 debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " majflt (remaining: " KERNEL_UINT_FORMAT ")",
                           pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, majflt);
+#endif
+#endif
         }
 
         if(unlikely(utime + stime + gtime + minflt + majflt > 0)) {
@@ -678,30 +670,33 @@ static inline void process_exited_pids() {
                 );
             }
 
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
             p->raw[PDF_UTIME]   = utime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
             p->raw[PDF_STIME]   = stime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
+
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
             p->raw[PDF_GTIME]   = gtime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
+            p->raw[PDF_CGTIME] = 0;
 #endif
-            p->raw[PDF_MINFLT]  = minflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
-            p->raw[PDF_MAJFLT]  = majflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
-#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-            p->raw[PDF_CUTIME] = p->raw[PDF_CSTIME] =
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-                    p->raw[PDF_CGTIME] =
-#endif
-                    p->raw[PDF_CMINFLT] = p->raw[PDF_CMAJFLT] = 0;
+            p->raw[PDF_CUTIME] = p->raw[PDF_CSTIME] = 0;
 #endif
 
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+            p->raw[PDF_MINFLT]  = minflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
+#if (PROCESSES_HAVE_MAJFLT == 1)
+            p->raw[PDF_MAJFLT]  = majflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
+#endif
+            p->raw[PDF_CMINFLT] = p->raw[PDF_CMAJFLT] = 0;
+#endif
             debug_log(" ");
         }
         else
             debug_log(" > totally absorbed - DONE - %s (%d %s)"
                       , pid_stat_comm(p)
                       , p->pid
-                      , p->updated?"running":"exited"
-            );
+                      , p->updated?"running":"exited");
     }
+#endif
 }
 
 void mark_pid_as_unread(struct pid_stat *p) {
