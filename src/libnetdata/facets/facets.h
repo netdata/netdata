@@ -88,6 +88,7 @@ typedef enum __attribute__((packed)) {
     FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS  = (1 << 5), // empty facet values will not be included in the report
     FACETS_OPTION_SORT_FACETS_ALPHABETICALLY    = (1 << 6),
     FACETS_OPTION_SHOW_DELTAS                   = (1 << 7),
+    FACETS_OPTION_HASH_IDS                      = (1 << 8), // when set, the id of the facets, keys and values will be their hash
 } FACETS_OPTIONS;
 
 FACETS *facets_create(uint32_t items_to_return, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys);
@@ -138,7 +139,7 @@ usec_t facets_row_oldest_ut(FACETS *facets);
 usec_t facets_row_newest_ut(FACETS *facets);
 uint32_t facets_rows(FACETS *facets);
 
-void facets_table_config(BUFFER *wb);
+void facets_table_config(FACETS *facets, BUFFER *wb);
 
 const char *facets_severity_to_string(FACET_ROW_SEVERITY severity);
 
@@ -147,5 +148,7 @@ bool facets_foreach_selected_value_in_key(FACETS *facets, const char *key, size_
 
 void facets_row_bin_data_set(FACETS *facets, void (*cleanup_cb)(void *data), void *data);
 void *facets_row_bin_data_get(FACETS *facets __maybe_unused, FACET_ROW *row);
+
+void facets_use_hashes_for_ids(FACETS *facets, bool set);
 
 #endif
