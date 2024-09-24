@@ -205,6 +205,9 @@ Section "Install Netdata"
 	WriteUninstaller "$INSTDIR\Uninstall.exe"
 
         Call NetdataUninstallRegistry
+
+        IfSilent 0 +2
+           nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
 SectionEnd
 
 Section "Uninstall"
