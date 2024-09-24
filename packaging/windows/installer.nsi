@@ -239,6 +239,19 @@ Section "Install Netdata"
                    nsExec::ExecToLog '$INSTDIR\msys2.exe'
                    pop $0
            ${EndIf}
+
+           StrLen $0 $cloudToken
+           StrLen $1 $cloudRooms
+           ${If} $0 == 0
+           ${OrIf} $1 == 0
+                   Goto goodbye
+           ${EndIf}
+
+           ${If} $0 == 135
+           ${AndIf} $1 >= 36
+                    nsExec::ExecToLog '$INSTDIR\usr\bin\NetdataClaim.exe /T $cloudToken /R $cloudRooms /P $proxy /I $insecure'
+                    pop $0
+           ${EndIf}
         goodbye:
 SectionEnd
 
