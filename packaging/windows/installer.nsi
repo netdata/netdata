@@ -54,6 +54,12 @@ Function .onInit
         StrCpy $startMsys ${BST_UNCHECKED}
         StrCpy $insecure ${BST_UNCHECKED}
         StrCpy $avoidClaim ${BST_UNCHECKED}
+        
+        ${GetParameters} $R0
+        ${GetOptionsS} $R0 "/s" $0
+        IfErrors +2 0
+            SetSilent silent
+        ClearErrors
 FunctionEnd
 
 Function NetdataConfigPage
