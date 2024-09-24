@@ -9,6 +9,11 @@
 
 kernel_uint_t system_uptime_secs;
 
+uint64_t apps_os_time_factor(void) {
+    os_get_system_HZ();
+    return system_hz; // Linux uses clock ticks
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // /proc/pid/fd
 

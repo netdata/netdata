@@ -445,6 +445,11 @@
 
 #if defined(OS_WINDOWS)
 
+uint64_t apps_os_time_factor(void) {
+    time_factor = 10000000ULL / RATES_DETAIL; // Windows uses 100-nanosecond intervals
+    PerflibNamesRegistryInitialize();
+}
+
 bool apps_os_read_global_cpu_utilization(void) {
     return false;
 }

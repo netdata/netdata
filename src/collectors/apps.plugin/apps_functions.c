@@ -186,7 +186,9 @@ void function_processes(const char *transaction, char *function,
         , CPU_max = 0.0
         , VMSize_max = 0.0
         , RSS_max = 0.0
+#if (PROCESSES_HAVE_VMSHARED == 1)
         , Shared_max = 0.0
+#endif
         , Swap_max = 0.0
         , Memory_max = 0.0
         , FDsLimitPercent_max = 0.0
@@ -203,13 +205,15 @@ void function_processes(const char *transaction, char *function,
 #endif
         , Uptime_max = 0
         , MinFlt_max = 0
-        , CMinFlt_max = 0
-        , TMinFlt_max = 0
 #if (PROCESSES_HAVE_MAJFLT == 1)
         , MajFlt_max = 0
 #endif
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+        , CMinFlt_max = 0
         , CMajFlt_max = 0
+        , TMinFlt_max = 0
         , TMajFlt_max = 0
+#endif
 #if (PROCESSES_HAVE_LOGICAL_IO == 1)
         , LReads_max = 0
         , LWrites_max = 0
@@ -346,7 +350,11 @@ void function_processes(const char *transaction, char *function,
             add_value_field_ndd_with_max(wb, Memory, (NETDATA_DOUBLE)p->values[PDF_VMRSS] * 100.0 / (NETDATA_DOUBLE)MemTotal);
 
         add_value_field_ndd_with_max(wb, RSS, (NETDATA_DOUBLE)p->values[PDF_VMRSS] / memory_divisor);
+
+#if (PROCESSES_HAVE_VMSHARED == 1)
         add_value_field_ndd_with_max(wb, Shared, (NETDATA_DOUBLE)p->values[PDF_VMSHARED] / memory_divisor);
+#endif
+
         add_value_field_ndd_with_max(wb, VMSize, (NETDATA_DOUBLE)p->values[PDF_VMSIZE] / memory_divisor);
 #if (PROCESSES_HAVE_VMSWAP == 1)
         add_value_field_ndd_with_max(wb, Swap, (NETDATA_DOUBLE)p->values[PDF_VMSWAP] / memory_divisor);
@@ -372,16 +380,18 @@ void function_processes(const char *transaction, char *function,
 
         // minor page faults
         add_value_field_llu_with_max(wb, MinFlt, p->values[PDF_MINFLT] / RATES_DETAIL);
-        add_value_field_llu_with_max(wb, CMinFlt, p->values[PDF_CMINFLT] / RATES_DETAIL);
-        add_value_field_llu_with_max(wb, TMinFlt, (p->values[PDF_MINFLT] + p->values[PDF_CMINFLT]) / RATES_DETAIL);
 
 #if (PROCESSES_HAVE_MAJFLT == 1)
         // major page faults
         add_value_field_llu_with_max(wb, MajFlt, p->values[PDF_MAJFLT] / RATES_DETAIL);
 #endif
 
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+        add_value_field_llu_with_max(wb, CMinFlt, p->values[PDF_CMINFLT] / RATES_DETAIL);
         add_value_field_llu_with_max(wb, CMajFlt, p->values[PDF_CMAJFLT] / RATES_DETAIL);
+        add_value_field_llu_with_max(wb, TMinFlt, (p->values[PDF_MINFLT] + p->values[PDF_CMINFLT]) / RATES_DETAIL);
         add_value_field_llu_with_max(wb, TMajFlt, (p->values[PDF_MAJFLT] + p->values[PDF_CMAJFLT]) / RATES_DETAIL);
+#endif
 
         // open file descriptors
         add_value_field_ndd_with_max(wb, FDsLimitPercent, p->openfds_limits_percent);
@@ -545,11 +555,14 @@ void function_processes(const char *transaction, char *function,
                                     2, "MiB", RSS_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
+#if (PROCESSES_HAVE_VMSHARED == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "Shared", "Shared Pages", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
                                     "MiB", Shared_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
+#endif
+
         buffer_rrdf_table_add_field(wb, field_id++, "Virtual", "Virtual Memory Size", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 2, "MiB", VMSize_max, RRDF_FIELD_SORT_DESCENDING, NULL,
@@ -615,17 +628,6 @@ void function_processes(const char *transaction, char *function,
                                     2, "pgflts/s", MinFlt_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "CMinFlt", "Children Minor Page Faults/s",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
-                                    RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", CMinFlt_max, RRDF_FIELD_SORT_DESCENDING,
-                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "TMinFlt", "Total Minor Page Faults/s",
-                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
-                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", TMinFlt_max, RRDF_FIELD_SORT_DESCENDING,
-                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
 
 #if (PROCESSES_HAVE_MAJFLT == 1)
         // major page faults
@@ -637,10 +639,22 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 #endif
 
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "CMinFlt", "Children Minor Page Faults/s",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", CMinFlt_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "CMajFlt", "Children Major Page Faults/s",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", CMajFlt_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "TMinFlt", "Total Minor Page Faults/s",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", TMinFlt_max, RRDF_FIELD_SORT_DESCENDING,
                                     NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "TMajFlt", "Total Major Page Faults/s",
@@ -648,6 +662,7 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", TMajFlt_max, RRDF_FIELD_SORT_DESCENDING,
                                     NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+#endif
 
         // open file descriptors
         buffer_rrdf_table_add_field(wb, field_id++, "FDsLimitPercent", "Percentage of Open Descriptors vs Limits",

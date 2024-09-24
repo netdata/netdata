@@ -204,7 +204,7 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status) {
 // ----------------------------------------------------------------------------
 // update chart dimensions
 
-#if defined(OS_LINUX)
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static void normalize_utilization(struct target *root) {
     struct target *w;
 
@@ -355,7 +355,7 @@ static void normalize_utilization(struct target *root) {
             , (kernel_uint_t)(cgtime * cgtime_fix_ratio)
     );
 }
-#endif // OS_LINUX
+#endif
 
 // ----------------------------------------------------------------------------
 // parse command line arguments
@@ -667,22 +667,9 @@ int main(int argc, char **argv) {
     procfile_adaptive_initial_allocation = 1;
 
     os_get_system_HZ();
-#if defined(OS_FREEBSD)
-    time_factor = 1000000ULL / RATES_DETAIL; // FreeBSD uses usecs
-#endif
-#if defined(OS_MACOS)
-    mach_timebase_info(&mach_info);
-    time_factor = 1000000ULL / RATES_DETAIL;
-#endif
-#if defined(OS_LINUX)
-    time_factor = system_hz; // Linux uses clock ticks
-#endif
-#if defined(OS_WINDOWS)
-    time_factor = 10000000ULL / RATES_DETAIL; // Windows uses 100-nanosecond intervals
-    PerflibNamesRegistryInitialize();
-#endif
-
     os_get_system_pid_max();
+
+    apps_os_time_factor();
     os_get_system_cpus_uncached();
 
 #if !defined(NETDATA_INTERNAL_CHECKS)
@@ -693,18 +680,16 @@ int main(int argc, char **argv) {
         uid_t uid = getuid(), euid = geteuid();
 #ifdef HAVE_SYS_CAPABILITY_H
         netdata_log_error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
-                      "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
-                      "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
-                      "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
-              , uid, euid, argv[0], argv[0], argv[0]
-        );
+                          "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
+                          "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
+                          "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
+                          , uid, euid, argv[0], argv[0], argv[0]);
 #else
         netdata_log_error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
-                      "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
-                      "Your system does not support capabilities. "
-                      "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
-              , uid, euid, argv[0], argv[0]
-        );
+                          "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
+                          "Your system does not support capabilities. "
+                          "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
+                          , uid, euid, argv[0], argv[0]);
 #endif
     }
 
@@ -766,7 +751,7 @@ int main(int argc, char **argv) {
 
         aggregate_processes_to_targets();
 
-#if defined(OS_LINUX)
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         normalize_utilization(apps_groups_root_target);
 #endif
 

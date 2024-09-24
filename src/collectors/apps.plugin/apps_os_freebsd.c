@@ -6,6 +6,10 @@
 
 usec_t system_current_time_ut;
 
+uint64_t apps_os_time_factor(void) {
+    return 1000000ULL / RATES_DETAIL; // FreeBSD uses usecs;
+}
+
 static inline void get_current_time(void) {
     struct timeval current_time;
     gettimeofday(&current_time, NULL);

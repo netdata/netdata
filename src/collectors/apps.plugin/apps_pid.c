@@ -337,9 +337,13 @@ static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t tim
 #endif
 #endif
     if(p->values[PDF_MINFLT])  fprintf(stderr, " minflt=" KERNEL_UINT_FORMAT,  p->values[PDF_MINFLT]);
-    if(p->values[PDF_CMINFLT]) fprintf(stderr, " cminflt=" KERNEL_UINT_FORMAT, p->values[PDF_CMINFLT]);
+#if (PROCESSES_HAVE_MAJFLT == 1)
     if(p->values[PDF_MAJFLT])  fprintf(stderr, " majflt=" KERNEL_UINT_FORMAT,  p->values[PDF_MAJFLT]);
+#endif
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+    if(p->values[PDF_CMINFLT]) fprintf(stderr, " cminflt=" KERNEL_UINT_FORMAT, p->values[PDF_CMINFLT]);
     if(p->values[PDF_CMAJFLT]) fprintf(stderr, " cmajflt=" KERNEL_UINT_FORMAT, p->values[PDF_CMAJFLT]);
+#endif
     fprintf(stderr, ")\n");
 
     return indent + 1;
@@ -359,19 +363,23 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
 
         switch(type) {
             case 1:
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
                 if(p->values[PDF_CMINFLT] > lost) {
                     fprintf(stderr, " > process %d (%s) could use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
                             p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
+#endif
                 break;
 
             case 2:
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
                 if(p->values[PDF_CMAJFLT] > lost) {
                     fprintf(stderr, " > process %d (%s) could use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
                             p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
                     found++;
                 }
+#endif
                 break;
 
             case 3:
@@ -409,33 +417,34 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
     if(!found) {
         switch(type) {
             case 1:
-                fprintf(stderr, " > cannot find any process to use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pid_stat_comm(pe));
+                fprintf(stderr, " > cannot find any process to use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+                        lost, pe->pid, pid_stat_comm(pe));
                 break;
 
             case 2:
-                fprintf(stderr, " > cannot find any process to use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pid_stat_comm(pe));
+                fprintf(stderr, " > cannot find any process to use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+                        lost, pe->pid, pid_stat_comm(pe));
                 break;
 
             case 3:
-                fprintf(stderr, " > cannot find any process to use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pid_stat_comm(pe));
+                fprintf(stderr, " > cannot find any process to use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+                        lost, pe->pid, pid_stat_comm(pe));
                 break;
 
             case 4:
-                fprintf(stderr, " > cannot find any process to use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pid_stat_comm(pe));
+                fprintf(stderr, " > cannot find any process to use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+                        lost, pe->pid, pid_stat_comm(pe));
                 break;
 
             case 5:
-                fprintf(stderr, " > cannot find any process to use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pid_stat_comm(pe));
+                fprintf(stderr, " > cannot find any process to use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+                        lost, pe->pid, pid_stat_comm(pe));
                 break;
         }
     }
 }
 
 void clear_pid_stat(struct pid_stat *p, bool threads) {
-    p->values[PDF_MINFLT]   = 0;
-    p->values[PDF_CMINFLT]  = 0;
-    p->values[PDF_MAJFLT]   = 0;
-    p->values[PDF_CMAJFLT]  = 0;
     p->values[PDF_UTIME]    = 0;
     p->values[PDF_STIME]    = 0;
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
@@ -447,6 +456,15 @@ void clear_pid_stat(struct pid_stat *p, bool threads) {
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
     p->values[PDF_CGTIME]   = 0;
 #endif
+#endif
+
+    p->values[PDF_MINFLT]   = 0;
+#if (PROCESSES_HAVE_MAJFLT == 1)
+    p->values[PDF_MAJFLT]   = 0;
+#endif
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+    p->values[PDF_CMINFLT]  = 0;
+    p->values[PDF_CMAJFLT]  = 0;
 #endif
 
     if(threads)
@@ -559,8 +577,21 @@ static inline void process_exited_pids() {
 #endif
 #endif
 
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
         kernel_uint_t minflt = (p->raw[PDF_MINFLT] + p->raw[PDF_CMINFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+#if (PROCESSES_HAVE_MAJFLT == 1)
         kernel_uint_t majflt = (p->raw[PDF_MAJFLT] + p->raw[PDF_CMAJFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+#else
+        kernel_uint_t majflt = 0;
+#endif
+#else
+        kernel_uint_t minflt = (p->raw[PDF_MINFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+#if (PROCESSES_HAVE_MAJFLT == 1)
+        kernel_uint_t majflt = (p->raw[PDF_MAJFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+#else
+        kernel_uint_t majflt = 0;
+#endif
+#endif
 
         if(utime + stime + gtime + minflt + majflt == 0)
             continue;
@@ -695,9 +726,18 @@ int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     p->values[PDF_VMSIZE]   = 0;
     p->values[PDF_VMRSS]    = 0;
+
+#if (PROCESSES_HAVE_VMSHARED == 1)
     p->values[PDF_VMSHARED] = 0;
+#endif
+
+#if (PROCESSES_HAVE_RSSFILE == 1)
     p->values[PDF_RSSFILE]  = 0;
+#endif
+
+#if (PROCESSES_HAVE_RSSSHMEM == 1)
     p->values[PDF_RSSSHMEM] = 0;
+#endif
 
 #if (PROCESSES_HAVE_VMSWAP == 1)
     p->values[PDF_VMSWAP]   = 0;

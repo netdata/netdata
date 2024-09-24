@@ -31,7 +31,11 @@
 #define PROCESSES_HAVE_UID                   1
 #define PROCESSES_HAVE_GID                   1
 #define PROCESSES_HAVE_MAJFLT                1
+#define PROCESSES_HAVE_CHILDREN_FLTS         1
 #define PROCESSES_HAVE_VMSWAP                0
+#define PROCESSES_HAVE_VMSHARED              0
+#define PROCESSES_HAVE_RSSFILE               0
+#define PROCESSES_HAVE_RSSSHMEM              0
 #endif
 
 #if defined(OS_MACOS)
@@ -63,7 +67,11 @@ struct pid_info {
 #define PROCESSES_HAVE_UID                   1
 #define PROCESSES_HAVE_GID                   1
 #define PROCESSES_HAVE_MAJFLT                1
+#define PROCESSES_HAVE_CHILDREN_FLTS         0
 #define PROCESSES_HAVE_VMSWAP                0
+#define PROCESSES_HAVE_VMSHARED              0
+#define PROCESSES_HAVE_RSSFILE               0
+#define PROCESSES_HAVE_RSSSHMEM              0
 #endif
 
 #if defined(OS_WINDOWS)
@@ -89,7 +97,11 @@ struct perflib_data {
 #define PROCESSES_HAVE_UID                   0
 #define PROCESSES_HAVE_GID                   0
 #define PROCESSES_HAVE_MAJFLT                0
+#define PROCESSES_HAVE_CHILDREN_FLTS         0
 #define PROCESSES_HAVE_VMSWAP                1
+#define PROCESSES_HAVE_VMSHARED              0
+#define PROCESSES_HAVE_RSSFILE               0
+#define PROCESSES_HAVE_RSSSHMEM              0
 #endif
 
 #if defined(OS_LINUX)
@@ -105,7 +117,11 @@ struct perflib_data {
 #define PROCESSES_HAVE_UID                   1
 #define PROCESSES_HAVE_GID                   1
 #define PROCESSES_HAVE_MAJFLT                1
+#define PROCESSES_HAVE_CHILDREN_FLTS         1
 #define PROCESSES_HAVE_VMSWAP                1
+#define PROCESSES_HAVE_VMSHARED              1
+#define PROCESSES_HAVE_RSSFILE               1
+#define PROCESSES_HAVE_RSSSHMEM              1
 #endif
 
 // ----------------------------------------------------------------------------
@@ -263,14 +279,25 @@ typedef enum __attribute__((packed)) {
     PDF_MAJFLT,
 #endif
 
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
     PDF_CMINFLT,
     PDF_CMAJFLT,
+#endif
 
     PDF_VMSIZE,     // the current virtual memory used by the process, in bytes
     PDF_VMRSS,      // the resident memory used by the process, in bytes
+
+#if (PROCESSES_HAVE_VMSHARED == 1)
     PDF_VMSHARED,   // the shared memory used by the process, in bytes
+#endif
+
+#if (PROCESSES_HAVE_RSSFILE == 1)
     PDF_RSSFILE,
+#endif
+
+#if (PROCESSES_HAVE_RSSSHMEM == 1)
     PDF_RSSSHMEM,
+#endif
 
 #if (PROCESSES_HAVE_VMSWAP == 1)
     PDF_VMSWAP,     // the swap memory used by the process, in bytes
@@ -599,6 +626,7 @@ int read_proc_pid_cmdline(struct pid_stat *p);
 int read_proc_pid_io(struct pid_stat *p, void *ptr);
 int read_pid_file_descriptors(struct pid_stat *p, void *ptr);
 bool apps_os_read_global_cpu_utilization(void);
+uint64_t apps_os_time_factor(void);
 void get_MemTotal(void);
 
 bool collect_data_for_all_pids(void);

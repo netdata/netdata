@@ -135,7 +135,11 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
 #endif
 
         send_BEGIN(type, string2str(w->clean_name), "mem_private_usage", dt);
+#if (PROCESSES_HAVE_VMSHARED == 1)
         send_SET("mem", (w->values[PDF_VMRSS] > w->values[PDF_VMSHARED])?(w->values[PDF_VMRSS] - w->values[PDF_VMSHARED]) : 0ULL);
+#else
+        send_SET("mem", w->values[PDF_VMRSS]);
+#endif
         send_END();
 
 #if (PROCESSES_HAVE_VOLCTX == 1) || (PROCESSES_HAVE_NVOLCTX == 1)
@@ -158,9 +162,17 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_END();
 
         send_BEGIN(type, string2str(w->clean_name), "mem_page_faults", dt);
-        send_SET("minor", (kernel_uint_t)(w->values[PDF_MINFLT] * minflt_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->values[PDF_CMINFLT] * cminflt_fix_ratio)) : 0ULL));
+        send_SET("minor", (kernel_uint_t)(w->values[PDF_MINFLT] * minflt_fix_ratio)
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+                              + (include_exited_childs ? ((kernel_uint_t)(w->values[PDF_CMINFLT] * cminflt_fix_ratio)) : 0ULL)
+#endif
+                              );
 #if (PROCESSES_HAVE_MAJFLT == 1)
-        send_SET("major", (kernel_uint_t)(w->values[PDF_MAJFLT] * majflt_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->values[PDF_CMAJFLT] * cmajflt_fix_ratio)) : 0ULL));
+        send_SET("major", (kernel_uint_t)(w->values[PDF_MAJFLT] * majflt_fix_ratio)
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+                              + (include_exited_childs ? ((kernel_uint_t)(w->values[PDF_CMAJFLT] * cmajflt_fix_ratio)) : 0ULL)
+#endif
+                              );
 #endif
         send_END();
 
