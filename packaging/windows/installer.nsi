@@ -96,6 +96,11 @@ Function .onInit
         IfSilent checklicense goahead
         checklicense:
                 ${If} $accepted == ${BST_UNCHECKED}
+                    System::Call 'kernel32::AttachConsole(i -1)i.r0'
+                    ${If} $0 != 0
+                        System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+                        FileWrite $0 "You must accept the licenses (/A) to continue.\n"
+                    ${EndIf}
                     Abort
                 ${EndIf}
         goahead:
@@ -248,7 +253,13 @@ Section "Install Netdata"
         IfSilent runcmds goodbye
         runcmds:
            nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
+           pop $0
 
+           System::Call 'kernel32::AttachConsole(i -1)i.r0'
+           ${If} $0 != 0
+                System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+                FileWrite $0 "Room(s) or Token invalid.\n"
+           ${EndIf}
            ${If} $startMsys == ${BST_CHECKED}
                    nsExec::ExecToLog '$INSTDIR\msys2.exe'
                    pop $0
@@ -265,6 +276,12 @@ Section "Install Netdata"
            ${AndIf} $1 >= 36
                     nsExec::ExecToLog '$INSTDIR\usr\bin\NetdataClaim.exe /T $cloudToken /R $cloudRooms /P $proxy /I $insecure'
                     pop $0
+           ${Else}         
+                    System::Call 'kernel32::AttachConsole(i -1)i.r0'
+                    ${If} $0 != 0
+                        System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+                        FileWrite $0 "Room(s) or Token invalid.\n"
+                    ${EndIf}
            ${EndIf}
         goodbye:
 SectionEnd
