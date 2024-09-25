@@ -1,1 +1,1 @@
-integrations/linux_sensors_lm-sensors.md
+integrations/linux_sensors.md

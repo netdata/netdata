@@ -5,7 +5,7 @@ modules:
       plugin_name: go.d.plugin
       module_name: sensors
       monitored_instance:
-        name: Linux Sensors (lm-sensors)
+        name: Linux Sensors
         link: https://hwmon.wiki.kernel.org/lm_sensors
         icon_filename: "microchip.svg"
         categories:
@@ -19,6 +19,7 @@ modules:
         - fan
         - energy
         - humidity
+        - intrusion
       related_resources:
         integrations:
           list: []
@@ -27,10 +28,19 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: >
-          This collector gathers real-time system sensor statistics, 
-          including temperature, voltage, current, power, fan speed, energy consumption, and humidity, 
-          utilizing the [sensors](https://linux.die.net/man/1/sensors) binary or [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface).
+        metrics_description: |
+          This collector gathers real-time system sensor statistics using the [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) interface.
+
+          Supported sensors:
+
+          - Temperature
+          - Voltage
+          - Fan
+          - Current
+          - Power
+          - Energy
+          - Humidity
+          - Intrusion
         method_description: ""
       supported_platforms:
         include: []
@@ -41,15 +51,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The following type of sensors are auto-detected:
-
-            - temperature
-            - fan
-            - voltage
-            - current
-            - power
-            - energy
-            - humidity
+            Automatically discovers and exposes all available sensors on the system through the [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) interface.
         limits:
           description: ""
         performance_impact:
@@ -71,31 +73,17 @@ modules:
               description: Data collection frequency.
               default_value: 10
               required: false
-            - name: binary_path
-              description: Path to the `sensors` binary. If left empty or if the binary is not found, [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) will be used to collect sensor statistics.
-              default_value: /usr/bin/sensors
-              required: true
-            - name: timeout
-              description: Timeout for executing the binary, specified in seconds.
-              default_value: 2
-              required: false
         examples:
           folding:
             title: Config
             enabled: true
           list:
-            - name: Custom binary path
-              description: The executable is not in the directories specified in the PATH environment variable.
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
               config: |
                 jobs:
                   - name: sensors
-                    binary_path: /usr/local/sbin/sensors
-            - name: Use sysfs instead of sensors
-              description: Set `binary_path` to an empty string to use sysfs.
-              config: |
-                jobs:
-                  - name: sensors
-                    binary_path: ""
+                    update_every: 5  # Collect sensors statistics every 5 seconds
     troubleshooting:
       problems:
         list: []
@@ -108,59 +96,117 @@ modules:
       availability: []
       scopes:
         - name: sensor
-          description: These metrics refer to the sensor.
+          description: These metrics refer to the system sensor.
           labels:
             - name: chip
-              description: The hardware component responsible for the sensor monitoring.
-            - name: feature
-              description: The specific sensor or monitoring point provided by the chip.
+              description: The path to the sensor's chip device, excluding the /sys/devices prefix. This provides a unique identifier for the physical hardware component.
+            - name: chip_id
+              description: A unique identifier for the sensor's chip, formatted as `chipName-busType-hash`.
+            - name: sensor
+              description: The name of the specific sensor within the chip device. This provides a direct identifier for the individual measurement point.
+            - name: label
+              description: A label provided by the kernel driver to indicate the intended use or purpose of the sensor.
+
           metrics:
-            - name: sensors.sensor_temperature
-              description: Sensor temperature
+            - name: sensors.chip_sensor_temperature
+              description: Sensor Temperature
               unit: Celsius
               chart_type: line
               dimensions:
-                - name: temperature
-            - name: sensors.sensor_voltage
-              description: Sensor voltage
-              unit: Volts
-              chart_type: line
-              dimensions:
-                - name: voltage
-            - name: sensors.sensor_current
-              description: Sensor current
-              unit: Amperes
-              chart_type: line
-              dimensions:
-                - name: current
-            - name: sensors.sensor_power
-              description: Sensor power
-              unit: Watts
-              chart_type: line
-              dimensions:
-                - name: power
-            - name: sensors.sensor_fan_speed
-              description: Sensor fan speed
-              unit: RPM
-              chart_type: line
-              dimensions:
-                - name: fan
-            - name: sensors.sensor_energy
-              description: Sensor energy
-              unit: Joules
-              chart_type: line
-              dimensions:
-                - name: energy
-            - name: sensors.sensor_humidity
-              description: Sensor humidity
-              unit: percent
-              chart_type: area
-              dimensions:
-                - name: humidity
-            - name: sensors.sensor_intrusion
-              description: Sensor intrusion
+                - name: input
+            - name: sensors.chip_sensor_temperature_alarm
+              description: Temperature Sensor Alarm
               unit: status
               chart_type: line
               dimensions:
-                - name: alarm_clear
-                - name: alarm_triggered
+                - name: clear
+                - name: triggered
+            - name: sensors.chip_sensor_voltage
+              description: Sensor Voltage
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: sensors.chip_sensor_voltage_average
+              description: Sensor Voltage Average
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: sensors.chip_sensor_voltage_alarm
+              description: Voltage Sensor Alarm
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: triggered
+            - name: sensors.chip_sensor_fan
+              description: Sensor Fan
+              unit: RPM
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: sensors.chip_sensor_fan_alarm
+              description: Fan Sensor Alarm
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: triggered
+            - name: sensors.chip_sensor_current
+              description: Sensor Current
+              unit: Amperes
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: sensors.chip_sensor_current_average
+              description: Sensor Current Average
+              unit: Amperes
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: sensors.chip_sensor_current_alarm
+              description: Current Sensor Alarm
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: triggered
+            - name: sensors.chip_sensor_power
+              description: Sensor Power
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: sensors.chip_sensor_power_average
+              description: Sensor Power Average
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: sensors.chip_sensor_power_alarm
+              description: Power Sensor Alarm
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: triggered
+            - name: sensors.chip_sensor_energy
+              description: Sensor Energy
+              unit: Joules
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: sensors.chip_sensor_humidity
+              description: Sensor Humidity
+              unit: percent
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: sensors.chip_sensor_intrusion_alarm
+              description: Intrusion Sensor Alarm
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: triggered

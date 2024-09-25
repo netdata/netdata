@@ -1081,7 +1081,7 @@ void function_windows_events(const char *transaction, char *function, usec_t *st
     LOGS_QUERY_STATUS tmp_fqs = {
             .facets = lqs_facets_create(
                     LQS_DEFAULT_ITEMS_PER_QUERY,
-                    FACETS_OPTION_ALL_KEYS_FTS,
+                    FACETS_OPTION_ALL_KEYS_FTS | FACETS_OPTION_HASH_IDS,
                     WEVT_ALWAYS_VISIBLE_KEYS,
                     WEVT_KEYS_INCLUDED_IN_FACETS,
                     WEVT_KEYS_EXCLUDED_FROM_FACETS,

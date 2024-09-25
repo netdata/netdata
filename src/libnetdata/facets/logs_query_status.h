@@ -354,6 +354,7 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
     if (json_object_object_get_ex(jobj, LQS_PARAMETER_SOURCE, &sources)) {
         if (json_object_get_type(sources) != json_type_array) {
             buffer_sprintf(error, "member '%s' is not an array", LQS_PARAMETER_SOURCE);
+            // nd_log(NDLS_COLLECTORS, NDLP_ERR, "POST payload: '%s' is not an array", LQS_PARAMETER_SOURCE);
             return false;
         }
 
@@ -369,6 +370,7 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
 
             if (json_object_get_type(src) != json_type_string) {
                 buffer_sprintf(error, "sources array item %zu is not a string", i);
+                // nd_log(NDLS_COLLECTORS, NDLP_ERR, "POST payload: sources array item %zu is not a string", i);
                 return false;
             }
 
@@ -401,6 +403,7 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
     if (json_object_object_get_ex(jobj, LQS_PARAMETER_FACETS, &fcts)) {
         if (json_object_get_type(sources) != json_type_array) {
             buffer_sprintf(error, "member '%s' is not an array", LQS_PARAMETER_FACETS);
+            // nd_log(NDLS_COLLECTORS, NDLP_ERR, "POST payload: '%s' is not an array", LQS_PARAMETER_FACETS);
             return false;
         }
 
@@ -415,6 +418,7 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
 
             if (json_object_get_type(fct) != json_type_string) {
                 buffer_sprintf(error, "facets array item %zu is not a string", i);
+                // nd_log(NDLS_COLLECTORS, NDLP_ERR, "POST payload: facets array item %zu is not a string", i);
                 return false;
             }
 
@@ -430,6 +434,7 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
     if (json_object_object_get_ex(jobj, "selections", &selections)) {
         if (json_object_get_type(selections) != json_type_object) {
             buffer_sprintf(error, "member 'selections' is not an object");
+            // nd_log(NDLS_COLLECTORS, NDLP_ERR, "POST payload: '%s' is not an object", "selections");
             return false;
         }
 
@@ -438,6 +443,7 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
         json_object_object_foreach(selections, key, val) {
             if (json_object_get_type(val) != json_type_array) {
                 buffer_sprintf(error, "selection '%s' is not an array", key);
+                // nd_log(NDLS_COLLECTORS, NDLP_ERR, "POST payload: selection '%s' is not an array", key);
                 return false;
             }
 
@@ -449,6 +455,7 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
 
                 if (json_object_get_type(value_obj) != json_type_string) {
                     buffer_sprintf(error, "selection '%s' array item %zu is not a string", key, i);
+                    // nd_log(NDLS_COLLECTORS, NDLP_ERR, "POST payload: selection '%s' array item %zu is not a string", key, i);
                     return false;
                 }
 
@@ -468,6 +475,7 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
         buffer_json_object_close(wb); // selections
     }
 
+    facets_use_hashes_for_ids(facets, false);
     rq->fields_are_ids = false;
     return true;
 }
@@ -475,6 +483,8 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
 static inline bool lqs_request_parse_POST(LOGS_QUERY_STATUS *lqs, BUFFER *wb, BUFFER *payload, const char *transaction) {
     FACETS *facets = lqs->facets;
     LOGS_QUERY_REQUEST *rq = &lqs->rq;
+
+    buffer_json_member_add_object(wb, "_request");
 
     struct logs_query_data qd = {
         .transaction = transaction,
@@ -498,7 +508,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
     buffer_json_member_add_object(wb, "_request");
 
     char func_copy[strlen(function) + 1];
-    strcpy(func_copy, function);
+    memcpy(func_copy, function, sizeof(func_copy));
 
     char *words[LQS_MAX_PARAMS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(func_copy, words, LQS_MAX_PARAMS);
@@ -661,6 +671,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
         }
     }
 
+    facets_use_hashes_for_ids(facets, true);
     rq->fields_are_ids = true;
     return true;
 }
@@ -689,7 +700,7 @@ static inline void lqs_info_response(BUFFER *wb, FACETS *facets) {
     }
     buffer_json_array_close(wb); // required_params array
 
-    facets_table_config(wb);
+    facets_table_config(facets, wb);
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
@@ -702,7 +713,7 @@ static inline void lqs_info_response(BUFFER *wb, FACETS *facets) {
 
 static inline BUFFER *lqs_create_output_buffer(void) {
     BUFFER *wb = buffer_create(0, NULL);
-    buffer_flush(wb);
+    buffer_reset(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     return wb;
 }

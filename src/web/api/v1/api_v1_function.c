@@ -39,6 +39,6 @@ int api_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     return rrd_function_run(host, wb, timeout, w->access, function, true, transaction,
                             NULL, NULL,
                             web_client_progress_functions_update, w,
-                            web_client_interrupt_callback, w, NULL,
+                            web_client_interrupt_callback, w, w->payload,
                             buffer_tostring(source), false);
 }
