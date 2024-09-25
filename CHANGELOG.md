@@ -2,10 +2,13 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.2...HEAD)
 
 **Merged pull requests:**
 
+- POST Functions [\#18611](https://github.com/netdata/netdata/pull/18611) ([ktsaou](https://github.com/ktsaou))
+- Correctly include Windows installer in release creation. [\#18609](https://github.com/netdata/netdata/pull/18609) ([Ferroin](https://github.com/Ferroin))
+- WEB SERVER: retry sending data when errno is EAGAIN [\#18607](https://github.com/netdata/netdata/pull/18607) ([ktsaou](https://github.com/ktsaou))
 - Publish Windows installers on nightly builds. [\#18603](https://github.com/netdata/netdata/pull/18603) ([Ferroin](https://github.com/Ferroin))
 - Bump github.com/docker/docker from 27.3.0+incompatible to 27.3.1+incompatible in /src/go [\#18600](https://github.com/netdata/netdata/pull/18600) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations.js [\#18598](https://github.com/netdata/netdata/pull/18598) ([netdatabot](https://github.com/netdatabot))
@@ -16,6 +19,7 @@
 - Bump go.mongodb.org/mongo-driver from 1.16.1 to 1.17.0 in /src/go [\#18589](https://github.com/netdata/netdata/pull/18589) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/docker/docker from 27.2.1+incompatible to 27.3.0+incompatible in /src/go [\#18588](https://github.com/netdata/netdata/pull/18588) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Update kickstart.sh [\#18587](https://github.com/netdata/netdata/pull/18587) ([eya46](https://github.com/eya46))
+- Add ceph commands to ndsudo [\#18583](https://github.com/netdata/netdata/pull/18583) ([Ancairon](https://github.com/Ancairon))
 - go.d/sensors refactor [\#18581](https://github.com/netdata/netdata/pull/18581) ([ilyam8](https://github.com/ilyam8))
 - go.d move packages [\#18580](https://github.com/netdata/netdata/pull/18580) ([ilyam8](https://github.com/ilyam8))
 - WEIGHTS: use node\_id when available, otherwise host\_id [\#18579](https://github.com/netdata/netdata/pull/18579) ([ktsaou](https://github.com/ktsaou))
@@ -157,6 +161,10 @@
 - remove python.d/boinc [\#18397](https://github.com/netdata/netdata/pull/18397) ([ilyam8](https://github.com/ilyam8))
 - fix warnings in Dockerfile [\#18395](https://github.com/netdata/netdata/pull/18395) ([NicolasCARPi](https://github.com/NicolasCARPi))
 - Use existing ACLK event loop for cloud queries [\#18218](https://github.com/netdata/netdata/pull/18218) ([stelfrag](https://github.com/stelfrag))
+
+## [v1.47.2](https://github.com/netdata/netdata/tree/v1.47.2) (2024-09-24)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.1...v1.47.2)
 
 ## [v1.47.1](https://github.com/netdata/netdata/tree/v1.47.1) (2024-09-10)
 
@@ -413,11 +421,6 @@
 - Bump github.com/likexian/whois-parser from 1.24.16 to 1.24.18 in /src/go/collectors/go.d.plugin [\#18046](https://github.com/netdata/netdata/pull/18046) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/gofrs/flock from 0.8.1 to 0.11.0 in /src/go/collectors/go.d.plugin [\#18045](https://github.com/netdata/netdata/pull/18045) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Semaphore \(common context\) [\#18041](https://github.com/netdata/netdata/pull/18041) ([thiagoftsm](https://github.com/thiagoftsm))
-- proc/diskstats: Increase accuracy of average IO operation time [\#18040](https://github.com/netdata/netdata/pull/18040) ([ilyam8](https://github.com/ilyam8))
-- diskspace: update exclude paths/filesystems [\#18039](https://github.com/netdata/netdata/pull/18039) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18038](https://github.com/netdata/netdata/pull/18038) ([netdatabot](https://github.com/netdatabot))
-- docs: fix go.d/weblog parser config [\#18037](https://github.com/netdata/netdata/pull/18037) ([ilyam8](https://github.com/ilyam8))
-- fix diskspace plugin in Docker [\#18035](https://github.com/netdata/netdata/pull/18035) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
