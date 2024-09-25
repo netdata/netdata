@@ -1,0 +1,95 @@
+{
+  "health": {
+    "status": "HEALTH_WARN",
+    "checks": [
+      {
+        "severity": "HEALTH_WARN",
+        "summary": {
+          "message": "Reduced data availability: 1 pg inactive, 1 pg incomplete",
+          "count": 2
+        },
+        "detail": [
+          {
+            "message": "pg 1.0 is creating+incomplete, acting [1,2147483647,2147483647,2147483647] (reducing pool mySuperPool min_size from 3 may help; search ceph.com/docs for 'incomplete')"
+          }
+        ],
+        "muted": false,
+        "type": "PG_AVAILABILITY"
+      }
+    ],
+    "mutes": []
+  },
+  "mon_status": {
+    "monmap": {
+      "mons": [
+        {}
+      ]
+    },
+    "quorum": [
+      0
+    ]
+  },
+  "fs_map": {
+    "filesystems": [],
+    "standbys": []
+  },
+  "osd_map": {
+    "osds": [
+      {
+        "in": 1,
+        "up": 1,
+        "state": [
+          "exists",
+          "up"
+        ]
+      },
+      {
+        "in": 1,
+        "up": 1,
+        "state": [
+          "exists",
+          "up"
+        ]
+      }
+    ]
+  },
+  "scrub_status": "Inactive",
+  "pg_info": {
+    "object_stats": {
+      "2": 3,
+      "num_object_copies": 6,
+      "num_objects_degraded": 0,
+      "num_objects_misplaced": 0,
+      "num_objects_unfound": 0
+    },
+    "statuses": {
+      "active+clean": 1,
+      "creating+incomplete": 1
+    },
+    "pgs_per_osd": 2
+  },
+  "pools": [
+    {},
+    {}
+  ],
+  "df": {
+    "stats": {
+      "total_avail_bytes": 175476211712,
+      "total_bytes": 176085270528,
+      "total_used_raw_bytes": 609058816
+    }
+  },
+  "client_perf": {
+    "read_bytes_sec": 0,
+    "read_op_per_sec": 0,
+    "recovering_bytes_per_sec": 0,
+    "write_bytes_sec": 0,
+    "write_op_per_sec": 0
+  },
+  "hosts": 1,
+  "rgw": 0,
+  "iscsi_daemons": {
+    "up": 0,
+    "down": 0
+  }
+}

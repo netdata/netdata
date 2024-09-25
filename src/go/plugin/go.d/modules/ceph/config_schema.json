@@ -11,12 +11,6 @@
         "minimum": 1,
         "default": 10
       },
-      "binary_path": {
-        "title": "Binary path",
-        "description": "Path to the `ceph` binary.",
-        "type": "string",
-        "default": "/usr/bin/ceph"
-      },
       "timeout": {
         "title": "Timeout",
         "description": "Timeout for executing the binary, specified in seconds.",
@@ -34,9 +28,6 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
-    },
-    "binary_path": {
-      "ui:help": "If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable."
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."

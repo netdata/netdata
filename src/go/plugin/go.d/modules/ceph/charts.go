@@ -62,8 +62,8 @@ var (
 		Type:     module.Stacked,
 		Priority: prioGeneralUsage,
 		Dims: module.Dims{
-			{ID: "general_available", Name: "avail"},
-			{ID: "general_usage", Name: "used"},
+			{ID: "total_avail_bytes", Name: "avail"},
+			{ID: "total_used_bytes", Name: "used"},
 		},
 	}
 
@@ -278,7 +278,7 @@ func (c *Ceph) addPoolCharts(poolName string) {
 
 }
 
-func (c *Ceph) addOsdCharts(osdID string) {
+func (c *Ceph) addOsdCharts(osdUuid, devClass, osdName string) {
 	charts := osdChartsTmpl.Copy()
 
 	for _, chart := range *charts {

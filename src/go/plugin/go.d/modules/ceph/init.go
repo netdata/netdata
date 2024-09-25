@@ -4,22 +4,14 @@ package ceph
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
-func (c *Ceph) initCephBinary() (cephBinary, error) {
-
-	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
-
-	if _, err := os.Stat(ndsudoPath); err != nil {
-		return nil, fmt.Errorf("ndsudo executable not found: %c", err)
-
+func (c *Ceph) validateConfig() error {
+	if c.URL == "" {
+		return fmt.Errorf("URL is required but not set")
 	}
-
-	ceph := newCephExecBinary(ndsudoPath, c.Config, c.Logger)
-
-	return ceph, nil
+	if c.Username == "" || c.Password == "" {
+		return fmt.Errorf("username and password are required but not set")
+	}
+	return nil
 }

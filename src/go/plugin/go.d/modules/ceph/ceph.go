@@ -5,10 +5,12 @@ package ceph
 import (
 	_ "embed"
 	"errors"
-	"time"
+	"fmt"
+	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -28,8 +30,18 @@ func init() {
 func New() *Ceph {
 	return &Ceph{
 		Config: Config{
-			BinaryPath: "/usr/bin/ceph",
-			Timeout:    confopt.Duration(time.Second * 2),
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
+					URL:      "https://127.0.0.1:8443",
+					Username: "admin",
+					Password: "639y7m1jkyy",
+				},
+				ClientConfig: web.ClientConfig{
+					TLSConfig: tlscfg.TLSConfig{
+						InsecureSkipVerify: true,
+					},
+				},
+			},
 		},
 		seenPools: make(map[string]bool),
 		seenOsds:  make(map[string]bool),
@@ -38,36 +50,38 @@ func New() *Ceph {
 }
 
 type Config struct {
-	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	BinaryPath  string           `yaml:"binary_path,omitempty" json:"binary_path"`
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type (
-	Ceph struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Ceph struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec cephBinary
+	httpClient *http.Client
 
-		seenPools map[string]bool
-		seenOsds  map[string]bool
-	}
-)
+	token string
+
+	seenPools map[string]bool
+	seenOsds  map[string]bool
+}
 
 func (c *Ceph) Configuration() any {
 	return c.Config
 }
 
 func (c *Ceph) Init() error {
-	cp, err := c.initCephBinary()
+	if err := c.validateConfig(); err != nil {
+		return fmt.Errorf("invalid config: %v", err)
+	}
+
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
-		c.Errorf("ceph exec initialization: %v", err)
 		return err
 	}
-	c.exec = cp
+	c.httpClient = httpClient
 
 	return nil
 }
@@ -103,4 +117,11 @@ func (c *Ceph) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *Ceph) Cleanup() {}
+func (c *Ceph) Cleanup() {
+	if c.httpClient != nil {
+		if err := c.authLogout(); err != nil {
+			c.Warningf("failed to logout: %v", err)
+		}
+		c.httpClient.CloseIdleConnections()
+	}
+}
