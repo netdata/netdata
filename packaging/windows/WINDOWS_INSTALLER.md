@@ -36,7 +36,7 @@ you accept both Licenses before proceeding.
 In silent mode, the following options are available without additional arguments:
 
 - `/S`: Runs the installer in silent mode.
-- `/A`: Accepts all licenses required by Netdata. Without this option, the installer will not proceed.
+- `/A`: Accepts all Licenses required by Netdata. Without this option, the installer will not proceed.
 - `/D`: Specifies the destination directory.
 - `/T`: Opens the `MSYS2` terminal after installation is complete.
 - `/I`: Accepts insecure connections, meaning the hostname will not be verified.
