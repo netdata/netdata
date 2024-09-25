@@ -44,7 +44,7 @@ In silent mode, the following options are available without additional arguments
 Additionally, the following options require arguments:
 
 - `/TOKEN=`: Specifies your Netdata Cloud Space's claim token.
-- `/ROOMS=`: Specifies the rooms to which you want to connect the host. Multiple rooms can be specified by separating
+- `/ROOMS=`: Specifies the Room IDs to which you want to connect the node to. Multiple rooms can be specified by separating
    them with commas.
 - `/PROXY=`: (Optional) If your network uses a proxy, you can specify its address here.
 
