@@ -58,37 +58,37 @@ Function .onInit
         StrCpy $accepted ${BST_UNCHECKED}
         
         ${GetParameters} $R0
-        ${GetOptionsS} $R0 "/s" $0
+        ${GetOptions} $R0 "/s" $0
         IfErrors +2 0
             SetSilent silent
         ClearErrors
 
-        ${GetOptionsS} $R0 "/t" $0
+        ${GetOptions} $R0 "/t" $0
         IfErrors +2 0
             StrCpy $startMsys ${BST_CHECKED}
         ClearErrors
 
-        ${GetOptionsS} $R0 "/i" $0
+        ${GetOptions} $R0 "/i" $0
         IfErrors +2 0
             StrCpy $insecure ${BST_CHECKED}
         ClearErrors
 
-        ${GetOptionsS} $R0 "/a" $0
+        ${GetOptions} $R0 "/a" $0
         IfErrors +2 0
             StrCpy $accepted ${BST_CHECKED}
         ClearErrors
 
-        ${GetOptionsS} $R0 "/token=" $0
+        ${GetOptions} $R0 "/token=" $0
         IfErrors +2 0
             StrCpy $cloudToken $0
         ClearErrors
 
-        ${GetOptionsS} $R0 "/rooms=" $0
+        ${GetOptions} $R0 "/rooms=" $0
         IfErrors +2 0
             StrCpy $cloudRooms $0
         ClearErrors
 
-        ${GetOptionsS} $R0 "/proxy=" $0
+        ${GetOptions} $R0 "/proxy=" $0
         IfErrors +2 0
             StrCpy $proxy $0
         ClearErrors
