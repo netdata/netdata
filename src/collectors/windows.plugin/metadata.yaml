@@ -19,7 +19,7 @@ modules:
         - threads
         - context switch
       most_popular: false
-      overview:
+    overview:
         data_collection:
           metrics_description: |
             Perflib provides different statistical methods about Microsoft Windows environment. This collector query for
@@ -39,7 +39,7 @@ modules:
             description: ""
           performance_impact:
             description: ""
-      setup:
+    setup:
         prerequisites:
           list: []
         configuration:
@@ -58,11 +58,11 @@ modules:
               enabled: true
               title: ""
             list: []
-      troubleshooting:
+    troubleshooting:
         problems:
           list: []
-      alerts:
-      metrics:
+    alerts: []
+    metrics:
         folding:
           title: Metrics
           enabled: false
@@ -109,7 +109,7 @@ modules:
         - memory
         - swap
       most_popular: false
-      overview:
+    overview:
         data_collection:
           metrics_description: |
             Perflib provides different statistical methods about Microsoft Windows environment. This collector query for
@@ -129,7 +129,7 @@ modules:
             description: ""
           performance_impact:
             description: ""
-      setup:
+    setup:
         prerequisites:
           list: []
         configuration:
@@ -148,11 +148,11 @@ modules:
               enabled: true
               title: ""
             list: []
-      troubleshooting:
+    troubleshooting:
         problems:
           list: []
-      alerts:
-      metrics:
+    alerts: []
+    metrics:
         folding:
           title: Metrics
           enabled: false
@@ -203,7 +203,7 @@ modules:
         - threads
         - context switch
       most_popular: false
-      overview:
+    overview:
         data_collection:
           metrics_description: |
             Perflib provides different statistical methods about Microsoft Windows environment. This collector query for
@@ -223,7 +223,7 @@ modules:
             description: ""
           performance_impact:
             description: ""
-      setup:
+    setup:
         prerequisites:
           list: []
         configuration:
@@ -242,11 +242,11 @@ modules:
               enabled: false
               title: ""
             list: []
-      troubleshooting:
+    troubleshooting:
         problems:
           list: []
-      alerts:
-      metrics:
+    alerts: []
+    metrics:
         folding:
           title: Metrics
           enabled: false
