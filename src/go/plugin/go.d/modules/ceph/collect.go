@@ -11,6 +11,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
+const precision = 1000
+
 func (c *Ceph) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 

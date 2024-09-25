@@ -61,7 +61,7 @@ func (c *Ceph) collectPools(mx map[string]int64) error {
 		mx[px+"size"] = int64(pool.Stats.AvailRaw.Latest)
 		mx[px+"space_used_bytes"] = int64(pool.Stats.BytesUsed.Latest)
 		mx[px+"space_avail_bytes"] = int64(pool.Stats.AvailRaw.Latest - pool.Stats.BytesUsed.Latest)
-		mx[px+"space_utilization"] = int64(pool.Stats.PercentUsed.Latest * 100)
+		mx[px+"space_utilization"] = int64(pool.Stats.PercentUsed.Latest * precision)
 		mx[px+"read_ops"] = int64(pool.Stats.Reads.Latest)
 		mx[px+"read_bytes"] = int64(pool.Stats.ReadBytes.Latest)
 		mx[px+"write_ops"] = int64(pool.Stats.Writes.Latest)
