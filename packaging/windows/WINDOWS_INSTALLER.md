@@ -1,13 +1,3 @@
-<!--
-title: "Windows installer"
-sidebar_label: "Windows installer"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/WINDOWS_INSTALLER.md"
-learn_status: "Published"
-sidebar_position: "1"
-learn_topic_type: "Installer"
-learn_rel_path: "Installation"
-learn_docs_purpose: "Present details of Netdata windows installer."
--->
 
 # Netdata Installer
 
