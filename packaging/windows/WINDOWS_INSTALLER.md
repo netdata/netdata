@@ -10,7 +10,7 @@ When you double-click the installer, you will be prompted to accept the installa
 Netdata will add a service to your system. After this, the installer GUI will guide you through the following steps:
 
 - Welcome: The initial screen provides details about the actions the installer will perform.
-- UI License: This screen presents the Netdata Cloud UI. You must accept the license to proceed.
+- UI License: This screen presents the [Netdata Cloud UI License](src/web/gui/v2/LICENSE.md). You must accept the license to proceed.
 - GPL 3 License: You will then be presented with the GPL 3 License, which governs netdata software.
 - Destination: By default, Netdata will be installed in `C:\Program Files\Netdata`. If you prefer a different directory, 
   you can change it here.
