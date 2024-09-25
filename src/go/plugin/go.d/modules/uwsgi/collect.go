@@ -27,14 +27,7 @@ type workerStats struct {
 }
 
 func (u *Uwsgi) collect() (map[string]int64, error) {
-	conn, err := u.establishConn()
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect: %v", err)
-	}
-
-	defer conn.disconnect()
-
-	stats, err := conn.queryStats()
+	stats, err := u.conn.queryStats()
 	if err != nil {
 		return nil, fmt.Errorf("failed to query stats: %v", err)
 	}
@@ -108,16 +101,6 @@ func (u *Uwsgi) collectStats(mx map[string]int64, stats []byte) error {
 	}
 
 	return nil
-}
-
-func (u *Uwsgi) establishConn() (uwsgiConn, error) {
-	conn := u.newConn(u.Config)
-
-	if err := conn.connect(); err != nil {
-		return nil, err
-	}
-
-	return conn, nil
 }
 
 func boolToInt(b bool) int64 {
