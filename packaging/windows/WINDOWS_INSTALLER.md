@@ -30,7 +30,7 @@ Netdata will add a service to your system. After this, the installer GUI will gu
 
 For faster installation, the silent mode does not display the 
 [cloud license](https://raw.githubusercontent.com/netdata/netdata/master/src/web/gui/v2/LICENSE.md),
-or the [GPL3 license](https://www.gnu.org/licenses/gpl-3.0.txt). However, you must use the `/A` option to indicate that
+nor the [GPL3 License](https://www.gnu.org/licenses/gpl-3.0.txt). However, you must use the `/A` option to indicate that
 you accept both licenses before proceeding.
 
 In silent mode, the following options are available without additional arguments:
