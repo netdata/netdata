@@ -258,7 +258,7 @@ Section "Install Netdata"
            System::Call 'kernel32::AttachConsole(i -1)i.r0'
            ${If} $0 != 0
                 System::Call 'kernel32::GetStdHandle(i -11)i.r0'
-                FileWrite $0 "Room(s) or Token invalid.\n"
+                FileWrite $0 "Netdata installed with success.\n"
            ${EndIf}
            ${If} $startMsys == ${BST_CHECKED}
                    nsExec::ExecToLog '$INSTDIR\msys2.exe'
