@@ -17,15 +17,7 @@ type diskStats struct {
 }
 
 func (h *HddTemp) collect() (map[string]int64, error) {
-	conn := h.newHddTempConn(h.Config)
-
-	if err := conn.connect(); err != nil {
-		return nil, err
-	}
-
-	defer conn.disconnect()
-
-	msg, err := conn.queryHddTemp()
+	msg, err := h.conn.queryHddTemp()
 	if err != nil {
 		return nil, err
 	}

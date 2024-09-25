@@ -82,7 +82,7 @@ func TestHddTemp_Cleanup(t *testing.T) {
 		"after check": {
 			prepare: func() *HddTemp {
 				hdd := New()
-				hdd.newHddTempConn = func(config Config) hddtempConn { return prepareMockAllDisksOk() }
+				hdd.conn = prepareMockAllDisksOk()
 				_ = hdd.Check()
 				return hdd
 			},
@@ -90,7 +90,7 @@ func TestHddTemp_Cleanup(t *testing.T) {
 		"after collect": {
 			prepare: func() *HddTemp {
 				hdd := New()
-				hdd.newHddTempConn = func(config Config) hddtempConn { return prepareMockAllDisksOk() }
+				hdd.conn = prepareMockAllDisksOk()
 				_ = hdd.Collect()
 				return hdd
 			},
@@ -123,10 +123,6 @@ func TestHddTemp_Check(t *testing.T) {
 			wantFail:    false,
 			prepareMock: prepareMockAllDisksSleep,
 		},
-		"err on connect": {
-			wantFail:    true,
-			prepareMock: prepareMockErrOnConnect,
-		},
 		"unexpected response": {
 			wantFail:    true,
 			prepareMock: prepareMockUnexpectedResponse,
@@ -140,8 +136,7 @@ func TestHddTemp_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			hdd := New()
-			mock := test.prepareMock()
-			hdd.newHddTempConn = func(config Config) hddtempConn { return mock }
+			hdd.conn = test.prepareMock()
 
 			if test.wantFail {
 				assert.Error(t, hdd.Check())
@@ -219,10 +214,6 @@ func TestHddTemp_Collect(t *testing.T) {
 				"disk_ata-WDC_WD10EARS-00Y5B1_WD-WCAV5R693922_temp_sensor_status_unk": 0,
 			},
 		},
-		"err on connect": {
-			prepareMock:    prepareMockErrOnConnect,
-			wantDisconnect: false,
-		},
 		"unexpected response": {
 			prepareMock:    prepareMockUnexpectedResponse,
 			wantDisconnect: true,
@@ -236,16 +227,13 @@ func TestHddTemp_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			hdd := New()
-			mock := test.prepareMock()
-			hdd.newHddTempConn = func(config Config) hddtempConn { return mock }
+			hdd.conn = test.prepareMock()
 
 			mx := hdd.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
 			assert.Len(t, *hdd.Charts(), test.wantCharts, "wantCharts")
-
-			assert.Equal(t, test.wantDisconnect, mock.disconnectCalled, "disconnectCalled")
 
 			module.TestMetricsHasAllChartsDims(t, hdd.Charts(), mx)
 		})
@@ -264,12 +252,6 @@ func prepareMockAllDisksSleep() *mockHddTempConn {
 	}
 }
 
-func prepareMockErrOnConnect() *mockHddTempConn {
-	return &mockHddTempConn{
-		errOnConnect: true,
-	}
-}
-
 func prepareMockUnexpectedResponse() *mockHddTempConn {
 	return &mockHddTempConn{
 		hddTempLine: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
@@ -283,21 +265,8 @@ func prepareMockEmptyResponse() *mockHddTempConn {
 }
 
 type mockHddTempConn struct {
-	errOnConnect      bool
 	errOnQueryHddTemp bool
 	hddTempLine       string
-	disconnectCalled  bool
-}
-
-func (m *mockHddTempConn) connect() error {
-	if m.errOnConnect {
-		return errors.New("mock.connect() error")
-	}
-	return nil
-}
-
-func (m *mockHddTempConn) disconnect() {
-	m.disconnectCalled = true
 }
 
 func (m *mockHddTempConn) queryHddTemp() (string, error) {
