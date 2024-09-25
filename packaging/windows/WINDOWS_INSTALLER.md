@@ -19,7 +19,7 @@ Netdata will add a service to your system. After this, the installer GUI will gu
   [claim](src/claim/README.md) it. The following fields are available:
  
     - Token: Your Netdata Cloud token.
-    - Rooms: The rooms to which you want to assign your node, separated by commas.
+    - Rooms: The Room IDs to which you want to assign your node, separated by commas.
     - Proxy: (Optional) The proxy address used to communicate with Netdata Cloud.
     - Insecure connection: By default, Netdata verifies the host certificate. If this option is selected,
       certificate verification will be disabled.
