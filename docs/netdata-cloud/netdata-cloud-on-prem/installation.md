@@ -10,6 +10,18 @@ The following components are required to install Netdata Cloud On-Prem:
 - **Helm** version 3.12+ with OCI Configuration (explained in the installation section)
 - **Kubectl**
 
+The minimum requirements for Netdata-Cloud are:
+- 4 CPU cores
+- 15GiB of memory
+- Cloud services are ephemeral
+
+The requirements for the non-production Dependencies helm chart:
+- 8 CPU cores
+- 14GiB of memory
+- 160GiB for PVCs (SSD)
+
+> **_NOTE:_** Values for each component may vary depending on the type of load. The most compute-intensive task that the On-Prem needs to perform is the initial sync of directly connected Agents. The testing for these requirements was conducted with 1,000 nodes directly connected to the On-Prem. If you plan on spawning hundreds of new nodes within a few minutes, Postgres will be the first bottleneck. For example, a 2 vCPU / 8 GiB memory / 1k IOPS database can handle 1,000 nodes without any problems if your environment is fairly steady, adding nodes in batches of 10-30 (directly connected).
+
 ## Preparations for Installation
 
 ### Configure AWS CLI
