@@ -1,7 +1,7 @@
 
 # Netdata Installer
 
-For Microsoft Windows, Netdata provides an executable to install and claim Netdata. This binary offers two different
+For installation on Microsoft Windows, there is an executable to install and claim Netdata. This binary offers two different
 installation modes, which are described in the following sections.
 
 ## Graphical User Interface (GUI)
