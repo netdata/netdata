@@ -40,6 +40,7 @@ var hProxy
 var proxy
 var hInsecure
 var insecure
+var accepted
 
 var avoidClaim
 
@@ -54,6 +55,7 @@ Function .onInit
         StrCpy $startMsys ${BST_UNCHECKED}
         StrCpy $insecure ${BST_UNCHECKED}
         StrCpy $avoidClaim ${BST_UNCHECKED}
+        StrCpy $accepted ${BST_UNCHECKED}
         
         ${GetParameters} $R0
         ${GetOptionsS} $R0 "/s" $0
@@ -71,6 +73,11 @@ Function .onInit
             StrCpy $insecure ${BST_CHECKED}
         ClearErrors
 
+        ${GetOptionsS} $R0 "/a" $0
+        IfErrors +2 0
+            StrCpy $accepted ${BST_CHECKED}
+        ClearErrors
+
         ${GetOptionsS} $R0 "/token=" $0
         IfErrors +2 0
             StrCpy $cloudToken $0
@@ -85,6 +92,13 @@ Function .onInit
         IfErrors +2 0
             StrCpy $proxy $0
         ClearErrors
+
+        IfSilent checklicense goahead
+        checklicense:
+                ${If} $accepted == ${BST_UNCHECKED}
+                    Abort
+                ${EndIf}
+        goahead:
 FunctionEnd
 
 Function NetdataConfigPage
