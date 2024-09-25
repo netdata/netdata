@@ -16,7 +16,7 @@ Netdata will add a service to your system. After this, the installer GUI will gu
   you can change it here.
 - Installation: At this stage, the software will be installed in the selected directory.
 - Claim: If you haven’t claimed your Agent yet, this screen will allow you to
-  [claim](https://github.com/netdata/netdata/blob/master/src/claim/README.md) it. The following fields are available:
+  [claim](src/claim/README.md) it. The following fields are available:
  
     - Token: Your Netdata Cloud token.
     - Rooms: The rooms to which you want to assign your node, separated by commas.
