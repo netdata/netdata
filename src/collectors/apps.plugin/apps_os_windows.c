@@ -507,7 +507,7 @@ static inline kernel_uint_t perflib_timer(COUNTER_DATA *d) {
     LONGLONG time1 = d->current.Time;
     LONGLONG time0 = d->previous.Time;
 
-    return RATES_DETAIL * 100ULL * (data1 - data0) / (time1 - time0);
+    return RATES_DETAIL * 100ULL * os_get_system_cpus() * (data1 - data0) / (time1 - time0);
 }
 
 static inline kernel_uint_t perflib_rate(COUNTER_DATA *d) {
@@ -515,8 +515,13 @@ static inline kernel_uint_t perflib_rate(COUNTER_DATA *d) {
     ULONGLONG data0 = d->previous.Data;
     LONGLONG time1 = d->current.Time;
     LONGLONG time0 = d->previous.Time;
+    ULONGLONG freq1 = d->current.Frequency;
 
-    return (RATES_DETAIL * (data1 - data0)) / ((time1 - time0) / d->current.Frequency);
+    LONGLONG dt = (time1 - time0) / time_factor;
+    if(dt)
+        return (RATES_DETAIL * (data1 - data0)) / dt;
+    else
+        return 0;
 }
 
 static inline kernel_uint_t perflib_value(COUNTER_DATA *d) {
@@ -644,6 +649,17 @@ bool apps_os_collect(void) {
         // Process uptime
         // Convert 100-nanosecond units to seconds
         p->values[PDF_UPTIME] = perflib_elapsed(&p->perflib[PDF_UPTIME]) / 10000000ULL;
+
+//        if(p->perflib[PDF_UTIME].current.Data != p->perflib[PDF_UTIME].previous.Data &&
+//           p->perflib[PDF_UTIME].current.Data && p->perflib[PDF_UTIME].previous.Data &&
+//           p->pid == 22456) {
+//            const char *cmd = string2str(p->comm);
+//            unsigned int cpu_divisor = time_factor * RATES_DETAIL / 100;
+//            double u = (double)p->values[PDF_UTIME] / cpu_divisor;
+//            double s = (double)p->values[PDF_STIME] / cpu_divisor;
+//            int x = 0;
+//            x++;
+//        }
     }
 
     perflibFreePerformanceData();

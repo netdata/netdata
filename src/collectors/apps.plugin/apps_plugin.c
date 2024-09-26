@@ -669,7 +669,7 @@ int main(int argc, char **argv) {
     os_get_system_HZ();
     os_get_system_pid_max();
 
-    apps_os_time_factor();
+    time_factor = apps_os_time_factor();
     os_get_system_cpus_uncached();
 
 #if !defined(NETDATA_INTERNAL_CHECKS)
