@@ -208,13 +208,16 @@ bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
 bool apps_os_read_global_cpu_utilization(void) {
     static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
     static usec_t collected_usec = 0, last_collected_usec = 0;
+    long cp_time[CPUSTATES];
 
-    host_cpu_load_info_data_t cpuinfo;
-    mach_msg_type_number_t count = HOST_CPU_LOAD_INFO_COUNT;
-
-    if (host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, (host_info_t)&cpuinfo, &count) != KERN_SUCCESS) {
-        // Handle error
+    if (unlikely(CPUSTATES != 5)) {
         goto cleanup;
+    } else {
+        static int mib[2] = {0, 0};
+
+        if (unlikely(GETSYSCTL_SIMPLE("kern.cp_time", mib, cp_time))) {
+            goto cleanup;
+        }
     }
 
     last_collected_usec = collected_usec;
@@ -222,13 +225,12 @@ bool apps_os_read_global_cpu_utilization(void) {
 
     calls_counter++;
 
-    // Convert ticks to time
-    // Note: MacOS does not separate nice time from user time in the CPU stats, so you might need to adjust this logic
-    kernel_uint_t global_ntime = 0;  // Assuming you want to keep track of nice time separately
+    // temporary - it is added global_ntime;
+    kernel_uint_t global_ntime = 0;
 
-    incremental_rate(global_utime, utime_raw, cpuinfo.cpu_ticks[CPU_STATE_USER] + cpuinfo.cpu_ticks[CPU_STATE_NICE], collected_usec, last_collected_usec);
-    incremental_rate(global_ntime, ntime_raw, cpuinfo.cpu_ticks[CPU_STATE_NICE], collected_usec, last_collected_usec);
-    incremental_rate(global_stime, stime_raw, cpuinfo.cpu_ticks[CPU_STATE_SYSTEM], collected_usec, last_collected_usec);
+    incremental_rate(global_utime, utime_raw, cp_time[0] * 100LLU / system_hz, collected_usec, last_collected_usec);
+    incremental_rate(global_ntime, ntime_raw, cp_time[1] * 100LLU / system_hz, collected_usec, last_collected_usec);
+    incremental_rate(global_stime, stime_raw, cp_time[2] * 100LLU / system_hz, collected_usec, last_collected_usec);
 
     global_utime += global_ntime;
 
@@ -238,13 +240,13 @@ bool apps_os_read_global_cpu_utilization(void) {
         global_gtime = 0;
     }
 
-    return true;
+    return 1;
 
 cleanup:
     global_utime = 0;
     global_stime = 0;
     global_gtime = 0;
-    return false;
+    return 0;
 }
 
 bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
@@ -303,10 +305,8 @@ cleanup:
 bool apps_os_collect(void) {
     // Mark all processes as unread before collecting new data
     struct pid_stat *p = NULL;
-    if(pids.all_pids.count) {
-        for(p = root_of_pids;() p ; p = p->next)
-            mark_pid_as_unread(p);
-    }
+    for(p = root_of_pids;() p ; p = p->next)
+        mark_pid_as_unread(p);
 
     int i, procnum;
 
