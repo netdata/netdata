@@ -1,0 +1,67 @@
+{
+    "jsonSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "OpenLDAP collector configuration.",
+        "type": "object",
+        "properties": {
+            "update_every": {
+                "title": "Update every",
+                "description": "Data collection interval, measured in seconds.",
+                "type": "integer",
+                "minimum": 1,
+                "default": 10
+            },
+            "timeout": {
+                "title": "Timeout",
+                "description": "Timeout for executing the binary, specified in seconds.",
+                "type": "number",
+                "minimum": 0.5,
+                "default": 2
+            },
+            "ldap_url": {
+                "title": "LDAP ",
+                "description": "LDAP server URL",
+                "type": "string",
+                "default": "ldap://localhost:389"
+            },
+            "distinguished_name": {
+                "title": "OpenLDAP distinguished_name",
+                "description": "The distinguished_name to use with the `ldapsearch` command.",
+                "type": "string",
+                "default": ""
+            },
+            "password": {
+                "title": "OpenLDAP password",
+                "description": "The password to use with the `ldapsearch` command.",
+                "type": "string",
+                "default": ""
+            }
+        },
+        "required": [
+            "ldap_url",
+            "distinguished_name",
+            "password"
+        ],
+        "additionalProperties": false,
+        "patternProperties": {
+            "^name$": {}
+        }
+    },
+    "uiSchema": {
+        "uiOptions": {
+            "fullPage": true
+        },
+        "ldap_url": {
+            "ui:help": "LDAP server URL, for example `ldap://localhost:389`"
+        },
+        "timeout": {
+            "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+        },
+        "distinguished_name": {
+            "ui:help": "This is the distinguished_name that will be used for the connection with LDAP."
+        },
+        "password": {
+            "ui:help": "This is the password that will be used for the connection with LDAP."
+        }
+    }
+}
