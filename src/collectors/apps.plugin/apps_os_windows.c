@@ -592,7 +592,7 @@ bool apps_os_collect_all_pids_windows(void) {
 
         perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &processId);
         d.pid = (DWORD) processId.current.Data;
-        if (d.pid < INIT_PID) continue;
+        if (d.pid <= 0) continue; // 0 = Idle (this takes all the spare resources)
 
         // Get or create pid_stat structure
         struct pid_stat *p = get_or_allocate_pid_entry((pid_t) d.pid);
