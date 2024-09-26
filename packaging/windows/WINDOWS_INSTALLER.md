@@ -14,11 +14,11 @@ The installer will then guide you through these steps:
 3. **Destination**:  Choose the installation directory. By default, Netdata installs in `C:\Program Files\Netdata`.
 4. **Installation**: The installer will copy the necessary files to the chosen directory.
 5. **Claiming**: [Connecting](/src/claim/README.md) your Netdata Agent to your Netdata Cloud Space. Here's what you can configure:
-    - Token: The claiming token for your Netdata Cloud Space.
-    - Rooms: Specify the Room IDs where you want your node to appear (comma-separated list).
-    - Proxy: Enter the address of a proxy server if required for communication with Netdata Cloud.
-    - Insecure connection: By default, Netdata verifies the server's certificate. Enabling this option bypasses verification (use only if necessary).
-    - Open MSYS2 Terminal: Select this option to launch the `MSYS2` terminal after installation completes.
+    - **Token**: The claiming token for your Netdata Cloud Space.
+    - **Rooms**: Specify the Room IDs where you want your node to appear (comma-separated list).
+    - **Proxy**: Enter the address of a proxy server if required for communication with Netdata Cloud.
+    - **Insecure connection**: By default, Netdata verifies the server's certificate. Enabling this option bypasses verification (use only if necessary).
+    - **Open Terminal**: Select this option to launch the `MSYS2` terminal after installation completes.
 6. **Finish**: The installation process is complete!
 
 ## Silent Mode
