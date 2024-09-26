@@ -3,42 +3,49 @@
 package hddtemp
 
 import (
+	"time"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
 )
 
+type hddtempConn interface {
+	queryHddTemp() (string, error)
+}
+
 func newHddTempConn(conf Config) hddtempConn {
-	return &hddtempClient{conn: socket.New(socket.Config{
-		Address:        conf.Address,
-		ConnectTimeout: conf.Timeout.Duration(),
-		ReadTimeout:    conf.Timeout.Duration(),
-		WriteTimeout:   conf.Timeout.Duration(),
-	})}
+	return &hddtempClient{
+		address: conf.Address,
+		timeout: conf.Timeout.Duration(),
+	}
 }
 
 type hddtempClient struct {
-	conn socket.Client
-}
-
-func (c *hddtempClient) connect() error {
-	return c.conn.Connect()
-}
-
-func (c *hddtempClient) disconnect() {
-	_ = c.conn.Disconnect()
+	address string
+	timeout time.Duration
 }
 
 func (c *hddtempClient) queryHddTemp() (string, error) {
 	var i int
 	var s string
-	err := c.conn.Command("", func(bytes []byte) bool {
+
+	cfg := socket.Config{
+		Address:        c.address,
+		ConnectTimeout: c.timeout,
+		ReadTimeout:    c.timeout,
+		WriteTimeout:   c.timeout,
+	}
+
+	err := socket.ConnectAndRead(cfg, func(bs []byte) bool {
 		if i++; i > 1 {
 			return false
 		}
-		s = string(bytes)
+		s = string(bs)
 		return true
+
 	})
 	if err != nil {
 		return "", err
 	}
+
 	return s, nil
 }

@@ -5,35 +5,25 @@ package uwsgi
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
 )
 
 type uwsgiConn interface {
-	connect() error
-	disconnect()
 	queryStats() ([]byte, error)
 }
 
 func newUwsgiConn(conf Config) uwsgiConn {
-	return &uwsgiClient{conn: socket.New(socket.Config{
-		Address:        conf.Address,
-		ConnectTimeout: conf.Timeout.Duration(),
-		ReadTimeout:    conf.Timeout.Duration(),
-		WriteTimeout:   conf.Timeout.Duration(),
-	})}
+	return &uwsgiClient{
+		address: conf.Address,
+		timeout: conf.Timeout.Duration(),
+	}
 }
 
 type uwsgiClient struct {
-	conn socket.Client
-}
-
-func (c *uwsgiClient) connect() error {
-	return c.conn.Connect()
-}
-
-func (c *uwsgiClient) disconnect() {
-	_ = c.conn.Disconnect()
+	address string
+	timeout time.Duration
 }
 
 func (c *uwsgiClient) queryStats() ([]byte, error) {
@@ -42,7 +32,14 @@ func (c *uwsgiClient) queryStats() ([]byte, error) {
 	var err error
 	const readLineLimit = 1000 * 10
 
-	clientErr := c.conn.Command("", func(bs []byte) bool {
+	cfg := socket.Config{
+		Address:        c.address,
+		ConnectTimeout: c.timeout,
+		ReadTimeout:    c.timeout,
+		WriteTimeout:   c.timeout,
+	}
+
+	clientErr := socket.ConnectAndRead(cfg, func(bs []byte) bool {
 		b.Write(bs)
 		b.WriteByte('\n')
 
