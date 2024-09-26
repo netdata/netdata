@@ -53,7 +53,11 @@ Page Custom NetdataConfigPage NetdataConfigLeave
 
     System::Call 'KERNEL32::CreateFile(ts,i0x40000000,i0,${SYSTYPE_PTR}0,i4,i0x04000000,${SYSTYPE_PTR}0)${SYSTYPE_PTR}.r0'
     ${IntPtrCmp} $0 -1 "" launch launch
-	MessageBox MB_ICONSTOP "Already running!"
+        System::Call 'kernel32::AttachConsole(i -1)i.r0'
+        ${If} $0 != 0
+            System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+            FileWrite $0 "The installer is already running.$\r$\n"
+        ${EndIf}
 	Abort
     launch:
 !macroend
@@ -130,7 +134,7 @@ Function .onInit
                     System::Call 'kernel32::AttachConsole(i -1)i.r0'
                     ${If} $0 != 0
                         System::Call 'kernel32::GetStdHandle(i -11)i.r0'
-                        FileWrite $0 "You must accept the licenses (/A) to continue.\n"
+                        FileWrite $0 "You must accept the licenses (/A) to continue.$\r$\n"
                     ${EndIf}
                     Abort
                 ${EndIf}
@@ -293,7 +297,7 @@ Section "Install Netdata"
            System::Call 'kernel32::AttachConsole(i -1)i.r0'
            ${If} $0 != 0
                 System::Call 'kernel32::GetStdHandle(i -11)i.r0'
-                FileWrite $0 "Netdata installed with success.\n"
+                FileWrite $0 "Netdata installed with success.$\r$\n"
            ${EndIf}
            ${If} $startMsys == ${BST_CHECKED}
                    nsExec::ExecToLog '$INSTDIR\msys2.exe'
@@ -315,7 +319,7 @@ Section "Install Netdata"
                     System::Call 'kernel32::AttachConsole(i -1)i.r0'
                     ${If} $0 != 0
                         System::Call 'kernel32::GetStdHandle(i -11)i.r0'
-                        FileWrite $0 "Room(s) or Token invalid.\n"
+                        FileWrite $0 "Room(s) or Token invalid.$\r$\n"
                     ${EndIf}
            ${EndIf}
         goodbye:
