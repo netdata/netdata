@@ -445,6 +445,13 @@
 
 #if defined(OS_WINDOWS)
 
+struct perflib_data {
+    PERF_DATA_BLOCK *pDataBlock;
+    PERF_OBJECT_TYPE *pObjectType;
+    PERF_INSTANCE_DEFINITION *pi;
+    DWORD pid;
+};
+
 uint64_t apps_os_time_factor(void) {
     PerflibNamesRegistryInitialize();
     return 10000000ULL / RATES_DETAIL; // Windows uses 100-nanosecond intervals
@@ -498,7 +505,7 @@ bool get_MemTotal_per_os(void) {
     return true;
 }
 
-static inline kernel_uint_t perflib_timer(COUNTER_DATA *d) {
+static inline kernel_uint_t perflib_cpu_utilization(COUNTER_DATA *d) {
     internal_fatal(d->current.CounterType != PERF_100NSEC_TIMER,
                    "Wrong timer type");
 
@@ -507,7 +514,11 @@ static inline kernel_uint_t perflib_timer(COUNTER_DATA *d) {
     LONGLONG time1 = d->current.Time;
     LONGLONG time0 = d->previous.Time;
 
-    return RATES_DETAIL * 100ULL * os_get_system_cpus() * (data1 - data0) / (time1 - time0);
+    LONGLONG dt = time1 - time0;
+    if(dt > 0)
+        return RATES_DETAIL * 100ULL * os_get_system_cpus() * (data1 - data0) / dt;
+    else
+        return 0;
 }
 
 static inline kernel_uint_t perflib_rate(COUNTER_DATA *d) {
@@ -515,10 +526,9 @@ static inline kernel_uint_t perflib_rate(COUNTER_DATA *d) {
     ULONGLONG data0 = d->previous.Data;
     LONGLONG time1 = d->current.Time;
     LONGLONG time0 = d->previous.Time;
-    ULONGLONG freq1 = d->current.Frequency;
 
     LONGLONG dt = (time1 - time0) / time_factor;
-    if(dt)
+    if(dt > 0)
         return (RATES_DETAIL * (data1 - data0)) / dt;
     else
         return 0;
@@ -560,26 +570,43 @@ bool apps_os_collect(void) {
     // we need these outside the loop to avoid searching by name all the time
     // (our perflib library caches the id inside the COUNTER_DATA).
     COUNTER_DATA processId = {.key = "ID Process"};
-    COUNTER_DATA ppid = {.key = "Creating Process ID"};
 
     d.pi = NULL;
     for(LONG i = 0; i < d.pObjectType->NumInstances; i++) {
         d.pi = perflibForEachInstance(d.pDataBlock, d.pObjectType, d.pi);
         if (!d.pi) break;
 
-        if (!getInstanceName(d.pDataBlock, d.pObjectType, d.pi, d.name, sizeof(d.name)))
-            strncpyz(d.name, "unknown", sizeof(d.name) - 1);
-
         perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &processId);
         d.pid = (DWORD) processId.current.Data;
-        if (d.pid <= 0) continue; // pid 0 is the Idle, which is not useful for us
+        if (d.pid < INIT_PID) continue;
 
         // Get or create pid_stat structure
         struct pid_stat *p = get_or_allocate_pid_entry((pid_t) d.pid);
-        bool first_run_for_this_pid = false;
-        if (!p->perflib[PDF_UTIME].key) {
-            // a new pid, let's set our keys
-            first_run_for_this_pid = true;
+        if (unlikely(!p->perflib[PDF_UTIME].key)) {
+            // a new pid
+
+            static __thread char name[MAX_PATH];
+            if (getInstanceName(d.pDataBlock, d.pObjectType, d.pi, name, sizeof(name))) {
+                // remove the PID from the end of the name
+                char pid[UINT64_MAX_LENGTH + 1]; // +1 for the underscore
+                pid[0] = '_';
+                print_uint64(&pid[1], p->pid);
+                size_t pid_len = strlen(pid);
+                size_t name_len = strlen(name);
+                if(pid_len < name_len) {
+                    char *compare = &name[name_len - pid_len];
+                    if(strcmp(pid, compare) == 0)
+                        *compare = '\0';
+                }
+            }
+            else
+                strncpyz(name, "unknown", sizeof(name) - 1);
+
+            update_pid_comm(p, name);
+
+            COUNTER_DATA ppid = {.key = "Creating Process ID"};
+            perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ppid);
+            p->ppid = (pid_t) ppid.current.Data;
 
             p->perflib[PDF_UTIME].key = "% User Time";
             p->perflib[PDF_STIME].key = "% Privileged Time";
@@ -612,18 +639,9 @@ bool apps_os_collect(void) {
 
         p->updated = true;
 
-        if (first_run_for_this_pid) {
-            // Parent Process ID
-            perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ppid);
-            p->ppid = (pid_t) ppid.current.Data;
-
-            // Update process name
-            update_pid_comm(p, d.name);
-        }
-
         // CPU time
-        p->values[PDF_UTIME] = perflib_timer(&p->perflib[PDF_UTIME]);
-        p->values[PDF_STIME] = perflib_timer(&p->perflib[PDF_STIME]);
+        p->values[PDF_UTIME] = perflib_cpu_utilization(&p->perflib[PDF_UTIME]);
+        p->values[PDF_STIME] = perflib_cpu_utilization(&p->perflib[PDF_STIME]);
 
         // Memory
         p->values[PDF_VMRSS] = perflib_value(&p->perflib[PDF_VMRSS]);
@@ -652,7 +670,7 @@ bool apps_os_collect(void) {
 
 //        if(p->perflib[PDF_UTIME].current.Data != p->perflib[PDF_UTIME].previous.Data &&
 //           p->perflib[PDF_UTIME].current.Data && p->perflib[PDF_UTIME].previous.Data &&
-//           p->pid == 22456) {
+//           p->pid == 207064) {
 //            const char *cmd = string2str(p->comm);
 //            unsigned int cpu_divisor = time_factor * RATES_DETAIL / 100;
 //            double u = (double)p->values[PDF_UTIME] / cpu_divisor;

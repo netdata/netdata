@@ -77,14 +77,6 @@ struct pid_info {
 #if defined(OS_WINDOWS)
 #include <windows.h>
 
-struct perflib_data {
-    PERF_DATA_BLOCK *pDataBlock;
-    PERF_OBJECT_TYPE *pObjectType;
-    PERF_INSTANCE_DEFINITION *pi;
-    char name[MAX_PATH];
-    DWORD pid;
-};
-
 #define INIT_PID                             0
 #define ALL_PIDS_ARE_READ_INSTANTLY          1
 #define PROCESSES_HAVE_CPU_GUEST_TIME        0

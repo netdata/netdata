@@ -8,7 +8,7 @@ usec_t system_current_time_ut;
 
 uint64_t apps_os_time_factor(void) {
     mach_timebase_info(&mach_info);
-    time_factor = 1000000ULL / RATES_DETAIL;
+    return 1000000ULL / RATES_DETAIL;
 }
 
 bool get_MemTotal_per_os(void) {
