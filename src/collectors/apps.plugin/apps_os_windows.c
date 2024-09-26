@@ -445,8 +445,6 @@
 
 #if defined(OS_WINDOWS)
 
-#define CPU_TO_NANOSECONDCORES (100) // convert 100-nanosecond intervals to nanoseconds
-
 struct perflib_data {
     PERF_DATA_BLOCK *pDataBlock;
     PERF_OBJECT_TYPE *pObjectType;
@@ -515,9 +513,26 @@ static inline kernel_uint_t perflib_cpu_utilization(COUNTER_DATA *d) {
     LONGLONG time1 = d->current.Time;
     LONGLONG time0 = d->previous.Time;
 
+    /*
+     * The Windows documentation provides the formula for percentage:
+     *
+     *           100 * (data1 - data0) / (time1 - time0)
+     *
+     * To get a fraction (0.0 to 1.0) instead of a percentage, we
+     * simply remove the 100 multiplier:
+     *
+     *           (data1 - data0) / (time1 - time0)
+     *
+     * This fraction represents the portion of a single CPU core used
+     * over the time period. Multiplying this fraction by NSEC_PER_SEC
+     * converts it to nanosecond-cores:
+     *
+     *           NSEC_PER_SEC * (data1 - data0) / (time1 - time0)
+     */
+
     LONGLONG dt = time1 - time0;
     if(dt > 0)
-        return os_get_system_cpus() * CPU_TO_NANOSECONDCORES * (data1 - data0) / dt;
+        return NSEC_PER_SEC * (data1 - data0) / dt;
     else
         return 0;
 }
@@ -671,9 +686,10 @@ bool apps_os_collect(void) {
 
 //        if(p->perflib[PDF_UTIME].current.Data != p->perflib[PDF_UTIME].previous.Data &&
 //           p->perflib[PDF_UTIME].current.Data && p->perflib[PDF_UTIME].previous.Data &&
-//           p->pid == 207064) {
+//           p->pid == 61812) {
 //            const char *cmd = string2str(p->comm);
-//            unsigned int cpu_divisor = NSEC_PER_SEC / 100ULL;
+//            uint64_t cpu_divisor = NSEC_PER_SEC / 100ULL;
+//            uint64_t cpus = os_get_system_cpus();
 //            double u = (double)p->values[PDF_UTIME] / cpu_divisor;
 //            double s = (double)p->values[PDF_STIME] / cpu_divisor;
 //            int x = 0;
