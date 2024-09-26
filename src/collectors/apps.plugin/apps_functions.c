@@ -154,7 +154,7 @@ void function_processes(const char *transaction, char *function,
         }
     }
 
-    unsigned int cpu_divisor = time_factor * RATES_DETAIL / 100;
+    uint64_t cpu_divisor = NSEC_PER_SEC / 100;
     unsigned int memory_divisor = 1024;
     unsigned int io_divisor = 1024 * RATES_DETAIL;
 

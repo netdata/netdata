@@ -276,8 +276,8 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION user '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
-        fprintf(stdout, "DIMENSION system '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
+        fprintf(stdout, "DIMENSION user '' absolute 1 %llu\n", NSEC_PER_SEC / 100ULL);
+        fprintf(stdout, "DIMENSION system '' absolute 1 %llu\n", NSEC_PER_SEC / 100ULL);
 
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         if (enable_guest_charts) {
@@ -285,7 +285,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
                     type, string2str(w->clean_name), title, type, update_every);
             fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
             fprintf(stdout, "CLABEL_COMMIT\n");
-            fprintf(stdout, "DIMENSION guest '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
+            fprintf(stdout, "DIMENSION guest '' absolute 1 %llu\n", NSEC_PER_SEC / 100ULL);
         }
 #endif
 

@@ -445,6 +445,8 @@
 
 #if defined(OS_WINDOWS)
 
+#define CPU_TO_NANOSECONDCORES (100) // convert 100-nanosecond intervals to nanoseconds
+
 struct perflib_data {
     PERF_DATA_BLOCK *pDataBlock;
     PERF_OBJECT_TYPE *pObjectType;
@@ -452,9 +454,8 @@ struct perflib_data {
     DWORD pid;
 };
 
-uint64_t apps_os_time_factor(void) {
+void apps_os_init(void) {
     PerflibNamesRegistryInitialize();
-    return 10000000ULL / RATES_DETAIL; // Windows uses 100-nanosecond intervals
 }
 
 bool apps_os_read_global_cpu_utilization(void) {
@@ -516,7 +517,7 @@ static inline kernel_uint_t perflib_cpu_utilization(COUNTER_DATA *d) {
 
     LONGLONG dt = time1 - time0;
     if(dt > 0)
-        return RATES_DETAIL * 100ULL * os_get_system_cpus() * (data1 - data0) / dt;
+        return os_get_system_cpus() * CPU_TO_NANOSECONDCORES * (data1 - data0) / dt;
     else
         return 0;
 }
@@ -527,7 +528,7 @@ static inline kernel_uint_t perflib_rate(COUNTER_DATA *d) {
     LONGLONG time1 = d->current.Time;
     LONGLONG time0 = d->previous.Time;
 
-    LONGLONG dt = (time1 - time0) / time_factor;
+    LONGLONG dt = (time1 - time0);
     if(dt > 0)
         return (RATES_DETAIL * (data1 - data0)) / dt;
     else
@@ -672,7 +673,7 @@ bool apps_os_collect(void) {
 //           p->perflib[PDF_UTIME].current.Data && p->perflib[PDF_UTIME].previous.Data &&
 //           p->pid == 207064) {
 //            const char *cmd = string2str(p->comm);
-//            unsigned int cpu_divisor = time_factor * RATES_DETAIL / 100;
+//            unsigned int cpu_divisor = NSEC_PER_SEC / 100ULL;
 //            double u = (double)p->values[PDF_UTIME] / cpu_divisor;
 //            double s = (double)p->values[PDF_STIME] / cpu_divisor;
 //            int x = 0;

@@ -36,6 +36,7 @@
 #define PROCESSES_HAVE_VMSHARED              0
 #define PROCESSES_HAVE_RSSFILE               0
 #define PROCESSES_HAVE_RSSSHMEM              0
+#define PPID_SHOULD_BE_RUNNING               1
 #endif
 
 #if defined(OS_MACOS)
@@ -45,8 +46,6 @@
 #include <sys/proc_info.h>
 #include <sys/sysctl.h>
 #include <mach/mach_time.h> // For mach_timebase_info_data_t and mach_timebase_info
-
-extern mach_timebase_info_data_t mach_info;
 
 struct pid_info {
     struct kinfo_proc proc;
@@ -72,6 +71,7 @@ struct pid_info {
 #define PROCESSES_HAVE_VMSHARED              0
 #define PROCESSES_HAVE_RSSFILE               0
 #define PROCESSES_HAVE_RSSSHMEM              0
+#define PPID_SHOULD_BE_RUNNING               1
 #endif
 
 #if defined(OS_WINDOWS)
@@ -94,6 +94,7 @@ struct pid_info {
 #define PROCESSES_HAVE_VMSHARED              0
 #define PROCESSES_HAVE_RSSFILE               0
 #define PROCESSES_HAVE_RSSSHMEM              0
+#define PPID_SHOULD_BE_RUNNING               0
 #endif
 
 #if defined(OS_LINUX)
@@ -114,6 +115,7 @@ struct pid_info {
 #define PROCESSES_HAVE_VMSHARED              1
 #define PROCESSES_HAVE_RSSFILE               1
 #define PROCESSES_HAVE_RSSSHMEM              1
+#define PPID_SHOULD_BE_RUNNING               1
 #endif
 
 // ----------------------------------------------------------------------------
@@ -147,10 +149,12 @@ extern uint32_t
     all_files_len,
     all_files_size;
 
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 extern kernel_uint_t
     global_utime,
     global_stime,
     global_gtime;
+#endif
 
 // the normalization ratios, as calculated by normalize_utilization()
 extern NETDATA_DOUBLE
@@ -164,12 +168,6 @@ extern NETDATA_DOUBLE
     cgtime_fix_ratio,
     cminflt_fix_ratio,
     cmajflt_fix_ratio;
-
-#if defined(__FreeBSD__) || defined(__APPLE__)
-extern usec_t system_current_time_ut;
-#else
-extern kernel_uint_t system_uptime_secs;
-#endif
 
 extern size_t pagesize;
 
@@ -252,16 +250,19 @@ typedef enum __attribute__((packed)) {
 } TARGET_TYPE;
 
 typedef enum __attribute__((packed)) {
-    PDF_UTIME, // CPU user time
-    PDF_STIME, // CPU system time
+    // CPU utilization time
+    // The values are expressed in "NANOSECONDCORES".
+    // 1 x "NANOSECONDCORE" = 1 x NSEC_PER_SEC (1 billion).
+    PDF_UTIME,      // CPU user time
+    PDF_STIME,      // CPU system time
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    PDF_GTIME, // CPU guest time
+    PDF_GTIME,      // CPU guest time
 #endif
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-    PDF_CUTIME, // exited children CPU user time
-    PDF_CSTIME, // exited children CPU system time
+    PDF_CUTIME,     // exited children CPU user time
+    PDF_CSTIME,     // exited children CPU system time
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    PDF_CGTIME, // exited children CPU guest time
+    PDF_CGTIME,     // exited children CPU guest time
 #endif
 #endif
 
@@ -552,7 +553,6 @@ struct pid_stat *root_of_pids(void);
 size_t all_pids_count(void);
 
 extern int update_every;
-extern unsigned int time_factor;
 extern kernel_uint_t MemTotal;
 
 #define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
@@ -610,15 +610,18 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status);
 // each parameter is accessed only ONCE - so it is safe to pass function calls
 // or other macros as parameters
 
-#define incremental_rate(rate_variable, last_kernel_variable, new_kernel_value, collected_usec, last_collected_usec) do { \
+#define incremental_rate(rate_variable, last_kernel_variable, new_kernel_value, collected_usec, last_collected_usec, multiplier) do { \
         kernel_uint_t _new_tmp = new_kernel_value; \
-        (rate_variable) = (_new_tmp - (last_kernel_variable)) * (USEC_PER_SEC * RATES_DETAIL) / ((collected_usec) - (last_collected_usec)); \
+        (rate_variable) = (_new_tmp - (last_kernel_variable)) * (USEC_PER_SEC * multiplier) / ((collected_usec) - (last_collected_usec)); \
         (last_kernel_variable) = _new_tmp; \
     } while(0)
 
 // the same macro for struct pid members
 #define pid_incremental_rate(type, idx, value) \
-    incremental_rate(p->values[idx], p->raw[idx], value, p->type##_collected_usec, p->last_##type##_collected_usec)
+    incremental_rate(p->values[idx], p->raw[idx], value, p->type##_collected_usec, p->last_##type##_collected_usec, RATES_DETAIL)
+
+#define pid_incremental_cpu(type, idx, value) \
+    incremental_rate(p->values[idx], p->raw[idx], value, p->type##_collected_usec, p->last_##type##_collected_usec, CPU_TO_NANOSECONDCORES)
 
 int read_proc_pid_stat(struct pid_stat *p, void *ptr);
 int read_proc_pid_limits(struct pid_stat *p, void *ptr);
@@ -627,7 +630,7 @@ int read_proc_pid_cmdline(struct pid_stat *p);
 int read_proc_pid_io(struct pid_stat *p, void *ptr);
 int read_pid_file_descriptors(struct pid_stat *p, void *ptr);
 bool apps_os_read_global_cpu_utilization(void);
-uint64_t apps_os_time_factor(void);
+void apps_os_init(void);
 void get_MemTotal(void);
 
 bool collect_data_for_all_pids(void);

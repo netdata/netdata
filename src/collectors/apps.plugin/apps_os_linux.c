@@ -7,11 +7,12 @@
 #define MAX_PROC_PID_LIMITS 8192
 #define PROC_PID_LIMITS_MAX_OPEN_FILES_KEY "\nMax open files "
 
+#define CPU_TO_NANOSECONDCORES (NSEC_PER_SEC / system_hz)
+
 kernel_uint_t system_uptime_secs;
 
-uint64_t apps_os_time_factor(void) {
-    os_get_system_HZ();
-    return system_hz; // Linux uses clock ticks
+void apps_os_init(void) {
+    ;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -521,7 +522,7 @@ bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// global timestamp
+// global CPU utilization
 
 bool apps_os_read_global_cpu_utilization(void) {
     static char filename[FILENAME_MAX + 1] = "";
@@ -546,10 +547,10 @@ bool apps_os_read_global_cpu_utilization(void) {
     // temporary - it is added global_ntime;
     kernel_uint_t global_ntime = 0;
 
-    incremental_rate(global_utime, utime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  1)), collected_usec, last_collected_usec);
-    incremental_rate(global_ntime, ntime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  2)), collected_usec, last_collected_usec);
-    incremental_rate(global_stime, stime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  3)), collected_usec, last_collected_usec);
-    incremental_rate(global_gtime, gtime_raw, str2kernel_uint_t(procfile_lineword(ff, 0, 10)), collected_usec, last_collected_usec);
+    incremental_rate(global_utime, utime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  1)), collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
+    incremental_rate(global_ntime, ntime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  2)), collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
+    incremental_rate(global_stime, stime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  3)), collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
+    incremental_rate(global_gtime, gtime_raw, str2kernel_uint_t(procfile_lineword(ff, 0, 10)), collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
 
     global_utime += global_ntime;
 
@@ -558,7 +559,7 @@ bool apps_os_read_global_cpu_utilization(void) {
         kernel_uint_t global_gntime = 0;
 
         // guest nice time, on guest time
-        incremental_rate(global_gntime, gntime_raw, str2kernel_uint_t(procfile_lineword(ff, 0, 11)), collected_usec, last_collected_usec);
+        incremental_rate(global_gntime, gntime_raw, str2kernel_uint_t(procfile_lineword(ff, 0, 11)), collected_usec, last_collected_usec, 1);
 
         global_gtime += global_gntime;
 
@@ -643,10 +644,10 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     pid_incremental_rate(stat, PDF_CMINFLT, str2kernel_uint_t(procfile_lineword(ff, 0, 10)));
     pid_incremental_rate(stat, PDF_MAJFLT,  str2kernel_uint_t(procfile_lineword(ff, 0, 11)));
     pid_incremental_rate(stat, PDF_CMAJFLT, str2kernel_uint_t(procfile_lineword(ff, 0, 12)));
-    pid_incremental_rate(stat, PDF_UTIME,   str2kernel_uint_t(procfile_lineword(ff, 0, 13)));
-    pid_incremental_rate(stat, PDF_STIME,   str2kernel_uint_t(procfile_lineword(ff, 0, 14)));
-    pid_incremental_rate(stat, PDF_CUTIME,  str2kernel_uint_t(procfile_lineword(ff, 0, 15)));
-    pid_incremental_rate(stat, PDF_CSTIME,  str2kernel_uint_t(procfile_lineword(ff, 0, 16)));
+    pid_incremental_cpu(stat, PDF_UTIME,   str2kernel_uint_t(procfile_lineword(ff, 0, 13)));
+    pid_incremental_cpu(stat, PDF_STIME,   str2kernel_uint_t(procfile_lineword(ff, 0, 14)));
+    pid_incremental_cpu(stat, PDF_CUTIME,  str2kernel_uint_t(procfile_lineword(ff, 0, 15)));
+    pid_incremental_cpu(stat, PDF_CSTIME,  str2kernel_uint_t(procfile_lineword(ff, 0, 16)));
     // p->priority      = str2kernel_uint_t(procfile_lineword(ff, 0, 17));
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
     p->values[PDF_THREADS] = (int32_t) str2uint32_t(procfile_lineword(ff, 0, 19), NULL);
@@ -675,8 +676,8 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     // p->delayacct_blkio_ticks = str2kernel_uint_t(procfile_lineword(ff, 0, 41));
 
     if(enable_guest_charts) {
-        pid_incremental_rate(stat, PDF_GTIME,  str2kernel_uint_t(procfile_lineword(ff, 0, 42)));
-        pid_incremental_rate(stat, PDF_CGTIME, str2kernel_uint_t(procfile_lineword(ff, 0, 43)));
+        pid_incremental_cpu(stat, PDF_GTIME,  str2kernel_uint_t(procfile_lineword(ff, 0, 42)));
+        pid_incremental_cpu(stat, PDF_CGTIME, str2kernel_uint_t(procfile_lineword(ff, 0, 43)));
 
         if (show_guest_time || p->values[PDF_GTIME] || p->values[PDF_CGTIME]) {
             p->values[PDF_UTIME] -= (p->values[PDF_UTIME] >= p->values[PDF_GTIME]) ? p->values[PDF_GTIME] : p->values[PDF_UTIME];

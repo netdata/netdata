@@ -62,7 +62,7 @@ uint32_t
     all_files_len = 0,
     all_files_size = 0;
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // Normalization
 //
 // With normalization we lower the collected metrics by a factor to make them
@@ -77,10 +77,12 @@ uint32_t
 // metric.
 
 // the total system time, as reported by /proc/stat
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 kernel_uint_t
     global_utime = 0,
     global_stime = 0,
     global_gtime = 0;
+#endif
 
 // the normalization ratios, as calculated by normalize_utilization()
 NETDATA_DOUBLE
@@ -95,18 +97,9 @@ NETDATA_DOUBLE
     cminflt_fix_ratio = 1.0,
     cmajflt_fix_ratio = 1.0;
 
-// ----------------------------------------------------------------------------
-// factor for calculating correct CPU time values depending on units of raw data
-unsigned int time_factor = 0;
-
-// ----------------------------------------------------------------------------
-// command line options
+// --------------------------------------------------------------------------------------------------------------------
 
 int update_every = 1;
-
-#if defined(OS_MACOS)
-mach_timebase_info_data_t mach_info;
-#endif
 
 #if defined(OS_LINUX)
 int max_fds_cache_seconds = 60;
@@ -212,7 +205,7 @@ static void normalize_utilization(struct target *root) {
     // here we try to eliminate them by disabling childs processing either for specific dimensions
     // or entirely. Of course, either way, we disable it just a single iteration.
 
-    kernel_uint_t max_time = os_get_system_cpus() * time_factor * RATES_DETAIL;
+    kernel_uint_t max_time = os_get_system_cpus() * NSEC_PER_SEC;
     kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
 
     if(global_utime > max_time) global_utime = max_time;
@@ -671,8 +664,8 @@ int main(int argc, char **argv) {
     os_get_system_HZ();
     os_get_system_pid_max();
 
-    time_factor = apps_os_time_factor();
     os_get_system_cpus_uncached();
+    apps_os_init();
 
     parse_args(argc, argv);
 
@@ -752,6 +745,7 @@ int main(int argc, char **argv) {
         aggregate_processes_to_targets();
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
+        apps_os_read_global_cpu_utilization();
         normalize_utilization(apps_groups_root_target);
 #endif
 

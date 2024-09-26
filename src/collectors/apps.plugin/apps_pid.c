@@ -57,7 +57,7 @@ static inline uint64_t pid_hash(pid_t pid) {
 }
 
 inline struct pid_stat *find_pid_entry(pid_t pid) {
-    if(pid <= 0) return NULL;
+    if(pid < INIT_PID) return NULL;
 
     uint64_t hash = pid_hash(pid);
     int32_t key = pid;
@@ -293,7 +293,12 @@ static inline void link_all_processes_to_their_parents(void) {
         }
         else {
             p->parent = NULL;
-            netdata_log_error("pid %d %s states parent %d, but the later does not exist.", p->pid, pid_stat_comm(p), p->ppid);
+
+#if (PPID_SHOULD_BE_RUNNING == 1)
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                   "pid %d %s states parent %d, but the later does not exist.",
+                   p->pid, pid_stat_comm(p), p->ppid);
+#endif
         }
     }
 }
@@ -797,9 +802,6 @@ bool collect_data_for_all_pids(void) {
 
     if(!pids.all_pids.count)
         return false;
-
-    // we need /proc/stat to normalize the cpu consumption of the exited childs
-    apps_os_read_global_cpu_utilization();
 
     // build the process tree
     link_all_processes_to_their_parents();

@@ -4,9 +4,12 @@
 
 #if defined(OS_MACOS)
 
-usec_t system_current_time_ut;
+#define CPU_TO_NANOSECONDCORES (1) // already in nanoseconds
 
-uint64_t apps_os_time_factor(void) {
+usec_t system_current_time_ut;
+mach_timebase_info_data_t mach_info;
+
+void apps_os_init(void) {
     mach_timebase_info(&mach_info);
     return 1000000ULL / RATES_DETAIL;
 }
@@ -192,9 +195,9 @@ bool apps_os_read_global_cpu_utilization(void) {
     // Note: MacOS does not separate nice time from user time in the CPU stats, so you might need to adjust this logic
     kernel_uint_t global_ntime = 0;  // Assuming you want to keep track of nice time separately
 
-    incremental_rate(global_utime, utime_raw, cpuinfo.cpu_ticks[CPU_STATE_USER] + cpuinfo.cpu_ticks[CPU_STATE_NICE], collected_usec, last_collected_usec);
-    incremental_rate(global_ntime, ntime_raw, cpuinfo.cpu_ticks[CPU_STATE_NICE], collected_usec, last_collected_usec);
-    incremental_rate(global_stime, stime_raw, cpuinfo.cpu_ticks[CPU_STATE_SYSTEM], collected_usec, last_collected_usec);
+    incremental_rate(global_utime, utime_raw, cpuinfo.cpu_ticks[CPU_STATE_USER] + cpuinfo.cpu_ticks[CPU_STATE_NICE], collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
+    incremental_rate(global_ntime, ntime_raw, cpuinfo.cpu_ticks[CPU_STATE_NICE], collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
+    incremental_rate(global_stime, stime_raw, cpuinfo.cpu_ticks[CPU_STATE_SYSTEM], collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
 
     global_utime += global_ntime;
 
@@ -206,8 +209,8 @@ bool apps_os_read_global_cpu_utilization(void) {
 
     return 1;
 
-    cleanup:
-        global_utime = 0;
+cleanup:
+    global_utime = 0;
     global_stime = 0;
     global_gtime = 0;
     return 0;
@@ -226,14 +229,14 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
 
     update_pid_comm(p, comm);
 
-    kernel_uint_t userCPU = (pi->taskinfo.pti_total_user * mach_info.numer) / mach_info.denom / NSEC_PER_USEC / 10000;
-    kernel_uint_t systemCPU = (pi->taskinfo.pti_total_system * mach_info.numer) / mach_info.denom / NSEC_PER_USEC / 10000;
+    kernel_uint_t userCPU = (pi->taskinfo.pti_total_user * mach_info.numer) / mach_info.denom;
+    kernel_uint_t systemCPU = (pi->taskinfo.pti_total_system * mach_info.numer) / mach_info.denom;
 
     // Map the values from taskinfo to the pid_stat structure
     pid_incremental_rate(stat, PDF_MINFLT, pi->taskinfo.pti_faults);
     pid_incremental_rate(stat, PDF_MAJFLT, pi->taskinfo.pti_pageins);
-    pid_incremental_rate(stat, PDF_UTIME, userCPU);
-    pid_incremental_rate(stat, PDF_STIME, systemCPU);
+    pid_incremental_cpu(stat, PDF_UTIME, userCPU);
+    pid_incremental_cpu(stat, PDF_STIME, systemCPU);
     p->values[PDF_THREADS] = pi->taskinfo.pti_threadnum;
 
     usec_t started_ut = timeval_usec(&pi->proc.kp_proc.p_starttime);

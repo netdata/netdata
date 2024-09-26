@@ -4,10 +4,12 @@
 
 #if defined(OS_FREEBSD)
 
+#define CPU_TO_NANOSECONDCORES (1000) // convert microseconds to nanoseconds
+
 usec_t system_current_time_ut;
 
-uint64_t apps_os_time_factor(void) {
-    return 1000000ULL / RATES_DETAIL; // FreeBSD uses usecs;
+void apps_os_init(void) {
+    ;
 }
 
 static inline void get_current_time(void) {
@@ -228,9 +230,9 @@ bool apps_os_read_global_cpu_utilization(void) {
     // temporary - it is added global_ntime;
     kernel_uint_t global_ntime = 0;
 
-    incremental_rate(global_utime, utime_raw, cp_time[0] * 100LLU / system_hz, collected_usec, last_collected_usec);
-    incremental_rate(global_ntime, ntime_raw, cp_time[1] * 100LLU / system_hz, collected_usec, last_collected_usec);
-    incremental_rate(global_stime, stime_raw, cp_time[2] * 100LLU / system_hz, collected_usec, last_collected_usec);
+    incremental_rate(global_utime, utime_raw, cp_time[0], collected_usec, last_collected_usec, (NSEC_PER_SEC / system_hz));
+    incremental_rate(global_ntime, ntime_raw, cp_time[1], collected_usec, last_collected_usec, (NSEC_PER_SEC / system_hz));
+    incremental_rate(global_stime, stime_raw, cp_time[2], collected_usec, last_collected_usec, (NSEC_PER_SEC / system_hz));
 
     global_utime += global_ntime;
 
@@ -263,10 +265,10 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     pid_incremental_rate(stat, PDF_CMINFLT, (kernel_uint_t)proc_info->ki_rusage_ch.ru_minflt);
     pid_incremental_rate(stat, PDF_MAJFLT,  (kernel_uint_t)proc_info->ki_rusage.ru_majflt);
     pid_incremental_rate(stat, PDF_CMAJFLT, (kernel_uint_t)proc_info->ki_rusage_ch.ru_majflt);
-    pid_incremental_rate(stat, PDF_UTIME,   (kernel_uint_t)proc_info->ki_rusage.ru_utime.tv_sec * 100 + proc_info->ki_rusage.ru_utime.tv_usec / 10000);
-    pid_incremental_rate(stat, PDF_STIME,   (kernel_uint_t)proc_info->ki_rusage.ru_stime.tv_sec * 100 + proc_info->ki_rusage.ru_stime.tv_usec / 10000);
-    pid_incremental_rate(stat, PDF_CUTIME,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_utime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_utime.tv_usec / 10000);
-    pid_incremental_rate(stat, PDF_CSTIME,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_stime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_stime.tv_usec / 10000);
+    pid_incremental_rate(stat, PDF_UTIME,   (kernel_uint_t)proc_info->ki_rusage.ru_utime.tv_sec * NSEC_PER_SEC + proc_info->ki_rusage.ru_utime.tv_usec * NSEC_PER_USEC);
+    pid_incremental_rate(stat, PDF_STIME,   (kernel_uint_t)proc_info->ki_rusage.ru_stime.tv_sec * NSEC_PER_SEC + proc_info->ki_rusage.ru_stime.tv_usec * NSEC_PER_USEC);
+    pid_incremental_rate(stat, PDF_CUTIME,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_utime.tv_sec * NSEC_PER_SEC + proc_info->ki_rusage_ch.ru_utime.tv_usec * NSEC_PER_USEC);
+    pid_incremental_rate(stat, PDF_CSTIME,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_stime.tv_sec * NSEC_PER_SEC + proc_info->ki_rusage_ch.ru_stime.tv_usec * NSEC_PER_USEC);
 
     p->values[PDF_THREADS] = proc_info->ki_numthreads;
 
