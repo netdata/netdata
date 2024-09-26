@@ -6,8 +6,11 @@
 
 **Merged pull requests:**
 
+- go.d/hddtemp: connect and read [\#18619](https://github.com/netdata/netdata/pull/18619) ([ilyam8](https://github.com/ilyam8))
+- go.d/uwsgi: don't write just connect and read [\#18618](https://github.com/netdata/netdata/pull/18618) ([ilyam8](https://github.com/ilyam8))
 - POST Functions [\#18611](https://github.com/netdata/netdata/pull/18611) ([ktsaou](https://github.com/ktsaou))
 - Correctly include Windows installer in release creation. [\#18609](https://github.com/netdata/netdata/pull/18609) ([Ferroin](https://github.com/Ferroin))
+- feat: HW req for onprem installation. [\#18608](https://github.com/netdata/netdata/pull/18608) ([M4itee](https://github.com/M4itee))
 - WEB SERVER: retry sending data when errno is EAGAIN [\#18607](https://github.com/netdata/netdata/pull/18607) ([ktsaou](https://github.com/ktsaou))
 - Publish Windows installers on nightly builds. [\#18603](https://github.com/netdata/netdata/pull/18603) ([Ferroin](https://github.com/Ferroin))
 - Bump github.com/docker/docker from 27.3.0+incompatible to 27.3.1+incompatible in /src/go [\#18600](https://github.com/netdata/netdata/pull/18600) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -419,8 +422,6 @@
 - Bump go.mongodb.org/mongo-driver from 1.15.1 to 1.16.0 in /src/go/collectors/go.d.plugin [\#18048](https://github.com/netdata/netdata/pull/18048) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/docker/docker from 27.0.0+incompatible to 27.0.2+incompatible in /src/go/collectors/go.d.plugin [\#18047](https://github.com/netdata/netdata/pull/18047) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/likexian/whois-parser from 1.24.16 to 1.24.18 in /src/go/collectors/go.d.plugin [\#18046](https://github.com/netdata/netdata/pull/18046) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/gofrs/flock from 0.8.1 to 0.11.0 in /src/go/collectors/go.d.plugin [\#18045](https://github.com/netdata/netdata/pull/18045) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Semaphore \(common context\) [\#18041](https://github.com/netdata/netdata/pull/18041) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
