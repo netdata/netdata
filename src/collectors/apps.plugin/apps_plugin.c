@@ -127,74 +127,6 @@ struct target
 size_t pagesize;
 
 // ----------------------------------------------------------------------------
-
-int managed_log(struct pid_stat *p, PID_LOG log, int status) {
-    if(unlikely(!status)) {
-        // netdata_log_error("command failed log %u, errno %d", log, errno);
-
-        if(unlikely(debug_enabled || errno != ENOENT)) {
-            if(unlikely(debug_enabled || !(p->log_thrown & log))) {
-                p->log_thrown |= log;
-                switch(log) {
-                    case PID_LOG_IO:
-                        #if defined(__FreeBSD__) || defined(__APPLE__)
-                        netdata_log_error("Cannot fetch process %d I/O info (command '%s')", p->pid, pid_stat_comm(p));
-                        #else
-                        netdata_log_error("Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
-                        #endif
-                        break;
-
-                    case PID_LOG_STATUS:
-                        #if defined(__FreeBSD__) || defined(__APPLE__)
-                        netdata_log_error("Cannot fetch process %d status info (command '%s')", p->pid, pid_stat_comm(p));
-                        #else
-                        netdata_log_error("Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
-                        #endif
-                        break;
-
-                    case PID_LOG_CMDLINE:
-                        #if defined(__FreeBSD__) || defined(__APPLE__)
-                        netdata_log_error("Cannot fetch process %d command line (command '%s')", p->pid, pid_stat_comm(p));
-                        #else
-                        netdata_log_error("Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
-                        #endif
-                        break;
-
-                    case PID_LOG_FDS:
-                        #if defined(__FreeBSD__) || defined(__APPLE__)
-                        netdata_log_error("Cannot fetch process %d files (command '%s')", p->pid, pid_stat_comm(p));
-                        #else
-                        netdata_log_error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
-                        #endif
-                        break;
-
-                    case PID_LOG_LIMITS:
-                        #if defined(__FreeBSD__) || defined(__APPLE__)
-                        ;
-                        #else
-                        netdata_log_error("Cannot process %s/proc/%d/limits (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
-                        #endif
-
-                    case PID_LOG_STAT:
-                        break;
-
-                    default:
-                        netdata_log_error("unhandled error for pid %d, command '%s'", p->pid, pid_stat_comm(p));
-                        break;
-                }
-            }
-        }
-        errno_clear();
-    }
-    else if(unlikely(p->log_thrown & log)) {
-        // netdata_log_error("unsetting log %u on pid %d", log, p->pid);
-        p->log_thrown &= ~log;
-    }
-
-    return status;
-}
-
-// ----------------------------------------------------------------------------
 // update chart dimensions
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
@@ -732,9 +664,6 @@ int main(int argc, char **argv) {
             fatal("Received error on read pipe.");
         }
 
-        if(global_iterations_counter % 10 == 0)
-            get_MemTotal();
-
         if(!collect_data_for_all_pids()) {
             netdata_log_error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
@@ -745,7 +674,7 @@ int main(int argc, char **argv) {
         aggregate_processes_to_targets();
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-        apps_os_read_global_cpu_utilization();
+        OS_FUNCTION(apps_os_read_global_cpu_utilization)();
         normalize_utilization(apps_groups_root_target);
 #endif
 

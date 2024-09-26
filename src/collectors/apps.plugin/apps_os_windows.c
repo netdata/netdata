@@ -456,17 +456,17 @@ void apps_os_init(void) {
     PerflibNamesRegistryInitialize();
 }
 
-bool apps_os_read_global_cpu_utilization(void) {
+bool apps_os_read_global_cpu_utilization_windows(void) {
     // dummy - not needed
     return false;
 }
 
-bool read_proc_pid_status_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
+bool apps_os_read_pid_status_windows(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
     // dummy - not needed
     return false;
 }
 
-bool read_proc_pid_stat_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
+bool apps_os_read_pid_stat_windows(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
     // dummy - not needed
     return false;
 }
@@ -491,17 +491,16 @@ bool read_pid_file_descriptors_per_os(struct pid_stat *p __maybe_unused, void *p
     return false;
 }
 
-bool get_MemTotal_per_os(void) {
+uint64_t apps_os_get_total_memory_windows(void) {
     MEMORYSTATUSEX memStat = { 0 };
     memStat.dwLength = sizeof(memStat);
 
     if (!GlobalMemoryStatusEx(&memStat)) {
         netdata_log_error("GlobalMemoryStatusEx() failed.");
-        return false;
+        return 0;
     }
 
-    MemTotal = memStat.ullTotalPhys;
-    return true;
+    return memStat.ullTotalPhys;
 }
 
 static inline kernel_uint_t perflib_cpu_utilization(COUNTER_DATA *d) {
@@ -569,9 +568,8 @@ static inline kernel_uint_t perflib_elapsed(COUNTER_DATA *d) {
     return (time1 - data1) / freq1;
 }
 
-bool apps_os_collect(void) {
-    for(struct pid_stat *p = root_of_pids(); p; p = p->next)
-        mark_pid_as_unread(p);
+bool apps_os_collect_all_pids_windows(void) {
+    calls_counter++;
 
     struct perflib_data d = { 0 };
     d.pDataBlock = perflibGetPerformanceData(RegistryFindIDByName("Process"));
@@ -598,6 +596,7 @@ bool apps_os_collect(void) {
 
         // Get or create pid_stat structure
         struct pid_stat *p = get_or_allocate_pid_entry((pid_t) d.pid);
+
         if (unlikely(!p->perflib[PDF_UTIME].key)) {
             // a new pid
 
@@ -639,6 +638,8 @@ bool apps_os_collect(void) {
             p->perflib[PDF_UPTIME].key = "Elapsed Time";
         }
 
+        pid_collection_started(p);
+
         // get all data from perflib
         size_t ok = 0, failed = 0, invalid = 0;
         for (PID_FIELD f = 0; f < PDF_MAX; f++) {
@@ -653,7 +654,10 @@ bool apps_os_collect(void) {
                 invalid++;
         }
 
-        p->updated = true;
+        if(failed) {
+            pid_collection_failed(p);
+            continue;
+        }
 
         // CPU time
         p->values[PDF_UTIME] = perflib_cpu_utilization(&p->perflib[PDF_UTIME]);
@@ -683,6 +687,8 @@ bool apps_os_collect(void) {
         // Process uptime
         // Convert 100-nanosecond units to seconds
         p->values[PDF_UPTIME] = perflib_elapsed(&p->perflib[PDF_UPTIME]) / 10000000ULL;
+
+        pid_collection_completed(p);
 
 //        if(p->perflib[PDF_UTIME].current.Data != p->perflib[PDF_UTIME].previous.Data &&
 //           p->perflib[PDF_UTIME].current.Data && p->perflib[PDF_UTIME].previous.Data &&

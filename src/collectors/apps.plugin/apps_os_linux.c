@@ -160,32 +160,33 @@ bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __maybe_unus
 // --------------------------------------------------------------------------------------------------------------------
 // /proc/meminfo
 
-bool get_MemTotal_per_os(void) {
+uint64_t apps_os_get_total_memory_linux(void) {
+    uint64_t ret = 0;
+
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/meminfo", netdata_configured_host_prefix);
 
     procfile *ff = procfile_open(filename, ": \t", PROCFILE_FLAG_DEFAULT);
     if(!ff)
-        return false;
+        return ret;
 
     ff = procfile_readall(ff);
     if(!ff)
-        return false;
+        return ret;
 
     size_t line, lines = procfile_lines(ff);
 
     for(line = 0; line < lines ;line++) {
         size_t words = procfile_linewords(ff, line);
         if(words == 3 && strcmp(procfile_lineword(ff, line, 0), "MemTotal") == 0 && strcmp(procfile_lineword(ff, line, 2), "kB") == 0) {
-            kernel_uint_t n = str2ull(procfile_lineword(ff, line, 1), NULL);
-            if(n) MemTotal = n;
+            ret = str2ull(procfile_lineword(ff, line, 1), NULL) * 1024;
             break;
         }
     }
 
     procfile_close(ff);
 
-    return true;
+    return ret;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -244,7 +245,6 @@ bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     return true;
 
 cleanup:
-    clear_pid_io(p);
     return false;
 }
 
@@ -418,7 +418,7 @@ void arl_callback_status_vmsize(const char *name, uint32_t hash, const char *val
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->values[PDF_VMSIZE] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
+    aptr->p->values[PDF_VMSIZE] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) * 1024;
 }
 
 void arl_callback_status_vmswap(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -426,7 +426,7 @@ void arl_callback_status_vmswap(const char *name, uint32_t hash, const char *val
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->values[PDF_VMSWAP] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
+    aptr->p->values[PDF_VMSWAP] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) * 1024;
 }
 
 void arl_callback_status_vmrss(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -434,7 +434,7 @@ void arl_callback_status_vmrss(const char *name, uint32_t hash, const char *valu
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->values[PDF_VMRSS] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
+    aptr->p->values[PDF_VMRSS] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) * 1024;
 }
 
 void arl_callback_status_rssfile(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -442,7 +442,7 @@ void arl_callback_status_rssfile(const char *name, uint32_t hash, const char *va
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->values[PDF_RSSFILE] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
+    aptr->p->values[PDF_RSSFILE] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) * 1024;
 }
 
 void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -450,7 +450,7 @@ void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *v
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->values[PDF_RSSSHMEM] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
+    aptr->p->values[PDF_RSSSHMEM] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) * 1024;
 }
 
 void arl_callback_status_voluntary_ctxt_switches(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -471,7 +471,7 @@ void arl_callback_status_nonvoluntary_ctxt_switches(const char *name, uint32_t h
     pid_incremental_rate(stat, PDF_NVOLCTX, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
 }
 
-bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
+bool apps_os_read_pid_status_linux(struct pid_stat *p, void *ptr __maybe_unused) {
     static struct arl_callback_ptr arl_ptr;
     static procfile *ff = NULL;
 
@@ -524,7 +524,7 @@ bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
 // --------------------------------------------------------------------------------------------------------------------
 // global CPU utilization
 
-bool apps_os_read_global_cpu_utilization(void) {
+bool apps_os_read_global_cpu_utilization_linux(void) {
     static char filename[FILENAME_MAX + 1] = "";
     static procfile *ff = NULL;
     static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0;
@@ -607,7 +607,7 @@ static inline void update_proc_state_count(char proc_stt) {
     }
 }
 
-bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
+bool apps_os_read_pid_stat_linux(struct pid_stat *p, void *ptr __maybe_unused) {
     static procfile *ff = NULL;
 
     if(unlikely(!p->stat_filename)) {
@@ -699,14 +699,10 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
                       p->values[PDF_CMAJFLT],
                       p->values[PDF_THREADS]);
 
-    if(unlikely(global_iterations_counter == 1))
-        clear_pid_stat(p, false);
-
     update_proc_state_count(p->state);
     return true;
 
 cleanup:
-    clear_pid_stat(p, true);
     return false;
 }
 
@@ -728,7 +724,7 @@ cleanup:
 // to avoid filling up all disk space
 // if debug is enabled, all errors are printed
 
-bool apps_os_collect(void) {
+bool apps_os_collect_all_pids_linux(void) {
     // clear process state counter
     memset(proc_state_count, 0, sizeof proc_state_count);
 
@@ -761,7 +757,7 @@ bool apps_os_collect(void) {
         if(unlikely(endptr == de->d_name || *endptr != '\0'))
             continue;
 
-        collect_data_for_pid(pid, NULL);
+        incrementally_collect_data_for_pid(pid, NULL);
     }
     closedir(dir);
 

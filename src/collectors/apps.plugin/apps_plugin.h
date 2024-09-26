@@ -6,15 +6,7 @@
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 
-// debug - enable all O/S to find usages of things
-//#undef OS_LINUX
-//#define OS_LINUX 1
-//#undef OS_FREEBSD
-//#define OS_FREEBSD 1
-//#undef OS_MACOS
-//#define OS_MACOS 1
-//#undef OS_WINDOWS
-//#define OS_WINDOWS 1
+#define OS_FUNC_CONCAT(a, b) a##b
 
 #if defined(OS_FREEBSD)
 #include <sys/user.h>
@@ -37,9 +29,9 @@
 #define PROCESSES_HAVE_RSSFILE               0
 #define PROCESSES_HAVE_RSSSHMEM              0
 #define PPID_SHOULD_BE_RUNNING               1
-#endif
+#define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _freebsd)
 
-#if defined(OS_MACOS)
+#elif defined(OS_MACOS)
 #include <mach/mach.h>
 #include <mach/mach_host.h>
 #include <libproc.h>
@@ -72,9 +64,9 @@ struct pid_info {
 #define PROCESSES_HAVE_RSSFILE               0
 #define PROCESSES_HAVE_RSSSHMEM              0
 #define PPID_SHOULD_BE_RUNNING               1
-#endif
+#define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _macos)
 
-#if defined(OS_WINDOWS)
+#elif defined(OS_WINDOWS)
 #include <windows.h>
 
 #define INIT_PID                             0
@@ -95,9 +87,9 @@ struct pid_info {
 #define PROCESSES_HAVE_RSSFILE               0
 #define PROCESSES_HAVE_RSSSHMEM              0
 #define PPID_SHOULD_BE_RUNNING               0
-#endif
+#define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _windows)
 
-#if defined(OS_LINUX)
+#elif defined(OS_LINUX)
 #define INIT_PID 1
 #define ALL_PIDS_ARE_READ_INSTANTLY          0
 #define PROCESSES_HAVE_CPU_GUEST_TIME        1
@@ -116,9 +108,13 @@ struct pid_info {
 #define PROCESSES_HAVE_RSSFILE               1
 #define PROCESSES_HAVE_RSSSHMEM              1
 #define PPID_SHOULD_BE_RUNNING               1
+#define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _linux)
+
+#else
+#error "Unsupported operating system"
 #endif
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 
 extern bool debug_enabled;
 
@@ -553,7 +549,6 @@ struct pid_stat *root_of_pids(void);
 size_t all_pids_count(void);
 
 extern int update_every;
-extern kernel_uint_t MemTotal;
 
 #define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
 
@@ -603,7 +598,7 @@ static inline void debug_log_dummy(void) {}
 #define debug_log(fmt, args...) debug_log_dummy()
 
 #endif
-int managed_log(struct pid_stat *p, PID_LOG log, int status);
+bool managed_log(struct pid_stat *p, PID_LOG log, bool status);
 
 // ----------------------------------------------------------------------------
 // macro to calculate the incremental rate of a value
@@ -623,15 +618,12 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status);
 #define pid_incremental_cpu(type, idx, value) \
     incremental_rate(p->values[idx], p->raw[idx], value, p->type##_collected_usec, p->last_##type##_collected_usec, CPU_TO_NANOSECONDCORES)
 
-int read_proc_pid_stat(struct pid_stat *p, void *ptr);
+bool read_proc_pid_stat(struct pid_stat *p, void *ptr);
 int read_proc_pid_limits(struct pid_stat *p, void *ptr);
-int read_proc_pid_status(struct pid_stat *p, void *ptr);
 int read_proc_pid_cmdline(struct pid_stat *p);
 int read_proc_pid_io(struct pid_stat *p, void *ptr);
 int read_pid_file_descriptors(struct pid_stat *p, void *ptr);
-bool apps_os_read_global_cpu_utilization(void);
 void apps_os_init(void);
-void get_MemTotal(void);
 
 bool collect_data_for_all_pids(void);
 
@@ -654,24 +646,38 @@ void aggregate_processes_to_targets(void);
 void del_pid_entry(pid_t pid);
 struct pid_stat *get_or_allocate_pid_entry(pid_t pid);
 
-void mark_pid_as_unread(struct pid_stat *p);
-bool apps_os_collect(void);
 bool collect_parents_before_children(void);
 
-void clear_pid_stat(struct pid_stat *p, bool threads);
-void clear_pid_io(struct pid_stat *p);
+void pid_collection_started(struct pid_stat *p);
+void pid_collection_failed(struct pid_stat *p);
+void pid_collection_completed(struct pid_stat *p);
+
 void make_all_pid_fds_negative(struct pid_stat *p);
 uint32_t file_descriptor_find_or_add(const char *name, uint32_t hash);
 
-int collect_data_for_pid(pid_t pid, void *ptr);
-int collect_data_for_pid_stat(struct pid_stat *p, void *ptr);
+int incrementally_collect_data_for_pid(pid_t pid, void *ptr);
+int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr);
 
-bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr);
-bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr);
 bool read_proc_pid_limits_per_os(struct pid_stat *p, void *ptr);
 bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr);
 bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr);
 bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes);
-bool get_MemTotal_per_os(void);
+
+// --------------------------------------------------------------------------------------------------------------------
+// operating system functions
+
+// collect all the available information for all processes running
+bool OS_FUNCTION(apps_os_collect_all_pids)(void);
+
+bool OS_FUNCTION(apps_os_read_pid_status)(struct pid_stat *p, void *ptr);
+
+bool OS_FUNCTION(apps_os_read_pid_stat)(struct pid_stat *p, void *ptr);
+
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
+bool OS_FUNCTION(apps_os_read_global_cpu_utilization)(void);
+#endif
+
+// return the total physical memory of the system, in bytes
+uint64_t OS_FUNCTION(apps_os_get_total_memory)(void);
 
 #endif //NETDATA_APPS_PLUGIN_H

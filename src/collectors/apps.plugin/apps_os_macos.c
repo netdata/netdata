@@ -14,16 +14,16 @@ void apps_os_init(void) {
     return 1000000ULL / RATES_DETAIL;
 }
 
-bool get_MemTotal_per_os(void) {
+uint64_t apps_os_get_total_memory_macos(void) {
+    uint64_t ret = 0;
     int mib[2] = {CTL_HW, HW_MEMSIZE};
-    size_t size = sizeof(MemTotal);
-    if (sysctl(mib, 2, &MemTotal, &size, NULL, 0) == -1) {
+    size_t size = sizeof(ret);
+    if (sysctl(mib, 2, &ret, &size, NULL, 0) == -1) {
         netdata_log_error("Failed to get total memory using sysctl");
-        return false;
+        return 0;
     }
-    // MacOS returns bytes; convert to kB
-    MemTotal /= 1024;
-    return true;
+
+    return ret;
 }
 
 bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
@@ -154,13 +154,13 @@ bool read_proc_pid_limits_per_os(struct pid_stat *p __maybe_unused, void *ptr __
     return false;
 }
 
-bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
+bool apps_os_read_pid_status_macos(struct pid_stat *p, void *ptr) {
     struct pid_info *pi = ptr;
 
     p->uid = pi->bsdinfo.pbi_uid;
     p->gid = pi->bsdinfo.pbi_gid;
-    p->values[PDF_VMSIZE] = pi->taskinfo.pti_virtual_size / 1024; // Convert bytes to KiB
-    p->values[PDF_VMRSS] = pi->taskinfo.pti_resident_size / 1024; // Convert bytes to KiB
+    p->values[PDF_VMSIZE] = pi->taskinfo.pti_virtual_size;
+    p->values[PDF_VMRSS] = pi->taskinfo.pti_resident_size;
     // p->values[PDF_VMSWAP] = rusageinfo.ri_swapins + rusageinfo.ri_swapouts; // This is not directly available, consider an alternative representation
     p->values[PDF_VOLCTX] = pi->taskinfo.pti_csw;
     // p->values[PDF_NVOLCTX] = taskinfo.pti_nivcsw;
@@ -174,7 +174,7 @@ static inline void get_current_time(void) {
     system_current_time_ut = timeval_usec(&current_time);
 }
 
-bool apps_os_read_global_cpu_utilization(void) {
+bool apps_os_read_global_cpu_utilization_macos(void) {
     static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
     static usec_t collected_usec = 0, last_collected_usec = 0;
 
@@ -216,7 +216,7 @@ cleanup:
     return 0;
 }
 
-bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
+bool apps_os_read_pid_stat_macos(struct pid_stat *p, void *ptr) {
     struct pid_info *pi = ptr;
 
     p->ppid = pi->proc.kp_eproc.e_ppid;
@@ -255,21 +255,15 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
                       p->values[PDF_THREADS]);
     }
 
-    if(unlikely(global_iterations_counter == 1))
-        clear_pid_stat(p, false);
-
     // MacOS doesn't have a direct concept of process state like Linux,
     // so updating process state count might need a different approach.
 
     return true;
 }
 
-bool apps_os_collect(void) {
+bool apps_os_collect_all_pids_macos(void) {
     // Mark all processes as unread before collecting new data
     struct pid_stat *p;
-    for(p = root_of_pids(); p; p = p->next)
-        mark_pid_as_unread(p);
-
     static pid_t *pids = NULL;
     static int allocatedProcessCount = 0;
 
@@ -334,7 +328,7 @@ bool apps_os_collect(void) {
             continue;
         }
 
-        collect_data_for_pid(pid, &pi);
+        incrementally_collect_data_for_pid(pid, &pi);
     }
 
     return true;

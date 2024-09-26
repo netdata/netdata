@@ -154,10 +154,6 @@ void function_processes(const char *transaction, char *function,
         }
     }
 
-    uint64_t cpu_divisor = NSEC_PER_SEC / 100;
-    unsigned int memory_divisor = 1024;
-    unsigned int io_divisor = 1024 * RATES_DETAIL;
-
     BUFFER *wb = buffer_create(4096, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
@@ -169,6 +165,12 @@ void function_processes(const char *transaction, char *function,
 
     if(info)
         goto close_and_send;
+
+    uint64_t cpu_divisor = NSEC_PER_SEC / 100;
+    unsigned int memory_divisor = 1024 * 1024;
+    unsigned int io_divisor = 1024 * RATES_DETAIL;
+
+    uint64_t total_memory_bytes = OS_FUNCTION(apps_os_get_total_memory)();
 
     NETDATA_DOUBLE
           UserCPU_max = 0.0
@@ -346,8 +348,8 @@ void function_processes(const char *transaction, char *function,
 #endif
 
         // memory MiB
-        if(MemTotal)
-            add_value_field_ndd_with_max(wb, Memory, (NETDATA_DOUBLE)p->values[PDF_VMRSS] * 100.0 / (NETDATA_DOUBLE)MemTotal);
+        if(total_memory_bytes)
+            add_value_field_ndd_with_max(wb, Memory, (NETDATA_DOUBLE)p->values[PDF_VMRSS] * 100.0 / (NETDATA_DOUBLE)total_memory_bytes);
 
         add_value_field_ndd_with_max(wb, RSS, (NETDATA_DOUBLE)p->values[PDF_VMRSS] / memory_divisor);
 
@@ -542,7 +544,7 @@ void function_processes(const char *transaction, char *function,
 #endif
 
         // memory
-        if (MemTotal)
+        if (total_memory_bytes)
             buffer_rrdf_table_add_field(wb, field_id++, "Memory", "Memory Percentage", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                         RRDF_FIELD_VISUAL_BAR,
                                         RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
@@ -805,7 +807,7 @@ void function_processes(const char *transaction, char *function,
         }
         buffer_json_object_close(wb);
 
-        if(MemTotal) {
+        if(total_memory_bytes) {
             // Memory chart
             buffer_json_member_add_object(wb, "MemoryPercent");
             {

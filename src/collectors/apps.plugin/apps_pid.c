@@ -2,6 +2,9 @@
 
 #include "apps_plugin.h"
 
+// --------------------------------------------------------------------------------------------------------------------
+// The index of all pids
+
 #define SIMPLE_HASHTABLE_NAME _PID
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct pid_stat
 #define SIMPLE_HASHTABLE_KEY_TYPE int32_t
@@ -127,73 +130,34 @@ void del_pid_entry(pid_t pid) {
     pids.all_pids.count--;
 }
 
-int collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
-    if(unlikely(p->read)) return 0;
+// --------------------------------------------------------------------------------------------------------------------
+
+static __thread pid_t current_pid;
+static __thread kernel_uint_t current_pid_values[PDF_MAX];
+
+void pid_collection_started(struct pid_stat *p) {
+    fatal_assert(sizeof(current_pid_values) == sizeof(p->values));
+    current_pid = p->pid;
+    memcpy(current_pid_values, p->values, sizeof(current_pid_values));
+    memset(p->values, 0, sizeof(p->values));
+    p->values[PDF_PROCESSES] = 1;
     p->read = true;
+}
 
-    // --------------------------------------------------------------------
-    // /proc/<pid>/stat
+void pid_collection_failed(struct pid_stat *p) {
+    fatal_assert(current_pid == p->pid);
+    fatal_assert(sizeof(current_pid_values) == sizeof(p->values));
+    memcpy(p->values, current_pid_values, sizeof(p->values));
+}
 
-    if(unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr))))
-        // there is no reason to proceed if we cannot get its status
-        return 0;
-
-    // check its parent pid
-    if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-        netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", p->pid, pid_stat_comm(p), p->ppid);
-        p->ppid = 0;
-    }
-
-    // --------------------------------------------------------------------
-    // /proc/<pid>/io
-
-    managed_log(p, PID_LOG_IO, read_proc_pid_io(p, ptr));
-
-    // --------------------------------------------------------------------
-    // /proc/<pid>/status
-
-    if(unlikely(!managed_log(p, PID_LOG_STATUS, read_proc_pid_status(p, ptr))))
-        // there is no reason to proceed if we cannot get its status
-        return 0;
-
-    // --------------------------------------------------------------------
-    // /proc/<pid>/fd
-
-    if(enable_file_charts) {
-        managed_log(p, PID_LOG_FDS, read_pid_file_descriptors(p, ptr));
-        managed_log(p, PID_LOG_LIMITS, read_proc_pid_limits(p, ptr));
-    }
-
-    // --------------------------------------------------------------------
-    // done!
-
-#if defined(NETDATA_INTERNAL_CHECKS) && (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-    struct pid_stat *pp = p->parent;
-    if(unlikely(include_exited_childs && pp && !pp->read))
-        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-               "Read process %d (%s) sortlisted %"PRIu32", but its parent %d (%s) sortlisted %"PRIu32", is not read",
-               p->pid, pid_stat_comm(p), p->sortlist, pp->pid, pid_stat_comm(pp), pp->sortlist);
-#endif
-
-    // mark it as updated
+void pid_collection_completed(struct pid_stat *p) {
     p->updated = true;
     p->keep = false;
     p->keeploops = 0;
-
-    return 1;
 }
 
-int collect_data_for_pid(pid_t pid, void *ptr) {
-    if(unlikely(pid < 0 || pid > pid_max)) {
-        netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
-        return 0;
-    }
-
-    struct pid_stat *p = get_or_allocate_pid_entry(pid);
-    if(unlikely(!p)) return 0;
-
-    return collect_data_for_pid_stat(p, ptr);
-}
+// --------------------------------------------------------------------------------------------------------------------
+// preloading of parents before their children
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static inline size_t compute_new_sorted_size(size_t old_size, size_t required_size) {
@@ -230,7 +194,6 @@ bool collect_parents_before_children(void) {
     struct pid_stat *p = NULL;
     uint32_t sortlist = 1;
     for (p = root_of_pids(); p && slc < pids.sorted.size; p = p->next) {
-        mark_pid_as_unread(p);
         pids.sorted.array[slc++] = p;
 
         // assign a sortlist id to all it and its parents
@@ -262,11 +225,11 @@ bool collect_parents_before_children(void) {
         qsort((void *)pids.sorted.array, sorted, sizeof(struct pid_stat *), compar_pid_sortlist);
 
         // we forward read all running processes
-        // collect_data_for_pid() is smart enough,
+        // incrementally_collect_data_for_pid() is smart enough,
         // not to read the same pid twice per iteration
         for (slc = 0; slc < sorted; slc++) {
             p = pids.sorted.array[slc];
-            collect_data_for_pid_stat(p, NULL);
+            incrementally_collect_data_for_pid_stat(p, NULL);
         }
     }
 
@@ -274,7 +237,7 @@ bool collect_parents_before_children(void) {
 }
 #endif
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 
 static inline void link_all_processes_to_their_parents(void) {
     // link all children to their parents
@@ -303,7 +266,7 @@ static inline void link_all_processes_to_their_parents(void) {
     }
 }
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 
 static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t time) {
     char *prefix = "\\_ ";
@@ -449,47 +412,7 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
     }
 }
 
-void clear_pid_stat(struct pid_stat *p, bool threads) {
-    p->values[PDF_UTIME]    = 0;
-    p->values[PDF_STIME]    = 0;
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    p->values[PDF_GTIME]    = 0;
-#endif
-#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-    p->values[PDF_CUTIME]   = 0;
-    p->values[PDF_CSTIME]   = 0;
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    p->values[PDF_CGTIME]   = 0;
-#endif
-#endif
-
-    p->values[PDF_MINFLT]   = 0;
-#if (PROCESSES_HAVE_MAJFLT == 1)
-    p->values[PDF_MAJFLT]   = 0;
-#endif
-#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
-    p->values[PDF_CMINFLT]  = 0;
-    p->values[PDF_CMAJFLT]  = 0;
-#endif
-
-    if(threads)
-        p->values[PDF_THREADS] = 0;
-}
-
-void clear_pid_io(struct pid_stat *p) {
-#if (PROCESSES_HAVE_LOGICAL_IO == 1)
-    p->values[PDF_LREAD]   = 0;
-    p->values[PDF_LWRITE]  = 0;
-#endif
-#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-    p->values[PDF_PREAD]   = 0;
-    p->values[PDF_PWRITE]  = 0;
-#endif
-#if (PROCESSES_HAVE_IO_CALLS == 1)
-    p->values[PDF_CREAD]   = 0;
-    p->values[PDF_CWRITE]  = 0;
-#endif
-}
+// --------------------------------------------------------------------------------------------------------------------
 
 static inline void assign_app_group_target_to_pid(struct pid_stat *p) {
     targets_assignment_counter++;
@@ -520,6 +443,8 @@ static inline void assign_app_group_target_to_pid(struct pid_stat *p) {
     }
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+
 void update_pid_comm(struct pid_stat *p, const char *comm) {
     if(strcmp(pid_stat_comm(p), comm) != 0) {
         if(unlikely(debug_enabled)) {
@@ -539,6 +464,8 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
         assign_app_group_target_to_pid(p);
     }
 }
+
+// --------------------------------------------------------------------------------------------------------------------
 
 static inline kernel_uint_t remove_exited_child_from_parent(kernel_uint_t *field, kernel_uint_t *pfield) {
     kernel_uint_t absorbed = 0;
@@ -704,54 +631,17 @@ static inline void process_exited_pids(void) {
 #endif
 }
 
-void mark_pid_as_unread(struct pid_stat *p) {
-    p->read = false; // mark it as not read, so that collect_data_for_pid() will read it
-    p->updated = false;
-    p->merged = false;
-    p->children_count = 0;
-    p->parent = NULL;
-}
+// --------------------------------------------------------------------------------------------------------------------
 
-int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
+bool read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     p->last_stat_collected_usec = p->stat_collected_usec;
     p->stat_collected_usec = now_monotonic_usec();
     calls_counter++;
 
-    if(!read_proc_pid_stat_per_os(p, ptr))
+    if(!OS_FUNCTION(apps_os_read_pid_stat)(p, ptr))
         return 0;
 
     return 1;
-}
-
-int read_proc_pid_status(struct pid_stat *p, void *ptr) {
-    p->values[PDF_VMSIZE]   = 0;
-    p->values[PDF_VMRSS]    = 0;
-
-#if (PROCESSES_HAVE_VMSHARED == 1)
-    p->values[PDF_VMSHARED] = 0;
-#endif
-
-#if (PROCESSES_HAVE_RSSFILE == 1)
-    p->values[PDF_RSSFILE]  = 0;
-#endif
-
-#if (PROCESSES_HAVE_RSSSHMEM == 1)
-    p->values[PDF_RSSSHMEM] = 0;
-#endif
-
-#if (PROCESSES_HAVE_VMSWAP == 1)
-    p->values[PDF_VMSWAP]   = 0;
-#endif
-
-#if (PROCESSES_HAVE_VOLCTX == 1)
-    p->values[PDF_VOLCTX]   = 0;
-#endif
-
-#if (PROCESSES_HAVE_NVOLCTX == 1)
-    p->values[PDF_NVOLCTX]  = 0;
-#endif
-
-    return read_proc_pid_status_per_os(p, ptr) ? 1 : 0;
 }
 
 int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
@@ -764,9 +654,6 @@ int read_proc_pid_io(struct pid_stat *p, void *ptr) {
     calls_counter++;
 
     bool ret = read_proc_pid_io_per_os(p, ptr);
-
-    if(unlikely(global_iterations_counter == 1))
-        clear_pid_io(p);
 
     return ret ? 1 : 0;
 }
@@ -789,29 +676,80 @@ cleanup:
     return 0;
 }
 
-kernel_uint_t MemTotal = 0;
+// --------------------------------------------------------------------------------------------------------------------
+// the main loop for collecting process data
 
-void get_MemTotal(void) {
-    if(!get_MemTotal_per_os())
-        MemTotal = 0;
+static inline void clear_pid_rates(struct pid_stat *p) {
+    p->values[PDF_UTIME]    = 0;
+    p->values[PDF_STIME]    = 0;
+
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    p->values[PDF_GTIME]    = 0;
+#endif
+
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+    p->values[PDF_CUTIME]   = 0;
+    p->values[PDF_CSTIME]   = 0;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    p->values[PDF_CGTIME]   = 0;
+#endif
+#endif
+
+    p->values[PDF_MINFLT]   = 0;
+#if (PROCESSES_HAVE_MAJFLT == 1)
+    p->values[PDF_MAJFLT]   = 0;
+#endif
+
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+    p->values[PDF_CMINFLT]  = 0;
+    p->values[PDF_CMAJFLT]  = 0;
+#endif
+
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+    p->values[PDF_LREAD]   = 0;
+    p->values[PDF_LWRITE]  = 0;
+#endif
+
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+    p->values[PDF_PREAD]   = 0;
+    p->values[PDF_PWRITE]  = 0;
+#endif
+
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+    p->values[PDF_CREAD]   = 0;
+    p->values[PDF_CWRITE]  = 0;
+#endif
+
+#if (PROCESSES_HAVE_VOLCTX == 1)
+    p->values[PDF_VOLCTX]  = 0;
+#endif
+
+#if (PROCESSES_HAVE_NVOLCTX == 1)
+    p->values[PDF_NVOLCTX]  = 0;
+#endif
 }
 
 bool collect_data_for_all_pids(void) {
-    if(!apps_os_collect())
-        return false;
+    // mark all pids as unread
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next)
+        p->read = false;
 
-    if(!pids.all_pids.count)
+    // collect data for all pids
+    if(!OS_FUNCTION(apps_os_collect_all_pids)())
         return false;
 
     // build the process tree
     link_all_processes_to_their_parents();
 
-    // normally this is done
-    // however we may have processes exited while we collected values
-    // so let's find the exited ones
-    // we do this by collecting the ownership of process
-    // if we manage to get the ownership, the process still runs
+    // merge exited pids to their parents
     process_exited_pids();
+
+    // the first iteration needs to be eliminated
+    // since we are looking for rates
+    if(unlikely(global_iterations_counter == 1)) {
+        for(struct pid_stat *p = root_of_pids(); p ; p = p->next)
+            if(p->read) clear_pid_rates(p);
+    }
 
     return true;
 }

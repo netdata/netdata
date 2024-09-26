@@ -18,16 +18,17 @@ static inline void get_current_time(void) {
     system_current_time_ut = timeval_usec(&current_time);
 }
 
-bool get_MemTotal_per_os(void) {
+uint64_t apps_os_get_total_memory_freebsd(void) {
+    uint64_t ret = 0;
+
     int mib[2] = {CTL_HW, HW_PHYSMEM};
-    size_t size = sizeof(MemTotal);
-    if (sysctl(mib, 2, &MemTotal, &size, NULL, 0) == -1) {
+    size_t size = sizeof(ret);
+    if (sysctl(mib, 2, &ret, &size, NULL, 0) == -1) {
         netdata_log_error("Failed to get total memory using sysctl");
-        return false;
+        return 0;
     }
-    // FreeBSD returns bytes; convert to kB
-    MemTotal /= 1024;
-    return true;
+
+    return ret;
 }
 
 bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr) {
@@ -196,18 +197,18 @@ bool read_proc_pid_limits_per_os(struct pid_stat *p __maybe_unused, void *ptr __
     return false;
 }
 
-bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
+bool apps_os_read_pid_status_freebsd(struct pid_stat *p, void *ptr) {
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
 
     p->uid                  = proc_info->ki_uid;
     p->gid                  = proc_info->ki_groups[0];
-    p->values[PDF_VMSIZE]   = proc_info->ki_size / 1024; // in KiB
-    p->values[PDF_VMRSS]    = proc_info->ki_rssize * pagesize / 1024; // in KiB
+    p->values[PDF_VMSIZE]   = proc_info->ki_size;
+    p->values[PDF_VMRSS]    = proc_info->ki_rssize * pagesize;
     // TODO: what about shared and swap memory on FreeBSD?
     return true;
 }
 
-bool apps_os_read_global_cpu_utilization(void) {
+bool apps_os_read_global_cpu_utilization_freebsd(void) {
     static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
     static usec_t collected_usec = 0, last_collected_usec = 0;
     long cp_time[CPUSTATES];
@@ -251,7 +252,7 @@ cleanup:
     return 0;
 }
 
-bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
+bool apps_os_read_pid_stat_freebsd(struct pid_stat *p, void *ptr) {
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
     if (unlikely(proc_info->ki_tdflags & TDF_IDLETD))
         goto cleanup;
@@ -294,22 +295,15 @@ bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
                       p->values[PDF_CMAJFLT],
                       p->values[PDF_THREADS]);
 
-    if(unlikely(global_iterations_counter == 1))
-        clear_pid_stat(p, false);
-
     return true;
 
 cleanup:
-    clear_pid_stat(p, true);
     return false;
 }
 
-bool apps_os_collect(void) {
+bool apps_os_collect_all_pids_freebsd(void) {
     // Mark all processes as unread before collecting new data
     struct pid_stat *p = NULL;
-    for(p = root_of_pids;() p ; p = p->next)
-        mark_pid_as_unread(p);
-
     int i, procnum;
 
     static size_t procbase_size = 0;
@@ -352,7 +346,7 @@ bool apps_os_collect(void) {
     for (i = 0 ; i < procnum ; ++i) {
         pid_t pid = procbase[i].ki_pid;
         if (pid <= 0) continue;
-        collect_data_for_pid(pid, &procbase[i]);
+        incrementally_collect_data_for_pid(pid, &procbase[i]);
     }
 
     return true;

@@ -293,7 +293,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L);
+        fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 
 #if (PROCESSES_HAVE_VOLCTX == 1) || (PROCESSES_HAVE_NVOLCTX == 1)
         fprintf(stdout, "CHART %s.%s_cpu_context_switches '' '%s CPU context switches' 'switches/s' cpu %s.cpu_context_switches stacked 20010 %d\n",
@@ -312,13 +312,13 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L);
+        fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 
         fprintf(stdout, "CHART %s.%s_vmem_usage '' '%s virtual memory size' 'MiB' mem %s.vmem_usage line 20065 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION vmem '' absolute %ld %ld\n", 1L, 1024L);
+        fprintf(stdout, "DIMENSION vmem '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 
         fprintf(stdout, "CHART %s.%s_mem_page_faults '' '%s memory page faults' 'pgfaults/s' mem %s.mem_page_faults stacked 20060 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
@@ -334,7 +334,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION swap '' absolute %ld %ld\n", 1L, 1024L);
+        fprintf(stdout, "DIMENSION swap '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 #endif
 
 #if (PROCESSES_HAVE_PHYSICAL_IO == 1)

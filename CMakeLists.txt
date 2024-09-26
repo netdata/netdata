@@ -1894,6 +1894,7 @@ if(ENABLE_PLUGIN_APPS)
             src/collectors/apps.plugin/apps_os_freebsd.c
             src/collectors/apps.plugin/apps_os_macos.c
             src/collectors/apps.plugin/apps_os_windows.c
+            src/collectors/apps.plugin/apps_incremental_collection.c
     )
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
