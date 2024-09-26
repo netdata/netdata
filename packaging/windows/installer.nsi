@@ -29,6 +29,35 @@ Page Custom NetdataConfigPage NetdataConfigLeave
 
 !insertmacro MUI_LANGUAGE "English"
 
+!define INSTALLERLOCKFILEGUID "f787d5ef-5c41-4dc0-a115-a1fb654fad1c"
+
+# https://nsis.sourceforge.io/Allow_only_one_installer_instance
+!macro SingleInstanceFile
+    !if "${NSIS_PTR_SIZE}" > 4
+    !include "Util.nsh"
+    !else ifndef IntPtrCmp
+    !define IntPtrCmp IntCmp
+    !endif
+
+    !ifndef NSIS_PTR_SIZE & SYSTYPE_PTR
+    !define SYSTYPE_PTR i ; NSIS v2.x
+    !else
+    !define /ifndef SYSTYPE_PTR p ; NSIS v3.0+
+    !endif
+
+    !if "${NSIS_CHAR_SIZE}" < 2
+    Push "$TEMP\${INSTALLERLOCKFILEGUID}.lock"
+    !else
+    Push "$APPDATA\${INSTALLERLOCKFILEGUID}.lock"
+    !endif
+
+    System::Call 'KERNEL32::CreateFile(ts,i0x40000000,i0,${SYSTYPE_PTR}0,i4,i0x04000000,${SYSTYPE_PTR}0)${SYSTYPE_PTR}.r0'
+    ${IntPtrCmp} $0 -1 "" launch launch
+	MessageBox MB_ICONSTOP "Already running!"
+	Abort
+    launch:
+!macroend
+
 var hStartMsys
 var startMsys
 
@@ -45,6 +74,8 @@ var accepted
 var avoidClaim
 
 Function .onInit
+        !insertmacro SingleInstanceFile
+
         nsExec::ExecToLog '$SYSDIR\sc.exe stop Netdata'
         pop $0
         ${If} $0 == 0
@@ -104,6 +135,10 @@ Function .onInit
                     Abort
                 ${EndIf}
         goahead:
+FunctionEnd
+
+Function un.onInit
+!insertmacro SingleInstanceFile
 FunctionEnd
 
 Function NetdataConfigPage
