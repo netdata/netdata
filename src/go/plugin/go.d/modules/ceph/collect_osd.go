@@ -8,44 +8,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-const (
-	urlPathApiOsd = "/api/osd"
-)
-
-type apiOsdResponse struct {
-	Up     int64  `json:"up"`
-	In     int64  `json:"in"`
-	Id     int64  `json:"id"`
-	UUID   string `json:"uuid"`
-	Statfs struct {
-		Total     int64 `json:"total"`
-		Available int64 `json:"available"`
-	} `json:"statfs"`
-	Stats struct {
-		OpW        float64 `json:"op_w"`
-		OpInBytes  float64 `json:"op_in_bytes"`
-		OpR        float64 `json:"op_r"`
-		OpOutBytes float64 `json:"op_out_bytes"`
-	} `json:"stats"`
-	PerfStats struct {
-		CommitLatencyMs int64 `json:"commit_latency_ms"`
-		ApplyLatencyMs  int64 `json:"apply_latency_ms"`
-	} `json:"perf_stats"`
-	Tree struct {
-		DeviceClass string `json:"device_class"`
-		Type        string `json:"type"`
-		Name        string `json:"name"`
-	} `json:"tree"`
-}
-
 func (c *Ceph) collectOsds(mx map[string]int64) error {
 	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiOsd)
 	if err != nil {
 		return err
 	}
 
-	req.Header.Set("Accept", "application/vnd.ceph.api.v1.0+json")
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", hdrAcceptVersion)
+	req.Header.Set("Content-Type", hdrContentTypeJson)
 	req.Header.Set("Authorization", "Bearer "+c.token)
 
 	var osds []apiOsdResponse
@@ -74,15 +44,15 @@ func (c *Ceph) collectOsds(mx map[string]int64) error {
 			mx[px+"status_in"], mx[px+"status_out"] = 0, 1
 		}
 
-		mx[px+"size_bytes"] = osd.Statfs.Total
-		mx[px+"space_used_bytes"] = osd.Statfs.Total - osd.Statfs.Available
-		mx[px+"space_avail_bytes"] = osd.Statfs.Available
+		mx[px+"size_bytes"] = osd.OsdStats.Statfs.Total
+		mx[px+"space_used_bytes"] = osd.OsdStats.Statfs.Total - osd.OsdStats.Statfs.Available
+		mx[px+"space_avail_bytes"] = osd.OsdStats.Statfs.Available
 		mx[px+"read_ops"] = int64(osd.Stats.OpR)
 		mx[px+"read_bytes"] = int64(osd.Stats.OpOutBytes)
 		mx[px+"write_ops"] = int64(osd.Stats.OpW)
 		mx[px+"written_bytes"] = int64(osd.Stats.OpInBytes)
-		mx[px+"commit_latency_ms"] = osd.PerfStats.CommitLatencyMs
-		mx[px+"apply_latency_ms"] = osd.PerfStats.ApplyLatencyMs
+		mx[px+"commit_latency_ms"] = int64(osd.OsdStats.PerfStat.CommitLatencyMs)
+		mx[px+"apply_latency_ms"] = int64(osd.OsdStats.PerfStat.ApplyLatencyMs)
 	}
 
 	for uuid := range c.seenOsds {

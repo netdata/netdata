@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
@@ -32,9 +33,7 @@ func New() *Ceph {
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
-					URL:      "https://127.0.0.1:8443",
-					Username: "admin",
-					Password: "639y7m1jkyy",
+					URL: "https://127.0.0.1:8443",
 				},
 				ClientConfig: web.ClientConfig{
 					TLSConfig: tlscfg.TLSConfig{
@@ -43,9 +42,9 @@ func New() *Ceph {
 				},
 			},
 		},
+		charts:    &module.Charts{},
 		seenPools: make(map[string]bool),
 		seenOsds:  make(map[string]bool),
-		charts:    generalCharts.Copy(),
 	}
 }
 
@@ -58,11 +57,14 @@ type Ceph struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
-	charts *module.Charts
+	charts               *module.Charts
+	addClusterChartsOnce sync.Once
 
 	httpClient *http.Client
 
 	token string
+
+	fsid string // a unique identifier for the cluster
 
 	seenPools map[string]bool
 	seenOsds  map[string]bool

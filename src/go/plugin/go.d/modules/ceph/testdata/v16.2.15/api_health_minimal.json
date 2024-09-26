@@ -56,11 +56,11 @@
   "scrub_status": "Inactive",
   "pg_info": {
     "object_stats": {
-      "2": 3,
+      "num_objects": 6,
       "num_object_copies": 6,
-      "num_objects_degraded": 0,
-      "num_objects_misplaced": 0,
-      "num_objects_unfound": 0
+      "num_objects_degraded": 1,
+      "num_objects_misplaced": 1,
+      "num_objects_unfound": 1
     },
     "statuses": {
       "active+clean": 1,
@@ -68,28 +68,38 @@
     },
     "pgs_per_osd": 2
   },
+  "mgr_map": {
+    "active_name": "pve-deb-work.snrdap",
+    "standbys": [
+      {
+        "gid": 24118,
+        "name": "pve-deb-work.rjothn",
+        "mgr_features": 4540138314316775400
+      }
+    ]
+  },
   "pools": [
     {},
     {}
   ],
   "df": {
     "stats": {
-      "total_avail_bytes": 175476211712,
+      "total_avail_bytes": 175476178944,
       "total_bytes": 176085270528,
-      "total_used_raw_bytes": 609058816
+      "total_used_raw_bytes": 609091584
     }
   },
   "client_perf": {
-    "read_bytes_sec": 0,
-    "read_op_per_sec": 0,
-    "recovering_bytes_per_sec": 0,
-    "write_bytes_sec": 0,
-    "write_op_per_sec": 0
+    "read_bytes_sec": 1,
+    "read_op_per_sec": 1,
+    "recovering_bytes_per_sec": 1,
+    "write_bytes_sec": 1,
+    "write_op_per_sec": 1
   },
   "hosts": 1,
-  "rgw": 0,
+  "rgw": 1,
   "iscsi_daemons": {
-    "up": 0,
-    "down": 0
+    "up": 1,
+    "down": 1
   }
 }

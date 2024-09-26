@@ -74,7 +74,7 @@
     },
     "stats": {
       "stored": {
-        "latest": 0,
+        "latest": 1,
         "rate": 0.0,
         "rates": [
           [
@@ -200,7 +200,7 @@
         ]
       },
       "objects": {
-        "latest": 0,
+        "latest": 1,
         "rate": 0.0,
         "rates": [
           [
@@ -284,7 +284,7 @@
         ]
       },
       "bytes_used": {
-        "latest": 0,
+        "latest": 1,
         "rate": 0.0,
         "rates": [
           [
@@ -410,7 +410,7 @@
         ]
       },
       "percent_used": {
-        "latest": 0.0,
+        "latest": 1.0,
         "rate": 0.0,
         "rates": [
           [
@@ -620,7 +620,7 @@
         ]
       },
       "rd": {
-        "latest": 0,
+        "latest": 1,
         "rate": 0.0,
         "rates": [
           [
@@ -662,7 +662,7 @@
         ]
       },
       "rd_bytes": {
-        "latest": 0,
+        "latest": 1,
         "rate": 0.0,
         "rates": [
           [
@@ -704,7 +704,7 @@
         ]
       },
       "wr": {
-        "latest": 0,
+        "latest": 1,
         "rate": 0.0,
         "rates": [
           [
@@ -746,7 +746,7 @@
         ]
       },
       "wr_bytes": {
-        "latest": 0,
+        "latest": 1,
         "rate": 0.0,
         "rates": [
           [
@@ -1037,7 +1037,7 @@
     },
     "stats": {
       "stored": {
-        "latest": 0,
+        "latest": 1,
         "rate": 0.0,
         "rates": [
           [
@@ -1079,7 +1079,7 @@
         ]
       },
       "stored_data": {
-        "latest": 0,
+        "latest": 1,
         "rate": 0.0,
         "rates": [
           [
@@ -1247,7 +1247,7 @@
         ]
       },
       "bytes_used": {
-        "latest": 0,
+        "latest": 1,
         "rate": 0.0,
         "rates": [
           [
@@ -1373,7 +1373,7 @@
         ]
       },
       "percent_used": {
-        "latest": 0.0,
+        "latest": 1.0,
         "rate": 0.0,
         "rates": [
           [
@@ -1583,7 +1583,7 @@
         ]
       },
       "rd": {
-        "latest": 0,
+        "latest": 1,
         "rate": 0.0,
         "rates": [
           [
@@ -1625,7 +1625,7 @@
         ]
       },
       "rd_bytes": {
-        "latest": 0,
+        "latest": 1,
         "rate": 0.0,
         "rates": [
           [

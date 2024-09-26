@@ -4,30 +4,9 @@ package ceph
 
 import (
 	"fmt"
-	"net/url"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
-
-var (
-	urlPathApiPool  = "/api/pool"
-	urlQueryApiPool = url.Values{"stats": {"true"}}.Encode()
-)
-
-type apiPoolResponse struct {
-	PoolName string `json:"pool_name"`
-	Stats    struct {
-		Stored       struct{ Latest float64 } `json:"stored"`
-		Objects      struct{ Latest float64 } `json:"objects"`
-		AvailRaw     struct{ Latest float64 } `json:"avail_raw"`
-		BytesUsed    struct{ Latest float64 } `json:"bytes_used"`
-		PercentUsed  struct{ Latest float64 } `json:"percent_used"`
-		Reads        struct{ Latest float64 } `json:"rd"`
-		ReadBytes    struct{ Latest float64 } `json:"rd_bytes"`
-		Writes       struct{ Latest float64 } `json:"wr"`
-		WrittenBytes struct{ Latest float64 } `json:"wr_bytes"`
-	} `json:"stats"`
-}
 
 func (c *Ceph) collectPools(mx map[string]int64) error {
 	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiPool)
@@ -36,8 +15,8 @@ func (c *Ceph) collectPools(mx map[string]int64) error {
 	}
 
 	req.URL.RawQuery = urlQueryApiPool
-	req.Header.Set("Accept", "application/vnd.ceph.api.v1.0+json")
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", hdrAcceptVersion)
+	req.Header.Set("Content-Type", hdrContentTypeJson)
 	req.Header.Set("Authorization", "Bearer "+c.token)
 
 	var pools []apiPoolResponse

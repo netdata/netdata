@@ -46,7 +46,6 @@ var prometheusPortAllocations = map[int]string{
 	9125: "statsd_exporter",
 	9126: "new_relic_exporter",
 	9127: "pgbouncer_exporter",
-	9128: "ceph_exporter",
 	9129: "haproxy_log_exporter",
 	9130: "unifi_poller",
 	9131: "varnish_exporter",

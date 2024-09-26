@@ -20,18 +20,32 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "This collector monitors Ceph metrics about Cluster statistics, OSD usage, latency and Pool statistics."
-        method_description: >
-          This tool uses the `ceph` command-line utility to gather the metrics.
+        metrics_description: |
+          This collector monitors the overall health status and performance of your Ceph clusters.
+          It gathers key metrics for the entire cluster, individual Pools, and OSDs
+        method_description: |
+          It collects metrics by periodically issuing HTTP GET requests to the Ceph Manager [RESP API](https://docs.ceph.com/en/reef/mgr/ceph_api/#):
+
+          - [/api/monitor](https://docs.ceph.com/en/reef/mgr/ceph_api/#get--api-monitor) (only once to get the Ceph cluster id (fsid))          
+          - [/api/health/minimal](https://docs.ceph.com/en/reef/mgr/ceph_api/#get--api-health-minimal)
+          - [/api/osd](https://docs.ceph.com/en/reef/mgr/ceph_api/#get--api-osd)
+          - [/api/pool?stats=true](https://docs.ceph.com/en/reef/mgr/ceph_api/#get--api-pool)
       supported_platforms:
         include: [Linux]
         exclude: []
-      multi_instance: false
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
         auto_detection:
-          description: ""
+          description: |
+            The collector can automatically detect Ceph Manager instances running on:
+
+            - localhost that are listening on port 8443
+            - within Docker containers
+            
+            > **Note that the Ceph RESP API requires a username and password**. 
+            > While Netdata can automatically detect Ceph Manager instances and create data collection jobs, these jobs will fail unless you provide the necessary credentials.
         limits:
           description: ""
         performance_impact:
@@ -51,27 +65,103 @@ modules:
           list:
             - name: update_every
               description: Data collection frequency.
-              default_value: 10
+              default_value: 1
               required: false
-            - name: binary_path
-              description: Path to the `ceph` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable.
-              default_value: /usr/bin/ceph
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: The URL of the [Ceph Manager API](https://docs.ceph.com/en/reef/mgr/ceph_api/).
+              default_value: https://127.0.0.1:8443
               required: true
             - name: timeout
-              description: Timeout for executing the binary, specified in seconds.
-              default_value: 2
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: true
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: true
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: "GET"
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: yes
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
               required: false
         examples:
           folding:
             title: ""
             enabled: false
           list:
-            - name: Custom binary path
-              description: The executable is not in the directories specified in the PATH environment variable.
+            - name: Basic
+              description: A basic example configuration.
+              folding:
+                enabled: false
               config: |
                 jobs:
-                  - name: custom_ceph
-                    binary_path: /usr/local/bin/ceph
+                  - name: local
+                    url: https://127.0.0.1:8443
+                    username: user
+                    password: pass
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:8443
+                    username: user
+                    password: pass
+                
+                  - name: remote
+                    url: https://192.0.2.1:8443
+                    username: user
+                    password: pass
     troubleshooting:
       problems:
         list: []
@@ -87,101 +177,215 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: "These metrics refer to the entire monitored application."
-          labels: []
+        - name: cluster
+          description: "These metrics refer to the entire Ceph cluster."
+          labels:
+            - name: fsid
+              description: A unique identifier of the cluster.
           metrics:
-            - name: ceph.general_usage
-              description: Ceph General Space
-              unit: "KiB"
+            - name: ceph.cluster_status
+              description: Ceph Cluster Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: err
+                - name: warn
+            - name: ceph.cluster_hosts_count
+              description: Ceph Cluster Hosts
+              unit: hosts
+              chart_type: line
+              dimensions:
+                - name: hosts
+            - name: ceph.cluster_monitors_count
+              description: Ceph Cluster Monitors
+              unit: monitors
+              chart_type: line
+              dimensions:
+                - name: monitors
+            - name: ceph.cluster_osds_count
+              description: Ceph Cluster OSDs
+              unit: osds
+              chart_type: line
+              dimensions:
+                - name: osds
+            - name: ceph.cluster_osds_by_status_count
+              description: Ceph Cluster OSDs by Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+                - name: in
+                - name: out
+            - name: ceph.cluster_managers_count
+              description: Ceph Cluster Managers
+              unit: managers
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: standby
+            - name: ceph.cluster_object_gateways_count
+              description: Ceph Cluster Object Gateways (RGW)
+              unit: gateways
+              chart_type: line
+              dimensions:
+                - name: object
+            - name: ceph.cluster_iscsi_gateways_count
+              description: Ceph Cluster iSCSI Gateways
+              unit: gateways
+              chart_type: line
+              dimensions:
+                - name: iscsi
+            - name: ceph.cluster_iscsi_gateways_by_status_count
+              description: Ceph Cluster iSCSI Gateways by Status
+              unit: gateways
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+            - name: ceph.cluster_physical_capacity_utilization
+              description: Ceph Cluster Physical Capacity Utilization
+              unit: percent
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: ceph.cluster_physical_capacity_usage
+              description: Ceph Cluster Physical Capacity Usage
+              unit: bytes
               chart_type: stacked
               dimensions:
                 - name: avail
                 - name: used
-            - name: ceph.general_objects
-              description: Ceph General Objects
-              unit: "objects"
+            - name: ceph.cluster_objects_count
+              description: Ceph Cluster Objects
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: objects
+            - name: ceph.cluster_objects_by_status_distribution
+              description: Ceph Cluster Objects by Status
+              unit: percent
+              chart_type: stacked
+              dimensions:
+                - name: healthy
+                - name: misplaced
+                - name: degraded
+                - name: unfound
+            - name: ceph.cluster_pools_count
+              description: Ceph Cluster Pools
+              unit: pools
+              chart_type: line
+              dimensions:
+                - name: pools
+            - name: ceph.cluster_pgs_count
+              description: Ceph Cluster Placement Groups
+              unit: pgs
+              chart_type: line
+              dimensions:
+                - name: pgs
+            - name: ceph.cluster_pgs_by_status_count
+              description: Ceph Cluster Placement Groups by Status
+              unit: pgs
+              chart_type: stacked
+              dimensions:
+                - name: clean
+                - name: working
+                - name: warning
+                - name: unknown
+            - name: ceph.cluster_pgs_per_osd_count
+              description: Ceph Cluster Placement Groups per OSD
+              unit: pgs
+              chart_type: line
+              dimensions:
+                - name: per_osd
+        - name: osd
+          description: These metrics refer to the Object Storage Daemon (OSD).
+          labels:
+            - name: fsid
+              description: A unique identifier of the cluster.
+            - name: osd_uuid
+              description: OSD UUID.
+            - name: osd_name
+              description: OSD name.
+            - name: device_class
+              description: OSD device class.
+          metrics:
+            - name: ceph.osd_status
+              description: Ceph OSD Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+                - name: in
+                - name: out
+            - name: ceph.osd_space_usage
+              description: Ceph OSD Space Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: avail
+                - name: used
+            - name: ceph.osd_io
+              description: Ceph OSD IO
+              unit: bytes/s
               chart_type: area
               dimensions:
-                - name: cluster
-            - name: ceph.general_bytes
-              description: Ceph General Read/Write Data/s
-              unit: "KiB/s"
+                - name: read
+                - name: written
+            - name: ceph.osd_iops
+              description: Ceph OSD IOPS
+              unit: ops/s
               chart_type: area
               dimensions:
                 - name: read
                 - name: write
-            - name: ceph.general_operations
-              description: Ceph General Read/Write Operations/s
-              unit: "operations"
-              chart_type: area
+            - name: ceph.osd_latency
+              description: Ceph OSD Latency
+              unit: milliseconds
+              chart_type: line
               dimensions:
-                - name: read
-                - name: write
-            - name: ceph.general_latency
-              description: Ceph General Apply/Commit latency
-              unit: "milliseconds"
-              chart_type: area
-              dimensions:
-                - name: apply
                 - name: commit
-            - name: ceph.pool_usage
-              description: Ceph Pools
-              unit: "KiB"
-              chart_type: line
-              dimensions:
-                - name: a dimension per Ceph Pool
-            - name: ceph.pool_objects
-              description: Ceph Pools
-              unit: "objects"
-              chart_type: line
-              dimensions:
-                - name: a dimension per Ceph Pool
-            - name: ceph.pool_read_bytes
-              description: Ceph Read Pool Data/s
-              unit: "KiB/s"
+                - name: apply
+        - name: pool
+          description: These metrics refer to the Pool.
+          labels:
+            - name: fsid
+              description: A unique identifier of the cluster.
+            - name: pool_name
+              description: Pool name.
+          metrics:
+            - name: ceph.pool_space_utilization
+              description: Ceph Pool Space Utilization
+              unit: percent
               chart_type: area
               dimensions:
-                - name: a dimension per Ceph Pool
-            - name: ceph.pool_write_bytes
-              description: Ceph Write Pool Data/s
-              unit: "KiB/s"
+                - name: utilization
+            - name: ceph.pool_space_usage
+              description: Ceph Pool Space Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: avail
+                - name: used
+            - name: ceph.pool_objects_count
+              description: Ceph Pool Objects
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: object
+            - name: ceph.pool_io
+              description: Ceph Pool IO
+              unit: bytes/s
               chart_type: area
               dimensions:
-                - name: a dimension per Ceph Pool
-            - name: ceph.pool_read_operations
-              description: Ceph Read Pool Operations/s
-              unit: "operations"
+                - name: read
+                - name: written
+            - name: ceph.pool_iops
+              description: Ceph Pool IOPS
+              unit: ops/s
               chart_type: area
               dimensions:
-                - name: a dimension per Ceph Pool
-            - name: ceph.pool_write_operations
-              description: Ceph Write Pool Operations/s
-              unit: "operations"
-              chart_type: area
-              dimensions:
-                - name: a dimension per Ceph Pool
-            - name: ceph.osd_usage
-              description: Ceph OSDs
-              unit: "KiB"
-              chart_type: line
-              dimensions:
-                - name: a dimension per Ceph OSD
-            - name: ceph.osd_size
-              description: Ceph OSDs size
-              unit: "KiB"
-              chart_type: line
-              dimensions:
-                - name: a dimension per Ceph OSD
-            - name: ceph.apply_latency
-              description: Ceph OSDs apply latency
-              unit: "milliseconds"
-              chart_type: line
-              dimensions:
-                - name: a dimension per Ceph OSD
-            - name: ceph.commit_latency
-              description: Ceph OSDs commit latency
-              unit: "milliseconds"
-              chart_type: line
-              dimensions:
-                - name: a dimension per Ceph OSD
+                - name: read
+                - name: write

@@ -13,10 +13,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-const (
-	urlPathApiAuth       = "/api/auth"
-	urlPathApiAuthCheck  = "/api/auth/check"
-	urlPathApiAuthLogout = "/api/auth/logout"
+type (
+	authLoginResp struct {
+		Token string `json:"token"`
+	}
+	authCheckResp struct {
+		Username    string         `json:"username"`
+		Permissions map[string]any `json:"permissions"`
+	}
 )
 
 func (c *Ceph) authLogin() (string, error) {
@@ -46,29 +50,26 @@ func (c *Ceph) authLogin() (string, error) {
 		req.Body = io.NopCloser(body)
 		req.ContentLength = int64(body.Len())
 		req.Method = http.MethodPost
-		req.Header.Set("Accept", "application/vnd.ceph.api.v1.0+json")
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", hdrAcceptVersion)
+		req.Header.Set("Content-Type", hdrContentTypeJson)
 
 		return req, nil
 	}()
-
 	if err != nil {
 		return "", err
 	}
 
-	var token struct {
-		Token string `json:"token"`
-	}
+	var tok authLoginResp
 
-	if err := c.webClient(201).RequestJSON(req, &token); err != nil {
+	if err := c.webClient(201).RequestJSON(req, &tok); err != nil {
 		return "", err
 	}
 
-	if token.Token == "" {
+	if tok.Token == "" {
 		return "", errors.New("empty token")
 	}
 
-	return token.Token, nil
+	return tok.Token, nil
 }
 
 func (c *Ceph) authCheck() (bool, error) {
@@ -78,13 +79,7 @@ func (c *Ceph) authCheck() (bool, error) {
 	}
 
 	req, err := func() (*http.Request, error) {
-		var token = struct {
-			Token string `json:"token"`
-		}{
-			Token: c.token,
-		}
-
-		bs, err := json.Marshal(token)
+		bs, err := json.Marshal(authLoginResp{Token: c.token})
 		if err != nil {
 			return nil, err
 		}
@@ -100,24 +95,21 @@ func (c *Ceph) authCheck() (bool, error) {
 		req.ContentLength = int64(body.Len())
 		req.URL.RawQuery = url.Values{"token": {c.token}}.Encode() // TODO: it seems not necessary?
 		req.Method = http.MethodPost
-		req.Header.Set("Accept", "application/vnd.ceph.api.v1.0+json")
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", hdrAcceptVersion)
+		req.Header.Set("Content-Type", hdrContentTypeJson)
 		return req, nil
 	}()
 	if err != nil {
 		return false, err
 	}
 
-	var resp struct {
-		Username    string         `json:"username"`
-		Permissions map[string]any `json:"permissions"`
-	}
+	var resp authCheckResp
 
 	if err := c.webClient().RequestJSON(req, &resp); err != nil {
 		return false, err
 	}
 
-	return resp.Username != "" && resp.Permissions != nil, nil
+	return resp.Username != "", nil
 }
 
 func (c *Ceph) authLogout() error {
@@ -135,7 +127,7 @@ func (c *Ceph) authLogout() error {
 		}
 
 		req.Method = http.MethodPost
-		req.Header.Set("Accept", "application/vnd.ceph.api.v1.0+json")
+		req.Header.Set("Accept", hdrAcceptVersion)
 		req.Header.Set("Authorization", "Bearer "+c.token)
 		return req, nil
 	}()

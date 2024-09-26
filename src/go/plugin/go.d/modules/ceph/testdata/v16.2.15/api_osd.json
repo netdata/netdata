@@ -114,8 +114,8 @@
         "upper_bound": 1
       },
       "perf_stat": {
-        "commit_latency_ms": 0.0,
-        "apply_latency_ms": 0.0,
+        "commit_latency_ms": 1.0,
+        "apply_latency_ms": 1.0,
         "commit_latency_ns": 0,
         "apply_latency_ns": 0
       },
@@ -147,10 +147,10 @@
       ]
     },
     "stats": {
-      "op_w": 0.0,
-      "op_in_bytes": 0.0,
-      "op_r": 0.0,
-      "op_out_bytes": 0.0,
+      "op_w": 1.0,
+      "op_in_bytes": 1.0,
+      "op_r": 1.0,
+      "op_out_bytes": 1.0,
       "numpg": 2,
       "stat_bytes": 107369988096,
       "stat_bytes_used": 304529408
@@ -586,8 +586,8 @@
         "upper_bound": 1
       },
       "perf_stat": {
-        "commit_latency_ms": 0.0,
-        "apply_latency_ms": 0.0,
+        "commit_latency_ms": 1.0,
+        "apply_latency_ms": 1.0,
         "commit_latency_ns": 0,
         "apply_latency_ns": 0
       },
@@ -619,10 +619,10 @@
       ]
     },
     "stats": {
-      "op_w": 0.0,
-      "op_in_bytes": 0.0,
-      "op_r": 0.0,
-      "op_out_bytes": 0.0,
+      "op_w": 1.0,
+      "op_in_bytes": 1.0,
+      "op_r": 1.0,
+      "op_out_bytes": 1.0,
       "numpg": 2,
       "stat_bytes": 68715282432,
       "stat_bytes_used": 304529408

@@ -5,6 +5,7 @@ package ceph
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 
@@ -20,11 +21,23 @@ func (c *Ceph) collect() (map[string]int64, error) {
 		return nil, err
 	}
 
+	if c.fsid == "" {
+		fsid, err := c.getFsid()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get fsid: %v", err)
+		}
+		c.fsid = fsid
+		c.addClusterChartsOnce.Do(c.addClusterCharts)
+	}
+
+	if err := c.collectHealth(mx); err != nil {
+		return nil, fmt.Errorf("failed to collect health: %v", err)
+	}
 	if err := c.collectOsds(mx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to collect osds: %v", err)
 	}
 	if err := c.collectPools(mx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to collect pools: %v", err)
 	}
 
 	return mx, nil
@@ -49,6 +62,35 @@ func (c *Ceph) auth() error {
 	c.token = tok
 
 	return nil
+}
+
+func (c *Ceph) getFsid() (string, error) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiMonitor)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Accept", hdrAcceptVersion)
+	req.Header.Set("Content-Type", hdrContentTypeJson)
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	var resp struct {
+		MonStatus struct {
+			MonMap struct {
+				FSID string `json:"fsid"`
+			} `json:"monmap"`
+		} `json:"mon_status"`
+	}
+
+	if err := c.webClient().RequestJSON(req, &resp); err != nil {
+		return "", err
+	}
+
+	if resp.MonStatus.MonMap.FSID == "" {
+		return "", errors.New("no fsid")
+	}
+
+	return resp.MonStatus.MonMap.FSID, nil
 }
 
 func (c *Ceph) webClient(statusCodes ...int) *web.Client {
