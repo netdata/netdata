@@ -1,55 +1,50 @@
+# Netdata Windows Installer
 
-# Netdata Installer
-
-For installation on Microsoft Windows, there is an executable to install and claim Netdata. This binary offers two different
-installation modes, which are described in the following sections.
+Netdata offers a convenient Windows installer for easy setup. This executable provides two distinct installation modes, outlined below.
 
 ## Graphical User Interface (GUI)
 
-When you double-click the installer, you will be prompted to accept the installation as an administrator since
-Netdata will add a service to your system. After this, the installer GUI will guide you through the following steps:
+Double-clicking the installer initiates the setup process. Since Netdata adds a service to your system, you'll need to provide administrator privileges.
+The installer will then guide you through these steps:
 
-- Welcome: The initial screen provides details about the actions the installer will perform.
-- UI License: This screen presents the [Netdata Cloud UI License](src/web/gui/v2/LICENSE.md). You must accept the license to proceed.
-- GPL 3 License: You will then be presented with the GPL 3 License that is used across the Netdata software.
-- Destination: By default, Netdata will be installed in `C:\Program Files\Netdata`. If you prefer a different directory, 
-  you can change it here.
-- Installation: At this stage, the software will be installed in the selected directory.
-- Claim: If you haven’t claimed your Agent yet, this screen will allow you to
-  [claim](src/claim/README.md) it. The following fields are available:
- 
-    - Token: Your Netdata Cloud Space's claim token.
-    - Rooms: The Room IDs to which you want to assign your node, separated by commas.
-    - Proxy: (Optional) The proxy address used to communicate with Netdata Cloud.
-    - Insecure connection: By default, Netdata verifies the host certificate. If this option is selected,
-      certificate verification will be disabled.
-    - Open terminal: Selecting this option will open the `MSYS2 `terminal at the end of the installation.
-- Finish: The installation completes.  
+1. **Welcome**: This screen provides a summary of the actions the installer will perform.
+2. **License Agreements**:
+    - [Netdata Cloud UI License](/src/web/gui/v2/LICENSE.md): Review and accept the license terms to proceed.
+    - [GPLv3 License](/LICENSE): Read the GNU General Public License v3, which governs the Netdata software.
+3. **Destination**:  Choose the installation directory. By default, Netdata installs in `C:\Program Files\Netdata`.
+4. **Installation**: The installer will copy the necessary files to the chosen directory.
+5. **Claiming**: [Connecting](/src/claim/README.md) your Netdata Agent to your Netdata Cloud Space. Here's what you can configure:
+    - Token: The claiming token for your Netdata Cloud Space.
+    - Rooms: Specify the Room IDs where you want your node to appear (comma-separated list).
+    - Proxy: Enter the address of a proxy server if required for communication with Netdata Cloud.
+    - Insecure connection: By default, Netdata verifies the server's certificate. Enabling this option bypasses verification (use only if necessary).
+    - Open MSYS2 Terminal: Select this option to launch the `MSYS2` terminal after installation completes.
+6. **Finish**: The installation process is complete!
 
 ## Silent Mode
 
-For faster installation, the silent mode does not display the 
-[Netdata Cloud UI License](src/web/gui/v2/LICENSE.md),
-nor the [GPL3 License](https://www.gnu.org/licenses/gpl-3.0.txt). However, you must use the `/A` option to indicate that
-you accept both Licenses before proceeding.
+This section provides instructions for installing Netdata in silent mode, which is ideal for automated deployments.
+Silent mode skips displaying license agreements, but requires explicitly accepting them using the `/A` option.
 
-In silent mode, the following options are available without additional arguments:
+**Available Options**:
 
-- `/S`: Runs the installer in silent mode.
-- `/A`: Accepts all Licenses required by Netdata. Without this option, the installer will not proceed.
-- `/D`: Specifies the destination directory.
-- `/T`: Opens the `MSYS2` terminal after installation is complete.
-- `/I`: Accepts insecure connections, meaning the hostname will not be verified.
+| Option    | Description                                                                                      |
+|-----------|--------------------------------------------------------------------------------------------------|
+| `/S`      | Enables silent mode installation.                                                                |
+| `/A`      | Accepts all Netdata licenses. This option is mandatory for silent installations.                 |
+| `/D`      | Specifies the desired installation directory (defaults to `C:\Program Files\Netdata`).           |
+| `/T`      | Opens the `MSYS2` terminal after installation.                                                   |
+| `/I`      | Forces insecure connections, bypassing hostname verification (use only if absolutely necessary). |
+| `/TOKEN=` | Sets the claiming token for your Netdata Cloud Space.                                            |
+| `/ROOMS=` | Comma-separated list of Room IDs where you want your node to appear.                             |
+| `/PROXY=` | Sets the proxy server address if your network requires one.                                      |
 
-Additionally, the following options require arguments:
+**Example Usage**
 
-- `/TOKEN=`: Specifies your Netdata Cloud Space's claim token.
-- `/ROOMS=`: Specifies the Room IDs to which you want to connect the node to. Multiple rooms can be specified by separating
-   them with commas.
-- `/PROXY=`: (Optional) If your network uses a proxy, you can specify its address here.
+Connect your Agent to your Netdata Cloud Space with token `<YOUR_TOKEN>` and room `<YOUR_ROOM>`:
 
-Below is an example of how to use the installer to connect to the cloud with token `YYY` and room `ZZZ`:
-
-```sh
-netdata-installer.exe /S /A /TOKEN=YYY /ROOMS=ZZZ
+```bash
+netdata-installer.exe /S /A /TOKEN=<YOUR_TOKEN> /ROOMS=<YOUR_ROOM>
 ```
+
+Replace `<YOUR_TOKEN>` and `<YOUR_ROOM>` with your actual Netdata Cloud Space claim token and room ID, respectively.
