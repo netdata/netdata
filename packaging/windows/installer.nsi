@@ -58,7 +58,7 @@ Page Custom NetdataConfigPage NetdataConfigLeave
             System::Call 'kernel32::GetStdHandle(i -11)i.r0'
             FileWrite $0 "The installer is already running.$\r$\n"
         ${EndIf}
-	Abort
+	Quit
     launch:
 !macroend
 
@@ -136,7 +136,7 @@ Function .onInit
                         System::Call 'kernel32::GetStdHandle(i -11)i.r0'
                         FileWrite $0 "You must accept the licenses (/A) to continue.$\r$\n"
                     ${EndIf}
-                    Abort
+                    Quit
                 ${EndIf}
         goahead:
 FunctionEnd
