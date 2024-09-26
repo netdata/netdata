@@ -28,7 +28,7 @@ struct rrdengine_instance;
 struct rrdeng_cmd;
 
 #define MAX_PAGES_PER_EXTENT (109) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
-#define DEFAULT_PAGES_PER_EXTENT (64)
+#define DEFAULT_PAGES_PER_EXTENT (109)
 
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
