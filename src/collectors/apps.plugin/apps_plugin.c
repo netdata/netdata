@@ -531,11 +531,13 @@ static void parse_args(int argc, char **argv)
                     , max_fds_cache_seconds
 #endif
             );
-            exit(1);
+            exit(0);
         }
 
+#if !defined(OS_WINDOWS) || !defined(RUN_UNDER_CLION)
         netdata_log_error("Cannot understand option %s", argv[i]);
         exit(1);
+#endif
     }
 
     if(freq > 0) update_every = freq;
@@ -672,9 +674,7 @@ int main(int argc, char **argv) {
     time_factor = apps_os_time_factor();
     os_get_system_cpus_uncached();
 
-#if !defined(NETDATA_INTERNAL_CHECKS)
     parse_args(argc, argv);
-#endif
 
     if(!check_capabilities() && !am_i_running_as_root() && !check_proc_1_io()) {
         uid_t uid = getuid(), euid = geteuid();

@@ -125,6 +125,8 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
         add_definitions(-D_GNU_SOURCE)
 
         if($ENV{CLION_IDE})
+                set(RUN_UNDER_CLION True)
+
                 # clion needs these to find the includes
                 if("${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
                         if("$ENV{MSYSTEM}" STREQUAL "MSYS")
