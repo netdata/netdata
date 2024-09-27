@@ -681,7 +681,7 @@ bool apps_os_collect_all_pids_windows(void) {
 
         // Process uptime
         // Convert 100-nanosecond units to seconds
-        p->values[PDF_UPTIME] = perflib_elapsed(&p->perflib[PDF_UPTIME]) / 10000000ULL;
+        p->values[PDF_UPTIME] = perflib_elapsed(&p->perflib[PDF_UPTIME]);
 
         pid_collection_completed(p);
 
