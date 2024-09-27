@@ -2379,19 +2379,18 @@ usec_t get_agent_event_time_average(event_log_type_t event_id)
     if (!PREPARE_STATEMENT(db_meta, SQL_GET_AGENT_EVENT_TYPE_AVERAGE, &res))
         return 0;
 
+    usec_t avg_time = 0;
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, event_id));
-    usec_t avg_time = 0;
+
     param = 0;
-    if (sqlite3_step_monitored(res) == SQLITE_ROW) {
+    if (sqlite3_step_monitored(res) == SQLITE_ROW)
         avg_time = sqlite3_column_int64(res, 0);
-    }
-    sqlite3_finalize(res);
-    return avg_time;
+
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
-    return -1;
+    return avg_time;
 }
 
 //
