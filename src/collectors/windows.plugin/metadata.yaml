@@ -5,7 +5,7 @@ modules:
       module_name: PerflibProcesses
       monitored_instance:
         name: System statistics
-        link: "https://www.microsoft.com/en-us/windows"
+        link: "https://learn.microsoft.com/en-us/windows/win32/procthread/processes-and-threads"
         categories:
           - data-collection.windows-systems
         icon_filename: "windows.svg"
