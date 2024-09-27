@@ -967,7 +967,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [CVMFS clients](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/cvmfs_clients.md)
 
-- [Ceph](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/ceph/integrations/ceph.md)
+- [Ceph](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/ceph/integrations/ceph.md)
 
 - [DMCache devices](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/dmcache/integrations/dmcache_devices.md)
 

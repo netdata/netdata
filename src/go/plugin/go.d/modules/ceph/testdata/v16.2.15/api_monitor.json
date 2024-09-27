@@ -1,0 +1,315 @@
+{
+  "mon_status": {
+    "name": "pve-deb-work",
+    "rank": 0,
+    "state": "leader",
+    "election_epoch": 7,
+    "quorum": [
+      0
+    ],
+    "quorum_age": 315075,
+    "features": {
+      "required_con": "2449958747317026820",
+      "required_mon": [
+        "kraken",
+        "luminous",
+        "mimic",
+        "osdmap-prune",
+        "nautilus",
+        "octopus",
+        "pacific",
+        "elector-pinging"
+      ],
+      "quorum_con": "4540138314316775423",
+      "quorum_mon": [
+        "kraken",
+        "luminous",
+        "mimic",
+        "osdmap-prune",
+        "nautilus",
+        "octopus",
+        "pacific",
+        "elector-pinging"
+      ]
+    },
+    "outside_quorum": [],
+    "extra_probe_peers": [],
+    "sync_provider": [],
+    "monmap": {
+      "epoch": 1,
+      "fsid": "28c31cb4-79ce-11ef-9a4d-e6007f1f06b0",
+      "modified": "2024-09-23T17:06:26.264498Z",
+      "created": "2024-09-23T17:06:26.264498Z",
+      "min_mon_release": 16,
+      "min_mon_release_name": "pacific",
+      "election_strategy": 1,
+      "disallowed_leaders: ": "",
+      "stretch_mode": false,
+      "tiebreaker_mon": "",
+      "removed_ranks: ": "",
+      "features": {
+        "persistent": [
+          "kraken",
+          "luminous",
+          "mimic",
+          "osdmap-prune",
+          "nautilus",
+          "octopus",
+          "pacific",
+          "elector-pinging"
+        ],
+        "optional": []
+      },
+      "mons": [
+        {
+          "rank": 0,
+          "name": "pve-deb-work",
+          "public_addrs": {
+            "addrvec": [
+              {
+                "type": "v2",
+                "addr": "127.0.0.1:3300",
+                "nonce": 0
+              },
+              {
+                "type": "v1",
+                "addr": "127.0.0.1:6789",
+                "nonce": 0
+              }
+            ]
+          },
+          "addr": "127.0.0.1:6789/0",
+          "public_addr": "127.0.0.1:6789/0",
+          "priority": 0,
+          "weight": 0,
+          "crush_location": "{}",
+          "stats": {
+            "num_sessions": [
+              [
+                1727428059.43674,
+                9
+              ],
+              [
+                1727428064.436794,
+                9
+              ],
+              [
+                1727428069.4371185,
+                9
+              ],
+              [
+                1727428074.437272,
+                9
+              ],
+              [
+                1727428079.437457,
+                9
+              ],
+              [
+                1727428084.4377377,
+                9
+              ],
+              [
+                1727428089.4380398,
+                9
+              ],
+              [
+                1727428094.4382815,
+                9
+              ],
+              [
+                1727428099.4385583,
+                9
+              ],
+              [
+                1727428104.4388537,
+                9
+              ],
+              [
+                1727428109.439028,
+                9
+              ],
+              [
+                1727428114.439225,
+                9
+              ],
+              [
+                1727428119.4395273,
+                9
+              ],
+              [
+                1727428124.4398105,
+                9
+              ],
+              [
+                1727428129.4401586,
+                9
+              ],
+              [
+                1727428134.4403143,
+                9
+              ],
+              [
+                1727428139.4406898,
+                9
+              ],
+              [
+                1727428144.4407866,
+                9
+              ],
+              [
+                1727428149.4410205,
+                9
+              ],
+              [
+                1727428154.4414103,
+                9
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    "feature_map": {
+      "mon": [
+        {
+          "features": "0x3f01cfbdfffdffff",
+          "release": "luminous",
+          "num": 1
+        }
+      ],
+      "osd": [
+        {
+          "features": "0x3f01cfbdfffdffff",
+          "release": "luminous",
+          "num": 2
+        }
+      ],
+      "client": [
+        {
+          "features": "0x3f01cfbdfffdffff",
+          "release": "luminous",
+          "num": 4
+        }
+      ],
+      "mgr": [
+        {
+          "features": "0x3f01cfbdfffdffff",
+          "release": "luminous",
+          "num": 2
+        }
+      ]
+    },
+    "stretch_mode": false
+  },
+  "in_quorum": [
+    {
+      "rank": 0,
+      "name": "pve-deb-work",
+      "public_addrs": {
+        "addrvec": [
+          {
+            "type": "v2",
+            "addr": "127.0.0.1:3300",
+            "nonce": 0
+          },
+          {
+            "type": "v1",
+            "addr": "127.0.0.1:6789",
+            "nonce": 0
+          }
+        ]
+      },
+      "addr": "127.0.0.1:6789/0",
+      "public_addr": "127.0.0.1:6789/0",
+      "priority": 0,
+      "weight": 0,
+      "crush_location": "{}",
+      "stats": {
+        "num_sessions": [
+          [
+            1727428059.43674,
+            9
+          ],
+          [
+            1727428064.436794,
+            9
+          ],
+          [
+            1727428069.4371185,
+            9
+          ],
+          [
+            1727428074.437272,
+            9
+          ],
+          [
+            1727428079.437457,
+            9
+          ],
+          [
+            1727428084.4377377,
+            9
+          ],
+          [
+            1727428089.4380398,
+            9
+          ],
+          [
+            1727428094.4382815,
+            9
+          ],
+          [
+            1727428099.4385583,
+            9
+          ],
+          [
+            1727428104.4388537,
+            9
+          ],
+          [
+            1727428109.439028,
+            9
+          ],
+          [
+            1727428114.439225,
+            9
+          ],
+          [
+            1727428119.4395273,
+            9
+          ],
+          [
+            1727428124.4398105,
+            9
+          ],
+          [
+            1727428129.4401586,
+            9
+          ],
+          [
+            1727428134.4403143,
+            9
+          ],
+          [
+            1727428139.4406898,
+            9
+          ],
+          [
+            1727428144.4407866,
+            9
+          ],
+          [
+            1727428149.4410205,
+            9
+          ],
+          [
+            1727428154.4414103,
+            9
+          ]
+        ]
+      }
+    }
+  ],
+  "out_quorum": []
+}
