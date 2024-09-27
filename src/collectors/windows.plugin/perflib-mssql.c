@@ -70,6 +70,18 @@ struct mssql_instance {
     RRDSET *st_deadLocks;
     DICTIONARY *locks_instances;
 
+    RRDSET *st_conn_memory;
+    RRDDIM *rd_conn_memory;
+
+    RRDSET *st_ext_benefit_mem;
+    RRDDIM *rd_ext_benefit_mem;
+
+    RRDSET *st_pending_mem_grant;
+    RRDDIM *rd_pending_mem_grant;
+
+    RRDSET *st_mem_tot_server;
+    RRDDIM *rd_mem_tot_server;
+
     COUNTER_DATA MSSQLAccessMethodPageSplits;
     COUNTER_DATA MSSQLBufferCacheHits;
     COUNTER_DATA MSSQLBufferCheckpointPages;
@@ -177,12 +189,12 @@ static inline void initialize_mssql_keys(struct mssql_instance *p) {
     // Errors
     p->MSSQLSQLErrorsTotal.key = "Errors/sec";
 
-    /*
-    p->MSSQLConnectionMemoryBytes.key = "";
-    p->MSSQLExternalBenefitOfMemory.key = "";
-    p->MSSQLPendingMemoryGrants.key = "";
-    p->MSSQLTotalServerMemory.key = "";
+    p->MSSQLConnectionMemoryBytes.key = "Connection Memory (KB)";
+    p->MSSQLExternalBenefitOfMemory.key = "External benefit of memory";
+    p->MSSQLPendingMemoryGrants.key = "Memory Grants Pending";
+    p->MSSQLTotalServerMemory.key = "Total Server Memory (KB)";
 
+    /*
     p->MSSQLDatabaseActiveTransactions.key = "";
     p->MSSQLDatabaseBackupRestoreOperations.key = "";
     p->MSSQLDatabaseDataFileSize.key = "";
@@ -869,6 +881,146 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p
     rrdset_done(p->st_deadLocks);
 }
 
+static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_MEMORY]);
+    if (!pObjectType)
+        return;
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLConnectionMemoryBytes)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_connection_memory_bytes", p->instanceID);
+        if (!p->st_conn_memory) {
+            p->st_conn_memory = rrdset_create_localhost("mssql"
+                                                        , id, NULL
+                                                        , "memory"
+                                                        , "mssql.instance_memmgr_connection_memory_bytes"
+                                                        , "Amount of dynamic memory to maintain connections"
+                                                        , "bytes"
+                                                        , PLUGIN_WINDOWS_NAME
+                                                        , "PerflibMSSQL"
+                                                        , PRIO_MSSQL_MEMMGR_CONNECTION_MEMORY_BYTES
+                                                        , update_every
+                                                        , RRDSET_TYPE_LINE
+                                                        );
+
+            snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_memmgr_connection_memory_bytes", p->instanceID);
+            p->rd_conn_memory  = rrddim_add(p->st_conn_memory,
+                                           id,
+                                           "memory",
+                                           1,
+                                           1,
+                                           RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_conn_memory->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(p->st_conn_memory,
+                              p->rd_conn_memory,
+                              (collected_number)(p->MSSQLConnectionMemoryBytes.current.Data*1024));
+        rrdset_done(p->st_conn_memory);
+    }
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLExternalBenefitOfMemory)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_external_benefit_of_memory", p->instanceID);
+        if (!p->st_ext_benefit_mem) {
+            p->st_ext_benefit_mem = rrdset_create_localhost("mssql"
+                                                            , id, NULL
+                                                            , "memory"
+                                                            , "mssql.instance_memmgr_external_benefit_of_memory"
+                                                            , "Performance benefit from adding memory to a specific cache"
+                                                            , "bytes"
+                                                            , PLUGIN_WINDOWS_NAME
+                                                            , "PerflibMSSQL"
+                                                            , PRIO_MSSQL_MEMMGR_EXTERNAL_BENEFIT_OF_MEMORY
+                                                            , update_every
+                                                            , RRDSET_TYPE_LINE
+                                                            );
+
+            snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_memmgr_external_benefit_of_memory", p->instanceID);
+            p->rd_ext_benefit_mem  = rrddim_add(p->st_ext_benefit_mem,
+                                                id,
+                                                "benefit",
+                                                1,
+                                                1,
+                                                RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_ext_benefit_mem->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(p->st_ext_benefit_mem,
+                              p->rd_ext_benefit_mem,
+                              (collected_number)p->MSSQLExternalBenefitOfMemory.current.Data);
+        rrdset_done(p->st_ext_benefit_mem);
+    }
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLPendingMemoryGrants)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_pending_memory_grants", p->instanceID);
+        if (!p->st_pending_mem_grant) {
+            p->st_pending_mem_grant = rrdset_create_localhost("mssql"
+                                                              , id, NULL
+                                                              , "memory"
+                                                              , "mssql.instance_memmgr_pending_memory_grants"
+                                                              , "Process waiting for memory grant"
+                                                              , "process"
+                                                              , PLUGIN_WINDOWS_NAME
+                                                              , "PerflibMSSQL"
+                                                              , PRIO_MSSQL_MEMMGR_PENDING_MEMORY_GRANTS
+                                                              , update_every
+                                                              , RRDSET_TYPE_LINE
+                                                              );
+
+            snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_memmgr_pending_memory_grants", p->instanceID);
+            p->rd_pending_mem_grant  = rrddim_add(p->st_pending_mem_grant,
+                                                 id,
+                                                 "pending",
+                                                 1,
+                                                 1,
+                                                 RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_pending_mem_grant->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(p->st_pending_mem_grant,
+                              p->rd_pending_mem_grant,
+                              (collected_number)p->MSSQLPendingMemoryGrants.current.Data);
+        rrdset_done(p->st_pending_mem_grant);
+    }
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLPendingMemoryGrants)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_server_memory", p->instanceID);
+        if (!p->st_mem_tot_server) {
+            p->st_mem_tot_server = rrdset_create_localhost("mssql"
+                                                           , id, NULL
+                                                           , "memory"
+                                                           , "mssql.instance_memmgr_server_memory"
+                                                           , "Memory committed"
+                                                           , "bytes"
+                                                           , PLUGIN_WINDOWS_NAME
+                                                           , "PerflibMSSQL"
+                                                           , PRIO_MSSQL_MEMMGR_TOTAL_SERVER
+                                                           , update_every
+                                                           , RRDSET_TYPE_LINE
+                                                           );
+
+            snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_memmgr_total_server_memory_bytes", p->instanceID);
+            p->rd_mem_tot_server  = rrddim_add(p->st_mem_tot_server,
+                                              id,
+                                              "memory",
+                                              1,
+                                              1,
+                                              RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_mem_tot_server->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(p->st_mem_tot_server,
+                              p->rd_mem_tot_server,
+                              (collected_number)(p->MSSQLPendingMemoryGrants.current.Data*1024));
+        rrdset_done(p->st_mem_tot_server);
+    }
+}
+
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_instance *p = value;
     int *update_every = data;
@@ -878,7 +1030,7 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         do_mssql_errors,
         NULL,
         do_mssql_locks,
-        NULL,
+        do_mssql_memory_mgr,
         do_mssql_buffer_management,
         do_mssql_sql_statistics,
         NULL,
