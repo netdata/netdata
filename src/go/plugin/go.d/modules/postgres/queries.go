@@ -51,12 +51,14 @@ GROUP BY state;
 `
 }
 
-func queryCheckpoints() string {
+func queryCheckpoints(version int) string {
 	// definition by version: https://pgpedia.info/p/pg_stat_bgwriter.html
 	// docs: https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-BGWRITER-VIEW
 	// code: https://github.com/postgres/postgres/blob/366283961ac0ed6d89014444c6090f3fd02fce0a/src/backend/catalog/system_views.sql#L1104
 
-	return `
+	if version < pgVersion17 {
+
+		return `
 SELECT checkpoints_timed,
        checkpoints_req,
        checkpoint_write_time,
@@ -68,6 +70,21 @@ SELECT checkpoints_timed,
        buffers_backend_fsync,
        buffers_alloc * current_setting('block_size')::numeric      AS buffers_alloc_bytes
 FROM pg_stat_bgwriter;
+`
+	}
+	return `
+SELECT 
+    chkpt.num_timed AS checkpoints_timed,
+    chkpt.num_requested AS checkpoints_req,
+    chkpt.write_time AS checkpoint_write_time,
+    chkpt.sync_time AS checkpoint_sync_time,
+    chkpt.buffers_written * current_setting('block_size')::numeric AS buffers_checkpoint_bytes,
+    bgwrtr.buffers_clean * current_setting('block_size')::numeric  AS buffers_clean_bytes,
+    bgwrtr.maxwritten_clean,
+    bgwrtr.buffers_alloc * current_setting('block_size')::numeric  AS buffers_alloc_bytes
+FROM 
+    pg_stat_bgwriter AS bgwrtr,
+    pg_stat_checkpointer AS chkpt;
 `
 }
 

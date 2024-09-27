@@ -155,7 +155,7 @@ func TestPostgres_Check(t *testing.T) {
 
 				mockExpect(t, m, queryServerCurrentConnectionsUsed(), dataVer140004ServerCurrentConnections)
 				mockExpect(t, m, queryServerConnectionsState(), dataVer140004ServerConnectionsState)
-				mockExpect(t, m, queryCheckpoints(), dataVer140004Checkpoints)
+				mockExpect(t, m, queryCheckpoints(140004), dataVer140004Checkpoints)
 				mockExpect(t, m, queryServerUptime(), dataVer140004ServerUptime)
 				mockExpect(t, m, queryTXIDWraparound(), dataVer140004TXIDWraparound)
 				mockExpect(t, m, queryWALWrites(140004), dataVer140004WALWrites)
@@ -258,7 +258,7 @@ func TestPostgres_Collect(t *testing.T) {
 
 					mockExpect(t, m, queryServerCurrentConnectionsUsed(), dataVer140004ServerCurrentConnections)
 					mockExpect(t, m, queryServerConnectionsState(), dataVer140004ServerConnectionsState)
-					mockExpect(t, m, queryCheckpoints(), dataVer140004Checkpoints)
+					mockExpect(t, m, queryCheckpoints(140004), dataVer140004Checkpoints)
 					mockExpect(t, m, queryServerUptime(), dataVer140004ServerUptime)
 					mockExpect(t, m, queryTXIDWraparound(), dataVer140004TXIDWraparound)
 					mockExpect(t, m, queryWALWrites(140004), dataVer140004WALWrites)

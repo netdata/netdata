@@ -18,6 +18,7 @@ const (
 	pgVersion94 = 9_04_00
 	pgVersion10 = 10_00_00
 	pgVersion11 = 11_00_00
+	pgVersion17 = 17_00_00
 )
 
 func (p *Postgres) collect() (map[string]int64, error) {
