@@ -625,8 +625,8 @@ bool apps_os_collect_all_pids_windows(void) {
             p->perflib[PDF_VMSWAP].key = "Page File Bytes";
             p->perflib[PDF_LREAD].key = "IO Read Bytes/sec";
             p->perflib[PDF_LWRITE].key = "IO Write Bytes/sec";
-            p->perflib[PDF_CREAD].key = "IO Read Operations/sec";
-            p->perflib[PDF_CWRITE].key = "IO Write Operations/sec";
+            p->perflib[PDF_OREAD].key = "IO Read Operations/sec";
+            p->perflib[PDF_OWRITE].key = "IO Write Operations/sec";
             p->perflib[PDF_THREADS].key = "Thread Count";
             p->perflib[PDF_HANDLES].key = "Handle Count";
             p->perflib[PDF_MINFLT].key = "Page Faults/sec";
@@ -666,8 +666,8 @@ bool apps_os_collect_all_pids_windows(void) {
         // I/O
         p->values[PDF_LREAD] = perflib_rate(&p->perflib[PDF_LREAD]);
         p->values[PDF_LWRITE] = perflib_rate(&p->perflib[PDF_LWRITE]);
-        p->values[PDF_CREAD] = perflib_rate(&p->perflib[PDF_CREAD]);
-        p->values[PDF_CWRITE] = perflib_rate(&p->perflib[PDF_CWRITE]);
+        p->values[PDF_OREAD] = perflib_rate(&p->perflib[PDF_OREAD]);
+        p->values[PDF_OWRITE] = perflib_rate(&p->perflib[PDF_OWRITE]);
 
         // Threads
         p->values[PDF_THREADS] = perflib_value(&p->perflib[PDF_THREADS]);

@@ -319,8 +319,8 @@ typedef enum __attribute__((packed)) {
 #endif
 
 #if (PROCESSES_HAVE_IO_CALLS == 1)
-    PDF_CREAD,      // read calls/sec
-    PDF_CWRITE,     // write calls/sec
+    PDF_OREAD,      // read ops/sec
+    PDF_OWRITE,     // write ops/sec
 #endif
 
     PDF_UPTIME,     // the process uptime in seconds

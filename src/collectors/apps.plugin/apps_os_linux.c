@@ -237,8 +237,8 @@ bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
 
     pid_incremental_rate(io, PDF_LREAD,     str2kernel_uint_t(procfile_lineword(ff, 0,  1)));
     pid_incremental_rate(io, PDF_LWRITE,    str2kernel_uint_t(procfile_lineword(ff, 1,  1)));
-    pid_incremental_rate(io, PDF_CREAD,     str2kernel_uint_t(procfile_lineword(ff, 2,  1)));
-    pid_incremental_rate(io, PDF_CWRITE,    str2kernel_uint_t(procfile_lineword(ff, 3,  1)));
+    pid_incremental_rate(io, PDF_OREAD,     str2kernel_uint_t(procfile_lineword(ff, 2,  1)));
+    pid_incremental_rate(io, PDF_OWRITE,    str2kernel_uint_t(procfile_lineword(ff, 3,  1)));
     pid_incremental_rate(io, PDF_PREAD,     str2kernel_uint_t(procfile_lineword(ff, 4,  1)));
     pid_incremental_rate(io, PDF_PWRITE,    str2kernel_uint_t(procfile_lineword(ff, 5,  1)));
 

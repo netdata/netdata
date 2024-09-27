@@ -228,8 +228,8 @@ void function_processes(const char *transaction, char *function,
         , PWrites_max = 0
 #endif
 #if (PROCESSES_HAVE_IO_CALLS == 1)
-        , RCalls_max = 0
-        , WCalls_max = 0
+        , ROps_max = 0
+        , WOps_max = 0
 #endif
 #if (PROCESSES_HAVE_FDS == 1)
         , Files_max = 0
@@ -384,8 +384,8 @@ void function_processes(const char *transaction, char *function,
 
 #if (PROCESSES_HAVE_IO_CALLS == 1)
         // I/O calls
-        add_value_field_llu_with_max(wb, RCalls, p->values[PDF_CREAD] / RATES_DETAIL);
-        add_value_field_llu_with_max(wb, WCalls, p->values[PDF_CWRITE] / RATES_DETAIL);
+        add_value_field_llu_with_max(wb, ROps, p->values[PDF_OREAD] / RATES_DETAIL);
+        add_value_field_llu_with_max(wb, WOps, p->values[PDF_OWRITE] / RATES_DETAIL);
 #endif
 
         // minor page faults
@@ -630,14 +630,14 @@ void function_processes(const char *transaction, char *function,
 
 #if (PROCESSES_HAVE_IO_CALLS == 1)
         // I/O calls
-        buffer_rrdf_table_add_field(wb, field_id++, "RCalls", "I/O Read Calls", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+        buffer_rrdf_table_add_field(wb, field_id++, "ROps", "I/O Read Operations", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
-                                    "calls/s", RCalls_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    "ops/s", ROps_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "WCalls", "I/O Write Calls", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+        buffer_rrdf_table_add_field(wb, field_id++, "WOps", "I/O Write Operations", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
-                                    "calls/s", WCalls_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    "ops/s", WOps_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 #endif
@@ -930,7 +930,7 @@ void function_processes(const char *transaction, char *function,
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "RCalls");
+                buffer_json_add_array_item_string(wb, "ROps");
                 buffer_json_add_array_item_string(wb, "WCalls");
             }
             buffer_json_array_close(wb);

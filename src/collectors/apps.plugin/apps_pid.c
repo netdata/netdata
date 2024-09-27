@@ -742,8 +742,8 @@ static inline void clear_pid_rates(struct pid_stat *p) {
 #endif
 
 #if (PROCESSES_HAVE_IO_CALLS == 1)
-    p->values[PDF_CREAD]   = 0;
-    p->values[PDF_CWRITE]  = 0;
+    p->values[PDF_OREAD]   = 0;
+    p->values[PDF_OWRITE]  = 0;
 #endif
 
 #if (PROCESSES_HAVE_VOLCTX == 1)
