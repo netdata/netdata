@@ -97,7 +97,7 @@ func (p *Postgres) doQueryConnectionsState() error {
 }
 
 func (p *Postgres) doQueryCheckpoints() error {
-	q := queryCheckpoints()
+	q := queryCheckpoints(p.pgVersion)
 
 	return p.doQuery(q, func(column, value string, _ bool) {
 		switch column {
