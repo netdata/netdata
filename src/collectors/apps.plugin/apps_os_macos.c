@@ -11,7 +11,6 @@ mach_timebase_info_data_t mach_info;
 
 void apps_os_init(void) {
     mach_timebase_info(&mach_info);
-    return 1000000ULL / RATES_DETAIL;
 }
 
 uint64_t apps_os_get_total_memory_macos(void) {
@@ -174,47 +173,47 @@ static inline void get_current_time(void) {
     system_current_time_ut = timeval_usec(&current_time);
 }
 
-bool apps_os_read_global_cpu_utilization_macos(void) {
-    static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
-    static usec_t collected_usec = 0, last_collected_usec = 0;
-
-    host_cpu_load_info_data_t cpuinfo;
-    mach_msg_type_number_t count = HOST_CPU_LOAD_INFO_COUNT;
-
-    if (host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, (host_info_t)&cpuinfo, &count) != KERN_SUCCESS) {
-        // Handle error
-        goto cleanup;
-    }
-
-    last_collected_usec = collected_usec;
-    collected_usec = now_monotonic_usec();
-
-    calls_counter++;
-
-    // Convert ticks to time
-    // Note: MacOS does not separate nice time from user time in the CPU stats, so you might need to adjust this logic
-    kernel_uint_t global_ntime = 0;  // Assuming you want to keep track of nice time separately
-
-    incremental_rate(global_utime, utime_raw, cpuinfo.cpu_ticks[CPU_STATE_USER] + cpuinfo.cpu_ticks[CPU_STATE_NICE], collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
-    incremental_rate(global_ntime, ntime_raw, cpuinfo.cpu_ticks[CPU_STATE_NICE], collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
-    incremental_rate(global_stime, stime_raw, cpuinfo.cpu_ticks[CPU_STATE_SYSTEM], collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
-
-    global_utime += global_ntime;
-
-    if(unlikely(global_iterations_counter == 1)) {
-        global_utime = 0;
-        global_stime = 0;
-        global_gtime = 0;
-    }
-
-    return 1;
-
-cleanup:
-    global_utime = 0;
-    global_stime = 0;
-    global_gtime = 0;
-    return 0;
-}
+// bool apps_os_read_global_cpu_utilization_macos(void) {
+//     static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
+//     static usec_t collected_usec = 0, last_collected_usec = 0;
+//
+//     host_cpu_load_info_data_t cpuinfo;
+//     mach_msg_type_number_t count = HOST_CPU_LOAD_INFO_COUNT;
+//
+//     if (host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, (host_info_t)&cpuinfo, &count) != KERN_SUCCESS) {
+//         // Handle error
+//         goto cleanup;
+//     }
+//
+//     last_collected_usec = collected_usec;
+//     collected_usec = now_monotonic_usec();
+//
+//     calls_counter++;
+//
+//     // Convert ticks to time
+//     // Note: MacOS does not separate nice time from user time in the CPU stats, so you might need to adjust this logic
+//     kernel_uint_t global_ntime = 0;  // Assuming you want to keep track of nice time separately
+//
+//     incremental_rate(global_utime, utime_raw, cpuinfo.cpu_ticks[CPU_STATE_USER] + cpuinfo.cpu_ticks[CPU_STATE_NICE], collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
+//     incremental_rate(global_ntime, ntime_raw, cpuinfo.cpu_ticks[CPU_STATE_NICE], collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
+//     incremental_rate(global_stime, stime_raw, cpuinfo.cpu_ticks[CPU_STATE_SYSTEM], collected_usec, last_collected_usec, CPU_TO_NANOSECONDCORES);
+//
+//     global_utime += global_ntime;
+//
+//     if(unlikely(global_iterations_counter == 1)) {
+//         global_utime = 0;
+//         global_stime = 0;
+//         global_gtime = 0;
+//     }
+//
+//     return 1;
+//
+// cleanup:
+//     global_utime = 0;
+//     global_stime = 0;
+//     global_gtime = 0;
+//     return 0;
+// }
 
 bool apps_os_read_pid_stat_macos(struct pid_stat *p, void *ptr) {
     struct pid_info *pi = ptr;
