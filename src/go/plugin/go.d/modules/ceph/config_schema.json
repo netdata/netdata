@@ -23,7 +23,7 @@
         "description": "The timeout in seconds for the HTTP request.",
         "type": "number",
         "minimum": 0.5,
-        "default": 1
+        "default": 2
       },
       "not_follow_redirects": {
         "title": "Not follow redirects",

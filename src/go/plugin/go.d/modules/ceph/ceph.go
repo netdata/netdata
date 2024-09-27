@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
@@ -36,6 +38,7 @@ func New() *Ceph {
 					URL: "https://127.0.0.1:8443",
 				},
 				ClientConfig: web.ClientConfig{
+					Timeout: confopt.Duration(time.Second * 2),
 					TLSConfig: tlscfg.TLSConfig{
 						InsecureSkipVerify: true,
 					},
