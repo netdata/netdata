@@ -22,7 +22,7 @@ Module: ceph
 ## Overview
 
 This collector monitors the overall health status and performance of your Ceph clusters.
-It gathers key metrics for the entire cluster, individual Pools, and OSDs
+It gathers key metrics for the entire cluster, individual Pools, and OSDs.
 
 
 It collects metrics by periodically issuing HTTP GET requests to the Ceph Manager [RESP API](https://docs.ceph.com/en/reef/mgr/ceph_api/#):
@@ -155,7 +155,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ceph_cluster_space_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.general_usage | cluster disk space utilization |
+| [ ceph_cluster_physical_capacity_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.cluster_physical_capacity_utilization | Ceph cluster ${label:fsid} disk space utilization |
 
 
 ## Setup
