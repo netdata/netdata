@@ -52,8 +52,8 @@ func TestCeph_Init(t *testing.T) {
 		wantFail bool
 		config   Config
 	}{
-		"success with default": {
-			wantFail: false,
+		"fails with default": {
+			wantFail: true,
 			config:   New().Config,
 		},
 		"fail when URL not set": {
@@ -308,6 +308,8 @@ func caseConnectionRefused(t *testing.T) (*Ceph, func()) {
 	t.Helper()
 	ceph := New()
 	ceph.URL = "http://127.0.0.1:65001"
+	ceph.Username = "user"
+	ceph.Password = "password"
 	require.NoError(t, ceph.Init())
 
 	return ceph, func() {}
@@ -321,6 +323,8 @@ func case404(t *testing.T) (*Ceph, func()) {
 		}))
 	ceph := New()
 	ceph.URL = srv.URL
+	ceph.Username = "user"
+	ceph.Password = "password"
 	require.NoError(t, ceph.Init())
 
 	return ceph, srv.Close
