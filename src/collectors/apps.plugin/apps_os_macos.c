@@ -143,8 +143,8 @@ bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
 
     // On MacOS, the proc_pid_rusage provides disk_io_statistics which includes io bytes read and written
     // but does not provide the same level of detail as Linux, like separating logical and physical I/O bytes.
-    pid_incremental_rate(io, PDF_PREAD, pi->rusageinfo.ri_diskio_bytesread);
-    pid_incremental_rate(io, PDF_PWRITE, pi->rusageinfo.ri_diskio_byteswritten);
+    pid_incremental_rate(io, PDF_LREAD, pi->rusageinfo.ri_diskio_bytesread);
+    pid_incremental_rate(io, PDF_LWRITE, pi->rusageinfo.ri_diskio_byteswritten);
 
     return true;
 }

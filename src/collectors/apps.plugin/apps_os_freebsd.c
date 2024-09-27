@@ -187,8 +187,8 @@ bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
 bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
 
-    pid_incremental_rate(io, PDF_PREAD,  proc_info->ki_rusage.ru_inblock);
-    pid_incremental_rate(io, PDF_PWRITE, proc_info->ki_rusage.ru_oublock);
+    pid_incremental_rate(io, PDF_LREAD,  proc_info->ki_rusage.ru_inblock);
+    pid_incremental_rate(io, PDF_LWRITE, proc_info->ki_rusage.ru_oublock);
 
     return true;
 }

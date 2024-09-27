@@ -17,8 +17,8 @@
 #define PROCESSES_HAVE_CPU_CHILDREN_TIME     1
 #define PROCESSES_HAVE_VOLCTX                0
 #define PROCESSES_HAVE_NVOLCTX               0
-#define PROCESSES_HAVE_PHYSICAL_IO           1
-#define PROCESSES_HAVE_LOGICAL_IO            0
+#define PROCESSES_HAVE_PHYSICAL_IO           0
+#define PROCESSES_HAVE_LOGICAL_IO            1
 #define PROCESSES_HAVE_IO_CALLS              0
 #define PROCESSES_HAVE_UID                   1
 #define PROCESSES_HAVE_GID                   1
@@ -54,8 +54,8 @@ struct pid_info {
 #define PROCESSES_HAVE_CPU_CHILDREN_TIME     0
 #define PROCESSES_HAVE_VOLCTX                1
 #define PROCESSES_HAVE_NVOLCTX               0
-#define PROCESSES_HAVE_PHYSICAL_IO           1
-#define PROCESSES_HAVE_LOGICAL_IO            0
+#define PROCESSES_HAVE_PHYSICAL_IO           0
+#define PROCESSES_HAVE_LOGICAL_IO            1
 #define PROCESSES_HAVE_IO_CALLS              0
 #define PROCESSES_HAVE_UID                   1
 #define PROCESSES_HAVE_GID                   1
