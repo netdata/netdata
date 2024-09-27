@@ -747,8 +747,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/uuid_generate.h
         src/libnetdata/os/setenv.c
         src/libnetdata/os/setenv.h
-        src/libnetdata/os/strndup.c
-        src/libnetdata/os/strndup.h
         src/libnetdata/spawn_server/spawn_server_nofork.c
         src/libnetdata/spawn_server/spawn_server.h
         src/libnetdata/spawn_server/spawn_popen.c
@@ -1708,6 +1706,8 @@ endif()
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src)
+
+target_compile_options(libnetdata PRIVATE -Werror)
 
 # pthread (FIXME: use find_package for this)
 

@@ -484,13 +484,16 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
 
     size_t env_size = 0;
     void *encoded_env = argv_encode(request->envp, &env_size);
-    if (!encoded_env)
-        goto cleanup;
+    if (!encoded_env) {
+        return false;
+    }
 
     size_t argv_size = 0;
     void *encoded_argv = argv_encode(request->argv, &argv_size);
-    if (!encoded_argv)
-        goto cleanup;
+    if (!encoded_argv) {
+        freez(encoded_env);
+        return false;
+    }
 
     struct msghdr msg = {0};
     struct cmsghdr *cmsg;
@@ -653,7 +656,7 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     if (cmsg == NULL || cmsg->cmsg_len != CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
             "SPAWN SERVER: Received invalid control message (expected %zu bytes, received %zu bytes)",
-            CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS), cmsg?cmsg->cmsg_len:0);
+            CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS), cmsg? (size_t) cmsg->cmsg_len:0);
         close(sock);
         return;
     }
@@ -910,17 +913,13 @@ static void spawn_server_event_loop(SPAWN_SERVER *server) {
 
     // stop all children
     if(spawn_server_requests) {
-        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: killing all children...");
-        size_t killed = 0;
         for(SPAWN_REQUEST *rq = spawn_server_requests; rq ; rq = rq->next) {
             kill(rq->pid, SIGTERM);
-            killed++;
         }
         while(spawn_server_requests) {
             spawn_server_process_sigchld();
             tinysleep();
         }
-        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: all %zu children finished", killed);
     }
 
     exit(1);
