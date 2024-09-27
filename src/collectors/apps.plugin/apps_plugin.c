@@ -288,6 +288,7 @@ static void normalize_utilization(struct target *root) {
 int check_proc_1_io() {
     int ret = 0;
 
+#if defined(OS_LINUX)
     procfile *ff = procfile_open("/proc/1/io", NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
     if(!ff) goto cleanup;
 
@@ -298,6 +299,8 @@ int check_proc_1_io() {
 
 cleanup:
     procfile_close(ff);
+#endif
+
     return ret;
 }
 
@@ -319,6 +322,7 @@ static void parse_args(int argc, char **argv)
             exit(0);
         }
 
+#if defined(OS_LINUX)
         if(strcmp("test-permissions", argv[i]) == 0 || strcmp("-t", argv[i]) == 0) {
             if(!check_proc_1_io()) {
                 perror("Tried to read /proc/1/io and it failed");
@@ -327,6 +331,7 @@ static void parse_args(int argc, char **argv)
             printf("OK\n");
             exit(0);
         }
+#endif
 
         if(strcmp("debug", argv[i]) == 0) {
             debug_enabled = true;
@@ -349,6 +354,7 @@ static void parse_args(int argc, char **argv)
         }
 #endif
 
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1) || (PROCESSES_HAVE_CHILDREN_FLTS == 1)
         if(strcmp("no-childs", argv[i]) == 0 || strcmp("without-childs", argv[i]) == 0) {
             include_exited_childs = 0;
             continue;
@@ -358,6 +364,7 @@ static void parse_args(int argc, char **argv)
             include_exited_childs = 1;
             continue;
         }
+#endif
 
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         if(strcmp("with-guest", argv[i]) == 0) {
@@ -371,6 +378,7 @@ static void parse_args(int argc, char **argv)
         }
 #endif
 
+#if (PROCESSES_HAVE_FDS == 1)
         if(strcmp("with-files", argv[i]) == 0) {
             enable_file_charts = 1;
             continue;
@@ -380,16 +388,21 @@ static void parse_args(int argc, char **argv)
             enable_file_charts = 0;
             continue;
         }
+#endif
 
+#if (PROCESSES_HAVE_UID == 1)
         if(strcmp("no-users", argv[i]) == 0 || strcmp("without-users", argv[i]) == 0) {
             enable_users_charts = 0;
             continue;
         }
+#endif
 
+#if (PROCESSES_HAVE_GID == 1)
         if(strcmp("no-groups", argv[i]) == 0 || strcmp("without-groups", argv[i]) == 0) {
             enable_groups_charts = 0;
             continue;
         }
+#endif
 
         if(strcmp("with-detailed-uptime", argv[i]) == 0) {
             enable_detailed_uptime_charts = 1;
@@ -421,23 +434,33 @@ static void parse_args(int argc, char **argv)
                     "                        it may include sensitive data such as passwords and tokens\n"
                     "                        enabling this could be a security risk\n"
                     "\n"
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1) || (PROCESSES_HAVE_CHILDREN_FLTS == 1)
                     " with-childs\n"
                     " without-childs         enable / disable aggregating exited\n"
                     "                        children resources into parents\n"
                     "                        (default is enabled)\n"
                     "\n"
+#endif
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
                     " with-guest\n"
                     " without-guest          enable / disable reporting guest charts\n"
                     "                        (default is disabled)\n"
                     "\n"
+#endif
+#if (PROCESSES_HAVE_FDS == 1)
                     " with-files\n"
                     " without-files          enable / disable reporting files, sockets, pipes\n"
                     "                        (default is enabled)\n"
                     "\n"
+#endif
+#if (PROCESSES_HAVE_UID == 1)
                     " without-users          disable reporting per user charts\n"
                     "\n"
+#endif
+#if (PROCESSES_HAVE_GID == 1)
                     " without-groups         disable reporting per user group charts\n"
                     "\n"
+#endif
                     " with-detailed-uptime   enable reporting min/avg/max uptime charts\n"
                     "\n"
 #if defined(OS_LINUX)
@@ -467,6 +490,7 @@ static void parse_args(int argc, char **argv)
 
     if(freq > 0) update_every = freq;
 
+#if (USE_APPS_GROUPS_CONF == 1)
     if(read_apps_groups_conf(user_config_dir, "groups")) {
         netdata_log_info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
 
@@ -479,9 +503,11 @@ static void parse_args(int argc, char **argv)
     }
     else
         netdata_log_info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
+#endif
 }
 
-static int am_i_running_as_root() {
+#if !defined(OS_WINDOWS)
+static inline int am_i_running_as_root() {
     uid_t uid = getuid(), euid = geteuid();
 
     if(uid == 0 || euid == 0) {
@@ -494,7 +520,7 @@ static int am_i_running_as_root() {
 }
 
 #ifdef HAVE_SYS_CAPABILITY_H
-static int check_capabilities() {
+static inline int check_capabilities() {
     cap_t caps = cap_get_proc();
     if(!caps) {
         netdata_log_error("Cannot get current capabilities.");
@@ -538,9 +564,10 @@ static int check_capabilities() {
     return ret;
 }
 #else
-static int check_capabilities() {
+static inline int check_capabilities() {
     return 0;
 }
+#endif
 #endif
 
 netdata_mutex_t apps_and_stdout_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -600,6 +627,7 @@ int main(int argc, char **argv) {
 
     parse_args(argc, argv);
 
+#if !defined(OS_WINDOWS)
     if(!check_capabilities() && !am_i_running_as_root() && !check_proc_1_io()) {
         uid_t uid = getuid(), euid = geteuid();
 #ifdef HAVE_SYS_CAPABILITY_H
@@ -616,6 +644,7 @@ int main(int argc, char **argv) {
                           , uid, euid, argv[0], argv[0]);
 #endif
     }
+#endif
 
     netdata_log_info("started on pid %d", getpid());
 
@@ -682,21 +711,28 @@ int main(int argc, char **argv) {
             send_resource_usage_to_netdata(dt);
 
         send_proc_states_count(dt);
-        send_charts_updates_to_netdata(apps_groups_root_target, "app", "app_group", "Processes Custom Groups");
-        send_collected_data_to_netdata(apps_groups_root_target, "app", dt);
 
         send_charts_updates_to_netdata(tree_root_target, "process_tree", "parent_process", "Processes Tree");
         send_collected_data_to_netdata(tree_root_target, "process_tree", dt);
 
+#if (USE_APPS_GROUPS_CONF == 1)
+        send_charts_updates_to_netdata(apps_groups_root_target, "app", "app_group", "Processes Custom Groups");
+        send_collected_data_to_netdata(apps_groups_root_target, "app", dt);
+#endif
+
+#if (PROCESSES_HAVE_UID == 1)
         if (enable_users_charts) {
             send_charts_updates_to_netdata(users_root_target, "user", "user", "User Processes");
             send_collected_data_to_netdata(users_root_target, "user", dt);
         }
+#endif
 
+#if (PROCESSES_HAVE_GID == 1)
         if (enable_groups_charts) {
             send_charts_updates_to_netdata(groups_root_target, "usergroup", "user_group", "User Group Processes");
             send_collected_data_to_netdata(groups_root_target, "usergroup", dt);
         }
+#endif
 
         fflush(stdout);
 

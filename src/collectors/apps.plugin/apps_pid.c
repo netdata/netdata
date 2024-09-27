@@ -277,6 +277,7 @@ static inline void link_all_processes_to_their_parents(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+#if (USE_APPS_GROUPS_CONF == 1)
 void assign_app_group_target_to_pid(struct pid_stat *p) {
     targets_assignment_counter++;
 
@@ -305,6 +306,7 @@ void assign_app_group_target_to_pid(struct pid_stat *p) {
         }
     }
 }
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -316,7 +318,9 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
         if(likely(proc_pid_cmdline_is_needed))
             managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
 
+#if (USE_APPS_GROUPS_CONF == 1)
         assign_app_group_target_to_pid(p);
+#endif
     }
 }
 

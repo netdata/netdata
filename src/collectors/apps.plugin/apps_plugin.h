@@ -31,6 +31,7 @@
 #define PROCESSES_HAVE_FDS                   1
 #define PROCESSES_HAVE_HANDLES               0
 #define PPID_SHOULD_BE_RUNNING               1
+#define USE_APPS_GROUPS_CONF                 1
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _freebsd)
 
 #elif defined(OS_MACOS)
@@ -68,6 +69,7 @@ struct pid_info {
 #define PROCESSES_HAVE_FDS                   1
 #define PROCESSES_HAVE_HANDLES               0
 #define PPID_SHOULD_BE_RUNNING               1
+#define USE_APPS_GROUPS_CONF                 1
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _macos)
 
 #elif defined(OS_WINDOWS)
@@ -93,6 +95,7 @@ struct pid_info {
 #define PROCESSES_HAVE_FDS                   0
 #define PROCESSES_HAVE_HANDLES               1
 #define PPID_SHOULD_BE_RUNNING               0
+#define USE_APPS_GROUPS_CONF                 0
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _windows)
 
 #elif defined(OS_LINUX)
@@ -116,6 +119,7 @@ struct pid_info {
 #define PROCESSES_HAVE_FDS                   1
 #define PROCESSES_HAVE_HANDLES               0
 #define PPID_SHOULD_BE_RUNNING               1
+#define USE_APPS_GROUPS_CONF                 1
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _linux)
 
 #else
@@ -449,7 +453,10 @@ struct pid_stat {
     struct pid_stat *next;
     struct pid_stat *parent;
 
+#if (USE_APPS_GROUPS_CONF == 1)
     struct target *target;          // app_groups.conf targets
+#endif
+
 #if (PROCESSES_HAVE_UID == 1)
     struct target *uid_target;      // uid based targets
 #endif
@@ -458,8 +465,9 @@ struct pid_stat {
 #endif
     struct target *tree_target;     // tree based target
 
-    STRING *comm;
-    STRING *cmdline;
+    STRING *comm;                   // the command name (short version)
+    STRING *name;                   // a better name, or NULL
+    STRING *cmdline;                // the full command line (or on windows, the full pathname of the program)
 
 #if defined(OS_WINDOWS)
     COUNTER_DATA perflib[PDF_MAX];
@@ -504,6 +512,7 @@ struct pid_stat {
 #if defined(OS_WINDOWS)
     bool got_info:1;
     bool assigned_to_target:1;
+    bool initialized:1;
 #endif
 
     usec_t stat_collected_usec;
@@ -548,8 +557,11 @@ struct user_or_group_id {
 #endif
 
 extern struct target
+#if (USE_APPS_GROUPS_CONF == 1)
     *apps_groups_default_target,
     *apps_groups_root_target,
+#endif
+
 #if (PROCESSES_HAVE_UID == 1)
     *users_root_target,
 #endif
@@ -574,18 +586,20 @@ struct target *find_target_by_name(struct target *base, const char *name);
 
 #if (PROCESSES_HAVE_UID == 1)
 struct target *get_uid_target(uid_t uid);
+struct user_or_group_id *user_id_find(struct user_or_group_id *user_id_to_find);
 #endif
 
 #if (PROCESSES_HAVE_GID == 1)
 struct target *get_gid_target(gid_t gid);
+struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find);
 #endif
 
 struct target *get_tree_target(struct pid_stat *p);
+#if (USE_APPS_GROUPS_CONF == 1)
 int read_apps_groups_conf(const char *path, const char *file);
+#endif
 
 void users_and_groups_init(void);
-struct user_or_group_id *user_id_find(struct user_or_group_id *user_id_to_find);
-struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find);
 
 // ----------------------------------------------------------------------------
 // debugging
@@ -678,7 +692,10 @@ bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr);
 bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr);
 bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes);
 
+#if (USE_APPS_GROUPS_CONF == 1)
 void assign_app_group_target_to_pid(struct pid_stat *p);
+#endif
+
 void orchestrators_and_aggregators_init(void);
 
 // --------------------------------------------------------------------------------------------------------------------

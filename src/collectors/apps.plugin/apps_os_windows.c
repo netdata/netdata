@@ -586,7 +586,8 @@ void GetAllProcessesInfo(void) {
         if(p->got_info) continue;
         p->got_info = true;
 
-        if(!p->comm) {
+        if(!p->initialized) {
+            string_freez(p->comm);
             p->comm = wchar_to_string(pe32.szExeFile);
             p->assigned_to_target = false;
         }
@@ -611,8 +612,8 @@ void GetAllProcessesInfo(void) {
         }
 
         if(friendly_name) {
-            string_freez(p->comm);
-            p->comm = friendly_name;
+            string_freez(p->name);
+            p->name = friendly_name;
             p->assigned_to_target = false;
         }
     } while (Process32NextW(hSnapshot, &pe32));
@@ -715,13 +716,14 @@ bool apps_os_collect_all_pids_windows(void) {
         // Get or create pid_stat structure
         struct pid_stat *p = get_or_allocate_pid_entry((pid_t) d.pid);
 
-        if (unlikely(!p->perflib[PDF_UTIME].key)) {
+        if (unlikely(!p->initialized)) {
             // a new pid
+            p->initialized = true;
 
             static __thread char name[MAX_PATH];
 
             if (getInstanceName(d.pDataBlock, d.pObjectType, d.pi, name, sizeof(name))) {
-                // remove the PID from the end of the name
+                // remove the PID suffix, if any
                 char pid[UINT64_MAX_LENGTH + 1]; // +1 for the underscore
                 pid[0] = '_';
                 print_uint64(&pid[1], p->pid);
@@ -732,10 +734,20 @@ bool apps_os_collect_all_pids_windows(void) {
                     if (strcmp(pid, compare) == 0)
                         *compare = '\0';
                 }
+
+                // remove the .exe suffix, if any
+                name_len = strlen(name);
+                size_t exe_len = strlen(".exe");
+                if(exe_len < name_len) {
+                    char *compare = &name[name_len - exe_len];
+                    if (strcmp(".exe", compare) == 0)
+                        *compare = '\0';
+                }
             }
             else
                 strncpyz(name, "unknown", sizeof(name) - 1);
 
+            string_freez(p->comm); // it may be detected in a previous run via GetAllProcessesInfo()
             p->comm = string_strdupz(name);
             p->got_info = false;
             p->assigned_to_target = false;
@@ -830,10 +842,12 @@ bool apps_os_collect_all_pids_windows(void) {
     if(added) {
         GetAllProcessesInfo();
 
+#if (USE_APPS_GROUPS_CONF == 1)
         for(struct pid_stat *p = root_of_pids(); p ;p = p->next) {
             if(!p->assigned_to_target)
                 assign_app_group_target_to_pid(p);
         }
+#endif
     }
 
     return true;

@@ -5,6 +5,7 @@
 // ----------------------------------------------------------------------------
 // update statistics on the targets
 
+#if (USE_APPS_GROUPS_CONF == 1)
 // 1. link all childs to their parents
 // 2. go from bottom to top, marking as merged all children to their parents,
 //    this step links all parents without a target to the child target, if any
@@ -120,6 +121,7 @@ static void apply_apps_groups_targets_inheritance(void) {
 
     debug_log("apply_apps_groups_targets_inheritance() made %d loops on the process tree", loops);
 }
+#endif
 
 static size_t zero_all_targets(struct target *root) {
     struct target *w;
@@ -229,16 +231,19 @@ static inline void cleanup_exited_pids(void) {
 }
 
 void aggregate_processes_to_targets(void) {
+#if (USE_APPS_GROUPS_CONF == 1)
     apply_apps_groups_targets_inheritance();
+    apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
+#endif
 
     zero_all_targets(tree_root_target);
+
 #if (PROCESSES_HAVE_UID == 1)
     zero_all_targets(users_root_target);
 #endif
 #if (PROCESSES_HAVE_GID == 1)
     zero_all_targets(groups_root_target);
 #endif
-    apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 
     // this has to be done, before the cleanup
     struct pid_stat *p = NULL;
@@ -250,7 +255,9 @@ void aggregate_processes_to_targets(void) {
         // --------------------------------------------------------------------
         // apps_groups target
 
+#if (USE_APPS_GROUPS_CONF == 1)
         aggregate_pid_on_target(p->target, p, NULL);
+#endif
 
 
         // --------------------------------------------------------------------

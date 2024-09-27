@@ -125,7 +125,7 @@ static STRING *id_cleanup_string(STRING *s) {
     return string_strdupz(buf);
 }
 
-static STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
+static inline STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
     if(!cmdline) return id_cleanup_string(comm);
 
     char buf_cmd[string_strlen(cmdline) + 1];
@@ -222,7 +222,16 @@ struct target *get_tree_target(struct pid_stat *p) {
     w->type = TARGET_TYPE_TREE;
     w->pid_comm = string_dup(p->comm);
     w->id = string_dup(p->comm);
-    w->name = comm_from_cmdline(p->comm, p->cmdline);
+    if(p->name)
+        w->name = id_cleanup_string(p->name);
+    else {
+#if defined(OS_WINDOWS)
+        w->name = id_cleanup_string(p->comm);
+#else
+        w->name = comm_from_cmdline(p->comm, p->cmdline);
+#endif
+    }
+
     w->clean_name = get_clean_name(w->name);
 
     w->next = tree_root_target;
@@ -231,6 +240,7 @@ struct target *get_tree_target(struct pid_stat *p) {
     return w;
 }
 
+#if (USE_APPS_GROUPS_CONF == 1)
 // find or create a new target
 // there are targets that are just aggregated to other target (the second argument)
 static struct target *get_apps_groups_target(const char *id, struct target *target, const char *name) {
@@ -413,6 +423,7 @@ int read_apps_groups_conf(const char *path, const char *file) {
 
     return 0;
 }
+#endif
 
 struct target *find_target_by_name(struct target *base, const char *name) {
     struct target *t;
