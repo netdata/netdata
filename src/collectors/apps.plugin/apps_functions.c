@@ -229,6 +229,7 @@ void function_processes(const char *transaction, char *function,
         , RCalls_max = 0
         , WCalls_max = 0
 #endif
+#if (PROCESSES_HAVE_FDS == 1)
         , Files_max = 0
         , Pipes_max = 0
         , Sockets_max = 0
@@ -239,6 +240,10 @@ void function_processes(const char *transaction, char *function,
         , EvPollFDs_max = 0
         , OtherFDs_max = 0
         , FDs_max = 0
+#endif
+#if (PROCESSES_HAVE_HANDLES == 1)
+        , Handles_max = 0
+#endif
         ;
 
     int rows= 0;
@@ -396,6 +401,7 @@ void function_processes(const char *transaction, char *function,
         add_value_field_llu_with_max(wb, TMajFlt, (p->values[PDF_MAJFLT] + p->values[PDF_CMAJFLT]) / RATES_DETAIL);
 #endif
 
+#if (PROCESSES_HAVE_FDS == 1)
         // open file descriptors
         add_value_field_ndd_with_max(wb, FDsLimitPercent, p->openfds_limits_percent);
         add_value_field_llu_with_max(wb, FDs, pid_openfds_sum(p));
@@ -408,6 +414,11 @@ void function_processes(const char *transaction, char *function,
         add_value_field_llu_with_max(wb, SigFDs, p->openfds.signalfds);
         add_value_field_llu_with_max(wb, EvPollFDs, p->openfds.eventpolls);
         add_value_field_llu_with_max(wb, OtherFDs, p->openfds.other);
+#endif
+
+#if (PROCESSES_HAVE_HANDLES == 1)
+        add_value_field_llu_with_max(wb, Handles, p->values[PDF_HANDLES]);
+#endif
 
         // processes, threads, uptime
         add_value_field_llu_with_max(wb, Processes, p->children_count);
@@ -596,18 +607,23 @@ void function_processes(const char *transaction, char *function,
 #endif
 
 #if (PROCESSES_HAVE_LOGICAL_IO == 1)
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+        RRDF_FIELD_OPTIONS logical_io_options = RRDF_FIELD_OPTS_NONE;
+#else
+        RRDF_FIELD_OPTIONS logical_io_options = RRDF_FIELD_OPTS_VISIBLE;
+#endif
         // Logical I/O
         buffer_rrdf_table_add_field(wb, field_id++, "LReads", "Logical I/O Reads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                                     2, "KiB/s", LReads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
+                                    logical_io_options, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "LWrites", "Logical I/O Writes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER,
                                     2, "KiB/s", LWrites_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
+                                    logical_io_options, NULL);
 #endif
 
 #if (PROCESSES_HAVE_IO_CALLS == 1)
@@ -667,6 +683,7 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 #endif
 
+#if (PROCESSES_HAVE_FDS == 1)
         // open file descriptors
         buffer_rrdf_table_add_field(wb, field_id++, "FDsLimitPercent", "Percentage of Open Descriptors vs Limits",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
@@ -725,6 +742,16 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", OtherFDs_max, RRDF_FIELD_SORT_DESCENDING,
                                     NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+
+#if (PROCESSES_HAVE_HANDLES == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "Handles", "Open Handles", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
+                                    "handles",
+                                    Handles_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+#endif
 
         // processes, threads, uptime
         buffer_rrdf_table_add_field(wb, field_id++, "Processes", "Processes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,

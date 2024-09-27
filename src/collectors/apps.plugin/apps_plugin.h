@@ -28,6 +28,8 @@
 #define PROCESSES_HAVE_VMSHARED              0
 #define PROCESSES_HAVE_RSSFILE               0
 #define PROCESSES_HAVE_RSSSHMEM              0
+#define PROCESSES_HAVE_FDS                   1
+#define PROCESSES_HAVE_HANDLES               0
 #define PPID_SHOULD_BE_RUNNING               1
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _freebsd)
 
@@ -48,7 +50,7 @@ struct pid_info {
 
 #define INIT_PID                             1
 #define ALL_PIDS_ARE_READ_INSTANTLY          1
-#define PROCESSES_HAVE_CPU_GUEST_TIME        1
+#define PROCESSES_HAVE_CPU_GUEST_TIME        0
 #define PROCESSES_HAVE_CPU_CHILDREN_TIME     0
 #define PROCESSES_HAVE_VOLCTX                1
 #define PROCESSES_HAVE_NVOLCTX               0
@@ -63,6 +65,8 @@ struct pid_info {
 #define PROCESSES_HAVE_VMSHARED              0
 #define PROCESSES_HAVE_RSSFILE               0
 #define PROCESSES_HAVE_RSSSHMEM              0
+#define PROCESSES_HAVE_FDS                   1
+#define PROCESSES_HAVE_HANDLES               0
 #define PPID_SHOULD_BE_RUNNING               1
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _macos)
 
@@ -86,6 +90,8 @@ struct pid_info {
 #define PROCESSES_HAVE_VMSHARED              0
 #define PROCESSES_HAVE_RSSFILE               0
 #define PROCESSES_HAVE_RSSSHMEM              0
+#define PROCESSES_HAVE_FDS                   0
+#define PROCESSES_HAVE_HANDLES               1
 #define PPID_SHOULD_BE_RUNNING               0
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _windows)
 
@@ -107,6 +113,8 @@ struct pid_info {
 #define PROCESSES_HAVE_VMSHARED              1
 #define PROCESSES_HAVE_RSSFILE               1
 #define PROCESSES_HAVE_RSSSHMEM              1
+#define PROCESSES_HAVE_FDS                   1
+#define PROCESSES_HAVE_HANDLES               0
 #define PPID_SHOULD_BE_RUNNING               1
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _linux)
 
@@ -301,26 +309,26 @@ typedef enum __attribute__((packed)) {
 #endif
 
 #if (PROCESSES_HAVE_LOGICAL_IO == 1)
-    PDF_LREAD,      // logical read bytes
-    PDF_LWRITE,     // logical write bytes
+    PDF_LREAD,      // logical reads in bytes/sec
+    PDF_LWRITE,     // logical writes in bytes/sec
 #endif
 
 #if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-    PDF_PREAD,      // physical read bytes
-    PDF_PWRITE,     // physical write bytes
+    PDF_PREAD,      // physical reads in bytes/sec
+    PDF_PWRITE,     // physical writes in bytes/sec
 #endif
 
 #if (PROCESSES_HAVE_IO_CALLS == 1)
-    PDF_CREAD,      // read calls
-    PDF_CWRITE,     // write calls
+    PDF_CREAD,      // read calls/sec
+    PDF_CWRITE,     // write calls/sec
 #endif
 
-    PDF_UPTIME,
-    PDF_THREADS,
+    PDF_UPTIME,     // the process uptime in seconds
+    PDF_THREADS,    // the number of threads
     PDF_PROCESSES,  // the number of processes
 
-#if defined(OS_WINDOWS)
-    PDF_HANDLES,
+#if (PROCESSES_HAVE_HANDLES == 1)
+    PDF_HANDLES,    // the number of handles the process maintains
 #endif
 
     // terminator
@@ -349,12 +357,12 @@ struct target {
     kernel_uint_t uptime_min;
     kernel_uint_t uptime_max;
 
+#if (PROCESSES_HAVE_FDS == 1)
     struct openfds openfds;
-
     NETDATA_DOUBLE max_open_files_percent;
-
     int *target_fds;
     uint32_t target_fds_size;
+#endif
 
     bool is_other:1;
     bool exposed:1;         // if set, we have sent this to netdata
@@ -471,17 +479,13 @@ struct pid_stat {
                         // each process gets a unique number (non-sequential though)
 #endif
 
-#if defined(OS_LINUX)
-    ARL_BASE *status_arl;
-#endif
-
+#if (PROCESSES_HAVE_FDS == 1)
     struct openfds openfds;
     struct pid_limits limits;
-
     NETDATA_DOUBLE openfds_limits_percent;
-
     struct pid_fd *fds;             // array of fds it uses
     uint32_t fds_size;              // the size of the fds array
+#endif
 
     uint32_t children_count;        // number of processes directly referencing this
     uint32_t keeploops;             // increases by 1 every time keep is 1 and updated 0
@@ -502,13 +506,15 @@ struct pid_stat {
     usec_t last_io_collected_usec;
     usec_t last_limits_collected_usec;
 
+#if defined(OS_LINUX)
+    ARL_BASE *status_arl;
     char *fds_dirname;              // the full directory name in /proc/PID/fd
-
     char *stat_filename;
     char *status_filename;
     char *io_filename;
     char *cmdline_filename;
     char *limits_filename;
+#endif
 };
 
 // ----------------------------------------------------------------------------

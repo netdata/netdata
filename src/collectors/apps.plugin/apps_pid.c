@@ -113,16 +113,18 @@ void del_pid_entry(pid_t pid) {
             if(p->fds[i].filename)
                 freez(p->fds[i].filename);
     }
-    arl_free(p->status_arl);
-#endif
 
-    freez(p->fds);
+    arl_free(p->status_arl);
+
     freez(p->fds_dirname);
     freez(p->stat_filename);
     freez(p->status_filename);
     freez(p->limits_filename);
     freez(p->io_filename);
     freez(p->cmdline_filename);
+#endif
+
+    freez(p->fds);
     string_freez(p->comm);
     string_freez(p->cmdline);
     aral_freez(pids.all_pids.aral, p);

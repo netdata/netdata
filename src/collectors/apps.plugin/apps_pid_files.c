@@ -134,6 +134,7 @@ void aggregate_pid_fds_on_targets(struct pid_stat *p) {
 #endif
     reallocate_target_fds(t);
 
+#if (PROCESSES_HAVE_FDS == 1)
     p->openfds.files = 0;
     p->openfds.pipes = 0;
     p->openfds.sockets = 0;
@@ -163,6 +164,7 @@ void aggregate_pid_fds_on_targets(struct pid_stat *p) {
 #endif
         aggregate_fd_on_target(fd, t);
     }
+#endif
 }
 
 // ----------------------------------------------------------------------------

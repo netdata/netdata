@@ -134,6 +134,7 @@ static size_t zero_all_targets(struct target *root) {
         w->uptime_min = 0;
         w->uptime_max = 0;
 
+#if (PROCESSES_HAVE_FDS == 1)
         // zero file counters
         if(w->target_fds) {
             memset(w->target_fds, 0, sizeof(int) * w->target_fds_size);
@@ -149,6 +150,7 @@ static size_t zero_all_targets(struct target *root) {
 
             w->max_open_files_percent = 0.0;
         }
+#endif
 
         if(unlikely(w->root_pid)) {
             struct pid_on_target *pid_on_target = w->root_pid;

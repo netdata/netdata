@@ -227,11 +227,14 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
 #endif
 
         if (enable_file_charts) {
+#if (PROCESSES_HAVE_FDS == 1)
             send_BEGIN(type, string2str(w->clean_name), "fds_open_limit", dt);
             send_SET("limit", w->max_open_files_percent * 100.0);
             send_END();
+#endif
 
             send_BEGIN(type, string2str(w->clean_name), "fds_open", dt);
+#if (PROCESSES_HAVE_FDS == 1)
             send_SET("files", w->openfds.files);
             send_SET("sockets", w->openfds.sockets);
             send_SET("pipes", w->openfds.sockets);
@@ -241,6 +244,10 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
             send_SET("signal", w->openfds.signalfds);
             send_SET("eventpolls", w->openfds.eventpolls);
             send_SET("other", w->openfds.other);
+#endif
+#if (PROCESSES_HAVE_HANDLES == 1)
+            send_SET("handles", w->values[PDF_HANDLES]);
+#endif
             send_END();
         }
     }
@@ -377,16 +384,19 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         fprintf(stdout, "DIMENSION threads '' absolute 1 1\n");
 
         if (enable_file_charts) {
+#if (PROCESSES_HAVE_FDS == 1)
             fprintf(stdout, "CHART %s.%s_fds_open_limit '' '%s open file descriptors limit' '%%' fds %s.fds_open_limit line 20200 %d\n",
                     type, string2str(w->clean_name), title, type, update_every);
             fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
             fprintf(stdout, "CLABEL_COMMIT\n");
             fprintf(stdout, "DIMENSION limit '' absolute 1 100\n");
+#endif
 
             fprintf(stdout, "CHART %s.%s_fds_open '' '%s open files descriptors' 'fds' fds %s.fds_open stacked 20210 %d\n",
                     type, string2str(w->clean_name), title, type, update_every);
             fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
             fprintf(stdout, "CLABEL_COMMIT\n");
+#if (PROCESSES_HAVE_FDS == 1)
             fprintf(stdout, "DIMENSION files '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION sockets '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION pipes '' absolute 1 1\n");
@@ -396,6 +406,10 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             fprintf(stdout, "DIMENSION signal '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION eventpolls '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION other '' absolute 1 1\n");
+#endif
+#if (PROCESSES_HAVE_HANDLES == 1)
+            fprintf(stdout, "DIMENSION handles '' absolute 1 1\n");
+#endif
         }
 
         fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n",

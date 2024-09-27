@@ -677,8 +677,8 @@ bool apps_os_collect_all_pids_windows(void) {
         // Threads
         p->values[PDF_THREADS] = perflib_value(&p->perflib[PDF_THREADS]);
 
-        // Handle count (as a proxy for file descriptors)
-        p->openfds.files = perflib_value(&p->perflib[PDF_HANDLES]);
+        // Handle count
+        p->values[PDF_HANDLES] = perflib_value(&p->perflib[PDF_HANDLES]);
 
         // Page faults
         // Windows doesn't distinguish between minor and major page faults
