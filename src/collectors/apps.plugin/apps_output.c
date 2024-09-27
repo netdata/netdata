@@ -345,21 +345,12 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 #endif
 
 #if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-#if defined(OS_LINUX)
         fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'KiB/s' disk %s.disk_physical_io area 20100 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
         fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", 1024LLU * RATES_DETAIL);
-#else
-        fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'blocks/s' disk %s.disk_physical_block_io area 20100 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
-        fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", RATES_DETAIL);
-        fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", RATES_DETAIL);
-#endif
 #endif
 
 #if (PROCESSES_HAVE_LOGICAL_IO == 1)

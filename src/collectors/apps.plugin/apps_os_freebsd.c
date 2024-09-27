@@ -7,9 +7,26 @@
 #define CPU_TO_NANOSECONDCORES (1000) // convert microseconds to nanoseconds
 
 usec_t system_current_time_ut;
+long global_block_size = 512;
+
+static long get_fs_block_size(void) {
+    struct statvfs vfs;
+    static long block_size = 0;
+
+    if (block_size == 0) {
+        if (statvfs("/", &vfs) == 0) {
+            block_size = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
+        } else {
+            // If statvfs fails, fall back to the typical block size
+            block_size = 512;
+        }
+    }
+
+    return block_size;
+}
 
 void apps_os_init(void) {
-    ;
+    global_block_size = get_fs_block_size();
 }
 
 static inline void get_current_time(void) {
@@ -187,8 +204,8 @@ bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
 bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
 
-    pid_incremental_rate(io, PDF_LREAD,  proc_info->ki_rusage.ru_inblock);
-    pid_incremental_rate(io, PDF_LWRITE, proc_info->ki_rusage.ru_oublock);
+    pid_incremental_rate(io, PDF_LREAD,  proc_info->ki_rusage.ru_inblock * global_block_size);
+    pid_incremental_rate(io, PDF_LWRITE, proc_info->ki_rusage.ru_oublock * global_block_size);
 
     return true;
 }
