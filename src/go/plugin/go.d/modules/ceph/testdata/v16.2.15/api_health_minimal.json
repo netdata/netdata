@@ -1,0 +1,105 @@
+{
+  "health": {
+    "status": "HEALTH_WARN",
+    "checks": [
+      {
+        "severity": "HEALTH_WARN",
+        "summary": {
+          "message": "Reduced data availability: 1 pg inactive, 1 pg incomplete",
+          "count": 2
+        },
+        "detail": [
+          {
+            "message": "pg 1.0 is creating+incomplete, acting [1,2147483647,2147483647,2147483647] (reducing pool mySuperPool min_size from 3 may help; search ceph.com/docs for 'incomplete')"
+          }
+        ],
+        "muted": false,
+        "type": "PG_AVAILABILITY"
+      }
+    ],
+    "mutes": []
+  },
+  "mon_status": {
+    "monmap": {
+      "mons": [
+        {}
+      ]
+    },
+    "quorum": [
+      0
+    ]
+  },
+  "fs_map": {
+    "filesystems": [],
+    "standbys": []
+  },
+  "osd_map": {
+    "osds": [
+      {
+        "in": 1,
+        "up": 1,
+        "state": [
+          "exists",
+          "up"
+        ]
+      },
+      {
+        "in": 1,
+        "up": 1,
+        "state": [
+          "exists",
+          "up"
+        ]
+      }
+    ]
+  },
+  "scrub_status": "Inactive",
+  "pg_info": {
+    "object_stats": {
+      "num_objects": 6,
+      "num_object_copies": 6,
+      "num_objects_degraded": 1,
+      "num_objects_misplaced": 1,
+      "num_objects_unfound": 1
+    },
+    "statuses": {
+      "active+clean": 1,
+      "creating+incomplete": 1
+    },
+    "pgs_per_osd": 2
+  },
+  "mgr_map": {
+    "active_name": "pve-deb-work.snrdap",
+    "standbys": [
+      {
+        "gid": 24118,
+        "name": "pve-deb-work.rjothn",
+        "mgr_features": 4540138314316775400
+      }
+    ]
+  },
+  "pools": [
+    {},
+    {}
+  ],
+  "df": {
+    "stats": {
+      "total_avail_bytes": 175476178944,
+      "total_bytes": 176085270528,
+      "total_used_raw_bytes": 609091584
+    }
+  },
+  "client_perf": {
+    "read_bytes_sec": 1,
+    "read_op_per_sec": 1,
+    "recovering_bytes_per_sec": 1,
+    "write_bytes_sec": 1,
+    "write_op_per_sec": 1
+  },
+  "hosts": 1,
+  "rgw": 1,
+  "iscsi_daemons": {
+    "up": 1,
+    "down": 1
+  }
+}
