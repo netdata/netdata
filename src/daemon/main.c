@@ -1245,9 +1245,9 @@ static void get_netdata_configured_variables()
         default_rrd_history_entries = (int)config_get_number(
             CONFIG_SECTION_DB,
             "retention",
-            align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
+            align_entries_to_pagesize(dbengine_tier0_in_ram ? RRD_MEMORY_MODE_RAM : default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
 
-        long h = align_entries_to_pagesize(default_rrd_memory_mode, default_rrd_history_entries);
+        long h = align_entries_to_pagesize(dbengine_tier0_in_ram ? RRD_MEMORY_MODE_RAM : default_rrd_memory_mode, default_rrd_history_entries);
         if (h != default_rrd_history_entries) {
             config_set_number(CONFIG_SECTION_DB, "retention", h);
             default_rrd_history_entries = (int)h;
