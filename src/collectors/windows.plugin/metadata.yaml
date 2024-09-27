@@ -32,9 +32,9 @@ modules:
       additional_permissions:
         description: ""
       default_behavior:
-          auto_detection:
-            description: |
-              The collector auto-detects all metrics. No configuration is needed.
+        auto_detection:
+          description: |
+            The collector automatically detects all metrics, no configuration required.
           limits:
             description: ""
           performance_impact:
