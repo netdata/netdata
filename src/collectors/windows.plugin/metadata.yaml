@@ -21,10 +21,10 @@ modules:
       most_popular: false
     overview:
       data_collection:
-          metrics_description: |
-            Perflib provides different statistical methods about Microsoft Windows environment. This collector query for
-            Object 'System' to show actual number of processes, threads and context switches.
-          method_description: ""
+        metrics_description: |
+          This collector monitors the current number of processes, threads, and context switches on Windows systems.
+        method_description: |
+          It queries the 'System' object from Perflib in order to gather the metrics.
       supported_platforms:
         include: ["windows"]
         exclude: []
