@@ -81,7 +81,7 @@ func TestUwsgi_Cleanup(t *testing.T) {
 		"after check": {
 			prepare: func() *Uwsgi {
 				uw := New()
-				uw.newConn = func(config Config) uwsgiConn { return prepareMockOk() }
+				uw.conn = prepareMockOk()
 				_ = uw.Check()
 				return uw
 			},
@@ -89,7 +89,7 @@ func TestUwsgi_Cleanup(t *testing.T) {
 		"after collect": {
 			prepare: func() *Uwsgi {
 				uw := New()
-				uw.newConn = func(config Config) uwsgiConn { return prepareMockOk() }
+				uw.conn = prepareMockOk()
 				_ = uw.Collect()
 				return uw
 			},
@@ -122,10 +122,6 @@ func TestUwsgi_Check(t *testing.T) {
 			wantFail:    false,
 			prepareMock: prepareMockOkNoWorkers,
 		},
-		"err on connect": {
-			wantFail:    true,
-			prepareMock: prepareMockErrOnConnect,
-		},
 		"unexpected response": {
 			wantFail:    true,
 			prepareMock: prepareMockUnexpectedResponse,
@@ -140,7 +136,7 @@ func TestUwsgi_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			uw := New()
 			mock := test.prepareMock()
-			uw.newConn = func(config Config) uwsgiConn { return mock }
+			uw.conn = mock
 
 			if test.wantFail {
 				assert.Error(t, uw.Check())
@@ -229,12 +225,6 @@ func TestUwsgi_Collect(t *testing.T) {
 			disconnectBeforeCleanup: true,
 			disconnectAfterCleanup:  true,
 		},
-		"err on connect": {
-			prepareMock:             prepareMockErrOnConnect,
-			wantCharts:              len(charts),
-			disconnectBeforeCleanup: false,
-			disconnectAfterCleanup:  false,
-		},
 		"err on query stats": {
 			prepareMock:             prepareMockErrOnQueryStats,
 			wantCharts:              len(charts),
@@ -247,7 +237,7 @@ func TestUwsgi_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			uw := New()
 			mock := test.prepareMock()
-			uw.newConn = func(config Config) uwsgiConn { return mock }
+			uw.conn = mock
 
 			mx := uw.Collect()
 
@@ -257,10 +247,6 @@ func TestUwsgi_Collect(t *testing.T) {
 				module.TestMetricsHasAllChartsDims(t, uw.Charts(), mx)
 			}
 			assert.Equal(t, test.wantCharts, len(*uw.Charts()), "want charts")
-
-			assert.Equal(t, test.disconnectBeforeCleanup, mock.disconnectCalled, "disconnect before cleanup")
-			uw.Cleanup()
-			assert.Equal(t, test.disconnectAfterCleanup, mock.disconnectCalled, "disconnect after cleanup")
 		})
 	}
 }
@@ -274,12 +260,6 @@ func prepareMockOk() *mockUwsgiConn {
 func prepareMockOkNoWorkers() *mockUwsgiConn {
 	return &mockUwsgiConn{
 		statsResponse: dataStatsNoWorkers,
-	}
-}
-
-func prepareMockErrOnConnect() *mockUwsgiConn {
-	return &mockUwsgiConn{
-		errOnConnect: true,
 	}
 }
 
@@ -300,21 +280,8 @@ func prepareMockEmptyResponse() *mockUwsgiConn {
 }
 
 type mockUwsgiConn struct {
-	errOnConnect     bool
-	errOnQueryStats  bool
-	statsResponse    []byte
-	disconnectCalled bool
-}
-
-func (m *mockUwsgiConn) connect() error {
-	if m.errOnConnect {
-		return errors.New("mock.connect() error")
-	}
-	return nil
-}
-
-func (m *mockUwsgiConn) disconnect() {
-	m.disconnectCalled = true
+	errOnQueryStats bool
+	statsResponse   []byte
 }
 
 func (m *mockUwsgiConn) queryStats() ([]byte, error) {

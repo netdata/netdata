@@ -21,6 +21,15 @@ func New(config Config) *Socket {
 	}
 }
 
+func ConnectAndRead(config Config, process Processor) error {
+	s := New(config)
+	if err := s.Connect(); err != nil {
+		return err
+	}
+	defer func() { _ = s.Disconnect() }()
+	return read(s.conn, process, s.ReadTimeout)
+}
+
 // Socket is the implementation of a socket client.
 type Socket struct {
 	Config

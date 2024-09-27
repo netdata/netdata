@@ -818,21 +818,28 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
 static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,size_t len, int flags)
 {
-    ssize_t bytes;
-    if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
-        if (SSL_connection(&w->ssl)) {
-            bytes = netdata_ssl_write(&w->ssl, buf, len) ;
-            web_client_enable_wait_from_ssl(w);
-        }
-        else
-            bytes = send(w->ofd,buf, len , flags);
-    }
-    else if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w))
-        bytes = send(w->ofd,buf, len , flags);
-    else
-        bytes = -999;
+    do {
+        errno_clear();
 
-    return bytes;
+        ssize_t bytes;
+        if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
+            if (SSL_connection(&w->ssl)) {
+                bytes = netdata_ssl_write(&w->ssl, buf, len);
+                web_client_enable_wait_from_ssl(w);
+            } else
+                bytes = send(w->ofd, buf, len, flags);
+        } else if (web_client_check_conn_tcp(w) || web_client_check_conn_unix(w))
+            bytes = send(w->ofd, buf, len, flags);
+        else
+            bytes = -999;
+
+        if(bytes < 0 && errno == EAGAIN) {
+            tinysleep();
+            continue;
+        }
+
+        return bytes;
+    } while(true);
 }
 
 void web_client_build_http_header(struct web_client *w) {

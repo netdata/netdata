@@ -1,6 +1,8 @@
 package lmsensors
 
 import (
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -8,15 +10,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudflare/cfssl/scan/crypto/sha1"
+
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
-// A filesystem is an interface to a filesystem, used for testing.
-type filesystem interface {
-	ReadFile(filename string) (string, error)
-	Readlink(name string) (string, error)
-	Stat(name string) (os.FileInfo, error)
-	WalkDir(root string, walkFn fs.WalkDirFunc) error
+// New creates a new Scanner.
+func New() *Scanner {
+	return &Scanner{
+		fs: &systemFilesystem{},
+	}
 }
 
 // A Scanner scans for Devices, so data can be read from their Sensors.
@@ -26,15 +29,8 @@ type Scanner struct {
 	fs filesystem
 }
 
-// New creates a new Scanner.
-func New() *Scanner {
-	return &Scanner{
-		fs: &systemFilesystem{},
-	}
-}
-
 // Scan scans for Devices and their Sensors.
-func (sc *Scanner) Scan() ([]*Device, error) {
+func (sc *Scanner) Scan() ([]*Chip, error) {
 	paths, err := sc.detectDevicePaths()
 	if err != nil {
 		return nil, err
@@ -42,93 +38,71 @@ func (sc *Scanner) Scan() ([]*Device, error) {
 
 	sc.Debugf("sysfs scanner: found %d paths", len(paths))
 
-	var devices []*Device
+	var chips []*Chip
 
-	for _, rootPath := range paths {
-		sc.Debugf("sysfs scanner: scanning %s", rootPath)
+	for _, path := range paths {
+		sc.Debugf("sysfs scanner: scanning %s", path)
 
-		dev := &Device{}
-		raw := make(map[string]map[string]string)
+		var chip Chip
 
-		// Walk filesystem paths to fetch devices and sensors
-		err := sc.fs.WalkDir(rootPath, func(path string, de fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		rawSns := make(rawSensors)
+
+		des, err := sc.fs.ReadDir(path)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, de := range des {
+			if !de.Type().IsRegular() || shouldSkip(de.Name()) {
+				continue
 			}
 
-			if de.IsDir() || !de.Type().IsRegular() {
-				if de.IsDir() && path != rootPath {
-					return fs.SkipDir
-				}
-				return nil
-			}
-
-			// Skip some files that can't be read or don't provide useful sensor information
-			file := filepath.Base(path)
-			if shouldSkip(file) {
-				return nil
-			}
+			filePath := filepath.Join(path, de.Name())
 
 			now := time.Now()
-			s, err := sc.fs.ReadFile(path)
+			content, err := sc.fs.ReadFile(filePath)
 			if err != nil {
-				return nil
+				sc.Debugf("sysfs scanner: failed to read '%s': %v", filePath, err)
+				continue
 			}
-			sc.Debugf("sysfs scanner: reading file '%s' took %s", path, time.Since(now))
+			since := time.Since(now)
 
-			if file == "name" {
-				dev.Name = s
-				return nil
+			sc.Debugf("sysfs scanner: reading file '%s' took %s", filePath, since)
+
+			if de.Name() == "name" {
+				chip.Name = content
+				continue
 			}
 
 			// Sensor names in format "sensor#_foo", e.g. "temp1_input"
-			parts := strings.SplitN(file, "_", 2)
-			if len(parts) != 2 {
-				return nil
+			feat, subfeat, ok := strings.Cut(de.Name(), "_")
+			if !ok {
+				continue
 			}
 
-			if _, ok := raw[parts[0]]; !ok {
-				raw[parts[0]] = make(map[string]string)
+			if _, ok := rawSns[feat]; !ok {
+				rawSns[feat] = make(map[string]rawValue)
 			}
 
-			raw[parts[0]][parts[1]] = s
+			rawSns[feat][subfeat] = rawValue{value: content, readTime: since}
+		}
 
-			return nil
-		})
+		sensors, err := parseSensors(rawSns)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("sysfs scanner: failed to parse (device '%s', path '%s'): %v", chip.Name, path, err)
 		}
 
-		sensors, err := parseSensors(raw)
-		if err != nil {
-			return nil, err
+		if sensors != nil {
+			chip.Sensors = *sensors
 		}
 
-		for _, sn := range sensors {
-			sc.Debugf("sysfs scanner: found sensor %+v", sn)
-		}
+		chip.SysDevice = getDevicePath(path)
+		chip.UniqueName = fmt.Sprintf("%s-%s-%s", chip.Name, getBusType(chip.SysDevice), getHash(chip.SysDevice))
 
-		dev.Sensors = sensors
-		devices = append(devices, dev)
+		chips = append(chips, &chip)
 	}
 
-	renameDevices(devices)
-
-	return devices, nil
-}
-
-// renameDevices renames devices in place to prevent duplicate device names, and to number each device.
-func renameDevices(devices []*Device) {
-	nameCount := make(map[string]int)
-
-	for i := range devices {
-		name := devices[i].Name
-		devices[i].Name = fmt.Sprintf("%s-%02d",
-			name,
-			nameCount[name],
-		)
-		nameCount[name]++
-	}
+	return chips, nil
 }
 
 // detectDevicePaths performs a filesystem walk to paths where devices may reside on Linux.
@@ -136,6 +110,7 @@ func (sc *Scanner) detectDevicePaths() ([]string, error) {
 	const lookPath = "/sys/class/hwmon"
 
 	var paths []string
+
 	err := sc.fs.WalkDir(lookPath, func(path string, de os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -154,7 +129,7 @@ func (sc *Scanner) detectDevicePaths() ([]string, error) {
 
 		// Symlink destination has a file called name, meaning a sensor exists here and data can be retrieved
 		fi, err := sc.fs.Stat(filepath.Join(dest, "name"))
-		if err != nil && !os.IsNotExist(err) {
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
 		if err == nil && fi.Mode().IsRegular() {
@@ -166,7 +141,7 @@ func (sc *Scanner) detectDevicePaths() ([]string, error) {
 		device := filepath.Join(dest, "device")
 		fi, err = sc.fs.Stat(device)
 		if err != nil {
-			if !os.IsNotExist(err) {
+			if !errors.Is(err, fs.ErrNotExist) {
 				return err
 			}
 			return nil
@@ -185,7 +160,7 @@ func (sc *Scanner) detectDevicePaths() ([]string, error) {
 
 		// Symlink destination has a file called name, meaning a sensor exists here and data can be retrieved
 		if _, err := sc.fs.Stat(filepath.Join(dest, "name")); err != nil {
-			if !os.IsNotExist(err) {
+			if !errors.Is(err, fs.ErrNotExist) {
 				return err
 			}
 			return nil
@@ -197,6 +172,34 @@ func (sc *Scanner) detectDevicePaths() ([]string, error) {
 	})
 
 	return paths, err
+}
+
+func getDevicePath(path string) string {
+	devPath, err := filepath.EvalSymlinks(filepath.Join(path, "device"))
+	if err != nil {
+		devPath = path
+		if i := strings.Index(devPath, "/hwmon"); i > 0 {
+			devPath = devPath[:i]
+		}
+	}
+	return strings.TrimPrefix(devPath, "/sys/devices/")
+}
+
+func getHash(devPath string) string {
+	hash := sha1.Sum([]byte(devPath))
+	return hex.EncodeToString(hash[:])[:8]
+}
+
+func getBusType(devPath string) string {
+	devPath = filepath.Join("/", devPath)
+	devPath = strings.ToLower(devPath)
+
+	for _, v := range []string{"i2c", "isa", "pci", "spi", "virtual", "acpi", "hid", "mdio", "scsi"} {
+		if strings.Contains(devPath, "/"+v) {
+			return v
+		}
+	}
+	return "unk"
 }
 
 // shouldSkip indicates if a given filename should be skipped during the filesystem walk operation.
@@ -217,29 +220,4 @@ func shouldSkip(file string) bool {
 	}
 
 	return true
-}
-
-var _ filesystem = &systemFilesystem{}
-
-// A systemFilesystem is a filesystem which uses operations on the host filesystem.
-type systemFilesystem struct{}
-
-func (fs *systemFilesystem) ReadFile(filename string) (string, error) {
-	b, err := os.ReadFile(filename)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(b)), nil
-}
-
-func (fs *systemFilesystem) Readlink(name string) (string, error) {
-	return os.Readlink(name)
-}
-
-func (fs *systemFilesystem) Stat(name string) (os.FileInfo, error) {
-	return os.Stat(name)
-}
-
-func (fs *systemFilesystem) WalkDir(root string, walkFn fs.WalkDirFunc) error {
-	return filepath.WalkDir(root, walkFn)
 }

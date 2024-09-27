@@ -28,10 +28,9 @@ func New() *HddTemp {
 			Address: "127.0.0.1:7634",
 			Timeout: confopt.Duration(time.Second * 1),
 		},
-		newHddTempConn: newHddTempConn,
-		charts:         &module.Charts{},
-		disks:          make(map[string]bool),
-		disksTemp:      make(map[string]bool),
+		charts:    &module.Charts{},
+		disks:     make(map[string]bool),
+		disksTemp: make(map[string]bool),
 	}
 }
 
@@ -41,25 +40,17 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout" json:"timeout"`
 }
 
-type (
-	HddTemp struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type HddTemp struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		newHddTempConn func(Config) hddtempConn
+	conn hddtempConn
 
-		disks     map[string]bool
-		disksTemp map[string]bool
-	}
-
-	hddtempConn interface {
-		connect() error
-		disconnect()
-		queryHddTemp() (string, error)
-	}
-)
+	disks     map[string]bool
+	disksTemp map[string]bool
+}
 
 func (h *HddTemp) Configuration() any {
 	return h.Config
@@ -70,6 +61,8 @@ func (h *HddTemp) Init() error {
 		h.Error("config: 'address' not set")
 		return errors.New("address not set")
 	}
+
+	h.conn = newHddTempConn(h.Config)
 
 	return nil
 }

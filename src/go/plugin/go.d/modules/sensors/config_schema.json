@@ -10,19 +10,6 @@
         "type": "integer",
         "minimum": 1,
         "default": 10
-      },
-      "binary_path": {
-        "title": "Binary path",
-        "description": "Path to the `sensors` binary. If left empty or if the binary is not found, [**sysfs**](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) will be used to collect sensor statistics.",
-        "type": "string",
-        "default": "/usr/bin/sensors"
-      },
-      "timeout": {
-        "title": "Timeout",
-        "description": "Timeout for executing the binary, specified in seconds.",
-        "type": "number",
-        "minimum": 0.5,
-        "default": 2
       }
     },
     "required": [
@@ -35,12 +22,6 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
-    },
-    "binary_path": {
-      "ui:help": "If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable."
-    },
-    "timeout": {
-      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     }
   }
 }

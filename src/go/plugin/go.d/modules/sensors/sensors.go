@@ -5,11 +5,9 @@ package sensors
 import (
 	_ "embed"
 	"errors"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/sensors/lmsensors"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 )
 
 //go:embed "config_schema.json"
@@ -28,19 +26,14 @@ func init() {
 
 func New() *Sensors {
 	return &Sensors{
-		Config: Config{
-			BinaryPath: "/usr/bin/sensors",
-			Timeout:    confopt.Duration(time.Second * 2),
-		},
-		charts:  &module.Charts{},
-		sensors: make(map[string]bool),
+		Config:      Config{},
+		charts:      &module.Charts{},
+		seenSensors: make(map[string]bool),
 	}
 }
 
 type Config struct {
-	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	BinaryPath  string           `yaml:"binary_path" json:"binary_path"`
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 }
 
 type (
@@ -50,16 +43,12 @@ type (
 
 		charts *module.Charts
 
-		exec sensorsBinary
-		sc   sysfsScanner
+		sc sysfsScanner
 
-		sensors map[string]bool
-	}
-	sensorsBinary interface {
-		sensorsInfo() ([]byte, error)
+		seenSensors map[string]bool
 	}
 	sysfsScanner interface {
-		Scan() ([]*lmsensors.Device, error)
+		Scan() ([]*lmsensors.Chip, error)
 	}
 )
 
@@ -68,12 +57,6 @@ func (s *Sensors) Configuration() any {
 }
 
 func (s *Sensors) Init() error {
-	if sb, err := s.initSensorsBinary(); err != nil {
-		s.Infof("sensors exec initialization: %v", err)
-	} else if sb != nil {
-		s.exec = sb
-	}
-
 	sc := lmsensors.New()
 	sc.Logger = s.Logger
 	s.sc = sc
