@@ -66,6 +66,9 @@ struct mssql_instance {
     RRDSET *st_sql_errors;
     RRDDIM *rd_sql_errors;
 
+    RRDSET *st_lockWait;
+    RRDSET *st_deadLocks;
+    DICTIONARY *locks_instances;
 
     COUNTER_DATA MSSQLAccessMethodPageSplits;
     COUNTER_DATA MSSQLBufferCacheHits;
@@ -75,8 +78,6 @@ struct mssql_instance {
     COUNTER_DATA MSSQLBufferPageWrites;
     COUNTER_DATA MSSQLBlockedProcesses;
     COUNTER_DATA MSSQLUserConnections;
-    COUNTER_DATA MSSQLLockWait;
-    COUNTER_DATA MSSQLDeadlocks;
     COUNTER_DATA MSSQLConnectionMemoryBytes;
     COUNTER_DATA MSSQLExternalBenefitOfMemory;
     COUNTER_DATA MSSQLPendingMemoryGrants;
@@ -96,6 +97,17 @@ struct mssql_instance {
     COUNTER_DATA MSSQLDatabaseTransactions;
     COUNTER_DATA MSSQLDatabaseWriteTransactions;
 };
+
+struct mssql_lock_instance {
+    struct mssql_instance *parent;
+
+    COUNTER_DATA lockWait;
+    COUNTER_DATA deadLocks;
+
+    RRDDIM *rd_lockWait;
+    RRDDIM *rd_deadLocks;
+};
+
 
 static DICTIONARY *mssql_instances = NULL;
 
@@ -166,8 +178,6 @@ static inline void initialize_mssql_keys(struct mssql_instance *p) {
     p->MSSQLSQLErrorsTotal.key = "Errors/sec";
 
     /*
-    p->MSSQLLockWait.key = "";
-    p->MSSQLDeadlocks.key = "";
     p->MSSQLConnectionMemoryBytes.key = "";
     p->MSSQLExternalBenefitOfMemory.key = "";
     p->MSSQLPendingMemoryGrants.key = "";
@@ -183,9 +193,22 @@ static inline void initialize_mssql_keys(struct mssql_instance *p) {
      */
 }
 
+void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct mssql_lock_instance  *ptr = value;
+    ptr->deadLocks.key = "Number of Deadlocks/sec";
+    ptr->lockWait.key = "Lock Waits/sec";
+}
+
 void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_instance *p = value;
     const char *instance = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+
+    if (!p->locks_instances) {
+        p->locks_instances = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE |
+                                                        DICT_OPTION_FIXED_SIZE,
+                                                        NULL, sizeof(struct mssql_lock_instance));
+        dictionary_register_insert_callback(p->locks_instances, dict_mssql_insert_locks_cb, NULL);
+    }
 
     initialize_mssql_objects(p, instance);
     initialize_mssql_keys(p);
@@ -730,6 +753,122 @@ static void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *
     }
 }
 
+int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    char id[RRD_ID_LENGTH_MAX + 1];
+    struct mssql_lock_instance *mli = value;
+    const char *instance = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+
+    int *update_every = data;
+
+    if (!mli->parent->st_lockWait) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_locks_lock_wait", mli->parent->instanceID);
+        mli->parent->st_lockWait = rrdset_create_localhost("mssql"
+                                                           , id, NULL
+                                                           , "locks"
+                                                           , "mssql.instance_locks_lock_wait"
+                                                           , "Lock requests that required the caller to wait."
+                                                           , "locks/s"
+                                                           , PLUGIN_WINDOWS_NAME
+                                                           , "PerflibMSSQL"
+                                                           , PRIO_MSSQL_LOCKS_WAIT
+                                                           , *update_every
+                                                           , RRDSET_TYPE_LINE
+                                                           );
+    }
+
+    if (!mli->rd_lockWait) {
+        snprintfz(id,
+                  RRD_ID_LENGTH_MAX,
+                  "mssql_instance_%s_resource_%s_locks_lock_wait_seconds",
+                  mli->parent->instanceID,
+                  instance);
+
+        mli->rd_lockWait = rrddim_add(mli->parent->st_lockWait,
+                                       id,
+                                       instance,
+                                       1,
+                                       1,
+                                       RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(mli->parent->st_lockWait,
+                          mli->rd_lockWait,
+                          (collected_number)mli->lockWait.current.Data);
+
+    if (!mli->parent->st_deadLocks) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_locks_deadlocks", mli->parent->instanceID);
+        mli->parent->st_deadLocks = rrdset_create_localhost("mssql"
+                                                            , id, NULL
+                                                            , "locks"
+                                                            , "mssql.instance_locks_deadlocks"
+                                                            , "Lock requests that resulted in deadlock."
+                                                            , "locks/s"
+                                                            , PLUGIN_WINDOWS_NAME
+                                                            , "PerflibMSSQL"
+                                                            , PRIO_MSSQL_LOCKS_DEADLOCK
+                                                            , *update_every
+                                                            , RRDSET_TYPE_LINE
+        );
+    }
+
+    if (!mli->rd_deadLocks) {
+        snprintfz(id,
+                  RRD_ID_LENGTH_MAX,
+                  "mssql_instance_%s_resource_%s_locks_deadlocks",
+                  mli->parent->instanceID,
+                  instance);
+
+        mli->rd_deadLocks = rrddim_add(mli->parent->st_deadLocks,
+                                      id,
+                                      instance,
+                                      1,
+                                      1,
+                                      RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(mli->parent->st_deadLocks,
+                          mli->rd_deadLocks,
+                          (collected_number)mli->deadLocks.current.Data);
+}
+
+static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_LOCKS]);
+    if (!pObjectType) return;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for(LONG i = 0; i < pObjectType->NumInstances ; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if(!pi) break;
+
+        if(!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+        if(!strcasecmp(windows_shared_buffer, "_Total"))
+            continue;
+
+        netdata_fix_chart_name(windows_shared_buffer);
+        struct mssql_lock_instance *mli = dictionary_set(p->locks_instances,
+                                                         windows_shared_buffer,
+                                                         NULL,
+                                                         sizeof(*mli));
+        if (!mli)
+            continue;
+
+        if (!mli->parent) {
+            mli->parent = p;
+        }
+
+        perflibGetObjectCounter(pDataBlock, pObjectType, &mli->lockWait);
+        perflibGetObjectCounter(pDataBlock, pObjectType, &mli->deadLocks);
+    }
+
+    dictionary_sorted_walkthrough_read(p->locks_instances, dict_mssql_locks_charts_cb, &update_every);
+    rrdset_done(p->st_lockWait);
+    rrdset_done(p->st_deadLocks);
+}
+
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_instance *p = value;
     int *update_every = data;
@@ -737,7 +876,9 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
         do_mssql_general_stats,
         do_mssql_errors,
-        NULL, NULL, NULL,
+        NULL,
+        do_mssql_locks,
+        NULL,
         do_mssql_buffer_management,
         do_mssql_sql_statistics,
         NULL,
