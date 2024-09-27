@@ -208,49 +208,49 @@ bool apps_os_read_pid_status_freebsd(struct pid_stat *p, void *ptr) {
     return true;
 }
 
-bool apps_os_read_global_cpu_utilization_freebsd(void) {
-    static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
-    static usec_t collected_usec = 0, last_collected_usec = 0;
-    long cp_time[CPUSTATES];
-
-    if (unlikely(CPUSTATES != 5)) {
-        goto cleanup;
-    } else {
-        static int mib[2] = {0, 0};
-
-        if (unlikely(GETSYSCTL_SIMPLE("kern.cp_time", mib, cp_time))) {
-            goto cleanup;
-        }
-    }
-
-    last_collected_usec = collected_usec;
-    collected_usec = now_monotonic_usec();
-
-    calls_counter++;
-
-    // temporary - it is added global_ntime;
-    kernel_uint_t global_ntime = 0;
-
-    incremental_rate(global_utime, utime_raw, cp_time[0], collected_usec, last_collected_usec, (NSEC_PER_SEC / system_hz));
-    incremental_rate(global_ntime, ntime_raw, cp_time[1], collected_usec, last_collected_usec, (NSEC_PER_SEC / system_hz));
-    incremental_rate(global_stime, stime_raw, cp_time[2], collected_usec, last_collected_usec, (NSEC_PER_SEC / system_hz));
-
-    global_utime += global_ntime;
-
-    if(unlikely(global_iterations_counter == 1)) {
-        global_utime = 0;
-        global_stime = 0;
-        global_gtime = 0;
-    }
-
-    return 1;
-
-cleanup:
-    global_utime = 0;
-    global_stime = 0;
-    global_gtime = 0;
-    return 0;
-}
+//bool apps_os_read_global_cpu_utilization_freebsd(void) {
+//    static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
+//    static usec_t collected_usec = 0, last_collected_usec = 0;
+//    long cp_time[CPUSTATES];
+//
+//    if (unlikely(CPUSTATES != 5)) {
+//        goto cleanup;
+//    } else {
+//        static int mib[2] = {0, 0};
+//
+//        if (unlikely(GETSYSCTL_SIMPLE("kern.cp_time", mib, cp_time))) {
+//            goto cleanup;
+//        }
+//    }
+//
+//    last_collected_usec = collected_usec;
+//    collected_usec = now_monotonic_usec();
+//
+//    calls_counter++;
+//
+//    // temporary - it is added global_ntime;
+//    kernel_uint_t global_ntime = 0;
+//
+//    incremental_rate(global_utime, utime_raw, cp_time[0], collected_usec, last_collected_usec, (NSEC_PER_SEC / system_hz));
+//    incremental_rate(global_ntime, ntime_raw, cp_time[1], collected_usec, last_collected_usec, (NSEC_PER_SEC / system_hz));
+//    incremental_rate(global_stime, stime_raw, cp_time[2], collected_usec, last_collected_usec, (NSEC_PER_SEC / system_hz));
+//
+//    global_utime += global_ntime;
+//
+//    if(unlikely(global_iterations_counter == 1)) {
+//        global_utime = 0;
+//        global_stime = 0;
+//        global_gtime = 0;
+//    }
+//
+//    return 1;
+//
+//cleanup:
+//    global_utime = 0;
+//    global_stime = 0;
+//    global_gtime = 0;
+//    return 0;
+//}
 
 bool apps_os_read_pid_stat_freebsd(struct pid_stat *p, void *ptr) {
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
