@@ -268,6 +268,60 @@ static inline void link_all_processes_to_their_parents(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static inline void assign_app_group_target_to_pid(struct pid_stat *p) {
+    targets_assignment_counter++;
+
+    for(struct target *w = apps_groups_root_target; w ; w = w->next) {
+        // find it - 4 cases:
+        // 1. the target is not a pattern
+        // 2. the target has the prefix
+        // 3. the target has the suffix
+        // 4. the target is something inside cmdline
+
+        if(unlikely(( (!w->starts_with && !w->ends_with && w->compare == p->comm)
+                      || (w->starts_with && !w->ends_with && string_starts_with_string(p->comm, w->compare))
+                      || (!w->starts_with && w->ends_with && string_ends_with_string(p->comm, w->compare))
+                      || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(pid_stat_cmdline(p), string2str(w->compare)))
+                          ))) {
+
+            p->matched_by_config = true;
+            if(w->target) p->target = w->target;
+            else p->target = w;
+
+            if(debug_enabled || (p->target && p->target->debug_enabled))
+                debug_log_int("%s linked to target %s",
+                              pid_stat_comm(p), string2str(p->target->name));
+
+            break;
+        }
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+void update_pid_comm(struct pid_stat *p, const char *comm) {
+    if(strcmp(pid_stat_comm(p), comm) != 0) {
+        if(unlikely(debug_enabled)) {
+            if(string_strlen(p->comm))
+                debug_log("\tpid %d (%s) changed name to '%s'", p->pid, pid_stat_comm(p), comm);
+            else
+                debug_log("\tJust added %d (%s)", p->pid, comm);
+        }
+
+        string_freez(p->comm);
+        p->comm = string_strdupz(comm);
+
+        // /proc/<pid>/cmdline
+        if(likely(proc_pid_cmdline_is_needed))
+            managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
+
+        assign_app_group_target_to_pid(p);
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1) || (PROCESSES_HAVE_CHILDREN_FLTS == 1)
 static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t time) {
     char *prefix = "\\_ ";
     int indent = 0;
@@ -412,61 +466,6 @@ static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost
     }
 }
 
-// --------------------------------------------------------------------------------------------------------------------
-
-static inline void assign_app_group_target_to_pid(struct pid_stat *p) {
-    targets_assignment_counter++;
-
-    for(struct target *w = apps_groups_root_target; w ; w = w->next) {
-        // find it - 4 cases:
-        // 1. the target is not a pattern
-        // 2. the target has the prefix
-        // 3. the target has the suffix
-        // 4. the target is something inside cmdline
-
-        if(unlikely(( (!w->starts_with && !w->ends_with && w->compare == p->comm)
-                      || (w->starts_with && !w->ends_with && string_starts_with_string(p->comm, w->compare))
-                      || (!w->starts_with && w->ends_with && string_ends_with_string(p->comm, w->compare))
-                      || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(pid_stat_cmdline(p), string2str(w->compare)))
-                          ))) {
-
-            p->matched_by_config = true;
-            if(w->target) p->target = w->target;
-            else p->target = w;
-
-            if(debug_enabled || (p->target && p->target->debug_enabled))
-                debug_log_int("%s linked to target %s",
-                              pid_stat_comm(p), string2str(p->target->name));
-
-            break;
-        }
-    }
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-
-void update_pid_comm(struct pid_stat *p, const char *comm) {
-    if(strcmp(pid_stat_comm(p), comm) != 0) {
-        if(unlikely(debug_enabled)) {
-            if(string_strlen(p->comm))
-                debug_log("\tpid %d (%s) changed name to '%s'", p->pid, pid_stat_comm(p), comm);
-            else
-                debug_log("\tJust added %d (%s)", p->pid, comm);
-        }
-
-        string_freez(p->comm);
-        p->comm = string_strdupz(comm);
-
-        // /proc/<pid>/cmdline
-        if(likely(proc_pid_cmdline_is_needed))
-            managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
-
-        assign_app_group_target_to_pid(p);
-    }
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-
 static inline kernel_uint_t remove_exited_child_from_parent(kernel_uint_t *field, kernel_uint_t *pfield) {
     kernel_uint_t absorbed = 0;
 
@@ -544,7 +543,7 @@ static inline void process_exited_pids(void) {
         for(pp = p->parent; pp ; pp = pp->parent) {
             if(!pp->updated) continue;
 
-            kernel_uint_t absorbed;
+            kernel_uint_t absorbed; (void)absorbed;
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
             absorbed = remove_exited_child_from_parent(&utime,  &pp->values[PDF_CUTIME]);
             if(unlikely(debug_enabled && absorbed))
@@ -647,6 +646,7 @@ static inline void process_exited_pids(void) {
                       , p->updated?"running":"exited");
     }
 }
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -758,8 +758,10 @@ bool collect_data_for_all_pids(void) {
     // build the process tree
     link_all_processes_to_their_parents();
 
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1) || (PROCESSES_HAVE_CHILDREN_FLTS == 1)
     // merge exited pids to their parents
     process_exited_pids();
+#endif
 
     // the first iteration needs to be eliminated
     // since we are looking for rates

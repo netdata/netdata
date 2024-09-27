@@ -85,14 +85,15 @@ void function_processes(const char *transaction, char *function,
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
 
-    struct target *category = NULL, *user = NULL, *group = NULL;
+    struct target *category = NULL, *user = NULL, *group = NULL; (void)user; (void)group;
     const char *process_name = NULL;
     pid_t pid = 0;
-    uid_t uid = 0;
-    gid_t gid = 0;
+    uid_t uid = 0; (void)uid;
+    gid_t gid = 0; (void)gid;
     bool info = false;
 
     bool filter_pid = false, filter_uid = false, filter_gid = false;
+    (void)filter_uid; (void)filter_gid;
 
     for(int i = 1; i < PLUGINSD_MAX_WORDS ;i++) {
         const char *keyword = get_word(words, num_words, i);
