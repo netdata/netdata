@@ -120,27 +120,3 @@ var (
 		},
 	}
 )
-
-// func newHostCharts(host string) *module.Charts {
-// 	charts := hostChartsTmpl.Copy()
-
-// 	for _, chart := range *charts {
-// 		chart.ID = fmt.Sprintf(chart.ID, strings.ReplaceAll(host, ".", "_"))
-// 		chart.Labels = []module.Label{
-// 			{Key: "host", Value: host},
-// 		}
-// 		for _, dim := range chart.Dims {
-// 			dim.ID = fmt.Sprintf(dim.ID, host)
-// 		}
-// 	}
-
-// 	return charts
-// }
-
-// func (p *Ping) addHostCharts(host string) {
-// 	charts := newHostCharts(host)
-
-// 	if err := p.Charts().Add(*charts...); err != nil {
-// 		p.Warning(err)
-// 	}
-// }

@@ -29,22 +29,20 @@ func New() *OpenLDAP {
 	return &OpenLDAP{
 		Config: Config{
 			LDAP_URL: "ldap://localhost:389",
-			Timeout: confopt.Duration(time.Second * 2),
+			Timeout:  confopt.Duration(time.Second * 2),
 		},
 
-		// seenBackends: make(map[string]bool),
-		// seenStorages: make(map[string]bool),
-		charts:       OpenLdapCharts.Copy(),
+		charts: OpenLdapCharts.Copy(),
 	}
 
 }
 
 type Config struct {
-	UpdateEvery     int              `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout         confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	DistinguishedName    string           `yaml:"distinguished_name,omitempty" json:"distinguished_name,omitempty"`
-	Password string           `yaml:"password,omitempty" json:"password,omitempty"`
-	LDAP_URL string `yaml:"ldap_url,omitempty" json:"ldap_url,omitempty"`
+	UpdateEvery       int              `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout           confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	DistinguishedName string           `yaml:"distinguished_name,omitempty" json:"distinguished_name,omitempty"`
+	Password          string           `yaml:"password,omitempty" json:"password,omitempty"`
+	LDAP_URL          string           `yaml:"ldap_url,omitempty" json:"ldap_url,omitempty"`
 }
 
 type OpenLDAP struct {
@@ -52,11 +50,6 @@ type OpenLDAP struct {
 	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
-
-	// exec ldapSearchBinary
-
-	// seenBackends map[string]bool
-	// seenStorages map[string]bool
 }
 
 func (l *OpenLDAP) Configuration() any {

@@ -111,7 +111,9 @@ see the appropriate collector readme.
 | [nginxvts](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginxvts)                     |           NGINX VTS           |
 | [nsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nsd)                               |       NSD (NLnet Labs)        |
 | [ntpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ntpd)                             |          NTP daemon           |
+| [nvidia_smi](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nvidia_smi)                 |          Nvidia SMI           |
 | [nvme](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nvme)                             |         NVMe devices          |
+| [openldap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/openldap)                     |           OpenLDAP            |
 | [openvpn](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/openvpn)                       |            OpenVPN            |
 | [openvpn_status_log](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/openvpn_status_log) |            OpenVPN            |
 | [pgbouncer](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/pgbouncer)                   |           PgBouncer           |

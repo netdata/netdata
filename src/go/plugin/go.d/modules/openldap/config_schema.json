@@ -26,13 +26,13 @@
             },
             "distinguished_name": {
                 "title": "OpenLDAP distinguished_name",
-                "description": "The distinguished_name to use with the `ldapsearch` command.",
+                "description": "The user's Distinguished Name to use with the `ldapsearch` command.",
                 "type": "string",
                 "default": ""
             },
             "password": {
                 "title": "OpenLDAP password",
-                "description": "The password to use with the `ldapsearch` command.",
+                "description": "The user's password to use with the `ldapsearch` command.",
                 "type": "string",
                 "default": ""
             }

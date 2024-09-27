@@ -1,0 +1,168 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      plugin_name: go.d.plugin
+      module_name: openldap
+      monitored_instance:
+        name: OpenLDAP
+        link: https://www.openldap.org/
+        categories:
+          - data-collection.authentication-and-authorization
+        icon_filename: openldap.svg
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - openldap
+        - RBAC
+        - Directory access
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: This collector monitors OpenLDAP metrics about connections, operations, referrals and more.
+        method_description: It gathers the metrics using the [go-ldap](https://github.com/go-ldap/ldap) module and the [Monitor backend](https://www.openldap.org/doc/admin24/monitoringslapd.html) of OpenLDAP.
+      supported_platforms:
+        include: ["Linux"]
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: "The collector cannot auto-detect OpenLDAP instances, because credential configuration is required."
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable the openLDAP Monitor Backend.
+            description: |
+              Follow instructions from https://www.openldap.org/doc/admin24/monitoringslapd.html to activate monitoring interface.
+      configuration:
+        file:
+          name: go.d/openldap.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: timeout
+              description: Timeout for executing the binary, specified in seconds.
+              default_value: 2
+              required: false
+            - name: ldap_url
+              description: "Specifies the LDAP server URL."
+              default_value: "ldap://localhost:389"
+              required: true
+            - name: distinguished_name
+              description: "Specifies the Distinguished Name of the user that has access to the monitor backend of the server"
+              default_value: ""
+              required: true
+            - name: password
+              description: "Specifies the Password of the user that has access to the monitor backend of the server"
+              default_value: ""
+              required: true
+        examples:
+          folding:
+            title: ""
+            enabled: false
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    ldap_url: ldap://localhost:389
+                    distinguished_name: cn=admin,dc=example,dc=com 
+                    password: test
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    ldap_url: ldap://localhost:389
+                    distinguished_name: cn=admin,dc=example,dc=com 
+                    password: test
+                  
+                  - name: remote
+                    ldap_url: ldap://192.0.2.1:389
+                    distinguished_name: cn=admin2,dc=example,dc=com 
+                    password: test2
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: openldap.total_connections
+              description: Total Connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: openldap.traffic_stats
+              description: Traffic
+              unit: "KiB/s"
+              chart_type: line
+              dimensions:
+                - name: sent
+            - name: openldap.operations_status
+              description: Operations Status
+              unit: "ops/s"
+              chart_type: line
+              dimensions:
+                - name: completed
+                - name: initiated
+            - name: openldap.referrals
+              description: Referrals
+              unit: "referrals/s"
+              chart_type: line
+              dimensions:
+                - name: sent
+            - name: openldap.entries
+              description: Entries
+              unit: "entries/s"
+              chart_type: line
+              dimensions:
+                - name: sent
+            - name: openldap.ldap_operations
+              description: Operations
+              unit: "ops/s"
+              chart_type: line
+              dimensions:
+                - name: bind
+                - name: search
+                - name: unbind
+                - name: add
+                - name: delete
+                - name: modify
+                - name: compare
+            - name: openldap.waiters
+              description: Waiters
+              unit: "waiters/s"
+              chart_type: line
+              dimensions:
+                - name: write
+                - name: read
