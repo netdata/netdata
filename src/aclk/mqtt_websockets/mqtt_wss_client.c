@@ -297,7 +297,7 @@ static int http_parse_reply(rbuf_t buf)
         }
 
     http_code_s[HTTP_CODE_LEN - 1] = 0;
-    int http_code = atoi(http_code_s);
+    int http_code = str2i(http_code_s);
 
     // TODO check if we ever have more headers here
     rbuf_find_bytes(buf, HTTP_ENDLINE, strlen(HTTP_ENDLINE), &idx);

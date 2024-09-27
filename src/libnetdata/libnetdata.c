@@ -1572,19 +1572,19 @@ bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_
 
 
 #if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
-static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)
+static inline EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)
 {
-	EVP_ENCODE_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
+    EVP_ENCODE_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
 
-	if (ctx != NULL) {
-		memset(ctx, 0, sizeof(*ctx));
-	}
-	return ctx;
+    if (ctx != NULL) {
+        memset(ctx, 0, sizeof(*ctx));
+    }
+    return ctx;
 }
+
 static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
 {
 	OPENSSL_free(ctx);
-	return;
 }
 #endif
 
