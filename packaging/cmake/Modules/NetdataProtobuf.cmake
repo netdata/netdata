@@ -169,6 +169,8 @@ function(netdata_protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
 
                 if(ENABLE_BUNDLED_PROTOBUF)
                         list(APPEND _PROTOC_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/_deps/protobuf-src/src/)
+                else()
+                        list(APPEND _PROTOC_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/_deps/grpc-src/third_party/protobuf/src/)
                 endif()
 
                 add_custom_command(OUTPUT ${GENERATED_PB_CC} ${GENERATED_PB_H}

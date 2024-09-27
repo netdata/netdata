@@ -210,7 +210,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
                       "\n# global netdata configuration\n");
     }
 
-    for(i = 0; i <= 17 ;i++) {
+    for(i = 0; i <= 18 ;i++) {
         APPCONFIG_LOCK(root);
         for(sect = root->sections; sect; sect = sect->next) {
             if(!string_strcmp(sect->name, CONFIG_SECTION_GLOBAL))                 pri = 0;
@@ -222,15 +222,16 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed, bool 
             else if(!string_strcmp(sect->name, CONFIG_SECTION_SQLITE))            pri = 6;
             else if(!string_strcmp(sect->name, CONFIG_SECTION_CLOUD))             pri = 7;
             else if(!string_strcmp(sect->name, CONFIG_SECTION_ML))                pri = 8;
-            else if(!string_strcmp(sect->name, CONFIG_SECTION_HEALTH))            pri = 9;
-            else if(!string_strcmp(sect->name, CONFIG_SECTION_WEB))               pri = 10;
-            else if(!string_strcmp(sect->name, CONFIG_SECTION_WEBRTC))            pri = 11;
-            // by default, new sections will get pri = 12 (set at the end, below)
-            else if(!string_strcmp(sect->name, CONFIG_SECTION_REGISTRY))          pri = 13;
-            else if(!string_strcmp(sect->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 14;
-            else if(!string_strcmp(sect->name, CONFIG_SECTION_PLUGINS))           pri = 15;
-            else if(!string_strcmp(sect->name, CONFIG_SECTION_STATSD))            pri = 16;
-            else if(!string_strncmp(sect->name, "plugin:", 7))                    pri = 17; // << change the loop too if you change this
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_OTEL))              pri = 9;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_HEALTH))            pri = 10;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_WEB))               pri = 11;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_WEBRTC))            pri = 12;
+            // by default, new sections will get pri = 13 (set at the end, below)
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_REGISTRY))          pri = 14;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_GLOBAL_STATISTICS)) pri = 15;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_PLUGINS))           pri = 16;
+            else if(!string_strcmp(sect->name, CONFIG_SECTION_STATSD))            pri = 17;
+            else if(!string_strncmp(sect->name, "plugin:", 7))                    pri = 18; // << change the loop too if you change this
             else pri = 12; // this is used for any new (currently unknown) sections
 
             if(i == pri) {

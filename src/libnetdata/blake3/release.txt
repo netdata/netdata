@@ -1,0 +1,1 @@
+https://github.com/BLAKE3-team/BLAKE3/releases/tag/1.5.4

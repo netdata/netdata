@@ -31,7 +31,7 @@ if(STATIC_BUILD)
 endif()
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME "netdata")
 
 option(USE_CXX_11 "Use C++11 instead of C++14 (should only be used on legacy systems that cannot support C++14, may disable some features)" False)
@@ -174,6 +174,7 @@ mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable OTEL metrics ingestion" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SLABINFO "Enable Linux kernel SLAB allocator monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "Enable systemd journal log collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
@@ -239,6 +240,42 @@ if(ENABLE_WEBRTC)
             CMAKE_ARGS ${NETDATA_PROPAGATE_TOOLCHAIN_ARGS}
         )
         FetchContent_MakeAvailable(libdatachannel)
+endif()
+
+if(ENABLE_PLUGIN_OTEL)
+        include(FetchContent)
+
+        FetchContent_Declare(
+          yaml-cpp
+          GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+          GIT_TAG f7320141120f720aecc4c32be25586e7da9eb978 # 0.8.0
+        )
+
+        FetchContent_GetProperties(yaml-cpp)
+        if(NOT yaml-cpp_POPULATED)
+                message(STATUS "Fetching yaml-cpp...")
+                FetchContent_MakeAvailable(yaml-cpp)
+                # add_subdirectory(${yaml-cpp_SOURCE_DIR})
+        endif()
+
+        set(ABSL_ENABLE_INSTALL ON)
+        set(gRPC_BUILD_GRPC_CSHARP_PLUGIN OFF CACHE BOOL "")
+        set(gRPC_BUILD_GRPC_NODE_PLUGIN OFF CACHE BOOL "")
+        set(gRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN OFF CACHE BOOL "")
+        set(gRPC_BUILD_GRPC_PHP_PLUGIN OFF CACHE BOOL "")
+        set(gRPC_BUILD_GRPC_PYTHON_PLUGIN OFF CACHE BOOL "")
+        set(gRPC_BUILD_GRPC_RUBY_PLUGIN OFF CACHE BOOL "")
+
+        include(FetchContent)
+        FetchContent_Declare(
+          gRPC
+          # GIT_REPOSITORY https://github.com/grpc/grpc
+          GIT_REPOSITORY /home/vk/repos/grpc
+          GIT_TAG        v1.66.2
+        )
+
+        set(FETCHCONTENT_QUIET OFF)
+        FetchContent_MakeAvailable(gRPC)
 endif()
 
 if(NEED_PROTOBUF)
@@ -621,6 +658,11 @@ set(LIBNETDATA_FILES
         src/libnetdata/aral/aral.h
         src/libnetdata/avl/avl.c
         src/libnetdata/avl/avl.h
+        src/libnetdata/blake3/blake3.c
+        src/libnetdata/blake3/blake3.h
+        src/libnetdata/blake3/blake3_portable.c
+        src/libnetdata/blake3/blake3_dispatch.c
+        src/libnetdata/blake3/blake3_impl.h
         src/libnetdata/buffer/buffer.c
         src/libnetdata/buffer/buffer.h
         src/libnetdata/ringbuffer/ringbuffer.c
@@ -1498,6 +1540,122 @@ set(TC_PLUGIN_FILES
         src/collectors/tc.plugin/plugin_tc.c
 )
 
+set(OTEL_PLUGIN_FILES
+        src/otel/CLI11.hpp
+        src/otel/otel.h
+        src/otel/otel.cc
+        # src/otel/otel_chart.h
+        # src/otel/otel_chart.cc
+        # src/otel/otel_config.h
+        # src/otel/otel_flatten.h
+        # src/otel/otel_flatten.cc
+        # src/otel/otel_hash.h
+        # src/otel/otel_hash.cc
+        # src/otel/otel_iterator.h
+        # src/otel/otel_process.h
+        # src/otel/otel_process.cc
+        # src/otel/otel_sort.h
+        # src/otel/otel_sort.cc
+        # src/otel/otel_transform.h
+        # src/otel/otel_transform.cc
+        # src/otel/otel_utils.h
+        # src/otel/otel_utils.cc
+)
+
+
+function(netdata_grpc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
+        if(NOT ARGN)
+                message(SEND_ERROR "Error: netdata_grpc_generate_cpp() called without any proto files")
+                return()
+        endif()
+
+        set(${INC_DIR})
+        set(${OUT_DIR})
+        set(${SRCS})
+        set(${HDRS})
+
+        set(PROTOBUF_PROTOC_EXECUTABLE $<TARGET_FILE:protoc>)
+        set(GRPC_CPP_PLUGIN $<TARGET_FILE:grpc_cpp_plugin>)
+
+        list(APPEND _PROTOC_INCLUDE_DIRS ${INC_DIR})
+        list(APPEND _PROTOC_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/_deps/grpc-src/third_party/protobuf/src/)
+
+        foreach(FIL ${ARGN})
+                get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+                get_filename_component(DIR ${ABS_FIL} DIRECTORY)
+                get_filename_component(FIL_WE ${FIL} NAME_WE)
+
+                set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
+                set(GENERATED_GRPC_PB_CC "${DIR}/${FIL_WE}.grpc.pb.cc")
+                list(APPEND ${SRCS} ${GENERATED_PB_CC} ${GENERATED_GRPC_PB_CC})
+
+                set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
+                set(GENERATED_GRPC_PB_H "${DIR}/${FIL_WE}.grpc.pb.h")
+                list(APPEND ${HDRS} ${GENERATED_PB_H} ${GENERATED_GRPC_PB_H})
+
+
+                add_custom_command(OUTPUT ${GENERATED_PB_CC} ${GENERATED_GRPC_PB_CC}
+                                          ${GENERATED_PB_H} ${GENERATED_GRPC_PB_H}
+                                   COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
+                                   ARGS --grpc_out "${OUT_DIR}"
+                                        --plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN}
+                                        "-I$<JOIN:${_PROTOC_INCLUDE_DIRS},;-I>" 
+                                        --cpp_out=${OUT_DIR} ${ABS_FIL}
+                                   DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
+                                   COMMENT "Running C++ protocol buffer compiler on ${FIL}"
+                                   COMMAND_EXPAND_LISTS)
+        endforeach()
+
+        set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
+        set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES COMPILE_OPTIONS -Wno-deprecated-declarations)
+
+        set(${SRCS} ${${SRCS}} PARENT_SCOPE)
+        set(${HDRS} ${${HDRS}} PARENT_SCOPE)
+endfunction()
+
+
+if(ENABLE_PLUGIN_OTEL)
+        #
+        # Modify the code here so that I can build the proto files
+        # and add the proper libraries/include paths for building otel.plugin
+        # 
+        
+        set(OPENTELEMETRY_PROTO_FILES "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/collector/logs/v1/logs_service.proto"
+                                      "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/collector/metrics/v1/metrics_service.proto"
+                                      "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/collector/trace/v1/trace_service.proto"
+                                      "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/common/v1/common.proto"
+                                      "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/logs/v1/logs.proto"
+                                      "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/metrics/v1/metrics.proto"
+                                      "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/resource/v1/resource.proto"
+                                      "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/trace/v1/trace.proto"
+        )
+
+
+        netdata_grpc_generate_cpp("${CMAKE_SOURCE_DIR}/src/otel"
+                                  "${CMAKE_SOURCE_DIR}/src/otel"
+                                  OTEL_PROTO_BUILT_SRCS
+                                  OTEL_PROTO_BUILT_HDRS
+                                  ${OPENTELEMETRY_PROTO_FILES})
+
+        add_executable(otel.plugin ${OTEL_PLUGIN_FILES} ${OTEL_PROTO_BUILT_SRCS} ${OTEL_PROTO_BUILT_HDRS})
+
+        target_include_directories(otel.plugin PUBLIC
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/otel
+        )
+        
+        target_link_libraries(otel.plugin PRIVATE
+                libnetdata
+                absl::strings
+                yaml-cpp::yaml-cpp
+                protobuf::libprotobuf
+                grpc++
+        )
+
+        # install(TARGETS otel.plugin
+        #         COMPONENT plugin-otel
+        #         DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
 set(NETDATA_FILES
         src/collectors/all.h
         ${DAEMON_FILES}
@@ -1709,6 +1867,8 @@ endif()
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
+target_compile_options(libnetdata PRIVATE -DBLAKE3_NO_SSE2 -DBLAKE3_NO_SSE41 -DBLAKE3_NO_AVX2 -DBLAKE3_NO_AVX512)
+
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src)
 
 # pthread (FIXME: use find_package for this)
@@ -1847,6 +2007,9 @@ list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
 #
 # build plugins
 #
+
+if(ENABLE_PLUGIN_OTEL)
+endif()
 
 if(ENABLE_PLUGIN_DEBUGFS)
     pkg_check_modules(CAP QUIET libcap)
@@ -2365,6 +2528,8 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
 )
 
+target_link_libraries(netdata PRIVATE absl::strings yaml-cpp::yaml-cpp)
+
 if(NEED_PROTOBUF)
         netdata_add_protobuf(netdata)
 endif()
@@ -2556,6 +2721,23 @@ install(FILES
         src/collectors/statsd.plugin/k6.conf
         COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d/statsd.d)
+
+#
+# otel
+#
+configure_file(src/otel/otel-config.yaml.in
+               src/otel/otel-config.yaml
+               @ONLY)
+
+install(FILES
+        ${CMAKE_BINARY_DIR}/src/otel/otel-config.yaml
+        COMPONENT netdata
+        DESTINATION etc/netdata)
+
+install(FILES
+        src/otel/otel-receivers-config.yaml
+        COMPONENT netdata
+        DESTINATION etc/netdata)
 
 #
 # exporting

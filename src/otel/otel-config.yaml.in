@@ -1,0 +1,24 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: localhost:20001
+
+  hostmetrics:
+    collection_interval: 1s
+    scrapers:
+      load:
+
+exporters:
+  file:
+    path: @cachedir_POST@/otel-metrics.pipe
+    format: proto
+
+service:
+  telemetry:
+    metrics:
+      level: none
+  pipelines:
+    metrics:
+      receivers: [otlp, hostmetrics]
+      exporters: [file]
