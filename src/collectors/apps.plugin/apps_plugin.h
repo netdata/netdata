@@ -499,6 +499,11 @@ struct pid_stat {
     bool keep:1;                    // true when we need to keep this process in memory even after it exited
     bool matched_by_config:1;
 
+#if defined(OS_WINDOWS)
+    bool got_info:1;
+    bool assigned_to_target:1;
+#endif
+
     usec_t stat_collected_usec;
     usec_t last_stat_collected_usec;
 
@@ -670,6 +675,8 @@ bool read_proc_pid_limits_per_os(struct pid_stat *p, void *ptr);
 bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr);
 bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr);
 bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes);
+
+void assign_app_group_target_to_pid(struct pid_stat *p);
 
 // --------------------------------------------------------------------------------------------------------------------
 // operating system functions

@@ -358,6 +358,8 @@ inline const char *string2str(const STRING *string) {
 }
 
 bool string_ends_with_string(const STRING *whole, const STRING *end) {
+    if(whole == end) return true;
+    if(!whole || !end) return false;
     if(end->length > whole->length) return false;
     if(end->length == whole->length) return strcmp(string2str(whole), string2str(end)) == 0;
     const char *we = string2str(whole);
@@ -366,6 +368,8 @@ bool string_ends_with_string(const STRING *whole, const STRING *end) {
 }
 
 bool string_starts_with_string(const STRING *whole, const STRING *end) {
+    if(whole == end) return true;
+    if(!whole || !end) return false;
     if(end->length > whole->length) return false;
     if(end->length == whole->length) return strcmp(string2str(whole), string2str(end)) == 0;
     return strncmp(string2str(whole), string2str(end), string_strlen(end)) == 0;

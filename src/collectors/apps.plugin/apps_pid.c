@@ -277,7 +277,7 @@ static inline void link_all_processes_to_their_parents(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline void assign_app_group_target_to_pid(struct pid_stat *p) {
+void assign_app_group_target_to_pid(struct pid_stat *p) {
     targets_assignment_counter++;
 
     for(struct target *w = apps_groups_root_target; w ; w = w->next) {
@@ -310,17 +310,9 @@ static inline void assign_app_group_target_to_pid(struct pid_stat *p) {
 
 void update_pid_comm(struct pid_stat *p, const char *comm) {
     if(strcmp(pid_stat_comm(p), comm) != 0) {
-        if(unlikely(debug_enabled)) {
-            if(string_strlen(p->comm))
-                debug_log("\tpid %d (%s) changed name to '%s'", p->pid, pid_stat_comm(p), comm);
-            else
-                debug_log("\tJust added %d (%s)", p->pid, comm);
-        }
-
         string_freez(p->comm);
         p->comm = string_strdupz(comm);
 
-        // /proc/<pid>/cmdline
         if(likely(proc_pid_cmdline_is_needed))
             managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
 

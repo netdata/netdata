@@ -84,7 +84,7 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     }
 
     // check its parent pid
-    if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
+    if(unlikely(p->ppid < INIT_PID)) {
         netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", p->pid, pid_stat_comm(p), p->ppid);
         p->ppid = 0;
     }
@@ -130,8 +130,8 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
 }
 
 int incrementally_collect_data_for_pid(pid_t pid, void *ptr) {
-    if(unlikely(pid < 0 || pid > pid_max)) {
-        netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
+    if(unlikely(pid < INIT_PID)) {
+        netdata_log_error("Invalid pid %d read (expected >= %d). Ignoring process.", pid, INIT_PID);
         return 0;
     }
 

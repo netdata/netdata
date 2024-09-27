@@ -445,6 +445,12 @@
 
 #if defined(OS_WINDOWS)
 
+#include <tlhelp32.h>
+#include <wchar.h>
+#include <psapi.h>
+#include <tchar.h>
+#include <strsafe.h>
+
 struct perflib_data {
     PERF_DATA_BLOCK *pDataBlock;
     PERF_OBJECT_TYPE *pObjectType;
@@ -452,8 +458,34 @@ struct perflib_data {
     DWORD pid;
 };
 
+BOOL EnableDebugPrivilege() {
+    HANDLE hToken;
+    LUID luid;
+    TOKEN_PRIVILEGES tkp;
+
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken))
+        return FALSE;
+
+    if (!LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &luid))
+        return FALSE;
+
+    tkp.PrivilegeCount = 1;
+    tkp.Privileges[0].Luid = luid;
+    tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+    if (!AdjustTokenPrivileges(hToken, FALSE, &tkp, sizeof(tkp), NULL, NULL))
+        return FALSE;
+
+    CloseHandle(hToken);
+
+    return TRUE;
+}
+
 void apps_os_init(void) {
     PerflibNamesRegistryInitialize();
+
+    if(!EnableDebugPrivilege())
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to enable debug privilege");
 }
 
 bool apps_os_read_global_cpu_utilization_windows(void) {
@@ -496,6 +528,96 @@ uint64_t apps_os_get_total_memory_windows(void) {
     }
 
     return memStat.ullTotalPhys;
+}
+
+static __thread wchar_t unicode[PATH_MAX];
+
+// Convert wide string to UTF-8
+static STRING *wchar_to_string(WCHAR *s) {
+    static __thread char utf8[PATH_MAX];
+    static __thread int utf8_size = sizeof(utf8);
+
+    int len = WideCharToMultiByte(CP_UTF8, 0, s, -1, NULL, 0, NULL, NULL);
+    if (len <= 0 || len >= utf8_size)
+        return NULL;
+
+    WideCharToMultiByte(CP_UTF8, 0, s, -1, utf8, utf8_size, NULL, NULL);
+    return string_strdupz(utf8);
+}
+
+STRING *GetProcessFriendlyName(WCHAR *path) {
+    static __thread uint8_t void_buf[1024 * 1024];
+
+    DWORD handle;
+    DWORD size = GetFileVersionInfoSizeW(path, &handle);
+    if (size == 0 || size > sizeof(void_buf))
+        return FALSE;
+
+    if (GetFileVersionInfoW(path, handle, size, void_buf)) {
+        LPWSTR value = NULL;
+        UINT len = 0;
+        DWORD unicode_size = sizeof(unicode) / sizeof(*unicode);
+        if (VerQueryValueW(void_buf, L"\\StringFileInfo\\040904B0\\FileDescription", (LPVOID*)&value, &len) &&
+            len > 0 && len < unicode_size) {
+            wcsncpy(unicode, value, unicode_size - 1);
+            unicode[unicode_size - 1] = L'\0';
+            return wchar_to_string(unicode);
+        }
+    }
+
+    return NULL;
+}
+
+void GetAllProcessesInfo(void) {
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnapshot == INVALID_HANDLE_VALUE) return;
+
+    PROCESSENTRY32W pe32;
+    pe32.dwSize = sizeof(PROCESSENTRY32W);
+
+    if (!Process32FirstW(hSnapshot, &pe32)) {
+        CloseHandle(hSnapshot);
+        return;
+    }
+
+    do {
+        struct pid_stat *p = get_or_allocate_pid_entry((pid_t)pe32.th32ProcessID);
+        p->ppid = (pid_t)pe32.th32ParentProcessID;
+        if(p->got_info) continue;
+        p->got_info = true;
+
+        if(!p->comm) {
+            p->comm = wchar_to_string(pe32.szExeFile);
+            p->assigned_to_target = false;
+        }
+
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, p->pid);
+        if (hProcess == NULL) continue;
+
+        STRING *full_path = NULL;
+        STRING *friendly_name = NULL;
+
+        DWORD unicode_size = sizeof(unicode) / sizeof(*unicode);
+        if(QueryFullProcessImageNameW(hProcess, 0, unicode, &unicode_size)) {
+            full_path = wchar_to_string(unicode);
+            friendly_name = GetProcessFriendlyName(unicode);
+        }
+
+        CloseHandle(hProcess);
+
+        if(full_path) {
+            string_freez(p->cmdline);
+            p->cmdline = full_path;
+        }
+
+        if(friendly_name) {
+            string_freez(p->comm);
+            p->comm = friendly_name;
+            p->assigned_to_target = false;
+        }
+    } while (Process32NextW(hSnapshot, &pe32));
+
+    CloseHandle(hSnapshot);
 }
 
 static inline kernel_uint_t perflib_cpu_utilization(COUNTER_DATA *d) {
@@ -581,6 +703,7 @@ bool apps_os_collect_all_pids_windows(void) {
     COUNTER_DATA processId = {.key = "ID Process"};
 
     d.pi = NULL;
+    size_t added = 0;
     for(LONG i = 0; i < d.pObjectType->NumInstances; i++) {
         d.pi = perflibForEachInstance(d.pDataBlock, d.pObjectType, d.pi);
         if (!d.pi) break;
@@ -596,6 +719,7 @@ bool apps_os_collect_all_pids_windows(void) {
             // a new pid
 
             static __thread char name[MAX_PATH];
+
             if (getInstanceName(d.pDataBlock, d.pObjectType, d.pi, name, sizeof(name))) {
                 // remove the PID from the end of the name
                 char pid[UINT64_MAX_LENGTH + 1]; // +1 for the underscore
@@ -603,16 +727,19 @@ bool apps_os_collect_all_pids_windows(void) {
                 print_uint64(&pid[1], p->pid);
                 size_t pid_len = strlen(pid);
                 size_t name_len = strlen(name);
-                if(pid_len < name_len) {
+                if (pid_len < name_len) {
                     char *compare = &name[name_len - pid_len];
-                    if(strcmp(pid, compare) == 0)
+                    if (strcmp(pid, compare) == 0)
                         *compare = '\0';
                 }
             }
             else
                 strncpyz(name, "unknown", sizeof(name) - 1);
 
-            update_pid_comm(p, name);
+            p->comm = string_strdupz(name);
+            p->got_info = false;
+            p->assigned_to_target = false;
+            added++;
 
             COUNTER_DATA ppid = {.key = "Creating Process ID"};
             perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ppid);
@@ -699,6 +826,15 @@ bool apps_os_collect_all_pids_windows(void) {
     }
 
     perflibFreePerformanceData();
+
+    if(added) {
+        GetAllProcessesInfo();
+
+        for(struct pid_stat *p = root_of_pids(); p ;p = p->next) {
+            if(!p->assigned_to_target)
+                assign_app_group_target_to_pid(p);
+        }
+    }
 
     return true;
 }

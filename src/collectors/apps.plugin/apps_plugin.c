@@ -594,7 +594,6 @@ int main(int argc, char **argv) {
     procfile_adaptive_initial_allocation = 1;
 
     os_get_system_HZ();
-    os_get_system_pid_max();
 
     os_get_system_cpus_uncached();
     apps_os_init();
