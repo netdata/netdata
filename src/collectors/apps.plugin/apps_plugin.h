@@ -633,10 +633,12 @@ void apps_os_init(void);
 
 bool collect_data_for_all_pids(void);
 
+#if (PROCESSES_HAVE_FDS == 1)
 void clear_pid_fd(struct pid_fd *pfd);
 void file_descriptor_not_used(int id);
 void init_pid_fds(struct pid_stat *p, size_t first, size_t size);
 void aggregate_pid_fds_on_targets(struct pid_stat *p);
+#endif
 
 void send_proc_states_count(usec_t dt);
 void send_charts_updates_to_netdata(struct target *root, const char *type, const char *lbl_name, const char *title);

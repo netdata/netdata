@@ -77,9 +77,13 @@ struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
         return p;
 
     p = aral_callocz(pids.all_pids.aral);
+
+#if (PROCESSES_HAVE_FDS == 1)
     p->fds = mallocz(sizeof(struct pid_fd) * MAX_SPARE_FDS);
     p->fds_size = MAX_SPARE_FDS;
     init_pid_fds(p, 0, p->fds_size);
+#endif
+
     p->pid = pid;
     p->values[PDF_PROCESSES] = 1;
 
@@ -124,7 +128,10 @@ void del_pid_entry(pid_t pid) {
     freez(p->cmdline_filename);
 #endif
 
+#if (PROCESSES_HAVE_FDS == 1)
     freez(p->fds);
+#endif
+
     string_freez(p->comm);
     string_freez(p->cmdline);
     aral_freez(pids.all_pids.aral, p);

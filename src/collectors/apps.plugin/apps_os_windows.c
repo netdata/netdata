@@ -486,11 +486,6 @@ bool get_cmdline_per_os(struct pid_stat *p __maybe_unused, char *cmdline __maybe
     return false;
 }
 
-bool read_pid_file_descriptors_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
-    // dummy - not needed
-    return false;
-}
-
 uint64_t apps_os_get_total_memory_windows(void) {
     MEMORYSTATUSEX memStat = { 0 };
     memStat.dwLength = sizeof(memStat);

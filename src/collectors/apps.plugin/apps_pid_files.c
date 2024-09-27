@@ -2,6 +2,7 @@
 
 #include "apps_plugin.h"
 
+#if (PROCESSES_HAVE_FDS == 1)
 // ----------------------------------------------------------------------------
 // file descriptor
 //
@@ -429,3 +430,4 @@ int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 
     return ret ? 1 : 0;
 }
+#endif

@@ -106,10 +106,12 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     // --------------------------------------------------------------------
     // /proc/<pid>/fd
 
+#if (PROCESSES_HAVE_FDS == 1)
     if(enable_file_charts) {
         managed_log(p, PID_LOG_FDS, read_pid_file_descriptors(p, ptr));
         managed_log(p, PID_LOG_LIMITS, read_proc_pid_limits(p, ptr));
     }
+#endif
 
     // --------------------------------------------------------------------
     // done!

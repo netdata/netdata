@@ -181,8 +181,10 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
         return;
     }
 
+#if (PROCESSES_HAVE_FDS == 1)
     if(p->openfds_limits_percent > w->max_open_files_percent)
         w->max_open_files_percent = p->openfds_limits_percent;
+#endif
 
     for(size_t f = 0; f < PDF_MAX ;f++)
         w->values[f] += p->values[f];
@@ -206,11 +208,13 @@ static inline void cleanup_exited_pids(void) {
             if(unlikely(debug_enabled && (p->keep || p->keeploops)))
                 debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, pid_stat_comm(p));
 
+#if (PROCESSES_HAVE_FDS == 1)
             for(size_t c = 0; c < p->fds_size; c++)
                 if(p->fds[c].fd > 0) {
                     file_descriptor_not_used(p->fds[c].fd);
                     clear_pid_fd(&p->fds[c]);
                 }
+#endif
 
             const pid_t r = p->pid;
             p = p->next;
@@ -303,8 +307,10 @@ void aggregate_processes_to_targets(void) {
         // --------------------------------------------------------------------
         // aggregate all file descriptors
 
+#if (PROCESSES_HAVE_FDS == 1)
         if(enable_file_charts)
             aggregate_pid_fds_on_targets(p);
+#endif
     }
 
     cleanup_exited_pids();

@@ -194,7 +194,9 @@ void function_processes(const char *transaction, char *function,
 #endif
         , Swap_max = 0.0
         , Memory_max = 0.0
+#if (PROCESSES_HAVE_FDS == 1)
         , FDsLimitPercent_max = 0.0
+#endif
         ;
 
     unsigned long long
