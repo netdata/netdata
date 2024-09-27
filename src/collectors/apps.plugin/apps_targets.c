@@ -144,20 +144,74 @@ static STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
     return id_cleanup_string(comm);
 }
 
+struct {
+    const char *txt;
+    STRING *comm;
+} process_orchestrators[] = {
+#if defined(OS_LINUX)
+    { "systemd", NULL, },
+#endif
+#if defined(OS_WINDOWS)
+    { "System", NULL, },
+    { "services", NULL, },
+    { "wininit", NULL, },
+#else
+    { "init", NULL, },
+#endif
+
+    // terminator
+    { NULL, NULL }
+};
+
+struct {
+    const char *txt;
+    STRING *comm;
+} process_aggregators[] = {
+#if defined(OS_LINUX)
+    { "kthread", NULL, },
+#endif
+
+    // terminator
+    { NULL, NULL }
+};
+
+static bool is_orchestrator(struct pid_stat *p) {
+    for(size_t i = 0; process_orchestrators[i].comm ;i++) {
+        if(p->comm == process_orchestrators[i].comm)
+            return true;
+    }
+
+    return false;
+}
+
+static bool is_aggregator(struct pid_stat *p) {
+    for(size_t i = 0; process_aggregators[i].comm ;i++) {
+        if(p->comm == process_aggregators[i].comm)
+            return true;
+    }
+
+    return false;
+}
+
+void orchestrators_and_aggregators_init(void) {
+    for(size_t i = 0; process_orchestrators[i].txt ;i++)
+        process_orchestrators[i].comm = string_strdupz(process_orchestrators[i].txt);
+
+    for(size_t i = 0; process_aggregators[i].txt ;i++)
+        process_aggregators[i].comm = string_strdupz(process_aggregators[i].txt);
+}
+
 struct target *get_tree_target(struct pid_stat *p) {
     // skip fast all the children that are more than 3 levels down
     while(p->parent && p->parent->parent && p->parent->parent->parent)
         p = p->parent;
 
-    // keep the children of INIT_PID, "systemd" and "init"
-    while(p->parent && p->parent->parent &&
-           p->parent->pid != INIT_PID &&
-           string_strcmp(p->parent->comm, "systemd") != 0 &&
-           string_strcmp(p->parent->comm, "init") != 0)
+    // keep the children of INIT_PID, and process orchestrators
+    while(p->parent && p->parent->pid != INIT_PID && !is_orchestrator(p->parent))
         p = p->parent;
 
-    // merge all kernel threads into kthread
-    if(p->parent && string_strcmp(p->parent->comm, "kthreadd") == 0)
+    // merge all processes into process aggregators
+    if(p->parent && is_aggregator(p->parent))
         p = p->parent;
 
     struct target *w;

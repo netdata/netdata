@@ -5,6 +5,7 @@
 bool enable_function_cmdline = false;
 
 #define PROCESS_FILTER_CATEGORY "category:"
+#define PROCESS_FILTER_PARENT "parent:"
 #define PROCESS_FILTER_USER "user:"
 #define PROCESS_FILTER_GROUP "group:"
 #define PROCESS_FILTER_PROCESS "process:"
@@ -23,6 +24,9 @@ static void apps_plugin_function_processes_help(const char *transaction) {
                    "\n"
                    "   category:NAME\n"
                    "      Shows only processes that are assigned the category `NAME` in apps_groups.conf\n"
+                   "\n"
+                   "   parent:NAME\n"
+                   "      Shows only processes that are aggregated under parent `NAME`\n"
                    "\n"
 #if (PROCESSES_HAVE_UID == 1)
                    "   user:NAME\n"
@@ -85,7 +89,7 @@ void function_processes(const char *transaction, char *function,
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
 
-    struct target *category = NULL, *user = NULL, *group = NULL; (void)user; (void)group;
+    struct target *category = NULL, *parent = NULL, *user = NULL, *group = NULL; (void)user; (void)group;
     const char *process_name = NULL;
     pid_t pid = 0;
     uid_t uid = 0; (void)uid;
@@ -104,6 +108,14 @@ void function_processes(const char *transaction, char *function,
             if(!category) {
                 pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
                                                        "No category with that name found.");
+                return;
+            }
+        }
+        else if(!parent && strncmp(keyword, PROCESS_FILTER_PARENT, strlen(PROCESS_FILTER_PARENT)) == 0) {
+            parent = find_target_by_name(apps_groups_root_target, &keyword[strlen(PROCESS_FILTER_PARENT)]);
+            if(!parent) {
+                pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
+                                                       "No parent with that name found.");
                 return;
             }
         }
@@ -248,12 +260,17 @@ void function_processes(const char *transaction, char *function,
 #endif
         ;
 
+    netdata_mutex_lock(&apps_and_stdout_mutex);
+
     int rows= 0;
     for(p = root_of_pids(); p ; p = p->next) {
         if(!p->updated)
             continue;
 
         if(category && p->target != category)
+            continue;
+
+        if(parent && p->tree_target != parent)
             continue;
 
 #if (PROCESSES_HAVE_UID == 1)
@@ -305,6 +322,9 @@ void function_processes(const char *transaction, char *function,
 
         // category
         buffer_json_add_array_item_string(wb, p->target ? string2str(p->target->name) : "-");
+
+        // parent
+        buffer_json_add_array_item_string(wb, p->tree_target ? string2str(p->tree_target->name) : "-");
 
 #if (PROCESSES_HAVE_UID == 1)
         // user
@@ -466,6 +486,12 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Category", "Category (apps_groups.conf)", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Parent", "Parent Process", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE,
                                     RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
@@ -1087,6 +1113,8 @@ void function_processes(const char *transaction, char *function,
 #endif
     }
     buffer_json_object_close(wb); // group_by
+
+    netdata_mutex_unlock(&apps_and_stdout_mutex);
 
 close_and_send:
     buffer_json_member_add_time_t(wb, "expires", now_s + update_every);

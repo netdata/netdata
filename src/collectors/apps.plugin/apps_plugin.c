@@ -543,7 +543,7 @@ static int check_capabilities() {
 }
 #endif
 
-static netdata_mutex_t apps_and_stdout_mutex = NETDATA_MUTEX_INITIALIZER;
+netdata_mutex_t apps_and_stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 
 static bool apps_plugin_exit = false;
 
@@ -619,6 +619,7 @@ int main(int argc, char **argv) {
 
     netdata_log_info("started on pid %d", getpid());
 
+    orchestrators_and_aggregators_init();
     users_and_groups_init();
     pids_init();
 
@@ -684,7 +685,7 @@ int main(int argc, char **argv) {
         send_charts_updates_to_netdata(apps_groups_root_target, "app", "app_group", "Processes Custom Groups");
         send_collected_data_to_netdata(apps_groups_root_target, "app", dt);
 
-        send_charts_updates_to_netdata(tree_root_target, "process_tree", "top_process", "Processes Tree");
+        send_charts_updates_to_netdata(tree_root_target, "process_tree", "parent_process", "Processes Tree");
         send_collected_data_to_netdata(tree_root_target, "process_tree", dt);
 
         if (enable_users_charts) {

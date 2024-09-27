@@ -175,6 +175,8 @@ extern NETDATA_DOUBLE
 
 extern size_t pagesize;
 
+extern netdata_mutex_t apps_and_stdout_mutex;
+
 // ----------------------------------------------------------------------------
 // string lengths
 
@@ -677,6 +679,7 @@ bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr);
 bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes);
 
 void assign_app_group_target_to_pid(struct pid_stat *p);
+void orchestrators_and_aggregators_init(void);
 
 // --------------------------------------------------------------------------------------------------------------------
 // operating system functions
