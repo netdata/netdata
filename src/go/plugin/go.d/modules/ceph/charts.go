@@ -324,7 +324,7 @@ var (
 		Priority: prioClusterClientIO,
 		Dims: module.Dims{
 			{ID: "client_perf_read_bytes_sec", Name: "read"},
-			{ID: "client_perf_write_bytes_sec", Name: "write", Mul: -1},
+			{ID: "client_perf_write_bytes_sec", Name: "written", Mul: -1},
 		},
 	}
 	clusterClientIOPSChart = module.Chart{
