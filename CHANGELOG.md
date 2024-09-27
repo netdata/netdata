@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Revert "Add ceph commands to ndsudo" [\#18620](https://github.com/netdata/netdata/pull/18620) ([ilyam8](https://github.com/ilyam8))
 - go.d/hddtemp: connect and read [\#18619](https://github.com/netdata/netdata/pull/18619) ([ilyam8](https://github.com/ilyam8))
 - go.d/uwsgi: don't write just connect and read [\#18618](https://github.com/netdata/netdata/pull/18618) ([ilyam8](https://github.com/ilyam8))
 - POST Functions [\#18611](https://github.com/netdata/netdata/pull/18611) ([ktsaou](https://github.com/ktsaou))
@@ -421,7 +422,6 @@
 - Bump github.com/prometheus/common from 0.54.0 to 0.55.0 in /src/go/collectors/go.d.plugin [\#18049](https://github.com/netdata/netdata/pull/18049) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump go.mongodb.org/mongo-driver from 1.15.1 to 1.16.0 in /src/go/collectors/go.d.plugin [\#18048](https://github.com/netdata/netdata/pull/18048) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/docker/docker from 27.0.0+incompatible to 27.0.2+incompatible in /src/go/collectors/go.d.plugin [\#18047](https://github.com/netdata/netdata/pull/18047) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/likexian/whois-parser from 1.24.16 to 1.24.18 in /src/go/collectors/go.d.plugin [\#18046](https://github.com/netdata/netdata/pull/18046) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
