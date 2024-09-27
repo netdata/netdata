@@ -192,7 +192,6 @@ var prometheusPortAllocations = map[int]string{
 	9280: "citrix_netscaler_exporter",
 	9281: "fastd_exporter",
 	9282: "freeswitch_exporter",
-	9283: "ceph_ceph-mgr_prometheus_plugin",
 	9284: "gobetween",
 	9285: "database_exporter",
 	9286: "vdo_compression_and_deduplication_exporter",
