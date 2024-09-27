@@ -732,7 +732,7 @@ static inline void clear_pid_rates(struct pid_stat *p) {
 bool collect_data_for_all_pids(void) {
     // mark all pids as unread
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next)
-        p->read = p->updated = false;
+        p->read = p->updated = p->merged = false;
 
     // collect data for all pids
     if(!OS_FUNCTION(apps_os_collect_all_pids)())

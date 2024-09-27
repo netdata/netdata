@@ -489,10 +489,10 @@ struct pid_stat {
     PID_LOG log_thrown;
 
     char state;
-    bool keep:1;                    // true when we need to keep this process in memory even after it exited
+    bool read:1;                    // true when we have already read this process for this iteration
     bool updated:1;                 // true when the process is currently running
     bool merged:1;                  // true when it has been merged to its parent
-    bool read:1;                    // true when we have already read this process for this iteration
+    bool keep:1;                    // true when we need to keep this process in memory even after it exited
     bool matched_by_config:1;
 
     usec_t stat_collected_usec;
