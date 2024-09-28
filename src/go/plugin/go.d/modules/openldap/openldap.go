@@ -9,6 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
 )
 
 //go:embed "config_schema.json"
@@ -28,21 +29,26 @@ func init() {
 func New() *OpenLDAP {
 	return &OpenLDAP{
 		Config: Config{
-			LDAP_URL: "ldap://localhost:389",
+			URL:      "ldap://127.0.0.1:389",
+			Username: "cn=admin,dc=example,dc=com",
+			Password: "321",
 			Timeout:  confopt.Duration(time.Second * 2),
 		},
 
-		charts: OpenLdapCharts.Copy(),
+		newConn: newLdapConn,
+
+		charts: charts.Copy(),
 	}
 
 }
 
 type Config struct {
-	UpdateEvery       int              `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout           confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	DistinguishedName string           `yaml:"distinguished_name,omitempty" json:"distinguished_name,omitempty"`
-	Password          string           `yaml:"password,omitempty" json:"password,omitempty"`
-	LDAP_URL          string           `yaml:"ldap_url,omitempty" json:"ldap_url,omitempty"`
+	UpdateEvery      int              `yaml:"update_every,omitempty" json:"update_every"`
+	URL              string           `yaml:"url" json:"url"`
+	Timeout          confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Username         string           `yaml:"username" json:"username"`
+	Password         string           `yaml:"password" json:"password"`
+	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 
 type OpenLDAP struct {
@@ -50,6 +56,9 @@ type OpenLDAP struct {
 	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
+
+	conn    ldapConn
+	newConn func(Config) ldapConn
 }
 
 func (l *OpenLDAP) Configuration() any {
@@ -57,8 +66,11 @@ func (l *OpenLDAP) Configuration() any {
 }
 
 func (l *OpenLDAP) Init() error {
-	if l.LDAP_URL == "" {
+	if l.URL == "" {
 		return errors.New("empty LDAP server url")
+	}
+	if l.Username == "" {
+		return errors.New("empty LDAP username")
 	}
 
 	return nil
@@ -95,4 +107,11 @@ func (l *OpenLDAP) Collect() map[string]int64 {
 	return mx
 }
 
-func (l *OpenLDAP) Cleanup() {}
+func (l *OpenLDAP) Cleanup() {
+	if l.conn != nil {
+		if err := l.conn.disconnect(); err != nil {
+			l.Warningf("error disconnecting ldap client: %v", err)
+		}
+		l.conn = nil
+	}
+}

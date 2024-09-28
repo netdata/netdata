@@ -3,91 +3,53 @@
 package openldap
 
 import (
-	"fmt"
-	"log"
-	"strconv"
-
 	"github.com/go-ldap/ldap/v3"
 )
 
 func (l *OpenLDAP) collect() (map[string]int64, error) {
-
-	ldapURL := l.LDAP_URL
-	adminDN := l.DistinguishedName
-	password := l.Password
+	if l.conn == nil {
+		conn, err := l.establishConn()
+		if err != nil {
+			return nil, err
+		}
+		l.conn = conn
+	}
 
 	mx := make(map[string]int64)
 
-	conn, err := ldap.DialURL(ldapURL)
-	if err != nil {
-		log.Fatalf("Failed to connect to LDAP: %v", err)
+	if err := l.collectMonitorCounters(mx); err != nil {
+		l.Cleanup()
+		return nil, err
 	}
-	defer conn.Close()
-
-	err = conn.Bind(adminDN, password)
-	if err != nil {
-		log.Fatalf("LDAP bind failed: %v", err)
-	}
-
-	metrics := []struct {
-		BaseDN        string
-		Attribute     string
-		InternalDimID string
-	}{
-		{"cn=Total,cn=Connections,cn=Monitor", "monitorCounter", "total_connections"},
-		{"cn=Bytes,cn=Statistics,cn=Monitor", "monitorCounter", "bytes_sent"},
-		{"cn=Operations,cn=Monitor", "monitorOpCompleted", "completed_operations"},
-		{"cn=Operations,cn=Monitor", "monitorOpInitiated", "initiated_operations"},
-		{"cn=Referrals,cn=Statistics,cn=Monitor", "monitorCounter", "referrals_sent"},
-		{"cn=Entries,cn=Statistics,cn=Monitor", "monitorCounter", "entries_sent"},
-		{"cn=Bind,cn=Operations,cn=Monitor", "monitorOpCompleted", "bind_operations"},
-		{"cn=Unbind,cn=Operations,cn=Monitor", "monitorOpCompleted", "unbind_operations"},
-		{"cn=Add,cn=Operations,cn=Monitor", "monitorOpInitiated", "add_operations"},
-		{"cn=Delete,cn=Operations,cn=Monitor", "monitorOpCompleted", "delete_operations"},
-		{"cn=Modify,cn=Operations,cn=Monitor", "monitorOpCompleted", "modify_operations"},
-		{"cn=Compare,cn=Operations,cn=Monitor", "monitorOpCompleted", "compare_operations"},
-		{"cn=Search,cn=Operations,cn=Monitor", "monitorOpCompleted", "search_operations"},
-		{"cn=Write,cn=Waiters,cn=Monitor", "monitorCounter", "write_waiters"},
-		{"cn=Read,cn=Waiters,cn=Monitor", "monitorCounter", "read_waiters"},
-	}
-
-	for _, metric := range metrics {
-		err = fetchMetric(mx, conn, metric.InternalDimID, metric.BaseDN, metric.Attribute)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch %s: %v", metric.InternalDimID, err)
-		}
+	if err := l.collectOperations(mx); err != nil {
+		l.Cleanup()
+		return nil, err
 	}
 
 	return mx, nil
 }
 
-func fetchMetric(mx map[string]int64, conn *ldap.Conn, internalDimID string, baseDN, attribute string) error {
-	searchRequest := ldap.NewSearchRequest(
-		baseDN,
-		ldap.ScopeBaseObject,
-		ldap.NeverDerefAliases,
-		0, 0, false,
-		"(objectclass=*)",
-		[]string{attribute},
-		nil,
-	)
-
-	searchResult, err := conn.Search(searchRequest)
+func (l *OpenLDAP) doSearchRequest(req *ldap.SearchRequest, fn func(*ldap.Entry)) error {
+	resp, err := l.conn.search(req)
 	if err != nil {
-		return fmt.Errorf("search failed: %v", err)
+		return err
 	}
 
-	for _, entry := range searchResult.Entries {
-		mx[internalDimID] = *parseInt(entry.GetAttributeValue(attribute))
-
+	for _, entry := range resp.Entries {
+		if len(entry.Attributes) != 0 {
+			fn(entry)
+		}
 	}
+
 	return nil
 }
 
-func parseInt(value string) *int64 {
-	v, err := strconv.ParseInt(value, 10, 64)
-	if err != nil {
-		return nil
+func (l *OpenLDAP) establishConn() (ldapConn, error) {
+	conn := l.newConn(l.Config)
+
+	if err := conn.connect(); err != nil {
+		return nil, err
 	}
-	return &v
+
+	return conn, nil
 }

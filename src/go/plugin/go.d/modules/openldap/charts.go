@@ -9,14 +9,14 @@ import (
 const (
 	prioTotalConnections = module.Priority + iota
 	prioBytesSent
-	prioOperations
-	prioReferrals
 	prioEntries
+	prioOperations
 	prioLdapOperations
+	prioReferrals
 	prioWaiters
 )
 
-var OpenLdapCharts = module.Charts{
+var charts = module.Charts{
 	totalConnectionsChart.Copy(),
 	bytesSentChart.Copy(),
 	operationsChart.Copy(),
@@ -95,15 +95,15 @@ var (
 		Fam:      "ldap",
 		Ctx:      "openldap.ldap_operations",
 		Priority: prioLdapOperations,
-		Type:     module.Line,
+		Type:     module.Stacked,
 		Dims: module.Dims{
-			{ID: "bind_operations", Name: "bind", Algo: module.Incremental},
-			{ID: "search_operations", Name: "search", Algo: module.Incremental},
-			{ID: "unbind_operations", Name: "unbind", Algo: module.Incremental},
-			{ID: "add_operations", Name: "add", Algo: module.Incremental},
-			{ID: "delete_operations", Name: "delete", Algo: module.Incremental},
-			{ID: "modify_operations", Name: "modify", Algo: module.Incremental},
-			{ID: "compare_operations", Name: "compare", Algo: module.Incremental},
+			{ID: "completed_bind_operations", Name: "bind", Algo: module.Incremental},
+			{ID: "completed_search_operations", Name: "search", Algo: module.Incremental},
+			{ID: "completed_unbind_operations", Name: "unbind", Algo: module.Incremental},
+			{ID: "completed_add_operations", Name: "add", Algo: module.Incremental},
+			{ID: "completed_delete_operations", Name: "delete", Algo: module.Incremental},
+			{ID: "completed_modify_operations", Name: "modify", Algo: module.Incremental},
+			{ID: "completed_compare_operations", Name: "compare", Algo: module.Incremental},
 		},
 	}
 	waitersChart = module.Chart{
