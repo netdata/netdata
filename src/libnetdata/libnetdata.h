@@ -327,9 +327,6 @@ typedef uint32_t uid_t;
 #include "storage-point.h"
 #include "paths/paths.h"
 
-void netdata_fix_chart_id(char *s);
-void netdata_fix_chart_name(char *s);
-
 int madvise_sequential(void *mem, size_t len);
 int madvise_random(void *mem, size_t len);
 int madvise_dontfork(void *mem, size_t len);
@@ -475,6 +472,8 @@ extern const char *netdata_configured_host_prefix;
 #include "string/string.h"
 #include "dictionary/dictionary.h"
 #include "dictionary/thread-cache.h"
+#include "sanitizers/chart_id_and_name.h"
+
 #if defined(HAVE_LIBBPF) && !defined(__cplusplus)
 #include "ebpf/ebpf.h"
 #endif

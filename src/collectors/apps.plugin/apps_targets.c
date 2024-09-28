@@ -119,65 +119,8 @@ struct target *get_gid_target(gid_t gid) {
 // --------------------------------------------------------------------------------------------------------------------
 // Tree
 
-// Function to remove commas, spaces and pipes from the target (UTF8 compatible)
-static void id_cleanup_txt(char *buf) {
-    char *s = buf, *d = buf;
-    bool last_was_dash = false;
-
-    // Process the input buffer
-    while (*s) {
-        if (!IS_UTF8_BYTE(*s)) { // ASCII character
-            if (*s == '-') {
-                *d++ = *s++;
-                last_was_dash = true;
-            }
-            else if (*s == ',' || *s == '|' || isspace((uint8_t)*s)) {
-                // Convert comma, pipe, or space to dash
-                if (!last_was_dash) {
-                    *d++ = '-';
-                    s++;
-                    last_was_dash = true;
-                }
-                else
-                    s++;
-            }
-            else {
-                *d++ = *s++;
-                last_was_dash = false;
-            }
-        }
-        else if (IS_UTF8_STARTBYTE(*s)) {
-            // copy it
-            *d++ = *s++;
-
-            // copy the rest
-            while (IS_UTF8_CONTBYTE(*s))
-                *d++ = *s++;
-
-            last_was_dash = false;
-        }
-        else
-            // an invalid UTF8 continuation byte - skip it
-            s++;
-    }
-
-    // Null-terminate the cleaned string
-    *d = '\0';
-
-    // Remove a trailing dash (if any)
-    if (d > buf && *(d - 1) == '-')
-        *(d - 1) = '\0';
-}
-
-static STRING *id_cleanup_string(STRING *s) {
-    char buf[string_strlen(s) + 1];
-    memcpy(buf, string2str(s), sizeof(buf));
-    id_cleanup_txt(buf);
-    return string_strdupz(buf);
-}
-
 static inline STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
-    if(!cmdline) return id_cleanup_string(comm);
+    if(!cmdline) return sanitize_chart_meta_string(comm);
 
     char buf_cmd[string_strlen(cmdline) + 1];
     memcpy(buf_cmd, string2str(cmdline), sizeof(buf_cmd));
@@ -188,11 +131,11 @@ static inline STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
         while(*end && !isspace((uint8_t)*end) && *end != '/' && *end != '\\') end++;
         *end = '\0';
 
-        id_cleanup_txt(start);
+        sanitize_chart_meta(start);
         return string_strdupz(start);
     }
 
-    return id_cleanup_string(comm);
+    return sanitize_chart_meta_string(comm);
 }
 
 struct {
@@ -273,15 +216,12 @@ struct target *get_tree_target(struct pid_stat *p) {
     w->type = TARGET_TYPE_TREE;
     w->pid_comm = string_dup(p->comm);
     w->id = string_dup(p->comm);
-    if(p->name)
-        w->name = id_cleanup_string(p->name);
-    else {
-#if defined(OS_WINDOWS)
-        w->name = id_cleanup_string(p->comm);
+
+#if (PROCESSES_HAVE_COMM_AND_NAME == 1)
+    w->name = sanitize_chart_meta_string(p->name ? p->name : p->comm);
 #else
-        w->name = comm_from_cmdline(p->comm, p->cmdline);
+    w->name = comm_from_cmdline(p->comm, p->cmdline);
 #endif
-    }
 
     w->clean_name = get_clean_name(w->name);
 

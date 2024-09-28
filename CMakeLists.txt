@@ -802,6 +802,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/timestamps.h
         src/libnetdata/parsers/entries.c
         src/libnetdata/parsers/entries.h
+        src/libnetdata/sanitizers/chart_id_and_name.c
+        src/libnetdata/sanitizers/chart_id_and_name.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

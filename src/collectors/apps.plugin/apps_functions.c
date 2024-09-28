@@ -316,7 +316,12 @@ void function_processes(const char *transaction, char *function,
         buffer_json_add_array_item_uint64(wb, p->pid);
 
         // cmd
+        buffer_json_add_array_item_string(wb, string2str(p->comm));
+
+#if (PROCESSES_HAVE_COMM_AND_NAME == 1)
+        // name
         buffer_json_add_array_item_string(wb, string2str(p->name ? p->name : p->comm));
+#endif
 
         // cmdline
         if (show_cmdline) {
@@ -482,6 +487,14 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
+#if (PROCESSES_HAVE_COMM_AND_NAME == 1)
+        buffer_rrdf_table_add_field(wb, field_id++, "Name", "Process Friendly Name", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+#endif
+
         if (show_cmdline) {
             buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", RRDF_FIELD_TYPE_STRING,
                                         RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0,
@@ -505,7 +518,7 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 #endif
 
-        buffer_rrdf_table_add_field(wb, field_id++, "Parent", "Parent Process", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, field_id++, "Parent", "Group Parent", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE,
                                     RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,

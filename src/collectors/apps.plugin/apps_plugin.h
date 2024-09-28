@@ -32,6 +32,7 @@
 #define PROCESSES_HAVE_HANDLES               0
 #define PROCESSES_HAVE_CMDLINE               1
 #define PROCESSES_HAVE_PID_LIMITS            0
+#define PROCESSES_HAVE_COMM_AND_NAME         0
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
 #define INCREMENTAL_DATA_COLLECTION          1
@@ -73,6 +74,7 @@ struct pid_info {
 #define PROCESSES_HAVE_HANDLES               0
 #define PROCESSES_HAVE_CMDLINE               1
 #define PROCESSES_HAVE_PID_LIMITS            0
+#define PROCESSES_HAVE_COMM_AND_NAME         0
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
 #define INCREMENTAL_DATA_COLLECTION          1
@@ -102,6 +104,7 @@ struct pid_info {
 #define PROCESSES_HAVE_HANDLES               1
 #define PROCESSES_HAVE_CMDLINE               0
 #define PROCESSES_HAVE_PID_LIMITS            0
+#define PROCESSES_HAVE_COMM_AND_NAME         1
 #define PPID_SHOULD_BE_RUNNING               0
 #define USE_APPS_GROUPS_CONF                 0
 #define INCREMENTAL_DATA_COLLECTION          0
@@ -129,6 +132,7 @@ struct pid_info {
 #define PROCESSES_HAVE_HANDLES               0
 #define PROCESSES_HAVE_CMDLINE               1
 #define PROCESSES_HAVE_PID_LIMITS            1
+#define PROCESSES_HAVE_COMM_AND_NAME         0
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
 #define INCREMENTAL_DATA_COLLECTION          1
