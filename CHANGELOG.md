@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18630](https://github.com/netdata/netdata/pull/18630) ([netdatabot](https://github.com/netdatabot))
+- go.d/postgres: fix checkpoints query for postgres 17 [\#18629](https://github.com/netdata/netdata/pull/18629) ([ilyam8](https://github.com/ilyam8))
+- go.d/ceph: fix leftovers after \#18582 [\#18628](https://github.com/netdata/netdata/pull/18628) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18627](https://github.com/netdata/netdata/pull/18627) ([netdatabot](https://github.com/netdatabot))
 - Revert "Add ceph commands to ndsudo" [\#18620](https://github.com/netdata/netdata/pull/18620) ([ilyam8](https://github.com/ilyam8))
 - go.d/hddtemp: connect and read [\#18619](https://github.com/netdata/netdata/pull/18619) ([ilyam8](https://github.com/ilyam8))
 - go.d/uwsgi: don't write just connect and read [\#18618](https://github.com/netdata/netdata/pull/18618) ([ilyam8](https://github.com/ilyam8))
@@ -23,7 +27,9 @@
 - Bump go.mongodb.org/mongo-driver from 1.16.1 to 1.17.0 in /src/go [\#18589](https://github.com/netdata/netdata/pull/18589) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/docker/docker from 27.2.1+incompatible to 27.3.0+incompatible in /src/go [\#18588](https://github.com/netdata/netdata/pull/18588) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Update kickstart.sh [\#18587](https://github.com/netdata/netdata/pull/18587) ([eya46](https://github.com/eya46))
+- Remove python ceph collector implementation [\#18584](https://github.com/netdata/netdata/pull/18584) ([Ancairon](https://github.com/Ancairon))
 - Add ceph commands to ndsudo [\#18583](https://github.com/netdata/netdata/pull/18583) ([Ancairon](https://github.com/Ancairon))
+- Port Ceph collector to Go [\#18582](https://github.com/netdata/netdata/pull/18582) ([Ancairon](https://github.com/Ancairon))
 - go.d/sensors refactor [\#18581](https://github.com/netdata/netdata/pull/18581) ([ilyam8](https://github.com/ilyam8))
 - go.d move packages [\#18580](https://github.com/netdata/netdata/pull/18580) ([ilyam8](https://github.com/ilyam8))
 - WEIGHTS: use node\_id when available, otherwise host\_id [\#18579](https://github.com/netdata/netdata/pull/18579) ([ktsaou](https://github.com/ktsaou))
@@ -415,13 +421,6 @@
 - freeipmi: add "no-restart" \(workaround \#17931\) [\#18057](https://github.com/netdata/netdata/pull/18057) ([ilyam8](https://github.com/ilyam8))
 - ndsudo add 'chronyc serverstats' [\#18056](https://github.com/netdata/netdata/pull/18056) ([ilyam8](https://github.com/ilyam8))
 - go.d chrony add serverstats query \(disabled for now\) [\#18055](https://github.com/netdata/netdata/pull/18055) ([ilyam8](https://github.com/ilyam8))
-- go.d update packages [\#18054](https://github.com/netdata/netdata/pull/18054) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18052](https://github.com/netdata/netdata/pull/18052) ([netdatabot](https://github.com/netdatabot))
-- docs: deploy docker add host root mount [\#18051](https://github.com/netdata/netdata/pull/18051) ([ilyam8](https://github.com/ilyam8))
-- Update role-based-access-model.md [\#18050](https://github.com/netdata/netdata/pull/18050) ([Ancairon](https://github.com/Ancairon))
-- Bump github.com/prometheus/common from 0.54.0 to 0.55.0 in /src/go/collectors/go.d.plugin [\#18049](https://github.com/netdata/netdata/pull/18049) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump go.mongodb.org/mongo-driver from 1.15.1 to 1.16.0 in /src/go/collectors/go.d.plugin [\#18048](https://github.com/netdata/netdata/pull/18048) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/docker/docker from 27.0.0+incompatible to 27.0.2+incompatible in /src/go/collectors/go.d.plugin [\#18047](https://github.com/netdata/netdata/pull/18047) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
