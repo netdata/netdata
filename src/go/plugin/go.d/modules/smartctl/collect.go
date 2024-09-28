@@ -181,7 +181,7 @@ func isSmartAttrValid(a *smartAttribute) bool {
 }
 
 func isDeviceInLowerPowerMode(r *gjson.Result) bool {
-	if !isExitStatusHasBit(r, 1) {
+	if !isExitStatusHasAnyBit(r, 1) {
 		return false
 	}
 
@@ -194,7 +194,7 @@ func isDeviceInLowerPowerMode(r *gjson.Result) bool {
 }
 
 func isDeviceOpenFailedNoSuchDevice(r *gjson.Result) bool {
-	if !isExitStatusHasBit(r, 1) {
+	if !isExitStatusHasAnyBit(r, 1) {
 		return false
 	}
 
@@ -206,9 +206,16 @@ func isDeviceOpenFailedNoSuchDevice(r *gjson.Result) bool {
 	})
 }
 
-func isExitStatusHasBit(r *gjson.Result, bit int) bool {
+func isExitStatusHasAnyBit(r *gjson.Result, bit int, bits ...int) bool {
 	// https://manpages.debian.org/bullseye/smartmontools/smartctl.8.en.html#EXIT_STATUS
 	status := int(r.Get("smartctl.exit_status").Int())
-	mask := 1 << bit
-	return (status & mask) != 0
+
+	for _, b := range append([]int{bit}, bits...) {
+		mask := 1 << b
+		if (status & mask) != 0 {
+			return true
+		}
+	}
+
+	return false
 }

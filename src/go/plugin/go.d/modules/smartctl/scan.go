@@ -100,12 +100,12 @@ func (s *Smartctl) handleGuessedScsiScannedDevice(dev *scanDevice) {
 	}
 
 	resp, _ := s.exec.deviceInfo(dev.name, "sat", s.NoCheckPowerMode)
-	if resp == nil || resp.Get("smartctl.exit_status").Int() != 0 {
+	if resp == nil || isExitStatusHasAnyBit(resp, 0, 1, 2) {
 		return
 	}
 
-	atts, ok := newSmartDevice(resp).ataSmartAttributeTable()
-	if !ok || len(atts) == 0 {
+	attrs, ok := newSmartDevice(resp).ataSmartAttributeTable()
+	if !ok || len(attrs) == 0 {
 		return
 	}
 
