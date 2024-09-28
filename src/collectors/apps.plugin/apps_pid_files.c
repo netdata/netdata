@@ -425,7 +425,7 @@ void init_pid_fds(struct pid_stat *p, size_t first, size_t size) {
 }
 
 int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
-    bool ret = read_pid_file_descriptors_per_os(p, ptr);
+    bool ret = OS_FUNCTION(apps_os_read_pid_fds)(p, ptr);
     cleanup_negative_pid_fds(p);
 
     return ret ? 1 : 0;

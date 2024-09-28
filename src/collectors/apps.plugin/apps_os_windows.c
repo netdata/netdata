@@ -481,7 +481,7 @@ BOOL EnableDebugPrivilege() {
     return TRUE;
 }
 
-void apps_os_init(void) {
+void apps_os_init_windows(void) {
     PerflibNamesRegistryInitialize();
 
     if(!EnableDebugPrivilege())
@@ -499,21 +499,6 @@ bool apps_os_read_pid_status_windows(struct pid_stat *p __maybe_unused, void *pt
 }
 
 bool apps_os_read_pid_stat_windows(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
-    // dummy - not needed
-    return false;
-}
-
-bool read_proc_pid_limits_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
-    // dummy - not needed
-    return false;
-}
-
-bool read_proc_pid_io_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
-    // dummy - not needed
-    return false;
-}
-
-bool get_cmdline_per_os(struct pid_stat *p __maybe_unused, char *cmdline __maybe_unused, size_t bytes __maybe_unused) {
     // dummy - not needed
     return false;
 }

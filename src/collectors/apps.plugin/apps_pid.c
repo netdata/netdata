@@ -50,7 +50,7 @@ size_t all_pids_count(void) {
     return pids.all_pids.count;
 }
 
-void pids_init(void) {
+void apps_pids_init(void) {
     pids.all_pids.aral = aral_create("pid_stat", sizeof(struct pid_stat), 1, 65536, NULL, NULL, NULL, false, true);
     simple_hashtable_init_PID(&pids.all_pids.ht, 1024);
 }
@@ -315,8 +315,10 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
         string_freez(p->comm);
         p->comm = string_strdupz(comm);
 
+#if (PROCESSES_HAVE_CMDLINE == 1)
         if(likely(proc_pid_cmdline_is_needed))
             managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
+#endif
 
 #if (USE_APPS_GROUPS_CONF == 1)
         assign_app_group_target_to_pid(p);
@@ -652,51 +654,6 @@ static inline void process_exited_pids(void) {
     }
 }
 #endif
-
-// --------------------------------------------------------------------------------------------------------------------
-
-bool read_proc_pid_stat(struct pid_stat *p, void *ptr) {
-    p->last_stat_collected_usec = p->stat_collected_usec;
-    p->stat_collected_usec = now_monotonic_usec();
-    calls_counter++;
-
-    if(!OS_FUNCTION(apps_os_read_pid_stat)(p, ptr))
-        return 0;
-
-    return 1;
-}
-
-int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
-    return read_proc_pid_limits_per_os(p, ptr) ? 1 : 0;
-}
-
-int read_proc_pid_io(struct pid_stat *p, void *ptr) {
-    p->last_io_collected_usec = p->io_collected_usec;
-    p->io_collected_usec = now_monotonic_usec();
-    calls_counter++;
-
-    bool ret = read_proc_pid_io_per_os(p, ptr);
-
-    return ret ? 1 : 0;
-}
-
-int read_proc_pid_cmdline(struct pid_stat *p) {
-    static char cmdline[MAX_CMDLINE];
-
-    if(unlikely(!get_cmdline_per_os(p, cmdline, sizeof(cmdline))))
-        goto cleanup;
-
-    string_freez(p->cmdline);
-    p->cmdline = string_strdupz(cmdline);
-
-    return 1;
-
-cleanup:
-    // copy the command to the command line
-    string_freez(p->cmdline);
-    p->cmdline = string_dup(p->comm);
-    return 0;
-}
 
 // --------------------------------------------------------------------------------------------------------------------
 // the main loop for collecting process data

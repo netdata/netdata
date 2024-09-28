@@ -25,7 +25,7 @@ static long get_fs_block_size(void) {
     return block_size;
 }
 
-void apps_os_init(void) {
+void apps_os_init_freebsd(void) {
     global_block_size = get_fs_block_size();
 }
 
@@ -48,7 +48,7 @@ uint64_t apps_os_get_total_memory_freebsd(void) {
     return ret;
 }
 
-bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr) {
+bool apps_os_read_pid_fds_freebsd(struct pid_stat *p, void *ptr) {
     int mib[4];
     size_t size;
     struct kinfo_file *fds;
@@ -183,7 +183,7 @@ bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr) {
     return true;
 }
 
-bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
+bool apps_os_get_pid_cmdline_freebsd(struct pid_stat *p, char *cmdline, size_t bytes) {
     size_t i, b = bytes - 1;
     int mib[4];
 
@@ -201,7 +201,7 @@ bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
     return true;
 }
 
-bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
+bool apps_os_read_pid_io_freebsd(struct pid_stat *p, void *ptr) {
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
 
     pid_incremental_rate(io, PDF_LREAD,  proc_info->ki_rusage.ru_inblock * global_block_size);
@@ -210,7 +210,7 @@ bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
     return true;
 }
 
-bool read_proc_pid_limits_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
+bool apps_os_read_pid_limits_freebsd(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
     return false;
 }
 

@@ -30,6 +30,8 @@
 #define PROCESSES_HAVE_RSSSHMEM              0
 #define PROCESSES_HAVE_FDS                   1
 #define PROCESSES_HAVE_HANDLES               0
+#define PROCESSES_HAVE_CMDLINE               1
+#define PROCESSES_HAVE_PID_LIMITS            0
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _freebsd)
@@ -68,6 +70,8 @@ struct pid_info {
 #define PROCESSES_HAVE_RSSSHMEM              0
 #define PROCESSES_HAVE_FDS                   1
 #define PROCESSES_HAVE_HANDLES               0
+#define PROCESSES_HAVE_CMDLINE               1
+#define PROCESSES_HAVE_PID_LIMITS            0
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _macos)
@@ -94,6 +98,8 @@ struct pid_info {
 #define PROCESSES_HAVE_RSSSHMEM              0
 #define PROCESSES_HAVE_FDS                   0
 #define PROCESSES_HAVE_HANDLES               1
+#define PROCESSES_HAVE_CMDLINE               0
+#define PROCESSES_HAVE_PID_LIMITS            0
 #define PPID_SHOULD_BE_RUNNING               0
 #define USE_APPS_GROUPS_CONF                 0
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _windows)
@@ -118,9 +124,13 @@ struct pid_info {
 #define PROCESSES_HAVE_RSSSHMEM              1
 #define PROCESSES_HAVE_FDS                   1
 #define PROCESSES_HAVE_HANDLES               0
+#define PROCESSES_HAVE_CMDLINE               1
+#define PROCESSES_HAVE_PID_LIMITS            1
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _linux)
+
+extern int max_fds_cache_seconds;
 
 #else
 #error "Unsupported operating system"
@@ -193,10 +203,6 @@ extern netdata_mutex_t apps_and_stdout_mutex;
 // having a lot of spares, increases the CPU utilization of the plugin.
 #define MAX_SPARE_FDS 1
 
-#if defined(OS_LINUX)
-extern int max_fds_cache_seconds;
-#endif
-
 // ----------------------------------------------------------------------------
 // some variables for keeping track of processes count by states
 
@@ -220,6 +226,7 @@ extern const char *proc_states[];
 // etc.
 #define RATES_DETAIL 10000ULL
 
+#if (PROCESSES_HAVE_FDS == 1)
 struct openfds {
     kernel_uint_t files;
     kernel_uint_t pipes;
@@ -231,8 +238,8 @@ struct openfds {
     kernel_uint_t eventpolls;
     kernel_uint_t other;
 };
-
 #define pid_openfds_sum(p) ((p)->openfds.files + (p)->openfds.pipes + (p)->openfds.sockets + (p)->openfds.inotifies + (p)->openfds.eventfds + (p)->openfds.timerfds + (p)->openfds.signalfds + (p)->openfds.eventpolls + (p)->openfds.other)
+#endif
 
 // ----------------------------------------------------------------------------
 // target
@@ -406,6 +413,7 @@ typedef enum __attribute__((packed)) {
 // structure to store data for each process running
 // see: man proc for the description of the fields
 
+#if (PROCESSES_HAVE_PID_LIMITS == 1)
 struct pid_limits {
     //    kernel_uint_t max_cpu_time;
     //    kernel_uint_t max_file_size;
@@ -424,6 +432,7 @@ struct pid_limits {
     //    kernel_uint_t max_realtime_priority;
     //    kernel_uint_t max_realtime_timeout;
 };
+#endif
 
 struct pid_fd {
     int fd;
@@ -491,8 +500,10 @@ struct pid_stat {
 
 #if (PROCESSES_HAVE_FDS == 1)
     struct openfds openfds;
+#if (PROCESSES_HAVE_PID_LIMITS == 1)
     struct pid_limits limits;
     NETDATA_DOUBLE openfds_limits_percent;
+#endif
     struct pid_fd *fds;             // array of fds it uses
     uint32_t fds_size;              // the size of the fds array
 #endif
@@ -556,50 +567,7 @@ struct user_or_group_id {
 };
 #endif
 
-extern struct target
-#if (USE_APPS_GROUPS_CONF == 1)
-    *apps_groups_default_target,
-    *apps_groups_root_target,
-#endif
-
-#if (PROCESSES_HAVE_UID == 1)
-    *users_root_target,
-#endif
-#if (PROCESSES_HAVE_GID == 1)
-    *groups_root_target,
-#endif
-    *tree_root_target;
-
-struct pid_stat *root_of_pids(void);
-size_t all_pids_count(void);
-
 extern int update_every;
-
-#define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
-
-void function_processes(const char *transaction, char *function,
-                        usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
-                        BUFFER *payload __maybe_unused, HTTP_ACCESS access,
-                        const char *source __maybe_unused, void *data __maybe_unused);
-
-struct target *find_target_by_name(struct target *base, const char *name);
-
-#if (PROCESSES_HAVE_UID == 1)
-struct target *get_uid_target(uid_t uid);
-struct user_or_group_id *user_id_find(struct user_or_group_id *user_id_to_find);
-#endif
-
-#if (PROCESSES_HAVE_GID == 1)
-struct target *get_gid_target(gid_t gid);
-struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find);
-#endif
-
-struct target *get_tree_target(struct pid_stat *p);
-#if (USE_APPS_GROUPS_CONF == 1)
-int read_apps_groups_conf(const char *path, const char *file);
-#endif
-
-void users_and_groups_init(void);
 
 // ----------------------------------------------------------------------------
 // debugging
@@ -645,68 +613,119 @@ bool managed_log(struct pid_stat *p, PID_LOG log, bool status);
 #define pid_incremental_cpu(type, idx, value) \
     incremental_rate(p->values[idx], p->raw[idx], value, p->type##_collected_usec, p->last_##type##_collected_usec, CPU_TO_NANOSECONDCORES)
 
-bool read_proc_pid_stat(struct pid_stat *p, void *ptr);
-int read_proc_pid_limits(struct pid_stat *p, void *ptr);
-int read_proc_pid_cmdline(struct pid_stat *p);
-int read_proc_pid_io(struct pid_stat *p, void *ptr);
-int read_pid_file_descriptors(struct pid_stat *p, void *ptr);
-void apps_os_init(void);
+void apps_orchestrators_and_aggregators_init(void);
+void apps_users_and_groups_init(void);
+void apps_pids_init(void);
 
-bool collect_data_for_all_pids(void);
+#if (PROCESSES_HAVE_CMDLINE == 1)
+int read_proc_pid_cmdline(struct pid_stat *p);
+#endif
 
 #if (PROCESSES_HAVE_FDS == 1)
 void clear_pid_fd(struct pid_fd *pfd);
 void file_descriptor_not_used(int id);
 void init_pid_fds(struct pid_stat *p, size_t first, size_t size);
 void aggregate_pid_fds_on_targets(struct pid_stat *p);
-#endif
-
-void send_proc_states_count(usec_t dt);
-void send_charts_updates_to_netdata(struct target *root, const char *type, const char *lbl_name, const char *title);
-void send_collected_data_to_netdata(struct target *root, const char *type, usec_t dt);
-void send_resource_usage_to_netdata(usec_t dt);
-
-void pids_init(void);
-struct pid_stat *find_pid_entry(pid_t pid);
-
-void update_pid_comm(struct pid_stat *p, const char *comm);
-void aggregate_processes_to_targets(void);
-
-void del_pid_entry(pid_t pid);
-struct pid_stat *get_or_allocate_pid_entry(pid_t pid);
-
-bool collect_parents_before_children(void);
-
-void pid_collection_started(struct pid_stat *p);
-void pid_collection_failed(struct pid_stat *p);
-void pid_collection_completed(struct pid_stat *p);
-
+int read_pid_file_descriptors(struct pid_stat *p, void *ptr);
 void make_all_pid_fds_negative(struct pid_stat *p);
 uint32_t file_descriptor_find_or_add(const char *name, uint32_t hash);
-
-int incrementally_collect_data_for_pid(pid_t pid, void *ptr);
-int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr);
-
-bool read_proc_pid_limits_per_os(struct pid_stat *p, void *ptr);
-bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr);
-bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr);
-bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes);
+#endif
 
 #if (USE_APPS_GROUPS_CONF == 1)
 void assign_app_group_target_to_pid(struct pid_stat *p);
 #endif
 
-void orchestrators_and_aggregators_init(void);
+// --------------------------------------------------------------------------------------------------------------------
+// data collection management
+
+bool collect_data_for_all_pids(void);
+
+void pid_collection_started(struct pid_stat *p);
+void pid_collection_failed(struct pid_stat *p);
+void pid_collection_completed(struct pid_stat *p);
+
+bool collect_parents_before_children(void);
+int incrementally_collect_data_for_pid(pid_t pid, void *ptr);
+int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr);
+void aggregate_processes_to_targets(void);
+
+// --------------------------------------------------------------------------------------------------------------------
+// pid management
+
+struct pid_stat *root_of_pids(void);
+size_t all_pids_count(void);
+
+struct pid_stat *get_or_allocate_pid_entry(pid_t pid);
+struct pid_stat *find_pid_entry(pid_t pid);
+void del_pid_entry(pid_t pid);
+void update_pid_comm(struct pid_stat *p, const char *comm);
+
+
+// --------------------------------------------------------------------------------------------------------------------
+// targets management
+
+extern struct target *tree_root_target;
+struct target *find_target_by_name(struct target *base, const char *name);
+struct target *get_tree_target(struct pid_stat *p);
+
+#if (PROCESSES_HAVE_UID == 1)
+extern struct target *users_root_target;
+struct target *get_uid_target(uid_t uid);
+struct user_or_group_id *user_id_find(struct user_or_group_id *user_id_to_find);
+#endif
+
+#if (PROCESSES_HAVE_GID == 1)
+extern struct target *groups_root_target;
+struct target *get_gid_target(gid_t gid);
+struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find);
+#endif
+
+#if (USE_APPS_GROUPS_CONF == 1)
+extern struct target *apps_groups_default_target, *apps_groups_root_target;
+int read_apps_groups_conf(const char *path, const char *file);
+#endif
+
+// --------------------------------------------------------------------------------------------------------------------
+// output
+
+void send_charts_updates_to_netdata(struct target *root, const char *type, const char *lbl_name, const char *title);
+void send_collected_data_to_netdata(struct target *root, const char *type, usec_t dt);
+void send_resource_usage_to_netdata(usec_t dt);
+
+#if defined(OS_LINUX)
+void send_proc_states_count(usec_t dt);
+#endif
+
+#define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
+void function_processes(const char *transaction, char *function,
+                        usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+                        BUFFER *payload __maybe_unused, HTTP_ACCESS access,
+                        const char *source __maybe_unused, void *data __maybe_unused);
 
 // --------------------------------------------------------------------------------------------------------------------
 // operating system functions
+
+// one time initialization per operating system
+void OS_FUNCTION(apps_os_init)(void);
 
 // collect all the available information for all processes running
 bool OS_FUNCTION(apps_os_collect_all_pids)(void);
 
 bool OS_FUNCTION(apps_os_read_pid_status)(struct pid_stat *p, void *ptr);
-
 bool OS_FUNCTION(apps_os_read_pid_stat)(struct pid_stat *p, void *ptr);
+bool OS_FUNCTION(apps_os_read_pid_io)(struct pid_stat *p, void *ptr);
+
+#if (PROCESSES_HAVE_PID_LIMITS == 1)
+bool OS_FUNCTION(apps_os_read_pid_limits)(struct pid_stat *p, void *ptr);
+#endif
+
+#if (PROCESSES_HAVE_CMDLINE == 1)
+bool OS_FUNCTION(apps_os_get_pid_cmdline)(struct pid_stat *p, char *cmdline, size_t bytes);
+#endif
+
+#if (PROCESSES_HAVE_FDS == 1)
+bool OS_FUNCTION(apps_os_read_pid_fds)(struct pid_stat *p, void *ptr);
+#endif
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 bool OS_FUNCTION(apps_os_read_global_cpu_utilization)(void);

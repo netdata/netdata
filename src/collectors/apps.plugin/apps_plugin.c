@@ -102,7 +102,6 @@ NETDATA_DOUBLE
 int update_every = 1;
 
 #if defined(OS_LINUX)
-int max_fds_cache_seconds = 60;
 proc_state proc_state_count[PROC_STATUS_END];
 const char *proc_states[] = {
     [PROC_STATUS_RUNNING] = "running",
@@ -116,13 +115,6 @@ const char *proc_states[] = {
 // will be changed to getenv(NETDATA_USER_CONFIG_DIR) if it exists
 static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
-
-struct target
-        *apps_groups_default_target = NULL, // the default target
-        *apps_groups_root_target = NULL,    // apps_groups.conf defined
-        *users_root_target = NULL,          // users
-        *groups_root_target = NULL,         // user groups
-        *tree_root_target = NULL;
 
 size_t pagesize;
 
@@ -304,6 +296,8 @@ cleanup:
     return ret;
 }
 
+static bool profile_speed = false;
+
 static void parse_args(int argc, char **argv)
 {
     int i, freq = 0;
@@ -338,6 +332,11 @@ static void parse_args(int argc, char **argv)
 #ifndef NETDATA_INTERNAL_CHECKS
             fprintf(stderr, "apps.plugin has been compiled without debugging\n");
 #endif
+            continue;
+        }
+
+        if(strcmp("profile-speed", argv[i]) == 0) {
+            profile_speed = true;
             continue;
         }
 
@@ -619,12 +618,8 @@ int main(int argc, char **argv) {
 #endif /* NETDATA_INTERNAL_CHECKS */
 
     procfile_adaptive_initial_allocation = 1;
-
     os_get_system_HZ();
-
     os_get_system_cpus_uncached();
-    apps_os_init();
-
     parse_args(argc, argv);
 
 #if !defined(OS_WINDOWS)
@@ -648,9 +643,10 @@ int main(int argc, char **argv) {
 
     netdata_log_info("started on pid %d", getpid());
 
-    orchestrators_and_aggregators_init();
-    users_and_groups_init();
-    pids_init();
+    apps_orchestrators_and_aggregators_init();
+    apps_users_and_groups_init();
+    apps_pids_init();
+    OS_FUNCTION(apps_os_init)();
 
     // ------------------------------------------------------------------------
     // the event loop for functions
@@ -672,15 +668,16 @@ int main(int argc, char **argv) {
     for(; !apps_plugin_exit ; global_iterations_counter++) {
         netdata_mutex_unlock(&apps_and_stdout_mutex);
 
-#ifdef NETDATA_PROFILING
-#warning "compiling for profiling"
-        static int profiling_count=0;
-        profiling_count++;
-        if(unlikely(profiling_count > 2000)) exit(0);
-        usec_t dt = update_every * USEC_PER_SEC;
-#else
-        usec_t dt = heartbeat_next(&hb, step);
-#endif
+        usec_t dt;
+        if(profile_speed) {
+            static int profiling_count=0;
+            profiling_count++;
+            if(unlikely(profiling_count > 500)) exit(0);
+            dt = update_every * USEC_PER_SEC;
+        }
+        else
+            dt = heartbeat_next(&hb, step);
+
         netdata_mutex_lock(&apps_and_stdout_mutex);
 
         struct pollfd pollfd = { .fd = fileno(stdout), .events = POLLERR };
@@ -710,7 +707,9 @@ int main(int argc, char **argv) {
         if(send_resource_usage)
             send_resource_usage_to_netdata(dt);
 
+#if defined(OS_LINUX)
         send_proc_states_count(dt);
+#endif
 
         send_charts_updates_to_netdata(tree_root_target, "process_tree", "parent_process", "Processes Tree");
         send_collected_data_to_netdata(tree_root_target, "process_tree", dt);

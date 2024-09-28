@@ -9,7 +9,7 @@
 usec_t system_current_time_ut;
 mach_timebase_info_data_t mach_info;
 
-void apps_os_init(void) {
+void apps_os_init_macos(void) {
     mach_timebase_info(&mach_info);
 }
 
@@ -25,7 +25,7 @@ uint64_t apps_os_get_total_memory_macos(void) {
     return ret;
 }
 
-bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
+bool apps_os_read_pid_fds_macos(struct pid_stat *p, void *ptr __maybe_unused) {
     static struct proc_fdinfo *fds = NULL;
     static int fdsCapacity = 0;
 
@@ -79,7 +79,7 @@ bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __maybe_unus
     return true;
 }
 
-bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t maxBytes) {
+bool apps_os_get_pid_cmdline_macos(struct pid_stat *p, char *cmdline, size_t maxBytes) {
     int mib[3] = {CTL_KERN, KERN_PROCARGS2, p->pid};
     static char *args = NULL;
     static size_t size = 0;
@@ -138,7 +138,7 @@ bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t maxBytes) {
     return true;
 }
 
-bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
+bool apps_os_read_pid_io_macos(struct pid_stat *p, void *ptr) {
     struct pid_info *pi = ptr;
 
     // On MacOS, the proc_pid_rusage provides disk_io_statistics which includes io bytes read and written
@@ -149,7 +149,7 @@ bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
     return true;
 }
 
-bool read_proc_pid_limits_per_os(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
+bool apps_os_read_pid_limits_macos(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
     return false;
 }
 

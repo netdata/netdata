@@ -183,7 +183,7 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
         return;
     }
 
-#if (PROCESSES_HAVE_FDS == 1)
+#if (PROCESSES_HAVE_FDS == 1) && (PROCESSES_HAVE_PID_LIMITS == 1)
     if(p->openfds_limits_percent > w->max_open_files_percent)
         w->max_open_files_percent = p->openfds_limits_percent;
 #endif

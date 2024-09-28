@@ -210,7 +210,7 @@ void function_processes(const char *transaction, char *function,
 #endif
         , Swap_max = 0.0
         , Memory_max = 0.0
-#if (PROCESSES_HAVE_FDS == 1)
+#if (PROCESSES_HAVE_FDS == 1) && (PROCESSES_HAVE_PID_LIMITS == 1)
         , FDsLimitPercent_max = 0.0
 #endif
         ;
@@ -433,7 +433,9 @@ void function_processes(const char *transaction, char *function,
 
 #if (PROCESSES_HAVE_FDS == 1)
         // open file descriptors
+#if (PROCESSES_HAVE_PID_LIMITS == 1)
         add_value_field_ndd_with_max(wb, FDsLimitPercent, p->openfds_limits_percent);
+#endif
         add_value_field_llu_with_max(wb, FDs, pid_openfds_sum(p));
         add_value_field_llu_with_max(wb, Files, p->openfds.files);
         add_value_field_llu_with_max(wb, Pipes, p->openfds.pipes);
@@ -725,11 +727,13 @@ void function_processes(const char *transaction, char *function,
 
 #if (PROCESSES_HAVE_FDS == 1)
         // open file descriptors
+#if (PROCESSES_HAVE_PID_LIMITS == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "FDsLimitPercent", "Percentage of Open Descriptors vs Limits",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", FDsLimitPercent_max, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+#endif
         buffer_rrdf_table_add_field(wb, field_id++, "FDs", "All Open File Descriptors",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", FDs_max, RRDF_FIELD_SORT_DESCENDING, NULL,

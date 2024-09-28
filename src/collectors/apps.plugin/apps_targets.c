@@ -18,11 +18,22 @@ static inline STRING *get_numeric_string(uint64_t n) {
     return string_strdupz(buf);
 }
 
-// ----------------------------------------------------------------------------
-// apps_groups.conf
-// aggregate all processes in groups, to have a limited number of dimensions
+struct target *find_target_by_name(struct target *base, const char *name) {
+    struct target *t;
+    for(t = base; t ; t = t->next) {
+        if (string_strcmp(t->name, name) == 0)
+            return t;
+    }
+
+    return NULL;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// Users
 
 #if (PROCESSES_HAVE_UID == 1)
+struct target *users_root_target = NULL;
+
 struct target *get_uid_target(uid_t uid) {
     struct target *w;
     for(w = users_root_target ; w ; w = w->next)
@@ -61,7 +72,12 @@ struct target *get_uid_target(uid_t uid) {
 }
 #endif
 
+// --------------------------------------------------------------------------------------------------------------------
+// Groups
+
 #if (PROCESSES_HAVE_GID == 1)
+struct target *groups_root_target = NULL;
+
 struct target *get_gid_target(gid_t gid) {
     struct target *w;
     for(w = groups_root_target ; w ; w = w->next)
@@ -100,22 +116,55 @@ struct target *get_gid_target(gid_t gid) {
 }
 #endif
 
+// --------------------------------------------------------------------------------------------------------------------
+// Tree
+
+// Function to remove commas, spaces and pipes from the target (UTF8 compatible)
 static void id_cleanup_txt(char *buf) {
-    char *s = buf;
-    while(*s) {
-        if (!isalnum((uint8_t)*s) && *s != '-' && *s != '_')
-            *s = ' ';
-        s++;
+    char *s = buf, *d = buf;
+    bool last_was_dash = false;
+
+    // Process the input buffer
+    while (*s) {
+        if (!IS_UTF8_BYTE(*s)) { // ASCII character
+            if (*s == '-') {
+                *d++ = *s++;
+                last_was_dash = true;
+            }
+            else if (*s == ',' || *s == '|' || isspace((uint8_t)*s)) {
+                // Convert comma, pipe, or space to dash
+                if (!last_was_dash) {
+                    *d++ = '-';
+                    s++;
+                    last_was_dash = true;
+                }
+            }
+            else {
+                *d++ = *s++;
+                last_was_dash = false;
+            }
+        }
+        else if (IS_UTF8_STARTBYTE(*s)) {
+            // copy it
+            *d++ = *s++;
+
+            // copy the rest
+            while (IS_UTF8_CONTBYTE(*s))
+                *d++ = *s++;
+
+            last_was_dash = false;
+        }
+        else
+            // an invalid UTF8 continuation byte - skip it
+            s++;
     }
 
-    trim_all(buf);
+    // Null-terminate the cleaned string
+    *d = '\0';
 
-    s = buf;
-    while(*s) {
-        if (isspace((uint8_t)*s))
-            *s = '-';
-        s++;
-    }
+    // Remove a trailing dash (if any)
+    if (d > buf && *(d - 1) == '-')
+        *(d - 1) = '\0';
 }
 
 static STRING *id_cleanup_string(STRING *s) {
@@ -173,7 +222,7 @@ struct {
     { NULL, NULL }
 };
 
-static bool is_orchestrator(struct pid_stat *p) {
+static inline bool is_orchestrator(struct pid_stat *p) {
     for(size_t i = 0; process_orchestrators[i].comm ;i++) {
         if(p->comm == process_orchestrators[i].comm)
             return true;
@@ -182,7 +231,7 @@ static bool is_orchestrator(struct pid_stat *p) {
     return false;
 }
 
-static bool is_aggregator(struct pid_stat *p) {
+static inline bool is_aggregator(struct pid_stat *p) {
     for(size_t i = 0; process_aggregators[i].comm ;i++) {
         if(p->comm == process_aggregators[i].comm)
             return true;
@@ -191,13 +240,15 @@ static bool is_aggregator(struct pid_stat *p) {
     return false;
 }
 
-void orchestrators_and_aggregators_init(void) {
+void apps_orchestrators_and_aggregators_init(void) {
     for(size_t i = 0; process_orchestrators[i].txt ;i++)
         process_orchestrators[i].comm = string_strdupz(process_orchestrators[i].txt);
 
     for(size_t i = 0; process_aggregators[i].txt ;i++)
         process_aggregators[i].comm = string_strdupz(process_aggregators[i].txt);
 }
+
+struct target *tree_root_target = NULL;
 
 struct target *get_tree_target(struct pid_stat *p) {
     // skip fast all the children that are more than 3 levels down
@@ -238,7 +289,12 @@ struct target *get_tree_target(struct pid_stat *p) {
     return w;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// apps_groups.conf
+
 #if (USE_APPS_GROUPS_CONF == 1)
+struct target *apps_groups_default_target = NULL, *apps_groups_root_target = NULL;
+
 // find or create a new target
 // there are targets that are just aggregated to other target (the second argument)
 static struct target *get_apps_groups_target(const char *id, struct target *target, const char *name) {
@@ -422,13 +478,3 @@ int read_apps_groups_conf(const char *path, const char *file) {
     return 0;
 }
 #endif
-
-struct target *find_target_by_name(struct target *base, const char *name) {
-    struct target *t;
-    for(t = base; t ; t = t->next) {
-        if (string_strcmp(t->name, name) == 0)
-            return t;
-    }
-
-    return NULL;
-}

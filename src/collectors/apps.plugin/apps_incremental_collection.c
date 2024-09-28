@@ -69,6 +69,53 @@ bool managed_log(struct pid_stat *p, PID_LOG log, bool status) {
     return status;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+
+#if (PROCESSES_HAVE_CMDLINE == 1)
+int read_proc_pid_cmdline(struct pid_stat *p) {
+    static char cmdline[MAX_CMDLINE];
+
+    if(unlikely(!OS_FUNCTION(apps_os_get_pid_cmdline)(p, cmdline, sizeof(cmdline))))
+        goto cleanup;
+
+    string_freez(p->cmdline);
+    p->cmdline = string_strdupz(cmdline);
+
+    return 1;
+
+cleanup:
+    // copy the command to the command line
+    string_freez(p->cmdline);
+    p->cmdline = string_dup(p->comm);
+    return 0;
+}
+#endif
+
+// --------------------------------------------------------------------------------------------------------------------
+
+static inline bool read_proc_pid_stat(struct pid_stat *p, void *ptr) {
+    p->last_stat_collected_usec = p->stat_collected_usec;
+    p->stat_collected_usec = now_monotonic_usec();
+    calls_counter++;
+
+    if(!OS_FUNCTION(apps_os_read_pid_stat)(p, ptr))
+        return 0;
+
+    return 1;
+}
+
+static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
+    p->last_io_collected_usec = p->io_collected_usec;
+    p->io_collected_usec = now_monotonic_usec();
+    calls_counter++;
+
+    bool ret = OS_FUNCTION(apps_os_read_pid_io)(p, ptr);
+
+    return ret ? 1 : 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     if(unlikely(p->read)) return 0;
 
@@ -84,10 +131,8 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     }
 
     // check its parent pid
-    if(unlikely(p->ppid < INIT_PID)) {
-        netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", p->pid, pid_stat_comm(p), p->ppid);
+    if(unlikely(p->ppid < INIT_PID))
         p->ppid = 0;
-    }
 
     // --------------------------------------------------------------------
     // /proc/<pid>/io
@@ -109,7 +154,9 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
 #if (PROCESSES_HAVE_FDS == 1)
     if(enable_file_charts) {
         managed_log(p, PID_LOG_FDS, read_pid_file_descriptors(p, ptr));
-        managed_log(p, PID_LOG_LIMITS, read_proc_pid_limits(p, ptr));
+#if (PROCESSES_HAVE_PID_LIMITS == 1)
+        managed_log(p, PID_LOG_LIMITS, OS_FUNCTION(apps_os_read_pid_limits)(p, ptr));
+#endif
     }
 #endif
 

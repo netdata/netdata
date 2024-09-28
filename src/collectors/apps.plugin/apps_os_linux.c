@@ -9,9 +9,10 @@
 
 #define CPU_TO_NANOSECONDCORES (NSEC_PER_SEC / system_hz)
 
+int max_fds_cache_seconds = 60;
 kernel_uint_t system_uptime_secs;
 
-void apps_os_init(void) {
+void apps_os_init_linux(void) {
     ;
 }
 
@@ -24,7 +25,7 @@ struct arl_callback_ptr {
     size_t line;
 };
 
-bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
+bool apps_os_read_pid_fds_linux(struct pid_stat *p, void *ptr __maybe_unused) {
     if(unlikely(!p->fds_dirname)) {
         char dirname[FILENAME_MAX+1];
         snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", netdata_configured_host_prefix, p->pid);
@@ -192,7 +193,7 @@ uint64_t apps_os_get_total_memory_linux(void) {
 // --------------------------------------------------------------------------------------------------------------------
 // /proc/pid/cmdline
 
-bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
+bool apps_os_get_pid_cmdline_linux(struct pid_stat *p, char *cmdline, size_t bytes) {
     if(unlikely(!p->cmdline_filename)) {
         char filename[FILENAME_MAX];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
@@ -219,7 +220,7 @@ bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
 // --------------------------------------------------------------------------------------------------------------------
 // /proc/pid/io
 
-bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
+bool apps_os_read_pid_io_linux(struct pid_stat *p, void *ptr __maybe_unused) {
     static procfile *ff = NULL;
 
     if(unlikely(!p->io_filename)) {
@@ -265,7 +266,7 @@ static inline kernel_uint_t get_proc_pid_limits_limit(char *buf, const char *key
     return str2ull(v, NULL);
 }
 
-bool read_proc_pid_limits_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
+bool apps_os_read_pid_limits_linux(struct pid_stat *p, void *ptr __maybe_unused) {
     static char proc_pid_limits_buffer[MAX_PROC_PID_LIMITS + 1];
     bool ret = false;
     bool read_limits = false;

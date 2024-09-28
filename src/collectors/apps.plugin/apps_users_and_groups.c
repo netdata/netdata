@@ -210,7 +210,7 @@ struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find
 }
 #endif
 
-void users_and_groups_init(void) {
+void apps_users_and_groups_init(void) {
 #if (PROCESSES_HAVE_UID == 1)
     snprintfz(all_user_ids.filename, FILENAME_MAX, "%s/etc/passwd", netdata_configured_host_prefix);
     debug_log("passwd file: '%s'", all_user_ids.filename);
