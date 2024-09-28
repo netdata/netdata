@@ -21,10 +21,8 @@ func (o *OpenVPN) initPerUserMatcher() (matcher.Matcher, error) {
 
 func (o *OpenVPN) initClient() *client.Client {
 	config := socket.Config{
-		Address:        o.Address,
-		ConnectTimeout: o.Timeout.Duration(),
-		ReadTimeout:    o.Timeout.Duration(),
-		WriteTimeout:   o.Timeout.Duration(),
+		Address: o.Address,
+		Timeout: o.Timeout.Duration(),
 	}
 	return &client.Client{Client: socket.New(config)}
 }

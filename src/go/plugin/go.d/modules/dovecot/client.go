@@ -16,10 +16,8 @@ type dovecotConn interface {
 
 func newDovecotConn(conf Config) dovecotConn {
 	return &dovecotClient{conn: socket.New(socket.Config{
-		Address:        conf.Address,
-		ConnectTimeout: conf.Timeout.Duration(),
-		ReadTimeout:    conf.Timeout.Duration(),
-		WriteTimeout:   conf.Timeout.Duration(),
+		Address: conf.Address,
+		Timeout: conf.Timeout.Duration(),
 	})}
 }
 

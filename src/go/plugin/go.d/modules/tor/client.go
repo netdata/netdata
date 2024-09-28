@@ -31,10 +31,8 @@ func newControlConn(conf Config) controlConn {
 	return &torControlClient{
 		password: conf.Password,
 		conn: socket.New(socket.Config{
-			Address:        conf.Address,
-			ConnectTimeout: conf.Timeout.Duration(),
-			ReadTimeout:    conf.Timeout.Duration(),
-			WriteTimeout:   conf.Timeout.Duration(),
+			Address: conf.Address,
+			Timeout: conf.Timeout.Duration(),
 		})}
 }
 
