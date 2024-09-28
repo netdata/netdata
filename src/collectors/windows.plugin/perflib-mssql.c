@@ -100,14 +100,6 @@ struct mssql_instance {
     COUNTER_DATA MSSQLStatSafeAutoParameterization;
     COUNTER_DATA MSSQLCompilations;
     COUNTER_DATA MSSQLRecompilations;
-
-    COUNTER_DATA MSSQLDatabaseActiveTransactions;
-    COUNTER_DATA MSSQLDatabaseBackupRestoreOperations;
-    COUNTER_DATA MSSQLDatabaseDataFileSize;
-    COUNTER_DATA MSSQLDatabaseLogFlushed;
-    COUNTER_DATA MSSQLDatabaseLogFlushes;
-    COUNTER_DATA MSSQLDatabaseTransactions;
-    COUNTER_DATA MSSQLDatabaseWriteTransactions;
 };
 
 struct mssql_lock_instance {
@@ -120,6 +112,17 @@ struct mssql_lock_instance {
     RRDDIM *rd_deadLocks;
 };
 
+struct mssql_db_instance {
+    struct mssql_instance *parent;
+
+    COUNTER_DATA MSSQLDatabaseActiveTransactions;
+    COUNTER_DATA MSSQLDatabaseBackupRestoreOperations;
+    COUNTER_DATA MSSQLDatabaseDataFileSize;
+    COUNTER_DATA MSSQLDatabaseLogFlushed;
+    COUNTER_DATA MSSQLDatabaseLogFlushes;
+    COUNTER_DATA MSSQLDatabaseTransactions;
+    COUNTER_DATA MSSQLDatabaseWriteTransactions;
+};
 
 static DICTIONARY *mssql_instances = NULL;
 
@@ -194,10 +197,11 @@ static inline void initialize_mssql_keys(struct mssql_instance *p) {
     p->MSSQLPendingMemoryGrants.key = "Memory Grants Pending";
     p->MSSQLTotalServerMemory.key = "Total Server Memory (KB)";
 
+    //p->MSSQLDatabaseDataFileSize.key = "Data File(s) Size (KB)";
+
     /*
     p->MSSQLDatabaseActiveTransactions.key = "";
     p->MSSQLDatabaseBackupRestoreOperations.key = "";
-    p->MSSQLDatabaseDataFileSize.key = "";
     p->MSSQLDatabaseLogFlushed.key = "";
     p->MSSQLDatabaseLogFlushes.key = "";
     p->MSSQLDatabaseTransactions.key = "";
@@ -881,6 +885,49 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p
     rrdset_done(p->st_deadLocks);
 }
 
+static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_DATABASE]);
+    if (!pObjectType) return;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for(LONG i = 0; i < pObjectType->NumInstances ; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if(!pi) break;
+
+        if(!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+        if(!strcasecmp(windows_shared_buffer, "_Total"))
+            continue;
+
+        netdata_fix_chart_name(windows_shared_buffer);
+        fprintf(stderr, "KILLME %s\n", windows_shared_buffer);
+        /*
+        struct mssql_lock_instance *mli = dictionary_set(p->locks_instances,
+                                                         windows_shared_buffer,
+                                                         NULL,
+                                                         sizeof(*mli));
+        if (!mli)
+            continue;
+
+        if (!mli->parent) {
+            mli->parent = p;
+        }
+
+        perflibGetObjectCounter(pDataBlock, pObjectType, &mli->lockWait);
+        perflibGetObjectCounter(pDataBlock, pObjectType, &mli->deadLocks);
+         */
+    }
+
+    /*
+    dictionary_sorted_walkthrough_read(p->locks_instances, dict_mssql_locks_charts_cb, &update_every);
+    rrdset_done(p->st_lockWait);
+    rrdset_done(p->st_deadLocks);
+     */
+}
+
 static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1028,7 +1075,7 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
         do_mssql_general_stats,
         do_mssql_errors,
-        NULL,
+        do_mssql_databases,
         do_mssql_locks,
         do_mssql_memory_mgr,
         do_mssql_buffer_management,
