@@ -148,19 +148,17 @@ struct {
     const char *txt;
     STRING *comm;
 } process_orchestrators[] = {
-#if defined(OS_LINUX)
-    { "systemd", NULL, },
-#endif
 #if defined(OS_WINDOWS)
-    { "System", NULL, },
-    { "services", NULL, },
-    { "wininit", NULL, },
-#else
-    { "init", NULL, },
+    { "System",     NULL, },
+    { "services",   NULL, },
+    { "wininit",    NULL, },
 #endif
+    { "systemd",    NULL, }, // lxc containers and host systems
+    { "init",       NULL, }, // lxc containers and host systems
+    { "dump-init",  NULL, }, // docker containers
 
     // terminator
-    { NULL, NULL }
+    { NULL,         NULL }
 };
 
 struct {
@@ -168,7 +166,7 @@ struct {
     STRING *comm;
 } process_aggregators[] = {
 #if defined(OS_LINUX)
-    { "kthread", NULL, },
+    { "kthread",    NULL, }, // linux kernels have many processes
 #endif
 
     // terminator

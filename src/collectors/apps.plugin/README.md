@@ -15,22 +15,49 @@ It is enabled by default on every Netdata installation.
 To achieve this task, it iterates through the whole process tree, collecting resource usage information
 for every process found running.
 
-Since Netdata needs to present this information in charts and track them through time,
-instead of presenting a `top` like list, `apps.plugin` uses a pre-defined list of **process groups**
-to which it assigns all running processes. This list is customizable via `apps_groups.conf`, and Netdata
-ships with a good default for most cases (to edit it on your system run `/etc/netdata/edit-config apps_groups.conf`).
+Unlike traditional process monitoring tools (like `top`), `apps.plugin` is able to account the resource
+utilization of exit processes. Their utilization is accounted at their currently running parents.
+So, `apps.plugin` is able to measure the resources used by shell scripts and other processes
+that fork/spawn other short-lived processes hundreds or even thousands of times per second.
 
-So, `apps.plugin` builds a process tree (much like `ps fax` does in Linux), and groups
+## Charts sections
+
+To provide more valuable insights, apps.plugin aggregates individual processes in several ways.
+Each type of aggregation is presented as a different section on the dashboard.
+
+### Custom Process Groups (Apps)
+
+In this section, apps.plugin summarizes the resources consumed by all processes, grouped based
+on the groups provided in `/etc/netdata/apps_groups.conf` (to edit it on your system run
+`/etc/netdata/edit-config apps_groups.conf`).
+
+For this section, `apps.plugin` builds a process tree (much like `ps fax` does in Linux), and groups
 processes together (evaluating both child and parent processes) so that the result is always a list with
 a predefined set of members (of course, only process groups found running are reported).
 
 > If you find that `apps.plugin` categorizes standard applications as `other`, we would be
 > glad to accept pull requests improving the defaults shipped with Netdata in `apps_groups.conf`.
 
-Unlike traditional process monitoring tools (like `top`), `apps.plugin` is able to account the resource
-utilization of exit processes. Their utilization is accounted at their currently running parents.
-So, `apps.plugin` is perfectly able to measure the resources used by shell scripts and other processes
-that fork/spawn other short-lived processes hundreds of times per second.
+This type of grouping is not available on Windows.
+
+### Parent Process (Tree)
+
+In this section, apps.plugin summarizes the resources consumed by all processes, grouped by the
+top-most process name, of each processes' subtree.
+
+This grouping is automatic, eliminates the need to configure process group by hand and still
+aggregates subprocesses to the top-level process, which is usually the most interesting for
+monitoring.
+
+### By User (Users)
+
+In this section, apps.plugin summarizes the resources consumed by all processes, grouped by the
+effective user under which each process runs.
+
+### By User Group (Groups)
+
+In this section, apps.plugin summarizes the resources consumed by all processes, grouped by the
+effective user group under which each process runs.
 
 ## Charts
 
@@ -381,14 +408,14 @@ the process tree of `sshd`, **including the exited children**.
 > `apps.plugin` does not use these mechanisms. The process grouping made by `apps.plugin` works
 > on any Linux, `systemd` based or not.
 
-#### a more technical description of how Netdata works
+#### a more technical description of how apps.plugin works
 
-Netdata reads `/proc/<pid>/stat` for all processes, once per second and extracts `utime` and
+Apps.plugin reads `/proc/<pid>/stat` for all processes, once per second and extracts `utime` and
 `stime` (user and system cpu utilization), much like all the console tools do.
 
-But it also extracts `cutime` and `cstime` that account the user and system time of the exit children of each process.
-By keeping a map in memory of the whole process tree, it is capable of assigning the right time to every process, taking
-into account all its exited children.
+But it also extracts `cutime` and `cstime` that account the user and system time of the exit
+children of each process. By keeping a map in memory of the whole process tree, it is capable of
+assigning the right time to every process, taking into account all its exited children.
 
 It is tricky, since a process may be running for 1 hour and once it exits, its parent should not
 receive the whole 1 hour of cpu time in just 1 second - you have to subtract the cpu time that has
@@ -397,6 +424,6 @@ been reported for it prior to this iteration.
 It is even trickier, because walking through the entire process tree takes some time itself. So,
 if you sum the CPU utilization of all processes, you might have more CPU time than the reported
 total cpu time of the system. Netdata solves this, by adapting the per process cpu utilization to
-the total of the system. [Netdata adds charts that document this normalization](https://london.my-netdata.io/default.html#menu_netdata_submenu_apps_plugin).
+the total of the system. [Apps.plugin adds charts that document this normalization](https://london.my-netdata.io/default.html#menu_netdata_submenu_apps_plugin).
 
 
