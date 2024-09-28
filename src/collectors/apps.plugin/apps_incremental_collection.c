@@ -2,7 +2,7 @@
 
 #include "apps_plugin.h"
 
-
+#if (INCREMENTAL_DATA_COLLECTION == 1)
 bool managed_log(struct pid_stat *p, PID_LOG log, bool status) {
     if(unlikely(!status)) {
         // netdata_log_error("command failed log %u, errno %d", log, errno);
@@ -68,30 +68,6 @@ bool managed_log(struct pid_stat *p, PID_LOG log, bool status) {
 
     return status;
 }
-
-// --------------------------------------------------------------------------------------------------------------------
-
-#if (PROCESSES_HAVE_CMDLINE == 1)
-int read_proc_pid_cmdline(struct pid_stat *p) {
-    static char cmdline[MAX_CMDLINE];
-
-    if(unlikely(!OS_FUNCTION(apps_os_get_pid_cmdline)(p, cmdline, sizeof(cmdline))))
-        goto cleanup;
-
-    string_freez(p->cmdline);
-    p->cmdline = string_strdupz(cmdline);
-
-    return 1;
-
-cleanup:
-    // copy the command to the command line
-    string_freez(p->cmdline);
-    p->cmdline = string_dup(p->comm);
-    return 0;
-}
-#endif
-
-// --------------------------------------------------------------------------------------------------------------------
 
 static inline bool read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     p->last_stat_collected_usec = p->stat_collected_usec;
@@ -187,4 +163,26 @@ int incrementally_collect_data_for_pid(pid_t pid, void *ptr) {
 
     return incrementally_collect_data_for_pid_stat(p, ptr);
 }
+#endif
 
+// --------------------------------------------------------------------------------------------------------------------
+
+#if (PROCESSES_HAVE_CMDLINE == 1)
+int read_proc_pid_cmdline(struct pid_stat *p) {
+    static char cmdline[MAX_CMDLINE];
+
+    if(unlikely(!OS_FUNCTION(apps_os_get_pid_cmdline)(p, cmdline, sizeof(cmdline))))
+        goto cleanup;
+
+    string_freez(p->cmdline);
+    p->cmdline = string_strdupz(cmdline);
+
+    return 1;
+
+cleanup:
+    // copy the command to the command line
+    string_freez(p->cmdline);
+    p->cmdline = string_dup(p->comm);
+    return 0;
+}
+#endif

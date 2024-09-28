@@ -488,21 +488,6 @@ void apps_os_init_windows(void) {
         nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to enable debug privilege");
 }
 
-bool apps_os_read_global_cpu_utilization_windows(void) {
-    // dummy - not needed
-    return false;
-}
-
-bool apps_os_read_pid_status_windows(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
-    // dummy - not needed
-    return false;
-}
-
-bool apps_os_read_pid_stat_windows(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) {
-    // dummy - not needed
-    return false;
-}
-
 uint64_t apps_os_get_total_memory_windows(void) {
     MEMORYSTATUSEX memStat = { 0 };
     memStat.dwLength = sizeof(memStat);

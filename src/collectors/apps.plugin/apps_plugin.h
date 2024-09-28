@@ -34,6 +34,7 @@
 #define PROCESSES_HAVE_PID_LIMITS            0
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
+#define INCREMENTAL_DATA_COLLECTION          1
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _freebsd)
 
 #elif defined(OS_MACOS)
@@ -74,6 +75,7 @@ struct pid_info {
 #define PROCESSES_HAVE_PID_LIMITS            0
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
+#define INCREMENTAL_DATA_COLLECTION          1
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _macos)
 
 #elif defined(OS_WINDOWS)
@@ -102,6 +104,7 @@ struct pid_info {
 #define PROCESSES_HAVE_PID_LIMITS            0
 #define PPID_SHOULD_BE_RUNNING               0
 #define USE_APPS_GROUPS_CONF                 0
+#define INCREMENTAL_DATA_COLLECTION          0
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _windows)
 
 #elif defined(OS_LINUX)
@@ -128,6 +131,7 @@ struct pid_info {
 #define PROCESSES_HAVE_PID_LIMITS            1
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
+#define INCREMENTAL_DATA_COLLECTION          1
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _linux)
 
 extern int max_fds_cache_seconds;
@@ -644,10 +648,11 @@ void pid_collection_started(struct pid_stat *p);
 void pid_collection_failed(struct pid_stat *p);
 void pid_collection_completed(struct pid_stat *p);
 
+#if (INCREMENTAL_DATA_COLLECTION == 1)
 bool collect_parents_before_children(void);
 int incrementally_collect_data_for_pid(pid_t pid, void *ptr);
 int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr);
-void aggregate_processes_to_targets(void);
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 // pid management
@@ -667,6 +672,8 @@ void update_pid_comm(struct pid_stat *p, const char *comm);
 extern struct target *tree_root_target;
 struct target *find_target_by_name(struct target *base, const char *name);
 struct target *get_tree_target(struct pid_stat *p);
+
+void aggregate_processes_to_targets(void);
 
 #if (PROCESSES_HAVE_UID == 1)
 extern struct target *users_root_target;

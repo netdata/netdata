@@ -236,14 +236,14 @@ void aggregate_processes_to_targets(void) {
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 #endif
 
-    zero_all_targets(tree_root_target);
-
 #if (PROCESSES_HAVE_UID == 1)
     zero_all_targets(users_root_target);
 #endif
 #if (PROCESSES_HAVE_GID == 1)
     zero_all_targets(groups_root_target);
 #endif
+
+    zero_all_targets(tree_root_target);
 
     // this has to be done, before the cleanup
     struct pid_stat *p = NULL;
