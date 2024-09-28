@@ -19,10 +19,8 @@ type gearmanConn interface {
 
 func newGearmanConn(conf Config) gearmanConn {
 	return &gearmanClient{conn: socket.New(socket.Config{
-		Address:        conf.Address,
-		ConnectTimeout: conf.Timeout.Duration(),
-		ReadTimeout:    conf.Timeout.Duration(),
-		WriteTimeout:   conf.Timeout.Duration(),
+		Address: conf.Address,
+		Timeout: conf.Timeout.Duration(),
 	})}
 }
 

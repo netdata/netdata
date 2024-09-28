@@ -86,11 +86,9 @@ func (u *Unbound) initClient() (err error) {
 	}
 
 	u.client = socket.New(socket.Config{
-		Address:        u.Address,
-		ConnectTimeout: u.Timeout.Duration(),
-		ReadTimeout:    u.Timeout.Duration(),
-		WriteTimeout:   u.Timeout.Duration(),
-		TLSConf:        tlsCfg,
+		Address: u.Address,
+		Timeout: u.Timeout.Duration(),
+		TLSConf: tlsCfg,
 	})
 	return nil
 }

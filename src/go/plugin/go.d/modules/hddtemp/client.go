@@ -29,10 +29,8 @@ func (c *hddtempClient) queryHddTemp() (string, error) {
 	var s string
 
 	cfg := socket.Config{
-		Address:        c.address,
-		ConnectTimeout: c.timeout,
-		ReadTimeout:    c.timeout,
-		WriteTimeout:   c.timeout,
+		Address: c.address,
+		Timeout: c.timeout,
 	}
 
 	err := socket.ConnectAndRead(cfg, func(bs []byte) bool {

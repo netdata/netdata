@@ -33,10 +33,8 @@ func (c *uwsgiClient) queryStats() ([]byte, error) {
 	const readLineLimit = 1000 * 10
 
 	cfg := socket.Config{
-		Address:        c.address,
-		ConnectTimeout: c.timeout,
-		ReadTimeout:    c.timeout,
-		WriteTimeout:   c.timeout,
+		Address: c.address,
+		Timeout: c.timeout,
 	}
 
 	clientErr := socket.ConnectAndRead(cfg, func(bs []byte) bool {

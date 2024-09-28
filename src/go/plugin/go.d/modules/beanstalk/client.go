@@ -88,11 +88,9 @@ func newBeanstalkConn(conf Config, log *logger.Logger) beanstalkConn {
 	return &beanstalkClient{
 		Logger: log,
 		client: socket.New(socket.Config{
-			Address:        conf.Address,
-			ConnectTimeout: conf.Timeout.Duration(),
-			ReadTimeout:    conf.Timeout.Duration(),
-			WriteTimeout:   conf.Timeout.Duration(),
-			TLSConf:        nil,
+			Address: conf.Address,
+			Timeout: conf.Timeout.Duration(),
+			TLSConf: nil,
 		}),
 	}
 }
