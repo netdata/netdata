@@ -138,6 +138,8 @@ static void id_cleanup_txt(char *buf) {
                     s++;
                     last_was_dash = true;
                 }
+                else
+                    s++;
             }
             else {
                 *d++ = *s++;
