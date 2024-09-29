@@ -368,149 +368,149 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
 // --------------------------------------------------------------------------------------------------------------------
 
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1) || (PROCESSES_HAVE_CHILDREN_FLTS == 1)
-static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t time) {
-    char *prefix = "\\_ ";
-    int indent = 0;
-
-    if(p->parent)
-        indent = debug_print_process_and_parents(p->parent, p->stat_collected_usec);
-    else
-        prefix = " > ";
-
-    char buffer[indent + 1];
-    int i;
-
-    for(i = 0; i < indent ;i++) buffer[i] = ' ';
-    buffer[i] = '\0';
-
-    fprintf(stderr, "  %s %s%s (%d %s %"PRIu64""
-            , buffer
-            , prefix
-            , pid_stat_comm(p)
-            , p->pid
-            , p->updated?"running":"exited"
-            , p->stat_collected_usec - time
-    );
-
-    if(p->values[PDF_UTIME])   fprintf(stderr, " utime=" KERNEL_UINT_FORMAT,   p->values[PDF_UTIME]);
-    if(p->values[PDF_STIME])   fprintf(stderr, " stime=" KERNEL_UINT_FORMAT,   p->values[PDF_STIME]);
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    if(p->values[PDF_GTIME])   fprintf(stderr, " gtime=" KERNEL_UINT_FORMAT,   p->values[PDF_GTIME]);
-#endif
-#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-    if(p->values[PDF_CUTIME])  fprintf(stderr, " cutime=" KERNEL_UINT_FORMAT,  p->values[PDF_CUTIME]);
-    if(p->values[PDF_CSTIME])  fprintf(stderr, " cstime=" KERNEL_UINT_FORMAT,  p->values[PDF_CSTIME]);
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-    if(p->values[PDF_CGTIME])  fprintf(stderr, " cgtime=" KERNEL_UINT_FORMAT,  p->values[PDF_CGTIME]);
-#endif
-#endif
-    if(p->values[PDF_MINFLT])  fprintf(stderr, " minflt=" KERNEL_UINT_FORMAT,  p->values[PDF_MINFLT]);
-#if (PROCESSES_HAVE_MAJFLT == 1)
-    if(p->values[PDF_MAJFLT])  fprintf(stderr, " majflt=" KERNEL_UINT_FORMAT,  p->values[PDF_MAJFLT]);
-#endif
-#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
-    if(p->values[PDF_CMINFLT]) fprintf(stderr, " cminflt=" KERNEL_UINT_FORMAT, p->values[PDF_CMINFLT]);
-    if(p->values[PDF_CMAJFLT]) fprintf(stderr, " cmajflt=" KERNEL_UINT_FORMAT, p->values[PDF_CMAJFLT]);
-#endif
-    fprintf(stderr, ")\n");
-
-    return indent + 1;
-}
-
-static inline void debug_print_process_tree(struct pid_stat *p, char *msg __maybe_unused) {
-    debug_log("%s: process %s (%d, %s) with parents:", msg, pid_stat_comm(p), p->pid, p->updated?"running":"exited");
-    debug_print_process_and_parents(p, p->stat_collected_usec);
-}
-
-static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost, int type) {
-    int found = 0;
-    struct pid_stat *p = NULL;
-
-    for(p = root_of_pids(); p ; p = p->next) {
-        if(p == pe) continue;
-
-        switch(type) {
-            case 1:
-#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
-                if(p->values[PDF_CMINFLT] > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
-                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
-                    found++;
-                }
-#endif
-                break;
-
-            case 2:
-#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
-                if(p->values[PDF_CMAJFLT] > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
-                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
-                    found++;
-                }
-#endif
-                break;
-
-            case 3:
-#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-                if(p->values[PDF_CUTIME] > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
-                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
-                    found++;
-                }
-#endif
-                break;
-
-            case 4:
-#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-                if(p->values[PDF_CSTIME] > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
-                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
-                    found++;
-                }
-#endif
-                break;
-
-            case 5:
-#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1) && (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-                if(p->values[PDF_CGTIME] > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
-                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
-                    found++;
-                }
-#endif
-                break;
-        }
-    }
-
-    if(!found) {
-        switch(type) {
-            case 1:
-                fprintf(stderr, " > cannot find any process to use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
-                        lost, pe->pid, pid_stat_comm(pe));
-                break;
-
-            case 2:
-                fprintf(stderr, " > cannot find any process to use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
-                        lost, pe->pid, pid_stat_comm(pe));
-                break;
-
-            case 3:
-                fprintf(stderr, " > cannot find any process to use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
-                        lost, pe->pid, pid_stat_comm(pe));
-                break;
-
-            case 4:
-                fprintf(stderr, " > cannot find any process to use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
-                        lost, pe->pid, pid_stat_comm(pe));
-                break;
-
-            case 5:
-                fprintf(stderr, " > cannot find any process to use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
-                        lost, pe->pid, pid_stat_comm(pe));
-                break;
-        }
-    }
-}
+//static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t time) {
+//    char *prefix = "\\_ ";
+//    int indent = 0;
+//
+//    if(p->parent)
+//        indent = debug_print_process_and_parents(p->parent, p->stat_collected_usec);
+//    else
+//        prefix = " > ";
+//
+//    char buffer[indent + 1];
+//    int i;
+//
+//    for(i = 0; i < indent ;i++) buffer[i] = ' ';
+//    buffer[i] = '\0';
+//
+//    fprintf(stderr, "  %s %s%s (%d %s %"PRIu64""
+//            , buffer
+//            , prefix
+//            , pid_stat_comm(p)
+//            , p->pid
+//            , p->updated?"running":"exited"
+//            , p->stat_collected_usec - time
+//    );
+//
+//    if(p->values[PDF_UTIME])   fprintf(stderr, " utime=" KERNEL_UINT_FORMAT,   p->values[PDF_UTIME]);
+//    if(p->values[PDF_STIME])   fprintf(stderr, " stime=" KERNEL_UINT_FORMAT,   p->values[PDF_STIME]);
+//#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+//    if(p->values[PDF_GTIME])   fprintf(stderr, " gtime=" KERNEL_UINT_FORMAT,   p->values[PDF_GTIME]);
+//#endif
+//#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+//    if(p->values[PDF_CUTIME])  fprintf(stderr, " cutime=" KERNEL_UINT_FORMAT,  p->values[PDF_CUTIME]);
+//    if(p->values[PDF_CSTIME])  fprintf(stderr, " cstime=" KERNEL_UINT_FORMAT,  p->values[PDF_CSTIME]);
+//#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+//    if(p->values[PDF_CGTIME])  fprintf(stderr, " cgtime=" KERNEL_UINT_FORMAT,  p->values[PDF_CGTIME]);
+//#endif
+//#endif
+//    if(p->values[PDF_MINFLT])  fprintf(stderr, " minflt=" KERNEL_UINT_FORMAT,  p->values[PDF_MINFLT]);
+//#if (PROCESSES_HAVE_MAJFLT == 1)
+//    if(p->values[PDF_MAJFLT])  fprintf(stderr, " majflt=" KERNEL_UINT_FORMAT,  p->values[PDF_MAJFLT]);
+//#endif
+//#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+//    if(p->values[PDF_CMINFLT]) fprintf(stderr, " cminflt=" KERNEL_UINT_FORMAT, p->values[PDF_CMINFLT]);
+//    if(p->values[PDF_CMAJFLT]) fprintf(stderr, " cmajflt=" KERNEL_UINT_FORMAT, p->values[PDF_CMAJFLT]);
+//#endif
+//    fprintf(stderr, ")\n");
+//
+//    return indent + 1;
+//}
+//
+//static inline void debug_print_process_tree(struct pid_stat *p, char *msg __maybe_unused) {
+//    debug_log("%s: process %s (%d, %s) with parents:", msg, pid_stat_comm(p), p->pid, p->updated?"running":"exited");
+//    debug_print_process_and_parents(p, p->stat_collected_usec);
+//}
+//
+//static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost, int type) {
+//    int found = 0;
+//    struct pid_stat *p = NULL;
+//
+//    for(p = root_of_pids(); p ; p = p->next) {
+//        if(p == pe) continue;
+//
+//        switch(type) {
+//            case 1:
+//#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+//                if(p->values[PDF_CMINFLT] > lost) {
+//                    fprintf(stderr, " > process %d (%s) could use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+//                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
+//                    found++;
+//                }
+//#endif
+//                break;
+//
+//            case 2:
+//#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+//                if(p->values[PDF_CMAJFLT] > lost) {
+//                    fprintf(stderr, " > process %d (%s) could use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+//                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
+//                    found++;
+//                }
+//#endif
+//                break;
+//
+//            case 3:
+//#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+//                if(p->values[PDF_CUTIME] > lost) {
+//                    fprintf(stderr, " > process %d (%s) could use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+//                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
+//                    found++;
+//                }
+//#endif
+//                break;
+//
+//            case 4:
+//#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+//                if(p->values[PDF_CSTIME] > lost) {
+//                    fprintf(stderr, " > process %d (%s) could use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+//                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
+//                    found++;
+//                }
+//#endif
+//                break;
+//
+//            case 5:
+//#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1) && (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+//                if(p->values[PDF_CGTIME] > lost) {
+//                    fprintf(stderr, " > process %d (%s) could use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+//                            p->pid, pid_stat_comm(p), lost, pe->pid, pid_stat_comm(pe));
+//                    found++;
+//                }
+//#endif
+//                break;
+//        }
+//    }
+//
+//    if(!found) {
+//        switch(type) {
+//            case 1:
+//                fprintf(stderr, " > cannot find any process to use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+//                        lost, pe->pid, pid_stat_comm(pe));
+//                break;
+//
+//            case 2:
+//                fprintf(stderr, " > cannot find any process to use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+//                        lost, pe->pid, pid_stat_comm(pe));
+//                break;
+//
+//            case 3:
+//                fprintf(stderr, " > cannot find any process to use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+//                        lost, pe->pid, pid_stat_comm(pe));
+//                break;
+//
+//            case 4:
+//                fprintf(stderr, " > cannot find any process to use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+//                        lost, pe->pid, pid_stat_comm(pe));
+//                break;
+//
+//            case 5:
+//                fprintf(stderr, " > cannot find any process to use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n",
+//                        lost, pe->pid, pid_stat_comm(pe));
+//                break;
+//        }
+//    }
+//}
 
 static inline kernel_uint_t remove_exited_child_from_parent(kernel_uint_t *field, kernel_uint_t *pfield) {
     kernel_uint_t absorbed = 0;
@@ -530,166 +530,158 @@ static inline kernel_uint_t remove_exited_child_from_parent(kernel_uint_t *field
 }
 
 static inline void process_exited_pids(void) {
-    struct pid_stat *p;
+    /*
+     * WHY WE NEED THIS?
+     *
+     * When a child process exits in Linux, its accumulated user time (utime) and its children's accumulated
+     * user time (cutime) are added to the parent's cutime. This means the parent process's cutime reflects
+     * the total user time spent by its exited children and their descendants
+     *
+     * This results in spikes in the charts.
+     * In this function we remove the exited children resources from the parent's cutime, but only for the
+     * children we have been monitoring and to the degree we have data for them. Since previously running
+     * children have already been reported by us, removing them is the right thing to do.
+     *
+     */
 
-    for(p = root_of_pids(); p ; p = p->next) {
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
         if(p->updated || !p->stat_collected_usec)
             continue;
 
-        kernel_uint_t utime = 0;
-        kernel_uint_t stime = 0;
-        kernel_uint_t gtime = 0;
-        kernel_uint_t minflt = 0;
-        kernel_uint_t majflt = 0;
+        bool have_work = false;
 
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-        utime  = (p->raw[PDF_UTIME] + p->raw[PDF_CUTIME]) * CPU_TO_NANOSECONDCORES;
-        stime  = (p->raw[PDF_STIME] + p->raw[PDF_CSTIME]) * CPU_TO_NANOSECONDCORES;
+        kernel_uint_t utime  = (p->raw[PDF_UTIME] + p->raw[PDF_CUTIME]) * CPU_TO_NANOSECONDCORES;
+        kernel_uint_t stime  = (p->raw[PDF_STIME] + p->raw[PDF_CSTIME]) * CPU_TO_NANOSECONDCORES;
+        if(utime + stime) have_work = true;
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        gtime  = (p->raw[PDF_GTIME] + p->raw[PDF_CGTIME]) * CPU_TO_NANOSECONDCORES;
-#endif
-#else
-        utime  = p->raw[PDF_UTIME] * CPU_TO_NANOSECONDCORES;
-        stime  = p->raw[PDF_STIME] * CPU_TO_NANOSECONDCORES;
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        gtime  = p->raw[PDF_GTIME] * CPU_TO_NANOSECONDCORES;
+        kernel_uint_t gtime  = (p->raw[PDF_GTIME] + p->raw[PDF_CGTIME]) * CPU_TO_NANOSECONDCORES;
+        if(gtime) have_work = true;
 #endif
 #endif
 
 #if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
-        minflt = (p->raw[PDF_MINFLT] + p->raw[PDF_CMINFLT]) * RATES_DETAIL;
+        kernel_uint_t minflt = (p->raw[PDF_MINFLT] + p->raw[PDF_CMINFLT]) * RATES_DETAIL;
+        if(minflt) have_work = true;
 #if (PROCESSES_HAVE_MAJFLT == 1)
-        majflt = (p->raw[PDF_MAJFLT] + p->raw[PDF_CMAJFLT]) * RATES_DETAIL;
-#endif
-#else
-        minflt = p->raw[PDF_MINFLT] * RATES_DETAIL;
-#if (PROCESSES_HAVE_MAJFLT == 1)
-        majflt = p->raw[PDF_MAJFLT] * RATES_DETAIL;
+        kernel_uint_t majflt = (p->raw[PDF_MAJFLT] + p->raw[PDF_CMAJFLT]) * RATES_DETAIL;
+        if(majflt) have_work = true;
 #endif
 #endif
 
-        if(utime + stime + gtime + minflt + majflt == 0)
+        if(!have_work)
             continue;
 
-        if(unlikely(debug_enabled)) {
-            debug_log("Absorb %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")"
-                      , pid_stat_comm(p)
-                      , p->pid
-                      , p->updated?"running":"exited"
-                      , utime
-                      , stime
-                      , gtime
-                      , minflt
-                      , majflt
-            );
-            debug_print_process_tree(p, "Searching parents");
-        }
+//        if(unlikely(debug_enabled)) {
+//            debug_log("Absorb %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")"
+//                      , pid_stat_comm(p)
+//                      , p->pid
+//                      , p->updated?"running":"exited"
+//                      , utime
+//                      , stime
+//                      , gtime
+//                      , minflt
+//                      , majflt
+//            );
+//            debug_print_process_tree(p, "Searching parents");
+//        }
 
-        struct pid_stat *pp;
-        for(pp = p->parent; pp ; pp = pp->parent) {
+        for(struct pid_stat *pp = p->parent; pp ; pp = pp->parent) {
             if(!pp->updated) continue;
 
-            kernel_uint_t absorbed; (void)absorbed;
+            kernel_uint_t absorbed;
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
             absorbed = remove_exited_child_from_parent(&utime,  &pp->values[PDF_CUTIME]);
-            if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " utime (remaining: " KERNEL_UINT_FORMAT ")",
-                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, utime);
+//            if(unlikely(debug_enabled && absorbed))
+//                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " utime (remaining: " KERNEL_UINT_FORMAT ")",
+//                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, utime);
 
             absorbed = remove_exited_child_from_parent(&stime,  &pp->values[PDF_CSTIME]);
-            if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " stime (remaining: " KERNEL_UINT_FORMAT ")",
-                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, stime);
+//            if(unlikely(debug_enabled && absorbed))
+//                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " stime (remaining: " KERNEL_UINT_FORMAT ")",
+//                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, stime);
 
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
             absorbed = remove_exited_child_from_parent(&gtime,  &pp->values[PDF_CGTIME]);
-            if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " gtime (remaining: " KERNEL_UINT_FORMAT ")",
-                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, gtime);
+//            if(unlikely(debug_enabled && absorbed))
+//                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " gtime (remaining: " KERNEL_UINT_FORMAT ")",
+//                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, gtime);
 #endif
 #endif
 
 #if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
             absorbed = remove_exited_child_from_parent(&minflt, &pp->values[PDF_CMINFLT]);
-            if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " minflt (remaining: " KERNEL_UINT_FORMAT ")",
-                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, minflt);
+//            if(unlikely(debug_enabled && absorbed))
+//                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " minflt (remaining: " KERNEL_UINT_FORMAT ")",
+//                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, minflt);
 
 #if (PROCESSES_HAVE_MAJFLT == 1)
             absorbed = remove_exited_child_from_parent(&majflt, &pp->values[PDF_CMAJFLT]);
-            if(unlikely(debug_enabled && absorbed))
-                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " majflt (remaining: " KERNEL_UINT_FORMAT ")",
-                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, majflt);
+//            if(unlikely(debug_enabled && absorbed))
+//                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " majflt (remaining: " KERNEL_UINT_FORMAT ")",
+//                          pid_stat_comm(pp), pp->pid, pp->updated?"running":"exited", absorbed, majflt);
 #endif
 #endif
+
+            (void)absorbed;
+            break;
         }
 
-        if(unlikely(utime + stime + gtime + minflt + majflt > 0)) {
-            if(unlikely(debug_enabled)) {
-                if(utime) debug_find_lost_child(p, utime, 3);
-                if(stime) debug_find_lost_child(p, stime, 4);
-                if(gtime) debug_find_lost_child(p, gtime, 5);
-                if(minflt) debug_find_lost_child(p, minflt, 1);
-                if(majflt) debug_find_lost_child(p, majflt, 2);
-            }
+//        if(unlikely(debug_enabled)) {
+//            if(utime) debug_find_lost_child(p, utime, 3);
+//            if(stime) debug_find_lost_child(p, stime, 4);
+//            if(gtime) debug_find_lost_child(p, gtime, 5);
+//            if(minflt) debug_find_lost_child(p, minflt, 1);
+//            if(majflt) debug_find_lost_child(p, majflt, 2);
+//        }
 
-            p->keep = true;
+//        debug_log(" > remaining resources - KEEP - for another loop: %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")"
+//                  , pid_stat_comm(p)
+//                  , p->pid
+//                  , p->updated?"running":"exited"
+//                  , utime
+//                  , stime
+//                  , gtime
+//                  , minflt
+//                  , majflt
+//        );
 
-            debug_log(" > remaining resources - KEEP - for another loop: %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")"
-                      , pid_stat_comm(p)
-                      , p->pid
-                      , p->updated?"running":"exited"
-                      , utime
-                      , stime
-                      , gtime
-                      , minflt
-                      , majflt
-            );
-
-            for(pp = p->parent; pp ; pp = pp->parent) {
-                if(pp->updated) break;
-                pp->keep = true;
-
-                debug_log(" > - KEEP - parent for another loop: %s (%d %s)"
-                          , pid_stat_comm(pp)
-                          , pp->pid
-                          , pp->updated?"running":"exited"
-                );
-            }
-
-            p->values[PDF_UTIME]  = utime / CPU_TO_NANOSECONDCORES;
-            p->values[PDF_STIME]  = stime / CPU_TO_NANOSECONDCORES;
-#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-            p->values[PDF_GTIME]  = gtime / CPU_TO_NANOSECONDCORES;
-#endif
+        bool done = true;
 
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-            p->values[PDF_CUTIME] = 0;
-            p->values[PDF_CSTIME] = 0;
+        p->values[PDF_UTIME]  = utime / CPU_TO_NANOSECONDCORES;
+        p->values[PDF_STIME]  = stime / CPU_TO_NANOSECONDCORES;
+        p->values[PDF_CUTIME] = 0;
+        p->values[PDF_CSTIME] = 0;
+        if(utime + stime) done = false;
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-            p->values[PDF_CGTIME] = 0;
+        p->values[PDF_GTIME]  = gtime / CPU_TO_NANOSECONDCORES;
+        p->values[PDF_CGTIME] = 0;
+        if(gtime) done = false;
 #endif
-#endif
-
-            p->values[PDF_MINFLT]  = minflt / RATES_DETAIL;
-#if (PROCESSES_HAVE_MAJFLT == 1)
-            p->values[PDF_MAJFLT]  = majflt / RATES_DETAIL;
 #endif
 
 #if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
-            p->values[PDF_CMINFLT] = 0;
+        p->values[PDF_MINFLT]  = minflt / RATES_DETAIL;
+        p->values[PDF_CMINFLT] = 0;
+        if(minflt) done = false;
 #if (PROCESSES_HAVE_MAJFLT == 1)
-            p->values[PDF_CMAJFLT] = 0;
+        p->values[PDF_MAJFLT]  = majflt / RATES_DETAIL;
+        p->values[PDF_CMAJFLT] = 0;
+        if(majflt) done = false;
 #endif
 #endif
 
-            debug_log(" ");
+        p->keep = !done;
+
+        if(p->keep) {
+            // we need to keep its exited parents too, to ensure we will have
+            // the information to reach the running parent at the next iteration
+            for (struct pid_stat *pp = p->parent; pp; pp = pp->parent) {
+                if (pp->updated) break;
+                pp->keep = true;
+            }
         }
-        else
-            debug_log(" > totally absorbed - DONE - %s (%d %s)"
-                      , pid_stat_comm(p)
-                      , p->pid
-                      , p->updated?"running":"exited");
     }
 }
 #endif
