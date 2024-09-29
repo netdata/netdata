@@ -197,6 +197,10 @@ struct target *tree_root_target = NULL;
 
 static struct pid_stat *get_first_parent_candidate(struct pid_stat *p) {
     // skip fast all the children that are more than 3 levels down
+
+    // IMPORTANT: windows may introduce process loops.
+    //            we detect and fix the issue here.
+
     struct pid_stat *orig = p;
 
     bool first_pid_set = false;

@@ -253,6 +253,22 @@ void aggregate_processes_to_targets(void) {
     for(p = root_of_pids(); p ; p = p->next) {
 
         // --------------------------------------------------------------------
+        // tree target
+
+        o = p->tree_target;
+        if(likely(p->tree_target && p->tree_target->pid_comm == p->comm))
+            w = p->tree_target;
+        else {
+            w = p->tree_target = get_tree_target(p);
+
+            if(unlikely(debug_enabled && o))
+                debug_log("pid %d (%s) switched top target from '%s' to '%s'.", p->pid, pid_stat_comm(p), string2str(o->pid_comm), string2str(w->pid_comm));
+        }
+
+        aggregate_pid_on_target(w, p, o);
+
+
+        // --------------------------------------------------------------------
         // apps_groups target
 
 #if (USE_APPS_GROUPS_CONF == 1)
@@ -293,23 +309,6 @@ void aggregate_processes_to_targets(void) {
 
         aggregate_pid_on_target(w, p, o);
 #endif
-
-
-        // --------------------------------------------------------------------
-        // tree target
-
-        o = p->tree_target;
-        if(likely(p->tree_target && p->tree_target->pid_comm == p->comm))
-            w = p->tree_target;
-        else {
-            w = p->tree_target = get_tree_target(p);
-
-            if(unlikely(debug_enabled && o))
-                debug_log("pid %d (%s) switched top target from '%s' to '%s'.", p->pid, pid_stat_comm(p), string2str(o->pid_comm), string2str(w->pid_comm));
-        }
-
-        aggregate_pid_on_target(w, p, o);
-
 
         // --------------------------------------------------------------------
         // aggregate all file descriptors

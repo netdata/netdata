@@ -248,6 +248,27 @@ bool collect_parents_before_children(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static void log_parent_loop(struct pid_stat *p) {
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_sprintf(wb, "original pid %d (%s)", p->pid, string2str(p->comm));
+
+    size_t loops = 0;
+    for(struct pid_stat *t = p->parent; t && loops < 2 ;t = t->parent) {
+        buffer_sprintf(wb, " => %d (%s)", t->pid, string2str(t->comm));
+        if(t == p->parent) loops++;
+    }
+
+    buffer_sprintf(wb, " : broke loop at %d (%s)", p->pid, string2str(p->comm));
+    nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Parents loop detected: %s", buffer_tostring(wb));
+}
+
+static inline bool is_already_a_parent(struct pid_stat *p, struct pid_stat *pp) {
+    for(struct pid_stat *t = pp; t ;t = t->next)
+        if(t == p) return true;
+
+    return false;
+}
+
 static inline void link_all_processes_to_their_parents(void) {
     // link all children to their parents
     // and update children count on parents
@@ -270,19 +291,16 @@ static inline void link_all_processes_to_their_parents(void) {
         if(likely(pp)) {
             fatal_assert(pp->pid == p->ppid);
 
-#if defined(OS_WINDOWS)
-            if(unlikely(p->perflib[PDF_UPTIME].current.Time > pp->perflib[PDF_UPTIME].current.Time)) {
-                // the child runs for more time than the parent
-                nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-                       "Process %u (%s) states parent %u (%s), which runs for less time than the child. Ignoring it.",
-                       p->pid, string2str(p->comm), pp->pid, string2str(pp->comm));
-                p->ppid = 0;
-                continue;
+            if(!is_already_a_parent(p, pp)) {
+                p->parent = pp;
+                pp->children_count++;
             }
-#endif
-
-            p->parent = pp;
-            pp->children_count++;
+            else {
+                p->parent = pp;
+                log_parent_loop(p);
+                p->parent = NULL;
+                p->ppid = 0;
+            }
         }
 #if (PPID_SHOULD_BE_RUNNING == 1)
         else {
