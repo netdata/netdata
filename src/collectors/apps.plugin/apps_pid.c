@@ -259,6 +259,8 @@ static void log_parent_loop(struct pid_stat *p) {
     }
 
     buffer_sprintf(wb, " : broke loop at %d (%s)", p->pid, string2str(p->comm));
+
+    errno_clear();
     nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Parents loop detected: %s", buffer_tostring(wb));
 }
 
