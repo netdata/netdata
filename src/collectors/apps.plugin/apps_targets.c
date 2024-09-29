@@ -195,10 +195,30 @@ void apps_orchestrators_and_aggregators_init(void) {
 
 struct target *tree_root_target = NULL;
 
-struct target *get_tree_target(struct pid_stat *p) {
+static struct pid_stat *get_first_parent_candidate(struct pid_stat *p) {
     // skip fast all the children that are more than 3 levels down
-    while(p->parent && p->parent->parent && p->parent->parent->parent)
+
+    bool first_pid_set = false;
+    pid_t first_pid = 0;
+    while(p->parent && p->parent->parent && p->parent->parent->parent) {
+        if(!first_pid_set) {
+            first_pid = p->parent->pid;
+            first_pid_set = true;
+        }
+        else if(p->parent->pid == first_pid) {
+            // loop detected!
+            p->parent = NULL;
+            break;
+        }
+
         p = p->parent;
+    }
+
+    return p;
+}
+
+struct target *get_tree_target(struct pid_stat *p) {
+    p = get_first_parent_candidate(p);
 
     // keep the children of INIT_PID, and process orchestrators
     while(p->parent && p->parent->pid != INIT_PID && !is_orchestrator(p->parent))

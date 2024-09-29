@@ -69,7 +69,7 @@ bool managed_log(struct pid_stat *p, PID_LOG log, bool status) {
     return status;
 }
 
-static inline bool read_proc_pid_stat(struct pid_stat *p, void *ptr) {
+static inline bool incrementally_read_pid_stat(struct pid_stat *p, void *ptr) {
     p->last_stat_collected_usec = p->stat_collected_usec;
     p->stat_collected_usec = now_monotonic_usec();
     calls_counter++;
@@ -80,7 +80,7 @@ static inline bool read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     return 1;
 }
 
-static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
+static inline int incrementally_read_pid_io(struct pid_stat *p, void *ptr) {
     p->last_io_collected_usec = p->io_collected_usec;
     p->io_collected_usec = now_monotonic_usec();
     calls_counter++;
@@ -100,7 +100,7 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     // --------------------------------------------------------------------
     // /proc/<pid>/stat
 
-    if(unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr)))) {
+    if(unlikely(!managed_log(p, PID_LOG_STAT, incrementally_read_pid_stat(p, ptr)))) {
         // there is no reason to proceed if we cannot get its status
         pid_collection_failed(p);
         return 0;
@@ -113,7 +113,7 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     // --------------------------------------------------------------------
     // /proc/<pid>/io
 
-    managed_log(p, PID_LOG_IO, read_proc_pid_io(p, ptr));
+    managed_log(p, PID_LOG_IO, incrementally_read_pid_io(p, ptr));
 
     // --------------------------------------------------------------------
     // /proc/<pid>/status

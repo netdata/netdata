@@ -707,7 +707,7 @@ int main(int argc, char **argv) {
         if(send_resource_usage)
             send_resource_usage_to_netdata(dt);
 
-#if defined(OS_LINUX)
+#if (PROCESSES_HAVE_STATE == 1)
         send_proc_states_count(dt);
 #endif
 

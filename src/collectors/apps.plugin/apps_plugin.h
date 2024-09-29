@@ -33,6 +33,7 @@
 #define PROCESSES_HAVE_CMDLINE               1
 #define PROCESSES_HAVE_PID_LIMITS            0
 #define PROCESSES_HAVE_COMM_AND_NAME         0
+#define PROCESSES_HAVE_STATE                 0
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
 #define INCREMENTAL_DATA_COLLECTION          1
@@ -75,6 +76,7 @@ struct pid_info {
 #define PROCESSES_HAVE_CMDLINE               1
 #define PROCESSES_HAVE_PID_LIMITS            0
 #define PROCESSES_HAVE_COMM_AND_NAME         0
+#define PROCESSES_HAVE_STATE                 0
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
 #define INCREMENTAL_DATA_COLLECTION          1
@@ -105,6 +107,7 @@ struct pid_info {
 #define PROCESSES_HAVE_CMDLINE               0
 #define PROCESSES_HAVE_PID_LIMITS            0
 #define PROCESSES_HAVE_COMM_AND_NAME         1
+#define PROCESSES_HAVE_STATE                 0
 #define PPID_SHOULD_BE_RUNNING               0
 #define USE_APPS_GROUPS_CONF                 0
 #define INCREMENTAL_DATA_COLLECTION          0
@@ -133,6 +136,7 @@ struct pid_info {
 #define PROCESSES_HAVE_CMDLINE               1
 #define PROCESSES_HAVE_PID_LIMITS            1
 #define PROCESSES_HAVE_COMM_AND_NAME         0
+#define PROCESSES_HAVE_STATE                 1
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
 #define INCREMENTAL_DATA_COLLECTION          1
@@ -213,7 +217,7 @@ extern netdata_mutex_t apps_and_stdout_mutex;
 
 // ----------------------------------------------------------------------------
 // some variables for keeping track of processes count by states
-
+#if (PROCESSES_HAVE_STATE == 1)
 typedef enum {
     PROC_STATUS_RUNNING = 0,
     PROC_STATUS_SLEEPING_D, // uninterruptible sleep
@@ -225,6 +229,7 @@ typedef enum {
 
 extern proc_state proc_state_count[PROC_STATUS_END];
 extern const char *proc_states[];
+#endif
 
 // ----------------------------------------------------------------------------
 // the rates we are going to send to netdata will have this detail a value of:
@@ -521,12 +526,18 @@ struct pid_stat {
 
     PID_LOG log_thrown;
 
-    char state;
     bool read:1;                    // true when we have already read this process for this iteration
     bool updated:1;                 // true when the process is currently running
     bool merged:1;                  // true when it has been merged to its parent
     bool keep:1;                    // true when we need to keep this process in memory even after it exited
+
+#if (USE_APPS_GROUPS_CONF == 1)
     bool matched_by_config:1;
+#endif
+
+#if (PROCESSES_HAVE_STATE == 1)
+    char state;
+#endif
 
 #if defined(OS_WINDOWS)
     bool got_info:1;
@@ -703,7 +714,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 void send_collected_data_to_netdata(struct target *root, const char *type, usec_t dt);
 void send_resource_usage_to_netdata(usec_t dt);
 
-#if defined(OS_LINUX)
+#if (PROCESSES_HAVE_STATE == 1)
 void send_proc_states_count(usec_t dt);
 #endif
 

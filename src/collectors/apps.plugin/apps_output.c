@@ -421,7 +421,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
     }
 }
 
-#if defined(OS_LINUX)
+#if (PROCESSES_HAVE_STATE == 1)
 void send_proc_states_count(usec_t dt __maybe_unused) {
     static bool chart_added = false;
     // create chart for count of processes in different states

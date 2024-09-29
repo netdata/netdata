@@ -726,8 +726,10 @@ cleanup:
 // if debug is enabled, all errors are printed
 
 bool apps_os_collect_all_pids_linux(void) {
+#if (PROCESSES_HAVE_STATE == 1)
     // clear process state counter
     memset(proc_state_count, 0, sizeof proc_state_count);
+#endif
 
     // preload the parents and then their children
     collect_parents_before_children();

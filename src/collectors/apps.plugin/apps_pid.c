@@ -263,15 +263,13 @@ static inline void link_all_processes_to_their_parents(void) {
             p->parent = pp;
             pp->children_count++;
         }
-        else {
-            p->parent = NULL;
-
 #if (PPID_SHOULD_BE_RUNNING == 1)
+        else {
             nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                    "pid %d %s states parent %d, but the later does not exist.",
                    p->pid, pid_stat_comm(p), p->ppid);
-#endif
         }
+#endif
     }
 }
 
@@ -710,8 +708,20 @@ static inline void clear_pid_rates(struct pid_stat *p) {
 
 bool collect_data_for_all_pids(void) {
     // mark all pids as unread
-    for(struct pid_stat *p = root_of_pids(); p ; p = p->next)
+#if (INCREMENTAL_DATA_COLLECTION == 0)
+    usec_t now_mon_ut = now_monotonic_usec();
+#endif
+
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
         p->read = p->updated = p->merged = false;
+        p->children_count = 0;
+
+#if (INCREMENTAL_DATA_COLLECTION == 0)
+        p->last_stat_collected_usec = p->stat_collected_usec;
+        p->last_io_collected_usec = p->io_collected_usec;
+        p->stat_collected_usec = p->io_collected_usec = now_mon_ut;
+#endif
+    }
 
     // collect data for all pids
     if(!OS_FUNCTION(apps_os_collect_all_pids)())
