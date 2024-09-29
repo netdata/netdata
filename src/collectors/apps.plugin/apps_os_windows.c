@@ -554,7 +554,7 @@ void GetAllProcessesInfo(void) {
 
     do {
         struct pid_stat *p = get_or_allocate_pid_entry((pid_t)pe32.th32ProcessID);
-        // p->ppid = (pid_t)pe32.th32ParentProcessID;
+        p->ppid = (pid_t)pe32.th32ParentProcessID;
         if(p->got_info) continue;
         p->got_info = true;
 
