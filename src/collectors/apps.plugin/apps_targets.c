@@ -223,7 +223,8 @@ static struct pid_stat *get_first_parent_candidate(struct pid_stat *p) {
                     nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Loop detected: %s", buffer_tostring(wb));
                     t->ppid = 0;
                     t->parent = NULL;
-                    return t;
+                    p = orig;
+                    continue;
                 }
             }
         }
