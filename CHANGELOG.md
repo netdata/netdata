@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- go.d/smartctl: fix exit status check in scan [\#18635](https://github.com/netdata/netdata/pull/18635) ([ilyam8](https://github.com/ilyam8))
+- go.d pkg/socket: keep only one timeout option [\#18633](https://github.com/netdata/netdata/pull/18633) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18630](https://github.com/netdata/netdata/pull/18630) ([netdatabot](https://github.com/netdatabot))
 - go.d/postgres: fix checkpoints query for postgres 17 [\#18629](https://github.com/netdata/netdata/pull/18629) ([ilyam8](https://github.com/ilyam8))
 - go.d/ceph: fix leftovers after \#18582 [\#18628](https://github.com/netdata/netdata/pull/18628) ([ilyam8](https://github.com/ilyam8))
@@ -418,9 +420,6 @@
 - fix prometeus export: missing comma before "instance" label [\#18061](https://github.com/netdata/netdata/pull/18061) ([ilyam8](https://github.com/ilyam8))
 - go.d vsphere add update\_every ui:help [\#18060](https://github.com/netdata/netdata/pull/18060) ([ilyam8](https://github.com/ilyam8))
 - restructure go.d [\#18058](https://github.com/netdata/netdata/pull/18058) ([ilyam8](https://github.com/ilyam8))
-- freeipmi: add "no-restart" \(workaround \#17931\) [\#18057](https://github.com/netdata/netdata/pull/18057) ([ilyam8](https://github.com/ilyam8))
-- ndsudo add 'chronyc serverstats' [\#18056](https://github.com/netdata/netdata/pull/18056) ([ilyam8](https://github.com/ilyam8))
-- go.d chrony add serverstats query \(disabled for now\) [\#18055](https://github.com/netdata/netdata/pull/18055) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
