@@ -195,53 +195,10 @@ void apps_orchestrators_and_aggregators_init(void) {
 
 struct target *tree_root_target = NULL;
 
-static struct pid_stat *get_first_parent_candidate(struct pid_stat *p) {
-    // skip fast all the children that are more than 3 levels down
-
-    // IMPORTANT: windows may introduce process loops.
-    //            we detect and fix the issue here.
-
-    struct pid_stat *orig = p;
-
-    bool first_pid_set = false;
-    pid_t first_pid = 0;
-    while(p->parent && p->parent->parent && p->parent->parent->parent) {
-        if(!first_pid_set) {
-            first_pid = p->parent->pid;
-            first_pid_set = true;
-        }
-        else if(p->parent->pid == first_pid) {
-            // loop detected!
-            CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            buffer_sprintf(wb, "original pid %d (%s)", orig->pid, string2str(orig->comm));
-
-            size_t loops = 0;
-            for(struct pid_stat *t = orig->parent; t && loops < 2 ;t = t->parent) {
-                buffer_sprintf(wb, " => %d (%s)", t->pid, string2str(t->comm));
-                if(t == orig->parent) loops++;
-            }
-
-            for(struct pid_stat *t = orig; t ;t = t->parent) {
-                if(t->pid < t->ppid) {
-                    buffer_sprintf(wb, " : broke loop at %d (%s)", t->pid, string2str(t->comm));
-                    nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Loop detected: %s", buffer_tostring(wb));
-                    t->parent->children_count--;
-                    t->ppid = 0;
-                    t->parent = NULL;
-                    p = orig;
-                    continue;
-                }
-            }
-        }
-
-        p = p->parent;
-    }
-
-    return p;
-}
-
 struct target *get_tree_target(struct pid_stat *p) {
-    p = get_first_parent_candidate(p);
+    // skip fast all the children that are more than 3 levels down
+    while(p->parent && p->parent->parent && p->parent->parent->parent)
+        p = p->parent;
 
     // keep the children of INIT_PID, and process orchestrators
     while(p->parent && p->parent->pid != INIT_PID && !is_orchestrator(p->parent))

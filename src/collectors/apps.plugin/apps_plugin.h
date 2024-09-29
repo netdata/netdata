@@ -471,9 +471,9 @@ struct pid_stat {
     // int32_t tpgid;
     // uint64_t flags;
 
-    struct pid_stat *prev;
-    struct pid_stat *next;
     struct pid_stat *parent;
+    struct pid_stat *next;
+    struct pid_stat *prev;
 
 #if (USE_APPS_GROUPS_CONF == 1)
     struct target *target;          // app_groups.conf targets
