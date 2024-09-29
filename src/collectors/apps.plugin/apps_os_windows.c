@@ -554,7 +554,7 @@ void GetAllProcessesInfo(void) {
 
     do {
         struct pid_stat *p = get_or_allocate_pid_entry((pid_t)pe32.th32ProcessID);
-        p->ppid = (pid_t)pe32.th32ParentProcessID;
+        // p->ppid = (pid_t)pe32.th32ParentProcessID;
         if(p->got_info) continue;
         p->got_info = true;
 
@@ -725,9 +725,9 @@ bool apps_os_collect_all_pids_windows(void) {
             p->assigned_to_target = false;
             added++;
 
-//            COUNTER_DATA ppid = {.key = "Creating Process ID"};
-//            perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ppid);
-//            p->ppid = (pid_t) ppid.current.Data;
+            COUNTER_DATA ppid = {.key = "Creating Process ID"};
+            perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ppid);
+            p->ppid = (pid_t) ppid.current.Data;
 
             p->perflib[PDF_UTIME].key = "% User Time";
             p->perflib[PDF_STIME].key = "% Privileged Time";
