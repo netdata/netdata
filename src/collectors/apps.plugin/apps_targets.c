@@ -197,6 +197,7 @@ struct target *tree_root_target = NULL;
 
 static struct pid_stat *get_first_parent_candidate(struct pid_stat *p) {
     // skip fast all the children that are more than 3 levels down
+    struct pid_stat *orig = p;
 
     bool first_pid_set = false;
     pid_t first_pid = 0;
@@ -207,9 +208,16 @@ static struct pid_stat *get_first_parent_candidate(struct pid_stat *p) {
         }
         else if(p->parent->pid == first_pid) {
             // loop detected!
-            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-                   "Loop detected: process %u (%s) states parent %u, in a loop!",
-                   p->pid, string2str(p->comm), p->ppid);
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            buffer_sprintf(wb, "original pid %u (%s)", orig->pid, string2str(orig->comm));
+
+            size_t loops = 0;
+            for(struct pid_stat *t = orig->parent; t && loops < 2 ;t = t->parent) {
+                buffer_sprintf(wb, " => %u (%s)", t->pid, string2str(t->comm));
+                if(t == orig->parent) loops++;
+            }
+
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Loop detected: %s", buffer_tostring(wb));
             p->ppid = 0;
             p->parent = NULL;
             break;
