@@ -263,7 +263,7 @@ static void log_parent_loop(struct pid_stat *p) {
 }
 
 static inline bool is_already_a_parent(struct pid_stat *p, struct pid_stat *pp) {
-    for(struct pid_stat *t = pp; t ;t = t->next)
+    for(struct pid_stat *t = pp; t ;t = t->parent)
         if(t == p) return true;
 
     return false;
