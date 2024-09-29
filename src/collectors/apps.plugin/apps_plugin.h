@@ -300,15 +300,15 @@ typedef enum __attribute__((packed)) {
 #endif
 #endif
 
-    PDF_MINFLT,
+    PDF_MINFLT,     // rate, unit: faults * RATES_DETAIL
 
 #if (PROCESSES_HAVE_MAJFLT == 1)
-    PDF_MAJFLT,
+    PDF_MAJFLT,     // rate, unit: faults * RATES_DETAIL
 #endif
 
 #if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
-    PDF_CMINFLT,
-    PDF_CMAJFLT,
+    PDF_CMINFLT,    // rate, unit: faults * RATES_DETAIL
+    PDF_CMAJFLT,    // rate, unit: faults * RATES_DETAIL
 #endif
 
     PDF_VMSIZE,     // the current virtual memory used by the process, in bytes
@@ -319,11 +319,11 @@ typedef enum __attribute__((packed)) {
 #endif
 
 #if (PROCESSES_HAVE_RSSFILE == 1)
-    PDF_RSSFILE,
+    PDF_RSSFILE,    // unit: bytes
 #endif
 
 #if (PROCESSES_HAVE_RSSSHMEM == 1)
-    PDF_RSSSHMEM,
+    PDF_RSSSHMEM,   // unit: bytes
 #endif
 
 #if (PROCESSES_HAVE_VMSWAP == 1)
@@ -331,26 +331,26 @@ typedef enum __attribute__((packed)) {
 #endif
 
 #if (PROCESSES_HAVE_VOLCTX == 1)
-    PDF_VOLCTX,
+    PDF_VOLCTX,     // rate, unit: switches * RATES_DETAIL
 #endif
 
 #if (PROCESSES_HAVE_NVOLCTX == 1)
-    PDF_NVOLCTX,
+    PDF_NVOLCTX,    // rate, unit: switches * RATES_DETAIL
 #endif
 
 #if (PROCESSES_HAVE_LOGICAL_IO == 1)
-    PDF_LREAD,      // logical reads in bytes/sec
-    PDF_LWRITE,     // logical writes in bytes/sec
+    PDF_LREAD,      // rate, logical reads in bytes/sec * RATES_DETAIL
+    PDF_LWRITE,     // rate, logical writes in bytes/sec * RATES_DETAIL
 #endif
 
 #if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-    PDF_PREAD,      // physical reads in bytes/sec
-    PDF_PWRITE,     // physical writes in bytes/sec
+    PDF_PREAD,      // rate, physical reads in bytes/sec * RATES_DETAIL
+    PDF_PWRITE,     // rate, physical writes in bytes/sec * RATES_DETAIL
 #endif
 
 #if (PROCESSES_HAVE_IO_CALLS == 1)
-    PDF_OREAD,      // read ops/sec
-    PDF_OWRITE,     // write ops/sec
+    PDF_OREAD,      // rate, read ops/sec * RATES_DETAIL
+    PDF_OWRITE,     // rate, write ops/sec * RATES_DETAIL
 #endif
 
     PDF_UPTIME,     // the process uptime in seconds

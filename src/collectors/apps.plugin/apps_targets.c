@@ -29,6 +29,122 @@ struct target *find_target_by_name(struct target *base, const char *name) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// Tree
+
+static inline STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
+    if(!cmdline) return sanitize_chart_meta_string(comm);
+
+    char buf_cmd[string_strlen(cmdline) + 1];
+    memcpy(buf_cmd, string2str(cmdline), sizeof(buf_cmd));
+
+    char *start = strstr(buf_cmd, string2str(comm));
+    if(start) {
+        char *end = start + string_strlen(comm);
+        while(*end && !isspace((uint8_t)*end) && *end != '/' && *end != '\\') end++;
+        *end = '\0';
+
+        sanitize_chart_meta(start);
+        return string_strdupz(start);
+    }
+
+    return sanitize_chart_meta_string(comm);
+}
+
+struct {
+    const char *txt;
+    STRING *comm;
+} process_orchestrators[] = {
+#if defined(OS_WINDOWS)
+    { "System",             NULL, },
+    { "services",           NULL, },
+    { "wininit",            NULL, },
+#endif
+    { "systemd",            NULL, }, // lxc containers and host systems
+    { "init",               NULL, }, // lxc containers and host systems
+    { "containerd-shim",    NULL, }, // docker containers
+    { "dump-init",          NULL, }, // docker containers
+
+    // terminator
+    { NULL,                 NULL }
+};
+
+struct {
+    const char *txt;
+    STRING *comm;
+} process_aggregators[] = {
+#if defined(OS_LINUX)
+    { "kthread",    NULL, }, // linux kernels have many processes
+#endif
+
+    // terminator
+    { NULL, NULL }
+};
+
+static inline bool is_orchestrator(struct pid_stat *p) {
+    for(size_t i = 0; process_orchestrators[i].comm ;i++) {
+        if(p->comm == process_orchestrators[i].comm)
+            return true;
+    }
+
+    return false;
+}
+
+static inline bool is_aggregator(struct pid_stat *p) {
+    for(size_t i = 0; process_aggregators[i].comm ;i++) {
+        if(p->comm == process_aggregators[i].comm)
+            return true;
+    }
+
+    return false;
+}
+
+void apps_orchestrators_and_aggregators_init(void) {
+    for(size_t i = 0; process_orchestrators[i].txt ;i++)
+        process_orchestrators[i].comm = string_strdupz(process_orchestrators[i].txt);
+
+    for(size_t i = 0; process_aggregators[i].txt ;i++)
+        process_aggregators[i].comm = string_strdupz(process_aggregators[i].txt);
+}
+
+struct target *tree_root_target = NULL;
+
+struct target *get_tree_target(struct pid_stat *p) {
+    // skip fast all the children that are more than 3 levels down
+    while(p->parent && p->parent->parent && p->parent->parent->parent)
+        p = p->parent;
+
+    // keep the children of INIT_PID, and process orchestrators
+    while(p->parent && p->parent->pid != INIT_PID && !is_orchestrator(p->parent))
+        p = p->parent;
+
+    // merge all processes into process aggregators
+    if(p->parent && is_aggregator(p->parent))
+        p = p->parent;
+
+    struct target *w;
+    for(w = tree_root_target; w ; w = w->next)
+        if(w->pid_comm == p->comm) return w;
+
+    w = callocz(sizeof(struct target), 1);
+    w->type = TARGET_TYPE_TREE;
+    w->pid_comm = string_dup(p->comm);
+    w->id = string_dup(p->comm);
+
+#if (PROCESSES_HAVE_COMM_AND_NAME == 1)
+    w->name = sanitize_chart_meta_string(p->name ? p->name : p->comm);
+#else
+    w->name = comm_from_cmdline(p->comm, p->cmdline);
+#endif
+
+    w->clean_name = get_clean_name(w->name);
+
+    w->next = tree_root_target;
+    tree_root_target = w;
+
+    return w;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // Users
 
 #if (PROCESSES_HAVE_UID == 1)
@@ -115,121 +231,6 @@ struct target *get_gid_target(gid_t gid) {
     return w;
 }
 #endif
-
-// --------------------------------------------------------------------------------------------------------------------
-// Tree
-
-static inline STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
-    if(!cmdline) return sanitize_chart_meta_string(comm);
-
-    char buf_cmd[string_strlen(cmdline) + 1];
-    memcpy(buf_cmd, string2str(cmdline), sizeof(buf_cmd));
-
-    char *start = strstr(buf_cmd, string2str(comm));
-    if(start) {
-        char *end = start + string_strlen(comm);
-        while(*end && !isspace((uint8_t)*end) && *end != '/' && *end != '\\') end++;
-        *end = '\0';
-
-        sanitize_chart_meta(start);
-        return string_strdupz(start);
-    }
-
-    return sanitize_chart_meta_string(comm);
-}
-
-struct {
-    const char *txt;
-    STRING *comm;
-} process_orchestrators[] = {
-#if defined(OS_WINDOWS)
-    { "System",     NULL, },
-    { "services",   NULL, },
-    { "wininit",    NULL, },
-#endif
-    { "systemd",    NULL, }, // lxc containers and host systems
-    { "init",       NULL, }, // lxc containers and host systems
-    { "dump-init",  NULL, }, // docker containers
-
-    // terminator
-    { NULL,         NULL }
-};
-
-struct {
-    const char *txt;
-    STRING *comm;
-} process_aggregators[] = {
-#if defined(OS_LINUX)
-    { "kthread",    NULL, }, // linux kernels have many processes
-#endif
-
-    // terminator
-    { NULL, NULL }
-};
-
-static inline bool is_orchestrator(struct pid_stat *p) {
-    for(size_t i = 0; process_orchestrators[i].comm ;i++) {
-        if(p->comm == process_orchestrators[i].comm)
-            return true;
-    }
-
-    return false;
-}
-
-static inline bool is_aggregator(struct pid_stat *p) {
-    for(size_t i = 0; process_aggregators[i].comm ;i++) {
-        if(p->comm == process_aggregators[i].comm)
-            return true;
-    }
-
-    return false;
-}
-
-void apps_orchestrators_and_aggregators_init(void) {
-    for(size_t i = 0; process_orchestrators[i].txt ;i++)
-        process_orchestrators[i].comm = string_strdupz(process_orchestrators[i].txt);
-
-    for(size_t i = 0; process_aggregators[i].txt ;i++)
-        process_aggregators[i].comm = string_strdupz(process_aggregators[i].txt);
-}
-
-struct target *tree_root_target = NULL;
-
-struct target *get_tree_target(struct pid_stat *p) {
-    // skip fast all the children that are more than 3 levels down
-    while(p->parent && p->parent->parent && p->parent->parent->parent)
-        p = p->parent;
-
-    // keep the children of INIT_PID, and process orchestrators
-    while(p->parent && p->parent->pid != INIT_PID && !is_orchestrator(p->parent))
-        p = p->parent;
-
-    // merge all processes into process aggregators
-    if(p->parent && is_aggregator(p->parent))
-        p = p->parent;
-
-    struct target *w;
-    for(w = tree_root_target; w ; w = w->next)
-        if(w->pid_comm == p->comm) return w;
-
-    w = callocz(sizeof(struct target), 1);
-    w->type = TARGET_TYPE_TREE;
-    w->pid_comm = string_dup(p->comm);
-    w->id = string_dup(p->comm);
-
-#if (PROCESSES_HAVE_COMM_AND_NAME == 1)
-    w->name = sanitize_chart_meta_string(p->name ? p->name : p->comm);
-#else
-    w->name = comm_from_cmdline(p->comm, p->cmdline);
-#endif
-
-    w->clean_name = get_clean_name(w->name);
-
-    w->next = tree_root_target;
-    tree_root_target = w;
-
-    return w;
-}
 
 // --------------------------------------------------------------------------------------------------------------------
 // apps_groups.conf

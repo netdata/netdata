@@ -5,7 +5,7 @@
 bool enable_function_cmdline = false;
 
 #define PROCESS_FILTER_CATEGORY "category:"
-#define PROCESS_FILTER_PARENT "parent:"
+#define PROCESS_FILTER_PARENT "app:"
 #define PROCESS_FILTER_USER "user:"
 #define PROCESS_FILTER_GROUP "group:"
 #define PROCESS_FILTER_PROCESS "process:"
@@ -518,7 +518,7 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 #endif
 
-        buffer_rrdf_table_add_field(wb, field_id++, "Parent", "Group Parent", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, field_id++, "App", "App Group Parent", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE,
                                     RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
@@ -1074,12 +1074,12 @@ void function_processes(const char *transaction, char *function,
     {
         buffer_json_add_array_item_array(wb);
         buffer_json_add_array_item_string(wb, "CPU");
-        buffer_json_add_array_item_string(wb, "Parent");
+        buffer_json_add_array_item_string(wb, "App");
         buffer_json_array_close(wb);
 
         buffer_json_add_array_item_array(wb);
         buffer_json_add_array_item_string(wb, "Memory");
-        buffer_json_add_array_item_string(wb, "Parent");
+        buffer_json_add_array_item_string(wb, "App");
         buffer_json_array_close(wb);
     }
     buffer_json_array_close(wb);
@@ -1099,12 +1099,12 @@ void function_processes(const char *transaction, char *function,
         buffer_json_object_close(wb);
 
         // group by Parent
-        buffer_json_member_add_object(wb, "Parent");
+        buffer_json_member_add_object(wb, "App");
         {
             buffer_json_member_add_string(wb, "name", "Process Tree by Parent");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Parent");
+                buffer_json_add_array_item_string(wb, "App");
                 buffer_json_add_array_item_string(wb, "PPID");
             }
             buffer_json_array_close(wb);

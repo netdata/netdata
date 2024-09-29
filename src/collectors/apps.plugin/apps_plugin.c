@@ -711,11 +711,11 @@ int main(int argc, char **argv) {
         send_proc_states_count(dt);
 #endif
 
-        send_charts_updates_to_netdata(tree_root_target, "process_tree", "parent_process", "Processes Tree");
-        send_collected_data_to_netdata(tree_root_target, "process_tree", dt);
+        send_charts_updates_to_netdata(tree_root_target, "process", "app", "Applications");
+        send_collected_data_to_netdata(tree_root_target, "process", dt);
 
 #if (USE_APPS_GROUPS_CONF == 1)
-        send_charts_updates_to_netdata(apps_groups_root_target, "app", "app_group", "Processes Custom Groups");
+        send_charts_updates_to_netdata(apps_groups_root_target, "app", "app_group", "Applications Groups");
         send_collected_data_to_netdata(apps_groups_root_target, "app", dt);
 #endif
 
