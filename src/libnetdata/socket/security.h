@@ -19,6 +19,7 @@ typedef enum __attribute__((packed)) {
 #define OPENSSL_VERSION_300 0x30000000L
 
 #  include <openssl/ssl.h>
+#  include <openssl/rand.h>
 #  include <openssl/err.h>
 #  include <openssl/evp.h>
 #  include <openssl/pem.h>

@@ -3,8 +3,6 @@
 #ifndef WS_CLIENT_H
 #define WS_CLIENT_H
 
-#include "mqtt_wss_log.h"
-
 #define WS_CLIENT_NEED_MORE_BYTES     0x10
 #define WS_CLIENT_PARSING_DONE        0x11
 #define WS_CLIENT_CONNECTION_CLOSED   0x12
@@ -94,23 +92,20 @@ typedef struct websocket_client {
     // memory usage and remove one more memcpy buf_read->buf_to_mqtt
     rbuf_t buf_to_mqtt; // RAW data for MQTT lib
 
-    int entropy_fd;
-
     // careful host is borrowed, don't free
     char **host;
-    mqtt_wss_log_ctx_t log;
 } ws_client;
 
-ws_client *ws_client_new(size_t buf_size, char **host, mqtt_wss_log_ctx_t log);
+ws_client *ws_client_new(size_t buf_size, char **host);
 void ws_client_destroy(ws_client *client);
 void ws_client_reset(ws_client *client);
 
 int ws_client_start_handshake(ws_client *client);
 
-int ws_client_want_write(ws_client *client);
+int ws_client_want_write(const ws_client *client);
 
 int ws_client_process(ws_client *client);
 
-int ws_client_send(ws_client *client, enum websocket_opcode frame_type, const char *data, size_t size);
+int ws_client_send(const ws_client *client, enum websocket_opcode frame_type, const char *data, size_t size);
 
 #endif /* WS_CLIENT_H */

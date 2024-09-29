@@ -309,7 +309,7 @@ const char *aclk_get_topic(enum aclk_topics topic)
  * having to resort to callbacks. 
  */
 
-const char *aclk_topic_cache_iterate(aclk_topic_cache_iter_t *iter)
+const char *aclk_topic_cache_iterate(size_t *iter)
 {
     if (!aclk_topic_cache) {
         netdata_log_error("Topic cache not initialized when %s was called.", __FUNCTION__);
@@ -433,45 +433,4 @@ void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd, enum mqtt
     }
 
     freez(proxy);
-}
-
-#if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
-static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)
-{
-	EVP_ENCODE_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
-
-	if (ctx != NULL) {
-		memset(ctx, 0, sizeof(*ctx));
-	}
-	return ctx;
-}
-static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
-{
-	OPENSSL_free(ctx);
-	return;
-}
-#endif
-
-int base64_encode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
-{
-    int len;
-    unsigned char *str = out;
-    EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
-    EVP_EncodeInit(ctx);
-    EVP_EncodeUpdate(ctx, str, outl, in, in_len);
-    str += *outl;
-    EVP_EncodeFinal(ctx, str, &len);
-    *outl += len;
-
-    str = out;
-    while(*str) {
-        if (*str != 0x0D && *str != 0x0A)
-            *out++ = *str++;
-        else
-            str++;
-    }
-    *out = 0;
-
-    EVP_ENCODE_CTX_free(ctx);
-    return 0;
 }
