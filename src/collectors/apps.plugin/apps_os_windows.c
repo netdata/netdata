@@ -725,9 +725,9 @@ bool apps_os_collect_all_pids_windows(void) {
             p->assigned_to_target = false;
             added++;
 
-            COUNTER_DATA ppid = {.key = "Creating Process ID"};
-            perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ppid);
-            p->ppid = (pid_t) ppid.current.Data;
+//            COUNTER_DATA ppid = {.key = "Creating Process ID"};
+//            perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ppid);
+//            p->ppid = (pid_t) ppid.current.Data;
 
             p->perflib[PDF_UTIME].key = "% User Time";
             p->perflib[PDF_STIME].key = "% Privileged Time";
