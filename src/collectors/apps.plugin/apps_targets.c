@@ -209,18 +209,19 @@ static struct pid_stat *get_first_parent_candidate(struct pid_stat *p) {
         else if(p->parent->pid == first_pid) {
             // loop detected!
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            buffer_sprintf(wb, "original pid %u (%s)", orig->pid, string2str(orig->comm));
+            buffer_sprintf(wb, "original pid %d (%s)", orig->pid, string2str(orig->comm));
 
             size_t loops = 0;
             for(struct pid_stat *t = orig->parent; t && loops < 2 ;t = t->parent) {
-                buffer_sprintf(wb, " => %u (%s)", t->pid, string2str(t->comm));
+                buffer_sprintf(wb, " => %d (%s)", t->pid, string2str(t->comm));
                 if(t == orig->parent) loops++;
             }
 
             for(struct pid_stat *t = orig; t ;t = t->parent) {
                 if(t->pid < t->ppid) {
-                    buffer_sprintf(wb, " : broke loop at %u (%s)", t->pid, string2str(t->comm));
+                    buffer_sprintf(wb, " : broke loop at %d (%s)", t->pid, string2str(t->comm));
                     nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Loop detected: %s", buffer_tostring(wb));
+                    t->parent->children_count--;
                     t->ppid = 0;
                     t->parent = NULL;
                     p = orig;
