@@ -70,6 +70,9 @@ struct mssql_instance {
     RRDSET *st_deadLocks;
     DICTIONARY *locks_instances;
 
+    RRDSET *st_db_data_file_size;
+    DICTIONARY *databases;
+
     RRDSET *st_conn_memory;
     RRDDIM *rd_conn_memory;
 
@@ -122,6 +125,8 @@ struct mssql_db_instance {
     COUNTER_DATA MSSQLDatabaseLogFlushes;
     COUNTER_DATA MSSQLDatabaseTransactions;
     COUNTER_DATA MSSQLDatabaseWriteTransactions;
+
+    RRDDIM *rd_db_data_size;
 };
 
 static DICTIONARY *mssql_instances = NULL;
@@ -197,8 +202,6 @@ static inline void initialize_mssql_keys(struct mssql_instance *p) {
     p->MSSQLPendingMemoryGrants.key = "Memory Grants Pending";
     p->MSSQLTotalServerMemory.key = "Total Server Memory (KB)";
 
-    //p->MSSQLDatabaseDataFileSize.key = "Data File(s) Size (KB)";
-
     /*
     p->MSSQLDatabaseActiveTransactions.key = "";
     p->MSSQLDatabaseBackupRestoreOperations.key = "";
@@ -215,6 +218,13 @@ void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void
     ptr->lockWait.key = "Lock Waits/sec";
 }
 
+void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct mssql_db_instance *ptr = value;
+
+    ptr->MSSQLDatabaseDataFileSize.key = "Data File(s) Size (KB)";
+
+}
+
 void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_instance *p = value;
     const char *instance = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
@@ -224,6 +234,13 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
                                                         DICT_OPTION_FIXED_SIZE,
                                                         NULL, sizeof(struct mssql_lock_instance));
         dictionary_register_insert_callback(p->locks_instances, dict_mssql_insert_locks_cb, NULL);
+    }
+
+    if (!p->databases) {
+        p->databases = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE |
+                                                      DICT_OPTION_FIXED_SIZE,
+                                                      NULL, sizeof(struct mssql_db_instance));
+        dictionary_register_insert_callback(p->databases, dict_mssql_insert_databases_cb, NULL);
     }
 
     initialize_mssql_objects(p, instance);
@@ -790,6 +807,8 @@ int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
                                                            , *update_every
                                                            , RRDSET_TYPE_LINE
                                                            );
+
+        rrdlabels_add(mli->parent->st_lockWait->rrdlabels, "mssql_instance", instance, RRDLABEL_SRC_AUTO);
     }
 
     if (!mli->rd_lockWait) {
@@ -825,6 +844,7 @@ int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
                                                             , *update_every
                                                             , RRDSET_TYPE_LINE
         );
+        rrdlabels_add(mli->parent->st_deadLocks->rrdlabels, "mssql_instance", instance, RRDLABEL_SRC_AUTO);
     }
 
     if (!mli->rd_deadLocks) {
@@ -885,6 +905,55 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p
     rrdset_done(p->st_deadLocks);
 }
 
+int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    struct mssql_db_instance *mli = value;
+    const char *db = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+
+    int *update_every = data;
+
+    if (!mli->parent->st_db_data_file_size) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_data_files_size", db, mli->parent->instanceID);
+        mli->parent->st_db_data_file_size = rrdset_create_localhost("mssql",
+                                                                    id,
+                                                                    NULL,
+                                                                    "size",
+                                                                    "mssql.database_data_files_size",
+                                                                    "Current database size.",
+                                                                    "bytes",
+                                                                    PLUGIN_WINDOWS_NAME,
+                                                                    "PerflibMSSQL",
+                                                                    PRIO_MSSQL_DATABASE_DATA_FILE_SIZE,
+                                                                    *update_every,
+                                                                    RRDSET_TYPE_LINE);
+        rrdlabels_add(mli->parent->st_db_data_file_size->rrdlabels,
+                      "mssql_instance",
+                      mli->parent->instanceID,
+                      RRDLABEL_SRC_AUTO);
+
+        rrdlabels_add(mli->parent->st_db_data_file_size->rrdlabels,
+                      "database",
+                      db,
+                      RRDLABEL_SRC_AUTO);
+    }
+
+    if (!mli->rd_db_data_size) {
+        snprintfz(id,
+                  RRD_ID_LENGTH_MAX,
+                  "mssql_db_%s_instance_%s_data_files_size_bytes",
+                  db,
+                  mli->parent->instanceID);
+
+        mli->rd_db_data_size = rrddim_add(mli->parent->st_db_data_file_size, id, db,
+                                          1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(mli->parent->st_db_data_file_size,
+                          mli->rd_db_data_size,
+                          (collected_number)mli->MSSQLDatabaseDataFileSize.current.Data*1024);
+}
+
 static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -903,29 +972,22 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
             continue;
 
         netdata_fix_chart_name(windows_shared_buffer);
-        fprintf(stderr, "KILLME %s\n", windows_shared_buffer);
-        /*
-        struct mssql_lock_instance *mli = dictionary_set(p->locks_instances,
-                                                         windows_shared_buffer,
-                                                         NULL,
-                                                         sizeof(*mli));
-        if (!mli)
+        struct mssql_db_instance *mdi = dictionary_set(p->databases,
+                                                       windows_shared_buffer,
+                                                       NULL,
+                                                       sizeof(*mdi));
+        if (!mdi)
             continue;
 
-        if (!mli->parent) {
-            mli->parent = p;
+        if (!mdi->parent) {
+            mdi->parent = p;
         }
 
-        perflibGetObjectCounter(pDataBlock, pObjectType, &mli->lockWait);
-        perflibGetObjectCounter(pDataBlock, pObjectType, &mli->deadLocks);
-         */
+        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseDataFileSize);
     }
 
-    /*
-    dictionary_sorted_walkthrough_read(p->locks_instances, dict_mssql_locks_charts_cb, &update_every);
-    rrdset_done(p->st_lockWait);
-    rrdset_done(p->st_deadLocks);
-     */
+    dictionary_sorted_walkthrough_read(p->databases, dict_mssql_databases_charts_cb, &update_every);
+    rrdset_done(p->st_db_data_file_size);
 }
 
 static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
