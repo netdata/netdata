@@ -106,10 +106,10 @@ static inline bool is_aggregator(struct pid_stat *p) {
 
     return false;
 }
-static STRING *SystemAggregator = NULL;
+static STRING *KernelAggregator = NULL;
 
 void apps_orchestrators_and_aggregators_init(void) {
-    SystemAggregator = string_strdupz("System");
+    KernelAggregator = string_strdupz("kernel");
 
     for(size_t i = 0; process_orchestrators[i].txt ;i++)
         process_orchestrators[i].comm = string_strdupz(process_orchestrators[i].txt);
@@ -134,7 +134,7 @@ struct target *get_tree_target(struct pid_stat *p) {
     bool aggregator = false;
     if(p->ppid == 0 || (p->parent && is_aggregator(p->parent))) {
         aggregator = true;
-        search_for = SystemAggregator;
+        search_for = KernelAggregator;
     }
 
     struct target *w;
