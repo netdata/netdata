@@ -2,6 +2,8 @@
 
 #include "apps_plugin.h"
 
+static inline void link_pid_to_its_parent(struct pid_stat *p);
+
 // --------------------------------------------------------------------------------------------------------------------
 // The index of all pids
 
@@ -206,11 +208,8 @@ bool collect_parents_before_children(void) {
         pids.sorted.array[slc++] = p;
 
         // assign a sortlist id to all it and its parents
-        for (struct pid_stat *pp = p; pp; pp = pp->parent) {
+        for (struct pid_stat *pp = p; pp ; pp = pp->parent)
             pp->sortlist = sortlist++;
-            if (pp->ppid && !pp->parent)
-                pp->parent = find_pid_entry(pp->ppid);
-        }
     }
     size_t sorted = slc;
 
@@ -271,47 +270,48 @@ static inline bool is_already_a_parent(struct pid_stat *p, struct pid_stat *pp) 
     return false;
 }
 
+static inline void link_pid_to_its_parent(struct pid_stat *p) {
+    p->parent = NULL;
+    if(unlikely(!p->ppid))
+        return;
+
+    if(unlikely(p->ppid == p->pid)) {
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+               "Process %d (%s) states parent %d, which is the same PID. Ignoring it.",
+               p->pid, string2str(p->comm), p->ppid);
+        p->ppid = 0;
+        return;
+    }
+
+    struct pid_stat *pp = find_pid_entry(p->ppid);
+    if(likely(pp)) {
+        fatal_assert(pp->pid == p->ppid);
+
+        if(!is_already_a_parent(p, pp)) {
+            p->parent = pp;
+            pp->children_count++;
+        }
+        else {
+            p->parent = pp;
+            log_parent_loop(p);
+            p->parent = NULL;
+            p->ppid = 0;
+        }
+    }
+#if (PPID_SHOULD_BE_RUNNING == 1)
+    else {
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+               "pid %d %s states parent %d, but the later does not exist.",
+               p->pid, pid_stat_comm(p), p->ppid);
+    }
+#endif
+}
+
 static inline void link_all_processes_to_their_parents(void) {
     // link all children to their parents
     // and update children count on parents
-    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
-        // for each process found
-
-        p->parent = NULL;
-        if(unlikely(!p->ppid))
-            continue;
-
-        if(unlikely(p->ppid == p->pid)) {
-            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-                   "Process %d (%s) states parent %d, which is the same PID. Ignoring it.",
-                   p->pid, string2str(p->comm), p->ppid);
-            p->ppid = 0;
-            continue;
-        }
-
-        struct pid_stat *pp = find_pid_entry(p->ppid);
-        if(likely(pp)) {
-            fatal_assert(pp->pid == p->ppid);
-
-            if(!is_already_a_parent(p, pp)) {
-                p->parent = pp;
-                pp->children_count++;
-            }
-            else {
-                p->parent = pp;
-                log_parent_loop(p);
-                p->parent = NULL;
-                p->ppid = 0;
-            }
-        }
-#if (PPID_SHOULD_BE_RUNNING == 1)
-        else {
-            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-                   "pid %d %s states parent %d, but the later does not exist.",
-                   p->pid, pid_stat_comm(p), p->ppid);
-        }
-#endif
-    }
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next)
+        link_pid_to_its_parent(p);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

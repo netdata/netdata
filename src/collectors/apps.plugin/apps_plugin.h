@@ -522,6 +522,9 @@ struct pid_stat {
 #endif
 
     uint32_t children_count;        // number of processes directly referencing this
+                                    // it is absorbed by apps_groups.conf inheritance
+                                    // don't rely on it for anything else.
+
     uint32_t keeploops;             // increases by 1 every time keep is 1 and updated 0
 
     PID_LOG log_thrown;

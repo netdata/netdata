@@ -458,7 +458,7 @@ void function_processes(const char *transaction, char *function,
 #endif
 
         // processes, threads, uptime
-        add_value_field_llu_with_max(wb, Processes, p->children_count);
+        add_value_field_llu_with_max(wb, Processes, p->values[PDF_PROCESSES]);
         add_value_field_llu_with_max(wb, Threads, p->values[PDF_THREADS]);
         add_value_field_llu_with_max(wb, Uptime, p->values[PDF_UPTIME]);
 
