@@ -258,8 +258,27 @@ static inline void link_all_processes_to_their_parents(void) {
         if(unlikely(!p->ppid))
             continue;
 
+        if(unlikely(p->ppid == p->pid)) {
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                   "Process %u (%s) states parent %u, which is the same PID. Ignoring it.",
+                   p->pid, string2str(p->comm), p->ppid);
+            p->ppid = 0;
+            continue;
+        }
+
         struct pid_stat *pp = find_pid_entry(p->ppid);
         if(likely(pp)) {
+#if defined(OS_WINDOWS)
+            if(unlikely(p->perflib[PDF_UPTIME].current.Time > pp->perflib[PDF_UPTIME].current.Time)) {
+                // the child runs for more time than the parent
+                nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                       "Process %u (%s) states parent %u (%s), which runs for less time than the child. Ignoring it.",
+                       p->pid, string2str(p->comm), pp->pid, string2str(pp->comm));
+                p->ppid = 0;
+                continue;
+            }
+#endif
+
             p->parent = pp;
             pp->children_count++;
         }

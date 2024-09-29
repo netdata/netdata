@@ -207,6 +207,10 @@ static struct pid_stat *get_first_parent_candidate(struct pid_stat *p) {
         }
         else if(p->parent->pid == first_pid) {
             // loop detected!
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                   "Loop detected: process %u (%s) states parent %u, in a loop!",
+                   p->pid, string2str(p->comm), p->ppid);
+            p->ppid = 0;
             p->parent = NULL;
             break;
         }
