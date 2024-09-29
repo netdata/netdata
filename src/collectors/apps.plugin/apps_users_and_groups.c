@@ -2,6 +2,8 @@
 
 #include "apps_plugin.h"
 
+#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_GID == 1)
+
 // ----------------------------------------------------------------------------
 // read users and groups from files
 
@@ -71,8 +73,8 @@ static struct user_or_group_ids all_group_ids = {
 };
 #endif
 
-int file_changed(const struct stat *statbuf __maybe_unused, struct timespec *last_modification_time __maybe_unused) {
-#if defined(OS_MACOS)
+static int file_changed(const struct stat *statbuf __maybe_unused, struct timespec *last_modification_time __maybe_unused) {
+#if defined(OS_MACOS) || defined(OS_WINDOWS)
     return 0;
 #else
     if(likely(statbuf->st_mtim.tv_sec == last_modification_time->tv_sec &&
@@ -85,7 +87,6 @@ int file_changed(const struct stat *statbuf __maybe_unused, struct timespec *las
 #endif
 }
 
-#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_GID == 1)
 static int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_modification_time) {
     struct stat statbuf;
     if(unlikely(stat(ids->filename, &statbuf)))
@@ -180,7 +181,6 @@ static int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec
 
     return 0;
 }
-#endif
 
 #if (PROCESSES_HAVE_UID == 1)
 struct user_or_group_id *user_id_find(struct user_or_group_id *user_id_to_find) {
@@ -209,6 +209,7 @@ struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find
     return NULL;
 }
 #endif
+#endif
 
 void apps_users_and_groups_init(void) {
 #if (PROCESSES_HAVE_UID == 1)
@@ -221,4 +222,3 @@ void apps_users_and_groups_init(void) {
     debug_log("group file: '%s'", all_group_ids.filename);
 #endif
 }
-
