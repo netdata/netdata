@@ -7,8 +7,6 @@
 #define MAX_PROC_PID_LIMITS 8192
 #define PROC_PID_LIMITS_MAX_OPEN_FILES_KEY "\nMax open files "
 
-#define CPU_TO_NANOSECONDCORES (NSEC_PER_SEC / system_hz)
-
 int max_fds_cache_seconds = 60;
 kernel_uint_t system_uptime_secs;
 

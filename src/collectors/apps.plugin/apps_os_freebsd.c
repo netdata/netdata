@@ -4,8 +4,6 @@
 
 #if defined(OS_FREEBSD)
 
-#define CPU_TO_NANOSECONDCORES (1000) // convert microseconds to nanoseconds
-
 usec_t system_current_time_ut;
 long global_block_size = 512;
 

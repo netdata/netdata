@@ -37,6 +37,7 @@
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
 #define INCREMENTAL_DATA_COLLECTION          1
+#define CPU_TO_NANOSECONDCORES (1000) // convert microseconds to nanoseconds
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _freebsd)
 
 #elif defined(OS_MACOS)
@@ -80,6 +81,7 @@ struct pid_info {
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
 #define INCREMENTAL_DATA_COLLECTION          1
+#define CPU_TO_NANOSECONDCORES (1) // already in nanoseconds
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _macos)
 
 #elif defined(OS_WINDOWS)
@@ -111,6 +113,7 @@ struct pid_info {
 #define PPID_SHOULD_BE_RUNNING               0
 #define USE_APPS_GROUPS_CONF                 0
 #define INCREMENTAL_DATA_COLLECTION          0
+#define CPU_TO_NANOSECONDCORES (100) // convert 100ns to ns
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _windows)
 
 #elif defined(OS_LINUX)
@@ -140,6 +143,7 @@ struct pid_info {
 #define PPID_SHOULD_BE_RUNNING               1
 #define USE_APPS_GROUPS_CONF                 1
 #define INCREMENTAL_DATA_COLLECTION          1
+#define CPU_TO_NANOSECONDCORES (NSEC_PER_SEC / system_hz)
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _linux)
 
 extern int max_fds_cache_seconds;

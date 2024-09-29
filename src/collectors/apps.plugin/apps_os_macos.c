@@ -4,8 +4,6 @@
 
 #if defined(OS_MACOS)
 
-#define CPU_TO_NANOSECONDCORES (1) // already in nanoseconds
-
 usec_t system_current_time_ut;
 mach_timebase_info_data_t mach_info;
 

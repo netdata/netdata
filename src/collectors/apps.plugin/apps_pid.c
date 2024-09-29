@@ -543,28 +543,28 @@ static inline void process_exited_pids(void) {
         kernel_uint_t majflt = 0;
 
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
-        utime  = p->values[PDF_UTIME] + p->values[PDF_CUTIME];
-        stime  = p->values[PDF_STIME] + p->values[PDF_CSTIME];
+        utime  = (p->raw[PDF_UTIME] + p->raw[PDF_CUTIME]) * (USEC_PER_SEC * CPU_TO_NANOSECONDCORES) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        stime  = (p->raw[PDF_STIME] + p->raw[PDF_CSTIME]) * (USEC_PER_SEC * CPU_TO_NANOSECONDCORES) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        gtime  = p->values[PDF_GTIME] + p->values[PDF_CGTIME];
+        gtime  = (p->raw[PDF_GTIME] + p->raw[PDF_CGTIME]) * (USEC_PER_SEC * CPU_TO_NANOSECONDCORES) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #endif
 #else
-        utime  = p->values[PDF_UTIME];
-        stime  = p->values[PDF_STIME];
+        utime  = p->raw[PDF_UTIME] * (USEC_PER_SEC * CPU_TO_NANOSECONDCORES) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        stime  = p->raw[PDF_STIME] * (USEC_PER_SEC * CPU_TO_NANOSECONDCORES) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        gtime  = p->values[PDF_GTIME];
+        gtime  = p->raw[PDF_GTIME] * (USEC_PER_SEC * CPU_TO_NANOSECONDCORES) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #endif
 #endif
 
 #if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
-        minflt = p->values[PDF_MINFLT] + p->values[PDF_CMINFLT];
+        minflt = (p->raw[PDF_MINFLT] + p->raw[PDF_CMINFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #if (PROCESSES_HAVE_MAJFLT == 1)
-        majflt = p->values[PDF_MAJFLT] + p->values[PDF_CMAJFLT];
+        majflt = (p->raw[PDF_MAJFLT] + p->raw[PDF_CMAJFLT]) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #endif
 #else
-        minflt = p->values[PDF_MINFLT];
+        minflt = p->raw[PDF_MINFLT] * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #if (PROCESSES_HAVE_MAJFLT == 1)
-        majflt = p->values[PDF_MAJFLT];
+        majflt = p->raw[PDF_MAJFLT] * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 #endif
 #endif
 
@@ -657,10 +657,10 @@ static inline void process_exited_pids(void) {
                 );
             }
 
-            p->values[PDF_UTIME]  = utime;
-            p->values[PDF_STIME]  = stime;
+            p->values[PDF_UTIME]  = utime * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * CPU_TO_NANOSECONDCORES);
+            p->values[PDF_STIME]  = stime * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * CPU_TO_NANOSECONDCORES);
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-            p->values[PDF_GTIME]  = gtime;
+            p->values[PDF_GTIME]  = gtime * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * CPU_TO_NANOSECONDCORES);
 #endif
 
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
@@ -671,9 +671,9 @@ static inline void process_exited_pids(void) {
 #endif
 #endif
 
-            p->values[PDF_MINFLT]  = minflt;
+            p->values[PDF_MINFLT]  = minflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
 #if (PROCESSES_HAVE_MAJFLT == 1)
-            p->values[PDF_MAJFLT]  = majflt;
+            p->values[PDF_MAJFLT]  = majflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
 #endif
 
 #if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
