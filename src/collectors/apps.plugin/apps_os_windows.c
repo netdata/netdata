@@ -719,6 +719,9 @@ bool apps_os_collect_all_pids_windows(void) {
             else
                 strncpyz(name, "unknown", sizeof(name) - 1);
 
+            if(strcmp(name, "wininit") == 0)
+                INIT_PID = p->pid;
+
             string_freez(p->comm); // it may be detected in a previous run via GetAllProcessesInfo()
             p->comm = string_strdupz(name);
             p->got_info = false;

@@ -11,7 +11,7 @@
 #if defined(OS_FREEBSD)
 #include <sys/user.h>
 
-#define INIT_PID                             1
+#define OS_INIT_PID                          1
 #define ALL_PIDS_ARE_READ_INSTANTLY          1
 #define PROCESSES_HAVE_CPU_GUEST_TIME        0
 #define PROCESSES_HAVE_CPU_CHILDREN_TIME     1
@@ -55,7 +55,7 @@ struct pid_info {
     struct rusage_info_v4 rusageinfo;
 };
 
-#define INIT_PID                             1
+#define OS_INIT_PID                          1
 #define ALL_PIDS_ARE_READ_INSTANTLY          1
 #define PROCESSES_HAVE_CPU_GUEST_TIME        0
 #define PROCESSES_HAVE_CPU_CHILDREN_TIME     0
@@ -87,7 +87,7 @@ struct pid_info {
 #elif defined(OS_WINDOWS)
 #include <windows.h>
 
-#define INIT_PID                             0
+#define OS_INIT_PID                          0 // dynamic, is set during data collection
 #define ALL_PIDS_ARE_READ_INSTANTLY          1
 #define PROCESSES_HAVE_CPU_GUEST_TIME        0
 #define PROCESSES_HAVE_CPU_CHILDREN_TIME     0
@@ -117,7 +117,7 @@ struct pid_info {
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _windows)
 
 #elif defined(OS_LINUX)
-#define INIT_PID 1
+#define OS_INIT_PID                          1
 #define ALL_PIDS_ARE_READ_INSTANTLY          0
 #define PROCESSES_HAVE_CPU_GUEST_TIME        1
 #define PROCESSES_HAVE_CPU_CHILDREN_TIME     1
@@ -153,6 +153,8 @@ extern int max_fds_cache_seconds;
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------
+
+extern pid_t INIT_PID;
 
 extern bool debug_enabled;
 

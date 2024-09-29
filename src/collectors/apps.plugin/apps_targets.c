@@ -2,6 +2,8 @@
 
 #include "apps_plugin.h"
 
+pid_t INIT_PID = OS_INIT_PID;
+
 static STRING *get_clean_name(STRING *name) {
     char buf[string_strlen(name) + 1];
     memcpy(buf, string2str(name), string_strlen(name) + 1);
@@ -58,11 +60,16 @@ struct {
     { "System",             NULL, },
     { "services",           NULL, },
     { "wininit",            NULL, },
-#endif
+#elif defined(LINUX)
     { "systemd",            NULL, }, // lxc containers and host systems
-    { "init",               NULL, }, // lxc containers and host systems
     { "containerd-shim",    NULL, }, // docker containers
+    { "init",               NULL, },
     { "dump-init",          NULL, }, // docker containers
+#elif defined(OS_FREBBSD)
+    { "init",               NULL, },
+#elif defined(OS_MACOS)
+    { "launchd",            NULL, },
+#endif
 
     // terminator
     { NULL,                 NULL }
@@ -73,7 +80,9 @@ struct {
     STRING *comm;
 } process_aggregators[] = {
 #if defined(OS_LINUX)
-    { "kthread",    NULL, }, // linux kernels have many processes
+    { "kthread",            NULL, }, // linux kernels have many processes
+#elif defined(OS_FREEBSD)
+    { "kernel",             NULL, },
 #endif
 
     // terminator
@@ -97,8 +106,11 @@ static inline bool is_aggregator(struct pid_stat *p) {
 
     return false;
 }
+static STRING *SystemAggregator = NULL;
 
 void apps_orchestrators_and_aggregators_init(void) {
+    SystemAggregator = string_strdupz("System");
+
     for(size_t i = 0; process_orchestrators[i].txt ;i++)
         process_orchestrators[i].comm = string_strdupz(process_orchestrators[i].txt);
 
@@ -110,7 +122,7 @@ struct target *tree_root_target = NULL;
 
 struct target *get_tree_target(struct pid_stat *p) {
     // skip fast all the children that are more than 3 levels down
-    while(p->parent && p->parent->parent && p->parent->parent->parent)
+    while(p->parent && p->parent->pid != INIT_PID && p->parent->parent && p->parent->parent->parent)
         p = p->parent;
 
     // keep the children of INIT_PID, and process orchestrators
@@ -118,23 +130,32 @@ struct target *get_tree_target(struct pid_stat *p) {
         p = p->parent;
 
     // merge all processes into process aggregators
-    if(p->parent && is_aggregator(p->parent))
-        p = p->parent;
+    STRING *search_for = p->comm;
+    bool aggregator = false;
+    if(p->ppid == 0 || (p->parent && is_aggregator(p->parent))) {
+        aggregator = true;
+        search_for = SystemAggregator;
+    }
 
     struct target *w;
     for(w = tree_root_target; w ; w = w->next)
-        if(w->pid_comm == p->comm) return w;
+        if(w->pid_comm == search_for) return w;
 
     w = callocz(sizeof(struct target), 1);
     w->type = TARGET_TYPE_TREE;
-    w->pid_comm = string_dup(p->comm);
-    w->id = string_dup(p->comm);
+    w->pid_comm = string_dup(search_for);
+    w->id = string_dup(search_for);
 
+    if(aggregator) {
+        w->name = string_dup(search_for);
+    }
+    else {
 #if (PROCESSES_HAVE_COMM_AND_NAME == 1)
-    w->name = sanitize_chart_meta_string(p->name ? p->name : p->comm);
+        w->name = sanitize_chart_meta_string(p->name ? p->name : p->comm);
 #else
-    w->name = comm_from_cmdline(p->comm, p->cmdline);
+        w->name = comm_from_cmdline(p->comm, p->cmdline);
 #endif
+    }
 
     w->clean_name = get_clean_name(w->name);
 
