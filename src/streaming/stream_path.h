@@ -22,6 +22,8 @@ typedef struct stream_path {
     int16_t hops;                   // -1 = stale node, 0 = localhost, >0 the hops count
     STREAM_PATH_FLAGS flags;        // ACLK or NONE for the moment
     STREAM_CAPABILITIES capabilities; // streaming connection capabilities
+    uint32_t start_time;            // Average time in ms the agent needs to start
+    uint32_t shutdown_time;         // Average time in ms the agent needs to shutdown
 } STREAM_PATH;
 
 typedef struct rrdhost_stream_path {

@@ -54,6 +54,8 @@ static void stream_path_to_json_object(BUFFER *wb, STREAM_PATH *p) {
     buffer_json_member_add_int64(wb, "hops", p->hops);
     buffer_json_member_add_uint64(wb, "since", p->since);
     buffer_json_member_add_uint64(wb, "first_time_t", p->first_time_t);
+    buffer_json_member_add_uint64(wb, "start_time", p->start_time);
+    buffer_json_member_add_uint64(wb, "shutdown_time", p->shutdown_time);
     stream_capabilities_to_json_array(wb, p->capabilities, "capabilities");
     STREAM_PATH_FLAGS_2json(wb, "flags", p->flags);
     buffer_json_object_close(wb);
@@ -68,6 +70,8 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
     p.host_id = localhost->host_id;
     p.node_id = localhost->node_id;
     p.claim_id = claim_id_get_uuid();
+    p.start_time = get_agent_event_time_average(EVENT_AGENT_START_TIME) / USEC_PER_MS;
+    p.shutdown_time = get_agent_event_time_average(EVENT_AGENT_SHUTDOWN_TIME) / USEC_PER_MS;
 
     p.flags = STREAM_PATH_FLAG_NONE;
     if(!UUIDiszero(p.claim_id))
