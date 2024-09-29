@@ -19,35 +19,27 @@ const (
 )
 
 var tcpConfig = Config{
-	Address:        testServerAddress,
-	ConnectTimeout: defaultTimeout,
-	ReadTimeout:    defaultTimeout,
-	WriteTimeout:   defaultTimeout,
-	TLSConf:        nil,
+	Address: testServerAddress,
+	Timeout: defaultTimeout,
+	TLSConf: nil,
 }
 
 var udpConfig = Config{
-	Address:        testUdpServerAddress,
-	ConnectTimeout: defaultTimeout,
-	ReadTimeout:    defaultTimeout,
-	WriteTimeout:   defaultTimeout,
-	TLSConf:        nil,
+	Address: testUdpServerAddress,
+	Timeout: defaultTimeout,
+	TLSConf: nil,
 }
 
 var unixConfig = Config{
-	Address:        testUnixServerAddress,
-	ConnectTimeout: defaultTimeout,
-	ReadTimeout:    defaultTimeout,
-	WriteTimeout:   defaultTimeout,
-	TLSConf:        nil,
+	Address: testUnixServerAddress,
+	Timeout: defaultTimeout,
+	TLSConf: nil,
 }
 
 var tcpTlsConfig = Config{
-	Address:        testServerAddress,
-	ConnectTimeout: defaultTimeout,
-	ReadTimeout:    defaultTimeout,
-	WriteTimeout:   defaultTimeout,
-	TLSConf:        &tls.Config{},
+	Address: testServerAddress,
+	Timeout: defaultTimeout,
+	TLSConf: &tls.Config{},
 }
 
 func Test_clientCommand(t *testing.T) {
@@ -72,13 +64,12 @@ func Test_clientTimeout(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 	sock := New(tcpConfig)
 	require.NoError(t, sock.Connect())
-	sock.ReadTimeout = 0
-	sock.ReadTimeout = 0
+	sock.Timeout = 0
 	err := sock.Command("ping\n", func(bytes []byte) bool {
 		assert.Equal(t, "pong", string(bytes))
 		return true
 	})
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func Test_clientIncompleteSSL(t *testing.T) {
