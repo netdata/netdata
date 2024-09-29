@@ -217,10 +217,15 @@ static struct pid_stat *get_first_parent_candidate(struct pid_stat *p) {
                 if(t == orig->parent) loops++;
             }
 
-            nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Loop detected: %s", buffer_tostring(wb));
-            p->ppid = 0;
-            p->parent = NULL;
-            break;
+            for(struct pid_stat *t = orig; t ;t = t->parent) {
+                if(t->pid < t->ppid) {
+                    buffer_sprintf(wb, " : broke loop at %u (%s)", t->pid, string2str(t->comm));
+                    nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Loop detected: %s", buffer_tostring(wb));
+                    t->ppid = 0;
+                    t->parent = NULL;
+                    return t;
+                }
+            }
         }
 
         p = p->parent;
