@@ -61,7 +61,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory);
 
 void cleanup_agent_event_log(void);
 void add_agent_event(event_log_type_t event_id, int64_t value);
-usec_t get_agent_event_time_average(event_log_type_t event_id);
+usec_t get_agent_event_time_median(event_log_type_t event_id);
 
 // UNIT TEST
 int metadata_unittest(void);

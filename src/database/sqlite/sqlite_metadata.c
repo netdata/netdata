@@ -2370,13 +2370,16 @@ void cleanup_agent_event_log(void)
     db_execute(db_meta, "DELETE FROM agent_event_log WHERE date_created < UNIXEPOCH() - 30 * 86400");
 }
 
-#define SQL_GET_AGENT_EVENT_TYPE_AVERAGE \
-        "SELECT CAST(AVG(value) AS INT) FROM agent_event_log WHERE event_type = @event"
+#define SQL_GET_AGENT_EVENT_TYPE_MEDIAN                                                                                \
+    "SELECT AVG(value) AS median FROM "                                                                                \
+    "(SELECT value FROM agent_event_log WHERE event_type = @event ORDER BY value "                                     \
+    " LIMIT 2 - (SELECT COUNT(*) FROM agent_event_log WHERE event_type = @event) % 2 "                                 \
+    "OFFSET(SELECT(COUNT(*) - 1) / 2 FROM agent_event_log WHERE event_type = @event)) "
 
-usec_t get_agent_event_time_average(event_log_type_t event_id)
+usec_t get_agent_event_time_median(event_log_type_t event_id)
 {
     sqlite3_stmt *res = NULL;
-    if (!PREPARE_STATEMENT(db_meta, SQL_GET_AGENT_EVENT_TYPE_AVERAGE, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_GET_AGENT_EVENT_TYPE_MEDIAN, &res))
         return 0;
 
     usec_t avg_time = 0;

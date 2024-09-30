@@ -70,8 +70,8 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
     p.host_id = localhost->host_id;
     p.node_id = localhost->node_id;
     p.claim_id = claim_id_get_uuid();
-    p.start_time = get_agent_event_time_average(EVENT_AGENT_START_TIME) / USEC_PER_MS;
-    p.shutdown_time = get_agent_event_time_average(EVENT_AGENT_SHUTDOWN_TIME) / USEC_PER_MS;
+    p.start_time = get_agent_event_time_median(EVENT_AGENT_START_TIME) / USEC_PER_MS;
+    p.shutdown_time = get_agent_event_time_median(EVENT_AGENT_SHUTDOWN_TIME) / USEC_PER_MS;
 
     p.flags = STREAM_PATH_FLAG_NONE;
     if(!UUIDiszero(p.claim_id))
