@@ -2,7 +2,7 @@
 
 #include "stream_path.h"
 #include "rrdpush.h"
-#include "collectors/plugins.d/pluginsd_internals.h"
+#include "plugins.d/pluginsd_internals.h"
 
 ENUM_STR_MAP_DEFINE(STREAM_PATH_FLAGS) = {
     { .id = STREAM_PATH_FLAG_ACLK, .name = "aclk" },

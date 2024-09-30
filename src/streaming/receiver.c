@@ -34,7 +34,7 @@ void receiver_state_free(struct receiver_state *rpt) {
     freez(rpt);
 }
 
-#include "collectors/plugins.d/pluginsd_parser.h"
+#include "plugins.d/pluginsd_parser.h"
 
 // IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
 #define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)

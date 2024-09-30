@@ -11,7 +11,7 @@ import (
 
 type (
 	// API implements Netdata external plugins API.
-	// https://learn.netdata.cloud/docs/agent/collectors/plugins.d#the-output-of-the-plugin
+	// https://learn.netdata.cloud/docs/agent/plugins.d#the-output-of-the-plugin
 	API struct {
 		io.Writer
 	}
