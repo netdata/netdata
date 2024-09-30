@@ -532,6 +532,8 @@ get_netdata_latest_tag() {
 newer_commit_date() {
   info "Checking if a newer version of the updater script is available."
 
+  ndtmpdir="$(create_tmp_directory)"
+  commit_check_file="${ndtmpdir}/latest-commit.json"
   commit_check_url="https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1"
   python_version_check="
 from __future__ import print_function
@@ -545,12 +547,14 @@ else:
     print(data[0]['commit']['committer']['date'] if isinstance(data, list) and data else '')
 "
 
+  _safe_download "${commit_check_url}" "${commit_check_file}"
+
   if command -v jq > /dev/null 2>&1; then
-    commit_date="$(_safe_download "${commit_check_url}" /dev/stdout | jq '.[0].commit.committer.date' 2>/dev/null | tr -d '"')"
+    commit_date="$(jq '.[0].commit.committer.date' 2>/dev/null < "${commit_check_file}" | tr -d '"')"
   elif command -v python > /dev/null 2>&1;then
-    commit_date="$(_safe_download "${commit_check_url}" /dev/stdout | python -c "${python_version_check}")"
+    commit_date="$(python -c "${python_version_check}" < "${commit_check_file}")"
   elif command -v python3 > /dev/null 2>&1;then
-    commit_date="$(_safe_download "${commit_check_url}" /dev/stdout | python3 -c "${python_version_check}")"
+    commit_date="$(python3 -c "${python_version_check}" < "${commit_check_file}")"
   fi
 
   if [ -z "${commit_date}" ] ; then
