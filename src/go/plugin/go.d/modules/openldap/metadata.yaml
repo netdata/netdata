@@ -1,0 +1,192 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      plugin_name: go.d.plugin
+      module_name: openldap
+      monitored_instance:
+        name: OpenLDAP
+        link: https://www.openldap.org/
+        categories:
+          - data-collection.authentication-and-authorization
+        icon_filename: openldap.svg
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - openldap
+        - RBAC
+        - Directory access
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors OpenLDAP metrics about connections, operations, referrals and more.
+        method_description: |
+          It gathers the metrics using the [go-ldap](https://github.com/go-ldap/ldap) module and the [Monitor backend](https://www.openldap.org/doc/admin24/monitoringslapd.html) of OpenLDAP.
+      supported_platforms:
+        include: ["Linux"]
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: "The collector cannot auto-detect OpenLDAP instances, because credential configuration is required."
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable the openLDAP Monitor Backend.
+            description: |
+              Follow instructions from https://www.openldap.org/doc/admin24/monitoringslapd.html to activate monitoring interface.
+      configuration:
+        file:
+          name: go.d/openldap.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: timeout
+              description: Timeout for establishing a connection and communication (reading and writing) in seconds.
+              default_value: 2
+              required: false
+            - name: url
+              description: LDAP server URL.
+              default_value: ldap://127.0.0.1:389
+              required: true
+            - name: username
+              description: The distinguished name (DN) of the user authorized to view the monitor database.
+              default_value: ""
+              required: true
+            - name: password
+              description: The password associated with the user identified by the DN.
+              default_value: ""
+              required: true
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: ""
+            enabled: false
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: ldap://localhost:389
+                    username: cn=netdata,dc=example,dc=com 
+                    password: secret
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: ldap://localhost:389
+                    username: cn=netdata,dc=example,dc=com 
+                    password: secret
+                
+                  - name: remote
+                    url: ldap://192.0.2.1:389
+                    username: cn=netdata,dc=example,dc=com 
+                    password: secret
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: openldap.current_connections
+              description: Current Connections
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: openldap.connections
+              description: Connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: openldap.traffic
+              description: Traffic
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: sent
+            - name: openldap.entries
+              description: Entries
+              unit: "entries/s"
+              chart_type: line
+              dimensions:
+                - name: sent
+            - name: openldap.referrals
+              description: Referrals
+              unit: "referrals/s"
+              chart_type: line
+              dimensions:
+                - name: sent
+            - name: openldap.operations
+              description: Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: completed
+                - name: initiated
+            - name: openldap.operations_by_type
+              description: Operations by Typ
+              unit: "operations/s"
+              chart_type: stacked
+              dimensions:
+                - name: bind
+                - name: search
+                - name: unbind
+                - name: add
+                - name: delete
+                - name: modify
+                - name: compare
+            - name: openldap.waiters
+              description: Waiters
+              unit: "waiters/s"
+              chart_type: line
+              dimensions:
+                - name: write
+                - name: read

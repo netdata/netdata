@@ -1,0 +1,110 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "OpenLDAP collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for establishing a connection and communication (reading and writing) in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 2
+      },
+      "url": {
+        "title": "URL",
+        "description": "LDAP server URL.",
+        "type": "string",
+        "default": "ldap://127.0.0.1:389"
+      },
+      "username": {
+        "title": "DN",
+        "description": "The distinguished name (DN) of the user authorized to view the monitor database.",
+        "type": "string",
+        "default": ""
+      },
+      "password": {
+        "title": "Password",
+        "description": "The password associated with the user identified by the DN.",
+        "type": "string",
+        "default": ""
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "If set, TLS certificate verification will be skipped.",
+        "type": "boolean"
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "The path to the CA certificate file for TLS verification.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "The path to the client certificate file for TLS authentication.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "The path to the client key file for TLS authentication.",
+        "type": "string",
+        "pattern": "^$|^/"
+      }
+    },
+    "required": [
+      "url",
+      "username"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "url",
+            "timeout",
+            "username",
+            "password"
+          ]
+        },
+        {
+          "title": "TLS",
+          "fields": [
+            "tls_skip_verify",
+            "tls_ca",
+            "tls_cert",
+            "tls_key"
+          ]
+        }
+      ]
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "username": {
+      "ui:placeholder": "cn=admin,dc=example,dc=com"
+    },
+    "password": {
+      "ui:widget": "password"
+    }
+  }
+}
