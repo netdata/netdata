@@ -119,6 +119,7 @@ void apps_orchestrators_and_aggregators_init(void) {
     managed_list_add(&tree.managers, "init");               // linux systems
     managed_list_add(&tree.managers, "systemd");            // lxc containers and host systems (this also catches "systemd --user")
     managed_list_add(&tree.managers, "containerd-shim");    // docker containers
+    managed_list_add(&tree.managers, "docker-init");        // docker containers
     managed_list_add(&tree.managers, "dumb-init");          // some docker containers use this
     managed_list_add(&tree.managers, "gnome-shell");        // gnome user applications
 #elif defined(OS_WINDOWS)
