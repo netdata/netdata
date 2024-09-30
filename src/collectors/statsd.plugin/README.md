@@ -785,7 +785,7 @@ visualize all the available operations.
 
 Start by creating a new configuration file under the `statsd.d/` folder in the 
 [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory). 
-Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-netdataconf) 
+Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) 
 to create a new file called `k6.conf`.
 
 ```bash=
