@@ -5,7 +5,6 @@
 bool enable_function_cmdline = false;
 
 #define PROCESS_FILTER_CATEGORY "category:"
-#define PROCESS_FILTER_PARENT "app:"
 #define PROCESS_FILTER_USER "user:"
 #define PROCESS_FILTER_GROUP "group:"
 #define PROCESS_FILTER_PROCESS "process:"
@@ -22,11 +21,9 @@ static void apps_plugin_function_processes_help(const char *transaction) {
                    "\n"
                    "The following filters are supported:\n"
                    "\n"
-#if (USE_APPS_GROUPS_CONF == 1)
                    "   category:NAME\n"
                    "      Shows only processes that are assigned the category `NAME` in apps_groups.conf\n"
                    "\n"
-#endif
                    "   parent:NAME\n"
                    "      Shows only processes that are aggregated under parent `NAME`\n"
                    "\n"
@@ -91,7 +88,7 @@ void function_processes(const char *transaction, char *function,
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
 
-    struct target *category = NULL, *parent = NULL, *user = NULL, *group = NULL; (void)category; (void)user; (void)group;
+    struct target *category = NULL, *user = NULL, *group = NULL; (void)category; (void)user; (void)group;
     const char *process_name = NULL;
     pid_t pid = 0;
     uid_t uid = 0; (void)uid;
@@ -105,16 +102,7 @@ void function_processes(const char *transaction, char *function,
         const char *keyword = get_word(words, num_words, i);
         if(!keyword) break;
 
-        if(!parent && strncmp(keyword, PROCESS_FILTER_PARENT, strlen(PROCESS_FILTER_PARENT)) == 0) {
-            parent = find_target_by_name(tree_root_target, &keyword[strlen(PROCESS_FILTER_PARENT)]);
-            if(!parent) {
-                pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
-                                                       "No parent with that name found.");
-                return;
-            }
-        }
-#if (USE_APPS_GROUPS_CONF == 1)
-        else if(!category && strncmp(keyword, PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
+        if(!category && strncmp(keyword, PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
             category = find_target_by_name(apps_groups_root_target, &keyword[strlen(PROCESS_FILTER_CATEGORY)]);
             if(!category) {
                 pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
@@ -122,7 +110,6 @@ void function_processes(const char *transaction, char *function,
                 return;
             }
         }
-#endif
 #if (PROCESSES_HAVE_UID == 1)
         else if(!user && strncmp(keyword, PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
             user = find_target_by_name(users_root_target, &keyword[strlen(PROCESS_FILTER_USER)]);
@@ -271,12 +258,7 @@ void function_processes(const char *transaction, char *function,
         if(!p->updated)
             continue;
 
-#if (USE_APPS_GROUPS_CONF == 1)
         if(category && p->target != category)
-            continue;
-#endif
-
-        if(parent && p->tree_target != parent)
             continue;
 
 #if (PROCESSES_HAVE_UID == 1)
@@ -331,13 +313,8 @@ void function_processes(const char *transaction, char *function,
         // ppid
         buffer_json_add_array_item_uint64(wb, p->ppid);
 
-#if (USE_APPS_GROUPS_CONF == 1)
         // category
         buffer_json_add_array_item_string(wb, p->target ? string2str(p->target->name) : "-");
-#endif
-
-        // parent
-        buffer_json_add_array_item_string(wb, p->tree_target ? string2str(p->tree_target->name) : "-");
 
 #if (PROCESSES_HAVE_UID == 1)
         // user
@@ -509,16 +486,7 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
-#if (USE_APPS_GROUPS_CONF == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "Category", "Category (apps_groups.conf)", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE,
-                                    RRDF_FIELD_TRANSFORM_NONE,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-#endif
-
-        buffer_rrdf_table_add_field(wb, field_id++, "App", "App Group Parent", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE,
                                     RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
@@ -1074,12 +1042,12 @@ void function_processes(const char *transaction, char *function,
     {
         buffer_json_add_array_item_array(wb);
         buffer_json_add_array_item_string(wb, "CPU");
-        buffer_json_add_array_item_string(wb, "App");
+        buffer_json_add_array_item_string(wb, "Category");
         buffer_json_array_close(wb);
 
         buffer_json_add_array_item_array(wb);
         buffer_json_add_array_item_string(wb, "Memory");
-        buffer_json_add_array_item_string(wb, "App");
+        buffer_json_add_array_item_string(wb, "Category");
         buffer_json_array_close(wb);
     }
     buffer_json_array_close(wb);
@@ -1098,20 +1066,6 @@ void function_processes(const char *transaction, char *function,
         }
         buffer_json_object_close(wb);
 
-        // group by Parent
-        buffer_json_member_add_object(wb, "App");
-        {
-            buffer_json_member_add_string(wb, "name", "Process Tree by Parent");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "App");
-                buffer_json_add_array_item_string(wb, "PPID");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-#if (USE_APPS_GROUPS_CONF == 1)
         // group by Category
         buffer_json_member_add_object(wb, "Category");
         {
@@ -1124,7 +1078,6 @@ void function_processes(const char *transaction, char *function,
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
-#endif
 
 #if (PROCESSES_HAVE_UID == 1)
         // group by User

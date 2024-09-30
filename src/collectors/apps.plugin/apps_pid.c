@@ -316,39 +316,6 @@ static inline void link_all_processes_to_their_parents(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-#if (USE_APPS_GROUPS_CONF == 1)
-void assign_app_group_target_to_pid(struct pid_stat *p) {
-    targets_assignment_counter++;
-
-    for(struct target *w = apps_groups_root_target; w ; w = w->next) {
-        // find it - 4 cases:
-        // 1. the target is not a pattern
-        // 2. the target has the prefix
-        // 3. the target has the suffix
-        // 4. the target is something inside cmdline
-
-        if(unlikely(( (!w->starts_with && !w->ends_with && w->compare == p->comm)
-                      || (w->starts_with && !w->ends_with && string_starts_with_string(p->comm, w->compare))
-                      || (!w->starts_with && w->ends_with && string_ends_with_string(p->comm, w->compare))
-                      || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(pid_stat_cmdline(p), string2str(w->compare)))
-                          ))) {
-
-            p->matched_by_config = true;
-            if(w->target) p->target = w->target;
-            else p->target = w;
-
-            if(debug_enabled || (p->target && p->target->debug_enabled))
-                debug_log_int("%s linked to target %s",
-                              pid_stat_comm(p), string2str(p->target->name));
-
-            break;
-        }
-    }
-}
-#endif
-
-// --------------------------------------------------------------------------------------------------------------------
-
 void update_pid_comm(struct pid_stat *p, const char *comm) {
     // some process names have ( and ), remove the parenthesis
     size_t len = strlen(comm);
@@ -372,11 +339,9 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
             managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
 #endif
 
-#if (USE_APPS_GROUPS_CONF == 1)
         // the process changes comm, we may have to reassign it to
         // an apps_groups.conf target.
         p->target = NULL;
-#endif
     }
 }
 

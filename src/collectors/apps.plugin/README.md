@@ -7,18 +7,30 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/System metrics"
 -->
 
-# Application monitoring (apps.plugin)
+# Applications monitoring (apps.plugin)
 
-`apps.plugin` breaks down system resource usage to **processes**, **users** and **user groups**.  
-It is enabled by default on every Netdata installation.
+`apps.plugin` monitors the resources utilization of all processes running.
 
-To achieve this task, it iterates through the whole process tree, collecting resource usage information
-for every process found running.
+## Process Aggregation and Grouping
 
-Unlike traditional process monitoring tools (like `top`), `apps.plugin` is able to account the resource
-utilization of exit processes. Their utilization is accounted at their currently running parents.
-So, `apps.plugin` is able to measure the resources used by shell scripts and other processes
-that fork/spawn other short-lived processes hundreds or even thousands of times per second.
+`apps.plugin` aggregates processes in three distinct ways to provide a more insightful
+breakdown of resource utilization:
+
+ - **Tree** or **Category**: Grouped by their position in the process tree.
+   This is customizable and allows aggregation by process managers and individual
+   processes of interest. Allows also renaming the processes for presentation purposes.
+ 
+ - **User**: Grouped by the effective user (UID) under which the processes run.
+ 
+ - **Group**: Grouped by the effective group (GID) under which the processes run.
+
+ ## Short-Lived Process Handling
+
+`apps.plugin` accounts for resource utilization of both running and exited processes,
+capturing the impact of processes that spawn short-lived subprocesses, such as shell
+scripts that fork hundreds or thousands of times per second. So, although processes
+may spawn short lived sub-processes, `apps.plugin` will aggregate their resources
+utilization providing a holistic view of how resources are shared among the processes. 
 
 ## Charts sections
 
@@ -36,17 +48,6 @@ a predefined set of members (of course, only process groups found running are re
 
 > If you find that `apps.plugin` categorizes standard applications as `other`, we would be
 > glad to accept pull requests improving the defaults shipped with Netdata in `apps_groups.conf`.
-
-This type of grouping is not available on Windows.
-
-### Parent Process (Tree)
-
-In this section, apps.plugin summarizes the resources consumed by all processes, grouped by the
-top-most process name, of each processes' subtree.
-
-This grouping is automatic, eliminates the need to configure process group by hand and still
-aggregates subprocesses to the top-level process, which is usually the most interesting for
-monitoring.
 
 ### By User (Users)
 
@@ -108,7 +109,7 @@ The above are reported:
 `apps.plugin` is a complex piece of software and has a lot of work to do
 We are proud that `apps.plugin` is a lot faster compared to any other similar tool,
 while collecting a lot more information for the processes, however the fact is that
-this plugin requires more CPU resources than the `netdata` daemon itself.
+this plugin may require more CPU resources than the `netdata` daemon itself.
 
 Under Linux, for each process running, `apps.plugin` reads several `/proc` files
 per process. Doing this work per-second, especially on hosts with several thousands
@@ -129,7 +130,7 @@ its CPU resources will be cut in half, and data collection will be once every 2 
 
 ## Configuration
 
-The configuration file is `/etc/netdata/apps_groups.conf`. To edit it on your system, run `/etc/netdata/edit-config apps_groups.conf`.
+The configuration file is `/etc/netdata/apps_groups.conf`. You can edit this file using our [`edit-config`](docs/netdata-agent/configuration/README.md) script.
 
 The configuration file works accepts multiple lines, each having this format:
 
@@ -424,5 +425,3 @@ It is even trickier, because walking through the entire process tree takes some 
 if you sum the CPU utilization of all processes, you might have more CPU time than the reported
 total cpu time of the system. Netdata solves this, by adapting the per process cpu utilization to
 the total of the system. [Apps.plugin adds charts that document this normalization](https://london.my-netdata.io/default.html#menu_netdata_submenu_apps_plugin).
-
-

@@ -489,7 +489,6 @@ static void parse_args(int argc, char **argv)
 
     if(freq > 0) update_every = freq;
 
-#if (USE_APPS_GROUPS_CONF == 1)
     if(read_apps_groups_conf(user_config_dir, "groups")) {
         netdata_log_info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
 
@@ -502,7 +501,6 @@ static void parse_args(int argc, char **argv)
     }
     else
         netdata_log_info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
-#endif
 }
 
 #if !defined(OS_WINDOWS)
@@ -620,6 +618,7 @@ int main(int argc, char **argv) {
     procfile_adaptive_initial_allocation = 1;
     os_get_system_HZ();
     os_get_system_cpus_uncached();
+    apps_orchestrators_and_aggregators_init(); // before parsing args!
     parse_args(argc, argv);
 
 #if !defined(OS_WINDOWS)
@@ -643,7 +642,6 @@ int main(int argc, char **argv) {
 
     netdata_log_info("started on pid %d", getpid());
 
-    apps_orchestrators_and_aggregators_init();
     apps_users_and_groups_init();
     apps_pids_init();
     OS_FUNCTION(apps_os_init)();
@@ -711,13 +709,8 @@ int main(int argc, char **argv) {
         send_proc_states_count(dt);
 #endif
 
-        send_charts_updates_to_netdata(tree_root_target, "process", "app", "Applications");
-        send_collected_data_to_netdata(tree_root_target, "process", dt);
-
-#if (USE_APPS_GROUPS_CONF == 1)
         send_charts_updates_to_netdata(apps_groups_root_target, "app", "app_group", "Applications Groups");
         send_collected_data_to_netdata(apps_groups_root_target, "app", dt);
-#endif
 
 #if (PROCESSES_HAVE_UID == 1)
         if (enable_users_charts) {

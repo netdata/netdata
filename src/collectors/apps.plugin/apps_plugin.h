@@ -35,7 +35,6 @@
 #define PROCESSES_HAVE_COMM_AND_NAME         0
 #define PROCESSES_HAVE_STATE                 0
 #define PPID_SHOULD_BE_RUNNING               1
-#define USE_APPS_GROUPS_CONF                 1
 #define INCREMENTAL_DATA_COLLECTION          1
 #define CPU_TO_NANOSECONDCORES (1000) // convert microseconds to nanoseconds
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _freebsd)
@@ -79,7 +78,6 @@ struct pid_info {
 #define PROCESSES_HAVE_COMM_AND_NAME         0
 #define PROCESSES_HAVE_STATE                 0
 #define PPID_SHOULD_BE_RUNNING               1
-#define USE_APPS_GROUPS_CONF                 1
 #define INCREMENTAL_DATA_COLLECTION          1
 #define CPU_TO_NANOSECONDCORES (1) // already in nanoseconds
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _macos)
@@ -111,7 +109,6 @@ struct pid_info {
 #define PROCESSES_HAVE_COMM_AND_NAME         1
 #define PROCESSES_HAVE_STATE                 0
 #define PPID_SHOULD_BE_RUNNING               0
-#define USE_APPS_GROUPS_CONF                 0
 #define INCREMENTAL_DATA_COLLECTION          0
 #define CPU_TO_NANOSECONDCORES (100) // convert 100ns to ns
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _windows)
@@ -375,7 +372,6 @@ struct target {
     TARGET_TYPE type;
     union {
         STRING *compare;
-        STRING *pid_comm;
 #if (PROCESSES_HAVE_UID == 1)
         uid_t uid;
 #endif
@@ -396,7 +392,6 @@ struct target {
     uint32_t target_fds_size;
 #endif
 
-    bool is_other:1;
     bool exposed:1;         // if set, we have sent this to netdata
     bool hidden:1;          // if set, we set the hidden flag on the dimension
     bool debug_enabled:1;
@@ -481,9 +476,7 @@ struct pid_stat {
     struct pid_stat *next;
     struct pid_stat *prev;
 
-#if (USE_APPS_GROUPS_CONF == 1)
     struct target *target;          // app_groups.conf targets
-#endif
 
 #if (PROCESSES_HAVE_UID == 1)
     struct target *uid_target;      // uid based targets
@@ -491,7 +484,6 @@ struct pid_stat {
 #if (PROCESSES_HAVE_GID == 1)
     struct target *gid_target;      // gid based targets
 #endif
-    struct target *tree_target;     // tree based target
 
     STRING *comm;                   // the command name (short version)
     STRING *name;                   // a better name, or NULL
@@ -540,9 +532,7 @@ struct pid_stat {
     bool merged:1;                  // true when it has been merged to its parent
     bool keep:1;                    // true when we need to keep this process in memory even after it exited
 
-#if (USE_APPS_GROUPS_CONF == 1)
     bool matched_by_config:1;
-#endif
 
 #if (PROCESSES_HAVE_STATE == 1)
     char state;
@@ -659,10 +649,6 @@ void make_all_pid_fds_negative(struct pid_stat *p);
 uint32_t file_descriptor_find_or_add(const char *name, uint32_t hash);
 #endif
 
-#if (USE_APPS_GROUPS_CONF == 1)
-void assign_app_group_target_to_pid(struct pid_stat *p);
-#endif
-
 // --------------------------------------------------------------------------------------------------------------------
 // data collection management
 
@@ -693,7 +679,6 @@ void update_pid_comm(struct pid_stat *p, const char *comm);
 // --------------------------------------------------------------------------------------------------------------------
 // targets management
 
-extern struct target *tree_root_target;
 struct target *find_target_by_name(struct target *base, const char *name);
 struct target *get_tree_target(struct pid_stat *p);
 
@@ -711,10 +696,8 @@ struct target *get_gid_target(gid_t gid);
 struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find);
 #endif
 
-#if (USE_APPS_GROUPS_CONF == 1)
-extern struct target *apps_groups_default_target, *apps_groups_root_target;
+extern struct target *apps_groups_root_target;
 int read_apps_groups_conf(const char *path, const char *file);
-#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 // output

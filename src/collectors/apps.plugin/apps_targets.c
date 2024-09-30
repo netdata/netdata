@@ -61,60 +61,89 @@ static inline STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
     return sanitize_chart_meta_string(comm);
 }
 
-struct {
-    const char *txt;
+struct comm_list {
     STRING *comm;
-} process_orchestrators[] = {
-#if defined(OS_WINDOWS)
-    { "System",             NULL, },
-    { "services",           NULL, },
-    { "wininit",            NULL, },
-#elif defined(OS_LINUX)
-    { "init",               NULL, }, // linux systems
-    { "systemd",            NULL, }, // lxc containers and host systems (this also catches "systemd --user")
-    { "containerd-shim",    NULL, }, // docker containers
-    { "dumb-init",          NULL, }, // some docker containers use this
-    { "gnome-shell",        NULL, }, // gnome user applications
-#elif defined(OS_FREBBSD)
-    { "init",               NULL, },
-#elif defined(OS_MACOS)
-    { "launchd",            NULL, },
-#endif
-
-    // terminator
-    { NULL,                 NULL }
 };
 
-struct {
-    const char *txt;
-    STRING *comm;
-} process_aggregators[] = {
-#if defined(OS_LINUX)
-    { "kthread",            NULL, }, // linux kernels have many processes
-#elif defined(OS_FREEBSD)
-    { "kernel",             NULL, },
-#endif
-
-    // terminator
-    { NULL, NULL }
+struct managed_list {
+    size_t used;
+    size_t size;
+    struct comm_list *array;
 };
+
+static struct {
+    struct managed_list managers;
+    struct managed_list aggregators;
+} tree = {
+    .managers = {
+        .array = NULL,
+        .size = 0,
+        .used = 0,
+    },
+    .aggregators = {
+        .array = NULL,
+        .size = 0,
+        .used = 0,
+    }
+};
+
+static void managed_list_clear(struct managed_list *list) {
+    for(size_t c = 0; c < list->used ; c++)
+        string_freez(list->array[c].comm);
+
+    freez(list->array);
+    list->array = NULL;
+    list->used = 0;
+    list->size = 0;
+}
+
+static void managed_list_add(struct managed_list *list, const char *s) {
+    if(list->used >= list->size) {
+        if(!list->size)
+            list->size = 10;
+        else
+            list->size *= 2;
+        list->array = reallocz(list->array, sizeof(*list->array) * list->size);
+    }
+
+    list->array[list->used++].comm = string_strdupz(s);
+}
 
 static STRING *KernelAggregator = NULL;
-struct target *tree_root_target = NULL;
 
 void apps_orchestrators_and_aggregators_init(void) {
     KernelAggregator = string_strdupz("kernel");
 
-    for(size_t i = 0; process_orchestrators[i].txt ;i++)
-        process_orchestrators[i].comm = string_strdupz(process_orchestrators[i].txt);
+    managed_list_clear(&tree.managers);
+#if defined(OS_LINUX)
+    managed_list_add(&tree.managers, "init");               // linux systems
+    managed_list_add(&tree.managers, "systemd");            // lxc containers and host systems (this also catches "systemd --user")
+    managed_list_add(&tree.managers, "containerd-shim");    // docker containers
+    managed_list_add(&tree.managers, "dumb-init");          // some docker containers use this
+    managed_list_add(&tree.managers, "gnome-shell");        // gnome user applications
+#elif defined(OS_WINDOWS)
+    managed_list_add(&tree.managers, "System");
+    managed_list_add(&tree.managers, "services");
+    managed_list_add(&tree.managers, "wininit");
+#elif defined(OS_FREEBSD)
+    managed_list_add(&tree.managers, "init");
+#elif defined(OS_MACOS)
+    managed_list_add(&tree.managers, "launchd");
+#endif
 
-    for(size_t i = 0; process_aggregators[i].txt ;i++)
-        process_aggregators[i].comm = string_strdupz(process_aggregators[i].txt);
+    managed_list_clear(&tree.aggregators);
+#if defined(OS_LINUX)
+    managed_list_add(&tree.aggregators, "kthread");
+#elif defined(OS_WINDOWS)
+#elif defined(OS_FREEBSD)
+    managed_list_add(&tree.aggregators, "kernel");
+#elif defined(OS_MACOS)
+#endif
 }
 
 static inline bool is_orchestrator(struct pid_stat *p) {
-    for(size_t i = 0; process_orchestrators[i].comm ;i++) {
-        if(p->comm == process_orchestrators[i].comm)
+    for(size_t c = 0; c < tree.managers.used ; c++) {
+        if(p->comm == tree.managers.array[c].comm)
             return true;
     }
 
@@ -122,8 +151,8 @@ static inline bool is_orchestrator(struct pid_stat *p) {
 }
 
 static inline bool is_aggregator(struct pid_stat *p) {
-    for(size_t i = 0; process_aggregators[i].comm ;i++) {
-        if(p->comm == process_aggregators[i].comm)
+    for(size_t c = 0; c < tree.aggregators.used ; c++) {
+        if(p->comm == tree.aggregators.array[c].comm)
             return true;
     }
 
@@ -140,37 +169,39 @@ struct target *get_tree_target(struct pid_stat *p) {
         p = p->parent;
 
     // merge all processes into process aggregators
-    STRING *search_for = p->comm;
+    STRING *search_for = string_dup(p->comm);
     bool aggregator = false;
     if((p->ppid == 0 && p->pid != INIT_PID) || (p->parent && is_aggregator(p->parent))) {
         aggregator = true;
-        search_for = KernelAggregator;
+        search_for = string_dup(KernelAggregator);
     }
 
-    struct target *w;
-    for(w = tree_root_target; w ; w = w->next)
-        if(w->pid_comm == search_for) return w;
-
-    w = callocz(sizeof(struct target), 1);
-    w->type = TARGET_TYPE_TREE;
-    w->pid_comm = string_dup(search_for);
-    w->id = string_dup(search_for);
-
-    if(aggregator) {
-        w->name = string_dup(search_for);
-    }
-    else {
+    if(!aggregator) {
 #if (PROCESSES_HAVE_COMM_AND_NAME == 1)
-        w->name = sanitize_chart_meta_string(p->name ? p->name : p->comm);
+        search_for = sanitize_chart_meta_string(p->name ? p->name : p->comm);
 #else
-        w->name = comm_from_cmdline(p->comm, p->cmdline);
+        search_for = comm_from_cmdline(p->comm, p->cmdline);
 #endif
     }
 
+    struct target *w;
+    for(w = apps_groups_root_target; w ; w = w->next) {
+        if (w->name == search_for) {
+            string_freez(search_for);
+            return w;
+        }
+    }
+
+    w = callocz(sizeof(struct target), 1);
+    w->type = TARGET_TYPE_TREE;
+    w->starts_with = w->ends_with = false;
+    w->compare = string_dup(p->comm);
+    w->id = search_for;
+    w->name = string_dup(search_for);
     w->clean_name = get_clean_name(w->name);
 
-    w->next = tree_root_target;
-    tree_root_target = w;
+    w->next = apps_groups_root_target;
+    apps_groups_root_target = w;
 
     return w;
 }
@@ -266,8 +297,7 @@ struct target *get_gid_target(gid_t gid) {
 // --------------------------------------------------------------------------------------------------------------------
 // apps_groups.conf
 
-#if (USE_APPS_GROUPS_CONF == 1)
-struct target *apps_groups_default_target = NULL, *apps_groups_root_target = NULL;
+struct target *apps_groups_root_target = NULL;
 
 // find or create a new target
 // there are targets that are just aggregated to other target (the second argument)
@@ -406,12 +436,35 @@ int read_apps_groups_conf(const char *path, const char *file) {
 
     size_t line, lines = procfile_lines(ff);
 
+    bool managers_reset_done = false;
+
     for(line = 0; line < lines ;line++) {
         size_t word, words = procfile_linewords(ff, line);
         if(!words) continue;
 
         char *name = procfile_lineword(ff, line, 0);
         if(!name || !*name) continue;
+
+        if(strcmp(name, "managers") == 0) {
+            if(!managers_reset_done) {
+                managers_reset_done = true;
+                managed_list_clear(&tree.managers);
+            }
+
+            for(word = 0; word < words ;word++) {
+                char *s = procfile_lineword(ff, line, word);
+                if (!s || !*s) continue;
+                if (*s == '#') break;
+
+                // is this the first word? skip it
+                if(s == name) continue;
+
+                managed_list_add(&tree.managers, s);
+            }
+
+            // done with managers, proceed to next line
+            continue;
+        }
 
         // find a possibly existing target
         struct target *w = NULL;
@@ -439,16 +492,5 @@ int read_apps_groups_conf(const char *path, const char *file) {
     }
 
     procfile_close(ff);
-
-    apps_groups_default_target = get_apps_groups_target("p+!o@w#e$i^r&7*5(-i)l-o_", NULL, "other"); // match nothing
-    if(!apps_groups_default_target)
-        fatal("Cannot create default target");
-    apps_groups_default_target->is_other = true;
-
-    // allow the user to override group 'other'
-    if(apps_groups_default_target->target)
-        apps_groups_default_target = apps_groups_default_target->target;
-
     return 0;
 }
-#endif

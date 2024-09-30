@@ -111,7 +111,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_SET("threads", w->values[PDF_THREADS]);
         send_END();
 
-        if (unlikely(!w->values[PDF_PROCESSES] && !w->is_other))
+        if (unlikely(!w->values[PDF_PROCESSES]))
             continue;
 
 #if (PROCESSES_HAVE_CPU_CHILDREN_TIME)
@@ -274,7 +274,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
     }
 
     for (w = root; w; w = w->next) {
-        if (likely(w->exposed || (!w->values[PDF_PROCESSES] && !w->is_other)))
+        if (likely(w->exposed || (!w->values[PDF_PROCESSES])))
             continue;
 
         w->exposed = true;

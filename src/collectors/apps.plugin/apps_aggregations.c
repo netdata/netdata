@@ -5,124 +5,6 @@
 // ----------------------------------------------------------------------------
 // update statistics on the targets
 
-#if (USE_APPS_GROUPS_CONF == 1)
-// 1. link all childs to their parents
-// 2. go from bottom to top, marking as merged all children to their parents,
-//    this step links all parents without a target to the child target, if any
-// 3. link all top level processes (the ones not merged) to default target
-// 4. go from top to bottom, linking all children without a target to their parent target
-//    after this step all processes have a target.
-// [5. for each killed pid (updated = 0), remove its usage from its target]
-// 6. zero all apps_groups_targets
-// 7. concentrate all values on the apps_groups_targets
-// 8. remove all killed processes
-// 9. find the unique file count for each target
-// check: update_apps_groups_statistics()
-
-static void apply_apps_groups_targets_inheritance(void) {
-    struct pid_stat *p = NULL;
-
-    // children that do not have a target
-    // inherit their target from their parent
-    int found = 1, loops = 0;
-    while(found) {
-        if(unlikely(debug_enabled)) loops++;
-        found = 0;
-        for(p = root_of_pids(); p ; p = p->next) {
-            // if this process does not have a target,
-            // and it has a parent
-            // and its parent has a target
-            // then, set the parent's target to this process
-            if(unlikely(!p->target && p->parent && p->parent->target)) {
-                p->target = p->parent->target;
-                found++;
-
-                if(debug_enabled || (p->target && p->target->debug_enabled))
-                    debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s).",
-                                  string2str(p->target->name), p->pid, pid_stat_comm(p), p->parent->pid, pid_stat_comm(p->parent));
-            }
-        }
-    }
-
-    // find all the procs with 0 childs and merge them to their parents
-    // repeat, until nothing more can be done.
-    found = 1;
-    while(found) {
-        if(unlikely(debug_enabled)) loops++;
-        found = 0;
-
-        for(p = root_of_pids(); p ; p = p->next) {
-            if(unlikely(
-                    !p->children_count            // if this process does not have any children
-                    && !p->merged                 // and is not already merged
-                    && p->parent                  // and has a parent
-                    && p->parent->children_count  // and its parent has children
-                                                 // and the target of this process and its parent is the same,
-                                                 // or the parent does not have a target
-                    && (p->target == p->parent->target || !p->parent->target)
-                    && p->ppid != INIT_PID        // and its parent is not init
-                    )) {
-                // mark it as merged
-                p->parent->children_count--;
-                p->merged = true;
-
-                // the parent inherits the child's target, if it does not have a target itself
-                if(unlikely(p->target && !p->parent->target)) {
-                    p->parent->target = p->target;
-
-                    if(debug_enabled || (p->target && p->target->debug_enabled))
-                        debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its child %d (%s).",
-                                      string2str(p->target->name), p->parent->pid, pid_stat_comm(p->parent), p->pid, pid_stat_comm(p));
-                }
-
-                found++;
-            }
-        }
-
-        debug_log("TARGET INHERITANCE: merged %d processes", found);
-    }
-
-    // init goes always to default target
-    struct pid_stat *pi = find_pid_entry(INIT_PID);
-    if(pi && !pi->matched_by_config)
-        pi->target = apps_groups_default_target;
-
-    // pid 0 goes always to default target
-    pi = find_pid_entry(0);
-    if(pi && !pi->matched_by_config)
-        pi->target = apps_groups_default_target;
-
-    // give a default target on all top level processes
-    if(unlikely(debug_enabled)) loops++;
-
-    for(p = root_of_pids(); p ; p = p->next) {
-        // if the process is not merged itself
-        // then it is a top level process
-        if(unlikely(!p->merged && !p->target))
-            p->target = apps_groups_default_target;
-    }
-
-    // give a target to all merged child processes
-    found = 1;
-    while(found) {
-        if(unlikely(debug_enabled)) loops++;
-        found = 0;
-        for(p = root_of_pids(); p ; p = p->next) {
-            if(unlikely(!p->target && p->merged && p->parent && p->parent->target)) {
-                p->target = p->parent->target;
-                found++;
-
-                if(debug_enabled || (p->target && p->target->debug_enabled))
-                    debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s) at phase 2.",
-                                  string2str(p->target->name), p->pid, pid_stat_comm(p), p->parent->pid, pid_stat_comm(p->parent));
-            }
-        }
-    }
-
-    debug_log("apply_apps_groups_targets_inheritance() made %d loops on the process tree", loops);
-}
-#endif
-
 static size_t zero_all_targets(struct target *root) {
     struct target *w;
     size_t count = 0;
@@ -170,9 +52,7 @@ static size_t zero_all_targets(struct target *root) {
     return count;
 }
 
-static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
-    (void)o;
-
+static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o __maybe_unused) {
     if(unlikely(!p->updated)) {
         // the process is not running
         return;
@@ -230,16 +110,66 @@ static inline void cleanup_exited_pids(void) {
     }
 }
 
-void aggregate_processes_to_targets(void) {
-#if (USE_APPS_GROUPS_CONF == 1)
-    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
-        if (!p->target)
-            assign_app_group_target_to_pid(p);
+static struct target *get_app_group_target_for_pid(struct pid_stat *p) {
+    targets_assignment_counter++;
+
+    for(struct target *w = apps_groups_root_target; w ; w = w->next) {
+        if(w->type != TARGET_TYPE_APP_GROUP) continue;
+
+        // find it - 4 cases:
+        // 1. the target is not a pattern
+        // 2. the target has the prefix
+        // 3. the target has the suffix
+        // 4. the target is something inside cmdline
+
+        if(unlikely(( (!w->starts_with && !w->ends_with && w->compare == p->comm)
+                      || (w->starts_with && !w->ends_with && string_starts_with_string(p->comm, w->compare))
+                      || (!w->starts_with && w->ends_with && string_ends_with_string(p->comm, w->compare))
+                      || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(pid_stat_cmdline(p), string2str(w->compare)))
+                          ))) {
+
+            p->matched_by_config = true;
+            if(w->target) return w->target;
+            else return w;
+        }
     }
 
-    apply_apps_groups_targets_inheritance();
+    return NULL;
+}
+
+static void assign_a_target_to_all_processes(void) {
+    // assign targets from app_groups.conf
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
+        if(!p->target)
+            p->target = get_app_group_target_for_pid(p);
+    }
+
+    // assign targets from their parents, if they have
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
+        if(!p->target) {
+            for(struct pid_stat *pp = p->parent ; pp ; pp = pp->parent) {
+                if(pp->target) {
+                    if(pp->matched_by_config) {
+                        // we are only interested about app_groups.conf matches
+                        p->target = pp->target;
+                    }
+                    break;
+                }
+            }
+
+            if(!p->target) {
+                // there is no target, get it from the tree
+                p->target = get_tree_target(p);
+            }
+        }
+
+        fatal_assert(p->target != NULL);
+    }
+}
+
+void aggregate_processes_to_targets(void) {
+    assign_a_target_to_all_processes();
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
-#endif
 
 #if (PROCESSES_HAVE_UID == 1)
     zero_all_targets(users_root_target);
@@ -248,8 +178,6 @@ void aggregate_processes_to_targets(void) {
     zero_all_targets(groups_root_target);
 #endif
 
-    zero_all_targets(tree_root_target);
-
     // this has to be done, before the cleanup
     struct target *w = NULL, *o = NULL;
 
@@ -257,27 +185,9 @@ void aggregate_processes_to_targets(void) {
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
 
         // --------------------------------------------------------------------
-        // tree target
+        // apps_groups and tree target
 
-        o = p->tree_target;
-        if(likely(p->tree_target && p->tree_target->pid_comm == p->comm))
-            w = p->tree_target;
-        else {
-            w = p->tree_target = get_tree_target(p);
-
-            if(unlikely(debug_enabled && o))
-                debug_log("pid %d (%s) switched top target from '%s' to '%s'.", p->pid, pid_stat_comm(p), string2str(o->pid_comm), string2str(w->pid_comm));
-        }
-
-        aggregate_pid_on_target(w, p, o);
-
-
-        // --------------------------------------------------------------------
-        // apps_groups target
-
-#if (USE_APPS_GROUPS_CONF == 1)
         aggregate_pid_on_target(p->target, p, NULL);
-#endif
 
 
         // --------------------------------------------------------------------
