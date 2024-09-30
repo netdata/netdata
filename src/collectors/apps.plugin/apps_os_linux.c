@@ -615,7 +615,7 @@ bool apps_os_read_pid_stat_linux(struct pid_stat *p, void *ptr __maybe_unused) {
         p->stat_filename = strdupz(filename);
     }
 
-    int set_quotes = (!ff)?1:0;
+    bool set_quotes = (!ff) ? true : false;
 
     ff = procfile_reopen(ff, p->stat_filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
     if(unlikely(!ff)) goto cleanup;

@@ -350,9 +350,22 @@ void assign_app_group_target_to_pid(struct pid_stat *p) {
 // --------------------------------------------------------------------------------------------------------------------
 
 void update_pid_comm(struct pid_stat *p, const char *comm) {
-    if(strcmp(pid_stat_comm(p), comm) != 0) {
+    // some process names have ( and ), remove the parenthesis
+    size_t len = strlen(comm);
+    char buf[len + 1];
+    if(comm[0] == '(' && comm[len - 1] == ')') {
+        memcpy(buf, &comm[1], len - 2);
+        buf[len - 2] = '\0';
+    }
+    else
+        memcpy(buf, comm, sizeof(buf));
+
+    // check if the comm is changed
+    if(!p->comm || strcmp(pid_stat_comm(p), buf) != 0) {
+        // it is changed
+
         string_freez(p->comm);
-        p->comm = string_strdupz(comm);
+        p->comm = string_strdupz(buf);
 
 #if (PROCESSES_HAVE_CMDLINE == 1)
         if(likely(proc_pid_cmdline_is_needed))
@@ -360,7 +373,9 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
 #endif
 
 #if (USE_APPS_GROUPS_CONF == 1)
-        assign_app_group_target_to_pid(p);
+        // the process changes comm, we may have to reassign it to
+        // an apps_groups.conf target.
+        p->target = NULL;
 #endif
     }
 }

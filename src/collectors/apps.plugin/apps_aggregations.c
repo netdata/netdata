@@ -232,6 +232,11 @@ static inline void cleanup_exited_pids(void) {
 
 void aggregate_processes_to_targets(void) {
 #if (USE_APPS_GROUPS_CONF == 1)
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
+        if (!p->target)
+            assign_app_group_target_to_pid(p);
+    }
+
     apply_apps_groups_targets_inheritance();
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 #endif
@@ -246,11 +251,10 @@ void aggregate_processes_to_targets(void) {
     zero_all_targets(tree_root_target);
 
     // this has to be done, before the cleanup
-    struct pid_stat *p = NULL;
     struct target *w = NULL, *o = NULL;
 
     // concentrate everything on the targets
-    for(p = root_of_pids(); p ; p = p->next) {
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
 
         // --------------------------------------------------------------------
         // tree target

@@ -65,6 +65,7 @@ struct {
     { "containerd-shim",    NULL, }, // docker containers
     { "init",               NULL, },
     { "dump-init",          NULL, }, // docker containers
+    { "gnome-shell",        NULL, },
 #elif defined(OS_FREBBSD)
     { "init",               NULL, },
 #elif defined(OS_MACOS)
@@ -89,6 +90,19 @@ struct {
     { NULL, NULL }
 };
 
+static STRING *KernelAggregator = NULL;
+struct target *tree_root_target = NULL;
+
+void apps_orchestrators_and_aggregators_init(void) {
+    KernelAggregator = string_strdupz("kernel");
+
+    for(size_t i = 0; process_orchestrators[i].txt ;i++)
+        process_orchestrators[i].comm = string_strdupz(process_orchestrators[i].txt);
+
+    for(size_t i = 0; process_aggregators[i].txt ;i++)
+        process_aggregators[i].comm = string_strdupz(process_aggregators[i].txt);
+}
+
 static inline bool is_orchestrator(struct pid_stat *p) {
     for(size_t i = 0; process_orchestrators[i].comm ;i++) {
         if(p->comm == process_orchestrators[i].comm)
@@ -106,33 +120,20 @@ static inline bool is_aggregator(struct pid_stat *p) {
 
     return false;
 }
-static STRING *KernelAggregator = NULL;
-
-void apps_orchestrators_and_aggregators_init(void) {
-    KernelAggregator = string_strdupz("kernel");
-
-    for(size_t i = 0; process_orchestrators[i].txt ;i++)
-        process_orchestrators[i].comm = string_strdupz(process_orchestrators[i].txt);
-
-    for(size_t i = 0; process_aggregators[i].txt ;i++)
-        process_aggregators[i].comm = string_strdupz(process_aggregators[i].txt);
-}
-
-struct target *tree_root_target = NULL;
 
 struct target *get_tree_target(struct pid_stat *p) {
-    // skip fast all the children that are more than 3 levels down
-    while(p->parent && p->parent->pid != INIT_PID && p->parent->parent && p->parent->parent->parent)
-        p = p->parent;
+//    // skip fast all the children that are more than 3 levels down
+//    while(p->parent && p->parent->pid != INIT_PID && p->parent->parent && p->parent->parent->parent)
+//        p = p->parent;
 
     // keep the children of INIT_PID, and process orchestrators
-    while(p->parent && p->parent->pid != INIT_PID && !is_orchestrator(p->parent))
+    while(p->parent && p->parent->pid != INIT_PID && p->parent->pid != 0 && !is_orchestrator(p->parent))
         p = p->parent;
 
     // merge all processes into process aggregators
     STRING *search_for = p->comm;
     bool aggregator = false;
-    if(p->ppid == 0 || (p->parent && is_aggregator(p->parent))) {
+    if((p->ppid == 0 && p->pid != INIT_PID) || (p->parent && is_aggregator(p->parent))) {
         aggregator = true;
         search_for = KernelAggregator;
     }
