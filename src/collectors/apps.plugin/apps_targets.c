@@ -60,7 +60,7 @@ struct {
     { "System",             NULL, },
     { "services",           NULL, },
     { "wininit",            NULL, },
-#elif defined(LINUX)
+#elif defined(OS_LINUX)
     { "systemd",            NULL, }, // lxc containers and host systems
     { "containerd-shim",    NULL, }, // docker containers
     { "init",               NULL, },
