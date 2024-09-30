@@ -294,7 +294,7 @@ func (e *localListenersExec) discover(ctx context.Context) ([]byte, error) {
 	defer cancel()
 
 	// TCPv4/6 and UPDv4 sockets in LISTEN state
-	// https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/local_listeners.c
+	// https://github.com/netdata/netdata/blob/master/src/plugins.d/local_listeners.c
 	args := []string{
 		"no-udp6",
 		"no-local",

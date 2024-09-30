@@ -7,7 +7,7 @@
 3. It communicates with Netdata via a unidirectional pipe (sending data to the `netdata` daemon)
 4. Supports any number of data collection **modules**
 
-To better understand the guidelines and the API behind our External plugins, please have a look at the [Introduction to External plugins](/src/collectors/plugins.d/README.md) prior to reading this page.
+To better understand the guidelines and the API behind our External plugins, please have a look at the [Introduction to External plugins](/src/plugins.d/README.md) prior to reading this page.
 
 
 `charts.d.plugin` has been designed so that the actual script that will do data collection will be permanently in

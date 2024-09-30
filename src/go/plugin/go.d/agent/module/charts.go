@@ -78,7 +78,7 @@ type (
 	}
 
 	// Chart represents a chart.
-	// For the full description please visit https://docs.netdata.cloud/collectors/plugins.d/#chart
+	// For the full description please visit https://docs.netdata.cloud/plugins.d/#chart
 	Chart struct {
 		// typeID is the unique identification of the chart, if not specified,
 		// the orchestrator will use job full name + chart ID as typeID (default behaviour).
@@ -128,7 +128,7 @@ type (
 	}
 
 	// Dim represents a chart dimension.
-	// For detailed description please visit https://docs.netdata.cloud/collectors/plugins.d/#dimension.
+	// For detailed description please visit https://docs.netdata.cloud/plugins.d/#dimension.
 	Dim struct {
 		ID   string
 		Name string
@@ -141,7 +141,7 @@ type (
 	}
 
 	// Var represents a chart variable.
-	// For detailed description please visit https://docs.netdata.cloud/collectors/plugins.d/#variable
+	// For detailed description please visit https://docs.netdata.cloud/plugins.d/#variable
 	Var struct {
 		ID    string
 		Name  string

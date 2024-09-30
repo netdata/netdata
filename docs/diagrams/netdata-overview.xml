@@ -78,7 +78,7 @@
             <mxGeometry x="254" y="690" width="770" height="93" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;plugins.d&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;external plugins API&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;text format, over pipes&lt;/font&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/plugins.d" id="32">
+        <UserObject label="&lt;div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;plugins.d&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;external plugins API&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;text format, over pipes&lt;/font&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/plugins.d" id="32">
           <mxCell style="whiteSpace=wrap;html=1;fontSize=16;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="74" y="887" width="580" height="130" as="geometry" />
           </mxCell>

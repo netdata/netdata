@@ -73,7 +73,7 @@ The basic elements of a Netdata collector are:
 - `get_data()`: The basic function of the plugin which will return to Netdata the correct values.
 
 **Note**: All names are better explained in the 
-[External Plugins Documentation](/src/collectors/plugins.d/README.md).
+[External Plugins Documentation](/src/plugins.d/README.md).
 Parameters like `priority` and `update_every` mentioned in that documentation are handled by the `python.d.plugin`,
 not by each collection module. 
 

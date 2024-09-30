@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "commands.h"
-#include "collectors/plugins.d/pluginsd_internals.h"
+#include "plugins.d/pluginsd_internals.h"
 
 PARSER_RC rrdpush_receiver_pluginsd_claimed_id(char **words, size_t num_words, PARSER *parser) {
     const char *machine_guid_str = get_word(words, num_words, 1);
