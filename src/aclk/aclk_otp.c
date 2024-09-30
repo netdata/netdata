@@ -267,40 +267,8 @@ exit:
 }
 #endif
 
-#if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
-static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)
-{
-	EVP_ENCODE_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
-
-	if (ctx != NULL) {
-		memset(ctx, 0, sizeof(*ctx));
-	}
-	return ctx;
-}
-static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
-{
-	OPENSSL_free(ctx);
-	return;
-}
-#endif
-
 #define CHALLENGE_LEN 256
 #define CHALLENGE_LEN_BASE64 344
-inline static int base64_decode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
-{
-    unsigned char remaining_data[CHALLENGE_LEN];
-    EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
-    EVP_DecodeInit(ctx);
-    EVP_DecodeUpdate(ctx, out, outl, in, in_len);
-    int remainder = 0;
-    EVP_DecodeFinal(ctx, remaining_data, &remainder);
-    EVP_ENCODE_CTX_free(ctx);
-    if (remainder) {
-        netdata_log_error("Unexpected data at EVP_DecodeFinal");
-        return 1;
-    }
-    return 0;
-}
 
 #define OTP_URL_PREFIX "/api/v1/auth/node/"
 int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **challenge, int *challenge_bytes, bool *fallback_ipv4)
@@ -347,7 +315,7 @@ int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **
         goto cleanup_json;
     }
     const char *challenge_base64;
-    if (!(challenge_base64 = json_object_get_string(challenge_json))) {
+    if (!((challenge_base64 = json_object_get_string(challenge_json)))) {
         netdata_log_error("Failed to extract challenge from JSON object");
         goto cleanup_json;
     }
@@ -356,8 +324,9 @@ int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **
         goto cleanup_json;
     }
 
-    *challenge = mallocz((CHALLENGE_LEN_BASE64 / 4) * 3);
-    base64_decode_helper(*challenge, challenge_bytes, (const unsigned char*)challenge_base64, strlen(challenge_base64));
+    *challenge = mallocz(CHALLENGE_LEN);
+    *challenge_bytes = netdata_base64_decode(*challenge, (const unsigned char *) challenge_base64, CHALLENGE_LEN_BASE64);
+
     if (*challenge_bytes != CHALLENGE_LEN) {
         netdata_log_error("Unexpected challenge length of %d instead of %d", *challenge_bytes, CHALLENGE_LEN);
         freez(*challenge);
@@ -375,7 +344,6 @@ cleanup_resp:
 
 int aclk_send_otp_response(const char *agent_id, const unsigned char *response, int response_bytes, url_t *target, struct auth_data *mqtt_auth, bool *fallback_ipv4)
 {
-    int len;
     int rc = 1;
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
     https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;
@@ -387,7 +355,7 @@ int aclk_send_otp_response(const char *agent_id, const unsigned char *response, 
     unsigned char base64[CHALLENGE_LEN_BASE64 + 1];
     memset(base64, 0, CHALLENGE_LEN_BASE64 + 1);
 
-    base64_encode_helper(base64, &len, response, response_bytes);
+    (void) netdata_base64_encode(base64, response, response_bytes);
 
     BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20, &netdata_buffers_statistics.buffers_aclk);
     BUFFER *resp_json = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20, &netdata_buffers_statistics.buffers_aclk);

@@ -3,49 +3,34 @@
 #ifndef MQTT_WSS_CLIENT_H
 #define MQTT_WSS_CLIENT_H
 
-#include "mqtt_wss_log.h"
 #include "common_public.h"
 
-// All OK call me at your earliest convinience
-#define MQTT_WSS_OK              0
-/* All OK, poll timeout you requested when calling mqtt_wss_service expired - you might want to know if timeout
- * happened or we got some data or handle same as MQTT_WSS_OK
- */
-#define MQTT_WSS_OK_TO           1
-// Connection was closed by remote
-#define MQTT_WSS_ERR_CONN_DROP  -1
-// Error in MQTT protocol (e.g. malformed packet)
-#define MQTT_WSS_ERR_PROTO_MQTT -2
-// Error in WebSocket protocol (e.g. malformed packet)
-#define MQTT_WSS_ERR_PROTO_WS   -3
 
-#define MQTT_WSS_ERR_TX_BUF_TOO_SMALL  -4
-#define MQTT_WSS_ERR_RX_BUF_TOO_SMALL  -5
-
-#define MQTT_WSS_ERR_TOO_BIG_FOR_SERVER -6
-// if client was initialized with MQTT 3 but MQTT 5 feature
-// was requested by user of library
-#define MQTT_WSS_ERR_CANT_DO       -8
+#define MQTT_WSS_OK                 0       // All OK call me at your earliest convinience
+#define MQTT_WSS_OK_TO              1       // All OK, poll timeout you requested when calling mqtt_wss_service expired
+                                            //you might want to know if timeout
+                                            //happened or we got some data or handle same as MQTT_WSS_OK
+#define MQTT_WSS_ERR_CONN_DROP      -1      // Connection was closed by remote
+#define MQTT_WSS_ERR_PROTO_MQTT     -2      // Error in MQTT protocol (e.g. malformed packet)
+#define MQTT_WSS_ERR_PROTO_WS       -3      // Error in WebSocket protocol (e.g. malformed packet)
+#define MQTT_WSS_ERR_MSG_TOO_BIG    -6      // Message size too big for server
+#define MQTT_WSS_ERR_CANT_DO        -8      // if client was initialized with MQTT 3 but MQTT 5 feature
+                                            // was requested by user of library
 
 typedef struct mqtt_wss_client_struct *mqtt_wss_client;
 
 typedef void (*msg_callback_fnc_t)(const char *topic, const void *msg, size_t msglen, int qos);
+
 /* Creates new instance of MQTT over WSS. Doesn't start connection.
- * @param log_prefix this is prefix to be used when logging to discern between multiple
- *        mqtt_wss instances. Can be NULL.
- * @param log_callback is function pointer to fnc to be called when mqtt_wss wants
- *        to log. This allows plugging this library into your own logging system/solution.
- *        If NULL STDOUT/STDERR will be used.
  * @param msg_callback is function pointer to function which will be called
  *        when application level message arrives from broker (for subscribed topics).
  *        Can be NULL if you are not interested about incoming messages.
  * @param puback_callback is function pointer to function to be called when QOS1 Publish
  *        is acknowledged by server
  */
-mqtt_wss_client mqtt_wss_new(const char *log_prefix,
-                             mqtt_wss_log_callback_t log_callback,
-                             msg_callback_fnc_t msg_callback,
-                             void (*puback_callback)(uint16_t packet_id));
+mqtt_wss_client mqtt_wss_new(
+    msg_callback_fnc_t msg_callback,
+    void (*puback_callback)(uint16_t packet_id));
 
 void mqtt_wss_set_max_buf_size(mqtt_wss_client client, size_t size);
 
@@ -71,7 +56,7 @@ int mqtt_wss_connect(
     int port,
     struct mqtt_connect_params *mqtt_params,
     int ssl_flags,
-    struct mqtt_wss_proxy *proxy,
+    const struct mqtt_wss_proxy *proxy,
     bool *fallback_ipv4);
 int mqtt_wss_service(mqtt_wss_client client, int timeout_ms);
 void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms);

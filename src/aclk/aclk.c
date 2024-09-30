@@ -226,30 +226,6 @@ static int wait_till_agent_claim_ready()
     return 1;
 }
 
-void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
-{
-    switch(log_type) {
-        case MQTT_WSS_LOG_ERROR:
-        case MQTT_WSS_LOG_FATAL:
-            nd_log(NDLS_DAEMON, NDLP_ERR, "%s", str);
-            return;
-
-        case MQTT_WSS_LOG_WARN:
-            nd_log(NDLS_DAEMON, NDLP_WARNING, "%s", str);
-            return;
-
-        case MQTT_WSS_LOG_INFO:
-            nd_log(NDLS_DAEMON, NDLP_INFO, "%s", str);
-            return;
-
-        case MQTT_WSS_LOG_DEBUG:
-            return;
-
-        default:
-            nd_log(NDLS_DAEMON, NDLP_ERR, "Unknown log type from mqtt_wss");
-    }
-}
-
 static void msg_callback(const char *topic, const void *msg, size_t msglen, int qos)
 {
     UNUSED(qos);
@@ -362,7 +338,7 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     aclk_rcvd_cloud_msgs = 0;
     aclk_connection_counter++;
 
-    aclk_topic_cache_iter_t iter = ACLK_TOPIC_CACHE_ITER_T_INITIALIZER;
+    size_t iter = 0;
     while ((topic = (char*)aclk_topic_cache_iterate(&iter)) != NULL)
         mqtt_wss_set_topic_alias(client, topic);
 
@@ -768,7 +744,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
  */
 void *aclk_main(void *ptr)
 {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    struct netdata_static_thread *static_thread = ptr;
 
     ACLK_PROXY_TYPE proxy_type;
     aclk_get_proxy(&proxy_type);
@@ -783,7 +759,7 @@ void *aclk_main(void *ptr)
     if (wait_till_agent_claim_ready())
         goto exit;
 
-    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback))) {
+    if (!((mqttwss_client = mqtt_wss_new(msg_callback, puback_callback)))) {
         netdata_log_error("Couldn't initialize MQTT_WSS network library");
         goto exit;
     }
@@ -1025,22 +1001,22 @@ char *aclk_state(void)
     }
 
     buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_online() ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
-    if (last_conn_time_mqtt && (tmptr = localtime_r(&last_conn_time_mqtt, &tmbuf)) ) {
+    if (last_conn_time_mqtt && ((tmptr = localtime_r(&last_conn_time_mqtt, &tmbuf))) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         buffer_sprintf(wb, "Last Connection Time: %s\n", timebuf);
     }
-    if (last_conn_time_appl && (tmptr = localtime_r(&last_conn_time_appl, &tmbuf)) ) {
+    if (last_conn_time_appl && ((tmptr = localtime_r(&last_conn_time_appl, &tmbuf))) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         buffer_sprintf(wb, "Last Connection Time + %d PUBACKs received: %s\n", ACLK_PUBACKS_CONN_STABLE, timebuf);
     }
-    if (last_disconnect_time && (tmptr = localtime_r(&last_disconnect_time, &tmbuf)) ) {
+    if (last_disconnect_time && ((tmptr = localtime_r(&last_disconnect_time, &tmbuf))) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         buffer_sprintf(wb, "Last Disconnect Time: %s\n", timebuf);
     }
-    if (!aclk_connected && next_connection_attempt && (tmptr = localtime_r(&next_connection_attempt, &tmbuf)) ) {
+    if (!aclk_connected && next_connection_attempt && ((tmptr = localtime_r(&next_connection_attempt, &tmbuf))) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         buffer_sprintf(wb, "Next Connection Attempt At: %s\nLast Backoff: %.3f", timebuf, last_backoff_value);
@@ -1107,7 +1083,7 @@ static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 static json_object *timestamp_to_json(const time_t *t)
 {
     struct tm *tmptr, tmbuf;
-    if (*t && (tmptr = gmtime_r(t, &tmbuf)) ) {
+    if (*t && ((tmptr = gmtime_r(t, &tmbuf))) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         return json_object_new_string(timebuf);

@@ -641,7 +641,8 @@ extern bool unittest_running;
 bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now);
 bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest);
 
-int netdata_base64_decode(const char *encoded, char *decoded, size_t decoded_size);
+int netdata_base64_decode(unsigned char *out, const unsigned char *in, int in_len);
+int netdata_base64_encode(unsigned char *encoded, const unsigned char *input, size_t input_size);
 
 static inline void freez_charp(char **p) {
     freez(*p);
