@@ -36,7 +36,7 @@
 #define PROCESSES_HAVE_STATE                 0
 #define PPID_SHOULD_BE_RUNNING               1
 #define INCREMENTAL_DATA_COLLECTION          1
-#define CPU_TO_NANOSECONDCORES (1000) // convert microseconds to nanoseconds
+#define CPU_TO_NANOSECONDCORES (1)
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _freebsd)
 
 #elif defined(OS_MACOS)
