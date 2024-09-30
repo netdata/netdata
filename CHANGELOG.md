@@ -12,6 +12,8 @@
 - go.d/postgres: fix checkpoints query for postgres 17 [\#18629](https://github.com/netdata/netdata/pull/18629) ([ilyam8](https://github.com/ilyam8))
 - go.d/ceph: fix leftovers after \#18582 [\#18628](https://github.com/netdata/netdata/pull/18628) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18627](https://github.com/netdata/netdata/pull/18627) ([netdatabot](https://github.com/netdatabot))
+- Change default pages per extent [\#18623](https://github.com/netdata/netdata/pull/18623) ([stelfrag](https://github.com/stelfrag))
+- Misc mqtt related code cleanup [\#18622](https://github.com/netdata/netdata/pull/18622) ([stelfrag](https://github.com/stelfrag))
 - Revert "Add ceph commands to ndsudo" [\#18620](https://github.com/netdata/netdata/pull/18620) ([ilyam8](https://github.com/ilyam8))
 - go.d/hddtemp: connect and read [\#18619](https://github.com/netdata/netdata/pull/18619) ([ilyam8](https://github.com/ilyam8))
 - go.d/uwsgi: don't write just connect and read [\#18618](https://github.com/netdata/netdata/pull/18618) ([ilyam8](https://github.com/ilyam8))
@@ -419,7 +421,6 @@
 - go.d postgres github.com/jackc/pgx/v5 [\#18062](https://github.com/netdata/netdata/pull/18062) ([ilyam8](https://github.com/ilyam8))
 - fix prometeus export: missing comma before "instance" label [\#18061](https://github.com/netdata/netdata/pull/18061) ([ilyam8](https://github.com/ilyam8))
 - go.d vsphere add update\_every ui:help [\#18060](https://github.com/netdata/netdata/pull/18060) ([ilyam8](https://github.com/ilyam8))
-- restructure go.d [\#18058](https://github.com/netdata/netdata/pull/18058) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
