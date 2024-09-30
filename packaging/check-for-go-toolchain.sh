@@ -14,8 +14,8 @@
 # GOLANG_FAILURE_REASON set to an error message indicating what went wrong.
 
 GOLANG_MIN_MAJOR_VERSION='1'
-GOLANG_MIN_MINOR_VERSION='22'
-GOLANG_MIN_PATCH_VERSION='0'
+GOLANG_MIN_MINOR_VERSION='23'
+GOLANG_MIN_PATCH_VERSION='1'
 GOLANG_MIN_VERSION="${GOLANG_MIN_MAJOR_VERSION}.${GOLANG_MIN_MINOR_VERSION}.${GOLANG_MIN_PATCH_VERSION}"
 
 GOLANG_TEMP_PATH="${TMPDIR}/go-toolchain"
@@ -53,32 +53,32 @@ install_go_toolchain() {
         Linux)
             case "$(uname -m)" in
                 i?86)
-                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.linux-386.tar.gz"
-                    GOLANG_ARCHIVE_CHECKSUM="1e209c4abde069067ac9afb341c8003db6a210f8173c77777f02d3a524313da3"
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.1.linux-386.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="cdee2f4e2efa001f7ee75c90f2efc310b63346cfbba7b549987e9139527c6b17"
                     ;;
                 x86_64)
-                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.linux-amd64.tar.gz"
-                    GOLANG_ARCHIVE_CHECKSUM="f6c8a87aa03b92c4b0bf3d558e28ea03006eb29db78917daec5cfb6ec1046265"
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.1.linux-amd64.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="49bbb517cfa9eee677e1e7897f7cf9cfdbcf49e05f61984a2789136de359f9bd"
                     ;;
                 aarch64)
-                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.linux-arm64.tar.gz"
-                    GOLANG_ARCHIVE_CHECKSUM="6a63fef0e050146f275bf02a0896badfe77c11b6f05499bb647e7bd613a45a10"
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.1.linux-arm64.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="faec7f7f8ae53fda0f3d408f52182d942cc89ef5b7d3d9f23ff117437d4b2d2f"
                     ;;
                 armv*)
-                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.linux-armv6l.tar.gz"
-                    GOLANG_ARCHIVE_CHECKSUM="0525f92f79df7ed5877147bce7b955f159f3962711b69faac66bc7121d36dcc4"
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.1.linux-armv6l.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="6c7832c7dcd8fb6d4eb308f672a725393403c74ee7be1aeccd8a443015df99de"
                     ;;
                 ppc64le)
-                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.linux-ppc64le.tar.gz"
-                    GOLANG_ARCHIVE_CHECKSUM="0e57f421df9449066f00155ce98a5be93744b3d81b00ee4c2c9b511be2a31d93"
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.1.linux-ppc64le.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="042888cae54b5fbfd9dd1e3b6bc4a5134879777fe6497fc4c62ec394b5ecf2da"
                     ;;
                 riscv64)
-                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.linux-riscv64.tar.gz"
-                    GOLANG_ARCHIVE_CHECKSUM="afe9cedcdbd6fdff27c57efd30aa5ce0f666f471fed5fa96cd4fb38d6b577086"
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.1.linux-riscv64.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="1a4a609f0391bea202d9095453cbfaf7368fa88a04c206bf9dd715a738664dc3"
                     ;;
                 s390x)
-                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.linux-s390x.tar.gz"
-                    GOLANG_ARCHIVE_CHECKSUM="2e546a3583ba7bd3988f8f476245698f6a93dfa9fe206a8ca8f85c1ceecb2446"
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.1.linux-s390x.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="47dc49ad45c45e192efa0df7dc7bc5403f5f2d15b5d0dc74ef3018154b616f4d"
                     ;;
                 *)
                     GOLANG_FAILURE_REASON="Linux $(uname -m) platform is not supported out-of-box by Go, you must install a toolchain for it yourself."
@@ -89,24 +89,24 @@ install_go_toolchain() {
         FreeBSD)
             case "$(uname -m)" in
                 386)
-                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.freebsd-386.tar.gz"
-                    GOLANG_ARCHIVE_CHECKSUM="b8065da37783e8b9e7086365a54d74537e832c92311b61101a66989ab2458d8e"
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.1.freebsd-386.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="cc957c1a019702e6cdc2e257202d42799011ebc1968b6c3bcd6b1965952607d5"
                     ;;
                 amd64)
-                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.freebsd-amd64.tar.gz"
-                    GOLANG_ARCHIVE_CHECKSUM="50f421c7f217083ac94aab1e09400cb9c2fea7d337679ec11f1638a11460da30"
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.1.freebsd-amd64.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="a7d57781c50bb80886a8f04066791956d45aa3eea0f83070c5268b6223afb2ff"
                     ;;
                 arm)
-                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.freebsd-arm.tar.gz"
-                    GOLANG_ARCHIVE_CHECKSUM="c9c8b305f90903536f4981bad9f029828c2483b3216ca1783777344fbe603f2d"
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.1.freebsd-arm.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="c7b09f3fef456048e596db9bea746eb66796aeb82885622b0388feee18f36a3e"
                     ;;
                 arm64)
-                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.freebsd-arm64.tar.gz"
-                    GOLANG_ARCHIVE_CHECKSUM="e23385e5c640787fa02cd58f2301ea09e162c4d99f8ca9fa6d52766f428a933d"
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.1.freebsd-arm64.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="b05cd6a77995a0c8439d88df124811c725fb78b942d0b6dd1643529d7ba62f1f"
                     ;;
                 riscv64)
-                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.freebsd-riscv64.tar.gz"
-                    GOLANG_ARCHIVE_CHECKSUM="c8f94d1de6024546194d58e7b9370dc7ea06176aad94a675b0062c25c40cb645"
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.1.freebsd-riscv64.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="56236ae70be1613f2915943b94f53c96be5bffc0719314078facd778a89bc57e"
                     ;;
                 *)
                     GOLANG_FAILURE_REASON="FreeBSD $(uname -m) platform is not supported out-of-box by Go, you must install a toolchain for it yourself."
