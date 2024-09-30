@@ -36,8 +36,17 @@ struct target *find_target_by_name(struct target *base, const char *name) {
 static inline STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
     if(!cmdline) return sanitize_chart_meta_string(comm);
 
-    char buf_cmd[string_strlen(cmdline) + 1];
-    memcpy(buf_cmd, string2str(cmdline), sizeof(buf_cmd));
+    const char *cl = string2str(cmdline);
+    size_t len = string_strlen(cmdline);
+
+    char buf_cmd[len + 1];
+    // if it is enclosed in (), remove the parenthesis
+    if(cl[0] == '(' && cl[len - 1] == ')') {
+        memcpy(buf_cmd, &cl[1], len - 2);
+        buf_cmd[len - 2] = '\0';
+    }
+    else
+        memcpy(buf_cmd, cl, sizeof(buf_cmd));
 
     char *start = strstr(buf_cmd, string2str(comm));
     if(start) {

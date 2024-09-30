@@ -212,6 +212,10 @@ bool apps_os_get_pid_cmdline_linux(struct pid_stat *p, char *cmdline, size_t byt
     for(i = 0; i < b ; i++)
         if(unlikely(!cmdline[i])) cmdline[i] = ' ';
 
+    // remove trailing spaces
+    while(b > 0 && cmdline[b - 1] == ' ')
+        cmdline[--b] = '\0';
+
     return true;
 }
 
