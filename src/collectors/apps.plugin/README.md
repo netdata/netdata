@@ -28,8 +28,7 @@ Each type of aggregation is presented as a different section on the dashboard.
 ### Custom Process Groups (Apps)
 
 In this section, apps.plugin summarizes the resources consumed by all processes, grouped based
-on the groups provided in `/etc/netdata/apps_groups.conf` (to edit it on your system run
-`/etc/netdata/edit-config apps_groups.conf`).
+on the groups provided in `/etc/netdata/apps_groups.conf`. You can edit this file using our [`edit-config`](docs/netdata-agent/configuration/README.md) script.
 
 For this section, `apps.plugin` builds a process tree (much like `ps fax` does in Linux), and groups
 processes together (evaluating both child and parent processes) so that the result is always a list with
