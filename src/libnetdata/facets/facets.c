@@ -102,25 +102,25 @@ static inline bool is_valid_string_hash(const char *s) {
 // hashtable for FACET_VALUE
 
 // cleanup hashtable defines
-#include "../../libnetdata/simple_hashtable_undef.h"
+#include "../simple_hashtable/simple_hashtable_undef.h"
 
 struct facet_value;
 // #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_facet_value
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct facet_value
 #define SIMPLE_HASHTABLE_NAME _VALUE
-#include "../simple_hashtable.h"
+#include "../simple_hashtable/simple_hashtable.h"
 
 // ----------------------------------------------------------------------------
 // hashtable for FACET_KEY
 
 // cleanup hashtable defines
-#include "../../libnetdata/simple_hashtable_undef.h"
+#include "../simple_hashtable/simple_hashtable_undef.h"
 
 struct facet_key;
 // #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_facet_key
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct facet_key
 #define SIMPLE_HASHTABLE_NAME _KEY
-#include "../simple_hashtable.h"
+#include "../simple_hashtable/simple_hashtable.h"
 
 // ----------------------------------------------------------------------------
 

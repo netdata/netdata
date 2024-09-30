@@ -11,7 +11,7 @@
 
 #define SIMPLE_HASHTABLE_VALUE_TYPE STRING
 #define SIMPLE_HASHTABLE_NAME _USERNAMES_CACHE
-#include "libnetdata/simple_hashtable.h"
+#include "../simple_hashtable/simple_hashtable.h"
 
 typedef struct usernames_cache {
     SPINLOCK spinlock;

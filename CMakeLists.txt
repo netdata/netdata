@@ -619,6 +619,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/aral/aral.h
         src/libnetdata/avl/avl.c
         src/libnetdata/avl/avl.h
+        src/libnetdata/bitmap/bitmap64.h
         src/libnetdata/buffer/buffer.c
         src/libnetdata/buffer/buffer.h
         src/libnetdata/ringbuffer/ringbuffer.c
@@ -665,7 +666,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/log.h
         src/libnetdata/os/os.c
         src/libnetdata/os/os.h
-        src/libnetdata/simple_hashtable.h
+        src/libnetdata/simple_hashtable/simple_hashtable.h
+        src/libnetdata/simple_hashtable/simple_hashtable_undef.h
         src/libnetdata/os/byteorder.h
         src/libnetdata/onewayalloc/onewayalloc.c
         src/libnetdata/onewayalloc/onewayalloc.h
@@ -716,11 +718,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/dictionary/dictionary-hashtable.h
         src/libnetdata/dictionary/dictionary-item.h
         src/libnetdata/dictionary/dictionary-callbacks.h
-        src/libnetdata/linked-lists.h
+        src/libnetdata/linked_list/linked-list.h
         src/libnetdata/storage-point.h
         src/libnetdata/parsers/parsers.h
         src/libnetdata/parsers/duration.c
-        src/libnetdata/bitmap64.h
         src/libnetdata/os/gettid.c
         src/libnetdata/os/gettid.h
         src/libnetdata/os/adjtimex.c

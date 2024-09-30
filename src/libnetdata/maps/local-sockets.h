@@ -22,7 +22,7 @@
 
 #define SIMPLE_HASHTABLE_VALUE_TYPE uint64_t
 #define SIMPLE_HASHTABLE_NAME _NET_NS
-#include "libnetdata/simple_hashtable.h"
+#include "../simple_hashtable/simple_hashtable.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 // hashtable for keeping the sockets of PIDs
@@ -31,7 +31,7 @@
 struct pid_socket;
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct pid_socket
 #define SIMPLE_HASHTABLE_NAME _PID_SOCKET
-#include "libnetdata/simple_hashtable.h"
+#include "../simple_hashtable/simple_hashtable.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 // hashtable for keeping all the sockets
@@ -40,7 +40,7 @@ struct pid_socket;
 struct local_socket;
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct local_socket
 #define SIMPLE_HASHTABLE_NAME _LOCAL_SOCKET
-#include "libnetdata/simple_hashtable.h"
+#include "../simple_hashtable/simple_hashtable.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 // hashtable for keeping all local IPs
@@ -49,7 +49,7 @@ struct local_socket;
 union ipv46;
 #define SIMPLE_HASHTABLE_VALUE_TYPE union ipv46
 #define SIMPLE_HASHTABLE_NAME _LOCAL_IP
-#include "libnetdata/simple_hashtable.h"
+#include "../simple_hashtable/simple_hashtable.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 // hashtable for keeping all listening ports
@@ -58,7 +58,7 @@ union ipv46;
 struct local_port;
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct local_port
 #define SIMPLE_HASHTABLE_NAME _LISTENING_PORT
-#include "libnetdata/simple_hashtable.h"
+#include "../simple_hashtable/simple_hashtable.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 

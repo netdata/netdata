@@ -323,7 +323,7 @@ typedef uint32_t uid_t;
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
-#include "linked-lists.h"
+#include "linked_list/linked-list.h"
 #include "storage-point.h"
 #include "paths/paths.h"
 
@@ -417,7 +417,7 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 // Taken from linux kernel
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
-#include "bitmap64.h"
+#include "bitmap/bitmap64.h"
 
 #define COMPRESSION_MAX_CHUNK 0x4000
 #define COMPRESSION_MAX_OVERHEAD 128
@@ -438,7 +438,7 @@ extern const char *netdata_configured_host_prefix;
 #include "os/os.h"
 
 #define XXH_INLINE_ALL
-#include "xxhash.h"
+#include "libnetdata/xxHash/xxhash.h"
 
 #include "uuid/uuid.h"
 #include "template-enum.h"
