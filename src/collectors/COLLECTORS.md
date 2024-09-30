@@ -77,8 +77,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [OpenLDAP (community)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/openldap_community.md)
 
-- [OpenLDAP](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/openldap/integrations/openldap.md)
-
 - [RADIUS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/radius.md)
 
 - [SSH](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/ssh.md)
