@@ -2068,7 +2068,7 @@ if(ENABLE_PLUGIN_CUPS)
 endif()
 
 if(NEED_NDSUDO)
-    set(NDSUDO_FILES src/plugins.d/ndsudo.c)
+    set(NDSUDO_FILES src/collectors/utils/ndsudo.c)
 
     add_executable(ndsudo ${NDSUDO_FILES})
 
@@ -2212,7 +2212,7 @@ endif()
 
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         set(LOCAL_LISTENERS_FILES
-                src/plugins.d/local_listeners.c
+                src/collectors/utils/local_listeners.c
                 src/libnetdata/maps/local-sockets.h
         )
 
