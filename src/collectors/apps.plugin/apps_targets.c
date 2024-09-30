@@ -70,11 +70,11 @@ struct {
     { "services",           NULL, },
     { "wininit",            NULL, },
 #elif defined(OS_LINUX)
-    { "systemd",            NULL, }, // lxc containers and host systems
+    { "init",               NULL, }, // linux systems
+    { "systemd",            NULL, }, // lxc containers and host systems (this also catches "systemd --user")
     { "containerd-shim",    NULL, }, // docker containers
-    { "init",               NULL, },
-    { "dump-init",          NULL, }, // docker containers
-    { "gnome-shell",        NULL, },
+    { "dumb-init",          NULL, }, // some docker containers use this
+    { "gnome-shell",        NULL, }, // gnome user applications
 #elif defined(OS_FREBBSD)
     { "init",               NULL, },
 #elif defined(OS_MACOS)
