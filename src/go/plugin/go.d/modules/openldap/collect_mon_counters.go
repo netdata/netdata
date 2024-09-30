@@ -16,6 +16,7 @@ func (l *OpenLDAP) collectMonitorCounters(mx map[string]int64) error {
 	req := newLdapMonitorCountersSearchRequest()
 
 	dnMetricMap := map[string]string{
+		"cn=Current,cn=Connections,cn=Monitor":  "current_connections",
 		"cn=Total,cn=Connections,cn=Monitor":    "total_connections",
 		"cn=Bytes,cn=Statistics,cn=Monitor":     "bytes_sent",
 		"cn=Referrals,cn=Statistics,cn=Monitor": "referrals_sent",

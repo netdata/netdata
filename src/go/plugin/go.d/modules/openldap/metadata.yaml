@@ -21,8 +21,10 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: This collector monitors OpenLDAP metrics about connections, operations, referrals and more.
-        method_description: It gathers the metrics using the [go-ldap](https://github.com/go-ldap/ldap) module and the [Monitor backend](https://www.openldap.org/doc/admin24/monitoringslapd.html) of OpenLDAP.
+        metrics_description: |
+          This collector monitors OpenLDAP metrics about connections, operations, referrals and more.
+        method_description: |
+          It gathers the metrics using the [go-ldap](https://github.com/go-ldap/ldap) module and the [Monitor backend](https://www.openldap.org/doc/admin24/monitoringslapd.html) of OpenLDAP.
       supported_platforms:
         include: ["Linux"]
         exclude: []
@@ -54,24 +56,40 @@ modules:
           list:
             - name: update_every
               description: Data collection frequency.
-              default_value: 10
+              default_value: 1
               required: false
             - name: timeout
-              description: Timeout for executing the binary, specified in seconds.
+              description: Timeout for establishing a connection and communication (reading and writing) in seconds.
               default_value: 2
               required: false
-            - name: ldap_url
-              description: "Specifies the LDAP server URL."
-              default_value: "ldap://localhost:389"
+            - name: url
+              description: LDAP server URL.
+              default_value: ldap://127.0.0.1:389
               required: true
-            - name: distinguished_name
-              description: "Specifies the Distinguished Name of the user that has access to the monitor backend of the server"
+            - name: username
+              description: The distinguished name (DN) of the user authorized to view the monitor database.
               default_value: ""
               required: true
             - name: password
-              description: "Specifies the Password of the user that has access to the monitor backend of the server"
+              description: The password associated with the user identified by the DN.
               default_value: ""
               required: true
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
         examples:
           folding:
             title: ""
@@ -82,9 +100,9 @@ modules:
               config: |
                 jobs:
                   - name: local
-                    ldap_url: ldap://localhost:389
-                    distinguished_name: cn=admin,dc=example,dc=com 
-                    password: test
+                    url: ldap://localhost:389
+                    username: cn=netdata,dc=example,dc=com 
+                    password: secret
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
@@ -93,14 +111,14 @@ modules:
               config: |
                 jobs:
                   - name: local
-                    ldap_url: ldap://localhost:389
-                    distinguished_name: cn=admin,dc=example,dc=com 
-                    password: test
-                  
+                    url: ldap://localhost:389
+                    username: cn=netdata,dc=example,dc=com 
+                    password: secret
+                
                   - name: remote
-                    ldap_url: ldap://192.0.2.1:389
-                    distinguished_name: cn=admin2,dc=example,dc=com 
-                    password: test2
+                    url: ldap://192.0.2.1:389
+                    username: cn=netdata,dc=example,dc=com 
+                    password: secret
     troubleshooting:
       problems:
         list: []
@@ -116,29 +134,22 @@ modules:
           description: "These metrics refer to the entire monitored application."
           labels: []
           metrics:
-            - name: openldap.total_connections
-              description: Total Connections
+            - name: openldap.current_connections
+              description: Current Connections
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: openldap.connections
+              description: Connections
               unit: "connections/s"
               chart_type: line
               dimensions:
                 - name: connections
-            - name: openldap.traffic_stats
+            - name: openldap.traffic
               description: Traffic
-              unit: "KiB/s"
-              chart_type: line
-              dimensions:
-                - name: sent
-            - name: openldap.operations_status
-              description: Operations Status
-              unit: "ops/s"
-              chart_type: line
-              dimensions:
-                - name: completed
-                - name: initiated
-            - name: openldap.referrals
-              description: Referrals
-              unit: "referrals/s"
-              chart_type: line
+              unit: "bytes/s"
+              chart_type: area
               dimensions:
                 - name: sent
             - name: openldap.entries
@@ -147,10 +158,23 @@ modules:
               chart_type: line
               dimensions:
                 - name: sent
-            - name: openldap.ldap_operations
-              description: Operations
-              unit: "ops/s"
+            - name: openldap.referrals
+              description: Referrals
+              unit: "referrals/s"
               chart_type: line
+              dimensions:
+                - name: sent
+            - name: openldap.operations
+              description: Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: completed
+                - name: initiated
+            - name: openldap.operations_by_type
+              description: Operations by Typ
+              unit: "operations/s"
+              chart_type: stacked
               dimensions:
                 - name: bind
                 - name: search

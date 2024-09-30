@@ -29,10 +29,8 @@ func init() {
 func New() *OpenLDAP {
 	return &OpenLDAP{
 		Config: Config{
-			URL:      "ldap://127.0.0.1:389",
-			Username: "cn=admin,dc=example,dc=com",
-			Password: "321",
-			Timeout:  confopt.Duration(time.Second * 2),
+			URL:     "ldap://127.0.0.1:389",
+			Timeout: confopt.Duration(time.Second * 2),
 		},
 
 		newConn: newLdapConn,
