@@ -38,8 +38,8 @@ func TestOpenLDAP_Init(t *testing.T) {
 		config   Config
 		wantFail bool
 	}{
-		"success with default config": {
-			wantFail: false,
+		"fails with default config": {
+			wantFail: true,
 			config:   New().Config,
 		},
 		"fails if URL not set": {
