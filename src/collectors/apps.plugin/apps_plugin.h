@@ -6,11 +6,40 @@
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 
-#ifdef __FreeBSD__
-#include <sys/user.h>
-#endif
+#define OS_FUNC_CONCAT(a, b) a##b
 
-#ifdef __APPLE__
+#if defined(OS_FREEBSD)
+#include <sys/user.h>
+
+#define OS_INIT_PID                          1
+#define ALL_PIDS_ARE_READ_INSTANTLY          1
+#define PROCESSES_HAVE_CPU_GUEST_TIME        0
+#define PROCESSES_HAVE_CPU_CHILDREN_TIME     1
+#define PROCESSES_HAVE_VOLCTX                0
+#define PROCESSES_HAVE_NVOLCTX               0
+#define PROCESSES_HAVE_PHYSICAL_IO           0
+#define PROCESSES_HAVE_LOGICAL_IO            1
+#define PROCESSES_HAVE_IO_CALLS              0
+#define PROCESSES_HAVE_UID                   1
+#define PROCESSES_HAVE_GID                   1
+#define PROCESSES_HAVE_MAJFLT                1
+#define PROCESSES_HAVE_CHILDREN_FLTS         1
+#define PROCESSES_HAVE_VMSWAP                0
+#define PROCESSES_HAVE_VMSHARED              0
+#define PROCESSES_HAVE_RSSFILE               0
+#define PROCESSES_HAVE_RSSSHMEM              0
+#define PROCESSES_HAVE_FDS                   1
+#define PROCESSES_HAVE_HANDLES               0
+#define PROCESSES_HAVE_CMDLINE               1
+#define PROCESSES_HAVE_PID_LIMITS            0
+#define PROCESSES_HAVE_COMM_AND_NAME         0
+#define PROCESSES_HAVE_STATE                 0
+#define PPID_SHOULD_BE_RUNNING               1
+#define INCREMENTAL_DATA_COLLECTION          1
+#define CPU_TO_NANOSECONDCORES (1000) // convert microseconds to nanoseconds
+#define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _freebsd)
+
+#elif defined(OS_MACOS)
 #include <mach/mach.h>
 #include <mach/mach_host.h>
 #include <libproc.h>
@@ -18,40 +47,114 @@
 #include <sys/sysctl.h>
 #include <mach/mach_time.h> // For mach_timebase_info_data_t and mach_timebase_info
 
-extern mach_timebase_info_data_t mach_info;
-#endif
-
-// ----------------------------------------------------------------------------
-// per O/S configuration
-
-// the minimum PID of the system
-// this is also the pid of the init process
-#define INIT_PID 1
-
-// if the way apps.plugin will work, will read the entire process list,
-// including the resource utilization of each process, instantly
-// set this to 1
-// when set to 0, apps.plugin builds a sort list of processes, in order
-// to process children processes, before parent processes
-#if defined(__FreeBSD__) || defined(__APPLE__)
-#define ALL_PIDS_ARE_READ_INSTANTLY 1
-#else
-#define ALL_PIDS_ARE_READ_INSTANTLY 0
-#endif
-
-#if defined(__APPLE__)
 struct pid_info {
     struct kinfo_proc proc;
     struct proc_taskinfo taskinfo;
     struct proc_bsdinfo bsdinfo;
     struct rusage_info_v4 rusageinfo;
 };
+
+#define OS_INIT_PID                          1
+#define ALL_PIDS_ARE_READ_INSTANTLY          1
+#define PROCESSES_HAVE_CPU_GUEST_TIME        0
+#define PROCESSES_HAVE_CPU_CHILDREN_TIME     0
+#define PROCESSES_HAVE_VOLCTX                1
+#define PROCESSES_HAVE_NVOLCTX               0
+#define PROCESSES_HAVE_PHYSICAL_IO           0
+#define PROCESSES_HAVE_LOGICAL_IO            1
+#define PROCESSES_HAVE_IO_CALLS              0
+#define PROCESSES_HAVE_UID                   1
+#define PROCESSES_HAVE_GID                   1
+#define PROCESSES_HAVE_MAJFLT                1
+#define PROCESSES_HAVE_CHILDREN_FLTS         0
+#define PROCESSES_HAVE_VMSWAP                0
+#define PROCESSES_HAVE_VMSHARED              0
+#define PROCESSES_HAVE_RSSFILE               0
+#define PROCESSES_HAVE_RSSSHMEM              0
+#define PROCESSES_HAVE_FDS                   1
+#define PROCESSES_HAVE_HANDLES               0
+#define PROCESSES_HAVE_CMDLINE               1
+#define PROCESSES_HAVE_PID_LIMITS            0
+#define PROCESSES_HAVE_COMM_AND_NAME         0
+#define PROCESSES_HAVE_STATE                 0
+#define PPID_SHOULD_BE_RUNNING               1
+#define INCREMENTAL_DATA_COLLECTION          1
+#define CPU_TO_NANOSECONDCORES (1) // already in nanoseconds
+#define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _macos)
+
+#elif defined(OS_WINDOWS)
+#include <windows.h>
+
+#define OS_INIT_PID                          0 // dynamic, is set during data collection
+#define ALL_PIDS_ARE_READ_INSTANTLY          1
+#define PROCESSES_HAVE_CPU_GUEST_TIME        0
+#define PROCESSES_HAVE_CPU_CHILDREN_TIME     0
+#define PROCESSES_HAVE_VOLCTX                0
+#define PROCESSES_HAVE_NVOLCTX               0
+#define PROCESSES_HAVE_PHYSICAL_IO           0
+#define PROCESSES_HAVE_LOGICAL_IO            1
+#define PROCESSES_HAVE_IO_CALLS              1
+#define PROCESSES_HAVE_UID                   0
+#define PROCESSES_HAVE_GID                   0
+#define PROCESSES_HAVE_MAJFLT                0
+#define PROCESSES_HAVE_CHILDREN_FLTS         0
+#define PROCESSES_HAVE_VMSWAP                1
+#define PROCESSES_HAVE_VMSHARED              0
+#define PROCESSES_HAVE_RSSFILE               0
+#define PROCESSES_HAVE_RSSSHMEM              0
+#define PROCESSES_HAVE_FDS                   0
+#define PROCESSES_HAVE_HANDLES               1
+#define PROCESSES_HAVE_CMDLINE               0
+#define PROCESSES_HAVE_PID_LIMITS            0
+#define PROCESSES_HAVE_COMM_AND_NAME         1
+#define PROCESSES_HAVE_STATE                 0
+#define PPID_SHOULD_BE_RUNNING               0
+#define INCREMENTAL_DATA_COLLECTION          0
+#define CPU_TO_NANOSECONDCORES (100) // convert 100ns to ns
+#define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _windows)
+
+#elif defined(OS_LINUX)
+#define OS_INIT_PID                          1
+#define ALL_PIDS_ARE_READ_INSTANTLY          0
+#define PROCESSES_HAVE_CPU_GUEST_TIME        1
+#define PROCESSES_HAVE_CPU_CHILDREN_TIME     1
+#define PROCESSES_HAVE_VOLCTX                1
+#define PROCESSES_HAVE_NVOLCTX               1
+#define PROCESSES_HAVE_PHYSICAL_IO           1
+#define PROCESSES_HAVE_LOGICAL_IO            1
+#define PROCESSES_HAVE_IO_CALLS              1
+#define PROCESSES_HAVE_UID                   1
+#define PROCESSES_HAVE_GID                   1
+#define PROCESSES_HAVE_MAJFLT                1
+#define PROCESSES_HAVE_CHILDREN_FLTS         1
+#define PROCESSES_HAVE_VMSWAP                1
+#define PROCESSES_HAVE_VMSHARED              1
+#define PROCESSES_HAVE_RSSFILE               1
+#define PROCESSES_HAVE_RSSSHMEM              1
+#define PROCESSES_HAVE_FDS                   1
+#define PROCESSES_HAVE_HANDLES               0
+#define PROCESSES_HAVE_CMDLINE               1
+#define PROCESSES_HAVE_PID_LIMITS            1
+#define PROCESSES_HAVE_COMM_AND_NAME         0
+#define PROCESSES_HAVE_STATE                 1
+#define PPID_SHOULD_BE_RUNNING               1
+#define USE_APPS_GROUPS_CONF                 1
+#define INCREMENTAL_DATA_COLLECTION          1
+#define CPU_TO_NANOSECONDCORES (NSEC_PER_SEC / system_hz)
+#define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _linux)
+
+extern int max_fds_cache_seconds;
+
+#else
+#error "Unsupported operating system"
 #endif
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
+
+extern pid_t INIT_PID;
 
 extern bool debug_enabled;
-extern bool enable_guest_charts;
+
 extern bool enable_detailed_uptime_charts;
 extern bool enable_users_charts;
 extern bool enable_groups_charts;
@@ -68,19 +171,23 @@ extern size_t
     inodes_changed_counter,
     links_changed_counter,
     targets_assignment_counter,
-    all_pids_count,
     apps_groups_targets_count;
 
-extern int
-    all_files_len,
-    all_files_size,
-    show_guest_time,
-    show_guest_time_old;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+extern bool enable_guest_charts;
+extern bool show_guest_time;
+#endif
 
+extern uint32_t
+    all_files_len,
+    all_files_size;
+
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 extern kernel_uint_t
     global_utime,
     global_stime,
     global_gtime;
+#endif
 
 // the normalization ratios, as calculated by normalize_utilization()
 extern NETDATA_DOUBLE
@@ -95,19 +202,13 @@ extern NETDATA_DOUBLE
     cminflt_fix_ratio,
     cmajflt_fix_ratio;
 
-#if defined(__FreeBSD__) || defined(__APPLE__)
-extern usec_t system_current_time_ut;
-#else
-extern kernel_uint_t system_uptime_secs;
-#endif
-
 extern size_t pagesize;
+
+extern netdata_mutex_t apps_and_stdout_mutex;
 
 // ----------------------------------------------------------------------------
 // string lengths
 
-#define MAX_COMPARE_NAME 100
-#define MAX_NAME 100
 #define MAX_CMDLINE 65536
 
 // ----------------------------------------------------------------------------
@@ -117,13 +218,9 @@ extern size_t pagesize;
 // having a lot of spares, increases the CPU utilization of the plugin.
 #define MAX_SPARE_FDS 1
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
-extern int max_fds_cache_seconds;
-#endif
-
 // ----------------------------------------------------------------------------
 // some variables for keeping track of processes count by states
-
+#if (PROCESSES_HAVE_STATE == 1)
 typedef enum {
     PROC_STATUS_RUNNING = 0,
     PROC_STATUS_SLEEPING_D, // uninterruptible sleep
@@ -135,6 +232,7 @@ typedef enum {
 
 extern proc_state proc_state_count[PROC_STATUS_END];
 extern const char *proc_states[];
+#endif
 
 // ----------------------------------------------------------------------------
 // the rates we are going to send to netdata will have this detail a value of:
@@ -144,6 +242,7 @@ extern const char *proc_states[];
 // etc.
 #define RATES_DETAIL 10000ULL
 
+#if (PROCESSES_HAVE_FDS == 1)
 struct openfds {
     kernel_uint_t files;
     kernel_uint_t pipes;
@@ -155,8 +254,8 @@ struct openfds {
     kernel_uint_t eventpolls;
     kernel_uint_t other;
 };
-
 #define pid_openfds_sum(p) ((p)->openfds.files + (p)->openfds.pipes + (p)->openfds.sockets + (p)->openfds.inotifies + (p)->openfds.eventfds + (p)->openfds.timerfds + (p)->openfds.signalfds + (p)->openfds.eventpolls + (p)->openfds.other)
+#endif
 
 // ----------------------------------------------------------------------------
 // target
@@ -172,69 +271,133 @@ struct pid_on_target {
     struct pid_on_target *next;
 };
 
+typedef enum __attribute__((packed)) {
+    TARGET_TYPE_APP_GROUP = 1,
+#if (PROCESSES_HAVE_UID == 1)
+    TARGET_TYPE_UID,
+#endif
+#if (PROCESSES_HAVE_GID == 1)
+    TARGET_TYPE_GID,
+#endif
+    TARGET_TYPE_TREE,
+} TARGET_TYPE;
+
+typedef enum __attribute__((packed)) {
+    // CPU utilization time
+    // The values are expressed in "NANOSECONDCORES".
+    // 1 x "NANOSECONDCORE" = 1 x NSEC_PER_SEC (1 billion).
+    PDF_UTIME,      // CPU user time
+    PDF_STIME,      // CPU system time
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    PDF_GTIME,      // CPU guest time
+#endif
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+    PDF_CUTIME,     // exited children CPU user time
+    PDF_CSTIME,     // exited children CPU system time
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+    PDF_CGTIME,     // exited children CPU guest time
+#endif
+#endif
+
+    PDF_MINFLT,     // rate, unit: faults * RATES_DETAIL
+
+#if (PROCESSES_HAVE_MAJFLT == 1)
+    PDF_MAJFLT,     // rate, unit: faults * RATES_DETAIL
+#endif
+
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+    PDF_CMINFLT,    // rate, unit: faults * RATES_DETAIL
+    PDF_CMAJFLT,    // rate, unit: faults * RATES_DETAIL
+#endif
+
+    PDF_VMSIZE,     // the current virtual memory used by the process, in bytes
+    PDF_VMRSS,      // the resident memory used by the process, in bytes
+
+#if (PROCESSES_HAVE_VMSHARED == 1)
+    PDF_VMSHARED,   // the shared memory used by the process, in bytes
+#endif
+
+#if (PROCESSES_HAVE_RSSFILE == 1)
+    PDF_RSSFILE,    // unit: bytes
+#endif
+
+#if (PROCESSES_HAVE_RSSSHMEM == 1)
+    PDF_RSSSHMEM,   // unit: bytes
+#endif
+
+#if (PROCESSES_HAVE_VMSWAP == 1)
+    PDF_VMSWAP,     // the swap memory used by the process, in bytes
+#endif
+
+#if (PROCESSES_HAVE_VOLCTX == 1)
+    PDF_VOLCTX,     // rate, unit: switches * RATES_DETAIL
+#endif
+
+#if (PROCESSES_HAVE_NVOLCTX == 1)
+    PDF_NVOLCTX,    // rate, unit: switches * RATES_DETAIL
+#endif
+
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+    PDF_LREAD,      // rate, logical reads in bytes/sec * RATES_DETAIL
+    PDF_LWRITE,     // rate, logical writes in bytes/sec * RATES_DETAIL
+#endif
+
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+    PDF_PREAD,      // rate, physical reads in bytes/sec * RATES_DETAIL
+    PDF_PWRITE,     // rate, physical writes in bytes/sec * RATES_DETAIL
+#endif
+
+#if (PROCESSES_HAVE_IO_CALLS == 1)
+    PDF_OREAD,      // rate, read ops/sec * RATES_DETAIL
+    PDF_OWRITE,     // rate, write ops/sec * RATES_DETAIL
+#endif
+
+    PDF_UPTIME,     // the process uptime in seconds
+    PDF_THREADS,    // the number of threads
+    PDF_PROCESSES,  // the number of processes
+
+#if (PROCESSES_HAVE_HANDLES == 1)
+    PDF_HANDLES,    // the number of handles the process maintains
+#endif
+
+    // terminator
+    PDF_MAX
+} PID_FIELD;
+
 struct target {
-    char compare[MAX_COMPARE_NAME + 1];
-    uint32_t comparehash;
-    size_t comparelen;
+    STRING *id;
+    STRING *name;
+    STRING *clean_name;
 
-    char id[MAX_NAME + 1];
-    uint32_t idhash;
+    TARGET_TYPE type;
+    union {
+        STRING *compare;
+#if (PROCESSES_HAVE_UID == 1)
+        uid_t uid;
+#endif
+#if (PROCESSES_HAVE_GID == 1)
+        gid_t gid;
+#endif
+    };
 
-    char name[MAX_NAME + 1];
-    char clean_name[MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
-    uid_t uid;
-    gid_t gid;
-
-    bool is_other;
-
-    kernel_uint_t minflt;
-    kernel_uint_t cminflt;
-    kernel_uint_t majflt;
-    kernel_uint_t cmajflt;
-    kernel_uint_t utime;
-    kernel_uint_t stime;
-    kernel_uint_t gtime;
-    kernel_uint_t cutime;
-    kernel_uint_t cstime;
-    kernel_uint_t cgtime;
-    kernel_uint_t num_threads;
-    // kernel_uint_t rss;
-
-    kernel_uint_t status_vmsize;
-    kernel_uint_t status_vmrss;
-    kernel_uint_t status_vmshared;
-    kernel_uint_t status_rssfile;
-    kernel_uint_t status_rssshmem;
-    kernel_uint_t status_vmswap;
-    kernel_uint_t status_voluntary_ctxt_switches;
-    kernel_uint_t status_nonvoluntary_ctxt_switches;
-
-    kernel_uint_t io_logical_bytes_read;
-    kernel_uint_t io_logical_bytes_written;
-    kernel_uint_t io_read_calls;
-    kernel_uint_t io_write_calls;
-    kernel_uint_t io_storage_bytes_read;
-    kernel_uint_t io_storage_bytes_written;
-    kernel_uint_t io_cancelled_write_bytes;
-
-    int *target_fds;
-    int target_fds_size;
-
-    struct openfds openfds;
-
-    NETDATA_DOUBLE max_open_files_percent;
+    kernel_uint_t values[PDF_MAX];
 
     kernel_uint_t uptime_min;
-    kernel_uint_t uptime_sum;
     kernel_uint_t uptime_max;
 
-    unsigned int processes; // how many processes have been merged to this
-    int exposed;            // if set, we have sent this to netdata
-    int hidden;             // if set, we set the hidden flag on the dimension
-    int debug_enabled;
-    int ends_with;
-    int starts_with;        // if set, the compare string matches only the
-                     // beginning of the command
+#if (PROCESSES_HAVE_FDS == 1)
+    struct openfds openfds;
+    NETDATA_DOUBLE max_open_files_percent;
+    int *target_fds;
+    uint32_t target_fds_size;
+#endif
+
+    bool exposed:1;         // if set, we have sent this to netdata
+    bool hidden:1;          // if set, we set the hidden flag on the dimension
+    bool debug_enabled:1;
+    bool ends_with:1;
+    bool starts_with:1;     // if set, the compare string matches only the
+                            // beginning of the command
 
     struct pid_on_target *root_pid; // list of aggregated pids for target debugging
 
@@ -264,6 +427,7 @@ typedef enum __attribute__((packed)) {
 // structure to store data for each process running
 // see: man proc for the description of the fields
 
+#if (PROCESSES_HAVE_PID_LIMITS == 1)
 struct pid_limits {
     //    kernel_uint_t max_cpu_time;
     //    kernel_uint_t max_file_size;
@@ -282,11 +446,12 @@ struct pid_limits {
     //    kernel_uint_t max_realtime_priority;
     //    kernel_uint_t max_realtime_timeout;
 };
+#endif
 
 struct pid_fd {
     int fd;
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
     ino_t inode;
     char *filename;
     uint32_t link_hash;
@@ -294,6 +459,9 @@ struct pid_fd {
     size_t cache_iterations_reset;
 #endif
 };
+
+#define pid_stat_comm(p) (string2str(p->comm))
+#define pid_stat_cmdline(p) (string2str(p->cmdline))
 
 struct pid_stat {
     int32_t pid;
@@ -304,122 +472,77 @@ struct pid_stat {
     // int32_t tpgid;
     // uint64_t flags;
 
-    char state;
+    struct pid_stat *parent;
+    struct pid_stat *next;
+    struct pid_stat *prev;
 
-    char comm[MAX_COMPARE_NAME + 1];
-    char *cmdline;
+    struct target *target;          // app_groups.conf targets
 
-    // these are raw values collected
-    kernel_uint_t minflt_raw;
-    kernel_uint_t cminflt_raw;
-    kernel_uint_t majflt_raw;
-    kernel_uint_t cmajflt_raw;
-    kernel_uint_t utime_raw;
-    kernel_uint_t stime_raw;
-    kernel_uint_t gtime_raw; // guest_time
-    kernel_uint_t cutime_raw;
-    kernel_uint_t cstime_raw;
-    kernel_uint_t cgtime_raw; // cguest_time
-
-    // these are rates
-    kernel_uint_t minflt;
-    kernel_uint_t cminflt;
-    kernel_uint_t majflt;
-    kernel_uint_t cmajflt;
-    kernel_uint_t utime;
-    kernel_uint_t stime;
-    kernel_uint_t gtime;
-    kernel_uint_t cutime;
-    kernel_uint_t cstime;
-    kernel_uint_t cgtime;
-
-    // int64_t priority;
-    // int64_t nice;
-    int32_t num_threads;
-    // int64_t itrealvalue;
-    // kernel_uint_t collected_starttime;
-    // kernel_uint_t vsize;
-    // kernel_uint_t rss;
-    // kernel_uint_t rsslim;
-    // kernel_uint_t starcode;
-    // kernel_uint_t endcode;
-    // kernel_uint_t startstack;
-    // kernel_uint_t kstkesp;
-    // kernel_uint_t kstkeip;
-    // uint64_t signal;
-    // uint64_t blocked;
-    // uint64_t sigignore;
-    // uint64_t sigcatch;
-    // uint64_t wchan;
-    // uint64_t nswap;
-    // uint64_t cnswap;
-    // int32_t exit_signal;
-    // int32_t processor;
-    // uint32_t rt_priority;
-    // uint32_t policy;
-    // kernel_uint_t delayacct_blkio_ticks;
-
-    uid_t uid;
-    gid_t gid;
-
-    kernel_uint_t status_voluntary_ctxt_switches_raw;
-    kernel_uint_t status_nonvoluntary_ctxt_switches_raw;
-
-    kernel_uint_t status_vmsize;
-    kernel_uint_t status_vmrss;
-    kernel_uint_t status_vmshared;
-    kernel_uint_t status_rssfile;
-    kernel_uint_t status_rssshmem;
-    kernel_uint_t status_vmswap;
-    kernel_uint_t status_voluntary_ctxt_switches;
-    kernel_uint_t status_nonvoluntary_ctxt_switches;
-#ifndef __FreeBSD__
-    ARL_BASE *status_arl;
+#if (PROCESSES_HAVE_UID == 1)
+    struct target *uid_target;      // uid based targets
+#endif
+#if (PROCESSES_HAVE_GID == 1)
+    struct target *gid_target;      // gid based targets
 #endif
 
-    kernel_uint_t io_logical_bytes_read_raw;
-    kernel_uint_t io_logical_bytes_written_raw;
-    kernel_uint_t io_read_calls_raw;
-    kernel_uint_t io_write_calls_raw;
-    kernel_uint_t io_storage_bytes_read_raw;
-    kernel_uint_t io_storage_bytes_written_raw;
-    kernel_uint_t io_cancelled_write_bytes_raw;
+    STRING *comm;                   // the command name (short version)
+    STRING *name;                   // a better name, or NULL
+    STRING *cmdline;                // the full command line (or on windows, the full pathname of the program)
 
-    kernel_uint_t io_logical_bytes_read;
-    kernel_uint_t io_logical_bytes_written;
-    kernel_uint_t io_read_calls;
-    kernel_uint_t io_write_calls;
-    kernel_uint_t io_storage_bytes_read;
-    kernel_uint_t io_storage_bytes_written;
-    kernel_uint_t io_cancelled_write_bytes;
+#if defined(OS_WINDOWS)
+    COUNTER_DATA perflib[PDF_MAX];
+#else
+    kernel_uint_t raw[PDF_MAX];
+#endif
 
-    kernel_uint_t uptime;
+    kernel_uint_t values[PDF_MAX];
 
-    struct pid_fd *fds;             // array of fds it uses
-    size_t fds_size;                // the size of the fds array
+#if (PROCESSES_HAVE_UID == 1)
+    uid_t uid;
+#endif
+#if (PROCESSES_HAVE_GID == 1)
+    gid_t gid;
+#endif
 
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
+    uint32_t sortlist;  // higher numbers = top on the process tree
+                        // each process gets a unique number (non-sequential though)
+#endif
+
+#if (PROCESSES_HAVE_FDS == 1)
     struct openfds openfds;
+#if (PROCESSES_HAVE_PID_LIMITS == 1)
     struct pid_limits limits;
-
     NETDATA_DOUBLE openfds_limits_percent;
+#endif
+    struct pid_fd *fds;             // array of fds it uses
+    uint32_t fds_size;              // the size of the fds array
+#endif
 
-    int sortlist;                   // higher numbers = top on the process tree
-                  // each process gets a unique number
+    uint32_t children_count;        // number of processes directly referencing this
+                                    // it is absorbed by apps_groups.conf inheritance
+                                    // don't rely on it for anything else.
 
-    int children_count;             // number of processes directly referencing this
-    int keeploops;                  // increases by 1 every time keep is 1 and updated 0
+    uint32_t keeploops;             // increases by 1 every time keep is 1 and updated 0
 
     PID_LOG log_thrown;
 
-    bool keep;                      // true when we need to keep this process in memory even after it exited
-    bool updated;                   // true when the process is currently running
-    bool merged;                    // true when it has been merged to its parent
-    bool read;                      // true when we have already read this process for this iteration
-    bool matched_by_config;
+    bool read:1;                    // true when we have already read this process for this iteration
+    bool updated:1;                 // true when the process is currently running
+    bool merged:1;                  // true when it has been merged to its parent
+    bool keep:1;                    // true when we need to keep this process in memory even after it exited
 
-    struct target *target;          // app_groups.conf targets
-    struct target *user_target;     // uid based targets
-    struct target *group_target;    // gid based targets
+    bool matched_by_config:1;
+
+#if (PROCESSES_HAVE_STATE == 1)
+    char state;
+#endif
+
+#if defined(OS_WINDOWS)
+    bool got_info:1;
+    bool assigned_to_target:1;
+    bool initialized:1;
+#endif
 
     usec_t stat_collected_usec;
     usec_t last_stat_collected_usec;
@@ -428,27 +551,30 @@ struct pid_stat {
     usec_t last_io_collected_usec;
     usec_t last_limits_collected_usec;
 
+#if defined(OS_LINUX)
+    ARL_BASE *status_arl;
     char *fds_dirname;              // the full directory name in /proc/PID/fd
-
     char *stat_filename;
     char *status_filename;
     char *io_filename;
     char *cmdline_filename;
     char *limits_filename;
-
-    struct pid_stat *parent;
-    struct pid_stat *prev;
-    struct pid_stat *next;
+#endif
 };
 
 // ----------------------------------------------------------------------------
 
+#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_GID == 1)
 struct user_or_group_id {
     avl_t avl;
 
     union {
+#if (PROCESSES_HAVE_UID == 1)
         uid_t uid;
+#endif
+#if (PROCESSES_HAVE_GID == 1)
         gid_t gid;
+#endif
     } id;
 
     char *name;
@@ -457,39 +583,9 @@ struct user_or_group_id {
 
     struct user_or_group_id * next;
 };
-
-extern struct target
-    *apps_groups_default_target,
-    *apps_groups_root_target,
-    *users_root_target,
-    *groups_root_target;
-
-extern struct pid_stat *root_of_pids;
-
-extern int update_every;
-extern unsigned int time_factor;
-extern kernel_uint_t MemTotal;
-
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-extern pid_t *all_pids_sortlist;
 #endif
 
-#define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
-
-void function_processes(const char *transaction, char *function,
-                        usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
-                        BUFFER *payload __maybe_unused, HTTP_ACCESS access,
-                        const char *source __maybe_unused, void *data __maybe_unused);
-
-struct target *find_target_by_name(struct target *base, const char *name);
-
-struct target *get_users_target(uid_t uid);
-struct target *get_groups_target(gid_t gid);
-int read_apps_groups_conf(const char *path, const char *file);
-
-void users_and_groups_init(void);
-struct user_or_group_id *user_id_find(struct user_or_group_id *user_id_to_find);
-struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find);
+extern int update_every;
 
 // ----------------------------------------------------------------------------
 // debugging
@@ -515,46 +611,141 @@ static inline void debug_log_dummy(void) {}
 #define debug_log(fmt, args...) debug_log_dummy()
 
 #endif
-int managed_log(struct pid_stat *p, PID_LOG log, int status);
+bool managed_log(struct pid_stat *p, PID_LOG log, bool status);
 
 // ----------------------------------------------------------------------------
 // macro to calculate the incremental rate of a value
 // each parameter is accessed only ONCE - so it is safe to pass function calls
 // or other macros as parameters
 
-#define incremental_rate(rate_variable, last_kernel_variable, new_kernel_value, collected_usec, last_collected_usec) do { \
+#define incremental_rate(rate_variable, last_kernel_variable, new_kernel_value, collected_usec, last_collected_usec, multiplier) do { \
         kernel_uint_t _new_tmp = new_kernel_value; \
-        (rate_variable) = (_new_tmp - (last_kernel_variable)) * (USEC_PER_SEC * RATES_DETAIL) / ((collected_usec) - (last_collected_usec)); \
+        (rate_variable) = (_new_tmp - (last_kernel_variable)) * (USEC_PER_SEC * multiplier) / ((collected_usec) - (last_collected_usec)); \
         (last_kernel_variable) = _new_tmp; \
     } while(0)
 
 // the same macro for struct pid members
-#define pid_incremental_rate(type, var, value) \
-    incremental_rate(var, var##_raw, value, p->type##_collected_usec, p->last_##type##_collected_usec)
+#define pid_incremental_rate(type, idx, value) \
+    incremental_rate(p->values[idx], p->raw[idx], value, p->type##_collected_usec, p->last_##type##_collected_usec, RATES_DETAIL)
 
-int read_proc_pid_stat(struct pid_stat *p, void *ptr);
-int read_proc_pid_limits(struct pid_stat *p, void *ptr);
-int read_proc_pid_status(struct pid_stat *p, void *ptr);
+#define pid_incremental_cpu(type, idx, value) \
+    incremental_rate(p->values[idx], p->raw[idx], value, p->type##_collected_usec, p->last_##type##_collected_usec, CPU_TO_NANOSECONDCORES)
+
+void apps_orchestrators_and_aggregators_init(void);
+void apps_users_and_groups_init(void);
+void apps_pids_init(void);
+
+#if (PROCESSES_HAVE_CMDLINE == 1)
 int read_proc_pid_cmdline(struct pid_stat *p);
-int read_proc_pid_io(struct pid_stat *p, void *ptr);
-int read_pid_file_descriptors(struct pid_stat *p, void *ptr);
-int read_global_time(void);
-void get_MemTotal(void);
+#endif
 
-bool collect_data_for_all_pids(void);
-void cleanup_exited_pids(void);
-
+#if (PROCESSES_HAVE_FDS == 1)
 void clear_pid_fd(struct pid_fd *pfd);
 void file_descriptor_not_used(int id);
 void init_pid_fds(struct pid_stat *p, size_t first, size_t size);
 void aggregate_pid_fds_on_targets(struct pid_stat *p);
+int read_pid_file_descriptors(struct pid_stat *p, void *ptr);
+void make_all_pid_fds_negative(struct pid_stat *p);
+uint32_t file_descriptor_find_or_add(const char *name, uint32_t hash);
+#endif
 
-void send_proc_states_count(usec_t dt);
+// --------------------------------------------------------------------------------------------------------------------
+// data collection management
+
+bool collect_data_for_all_pids(void);
+
+void pid_collection_started(struct pid_stat *p);
+void pid_collection_failed(struct pid_stat *p);
+void pid_collection_completed(struct pid_stat *p);
+
+#if (INCREMENTAL_DATA_COLLECTION == 1)
+bool collect_parents_before_children(void);
+int incrementally_collect_data_for_pid(pid_t pid, void *ptr);
+int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr);
+#endif
+
+// --------------------------------------------------------------------------------------------------------------------
+// pid management
+
+struct pid_stat *root_of_pids(void);
+size_t all_pids_count(void);
+
+struct pid_stat *get_or_allocate_pid_entry(pid_t pid);
+struct pid_stat *find_pid_entry(pid_t pid);
+void del_pid_entry(pid_t pid);
+void update_pid_comm(struct pid_stat *p, const char *comm);
+
+
+// --------------------------------------------------------------------------------------------------------------------
+// targets management
+
+struct target *find_target_by_name(struct target *base, const char *name);
+struct target *get_tree_target(struct pid_stat *p);
+
+void aggregate_processes_to_targets(void);
+
+#if (PROCESSES_HAVE_UID == 1)
+extern struct target *users_root_target;
+struct target *get_uid_target(uid_t uid);
+struct user_or_group_id *user_id_find(struct user_or_group_id *user_id_to_find);
+#endif
+
+#if (PROCESSES_HAVE_GID == 1)
+extern struct target *groups_root_target;
+struct target *get_gid_target(gid_t gid);
+struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find);
+#endif
+
+extern struct target *apps_groups_root_target;
+int read_apps_groups_conf(const char *path, const char *file);
+
+// --------------------------------------------------------------------------------------------------------------------
+// output
+
 void send_charts_updates_to_netdata(struct target *root, const char *type, const char *lbl_name, const char *title);
 void send_collected_data_to_netdata(struct target *root, const char *type, usec_t dt);
 void send_resource_usage_to_netdata(usec_t dt);
 
-void pids_init(void);
-struct pid_stat *find_pid_entry(pid_t pid);
+#if (PROCESSES_HAVE_STATE == 1)
+void send_proc_states_count(usec_t dt);
+#endif
+
+#define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
+void function_processes(const char *transaction, char *function,
+                        usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+                        BUFFER *payload __maybe_unused, HTTP_ACCESS access,
+                        const char *source __maybe_unused, void *data __maybe_unused);
+
+// --------------------------------------------------------------------------------------------------------------------
+// operating system functions
+
+// one time initialization per operating system
+void OS_FUNCTION(apps_os_init)(void);
+
+// collect all the available information for all processes running
+bool OS_FUNCTION(apps_os_collect_all_pids)(void);
+
+bool OS_FUNCTION(apps_os_read_pid_status)(struct pid_stat *p, void *ptr);
+bool OS_FUNCTION(apps_os_read_pid_stat)(struct pid_stat *p, void *ptr);
+bool OS_FUNCTION(apps_os_read_pid_io)(struct pid_stat *p, void *ptr);
+
+#if (PROCESSES_HAVE_PID_LIMITS == 1)
+bool OS_FUNCTION(apps_os_read_pid_limits)(struct pid_stat *p, void *ptr);
+#endif
+
+#if (PROCESSES_HAVE_CMDLINE == 1)
+bool OS_FUNCTION(apps_os_get_pid_cmdline)(struct pid_stat *p, char *cmdline, size_t bytes);
+#endif
+
+#if (PROCESSES_HAVE_FDS == 1)
+bool OS_FUNCTION(apps_os_read_pid_fds)(struct pid_stat *p, void *ptr);
+#endif
+
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
+bool OS_FUNCTION(apps_os_read_global_cpu_utilization)(void);
+#endif
+
+// return the total physical memory of the system, in bytes
+uint64_t OS_FUNCTION(apps_os_get_total_memory)(void);
 
 #endif //NETDATA_APPS_PLUGIN_H

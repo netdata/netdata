@@ -169,6 +169,8 @@
 #cmakedefine HAVE_LIBYAML
 #cmakedefine HAVE_LIBMNL
 
+#cmakedefine RUN_UNDER_CLION
+
 // /* Enable GNU extensions on systems that have them.  */
 // #ifndef _GNU_SOURCE
 // # define _GNU_SOURCE 1

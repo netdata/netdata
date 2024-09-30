@@ -82,7 +82,14 @@ long os_get_system_cpus_cached(bool cache, bool for_netdata) {
 
     SYSTEM_INFO sysInfo;
     GetSystemInfo(&sysInfo);
-    return (long) sysInfo.dwNumberOfProcessors;
+    processors[index] = sysInfo.dwNumberOfProcessors;
+
+    if(processors[index] < 1) {
+        processors[index] = 1;
+        netdata_log_error("Assuming system has %ld processors.", processors[index]);
+    }
+
+    return processors[index];
 
 #else
 

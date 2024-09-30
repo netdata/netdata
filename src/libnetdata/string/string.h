@@ -14,8 +14,10 @@ STRING *string_strndupz(const char *str, size_t len);
 
 STRING *string_dup(STRING *string);
 void string_freez(STRING *string);
-size_t string_strlen(STRING *string);
-const char *string2str(STRING *string) NEVERNULL;
+size_t string_strlen(const STRING *string);
+const char *string2str(const STRING *string) NEVERNULL;
+bool string_ends_with_string(const STRING *whole, const STRING *end);
+bool string_starts_with_string(const STRING *whole, const STRING *end);
 
 // keep common prefix/suffix and replace everything else with [x]
 STRING *string_2way_merge(STRING *a, STRING *b);

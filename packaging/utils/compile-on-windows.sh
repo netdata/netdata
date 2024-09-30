@@ -66,6 +66,7 @@ then
       -DENABLE_ML=On \
       -DENABLE_BUNDLED_JSONC=On \
       -DENABLE_BUNDLED_PROTOBUF=Off \
+      -DENABLE_PLUGIN_APPS=On \
       ${NULL}
 fi
 

@@ -23,6 +23,7 @@
 #include "os-freebsd-wrappers.h"
 #include "os-macos-wrappers.h"
 #include "os-windows-wrappers.h"
+#include "windows-perflib/perflib.h"
 
 // =====================================================================================================================
 // common defs for Apple/FreeBSD/Linux

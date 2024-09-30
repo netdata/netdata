@@ -76,7 +76,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
             "SET inode_changes = %zu\n"
             "SET link_changes = %zu\n"
             "SET pids = %zu\n"
-            "SET fds = %d\n"
+            "SET fds = %"PRIu32"\n"
             "SET targets = %zu\n"
             "SET new_pids = %zu\n"
             "END\n"
@@ -89,7 +89,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
             , filenames_allocated_counter
             , inodes_changed_counter
             , links_changed_counter
-            , all_pids_count
+            , all_pids_count()
             , all_files_len
             , apps_groups_targets_count
             , targets_assignment_counter
@@ -103,103 +103,138 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         if (unlikely(!w->exposed))
             continue;
 
-        send_BEGIN(type, w->clean_name, "processes", dt);
-        send_SET("processes", w->processes);
+        send_BEGIN(type, string2str(w->clean_name), "processes", dt);
+        send_SET("processes", w->values[PDF_PROCESSES]);
         send_END();
 
-        send_BEGIN(type, w->clean_name, "threads", dt);
-        send_SET("threads", w->num_threads);
+        send_BEGIN(type, string2str(w->clean_name), "threads", dt);
+        send_SET("threads", w->values[PDF_THREADS]);
         send_END();
 
-        if (unlikely(!w->processes && !w->is_other))
+        if (unlikely(!w->values[PDF_PROCESSES]))
             continue;
 
-        send_BEGIN(type, w->clean_name, "cpu_utilization", dt);
-        send_SET("user", (kernel_uint_t)(w->utime * utime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cutime * cutime_fix_ratio)) : 0ULL));
-        send_SET("system", (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cstime * cstime_fix_ratio)) : 0ULL));
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME)
+        send_BEGIN(type, string2str(w->clean_name), "cpu_utilization", dt);
+        send_SET("user", (kernel_uint_t)(w->values[PDF_UTIME] * utime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->values[PDF_CUTIME] * cutime_fix_ratio)) : 0ULL));
+        send_SET("system", (kernel_uint_t)(w->values[PDF_STIME] * stime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->values[PDF_CSTIME] * cstime_fix_ratio)) : 0ULL));
         send_END();
+#else
+        send_BEGIN(type, string2str(w->clean_name), "cpu_utilization", dt);
+        send_SET("user", (kernel_uint_t)(w->values[PDF_UTIME] * utime_fix_ratio));
+        send_SET("system", (kernel_uint_t)(w->values[PDF_STIME] * stime_fix_ratio));
+        send_END();
+#endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         if (enable_guest_charts) {
-            send_BEGIN(type, w->clean_name, "cpu_guest_utilization", dt);
-            send_SET("guest", (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cgtime * cgtime_fix_ratio)) : 0ULL));
+            send_BEGIN(type, string2str(w->clean_name), "cpu_guest_utilization", dt);
+            send_SET("guest", (kernel_uint_t)(w->values[PDF_GTIME] * gtime_fix_ratio)
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1)
+                                  + (include_exited_childs ? ((kernel_uint_t)(w->values[PDF_CGTIME] * cgtime_fix_ratio)) : 0ULL)
+#endif
+                     );
             send_END();
         }
+#endif
 
-        send_BEGIN(type, w->clean_name, "cpu_context_switches", dt);
-        send_SET("voluntary", w->status_voluntary_ctxt_switches);
-        send_SET("involuntary", w->status_nonvoluntary_ctxt_switches);
+        send_BEGIN(type, string2str(w->clean_name), "mem_private_usage", dt);
+#if (PROCESSES_HAVE_VMSHARED == 1)
+        send_SET("mem", (w->values[PDF_VMRSS] > w->values[PDF_VMSHARED])?(w->values[PDF_VMRSS] - w->values[PDF_VMSHARED]) : 0ULL);
+#else
+        send_SET("mem", w->values[PDF_VMRSS]);
+#endif
         send_END();
 
-        send_BEGIN(type, w->clean_name, "mem_private_usage", dt);
-        send_SET("mem", (w->status_vmrss > w->status_vmshared)?(w->status_vmrss - w->status_vmshared) : 0ULL);
+#if (PROCESSES_HAVE_VOLCTX == 1) || (PROCESSES_HAVE_NVOLCTX == 1)
+        send_BEGIN(type, string2str(w->clean_name), "cpu_context_switches", dt);
+#if (PROCESSES_HAVE_VOLCTX == 1)
+        send_SET("voluntary", w->values[PDF_VOLCTX]);
+#endif
+#if (PROCESSES_HAVE_NVOLCTX == 1)
+        send_SET("involuntary", w->values[PDF_NVOLCTX]);
+#endif
         send_END();
 #endif
 
-        send_BEGIN(type, w->clean_name, "mem_usage", dt);
-        send_SET("rss", w->status_vmrss);
+        send_BEGIN(type, string2str(w->clean_name), "mem_usage", dt);
+        send_SET("rss", w->values[PDF_VMRSS]);
         send_END();
 
-#if !defined(__APPLE__)
-        send_BEGIN(type, w->clean_name, "vmem_usage", dt);
-        send_SET("vmem", w->status_vmsize);
+        send_BEGIN(type, string2str(w->clean_name), "vmem_usage", dt);
+        send_SET("vmem", w->values[PDF_VMSIZE]);
+        send_END();
+
+        send_BEGIN(type, string2str(w->clean_name), "mem_page_faults", dt);
+        send_SET("minor", (kernel_uint_t)(w->values[PDF_MINFLT] * minflt_fix_ratio)
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+                              + (include_exited_childs ? ((kernel_uint_t)(w->values[PDF_CMINFLT] * cminflt_fix_ratio)) : 0ULL)
+#endif
+                              );
+#if (PROCESSES_HAVE_MAJFLT == 1)
+        send_SET("major", (kernel_uint_t)(w->values[PDF_MAJFLT] * majflt_fix_ratio)
+#if (PROCESSES_HAVE_CHILDREN_FLTS == 1)
+                              + (include_exited_childs ? ((kernel_uint_t)(w->values[PDF_CMAJFLT] * cmajflt_fix_ratio)) : 0ULL)
+#endif
+                              );
+#endif
+        send_END();
+
+#if (PROCESSES_HAVE_VMSWAP == 1)
+        send_BEGIN(type, string2str(w->clean_name), "swap_usage", dt);
+        send_SET("swap", w->values[PDF_VMSWAP]);
         send_END();
 #endif
 
-        send_BEGIN(type, w->clean_name, "mem_page_faults", dt);
-        send_SET("minor", (kernel_uint_t)(w->minflt * minflt_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cminflt * cminflt_fix_ratio)) : 0ULL));
-        send_SET("major", (kernel_uint_t)(w->majflt * majflt_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cmajflt * cmajflt_fix_ratio)) : 0ULL));
-        send_END();
-
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
-        send_BEGIN(type, w->clean_name, "swap_usage", dt);
-        send_SET("swap", w->status_vmswap);
-        send_END();
-#endif
-
-        if (w->processes == 0) {
-            send_BEGIN(type, w->clean_name, "uptime", dt);
+        if (w->values[PDF_PROCESSES] == 0) {
+            send_BEGIN(type, string2str(w->clean_name), "uptime", dt);
             send_SET("uptime", 0);
             send_END();
 
             if (enable_detailed_uptime_charts) {
-                send_BEGIN(type, w->clean_name, "uptime_summary", dt);
+                send_BEGIN(type, string2str(w->clean_name), "uptime_summary", dt);
                 send_SET("min", 0);
                 send_SET("avg", 0);
                 send_SET("max", 0);
                 send_END();
             }
         } else {
-            send_BEGIN(type, w->clean_name, "uptime", dt);
+            send_BEGIN(type, string2str(w->clean_name), "uptime", dt);
             send_SET("uptime", w->uptime_max);
             send_END();
 
             if (enable_detailed_uptime_charts) {
-                send_BEGIN(type, w->clean_name, "uptime_summary", dt);
+                send_BEGIN(type, string2str(w->clean_name), "uptime_summary", dt);
                 send_SET("min", w->uptime_min);
-                send_SET("avg", w->processes > 0 ? w->uptime_sum / w->processes : 0);
+                send_SET("avg", w->values[PDF_PROCESSES] > 0 ? w->values[PDF_UPTIME] / w->values[PDF_PROCESSES] : 0);
                 send_SET("max", w->uptime_max);
                 send_END();
             }
         }
 
-        send_BEGIN(type, w->clean_name, "disk_physical_io", dt);
-        send_SET("reads", w->io_storage_bytes_read);
-        send_SET("writes", w->io_storage_bytes_written);
-        send_END();
-
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
-        send_BEGIN(type, w->clean_name, "disk_logical_io", dt);
-        send_SET("reads", w->io_logical_bytes_read);
-        send_SET("writes", w->io_logical_bytes_written);
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+        send_BEGIN(type, string2str(w->clean_name), "disk_physical_io", dt);
+        send_SET("reads", w->values[PDF_PREAD]);
+        send_SET("writes", w->values[PDF_PWRITE]);
         send_END();
 #endif
+
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+        send_BEGIN(type, string2str(w->clean_name), "disk_logical_io", dt);
+        send_SET("reads", w->values[PDF_LREAD]);
+        send_SET("writes", w->values[PDF_LWRITE]);
+        send_END();
+#endif
+
         if (enable_file_charts) {
-            send_BEGIN(type, w->clean_name, "fds_open_limit", dt);
+#if (PROCESSES_HAVE_FDS == 1)
+            send_BEGIN(type, string2str(w->clean_name), "fds_open_limit", dt);
             send_SET("limit", w->max_open_files_percent * 100.0);
             send_END();
+#endif
 
-            send_BEGIN(type, w->clean_name, "fds_open", dt);
+            send_BEGIN(type, string2str(w->clean_name), "fds_open", dt);
+#if (PROCESSES_HAVE_FDS == 1)
             send_SET("files", w->openfds.files);
             send_SET("sockets", w->openfds.sockets);
             send_SET("pipes", w->openfds.sockets);
@@ -209,6 +244,10 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
             send_SET("signal", w->openfds.signalfds);
             send_SET("eventpolls", w->openfds.eventpolls);
             send_SET("other", w->openfds.other);
+#endif
+#if (PROCESSES_HAVE_HANDLES == 1)
+            send_SET("handles", w->values[PDF_HANDLES]);
+#endif
             send_END();
         }
     }
@@ -223,9 +262,9 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 
     if (debug_enabled) {
         for (w = root; w; w = w->next) {
-            if (unlikely(!w->target && w->processes)) {
+            if (unlikely(!w->target && w->values[PDF_PROCESSES])) {
                 struct pid_on_target *pid_on_target;
-                fprintf(stderr, "apps.plugin: target '%s' has aggregated %u process(es):", w->name, w->processes);
+                fprintf(stderr, "apps.plugin: target '%s' has aggregated %"PRIu64" process(es):", string2str(w->name), w->values[PDF_PROCESSES]);
                 for (pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {
                     fprintf(stderr, " %d", pid_on_target->pid);
                 }
@@ -235,101 +274,120 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
     }
 
     for (w = root; w; w = w->next) {
-        if (likely(w->exposed || (!w->processes && !w->is_other)))
+        if (likely(w->exposed || (!w->values[PDF_PROCESSES])))
             continue;
 
-        w->exposed = 1;
+        w->exposed = true;
 
-        fprintf(stdout, "CHART %s.%s_cpu_utilization '' '%s CPU utilization (100%% = 1 core)' 'percentage' cpu %s.cpu_utilization stacked 20001 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+        fprintf(stdout, "CHART %s.%s_cpu_utilization '' '%s CPU utilization (100%% = 1 core)' 'percentage' cpu %s.cpu_utilization stacked 20001 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION user '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
-        fprintf(stdout, "DIMENSION system '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
+        fprintf(stdout, "DIMENSION user '' absolute 1 %llu\n", NSEC_PER_SEC / 100ULL);
+        fprintf(stdout, "DIMENSION system '' absolute 1 %llu\n", NSEC_PER_SEC / 100ULL);
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         if (enable_guest_charts) {
-            fprintf(stdout, "CHART %s.%s_cpu_guest_utilization '' '%s CPU guest utlization (100%% = 1 core)' 'percentage' cpu %s.cpu_guest_utilization line 20005 %d\n", type, w->clean_name, title, type, update_every);
-            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+            fprintf(stdout, "CHART %s.%s_cpu_guest_utilization '' '%s CPU guest utlization (100%% = 1 core)' 'percentage' cpu %s.cpu_guest_utilization line 20005 %d\n",
+                    type, string2str(w->clean_name), title, type, update_every);
+            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
             fprintf(stdout, "CLABEL_COMMIT\n");
-            fprintf(stdout, "DIMENSION guest '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
+            fprintf(stdout, "DIMENSION guest '' absolute 1 %llu\n", NSEC_PER_SEC / 100ULL);
         }
+#endif
 
-        fprintf(stdout, "CHART %s.%s_cpu_context_switches '' '%s CPU context switches' 'switches/s' cpu %s.cpu_context_switches stacked 20010 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+        fprintf(stdout, "CHART %s.%s_mem_private_usage '' '%s memory usage without shared' 'MiB' mem %s.mem_private_usage area 20050 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
+        fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L * 1024L);
+
+#if (PROCESSES_HAVE_VOLCTX == 1) || (PROCESSES_HAVE_NVOLCTX == 1)
+        fprintf(stdout, "CHART %s.%s_cpu_context_switches '' '%s CPU context switches' 'switches/s' cpu %s.cpu_context_switches stacked 20010 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
+        fprintf(stdout, "CLABEL_COMMIT\n");
+#if (PROCESSES_HAVE_VOLCTX == 1)
         fprintf(stdout, "DIMENSION voluntary '' absolute 1 %llu\n", RATES_DETAIL);
+#endif
+#if (PROCESSES_HAVE_NVOLCTX == 1)
         fprintf(stdout, "DIMENSION involuntary '' absolute 1 %llu\n", RATES_DETAIL);
-
-        fprintf(stdout, "CHART %s.%s_mem_private_usage '' '%s memory usage without shared' 'MiB' mem %s.mem_private_usage area 20050 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
-        fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L);
+#endif
 #endif
 
-        fprintf(stdout, "CHART %s.%s_mem_usage '' '%s memory RSS usage' 'MiB' mem %s.mem_usage area 20055 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+        fprintf(stdout, "CHART %s.%s_mem_usage '' '%s memory RSS usage' 'MiB' mem %s.mem_usage area 20055 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L);
+        fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 
-#if !defined(__APPLE__)
-        fprintf(stdout, "CHART %s.%s_vmem_usage '' '%s virtual memory size' 'MiB' mem %s.vmem_usage line 20065 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+        fprintf(stdout, "CHART %s.%s_vmem_usage '' '%s virtual memory size' 'MiB' mem %s.vmem_usage line 20065 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION vmem '' absolute %ld %ld\n", 1L, 1024L);
-#endif
+        fprintf(stdout, "DIMENSION vmem '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 
-        fprintf(stdout, "CHART %s.%s_mem_page_faults '' '%s memory page faults' 'pgfaults/s' mem %s.mem_page_faults stacked 20060 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+        fprintf(stdout, "CHART %s.%s_mem_page_faults '' '%s memory page faults' 'pgfaults/s' mem %s.mem_page_faults stacked 20060 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION major '' absolute 1 %llu\n", RATES_DETAIL);
         fprintf(stdout, "DIMENSION minor '' absolute 1 %llu\n", RATES_DETAIL);
-
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
-        fprintf(stdout, "CHART %s.%s_swap_usage '' '%s swap usage' 'MiB' mem %s.swap_usage area 20065 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
-        fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION swap '' absolute %ld %ld\n", 1L, 1024L);
+#if (PROCESSES_HAVE_MAJFLT == 1)
+        fprintf(stdout, "DIMENSION major '' absolute 1 %llu\n", RATES_DETAIL);
 #endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
-        fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'KiB/s' disk %s.disk_physical_io area 20100 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+#if (PROCESSES_HAVE_VMSWAP == 1)
+        fprintf(stdout, "CHART %s.%s_swap_usage '' '%s swap usage' 'MiB' mem %s.swap_usage area 20065 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
+        fprintf(stdout, "CLABEL_COMMIT\n");
+        fprintf(stdout, "DIMENSION swap '' absolute %ld %ld\n", 1L, 1024L * 1024L);
+#endif
+
+#if (PROCESSES_HAVE_PHYSICAL_IO == 1)
+        fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'KiB/s' disk %s.disk_physical_io area 20100 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
         fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", 1024LLU * RATES_DETAIL);
+#endif
 
-        fprintf(stdout, "CHART %s.%s_disk_logical_io '' '%s disk logical IO' 'KiB/s' disk %s.disk_logical_io area 20105 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+#if (PROCESSES_HAVE_LOGICAL_IO == 1)
+        fprintf(stdout, "CHART %s.%s_disk_logical_io '' '%s disk logical IO' 'KiB/s' disk %s.disk_logical_io area 20105 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
         fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", 1024LLU * RATES_DETAIL);
-#else
-        fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'blocks/s' disk %s.disk_physical_block_io area 20100 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
-        fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", RATES_DETAIL);
-        fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", RATES_DETAIL);
 #endif
 
-        fprintf(stdout, "CHART %s.%s_processes '' '%s processes' 'processes' processes %s.processes line 20150 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+        fprintf(stdout, "CHART %s.%s_processes '' '%s processes' 'processes' processes %s.processes line 20150 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION processes '' absolute 1 1\n");
 
-        fprintf(stdout, "CHART %s.%s_threads '' '%s threads' 'threads' processes %s.threads line 20155 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+        fprintf(stdout, "CHART %s.%s_threads '' '%s threads' 'threads' processes %s.threads line 20155 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION threads '' absolute 1 1\n");
 
         if (enable_file_charts) {
-            fprintf(stdout, "CHART %s.%s_fds_open_limit '' '%s open file descriptors limit' '%%' fds %s.fds_open_limit line 20200 %d\n", type, w->clean_name, title, type, update_every);
-            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+#if (PROCESSES_HAVE_FDS == 1)
+            fprintf(stdout, "CHART %s.%s_fds_open_limit '' '%s open file descriptors limit' '%%' fds %s.fds_open_limit line 20200 %d\n",
+                    type, string2str(w->clean_name), title, type, update_every);
+            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
             fprintf(stdout, "CLABEL_COMMIT\n");
             fprintf(stdout, "DIMENSION limit '' absolute 1 100\n");
+#endif
 
-            fprintf(stdout, "CHART %s.%s_fds_open '' '%s open files descriptors' 'fds' fds %s.fds_open stacked 20210 %d\n", type, w->clean_name, title, type, update_every);
-            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+            fprintf(stdout, "CHART %s.%s_fds_open '' '%s open files descriptors' 'fds' fds %s.fds_open stacked 20210 %d\n",
+                    type, string2str(w->clean_name), title, type, update_every);
+            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
             fprintf(stdout, "CLABEL_COMMIT\n");
+#if (PROCESSES_HAVE_FDS == 1)
             fprintf(stdout, "DIMENSION files '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION sockets '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION pipes '' absolute 1 1\n");
@@ -339,16 +397,22 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             fprintf(stdout, "DIMENSION signal '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION eventpolls '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION other '' absolute 1 1\n");
+#endif
+#if (PROCESSES_HAVE_HANDLES == 1)
+            fprintf(stdout, "DIMENSION handles '' absolute 1 1\n");
+#endif
         }
 
-        fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+        fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n",
+                type, string2str(w->clean_name), title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION uptime '' absolute 1 1\n");
 
         if (enable_detailed_uptime_charts) {
-            fprintf(stdout, "CHART %s.%s_uptime_summary '' '%s uptime summary' 'seconds' uptime %s.uptime_summary area 20255 %d\n", type, w->clean_name, title, type, update_every);
-            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+            fprintf(stdout, "CHART %s.%s_uptime_summary '' '%s uptime summary' 'seconds' uptime %s.uptime_summary area 20255 %d\n",
+                    type, string2str(w->clean_name), title, type, update_every);
+            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
             fprintf(stdout, "CLABEL_COMMIT\n");
             fprintf(stdout, "DIMENSION min '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION avg '' absolute 1 1\n");
@@ -357,8 +421,8 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
     }
 }
 
+#if (PROCESSES_HAVE_STATE == 1)
 void send_proc_states_count(usec_t dt __maybe_unused) {
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
     static bool chart_added = false;
     // create chart for count of processes in different states
     if (!chart_added) {
@@ -379,6 +443,6 @@ void send_proc_states_count(usec_t dt __maybe_unused) {
         send_SET(proc_states[i], proc_state_count[i]);
     }
     send_END();
-#endif
 }
+#endif
 

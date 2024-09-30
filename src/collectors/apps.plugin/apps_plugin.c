@@ -27,16 +27,16 @@
 // options
 
 bool debug_enabled = false;
-bool enable_guest_charts = false;
+
 bool enable_detailed_uptime_charts = false;
 bool enable_users_charts = true;
 bool enable_groups_charts = true;
 bool include_exited_childs = true;
-bool proc_pid_cmdline_is_needed = false; // true when we need to read /proc/cmdline
+bool proc_pid_cmdline_is_needed = true; // true when we need to read /proc/cmdline
 
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(OS_FREEBSD) || defined(OS_MACOS) || defined(OS_WINDOWS)
 bool enable_file_charts = false;
-#else
+#elif defined(OS_LINUX)
 bool enable_file_charts = true;
 #endif
 
@@ -53,19 +53,16 @@ size_t
     targets_assignment_counter = 0,
     apps_groups_targets_count = 0;       // # of apps_groups.conf targets
 
-int
-    all_files_len = 0,
-    all_files_size = 0,
-    show_guest_time = 0,            // 1 when guest values are collected
-    show_guest_time_old = 0;
-
-#if defined(__FreeBSD__) || defined(__APPLE__)
-usec_t system_current_time_ut;
-#else
-kernel_uint_t system_uptime_secs;
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
+bool enable_guest_charts = false;
+bool show_guest_time = false;            // set when guest values are collected
 #endif
 
-// ----------------------------------------------------------------------------
+uint32_t
+    all_files_len = 0,
+    all_files_size = 0;
+
+// --------------------------------------------------------------------------------------------------------------------
 // Normalization
 //
 // With normalization we lower the collected metrics by a factor to make them
@@ -80,10 +77,12 @@ kernel_uint_t system_uptime_secs;
 // metric.
 
 // the total system time, as reported by /proc/stat
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 kernel_uint_t
     global_utime = 0,
     global_stime = 0,
     global_gtime = 0;
+#endif
 
 // the normalization ratios, as calculated by normalize_utilization()
 NETDATA_DOUBLE
@@ -98,21 +97,11 @@ NETDATA_DOUBLE
     cminflt_fix_ratio = 1.0,
     cmajflt_fix_ratio = 1.0;
 
-// ----------------------------------------------------------------------------
-// factor for calculating correct CPU time values depending on units of raw data
-unsigned int time_factor = 0;
-
-// ----------------------------------------------------------------------------
-// command line options
+// --------------------------------------------------------------------------------------------------------------------
 
 int update_every = 1;
 
-#if defined(__APPLE__)
-mach_timebase_info_data_t mach_info;
-#endif
-
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
-int max_fds_cache_seconds = 60;
+#if defined(OS_LINUX)
 proc_state proc_state_count[PROC_STATUS_END];
 const char *proc_states[] = {
     [PROC_STATUS_RUNNING] = "running",
@@ -127,412 +116,12 @@ const char *proc_states[] = {
 static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
 
-struct target
-        *apps_groups_default_target = NULL, // the default target
-        *apps_groups_root_target = NULL,    // apps_groups.conf defined
-        *users_root_target = NULL,          // users
-        *groups_root_target = NULL;         // user groups
-
 size_t pagesize;
-
-// ----------------------------------------------------------------------------
-
-int managed_log(struct pid_stat *p, PID_LOG log, int status) {
-    if(unlikely(!status)) {
-        // netdata_log_error("command failed log %u, errno %d", log, errno);
-
-        if(unlikely(debug_enabled || errno != ENOENT)) {
-            if(unlikely(debug_enabled || !(p->log_thrown & log))) {
-                p->log_thrown |= log;
-                switch(log) {
-                    case PID_LOG_IO:
-                        #if defined(__FreeBSD__) || defined(__APPLE__)
-                        netdata_log_error("Cannot fetch process %d I/O info (command '%s')", p->pid, p->comm);
-                        #else
-                        netdata_log_error("Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
-                        #endif
-                        break;
-
-                    case PID_LOG_STATUS:
-                        #if defined(__FreeBSD__) || defined(__APPLE__)
-                        netdata_log_error("Cannot fetch process %d status info (command '%s')", p->pid, p->comm);
-                        #else
-                        netdata_log_error("Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
-                        #endif
-                        break;
-
-                    case PID_LOG_CMDLINE:
-                        #if defined(__FreeBSD__) || defined(__APPLE__)
-                        netdata_log_error("Cannot fetch process %d command line (command '%s')", p->pid, p->comm);
-                        #else
-                        netdata_log_error("Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
-                        #endif
-                        break;
-
-                    case PID_LOG_FDS:
-                        #if defined(__FreeBSD__) || defined(__APPLE__)
-                        netdata_log_error("Cannot fetch process %d files (command '%s')", p->pid, p->comm);
-                        #else
-                        netdata_log_error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
-                        #endif
-                        break;
-
-                    case PID_LOG_LIMITS:
-                        #if defined(__FreeBSD__) || defined(__APPLE__)
-                        ;
-                        #else
-                        netdata_log_error("Cannot process %s/proc/%d/limits (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
-                        #endif
-
-                    case PID_LOG_STAT:
-                        break;
-
-                    default:
-                        netdata_log_error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
-                        break;
-                }
-            }
-        }
-        errno_clear();
-    }
-    else if(unlikely(p->log_thrown & log)) {
-        // netdata_log_error("unsetting log %u on pid %d", log, p->pid);
-        p->log_thrown &= ~log;
-    }
-
-    return status;
-}
-
-// ----------------------------------------------------------------------------
-// update statistics on the targets
-
-// 1. link all childs to their parents
-// 2. go from bottom to top, marking as merged all children to their parents,
-//    this step links all parents without a target to the child target, if any
-// 3. link all top level processes (the ones not merged) to default target
-// 4. go from top to bottom, linking all children without a target to their parent target
-//    after this step all processes have a target.
-// [5. for each killed pid (updated = 0), remove its usage from its target]
-// 6. zero all apps_groups_targets
-// 7. concentrate all values on the apps_groups_targets
-// 8. remove all killed processes
-// 9. find the unique file count for each target
-// check: update_apps_groups_statistics()
-
-static void apply_apps_groups_targets_inheritance(void) {
-    struct pid_stat *p = NULL;
-
-    // children that do not have a target
-    // inherit their target from their parent
-    int found = 1, loops = 0;
-    while(found) {
-        if(unlikely(debug_enabled)) loops++;
-        found = 0;
-        for(p = root_of_pids; p ; p = p->next) {
-            // if this process does not have a target,
-            // and it has a parent
-            // and its parent has a target
-            // then, set the parent's target to this process
-            if(unlikely(!p->target && p->parent && p->parent->target)) {
-                p->target = p->parent->target;
-                found++;
-
-                if(debug_enabled || (p->target && p->target->debug_enabled))
-                    debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s).", p->target->name, p->pid, p->comm, p->parent->pid, p->parent->comm);
-            }
-        }
-    }
-
-    // find all the procs with 0 childs and merge them to their parents
-    // repeat, until nothing more can be done.
-    int sortlist = 1;
-    found = 1;
-    while(found) {
-        if(unlikely(debug_enabled)) loops++;
-        found = 0;
-
-        for(p = root_of_pids; p ; p = p->next) {
-            if(unlikely(!p->sortlist && !p->children_count))
-                p->sortlist = sortlist++;
-
-            if(unlikely(
-                    !p->children_count            // if this process does not have any children
-                    && !p->merged                 // and is not already merged
-                    && p->parent                  // and has a parent
-                    && p->parent->children_count  // and its parent has children
-                                                  // and the target of this process and its parent is the same,
-                                                  // or the parent does not have a target
-                    && (p->target == p->parent->target || !p->parent->target)
-                    && p->ppid != INIT_PID        // and its parent is not init
-                )) {
-                // mark it as merged
-                p->parent->children_count--;
-                p->merged = true;
-
-                // the parent inherits the child's target, if it does not have a target itself
-                if(unlikely(p->target && !p->parent->target)) {
-                    p->parent->target = p->target;
-
-                    if(debug_enabled || (p->target && p->target->debug_enabled))
-                        debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its child %d (%s).", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
-                }
-
-                found++;
-            }
-        }
-
-        debug_log("TARGET INHERITANCE: merged %d processes", found);
-    }
-
-    // init goes always to default target
-    struct pid_stat *pi = find_pid_entry(INIT_PID);
-    if(pi && !pi->matched_by_config)
-        pi->target = apps_groups_default_target;
-
-    // pid 0 goes always to default target
-    pi = find_pid_entry(0);
-    if(pi && !pi->matched_by_config)
-        pi->target = apps_groups_default_target;
-
-    // give a default target on all top level processes
-    if(unlikely(debug_enabled)) loops++;
-    for(p = root_of_pids; p ; p = p->next) {
-        // if the process is not merged itself
-        // then it is a top level process
-        if(unlikely(!p->merged && !p->target))
-            p->target = apps_groups_default_target;
-
-        // make sure all processes have a sortlist
-        if(unlikely(!p->sortlist))
-            p->sortlist = sortlist++;
-    }
-
-    pi = find_pid_entry(1);
-    if(pi)
-        pi->sortlist = sortlist++;
-
-    // give a target to all merged child processes
-    found = 1;
-    while(found) {
-        if(unlikely(debug_enabled)) loops++;
-        found = 0;
-        for(p = root_of_pids; p ; p = p->next) {
-            if(unlikely(!p->target && p->merged && p->parent && p->parent->target)) {
-                p->target = p->parent->target;
-                found++;
-
-                if(debug_enabled || (p->target && p->target->debug_enabled))
-                    debug_log_int("TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s) at phase 2.", p->target->name, p->pid, p->comm, p->parent->pid, p->parent->comm);
-            }
-        }
-    }
-
-    debug_log("apply_apps_groups_targets_inheritance() made %d loops on the process tree", loops);
-}
-
-static size_t zero_all_targets(struct target *root) {
-    struct target *w;
-    size_t count = 0;
-
-    for (w = root; w ; w = w->next) {
-        count++;
-
-        w->minflt = 0;
-        w->majflt = 0;
-        w->utime = 0;
-        w->stime = 0;
-        w->gtime = 0;
-        w->cminflt = 0;
-        w->cmajflt = 0;
-        w->cutime = 0;
-        w->cstime = 0;
-        w->cgtime = 0;
-        w->num_threads = 0;
-        // w->rss = 0;
-        w->processes = 0;
-
-        w->status_vmsize = 0;
-        w->status_vmrss = 0;
-        w->status_vmshared = 0;
-        w->status_rssfile = 0;
-        w->status_rssshmem = 0;
-        w->status_vmswap = 0;
-        w->status_voluntary_ctxt_switches = 0;
-        w->status_nonvoluntary_ctxt_switches = 0;
-
-        w->io_logical_bytes_read = 0;
-        w->io_logical_bytes_written = 0;
-        w->io_read_calls = 0;
-        w->io_write_calls = 0;
-        w->io_storage_bytes_read = 0;
-        w->io_storage_bytes_written = 0;
-        w->io_cancelled_write_bytes = 0;
-
-        // zero file counters
-        if(w->target_fds) {
-            memset(w->target_fds, 0, sizeof(int) * w->target_fds_size);
-            w->openfds.files = 0;
-            w->openfds.pipes = 0;
-            w->openfds.sockets = 0;
-            w->openfds.inotifies = 0;
-            w->openfds.eventfds = 0;
-            w->openfds.timerfds = 0;
-            w->openfds.signalfds = 0;
-            w->openfds.eventpolls = 0;
-            w->openfds.other = 0;
-
-            w->max_open_files_percent = 0.0;
-        }
-
-        w->uptime_min = 0;
-        w->uptime_sum = 0;
-        w->uptime_max = 0;
-
-        if(unlikely(w->root_pid)) {
-            struct pid_on_target *pid_on_target = w->root_pid;
-
-            while(pid_on_target) {
-                struct pid_on_target *pid_on_target_to_free = pid_on_target;
-                pid_on_target = pid_on_target->next;
-                freez(pid_on_target_to_free);
-            }
-
-            w->root_pid = NULL;
-        }
-    }
-
-    return count;
-}
-
-static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
-    (void)o;
-
-    if(unlikely(!p->updated)) {
-        // the process is not running
-        return;
-    }
-
-    if(unlikely(!w)) {
-        netdata_log_error("pid %d %s was left without a target!", p->pid, p->comm);
-        return;
-    }
-
-    if(p->openfds_limits_percent > w->max_open_files_percent)
-        w->max_open_files_percent = p->openfds_limits_percent;
-
-    w->cutime  += p->cutime;
-    w->cstime  += p->cstime;
-    w->cgtime  += p->cgtime;
-    w->cminflt += p->cminflt;
-    w->cmajflt += p->cmajflt;
-
-    w->utime  += p->utime;
-    w->stime  += p->stime;
-    w->gtime  += p->gtime;
-    w->minflt += p->minflt;
-    w->majflt += p->majflt;
-
-    // w->rss += p->rss;
-
-    w->status_vmsize   += p->status_vmsize;
-    w->status_vmrss    += p->status_vmrss;
-    w->status_vmshared += p->status_vmshared;
-    w->status_rssfile  += p->status_rssfile;
-    w->status_rssshmem += p->status_rssshmem;
-    w->status_vmswap   += p->status_vmswap;
-    w->status_voluntary_ctxt_switches += p->status_voluntary_ctxt_switches;
-    w->status_nonvoluntary_ctxt_switches += p->status_nonvoluntary_ctxt_switches;
-
-    w->io_logical_bytes_read    += p->io_logical_bytes_read;
-    w->io_logical_bytes_written += p->io_logical_bytes_written;
-    w->io_read_calls            += p->io_read_calls;
-    w->io_write_calls           += p->io_write_calls;
-    w->io_storage_bytes_read    += p->io_storage_bytes_read;
-    w->io_storage_bytes_written += p->io_storage_bytes_written;
-    w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
-
-    w->processes++;
-    w->num_threads += p->num_threads;
-
-    if(!w->uptime_min || p->uptime < w->uptime_min) w->uptime_min = p->uptime;
-    if(!w->uptime_max || w->uptime_max < p->uptime) w->uptime_max = p->uptime;
-    w->uptime_sum += p->uptime;
-
-    if(unlikely(debug_enabled || w->debug_enabled)) {
-        debug_log_int("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
-
-        struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
-        pid_on_target->pid = p->pid;
-        pid_on_target->next = w->root_pid;
-        w->root_pid = pid_on_target;
-    }
-}
-
-static void calculate_netdata_statistics(void) {
-    apply_apps_groups_targets_inheritance();
-
-    zero_all_targets(users_root_target);
-    zero_all_targets(groups_root_target);
-    apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
-
-    // this has to be done, before the cleanup
-    struct pid_stat *p = NULL;
-    struct target *w = NULL, *o = NULL;
-
-    // concentrate everything on the targets
-    for(p = root_of_pids; p ; p = p->next) {
-
-        // --------------------------------------------------------------------
-        // apps_groups target
-
-        aggregate_pid_on_target(p->target, p, NULL);
-
-
-        // --------------------------------------------------------------------
-        // user target
-
-        o = p->user_target;
-        if(likely(p->user_target && p->user_target->uid == p->uid))
-            w = p->user_target;
-        else {
-            if(unlikely(debug_enabled && p->user_target))
-                debug_log("pid %d (%s) switched user from %u (%s) to %u.", p->pid, p->comm, p->user_target->uid, p->user_target->name, p->uid);
-
-            w = p->user_target = get_users_target(p->uid);
-        }
-
-        aggregate_pid_on_target(w, p, o);
-
-
-        // --------------------------------------------------------------------
-        // user group target
-
-        o = p->group_target;
-        if(likely(p->group_target && p->group_target->gid == p->gid))
-            w = p->group_target;
-        else {
-            if(unlikely(debug_enabled && p->group_target))
-                debug_log("pid %d (%s) switched group from %u (%s) to %u.", p->pid, p->comm, p->group_target->gid, p->group_target->name, p->gid);
-
-            w = p->group_target = get_groups_target(p->gid);
-        }
-
-        aggregate_pid_on_target(w, p, o);
-
-
-        // --------------------------------------------------------------------
-        // aggregate all file descriptors
-
-        if(enable_file_charts)
-            aggregate_pid_fds_on_targets(p);
-    }
-
-    cleanup_exited_pids();
-}
 
 // ----------------------------------------------------------------------------
 // update chart dimensions
 
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static void normalize_utilization(struct target *root) {
     struct target *w;
 
@@ -540,7 +129,7 @@ static void normalize_utilization(struct target *root) {
     // here we try to eliminate them by disabling childs processing either for specific dimensions
     // or entirely. Of course, either way, we disable it just a single iteration.
 
-    kernel_uint_t max_time = os_get_system_cpus() * time_factor * RATES_DETAIL;
+    kernel_uint_t max_time = os_get_system_cpus() * NSEC_PER_SEC;
     kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
 
     if(global_utime > max_time) global_utime = max_time;
@@ -548,19 +137,19 @@ static void normalize_utilization(struct target *root) {
     if(global_gtime > max_time) global_gtime = max_time;
 
     for(w = root; w ; w = w->next) {
-        if(w->target || (!w->processes && !w->exposed)) continue;
+        if(w->target || (!w->values[PDF_PROCESSES] && !w->exposed)) continue;
 
-        utime   += w->utime;
-        stime   += w->stime;
-        gtime   += w->gtime;
-        cutime  += w->cutime;
-        cstime  += w->cstime;
-        cgtime  += w->cgtime;
+        utime   += w->values[PDF_UTIME];
+        stime   += w->values[PDF_STIME];
+        gtime   += w->values[PDF_GTIME];
+        cutime  += w->values[PDF_CUTIME];
+        cstime  += w->values[PDF_CSTIME];
+        cgtime  += w->values[PDF_CGTIME];
 
-        minflt  += w->minflt;
-        majflt  += w->majflt;
-        cminflt += w->cminflt;
-        cmajflt += w->cmajflt;
+        minflt  += w->values[PDF_MINFLT];
+        majflt  += w->values[PDF_MAJFLT];
+        cminflt += w->values[PDF_CMINFLT];
+        cmajflt += w->values[PDF_CMAJFLT];
     }
 
     if(global_utime || global_stime || global_gtime) {
@@ -683,6 +272,7 @@ static void normalize_utilization(struct target *root) {
             , (kernel_uint_t)(cgtime * cgtime_fix_ratio)
     );
 }
+#endif
 
 // ----------------------------------------------------------------------------
 // parse command line arguments
@@ -690,6 +280,7 @@ static void normalize_utilization(struct target *root) {
 int check_proc_1_io() {
     int ret = 0;
 
+#if defined(OS_LINUX)
     procfile *ff = procfile_open("/proc/1/io", NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
     if(!ff) goto cleanup;
 
@@ -700,8 +291,12 @@ int check_proc_1_io() {
 
 cleanup:
     procfile_close(ff);
+#endif
+
     return ret;
 }
+
+static bool profile_speed = false;
 
 static void parse_args(int argc, char **argv)
 {
@@ -721,6 +316,7 @@ static void parse_args(int argc, char **argv)
             exit(0);
         }
 
+#if defined(OS_LINUX)
         if(strcmp("test-permissions", argv[i]) == 0 || strcmp("-t", argv[i]) == 0) {
             if(!check_proc_1_io()) {
                 perror("Tried to read /proc/1/io and it failed");
@@ -729,6 +325,7 @@ static void parse_args(int argc, char **argv)
             printf("OK\n");
             exit(0);
         }
+#endif
 
         if(strcmp("debug", argv[i]) == 0) {
             debug_enabled = true;
@@ -738,7 +335,12 @@ static void parse_args(int argc, char **argv)
             continue;
         }
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+        if(strcmp("profile-speed", argv[i]) == 0) {
+            profile_speed = true;
+            continue;
+        }
+
+#if defined(OS_LINUX)
         if(strcmp("fds-cache-secs", argv[i]) == 0) {
             if(argc <= i + 1) {
                 fprintf(stderr, "Parameter 'fds-cache-secs' requires a number as argument.\n");
@@ -751,6 +353,7 @@ static void parse_args(int argc, char **argv)
         }
 #endif
 
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1) || (PROCESSES_HAVE_CHILDREN_FLTS == 1)
         if(strcmp("no-childs", argv[i]) == 0 || strcmp("without-childs", argv[i]) == 0) {
             include_exited_childs = 0;
             continue;
@@ -760,7 +363,9 @@ static void parse_args(int argc, char **argv)
             include_exited_childs = 1;
             continue;
         }
+#endif
 
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
         if(strcmp("with-guest", argv[i]) == 0) {
             enable_guest_charts = true;
             continue;
@@ -770,7 +375,9 @@ static void parse_args(int argc, char **argv)
             enable_guest_charts = false;
             continue;
         }
+#endif
 
+#if (PROCESSES_HAVE_FDS == 1)
         if(strcmp("with-files", argv[i]) == 0) {
             enable_file_charts = 1;
             continue;
@@ -780,16 +387,21 @@ static void parse_args(int argc, char **argv)
             enable_file_charts = 0;
             continue;
         }
+#endif
 
+#if (PROCESSES_HAVE_UID == 1)
         if(strcmp("no-users", argv[i]) == 0 || strcmp("without-users", argv[i]) == 0) {
             enable_users_charts = 0;
             continue;
         }
+#endif
 
+#if (PROCESSES_HAVE_GID == 1)
         if(strcmp("no-groups", argv[i]) == 0 || strcmp("without-groups", argv[i]) == 0) {
             enable_groups_charts = 0;
             continue;
         }
+#endif
 
         if(strcmp("with-detailed-uptime", argv[i]) == 0) {
             enable_detailed_uptime_charts = 1;
@@ -821,26 +433,36 @@ static void parse_args(int argc, char **argv)
                     "                        it may include sensitive data such as passwords and tokens\n"
                     "                        enabling this could be a security risk\n"
                     "\n"
+#if (PROCESSES_HAVE_CPU_CHILDREN_TIME == 1) || (PROCESSES_HAVE_CHILDREN_FLTS == 1)
                     " with-childs\n"
                     " without-childs         enable / disable aggregating exited\n"
                     "                        children resources into parents\n"
                     "                        (default is enabled)\n"
                     "\n"
+#endif
+#if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
                     " with-guest\n"
                     " without-guest          enable / disable reporting guest charts\n"
                     "                        (default is disabled)\n"
                     "\n"
+#endif
+#if (PROCESSES_HAVE_FDS == 1)
                     " with-files\n"
                     " without-files          enable / disable reporting files, sockets, pipes\n"
                     "                        (default is enabled)\n"
                     "\n"
+#endif
+#if (PROCESSES_HAVE_UID == 1)
                     " without-users          disable reporting per user charts\n"
                     "\n"
+#endif
+#if (PROCESSES_HAVE_GID == 1)
                     " without-groups         disable reporting per user group charts\n"
                     "\n"
+#endif
                     " with-detailed-uptime   enable reporting min/avg/max uptime charts\n"
                     "\n"
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
                     " fds-cache-secs N       cache the files of processed for N seconds\n"
                     "                        caching is adaptive per file (when a file\n"
                     "                        is found, it starts at 0 and while the file\n"
@@ -852,15 +474,17 @@ static void parse_args(int argc, char **argv)
                     " version or -v or -V print program version and exit\n"
                     "\n"
                     , NETDATA_VERSION
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if defined(OS_LINUX)
                     , max_fds_cache_seconds
 #endif
             );
-            exit(1);
+            exit(0);
         }
 
+#if !defined(OS_WINDOWS) || !defined(RUN_UNDER_CLION)
         netdata_log_error("Cannot understand option %s", argv[i]);
         exit(1);
+#endif
     }
 
     if(freq > 0) update_every = freq;
@@ -879,7 +503,8 @@ static void parse_args(int argc, char **argv)
         netdata_log_info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
 }
 
-static int am_i_running_as_root() {
+#if !defined(OS_WINDOWS)
+static inline int am_i_running_as_root() {
     uid_t uid = getuid(), euid = geteuid();
 
     if(uid == 0 || euid == 0) {
@@ -892,7 +517,7 @@ static int am_i_running_as_root() {
 }
 
 #ifdef HAVE_SYS_CAPABILITY_H
-static int check_capabilities() {
+static inline int check_capabilities() {
     cap_t caps = cap_get_proc();
     if(!caps) {
         netdata_log_error("Cannot get current capabilities.");
@@ -936,22 +561,13 @@ static int check_capabilities() {
     return ret;
 }
 #else
-static int check_capabilities() {
+static inline int check_capabilities() {
     return 0;
 }
 #endif
+#endif
 
-static netdata_mutex_t apps_and_stdout_mutex = NETDATA_MUTEX_INITIALIZER;
-
-struct target *find_target_by_name(struct target *base, const char *name) {
-    struct target *t;
-    for(t = base; t ; t = t->next) {
-        if (strcmp(t->name, name) == 0)
-            return t;
-    }
-
-    return NULL;
-}
+netdata_mutex_t apps_and_stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 
 static bool apps_plugin_exit = false;
 
@@ -1000,47 +616,35 @@ int main(int argc, char **argv) {
 #endif /* NETDATA_INTERNAL_CHECKS */
 
     procfile_adaptive_initial_allocation = 1;
-
     os_get_system_HZ();
-#if defined(__FreeBSD__)
-    time_factor = 1000000ULL / RATES_DETAIL; // FreeBSD uses usecs
-#endif
-#if defined(__APPLE__)
-    mach_timebase_info(&mach_info);
-    time_factor = 1000000ULL / RATES_DETAIL;
-#endif
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
-    time_factor = system_hz; // Linux uses clock ticks
-#endif
-
-    os_get_system_pid_max();
     os_get_system_cpus_uncached();
-
+    apps_orchestrators_and_aggregators_init(); // before parsing args!
     parse_args(argc, argv);
 
+#if !defined(OS_WINDOWS)
     if(!check_capabilities() && !am_i_running_as_root() && !check_proc_1_io()) {
         uid_t uid = getuid(), euid = geteuid();
 #ifdef HAVE_SYS_CAPABILITY_H
         netdata_log_error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
-                      "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
-                      "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
-                      "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
-              , uid, euid, argv[0], argv[0], argv[0]
-        );
+                          "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
+                          "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
+                          "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
+                          , uid, euid, argv[0], argv[0], argv[0]);
 #else
         netdata_log_error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
-                      "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
-                      "Your system does not support capabilities. "
-                      "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
-              , uid, euid, argv[0], argv[0]
-        );
+                          "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
+                          "Your system does not support capabilities. "
+                          "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
+                          , uid, euid, argv[0], argv[0]);
 #endif
     }
+#endif
 
     netdata_log_info("started on pid %d", getpid());
 
-    users_and_groups_init();
-    pids_init();
+    apps_users_and_groups_init();
+    apps_pids_init();
+    OS_FUNCTION(apps_os_init)();
 
     // ------------------------------------------------------------------------
     // the event loop for functions
@@ -1062,15 +666,16 @@ int main(int argc, char **argv) {
     for(; !apps_plugin_exit ; global_iterations_counter++) {
         netdata_mutex_unlock(&apps_and_stdout_mutex);
 
-#ifdef NETDATA_PROFILING
-#warning "compiling for profiling"
-        static int profiling_count=0;
-        profiling_count++;
-        if(unlikely(profiling_count > 2000)) exit(0);
-        usec_t dt = update_every * USEC_PER_SEC;
-#else
-        usec_t dt = heartbeat_next(&hb, step);
-#endif
+        usec_t dt;
+        if(profile_speed) {
+            static int profiling_count=0;
+            profiling_count++;
+            if(unlikely(profiling_count > 500)) exit(0);
+            dt = update_every * USEC_PER_SEC;
+        }
+        else
+            dt = heartbeat_next(&hb, step);
+
         netdata_mutex_lock(&apps_and_stdout_mutex);
 
         struct pollfd pollfd = { .fd = fileno(stdout), .events = POLLERR };
@@ -1083,9 +688,6 @@ int main(int argc, char **argv) {
             fatal("Received error on read pipe.");
         }
 
-        if(global_iterations_counter % 10 == 0)
-            get_MemTotal();
-
         if(!collect_data_for_all_pids()) {
             netdata_log_error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
@@ -1093,29 +695,38 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
-        calculate_netdata_statistics();
+        aggregate_processes_to_targets();
+
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
+        OS_FUNCTION(apps_os_read_global_cpu_utilization)();
         normalize_utilization(apps_groups_root_target);
+#endif
 
         if(send_resource_usage)
             send_resource_usage_to_netdata(dt);
 
+#if (PROCESSES_HAVE_STATE == 1)
         send_proc_states_count(dt);
-        send_charts_updates_to_netdata(apps_groups_root_target, "app", "app_group", "Apps");
+#endif
+
+        send_charts_updates_to_netdata(apps_groups_root_target, "app", "app_group", "Applications Groups");
         send_collected_data_to_netdata(apps_groups_root_target, "app", dt);
 
+#if (PROCESSES_HAVE_UID == 1)
         if (enable_users_charts) {
-            send_charts_updates_to_netdata(users_root_target, "user", "user", "Users");
+            send_charts_updates_to_netdata(users_root_target, "user", "user", "User Processes");
             send_collected_data_to_netdata(users_root_target, "user", dt);
         }
+#endif
 
+#if (PROCESSES_HAVE_GID == 1)
         if (enable_groups_charts) {
-            send_charts_updates_to_netdata(groups_root_target, "usergroup", "user_group", "User Groups");
+            send_charts_updates_to_netdata(groups_root_target, "usergroup", "user_group", "User Group Processes");
             send_collected_data_to_netdata(groups_root_target, "usergroup", dt);
         }
+#endif
 
         fflush(stdout);
-
-        show_guest_time_old = show_guest_time;
 
         debug_log("done Loop No %zu", global_iterations_counter);
     }

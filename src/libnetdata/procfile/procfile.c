@@ -230,8 +230,12 @@ static void procfile_parser(procfile *ff) {
         }
         else if(likely(ct == PF_CHAR_IS_OPEN)) {
             if(s == t) {
+                if(!opened)
+                    t = ++s;
+                else
+                    ++s;
+
                 opened++;
-                t = ++s;
             }
             else if(opened) {
                 opened++;

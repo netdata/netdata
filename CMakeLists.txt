@@ -125,6 +125,8 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
         add_definitions(-D_GNU_SOURCE)
 
         if($ENV{CLION_IDE})
+                set(RUN_UNDER_CLION True)
+
                 # clion needs these to find the includes
                 if("${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
                         if("$ENV{MSYSTEM}" STREQUAL "MSYS")
@@ -158,7 +160,7 @@ option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
-cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
+cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD OR OS_MACOS OR OS_WINDOWS" False)
 cmake_dependent_option(ENABLE_PLUGIN_CHARTS "Enable metric collectors written in Bash" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 cmake_dependent_option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 
@@ -763,6 +765,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/close_range.h
         src/libnetdata/os/setproctitle.c
         src/libnetdata/os/setproctitle.h
+        src/libnetdata/os/windows-perflib/perflib.c
+        src/libnetdata/os/windows-perflib/perflib.h
+        src/libnetdata/os/windows-perflib/perflib-names.c
+        src/libnetdata/os/windows-perflib/perflib-dump.c
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
         src/libnetdata/json/json-c-parser-inline.c
@@ -796,6 +802,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/timestamps.h
         src/libnetdata/parsers/entries.c
         src/libnetdata/parsers/entries.h
+        src/libnetdata/sanitizers/chart_id_and_name.c
+        src/libnetdata/sanitizers/chart_id_and_name.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1427,12 +1435,8 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetSystemUptime.c
         src/collectors/windows.plugin/GetSystemRAM.c
         src/collectors/windows.plugin/GetSystemCPU.c
-        src/collectors/windows.plugin/perflib.c
-        src/collectors/windows.plugin/perflib.h
         src/collectors/windows.plugin/perflib-rrd.c
         src/collectors/windows.plugin/perflib-rrd.h
-        src/collectors/windows.plugin/perflib-names.c
-        src/collectors/windows.plugin/perflib-dump.c
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
         src/collectors/windows.plugin/perflib-thermalzone.c
@@ -1883,19 +1887,21 @@ if(ENABLE_PLUGIN_APPS)
             src/collectors/apps.plugin/apps_targets.c
             src/collectors/apps.plugin/apps_users_and_groups.c
             src/collectors/apps.plugin/apps_output.c
-            src/collectors/apps.plugin/apps_proc_pid_status.c
-            src/collectors/apps.plugin/apps_proc_pid_limits.c
-            src/collectors/apps.plugin/apps_proc_pid_stat.c
-            src/collectors/apps.plugin/apps_proc_pid_cmdline.c
-            src/collectors/apps.plugin/apps_proc_pid_io.c
-            src/collectors/apps.plugin/apps_proc_stat.c
-            src/collectors/apps.plugin/apps_proc_pid_fd.c
-            src/collectors/apps.plugin/apps_proc_pids.c
-            src/collectors/apps.plugin/apps_proc_meminfo.c
+            src/collectors/apps.plugin/apps_pid_files.c
+            src/collectors/apps.plugin/apps_pid.c
+            src/collectors/apps.plugin/apps_aggregations.c
+            src/collectors/apps.plugin/apps_os_linux.c
+            src/collectors/apps.plugin/apps_os_freebsd.c
+            src/collectors/apps.plugin/apps_os_macos.c
+            src/collectors/apps.plugin/apps_os_windows.c
+            src/collectors/apps.plugin/apps_incremental_collection.c
     )
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
-    target_link_libraries(apps.plugin libnetdata ${CAP_LIBRARIES})
+
+    target_link_libraries(apps.plugin libnetdata ${CAP_LIBRARIES}
+            "$<$<BOOL:${OS_WINDOWS}>:Version>")
+
     target_include_directories(apps.plugin PRIVATE ${CAP_INCLUDE_DIRS})
     target_compile_options(apps.plugin PRIVATE ${CAP_CFLAGS_OTHER})
 
