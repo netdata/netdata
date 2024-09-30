@@ -1,13 +1,12 @@
 module github.com/netdata/netdata/go/plugins
 
 go 1.22.0
-
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.50.1
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/Wing924/ltsv v0.3.1
+	github.com/Wing924/ltsv v0.4.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/axiomhq/hyperloglog v0.1.0
@@ -148,7 +147,6 @@ require (
 	golang.org/x/term v0.24.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.22.0 // indirect
-	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/cenkalti/backoff.v2 v2.2.1 // indirect
