@@ -22,7 +22,7 @@ static inline void *item_to_key(DICTIONARY_ITEM *item) {
 #define SIMPLE_HASHTABLE_NAME _DICTIONARY
 #define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION item_to_key
 #define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION compare_keys
-#include "..//simple_hashtable.h"
+#include "../simple_hashtable/simple_hashtable.h"
 
 static inline size_t hashtable_init_hashtable(DICTIONARY *dict) {
     SIMPLE_HASHTABLE_DICTIONARY *ht = callocz(1, sizeof(*ht));

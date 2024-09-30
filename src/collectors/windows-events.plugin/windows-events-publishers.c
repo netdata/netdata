@@ -54,7 +54,7 @@ typedef struct publisher {
 #define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION publisher_value_to_key
 #define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION publisher_cache_compar
 #define SIMPLE_HASHTABLE_SAMPLE_IMPLEMENTATION 1
-#include "libnetdata/simple_hashtable.h"
+#include "libnetdata/simple_hashtable/simple_hashtable.h"
 
 static struct {
     SPINLOCK spinlock;

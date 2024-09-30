@@ -19,7 +19,7 @@ typedef struct field_value {
 #define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION field_cache_value_to_key
 #define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION field_cache_cache_compar
 #define SIMPLE_HASHTABLE_SAMPLE_IMPLEMENTATION 1
-#include "libnetdata/simple_hashtable.h"
+#include "libnetdata/simple_hashtable/simple_hashtable.h"
 
 static inline WEVT_FIELD_KEY *field_cache_value_to_key(WEVT_FIELD_VALUE *p) {
     return &p->key;
