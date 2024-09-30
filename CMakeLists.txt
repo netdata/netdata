@@ -1133,29 +1133,29 @@ endif()
 
 set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/common-contexts.h
-        src/collectors/common-contexts/disk.io.h
-        src/collectors/common-contexts/system.io.h
-        src/collectors/common-contexts/system.interrupts.h
-        src/collectors/common-contexts/system.processes.h
-        src/collectors/common-contexts/system.ram.h
-        src/collectors/common-contexts/mem.swap.h
-        src/collectors/common-contexts/mem.pgfaults.h
-        src/collectors/common-contexts/mem.available.h
+        src/collectors/common-contexts/disk-io.h
+        src/collectors/common-contexts/system-io.h
+        src/collectors/common-contexts/system-interrupts.h
+        src/collectors/common-contexts/system-processes.h
+        src/collectors/common-contexts/system-ram.h
+        src/collectors/common-contexts/mem-swap.h
+        src/collectors/common-contexts/mem-pgfaults.h
+        src/collectors/common-contexts/mem-available.h
 )
 
 set(PLUGINSD_PLUGIN_FILES
-        src/collectors/plugins.d/plugins_d.c
-        src/collectors/plugins.d/plugins_d.h
-        src/collectors/plugins.d/pluginsd_dyncfg.c
-        src/collectors/plugins.d/pluginsd_dyncfg.h
-        src/collectors/plugins.d/pluginsd_functions.c
-        src/collectors/plugins.d/pluginsd_functions.h
-        src/collectors/plugins.d/pluginsd_internals.c
-        src/collectors/plugins.d/pluginsd_internals.h
-        src/collectors/plugins.d/pluginsd_parser.c
-        src/collectors/plugins.d/pluginsd_parser.h
-        src/collectors/plugins.d/pluginsd_replication.c
-        src/collectors/plugins.d/pluginsd_replication.h
+        src/plugins.d/plugins_d.c
+        src/plugins.d/plugins_d.h
+        src/plugins.d/pluginsd_dyncfg.c
+        src/plugins.d/pluginsd_dyncfg.h
+        src/plugins.d/pluginsd_functions.c
+        src/plugins.d/pluginsd_functions.h
+        src/plugins.d/pluginsd_internals.c
+        src/plugins.d/pluginsd_internals.h
+        src/plugins.d/pluginsd_parser.c
+        src/plugins.d/pluginsd_parser.h
+        src/plugins.d/pluginsd_replication.c
+        src/plugins.d/pluginsd_replication.h
 )
 
 set(RRD_PLUGIN_FILES
@@ -2074,7 +2074,7 @@ if(ENABLE_PLUGIN_CUPS)
 endif()
 
 if(NEED_NDSUDO)
-    set(NDSUDO_FILES src/collectors/plugins.d/ndsudo.c)
+    set(NDSUDO_FILES src/collectors/utils/ndsudo.c)
 
     add_executable(ndsudo ${NDSUDO_FILES})
 
@@ -2218,7 +2218,7 @@ endif()
 
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         set(LOCAL_LISTENERS_FILES
-                src/collectors/plugins.d/local_listeners.c
+                src/collectors/utils/local_listeners.c
                 src/libnetdata/maps/local-sockets.h
         )
 
@@ -2943,7 +2943,6 @@ if(ENABLE_PLUGIN_PYTHON)
           src/collectors/python.d.plugin/am2320/am2320.conf
           src/collectors/python.d.plugin/go_expvar/go_expvar.conf
           src/collectors/python.d.plugin/haproxy/haproxy.conf
-          src/collectors/python.d.plugin/openldap/openldap.conf
           src/collectors/python.d.plugin/oracledb/oracledb.conf
           src/collectors/python.d.plugin/pandas/pandas.conf
           src/collectors/python.d.plugin/spigotmc/spigotmc.conf
@@ -2956,7 +2955,6 @@ if(ENABLE_PLUGIN_PYTHON)
           src/collectors/python.d.plugin/am2320/am2320.chart.py
           src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
           src/collectors/python.d.plugin/haproxy/haproxy.chart.py
-          src/collectors/python.d.plugin/openldap/openldap.chart.py
           src/collectors/python.d.plugin/oracledb/oracledb.chart.py
           src/collectors/python.d.plugin/pandas/pandas.chart.py
           src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py

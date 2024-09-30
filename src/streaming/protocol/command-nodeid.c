@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "commands.h"
-#include "collectors/plugins.d/pluginsd_internals.h"
+#include "plugins.d/pluginsd_internals.h"
 
 // the child disconnected from the parent, and it has to clear the parent's claim id
 void rrdpush_sender_clear_parent_claim_id(RRDHOST *host) {

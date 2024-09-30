@@ -53,7 +53,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## E
 
-- [**External Plugins**](/src/collectors/plugins.d/README.md): These gather metrics from external processes, such as a webserver or database, and run as independent processes that communicate with the Netdata daemon via pipes.
+- [**External Plugins**](/src/plugins.d/README.md): These gather metrics from external processes, such as a webserver or database, and run as independent processes that communicate with the Netdata daemon via pipes.
 
 ## F
 

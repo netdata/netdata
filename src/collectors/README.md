@@ -45,7 +45,7 @@ specifics of what a given collector does.
     -   **External** plugins organize collectors that gather metrics from external processes, such as a MySQL database or
         Nginx web server. They can be written in any language, and the `netdata` daemon spawns them as long-running
         independent processes. They communicate with the daemon via pipes. All external plugins are managed by
-        [plugins.d](/src/collectors/plugins.d/README.md), which provides additional management options.
+        [plugins.d](/src/plugins.d/README.md), which provides additional management options.
 
 -   **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
     The Go orchestrator is in active development.
