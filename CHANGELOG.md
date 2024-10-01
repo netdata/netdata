@@ -6,12 +6,18 @@
 
 **Merged pull requests:**
 
+- fixed freebsd cpu calculation [\#18648](https://github.com/netdata/netdata/pull/18648) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#18647](https://github.com/netdata/netdata/pull/18647) ([netdatabot](https://github.com/netdatabot))
+- Update file names. [\#18638](https://github.com/netdata/netdata/pull/18638) ([vkalintiris](https://github.com/vkalintiris))
+- Move plugins.d directory outside of collectors [\#18637](https://github.com/netdata/netdata/pull/18637) ([vkalintiris](https://github.com/vkalintiris))
 - go.d/smartctl: fix exit status check in scan [\#18635](https://github.com/netdata/netdata/pull/18635) ([ilyam8](https://github.com/ilyam8))
 - go.d pkg/socket: keep only one timeout option [\#18633](https://github.com/netdata/netdata/pull/18633) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18630](https://github.com/netdata/netdata/pull/18630) ([netdatabot](https://github.com/netdatabot))
 - go.d/postgres: fix checkpoints query for postgres 17 [\#18629](https://github.com/netdata/netdata/pull/18629) ([ilyam8](https://github.com/ilyam8))
 - go.d/ceph: fix leftovers after \#18582 [\#18628](https://github.com/netdata/netdata/pull/18628) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18627](https://github.com/netdata/netdata/pull/18627) ([netdatabot](https://github.com/netdatabot))
+- Remove Python OpenLDAP implementation [\#18626](https://github.com/netdata/netdata/pull/18626) ([Ancairon](https://github.com/Ancairon))
+- Port the OpenLDAP collector from Python to Go [\#18625](https://github.com/netdata/netdata/pull/18625) ([Ancairon](https://github.com/Ancairon))
 - Change default pages per extent [\#18623](https://github.com/netdata/netdata/pull/18623) ([stelfrag](https://github.com/stelfrag))
 - Misc mqtt related code cleanup [\#18622](https://github.com/netdata/netdata/pull/18622) ([stelfrag](https://github.com/stelfrag))
 - Revert "Add ceph commands to ndsudo" [\#18620](https://github.com/netdata/netdata/pull/18620) ([ilyam8](https://github.com/ilyam8))
@@ -26,6 +32,7 @@
 - Regenerate integrations.js [\#18598](https://github.com/netdata/netdata/pull/18598) ([netdatabot](https://github.com/netdatabot))
 - go.d/sensors fix meta [\#18597](https://github.com/netdata/netdata/pull/18597) ([ilyam8](https://github.com/ilyam8))
 - go.d/sensors update meta [\#18595](https://github.com/netdata/netdata/pull/18595) ([ilyam8](https://github.com/ilyam8))
+- apps.plugin for windows [\#18594](https://github.com/netdata/netdata/pull/18594) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18592](https://github.com/netdata/netdata/pull/18592) ([netdatabot](https://github.com/netdatabot))
 - Add DLLs to CmakeLists.txt [\#18590](https://github.com/netdata/netdata/pull/18590) ([thiagoftsm](https://github.com/thiagoftsm))
 - Bump go.mongodb.org/mongo-driver from 1.16.1 to 1.17.0 in /src/go [\#18589](https://github.com/netdata/netdata/pull/18589) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -415,12 +422,6 @@
 - Port ipfs from python to Go [\#18070](https://github.com/netdata/netdata/pull/18070) ([Ancairon](https://github.com/Ancairon))
 - update golang version in netdata.spec [\#18069](https://github.com/netdata/netdata/pull/18069) ([ilyam8](https://github.com/ilyam8))
 - go.d set sensitive props to "password" widget [\#18068](https://github.com/netdata/netdata/pull/18068) ([ilyam8](https://github.com/ilyam8))
-- netdata.spec/plugin-go: added weak dependency for lm\_sensors [\#18067](https://github.com/netdata/netdata/pull/18067) ([k0ste](https://github.com/k0ste))
-- Disable health thread on windows [\#18066](https://github.com/netdata/netdata/pull/18066) ([stelfrag](https://github.com/stelfrag))
-- Remove hard-coded url from python.d puppet chart plugin [\#18064](https://github.com/netdata/netdata/pull/18064) ([Hufschmidt](https://github.com/Hufschmidt))
-- go.d postgres github.com/jackc/pgx/v5 [\#18062](https://github.com/netdata/netdata/pull/18062) ([ilyam8](https://github.com/ilyam8))
-- fix prometeus export: missing comma before "instance" label [\#18061](https://github.com/netdata/netdata/pull/18061) ([ilyam8](https://github.com/ilyam8))
-- go.d vsphere add update\_every ui:help [\#18060](https://github.com/netdata/netdata/pull/18060) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
