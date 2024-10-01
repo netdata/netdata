@@ -154,12 +154,12 @@ func TestRethinkdb_Collect(t *testing.T) {
 		prepare     func() *Rethinkdb
 		wantMetrics map[string]int64
 		wantCharts  int
-		skipChart   func(chart *module.Chart) bool
+		skipChart   func(chart *module.Chart, dim *module.Dim) bool
 	}{
 		"success on valid response": {
 			prepare:    prepareCaseOk,
 			wantCharts: len(clusterCharts) + len(serverChartsTmpl)*3,
-			skipChart: func(chart *module.Chart) bool {
+			skipChart: func(chart *module.Chart, dim *module.Dim) bool {
 				return strings.HasPrefix(chart.ID, "server_0f74c641-af5f-48d6-a005-35b8983c576a") &&
 					!strings.Contains(chart.ID, "stats_request_status")
 			},

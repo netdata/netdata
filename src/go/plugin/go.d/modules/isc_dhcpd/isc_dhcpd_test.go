@@ -226,29 +226,13 @@ func TestDHCPd_Collect(t *testing.T) {
 			dhcpd := test.prepare()
 			require.NoError(t, dhcpd.Init())
 
-			collected := dhcpd.Collect()
+			mx := dhcpd.Collect()
 
-			assert.Equal(t, test.wantCollected, collected)
-			if len(collected) > 0 {
-				ensureCollectedHasAllChartsDimsVarsIDs(t, dhcpd, collected)
+			assert.Equal(t, test.wantCollected, mx)
+			if len(mx) > 0 {
+				module.TestMetricsHasAllChartsDims(t, dhcpd.Charts(), mx)
 			}
 		})
-	}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, dhcpd *DHCPd, collected map[string]int64) {
-	for _, chart := range *dhcpd.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
 	}
 }
 

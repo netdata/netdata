@@ -463,7 +463,9 @@ func TestNginxPlus_Collect(t *testing.T) {
 			require.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {
 				assert.Equalf(t, test.wantNumOfCharts, len(*nginx.Charts()), "number of charts")
-				ensureCollectedHasAllChartsDimsVarsIDs(t, nginx, mx)
+				module.TestMetricsHasAllChartsDimsSkip(t, nginx.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
+					return chart.ID == uptimeChart.ID
+				})
 			}
 		})
 	}
@@ -577,20 +579,4 @@ func caseConnectionRefused(t *testing.T) (*NginxPlus, func()) {
 	require.NoError(t, nginx.Init())
 
 	return nginx, func() {}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, n *NginxPlus, mx map[string]int64) {
-	for _, chart := range *n.Charts() {
-		if chart.ID == uptimeChart.ID {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := mx[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
-	}
 }

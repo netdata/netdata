@@ -169,37 +169,12 @@ func TestSupervisord_Collect(t *testing.T) {
 			supvr := test.prepare(t)
 			defer supvr.Cleanup()
 
-			ms := supvr.Collect()
-			assert.Equal(t, test.wantCollected, ms)
+			mx := supvr.Collect()
+			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				ensureCollectedHasAllChartsDimsVarsIDs(t, supvr, ms)
-				ensureCollectedProcessesAddedToCharts(t, supvr)
+				module.TestMetricsHasAllChartsDims(t, supvr.Charts(), mx)
 			}
 		})
-	}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, supvr *Supervisord, ms map[string]int64) {
-	for _, chart := range *supvr.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := ms[dim.ID]
-			assert.Truef(t, ok, "chart '%s' dim '%s': no dim in collected", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := ms[v.ID]
-			assert.Truef(t, ok, "chart '%s' dim '%s': no dim in collected", v.ID, chart.ID)
-		}
-	}
-}
-
-func ensureCollectedProcessesAddedToCharts(t *testing.T, supvr *Supervisord) {
-	for group := range supvr.cache {
-		for _, c := range *newProcGroupCharts(group) {
-			assert.NotNilf(t, supvr.Charts().Get(c.ID), "'%s' chart is not in charts", c.ID)
-		}
 	}
 }
 

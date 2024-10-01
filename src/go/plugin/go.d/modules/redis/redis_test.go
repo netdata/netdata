@@ -298,13 +298,13 @@ func TestRedis_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			rdb := test.prepare(t)
 
-			ms := rdb.Collect()
+			mx := rdb.Collect()
 
-			copyTimeRelatedMetrics(ms, test.wantCollected)
+			copyTimeRelatedMetrics(mx, test.wantCollected)
 
-			assert.Equal(t, test.wantCollected, ms)
+			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				ensureCollectedHasAllChartsDimsVarsIDs(t, rdb, ms)
+				module.TestMetricsHasAllChartsDims(t, rdb.Charts(), mx)
 				ensureCollectedCommandsAddedToCharts(t, rdb)
 				ensureCollectedDbsAddedToCharts(t, rdb)
 			}
@@ -338,23 +338,6 @@ func prepareRedisWithPikaMetrics(t *testing.T) *Redis {
 	}
 	return rdb
 }
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, rdb *Redis, ms map[string]int64) {
-	for _, chart := range *rdb.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := ms[dim.ID]
-			assert.Truef(t, ok, "chart '%s' dim '%s': no dim in collected", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := ms[v.ID]
-			assert.Truef(t, ok, "chart '%s' dim '%s': no dim in collected", v.ID, chart.ID)
-		}
-	}
-}
-
 func ensureCollectedCommandsAddedToCharts(t *testing.T, rdb *Redis) {
 	for _, id := range []string{
 		chartCommandsCalls.ID,

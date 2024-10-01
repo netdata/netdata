@@ -180,22 +180,9 @@ func TestLogstash_Collect(t *testing.T) {
 			require.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {
 				assert.Equal(t, test.wantNumOfCharts, len(*ls.Charts()))
-				ensureCollectedHasAllChartsDimsVarsIDs(t, ls, mx)
+				module.TestMetricsHasAllChartsDims(t, ls.Charts(), mx)
 			}
 		})
-	}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, ls *Logstash, mx map[string]int64) {
-	for _, chart := range *ls.Charts() {
-		for _, dim := range chart.Dims {
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := mx[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
 	}
 }
 

@@ -130,10 +130,10 @@ func TestX509Check_Collect(t *testing.T) {
 	require.NoError(t, x509Check.Init())
 	x509Check.prov = &mockProvider{certs: []*x509.Certificate{{}}}
 
-	collected := x509Check.Collect()
+	mx := x509Check.Collect()
 
-	assert.NotZero(t, collected)
-	ensureCollectedHasAllChartsDimsVarsIDs(t, x509Check, collected)
+	assert.NotZero(t, mx)
+	module.TestMetricsHasAllChartsDims(t, x509Check.Charts(), mx)
 }
 
 func TestX509Check_Collect_ReturnsNilOnProviderError(t *testing.T) {
@@ -149,19 +149,6 @@ func TestX509Check_Collect_ReturnsNilOnZeroCertificates(t *testing.T) {
 	mx := x509Check.Collect()
 
 	assert.Nil(t, mx)
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, x509Check *X509Check, collected map[string]int64) {
-	for _, chart := range *x509Check.Charts() {
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
-	}
 }
 
 type mockProvider struct {

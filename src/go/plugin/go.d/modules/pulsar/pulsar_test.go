@@ -171,11 +171,11 @@ func TestPulsar_Collect(t *testing.T) {
 			for i := 0; i < 10; i++ {
 				_ = pulsar.Collect()
 			}
-			collected := pulsar.Collect()
+			mx := pulsar.Collect()
 
-			require.NotNil(t, collected)
-			require.Equal(t, test.expected, collected)
-			ensureCollectedHasAllChartsDimsVarsIDs(t, pulsar, collected)
+			require.NotNil(t, mx)
+			require.Equal(t, test.expected, mx)
+			module.TestMetricsHasAllChartsDims(t, pulsar.Charts(), mx)
 		})
 	}
 }
@@ -208,19 +208,6 @@ func TestPulsar_Collect_RemoveAddNamespacesTopicsInRuntime(t *testing.T) {
 			if strings.HasPrefix(chart.ID, "topic_") {
 				assert.Truef(t, dim.Obsolete, "expected chart '%s' dim '%s' Obsolete flag is set", chart.ID, dim.ID)
 			}
-		}
-	}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, pulsar *Pulsar, collected map[string]int64) {
-	for _, chart := range *pulsar.Charts() {
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
 		}
 	}
 }
