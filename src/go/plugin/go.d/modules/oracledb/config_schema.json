@@ -1,0 +1,48 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "OracleDB collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "dsn": {
+        "title": "DSN",
+        "description": "Oracle server Data Source Name specifying the connection details.",
+        "type": "string",
+        "default": ""
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Query timeout, in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 1
+      }
+    },
+    "required": [
+      "dsn"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "dsn": {
+      "ui:help": "Format is `oracle://username:password@host:port/service`.",
+      "ui:placeholder": "oracle://username:password@host:port/service?param1=value1&...&paramN=valueN"
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    }
+  }
+}
