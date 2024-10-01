@@ -19,8 +19,8 @@ RequestExecutionLevel admin
 !insertmacro MUI_PAGE_LICENSE "C:\msys64\cloud.txt"
 !insertmacro MUI_PAGE_LICENSE "C:\msys64\gpl-3.0.txt"
 !insertmacro MUI_PAGE_DIRECTORY
-!insertmacro MUI_PAGE_INSTFILES
 Page Custom NetdataConfigPage NetdataConfigLeave
+!insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_UNPAGE_CONFIRM
