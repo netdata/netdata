@@ -121,6 +121,8 @@ void apps_orchestrators_and_aggregators_init(void) {
     managed_list_add(&tree.managers, "containerd-shim");    // docker containers
     managed_list_add(&tree.managers, "docker-init");        // docker containers
     managed_list_add(&tree.managers, "dumb-init");          // some docker containers use this
+    managed_list_add(&tree.managers, "openrc-run.sh");      // openrc
+    managed_list_add(&tree.managers, "crond");              // linux crond
     managed_list_add(&tree.managers, "gnome-shell");        // gnome user applications
 #elif defined(OS_WINDOWS)
     managed_list_add(&tree.managers, "System");
@@ -196,7 +198,7 @@ struct target *get_tree_target(struct pid_stat *p) {
     w = callocz(sizeof(struct target), 1);
     w->type = TARGET_TYPE_TREE;
     w->starts_with = w->ends_with = false;
-    w->compare = string_dup(p->comm);
+    w->ag.compare = string_dup(p->comm);
     w->id = search_for;
     w->name = string_dup(search_for);
     w->clean_name = get_clean_name(w->name);
@@ -302,17 +304,17 @@ struct target *apps_groups_root_target = NULL;
 
 // find or create a new target
 // there are targets that are just aggregated to other target (the second argument)
-static struct target *get_apps_groups_target(const char *id, struct target *target, const char *name) {
-    bool tdebug = false, thidden = target ? target->hidden : false, ends_with = false, starts_with = false;
+static struct target *get_apps_groups_target(const char *comm, struct target *target, const char *name) {
+    bool ends_with = false, starts_with = false, has_asterisk_inside = false;
 
-    STRING *id_lookup = NULL;
+    STRING *comm_lookup = NULL;
     STRING *name_lookup = NULL;
 
     // extract the options from the id
     {
-        size_t len = strlen(id);
+        size_t len = strlen(comm);
         char buf[len + 1];
-        memcpy(buf, id, sizeof(buf));
+        memcpy(buf, comm, sizeof(buf));
 
         if(buf[len - 1] == '*') {
             buf[--len] = '\0';
@@ -320,37 +322,25 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
         }
 
         const char *nid = buf;
-        while (nid[0] == '-' || nid[0] == '+' || nid[0] == '*') {
-            if (nid[0] == '-') thidden = true;
-            if (nid[0] == '+') tdebug = true;
-            if (nid[0] == '*') ends_with = true;
+        if (nid[0] == '*') {
+            ends_with = true;
             nid++;
         }
 
-        id_lookup = string_strdupz(nid);
+        if(strchr(nid, '*'))
+            has_asterisk_inside = true;
+
+        comm_lookup = string_strdupz(nid);
     }
 
     // extract the options from the name
-    {
-        size_t len = strlen(name);
-        char buf[len + 1];
-        memcpy(buf, name, sizeof(buf));
-
-        const char *nn = buf;
-        while (nn[0] == '-' || nn[0] == '+') {
-            if (nn[0] == '-') thidden = true;
-            if (nn[0] == '+') tdebug = true;
-            nn++;
-        }
-
-        name_lookup = string_strdupz(nn);
-    }
+    name_lookup = string_strdupz(name);
 
     // find if it already exists
     struct target *w, *last = apps_groups_root_target;
     for(w = apps_groups_root_target ; w ; w = w->next) {
-        if(w->id == id_lookup) {
-            string_freez(id_lookup);
+        if(w->id == comm_lookup) {
+            string_freez(comm_lookup);
             string_freez(name_lookup);
             return w;
         }
@@ -368,19 +358,22 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
 
     if(target && target->target)
         fatal("Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'",
-              id, string2str(target->id), string2str(target->target->id));
+            comm, string2str(target->id), string2str(target->target->id));
 
     w = callocz(sizeof(struct target), 1);
     w->type = TARGET_TYPE_APP_GROUP;
-    w->compare = string_dup(id_lookup);
+    w->ag.compare = string_dup(comm_lookup);
     w->starts_with = starts_with;
     w->ends_with = ends_with;
-    w->id = string_dup(id_lookup);
+    w->id = string_dup(comm_lookup);
+
+    if(has_asterisk_inside)
+        w->ag.pattern = simple_pattern_create(comm, " ", SIMPLE_PATTERN_EXACT, true);
 
     if(unlikely(!target))
         w->name = string_dup(name_lookup); // copy the name
     else
-        w->name = string_dup(id_lookup); // copy the id
+        w->name = string_dup(comm_lookup); // copy the id
 
     // dots are used to distinguish chart type and id in streaming, so we should replace them
     w->clean_name = get_clean_name(w->name);
@@ -388,29 +381,20 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
     if(w->starts_with && w->ends_with)
         proc_pid_cmdline_is_needed = true;
 
-    w->hidden = thidden;
-#ifdef NETDATA_INTERNAL_CHECKS
-    w->debug_enabled = tdebug;
-#else
-    if(tdebug)
-        fprintf(stderr, "apps.plugin has been compiled without debugging\n");
-#endif
     w->target = target;
 
     // append it, to maintain the order in apps_groups.conf
     if(last) last->next = w;
     else apps_groups_root_target = w;
 
-    debug_log("ADDING TARGET ID '%s', process name '%s' (%s), aggregated on target '%s', options: %s %s"
+    debug_log("ADDING TARGET ID '%s', process name '%s' (%s), aggregated on target '%s'"
               , string2str(w->id)
-              , string2str(w->compare)
+              , string2str(w->ag.compare)
               , (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
               , w->target?w->target->name:w->name
-              , (w->hidden)?"hidden":"-"
-              , (w->debug_enabled)?"debug":"-"
     );
 
-    string_freez(id_lookup);
+    string_freez(comm_lookup);
     string_freez(name_lookup);
 
     return w;

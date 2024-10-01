@@ -168,10 +168,6 @@ To add processes with single quotes, enclose them in double quotes: `"process wi
 
 To add processes with double quotes, enclose them in single quotes: `'process with this " double quote'`
 
-If a group or process name starts with a `-`, the dimension will be hidden from the chart (cpu chart only).
-
-If a process starts with a `+`, debugging will be enabled for it (debugging produces a lot of output - do not enable it in production systems).
-
 You can add any number of groups. Only the ones found running will affect the charts generated.
 However, producing charts with hundreds of dimensions may slow down your web browser.
 

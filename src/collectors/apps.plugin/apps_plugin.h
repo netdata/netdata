@@ -371,7 +371,10 @@ struct target {
 
     TARGET_TYPE type;
     union {
-        STRING *compare;
+        struct {
+            SIMPLE_PATTERN *pattern;
+            STRING *compare;
+        } ag;
 #if (PROCESSES_HAVE_UID == 1)
         uid_t uid;
 #endif
@@ -393,11 +396,8 @@ struct target {
 #endif
 
     bool exposed:1;         // if set, we have sent this to netdata
-    bool hidden:1;          // if set, we set the hidden flag on the dimension
-    bool debug_enabled:1;
-    bool ends_with:1;
-    bool starts_with:1;     // if set, the compare string matches only the
-                            // beginning of the command
+    bool ends_with:1;       // if set, the compare string matches the end of the command
+    bool starts_with:1;     // if set, the compare string matches the start of the command
 
     struct pid_on_target *root_pid; // list of aggregated pids for target debugging
 
