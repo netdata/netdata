@@ -29,6 +29,39 @@ Page Custom NetdataConfigPage NetdataConfigLeave
 
 !insertmacro MUI_LANGUAGE "English"
 
+!define INSTALLERLOCKFILEGUID "f787d5ef-5c41-4dc0-a115-a1fb654fad1c"
+
+# https://nsis.sourceforge.io/Allow_only_one_installer_instance
+!macro SingleInstanceFile
+    !if "${NSIS_PTR_SIZE}" > 4
+    !include "Util.nsh"
+    !else ifndef IntPtrCmp
+    !define IntPtrCmp IntCmp
+    !endif
+
+    !ifndef NSIS_PTR_SIZE & SYSTYPE_PTR
+    !define SYSTYPE_PTR i ; NSIS v2.x
+    !else
+    !define /ifndef SYSTYPE_PTR p ; NSIS v3.0+
+    !endif
+
+    !if "${NSIS_CHAR_SIZE}" < 2
+    Push "$TEMP\${INSTALLERLOCKFILEGUID}.lock"
+    !else
+    Push "$APPDATA\${INSTALLERLOCKFILEGUID}.lock"
+    !endif
+
+    System::Call 'KERNEL32::CreateFile(ts,i0x40000000,i0,${SYSTYPE_PTR}0,i4,i0x04000000,${SYSTYPE_PTR}0)${SYSTYPE_PTR}.r0'
+    ${IntPtrCmp} $0 -1 "" launch launch
+        System::Call 'kernel32::AttachConsole(i -1)i.r0'
+        ${If} $0 != 0
+            System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+            FileWrite $0 "The installer is already running.$\r$\n"
+        ${EndIf}
+	Quit
+    launch:
+!macroend
+
 var hStartMsys
 var startMsys
 
@@ -40,10 +73,13 @@ var hProxy
 var proxy
 var hInsecure
 var insecure
+var accepted
 
 var avoidClaim
 
 Function .onInit
+        !insertmacro SingleInstanceFile
+
         nsExec::ExecToLog '$SYSDIR\sc.exe stop Netdata'
         pop $0
         ${If} $0 == 0
@@ -54,6 +90,59 @@ Function .onInit
         StrCpy $startMsys ${BST_UNCHECKED}
         StrCpy $insecure ${BST_UNCHECKED}
         StrCpy $avoidClaim ${BST_UNCHECKED}
+        StrCpy $accepted ${BST_UNCHECKED}
+        
+        ${GetParameters} $R0
+        ${GetOptions} $R0 "/s" $0
+        IfErrors +2 0
+            SetSilent silent
+        ClearErrors
+
+        ${GetOptions} $R0 "/t" $0
+        IfErrors +2 0
+            StrCpy $startMsys ${BST_CHECKED}
+        ClearErrors
+
+        ${GetOptions} $R0 "/i" $0
+        IfErrors +2 0
+            StrCpy $insecure ${BST_CHECKED}
+        ClearErrors
+
+        ${GetOptions} $R0 "/a" $0
+        IfErrors +2 0
+            StrCpy $accepted ${BST_CHECKED}
+        ClearErrors
+
+        ${GetOptions} $R0 "/token=" $0
+        IfErrors +2 0
+            StrCpy $cloudToken $0
+        ClearErrors
+
+        ${GetOptions} $R0 "/rooms=" $0
+        IfErrors +2 0
+            StrCpy $cloudRooms $0
+        ClearErrors
+
+        ${GetOptions} $R0 "/proxy=" $0
+        IfErrors +2 0
+            StrCpy $proxy $0
+        ClearErrors
+
+        IfSilent checklicense goahead
+        checklicense:
+                ${If} $accepted == ${BST_UNCHECKED}
+                    System::Call 'kernel32::AttachConsole(i -1)i.r0'
+                    ${If} $0 != 0
+                        System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+                        FileWrite $0 "You must accept the licenses (/A) to continue.$\r$\n"
+                    ${EndIf}
+                    Quit
+                ${EndIf}
+        goahead:
+FunctionEnd
+
+Function un.onInit
+!insertmacro SingleInstanceFile
 FunctionEnd
 
 Function NetdataConfigPage
@@ -199,6 +288,41 @@ Section "Install Netdata"
 	WriteUninstaller "$INSTDIR\Uninstall.exe"
 
         Call NetdataUninstallRegistry
+
+        IfSilent runcmds goodbye
+        runcmds:
+           nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
+           pop $0
+
+           System::Call 'kernel32::AttachConsole(i -1)i.r0'
+           ${If} $0 != 0
+                System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+                FileWrite $0 "Netdata installed with success.$\r$\n"
+           ${EndIf}
+           ${If} $startMsys == ${BST_CHECKED}
+                   nsExec::ExecToLog '$INSTDIR\msys2.exe'
+                   pop $0
+           ${EndIf}
+
+           StrLen $0 $cloudToken
+           StrLen $1 $cloudRooms
+           ${If} $0 == 0
+           ${OrIf} $1 == 0
+                   Goto goodbye
+           ${EndIf}
+
+           ${If} $0 == 135
+           ${AndIf} $1 >= 36
+                    nsExec::ExecToLog '$INSTDIR\usr\bin\NetdataClaim.exe /T $cloudToken /R $cloudRooms /P $proxy /I $insecure'
+                    pop $0
+           ${Else}         
+                    System::Call 'kernel32::AttachConsole(i -1)i.r0'
+                    ${If} $0 != 0
+                        System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+                        FileWrite $0 "Room(s) or Token invalid.$\r$\n"
+                    ${EndIf}
+           ${EndIf}
+        goodbye:
 SectionEnd
 
 Section "Uninstall"
