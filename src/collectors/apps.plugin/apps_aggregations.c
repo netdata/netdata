@@ -130,7 +130,7 @@ static struct target *get_apps_groups_target_for_pid(struct pid_stat *p) {
                     return matched_apps_groups_target(p, w);
             }
             else {
-                if(w->ag.compare == p->comm)
+                if(w->ag.compare == p->comm || w->ag.compare == p->comm_orig)
                     return matched_apps_groups_target(p, w);
             }
         }
@@ -140,7 +140,8 @@ static struct target *get_apps_groups_target_for_pid(struct pid_stat *p) {
                     return matched_apps_groups_target(p, w);
             }
             else {
-                if(string_starts_with_string(p->comm, w->ag.compare))
+                if(string_starts_with_string(p->comm, w->ag.compare) ||
+                    (p->comm != p->comm_orig && string_starts_with_string(p->comm, w->ag.compare)))
                     return matched_apps_groups_target(p, w);
             }
         }
@@ -150,7 +151,8 @@ static struct target *get_apps_groups_target_for_pid(struct pid_stat *p) {
                     return matched_apps_groups_target(p, w);
             }
             else {
-                if(string_ends_with_string(p->comm, w->ag.compare))
+                if(string_ends_with_string(p->comm, w->ag.compare) ||
+                    (p->comm != p->comm_orig && string_ends_with_string(p->comm, w->ag.compare)))
                     return matched_apps_groups_target(p, w);
             }
         }

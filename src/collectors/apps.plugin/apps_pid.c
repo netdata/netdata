@@ -134,6 +134,7 @@ void del_pid_entry(pid_t pid) {
     freez(p->fds);
 #endif
 
+    string_freez(p->comm_orig);
     string_freez(p->comm);
     string_freez(p->cmdline);
     aral_freez(pids.all_pids.aral, p);
@@ -316,7 +317,49 @@ static inline void link_all_processes_to_their_parents(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static inline STRING *comm_from_cmdline(char *comm, STRING *cmdline) {
+    if(!cmdline) {
+        sanitize_chart_meta(comm);
+        return string_strdupz(comm);
+    }
+
+    const char *cl = string2str(cmdline);
+    size_t len = string_strlen(cmdline);
+
+    char buf_cmd[len + 1];
+    // if it is enclosed in (), remove the parenthesis
+    if(cl[0] == '(' && cl[len - 1] == ')') {
+        memcpy(buf_cmd, &cl[1], len - 2);
+        buf_cmd[len - 2] = '\0';
+    }
+    else
+        memcpy(buf_cmd, cl, sizeof(buf_cmd));
+
+    size_t comm_len = strlen(comm);
+    char *start = strstr(buf_cmd, comm);
+    if(start) {
+        char *end = start + comm_len;
+        while(*end && !isspace((uint8_t)*end) && *end != '/' && *end != '\\') end++;
+        *end = '\0';
+
+        sanitize_chart_meta(start);
+        return string_strdupz(start);
+    }
+
+    sanitize_chart_meta(comm);
+    return string_strdupz(comm);
+}
+
 void update_pid_comm(struct pid_stat *p, const char *comm) {
+    if(p->comm_orig && string_strcmp(p->comm_orig, comm) == 0)
+        // no change
+        return;
+
+#if (PROCESSES_HAVE_CMDLINE == 1)
+    if(likely(proc_pid_cmdline_is_needed && !p->cmdline))
+        managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
+#endif
+
     // some process names have ( and ), remove the parenthesis
     size_t len = strlen(comm);
     char buf[len + 1];
@@ -327,22 +370,15 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
     else
         memcpy(buf, comm, sizeof(buf));
 
-    // check if the comm is changed
-    if(!p->comm || strcmp(pid_stat_comm(p), buf) != 0) {
-        // it is changed
+    string_freez(p->comm_orig);
+    p->comm_orig = string_strdupz(comm);
 
-        string_freez(p->comm);
-        p->comm = string_strdupz(buf);
+    string_freez(p->comm);
+    p->comm = comm_from_cmdline(buf, p->cmdline);
 
-#if (PROCESSES_HAVE_CMDLINE == 1)
-        if(likely(proc_pid_cmdline_is_needed))
-            managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
-#endif
-
-        // the process changes comm, we may have to reassign it to
-        // an apps_groups.conf target.
-        p->target = NULL;
-    }
+    // the process changed comm, we may have to reassign it to
+    // an apps_groups.conf target.
+    p->target = NULL;
 }
 
 // --------------------------------------------------------------------------------------------------------------------

@@ -485,6 +485,7 @@ struct pid_stat {
     struct target *gid_target;      // gid based targets
 #endif
 
+    STRING *comm_orig;
     STRING *comm;                   // the command name (short version)
     STRING *name;                   // a better name, or NULL
     STRING *cmdline;                // the full command line (or on windows, the full pathname of the program)

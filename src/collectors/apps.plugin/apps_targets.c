@@ -33,34 +33,6 @@ struct target *find_target_by_name(struct target *base, const char *name) {
 // --------------------------------------------------------------------------------------------------------------------
 // Tree
 
-static inline STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
-    if(!cmdline) return sanitize_chart_meta_string(comm);
-
-    const char *cl = string2str(cmdline);
-    size_t len = string_strlen(cmdline);
-
-    char buf_cmd[len + 1];
-    // if it is enclosed in (), remove the parenthesis
-    if(cl[0] == '(' && cl[len - 1] == ')') {
-        memcpy(buf_cmd, &cl[1], len - 2);
-        buf_cmd[len - 2] = '\0';
-    }
-    else
-        memcpy(buf_cmd, cl, sizeof(buf_cmd));
-
-    char *start = strstr(buf_cmd, string2str(comm));
-    if(start) {
-        char *end = start + string_strlen(comm);
-        while(*end && !isspace((uint8_t)*end) && *end != '/' && *end != '\\') end++;
-        *end = '\0';
-
-        sanitize_chart_meta(start);
-        return string_strdupz(start);
-    }
-
-    return sanitize_chart_meta_string(comm);
-}
-
 struct comm_list {
     STRING *comm;
 };
@@ -116,14 +88,14 @@ void apps_orchestrators_and_aggregators_init(void) {
 
     managed_list_clear(&tree.managers);
 #if defined(OS_LINUX)
-    managed_list_add(&tree.managers, "init");               // linux systems
-    managed_list_add(&tree.managers, "systemd");            // lxc containers and host systems (this also catches "systemd --user")
-    managed_list_add(&tree.managers, "containerd-shim");    // docker containers
-    managed_list_add(&tree.managers, "docker-init");        // docker containers
-    managed_list_add(&tree.managers, "dumb-init");          // some docker containers use this
-    managed_list_add(&tree.managers, "openrc-run.sh");      // openrc
-    managed_list_add(&tree.managers, "crond");              // linux crond
-    managed_list_add(&tree.managers, "gnome-shell");        // gnome user applications
+    managed_list_add(&tree.managers, "init");                       // linux systems
+    managed_list_add(&tree.managers, "systemd");                    // lxc containers and host systems (this also catches "systemd --user")
+    managed_list_add(&tree.managers, "containerd-shim-runc-v2");    // docker containers
+    managed_list_add(&tree.managers, "docker-init");                // docker containers
+    managed_list_add(&tree.managers, "dumb-init");                  // some docker containers use this
+    managed_list_add(&tree.managers, "openrc-run.sh");              // openrc
+    managed_list_add(&tree.managers, "crond");                      // linux crond
+    managed_list_add(&tree.managers, "gnome-shell");                // gnome user applications
 #elif defined(OS_WINDOWS)
     managed_list_add(&tree.managers, "System");
     managed_list_add(&tree.managers, "services");
@@ -146,7 +118,8 @@ void apps_orchestrators_and_aggregators_init(void) {
 
 bool is_process_manager(struct pid_stat *p) {
     for(size_t c = 0; c < tree.managers.used ; c++) {
-        if(p->comm == tree.managers.array[c].comm)
+        if(p->comm == tree.managers.array[c].comm ||
+            p->comm_orig == tree.managers.array[c].comm)
             return true;
     }
 
@@ -155,7 +128,8 @@ bool is_process_manager(struct pid_stat *p) {
 
 static inline bool is_aggregator(struct pid_stat *p) {
     for(size_t c = 0; c < tree.aggregators.used ; c++) {
-        if(p->comm == tree.aggregators.array[c].comm)
+        if(p->comm == tree.aggregators.array[c].comm ||
+            p->comm_orig == tree.aggregators.array[c].comm)
             return true;
     }
 
@@ -183,7 +157,7 @@ struct target *get_tree_target(struct pid_stat *p) {
 #if (PROCESSES_HAVE_COMM_AND_NAME == 1)
         search_for = sanitize_chart_meta_string(p->name ? p->name : p->comm);
 #else
-        search_for = comm_from_cmdline(p->comm, p->cmdline);
+        search_for = string_dup(p->comm);
 #endif
     }
 
