@@ -16,7 +16,7 @@
 #define POLLFD_SOCKET  0
 #define POLLFD_PIPE    1
 
-#define PING_TIMEOUT    (10)  //Expect a ping response within this time (seconds)
+#define PING_TIMEOUT    (60)  //Expect a ping response within this time (seconds)
 time_t ping_timeout = 0;
 
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) && (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
