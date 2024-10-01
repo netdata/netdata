@@ -221,7 +221,7 @@ func TestApcupsd_Collect(t *testing.T) {
 
 			if len(test.wantCollected) > 0 {
 				if strings.Contains(name, "commlost") {
-					module.TestMetricsHasAllChartsDimsSkip(t, apc.Charts(), mx, func(chart *module.Chart) bool {
+					module.TestMetricsHasAllChartsDimsSkip(t, apc.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
 						return chart.ID != statusChart.ID
 					})
 				} else {

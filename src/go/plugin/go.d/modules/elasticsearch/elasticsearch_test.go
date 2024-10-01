@@ -636,37 +636,10 @@ func TestElasticsearch_Collect(t *testing.T) {
 				mx = es.Collect()
 			}
 
-			//m := mx
-			//l := make([]string, 0)
-			//for k := range m {
-			//	l = append(l, k)
-			//}
-			//sort.Strings(l)
-			//for _, value := range l {
-			//	fmt.Println(fmt.Sprintf("\"%s\": %d,", value, m[value]))
-			//}
-			//return
-
 			assert.Equal(t, test.wantCollected, mx)
 			assert.Len(t, *es.Charts(), test.wantCharts)
-			ensureCollectedHasAllChartsDimsVarsIDs(t, es, mx)
+			module.TestMetricsHasAllChartsDims(t, es.Charts(), mx)
 		})
-	}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, es *Elasticsearch, collected map[string]int64) {
-	for _, chart := range *es.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
 	}
 }
 

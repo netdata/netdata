@@ -357,32 +357,16 @@ func TestCouchDB_Collect(t *testing.T) {
 			cdb, cleanup := prepareCouchDB(t, test.prepare)
 			defer cleanup()
 
-			var collected map[string]int64
+			var mx map[string]int64
 			for i := 0; i < 10; i++ {
-				collected = cdb.Collect()
+				mx = cdb.Collect()
 			}
 
-			assert.Equal(t, test.wantCollected, collected)
+			assert.Equal(t, test.wantCollected, mx)
 			if test.checkCharts {
-				ensureCollectedHasAllChartsDimsVarsIDs(t, cdb, collected)
+				module.TestMetricsHasAllChartsDims(t, cdb.Charts(), mx)
 			}
 		})
-	}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, cdb *CouchDB, collected map[string]int64) {
-	for _, chart := range *cdb.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
 	}
 }
 

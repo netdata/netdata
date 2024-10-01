@@ -101,7 +101,7 @@ func TestWhoisQuery_Collect(t *testing.T) {
 	require.NoError(t, whoisquery.Init())
 	whoisquery.prov = &mockProvider{remTime: 12345}
 
-	collected := whoisquery.Collect()
+	mx := whoisquery.Collect()
 
 	expected := map[string]int64{
 		"expiry":                         12345,
@@ -109,9 +109,9 @@ func TestWhoisQuery_Collect(t *testing.T) {
 		"days_until_expiration_critical": 15,
 	}
 
-	assert.NotZero(t, collected)
-	assert.Equal(t, expected, collected)
-	ensureCollectedHasAllChartsDimsVarsIDs(t, whoisquery, collected)
+	assert.NotZero(t, mx)
+	assert.Equal(t, expected, mx)
+	module.TestMetricsHasAllChartsDims(t, whoisquery.Charts(), mx)
 }
 
 func TestWhoisQuery_Collect_ReturnsNilOnProviderError(t *testing.T) {
@@ -121,19 +121,6 @@ func TestWhoisQuery_Collect_ReturnsNilOnProviderError(t *testing.T) {
 	whoisquery.prov = &mockProvider{err: true}
 
 	assert.Nil(t, whoisquery.Collect())
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, whoisquery *WhoisQuery, collected map[string]int64) {
-	for _, chart := range *whoisquery.Charts() {
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
-	}
 }
 
 type mockProvider struct {

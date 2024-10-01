@@ -279,29 +279,13 @@ func TestRecursor_Collect(t *testing.T) {
 			defer cleanup()
 			require.NoError(t, recursor.Init())
 
-			collected := recursor.Collect()
+			mx := recursor.Collect()
 
-			assert.Equal(t, test.wantCollected, collected)
+			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				ensureCollectedHasAllChartsDimsVarsIDs(t, recursor, collected)
+				module.TestMetricsHasAllChartsDims(t, recursor.Charts(), mx)
 			}
 		})
-	}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, rec *Recursor, collected map[string]int64) {
-	for _, chart := range *rec.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "chart '%s' dim '%s': no dim in collected", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "chart '%s' dim '%s': no dim in collected", v.ID, chart.ID)
-		}
 	}
 }
 

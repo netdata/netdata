@@ -330,9 +330,9 @@ func TestVSphere_Collect(t *testing.T) {
 		"vm-72_sys.uptime.latest":             200,
 	}
 
-	collected := vSphere.Collect()
+	mx := vSphere.Collect()
 
-	require.Equal(t, expected, collected)
+	require.Equal(t, expected, mx)
 
 	count := model.Count()
 	assert.Len(t, vSphere.discoveredHosts, count.Host)
@@ -340,7 +340,7 @@ func TestVSphere_Collect(t *testing.T) {
 	assert.Len(t, vSphere.charted, count.Host+count.Machine)
 
 	assert.Len(t, *vSphere.Charts(), count.Host*len(hostChartsTmpl)+count.Machine*len(vmChartsTmpl))
-	ensureCollectedHasAllChartsDimsVarsIDs(t, vSphere, collected)
+	module.TestMetricsHasAllChartsDims(t, vSphere.Charts(), mx)
 }
 
 func TestVSphere_Collect_RemoveHostsVMsInRuntime(t *testing.T) {
@@ -419,19 +419,6 @@ func TestVSphere_Collect_Run(t *testing.T) {
 	assert.Len(t, vSphere.discoveredVMs, count.Machine)
 	assert.Len(t, vSphere.charted, count.Host+count.Machine)
 	assert.Len(t, *vSphere.charts, count.Host*len(hostChartsTmpl)+count.Machine*len(vmChartsTmpl))
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, vSphere *VSphere, collected map[string]int64) {
-	for _, chart := range *vSphere.Charts() {
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
-	}
 }
 
 func prepareVSphereSim(t *testing.T) (vSphere *VSphere, model *simulator.Model, teardown func()) {

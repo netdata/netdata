@@ -117,10 +117,10 @@ func TestFreeRADIUS_Collect(t *testing.T) {
 		"proxy-acct-dropped-requests":   33,
 		"proxy-acct-unknown-types":      34,
 	}
-	collected := freeRADIUS.Collect()
+	mx := freeRADIUS.Collect()
 
-	assert.Equal(t, expected, collected)
-	ensureCollectedHasAllChartsDimsVarsIDs(t, freeRADIUS, collected)
+	assert.Equal(t, expected, mx)
+	module.TestMetricsHasAllChartsDims(t, freeRADIUS.Charts(), mx)
 }
 
 func TestFreeRADIUS_Collect_ReturnsNilIfClientStatusReturnsError(t *testing.T) {
@@ -132,19 +132,6 @@ func TestFreeRADIUS_Collect_ReturnsNilIfClientStatusReturnsError(t *testing.T) {
 
 func TestFreeRADIUS_Cleanup(t *testing.T) {
 	New().Cleanup()
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, f *FreeRADIUS, collected map[string]int64) {
-	for _, chart := range *f.Charts() {
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
-	}
 }
 
 func newOKMockClient() *mockClient {

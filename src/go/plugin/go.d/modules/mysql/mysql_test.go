@@ -1666,23 +1666,17 @@ func TestMySQL_Collect(t *testing.T) {
 	}
 }
 
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, mySQL *MySQL, collected map[string]int64) {
-	for _, chart := range *mySQL.Charts() {
+func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, mySQL *MySQL, mx map[string]int64) {
+	module.TestMetricsHasAllChartsDimsSkip(t, mySQL.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
 		if mySQL.isMariaDB {
 			// https://mariadb.com/kb/en/server-status-variables/#connection_errors_accept
 			if mySQL.version.LT(semver.Version{Major: 10, Minor: 0, Patch: 4}) && chart.ID == "connection_errors" {
-				continue
+				return true
 			}
 		}
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
-	}
+		return false
+
+	})
 }
 
 func copyProcessListQueryDuration(dst, src map[string]int64) {

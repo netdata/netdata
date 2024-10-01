@@ -241,13 +241,13 @@ func TestTraefik_Collect(t *testing.T) {
 			tk, cleanup := test.prepare(t)
 			defer cleanup()
 
-			var ms map[string]int64
+			var mx map[string]int64
 			for _, want := range test.wantCollected {
-				ms = tk.Collect()
-				assert.Equal(t, want, ms)
+				mx = tk.Collect()
+				assert.Equal(t, want, mx)
 			}
 			if len(test.wantCollected) > 0 {
-				ensureCollectedHasAllChartsDimsVarsIDs(t, tk, ms)
+				module.TestMetricsHasAllChartsDims(t, tk.Charts(), mx)
 			}
 		})
 	}
@@ -351,20 +351,4 @@ func prepareCaseConnectionRefused(t *testing.T) (*Traefik, func()) {
 	require.NoError(t, h.Init())
 
 	return h, func() {}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, tk *Traefik, ms map[string]int64) {
-	for _, chart := range *tk.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := ms[dim.ID]
-			assert.Truef(t, ok, "chart '%s' dim '%s': no dim in collected", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := ms[v.ID]
-			assert.Truef(t, ok, "chart '%s' dim '%s': no dim in collected", v.ID, chart.ID)
-		}
-	}
 }

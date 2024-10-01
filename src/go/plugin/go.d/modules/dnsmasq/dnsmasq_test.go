@@ -152,29 +152,13 @@ func TestDnsmasq_Collect(t *testing.T) {
 			dnsmasq := test.prepare()
 			require.NoError(t, dnsmasq.Init())
 
-			collected := dnsmasq.Collect()
+			mx := dnsmasq.Collect()
 
-			assert.Equal(t, test.wantCollected, collected)
+			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				ensureCollectedHasAllChartsDimsVarsIDs(t, dnsmasq, collected)
+				module.TestMetricsHasAllChartsDims(t, dnsmasq.Charts(), mx)
 			}
 		})
-	}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, dnsmasq *Dnsmasq, collected map[string]int64) {
-	for _, chart := range *dnsmasq.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "chart '%s' dim '%s': no dim in collected", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "chart '%s' dim '%s': no dim in collected", v.ID, chart.ID)
-		}
 	}
 }
 

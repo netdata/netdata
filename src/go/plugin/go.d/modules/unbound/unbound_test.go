@@ -269,11 +269,13 @@ func (m mockUnboundClient) Command(_ string, process socket.Processor) error {
 	return nil
 }
 
-func testCharts(t *testing.T, unbound *Unbound, collected map[string]int64) {
+func testCharts(t *testing.T, unbound *Unbound, mx map[string]int64) {
 	t.Helper()
 	ensureChartsCreatedForEveryThread(t, unbound)
 	ensureExtendedChartsCreated(t, unbound)
-	ensureCollectedHasAllChartsDimsVarsIDs(t, unbound, collected)
+	module.TestMetricsHasAllChartsDimsSkip(t, unbound.Charts(), mx, func(_ *module.Chart, dim *module.Dim) bool {
+		return dim.ID == "mem.mod.ipsecmod"
+	})
 }
 
 func ensureChartsCreatedForEveryThread(t *testing.T, u *Unbound) {
@@ -314,22 +316,6 @@ func ensureExtendedChartsCreated(t *testing.T, u *Unbound) {
 		for rcode := range u.cache.answerRCode {
 			dimID := "num.answer.rcode." + rcode
 			assert.Truef(t, chart.HasDim(dimID), "chart '%s' has no dim for '%s' rcode, expected '%s'", chart.ID, rcode, dimID)
-		}
-	}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, u *Unbound, collected map[string]int64) {
-	for _, chart := range *u.Charts() {
-		for _, dim := range chart.Dims {
-			if dim.ID == "mem.mod.ipsecmod" {
-				continue
-			}
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
 		}
 	}
 }

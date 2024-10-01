@@ -862,7 +862,7 @@ func TestSystemdUnits_Collect(t *testing.T) {
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				ensureCollectedHasAllChartsDimsVarsIDs(t, systemd, mx)
+				module.TestMetricsHasAllChartsDims(t, systemd.Charts(), mx)
 			}
 		})
 	}
@@ -882,22 +882,6 @@ func TestSystemdUnits_connectionReuse(t *testing.T) {
 
 	assert.NotEmpty(t, collected)
 	assert.Equal(t, 1, client.connectCalls)
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, sd *SystemdUnits, collected map[string]int64) {
-	for _, chart := range *sd.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-		}
-	}
 }
 
 func prepareOKClient(ver int) *mockClient {

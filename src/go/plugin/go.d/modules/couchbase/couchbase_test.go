@@ -166,10 +166,10 @@ func TestCouchbase_Collect(t *testing.T) {
 			cb, cleanup := test.prepare(t)
 			defer cleanup()
 
-			collected := cb.Collect()
+			mx := cb.Collect()
 
-			assert.Equal(t, test.wantCollected, collected)
-			ensureCollectedHasAllChartsDimsVarsIDs(t, cb, collected)
+			assert.Equal(t, test.wantCollected, mx)
+			module.TestMetricsHasAllChartsDims(t, cb.Charts(), mx)
 		})
 	}
 }
@@ -221,20 +221,4 @@ func prepareCouchbaseConnectionRefused(t *testing.T) (*Couchbase, func()) {
 	require.NoError(t, cb.Init())
 
 	return cb, func() {}
-}
-
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, cb *Couchbase, collected map[string]int64) {
-	for _, chart := range *cb.Charts() {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			_, ok := collected[dim.ID]
-			assert.Truef(t, ok, "chart '%s' dim '%s': no dim in collected", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := collected[v.ID]
-			assert.Truef(t, ok, "chart '%s' dim '%s': no dim in collected", v.ID, chart.ID)
-		}
-	}
 }

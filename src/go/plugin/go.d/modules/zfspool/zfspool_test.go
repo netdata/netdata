@@ -388,7 +388,7 @@ func TestZFSPool_Collect(t *testing.T) {
 
 				assert.Len(t, *zp.Charts(), want, "want charts")
 
-				module.TestMetricsHasAllChartsDimsSkip(t, zp.Charts(), mx, func(chart *module.Chart) bool {
+				module.TestMetricsHasAllChartsDimsSkip(t, zp.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
 					return strings.HasPrefix(chart.ID, "zfspool_zion") && !strings.HasSuffix(chart.ID, "health_state")
 				})
 			}
