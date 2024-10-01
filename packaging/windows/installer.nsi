@@ -216,27 +216,6 @@ Function NetdataConfigLeave
                 ${NSD_GetText} $hProxy $proxy
                 ${NSD_GetState} $hStartMsys $startMsys
                 ${NSD_GetState} $hInsecure $insecure
-
-                StrLen $0 $cloudToken
-                StrLen $1 $cloudRooms
-                ${If} $0 == 0
-                ${OrIf} $1 == 0
-                        Goto runMsys
-                ${EndIf}
-
-                ${If} $0 == 135
-                ${AndIf} $1 >= 36
-                        nsExec::ExecToLog '$INSTDIR\usr\bin\NetdataClaim.exe /T $cloudToken /R $cloudRooms /P $proxy /I $insecure /U $cloudURL'
-                        pop $0
-                ${Else}
-                        MessageBox MB_OK "The Cloud information does not have the expected length."
-                ${EndIf}
-
-                runMsys:
-                ${If} $startMsys == ${BST_CHECKED}
-                        nsExec::ExecToLog '$INSTDIR\msys2.exe'
-                        pop $0
-                ${EndIf}
         ${EndIf}
 FunctionEnd
 
@@ -343,6 +322,27 @@ Section "Install Netdata"
                     ${EndIf}
            ${EndIf}
         goodbye:
+
+        StrLen $0 $cloudToken
+        StrLen $1 $cloudRooms
+        ${If} $0 == 0
+        ${OrIf} $1 == 0
+                Goto runMsys
+        ${EndIf}
+
+        ${If} $0 == 135
+        ${AndIf} $1 >= 36
+                nsExec::ExecToLog '$INSTDIR\usr\bin\NetdataClaim.exe /T $cloudToken /R $cloudRooms /P $proxy /I $insecure /U $cloudURL'
+                pop $0
+        ${Else}
+                MessageBox MB_OK "The Cloud information does not have the expected length."
+        ${EndIf}
+
+        runMsys:
+        ${If} $startMsys == ${BST_CHECKED}
+                nsExec::ExecToLog '$INSTDIR\msys2.exe'
+                pop $0
+        ${EndIf}
 SectionEnd
 
 Section "Uninstall"
