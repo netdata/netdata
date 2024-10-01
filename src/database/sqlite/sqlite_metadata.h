@@ -6,6 +6,11 @@
 #include "sqlite3.h"
 #include "sqlite_functions.h"
 
+typedef enum event_log_type {
+    EVENT_AGENT_START_TIME  = 1,
+    EVENT_AGENT_SHUTDOWN_TIME,
+} event_log_type_t;
+
 // return a node list
 struct node_instance_list {
     nd_uuid_t  node_id;
@@ -53,6 +58,10 @@ bool sql_set_host_label(nd_uuid_t *host_id, const char *label_key, const char *l
 
 uint64_t sqlite_get_meta_space(void);
 int sql_init_meta_database(db_check_action_type_t rebuild, int memory);
+
+void cleanup_agent_event_log(void);
+void add_agent_event(event_log_type_t event_id, int64_t value);
+usec_t get_agent_event_time_median(event_log_type_t event_id);
 
 // UNIT TEST
 int metadata_unittest(void);
