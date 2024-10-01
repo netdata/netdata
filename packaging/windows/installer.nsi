@@ -360,7 +360,8 @@ Section "Uninstall"
 	    DetailPrint "Warning: Failed to delete Netdata service."
         ${EndIf}
 
-	RMDir /r "$INSTDIR"
+        # https://nsis.sourceforge.io/Reference/RMDir
+	RMDir /r /REBOOTOK "$INSTDIR"
 
         DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata"
 SectionEnd
