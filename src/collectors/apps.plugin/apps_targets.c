@@ -144,7 +144,7 @@ void apps_orchestrators_and_aggregators_init(void) {
 #endif
 }
 
-static inline bool is_orchestrator(struct pid_stat *p) {
+bool is_process_manager(struct pid_stat *p) {
     for(size_t c = 0; c < tree.managers.used ; c++) {
         if(p->comm == tree.managers.array[c].comm)
             return true;
@@ -168,7 +168,7 @@ struct target *get_tree_target(struct pid_stat *p) {
 //        p = p->parent;
 
     // keep the children of INIT_PID, and process orchestrators
-    while(p->parent && p->parent->pid != INIT_PID && p->parent->pid != 0 && !is_orchestrator(p->parent))
+    while(p->parent && p->parent->pid != INIT_PID && p->parent->pid != 0 && !is_process_manager(p->parent))
         p = p->parent;
 
     // merge all processes into process aggregators

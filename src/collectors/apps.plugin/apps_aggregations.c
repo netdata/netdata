@@ -111,6 +111,9 @@ static inline void cleanup_exited_pids(void) {
 }
 
 static struct target *matched_apps_groups_target(struct pid_stat *p, struct target *w) {
+    if(is_process_manager(p))
+        return NULL;
+
     p->matched_by_config = true;
     return w->target ? w->target : w;
 }

@@ -675,6 +675,7 @@ struct pid_stat *find_pid_entry(pid_t pid);
 void del_pid_entry(pid_t pid);
 void update_pid_comm(struct pid_stat *p, const char *comm);
 
+bool is_process_manager(struct pid_stat *p);
 
 // --------------------------------------------------------------------------------------------------------------------
 // targets management
