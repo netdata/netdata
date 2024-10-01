@@ -779,10 +779,12 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #endif
 
     // Check user requested TO doesn't interfere with MQTT keep alives
-    int till_next_keep_alive = t_till_next_keepalive_ms(client);
-    if (client->mqtt_connected && (timeout_ms < 0 || timeout_ms >= till_next_keep_alive)) {
-        timeout_ms = till_next_keep_alive;
-        send_keepalive = 1;
+    if (!ping_timeout) {
+        int till_next_keep_alive = t_till_next_keepalive_ms(client);
+        if (client->mqtt_connected && (timeout_ms < 0 || timeout_ms >= till_next_keep_alive)) {
+            timeout_ms = till_next_keep_alive;
+            send_keepalive = 1;
+        }
     }
 
 #ifdef MQTT_WSS_CPUSTATS
@@ -811,8 +813,10 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             mqtt_ng_ping(client->mqtt);
             ping_timeout = now + PING_TIMEOUT;
         } else {
-            if (ping_timeout && ping_timeout < now)
+            if (ping_timeout && ping_timeout < now) {
                 disconnect_req = ACLK_PING_TIMEOUT;
+                ping_timeout = 0;
+            }
             // if poll timed out and user requested timeout was being used
             // return here let user do his work and he will call us back soon
             return 0;
