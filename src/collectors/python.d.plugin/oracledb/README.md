@@ -1,1 +1,0 @@
-integrations/oracle_db.md
