@@ -1804,6 +1804,7 @@ static int parse_data(struct mqtt_ng_client *client)
                         return MQTT_NG_CLIENT_PROTOCOL_ERROR;
                     }
                     parser->state = MQTT_PARSE_MQTT_PACKET_DONE;
+                    ping_timeout = 0;
                     break;
                 case MQTT_CPT_DISCONNECT:
                     rc = parse_disconnect_varhdr(client);

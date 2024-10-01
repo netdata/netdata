@@ -23,7 +23,6 @@
 int aclk_pubacks_per_conn = 0; // How many PubAcks we got since MQTT conn est.
 int aclk_rcvd_cloud_msgs = 0;
 int aclk_connection_counter = 0;
-int disconnect_req = 0;
 
 static bool aclk_connected = false;
 static inline void aclk_set_connected(void) {
@@ -51,7 +50,8 @@ bool aclk_online_for_nodes(void) {
 
 int aclk_ctx_based = 0;
 int aclk_disable_runtime = 0;
-int aclk_kill_link = 0;
+
+ACLK_DISCONNECT_ACTION disconnect_req = ACLK_NO_DISCONNECT;
 
 usec_t aclk_session_us = 0;
 time_t aclk_session_sec = 0;
@@ -301,14 +301,26 @@ static int handle_connection(mqtt_wss_client client)
             return 1;
         }
 
-        if (disconnect_req || aclk_kill_link) {
-            nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                   "Going to restart connection due to disconnect_req=%s (cloud req), aclk_kill_link=%s (reclaim)",
-                   disconnect_req ? "true" : "false",
-                   aclk_kill_link ? "true" : "false");
+        if (disconnect_req != ACLK_NO_DISCONNECT) {
+            const char *reason;
+            switch (disconnect_req) {
+                case ACLK_CLOUD_DISCONNECT:
+                    reason = "cloud request";
+                    break;
+                case ACLK_PING_TIMEOUT:
+                    reason = "ping timeout";
+                    break;
+                case ACLK_RELOAD_CONF:
+                    reason = "reclaim";
+                    break;
+                default:
+                    reason = "unknown";
+                    break;
+            }
 
-            disconnect_req = 0;
-            aclk_kill_link = 0;
+            nd_log(NDLS_DAEMON, NDLP_NOTICE, "Going to restart connection due to \"%s\"", reason);
+
+            disconnect_req = ACLK_NO_DISCONNECT;
             aclk_graceful_disconnect(client);
             aclk_shared_state.mqtt_shutdown_msg_id = -1;
             aclk_shared_state.mqtt_shutdown_msg_rcvd = 0;

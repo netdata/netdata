@@ -407,7 +407,7 @@ int handle_disconnect_req(const char *msg, size_t msg_len)
             "Cloud asks not to reconnect for %u seconds. We shall honor that request",
             (unsigned int)cmd->reconnect_after_s);
     }
-    disconnect_req = 1;
+    disconnect_req = ACLK_CLOUD_DISCONNECT;
     freez(cmd->error_description);
     freez(cmd);
     return 0;
