@@ -66,6 +66,8 @@ var hCtrlButton
 var hStartMsys
 var startMsys
 
+var hCloudURL
+var cloudURL
 var hCloudToken
 var cloudToken
 var hCloudRooms
@@ -181,10 +183,15 @@ Function NetdataConfigPage
         ${NSD_CreateText} 21% 60% 79% 10% ""
         Pop $hProxy
 
-        ${NSD_CreateCheckbox} 0 75% 50% 10u "Insecure connection"
+        ${NSD_CreateLabel} 0 75% 20% 10% "URL"
+        Pop $0
+        ${NSD_CreateText} 21% 75% 79% 10% ""
+        Pop $hCloudURL
+
+        ${NSD_CreateCheckbox} 0 90% 45% 10u "Insecure connection"
         Pop $hInsecure
 
-        ${NSD_CreateCheckbox} 0 90% 50% 10u "Open terminal"
+        ${NSD_CreateCheckbox} 50% 90% 45% 10u "Open terminal"
         Pop $hStartMsys
 
         ${NSD_CreateButton} 80% 90% 30u 15u "&Help"
@@ -204,6 +211,7 @@ FunctionEnd
 Function NetdataConfigLeave
         ${If} $avoidClaim == ${BST_UNCHECKED}
                 ${NSD_GetText} $hCloudToken $cloudToken
+                ${NSD_GetText} $hCloudURL $cloudURL
                 ${NSD_GetText} $hCloudRooms $cloudRooms
                 ${NSD_GetText} $hProxy $proxy
                 ${NSD_GetState} $hStartMsys $startMsys
@@ -218,7 +226,7 @@ Function NetdataConfigLeave
 
                 ${If} $0 == 135
                 ${AndIf} $1 >= 36
-                        nsExec::ExecToLog '$INSTDIR\usr\bin\NetdataClaim.exe /T $cloudToken /R $cloudRooms /P $proxy /I $insecure'
+                        nsExec::ExecToLog '$INSTDIR\usr\bin\NetdataClaim.exe /T $cloudToken /R $cloudRooms /P $proxy /I $insecure /U $cloudURL'
                         pop $0
                 ${Else}
                         MessageBox MB_OK "The Cloud information does not have the expected length."
