@@ -183,7 +183,7 @@ Both files are machine readable text files.
 
 Beginning with `v1.30.0`, when the Netdata Agent's web server processes a request, it delivers the `SameSite=none`
 and `Secure` cookies. If you have problems accessing the local Agent dashboard or Netdata Cloud, disable these
-cookies by [editing `netdata.conf`](/docs/netdata-agent/configuration/README.md#edit-netdataconf):
+cookies by [editing `netdata.conf`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config):
 
 ```conf
 [registry]
