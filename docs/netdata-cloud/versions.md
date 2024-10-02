@@ -4,7 +4,7 @@ Netdata Cloud is provided in two versions:
 
 - **SaaS**, we run and maintain Netdata Cloud and users use it to complement their observability with the additional features it provides.
 
-- **On Prem**, we provide a licensed copy of the Netdata Cloud software, that users can install and run at their premises. 
+- **On Prem**, we provide a licensed copy of the Netdata Cloud software, that users can install and run at their premises.
 
 The pricing of both versions is similar, with the On-Prem version introducing a monthly fixed-fee for the extra support and packaging required when users are running Netdata Cloud by themselves.
 
