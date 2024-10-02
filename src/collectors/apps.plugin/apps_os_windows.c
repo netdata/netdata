@@ -599,6 +599,59 @@ static STRING *GetNameFromCmdlineSanitized(struct pid_stat *p) {
     return NULL;
 }
 
+static void GetServiceNames(void) {
+    SC_HANDLE hSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ENUMERATE_SERVICE);
+    if (hSCManager == NULL) return;
+
+    DWORD dwBytesNeeded = 0, dwServicesReturned = 0, dwResumeHandle = 0;
+    ENUM_SERVICE_STATUS_PROCESS *pServiceStatus = NULL;
+
+    // First, query the required buffer size
+    EnumServicesStatusEx(
+            hSCManager, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
+            NULL, 0, &dwBytesNeeded, &dwServicesReturned, &dwResumeHandle, NULL);
+
+    if (dwBytesNeeded == 0) {
+        CloseServiceHandle(hSCManager);
+        return;
+    }
+
+    // Allocate memory to hold the services
+    pServiceStatus = mallocz(dwBytesNeeded);
+
+    // Now, retrieve the list of services
+    if (!EnumServicesStatusEx(
+            hSCManager, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
+            (LPBYTE)pServiceStatus, dwBytesNeeded, &dwBytesNeeded, &dwServicesReturned,
+            &dwResumeHandle, NULL)) {
+        freez(pServiceStatus);
+        CloseServiceHandle(hSCManager);
+        return;
+    }
+
+    // Loop through the services
+    for (DWORD i = 0; i < dwServicesReturned; i++) {
+        if(!pServiceStatus[i].lpDisplayName || !*pServiceStatus[i].lpDisplayName)
+            continue;
+
+        struct pid_stat *p = find_pid_entry((pid_t)pServiceStatus[i].ServiceStatusProcess.dwProcessId);
+        if(p && !p->got_service) {
+            p->got_service = true;
+
+            size_t len = strlen(pServiceStatus[i].lpDisplayName);
+            char buf[len + 1];
+            memcpy(buf, pServiceStatus[i].lpDisplayName, sizeof(buf));
+            sanitize_chart_meta(buf);
+
+            string_freez(p->name);
+            p->name = string_strdupz(buf);
+        }
+    }
+
+    free(pServiceStatus);
+    CloseServiceHandle(hSCManager);
+}
+
 static WCHAR *executable_path_from_cmdline(WCHAR *cmdline) {
     if (!cmdline || !*cmdline) return NULL;
 
@@ -640,6 +693,8 @@ void GetAllProcessesInfo(void) {
         CloseHandle(hSnapshot);
         return;
     }
+
+    bool need_service_names = false;
 
     do {
         if(!pe32.th32ProcessID) continue;
@@ -688,6 +743,9 @@ void GetAllProcessesInfo(void) {
         fix_windows_comm(p, comm);
         update_pid_comm(p, comm); // will sanitize p->comm
 
+        if(!need_service_names && string_strcmp(p->comm, "svchost") == 0)
+            need_service_names = true;
+
         STRING *better_name = GetNameFromCmdlineSanitized(p);
         if(better_name) {
             string_freez(p->name);
@@ -697,6 +755,9 @@ void GetAllProcessesInfo(void) {
     } while (Process32NextW(hSnapshot, &pe32));
 
     CloseHandle(hSnapshot);
+
+    if(need_service_names)
+        GetServiceNames();
 }
 
 static inline kernel_uint_t perflib_cpu_utilization(COUNTER_DATA *d) {
