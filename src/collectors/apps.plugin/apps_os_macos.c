@@ -242,7 +242,7 @@ bool apps_os_read_pid_stat_macos(struct pid_stat *p, void *ptr) {
     // Note: Some values such as guest time, cutime, cstime, etc., are not directly available in MacOS.
     // You might need to approximate or leave them unset depending on your needs.
 
-    if(unlikely(debug_enabled || (p->target && p->target->debug_enabled))) {
+    if(unlikely(debug_enabled || p->target)) {
         debug_log_int("READ PROC/PID/STAT for MacOS: process: '%s' on target '%s' VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", threads=%d",
                       pid_stat_comm(p), (p->target) ? string2str(p->target->name) : "UNSET",
                       p->values[PDF_UTIME],

@@ -132,6 +132,26 @@ its CPU resources will be cut in half, and data collection will be once every 2 
 
 The configuration file is `/etc/netdata/apps_groups.conf`. You can edit this file using our [`edit-config`](docs/netdata-agent/configuration/README.md) script.
 
+### Configuring process managers
+
+`apps.plugin` needs to know the common process managers, meaning the names of the processes
+which spawn other processes. Process managers are used so that `apps.plugin` will automatically
+consider all their sub-processes important to monitor.
+
+Process managers are configured in `apps_groups.conf` with the prefix `managers:`, like this:
+
+```
+managers: process1 process2 process3
+```
+
+Multiple lines may exist, all starting with `managers:`.
+
+The process names given here should be exactly as the operating system sets them. In Linux these
+process names are limited to 15 characters. Usually the command `ps -e` or `cat /proc/{PID}/stat`
+states the names needed here.
+
+### Configuring process groups and renaming processes
+
 The configuration file works accepts multiple lines, each having this format:
 
 ```txt
@@ -140,48 +160,39 @@ group: process1 process2 ...
 
 Each group can be given multiple times, to add more processes to it.
 
-For the **Applications** section, only groups configured in this file are reported.
-All other processes will be reported as `other`.
-
-For each process given, its whole process tree will be grouped, not just the process matched.
-The plugin will include both parents and children. If including the parents into the group is
-undesirable, the line `other: *` should be appended to the `apps_groups.conf`.
+For each process given, all of its sub-processes will be grouped, not just the matched process.
 
 The process names are the ones returned by:
 
--   `ps -e` or `cat /proc/PID/stat`
--   in case of substring mode (see below): `/proc/PID/cmdline`
+-   **comm**: `ps -e` or `cat /proc/{PID}/stat`
+-   **cmdline**: in case of substring mode (see below): `/proc/{PID}/cmdline`
+
+On Linux **comm** is limited to just a few characters. `apps.plugin` attempts to find the entire
+**comm** name by looking for it at the **cmdline**. When this is successful, the entire process name
+is available, otherwise the shortened one is used.
 
 To add process names with spaces, enclose them in quotes (single or double)
 example: `'Plex Media Serv'` or `"my other process"`.
 
-You can add an asterisk `*` at the beginning and/or the end of a process:
+You can add asterisks (`*`) to provide a pattern:
 
--   `*name` _suffix_ mode: will search for processes ending with `name` (at `/proc/PID/stat`)
--   `name*` _prefix_ mode: will search for processes beginning with `name` (at `/proc/PID/stat`)
--   `*name*` _substring_ mode: will search for `name` in the whole command line (at `/proc/PID/cmdline`)
+-   `*name` _suffix_ mode: will match a **comm** ending with `name`.
+-   `name*` _prefix_ mode: will match a **comm** beginning with `name`.
+-   `*name*` _substring_ mode: will search for `name` in **cmdline**.
 
-If you enter even just one _name_ (substring), `apps.plugin` will process
-`/proc/PID/cmdline` for all processes (of course only once per process: when they are first seen).
+Asterisks may appear in the middle of `name` (like `na*me`), without affecting what is being
+matched (**comm** or **cmdline**). 
 
 To add processes with single quotes, enclose them in double quotes: `"process with this ' single quote"`
 
 To add processes with double quotes, enclose them in single quotes: `'process with this " double quote'`
 
-If a group or process name starts with a `-`, the dimension will be hidden from the chart (cpu chart only).
+The order of the entries in this list is important: the first one that matches a process is used, so follow a top-down hierarchy.
+Processes not matched by any row, will inherit it from their parents.
 
-If a process starts with a `+`, debugging will be enabled for it (debugging produces a lot of output - do not enable it in production systems).
-
-You can add any number of groups. Only the ones found running will affect the charts generated.
-However, producing charts with hundreds of dimensions may slow down your web browser.
-
-The order of the entries in this list is important: the first that matches a process is used, so put important
-ones at the top. Processes not matched by any row, will inherit it from their parents or children.
-
-The order also controls the order of the dimensions on the generated charts (although applications started
-after apps.plugin is started, will be appended to the existing list of dimensions the `netdata` daemon maintains).
-
-There are a few command line options you can pass to `apps.plugin`. The list of available options can be acquired with the `--help` flag. The options can be set in the `netdata.conf` file. For example, to disable user and user group charts you should set
+There are a few command line options you can pass to `apps.plugin`. The list of available
+options can be acquired with the `--help` flag. The options can be set in the `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configuration/README.md).
+For example, to disable user and user group charts you would set:
 
 ```
 [plugin:apps]

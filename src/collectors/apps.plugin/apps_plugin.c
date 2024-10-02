@@ -121,6 +121,84 @@ size_t pagesize;
 // ----------------------------------------------------------------------------
 // update chart dimensions
 
+// Helper function to count the number of processes in the linked list
+int count_processes(struct pid_stat *root) {
+    int count = 0;
+
+    for(struct pid_stat *p = root; p ; p = p->next)
+        if(p->updated) count++;
+
+    return count;
+}
+
+// Comparator function to sort by pid
+int compare_by_pid(const void *a, const void *b) {
+    struct pid_stat *pa = *(struct pid_stat **)a;
+    struct pid_stat *pb = *(struct pid_stat **)b;
+    return ((int)pa->pid - (int)pb->pid);
+}
+
+// Function to print a process and its children recursively
+void print_process_tree(struct pid_stat *root, struct pid_stat *parent, int depth, int total_processes) {
+    // Allocate an array of pointers for processes with the given parent
+    struct pid_stat **children = (struct pid_stat **)malloc(total_processes * sizeof(struct pid_stat *));
+    int children_count = 0;
+
+    // Populate the array with processes that have the given parent
+    struct pid_stat *p = root;
+    while (p != NULL) {
+        if (p->updated && p->parent == parent) {
+            children[children_count++] = p;
+        }
+        p = p->next;
+    }
+
+    // Sort the children array by pid
+    qsort(children, children_count, sizeof(struct pid_stat *), compare_by_pid);
+
+    // Print each child and recurse
+    for (int i = 0; i < children_count; i++) {
+        // Print the current process with indentation based on depth
+        if (depth > 0) {
+            for (int j = 0; j < (depth - 1) * 4; j++) {
+                printf(" ");
+            }
+            printf(" \\_ ");
+        }
+
+#if (PROCESSES_HAVE_COMM_AND_NAME == 1)
+        printf("[%d] %s (name: %s) [%s]: %s\n", children[i]->pid,
+               string2str(children[i]->comm),
+               string2str(children[i]->name),
+               string2str(children[i]->target->name),
+               string2str(children[i]->cmdline));
+#else
+        printf("[%d] %s [%s]: %s\n", children[i]->pid,
+               string2str(children[i]->comm),
+               string2str(children[i]->target->name),
+               string2str(children[i]->cmdline));
+#endif
+
+        // Recurse to print this child's children
+        print_process_tree(root, children[i], depth + 1, total_processes);
+    }
+
+    // Free the allocated array
+    free(children);
+}
+
+// Function to print the full hierarchy
+void print_hierarchy(struct pid_stat *root) {
+    // Count the total number of processes
+    int total_processes = count_processes(root);
+
+    // Start printing from processes with parent = NULL (i.e., root processes)
+    print_process_tree(root, NULL, 0, total_processes);
+}
+
+// ----------------------------------------------------------------------------
+// update chart dimensions
+
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static void normalize_utilization(struct target *root) {
     struct target *w;
@@ -297,6 +375,7 @@ cleanup:
 }
 
 static bool profile_speed = false;
+static bool print_tree_and_exit = false;
 
 static void parse_args(int argc, char **argv)
 {
@@ -314,6 +393,11 @@ static void parse_args(int argc, char **argv)
         if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
             printf("apps.plugin %s\n", NETDATA_VERSION);
             exit(0);
+        }
+
+        if(strcmp("print", argv[i]) == 0 || strcmp("-print", argv[i]) == 0 || strcmp("--print", argv[i]) == 0) {
+            print_tree_and_exit = true;
+            continue;
         }
 
 #if defined(OS_LINUX)
@@ -618,7 +702,7 @@ int main(int argc, char **argv) {
     procfile_adaptive_initial_allocation = 1;
     os_get_system_HZ();
     os_get_system_cpus_uncached();
-    apps_orchestrators_and_aggregators_init(); // before parsing args!
+    apps_managers_and_aggregators_init(); // before parsing args!
     parse_args(argc, argv);
 
 #if !defined(OS_WINDOWS)
@@ -701,6 +785,11 @@ int main(int argc, char **argv) {
         OS_FUNCTION(apps_os_read_global_cpu_utilization)();
         normalize_utilization(apps_groups_root_target);
 #endif
+
+        if(unlikely(print_tree_and_exit)) {
+            print_hierarchy(root_of_pids());
+            exit(0);
+        }
 
         if(send_resource_usage)
             send_resource_usage_to_netdata(dt);

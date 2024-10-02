@@ -371,7 +371,10 @@ struct target {
 
     TARGET_TYPE type;
     union {
-        STRING *compare;
+        struct {
+            SIMPLE_PATTERN *pattern;
+            STRING *compare;
+        } ag;
 #if (PROCESSES_HAVE_UID == 1)
         uid_t uid;
 #endif
@@ -393,11 +396,8 @@ struct target {
 #endif
 
     bool exposed:1;         // if set, we have sent this to netdata
-    bool hidden:1;          // if set, we set the hidden flag on the dimension
-    bool debug_enabled:1;
-    bool ends_with:1;
-    bool starts_with:1;     // if set, the compare string matches only the
-                            // beginning of the command
+    bool ends_with:1;       // if set, the compare string matches the end of the command
+    bool starts_with:1;     // if set, the compare string matches the start of the command
 
     struct pid_on_target *root_pid; // list of aggregated pids for target debugging
 
@@ -476,7 +476,7 @@ struct pid_stat {
     struct pid_stat *next;
     struct pid_stat *prev;
 
-    struct target *target;          // app_groups.conf targets
+    struct target *target;          // app_groups.conf/tree targets
 
 #if (PROCESSES_HAVE_UID == 1)
     struct target *uid_target;      // uid based targets
@@ -485,9 +485,10 @@ struct pid_stat {
     struct target *gid_target;      // gid based targets
 #endif
 
-    STRING *comm;                   // the command name (short version)
-    STRING *name;                   // a better name, or NULL
-    STRING *cmdline;                // the full command line (or on windows, the full pathname of the program)
+    STRING *comm_orig;              // the command, as-collected
+    STRING *comm;                   // the command, sanitized
+    STRING *name;                   // the command name if any, sanitized
+    STRING *cmdline;                // the full command line of the program
 
 #if defined(OS_WINDOWS)
     COUNTER_DATA perflib[PDF_MAX];
@@ -531,6 +532,8 @@ struct pid_stat {
     bool updated:1;                 // true when the process is currently running
     bool merged:1;                  // true when it has been merged to its parent
     bool keep:1;                    // true when we need to keep this process in memory even after it exited
+    bool is_manager:1;              // true when this pid is a process manager
+    bool is_aggregator:1;           // true when this pid is a process aggregator
 
     bool matched_by_config:1;
 
@@ -540,7 +543,7 @@ struct pid_stat {
 
 #if defined(OS_WINDOWS)
     bool got_info:1;
-    bool assigned_to_target:1;
+    bool got_service:1;
     bool initialized:1;
 #endif
 
@@ -631,7 +634,7 @@ bool managed_log(struct pid_stat *p, PID_LOG log, bool status);
 #define pid_incremental_cpu(type, idx, value) \
     incremental_rate(p->values[idx], p->raw[idx], value, p->type##_collected_usec, p->last_##type##_collected_usec, CPU_TO_NANOSECONDCORES)
 
-void apps_orchestrators_and_aggregators_init(void);
+void apps_managers_and_aggregators_init(void);
 void apps_users_and_groups_init(void);
 void apps_pids_init(void);
 
@@ -675,6 +678,8 @@ struct pid_stat *find_pid_entry(pid_t pid);
 void del_pid_entry(pid_t pid);
 void update_pid_comm(struct pid_stat *p, const char *comm);
 
+bool is_process_manager(struct pid_stat *p);
+bool is_process_aggregator(struct pid_stat *p);
 
 // --------------------------------------------------------------------------------------------------------------------
 // targets management
