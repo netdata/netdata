@@ -54,7 +54,7 @@ static BUFFER *argv_to_windows(const char **argv) {
     BUFFER *wb = buffer_create(0, NULL);
 
     // argv[0] is the path
-    char b[strlen(argv[0]) * 2 + 1024];
+    char b[strlen(argv[0]) * 2 + FILENAME_MAX];
     cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, sizeof(b));
 
     for(size_t i = 0; argv[i] ;i++) {
@@ -84,6 +84,8 @@ static BUFFER *argv_to_windows(const char **argv) {
             else
                 buffer_putc(wb, ' ');
         }
+        else if (needs_quotes)
+            buffer_putc(wb, '"');
 
         for(const char *c = s; *c ; c++) {
             switch(*c) {
