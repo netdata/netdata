@@ -9,11 +9,15 @@
 #include "mqtt_ng.h"
 #include "ws_client.h"
 #include "common_internal.h"
+#include "../aclk.h"
 
 #define PIPE_READ_END  0
 #define PIPE_WRITE_END 1
 #define POLLFD_SOCKET  0
 #define POLLFD_PIPE    1
+
+#define PING_TIMEOUT    (60)  //Expect a ping response within this time (seconds)
+time_t ping_timeout = 0;
 
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) && (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
 #include <openssl/conf.h>
@@ -744,13 +748,11 @@ static int handle_mqtt_internal(mqtt_wss_client client)
     return 0;
 }
 
-#define SEC_TO_MSEC 1000
-static long long int t_till_next_keepalive_ms(mqtt_wss_client client)
+static int t_till_next_keepalive_ms(mqtt_wss_client client)
 {
     time_t last_send = mqtt_ng_last_send_time(client->mqtt);
-    long long int next_mqtt_keep_alive = (last_send * SEC_TO_MSEC)
-        + (client->mqtt_keepalive * (SEC_TO_MSEC * 0.75 /* SEND IN ADVANCE */));
-    return(next_mqtt_keep_alive - (time(NULL) * SEC_TO_MSEC));
+    time_t next_mqtt_keep_alive = last_send + client->mqtt_keepalive * 0.75;
+    return ((next_mqtt_keep_alive - now_realtime_sec()) * MSEC_PER_SEC);
 }
 
 #ifdef MQTT_WSS_CPUSTATS
@@ -777,10 +779,12 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #endif
 
     // Check user requested TO doesn't interfere with MQTT keep alives
-    long long int till_next_keep_alive = t_till_next_keepalive_ms(client);
-    if (client->mqtt_connected && (timeout_ms < 0 || timeout_ms >= till_next_keep_alive)) {
-        timeout_ms = till_next_keep_alive;
-        send_keepalive = 1;
+    if (!ping_timeout) {
+        int till_next_keep_alive = t_till_next_keepalive_ms(client);
+        if (client->mqtt_connected && (timeout_ms < 0 || timeout_ms >= till_next_keep_alive)) {
+            timeout_ms = till_next_keep_alive;
+            send_keepalive = 1;
+        }
     }
 
 #ifdef MQTT_WSS_CPUSTATS
@@ -802,11 +806,17 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #endif
 
     if (ret == 0) {
+        time_t now = now_realtime_sec();
         if (send_keepalive) {
             // otherwise we shortened the timeout ourselves to take care of
             // MQTT keep alives
             mqtt_ng_ping(client->mqtt);
+            ping_timeout = now + PING_TIMEOUT;
         } else {
+            if (ping_timeout && ping_timeout < now) {
+                disconnect_req = ACLK_PING_TIMEOUT;
+                ping_timeout = 0;
+            }
             // if poll timed out and user requested timeout was being used
             // return here let user do his work and he will call us back soon
             return 0;

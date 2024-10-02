@@ -10,7 +10,7 @@
 #define MQTT_NG_MSGGEN_MSG_TOO_BIG 3
 
 struct mqtt_ng_client;
-
+extern time_t ping_timeout;
 /* Converts integer to MQTT Variable Byte Integer as per 1.5.5 of MQTT 5 specs
  * @param input value to be converted
  * @param output pointer to memory where output will be written to. Must allow up to 4 bytes to be written.
