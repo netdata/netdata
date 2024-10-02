@@ -543,7 +543,6 @@ struct pid_stat {
 
 #if defined(OS_WINDOWS)
     bool got_info:1;
-    bool assigned_to_target:1;
     bool initialized:1;
 #endif
 

@@ -218,6 +218,7 @@ void aggregate_processes_to_targets(void) {
 
     // this has to be done, before the cleanup
     struct target *w = NULL, *o = NULL;
+    (void)w; (void)o;
 
     // concentrate everything on the targets
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {

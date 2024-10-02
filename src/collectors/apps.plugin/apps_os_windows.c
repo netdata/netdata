@@ -500,10 +500,31 @@ uint64_t apps_os_get_total_memory_windows(void) {
     return memStat.ullTotalPhys;
 }
 
-static __thread wchar_t unicode[PATH_MAX];
+// remove the PID suffix and .exe suffix, if any
+static void fix_windows_comm(struct pid_stat *p, char *comm) {
+    char pid[UINT64_MAX_LENGTH + 1]; // +1 for the underscore
+    pid[0] = '_';
+    print_uint64(&pid[1], p->pid);
+    size_t pid_len = strlen(pid);
+    size_t comm_len = strlen(comm);
+    if (pid_len < comm_len) {
+        char *compare = &comm[comm_len - pid_len];
+        if (strcmp(pid, compare) == 0)
+            *compare = '\0';
+    }
+
+    // remove the .exe suffix, if any
+    comm_len = strlen(comm);
+    size_t exe_len = strlen(".exe");
+    if(exe_len < comm_len) {
+        char *compare = &comm[comm_len - exe_len];
+        if (strcmp(".exe", compare) == 0)
+            *compare = '\0';
+    }
+}
 
 // Convert wide string to UTF-8
-static STRING *wchar_to_string(WCHAR *s) {
+static char *wchar_to_utf8(WCHAR *s) {
     static __thread char utf8[PATH_MAX];
     static __thread int utf8_size = sizeof(utf8);
 
@@ -512,21 +533,28 @@ static STRING *wchar_to_string(WCHAR *s) {
         return NULL;
 
     WideCharToMultiByte(CP_UTF8, 0, s, -1, utf8, utf8_size, NULL, NULL);
-    return string_strdupz(utf8);
+    return utf8;
+}
+
+// Convert wide string to UTF-8
+static STRING *wchar_to_string(WCHAR *s) {
+    return string_strdupz(wchar_to_utf8(s));
 }
 
 STRING *GetProcessFriendlyName(WCHAR *path) {
     static __thread uint8_t void_buf[1024 * 1024];
+    static __thread DWORD void_buf_size = sizeof(void_buf);
+    static __thread wchar_t unicode[PATH_MAX];
+    static __thread DWORD unicode_size = sizeof(unicode) / sizeof(*unicode);
 
     DWORD handle;
     DWORD size = GetFileVersionInfoSizeW(path, &handle);
-    if (size == 0 || size > sizeof(void_buf))
+    if (size == 0 || size > void_buf_size)
         return FALSE;
 
     if (GetFileVersionInfoW(path, handle, size, void_buf)) {
         LPWSTR value = NULL;
         UINT len = 0;
-        DWORD unicode_size = sizeof(unicode) / sizeof(*unicode);
         if (VerQueryValueW(void_buf, L"\\StringFileInfo\\040904B0\\FileDescription", (LPVOID*)&value, &len) &&
             len > 0 && len < unicode_size) {
             wcsncpy(unicode, value, unicode_size - 1);
@@ -539,6 +567,9 @@ STRING *GetProcessFriendlyName(WCHAR *path) {
 }
 
 void GetAllProcessesInfo(void) {
+    static __thread wchar_t unicode[PATH_MAX];
+    static __thread DWORD unicode_size = sizeof(unicode) / sizeof(*unicode);
+
     calls_counter++;
 
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -558,36 +589,22 @@ void GetAllProcessesInfo(void) {
         if(p->got_info) continue;
         p->got_info = true;
 
-        if(!p->initialized) {
-            string_freez(p->comm);
-            p->comm = wchar_to_string(pe32.szExeFile);
-            p->assigned_to_target = false;
-        }
-
         HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, p->pid);
         if (hProcess == NULL) continue;
 
-        STRING *full_path = NULL;
-        STRING *friendly_name = NULL;
-
-        DWORD unicode_size = sizeof(unicode) / sizeof(*unicode);
         if(QueryFullProcessImageNameW(hProcess, 0, unicode, &unicode_size)) {
-            full_path = wchar_to_string(unicode);
-            friendly_name = GetProcessFriendlyName(unicode);
+            string_freez(p->cmdline);
+            p->cmdline = wchar_to_string(unicode);
+
+            string_freez(p->name);
+            p->name = GetProcessFriendlyName(unicode);
         }
 
         CloseHandle(hProcess);
 
-        if(full_path) {
-            string_freez(p->cmdline);
-            p->cmdline = full_path;
-        }
-
-        if(friendly_name) {
-            string_freez(p->name);
-            p->name = friendly_name;
-            p->assigned_to_target = false;
-        }
+        char *comm = wchar_to_utf8(pe32.szExeFile);
+        fix_windows_comm(p, comm);
+        update_pid_comm(p, comm);
     } while (Process32NextW(hSnapshot, &pe32));
 
     CloseHandle(hSnapshot);
@@ -692,40 +709,17 @@ bool apps_os_collect_all_pids_windows(void) {
             // a new pid
             p->initialized = true;
 
-            static __thread char name[MAX_PATH];
+            static __thread char comm[MAX_PATH];
 
-            if (getInstanceName(d.pDataBlock, d.pObjectType, d.pi, name, sizeof(name))) {
-                // remove the PID suffix, if any
-                char pid[UINT64_MAX_LENGTH + 1]; // +1 for the underscore
-                pid[0] = '_';
-                print_uint64(&pid[1], p->pid);
-                size_t pid_len = strlen(pid);
-                size_t name_len = strlen(name);
-                if (pid_len < name_len) {
-                    char *compare = &name[name_len - pid_len];
-                    if (strcmp(pid, compare) == 0)
-                        *compare = '\0';
-                }
-
-                // remove the .exe suffix, if any
-                name_len = strlen(name);
-                size_t exe_len = strlen(".exe");
-                if(exe_len < name_len) {
-                    char *compare = &name[name_len - exe_len];
-                    if (strcmp(".exe", compare) == 0)
-                        *compare = '\0';
-                }
-            }
+            if (getInstanceName(d.pDataBlock, d.pObjectType, d.pi, comm, sizeof(comm)))
+                fix_windows_comm(p, comm);
             else
-                strncpyz(name, "unknown", sizeof(name) - 1);
+                strncpyz(comm, "unknown", sizeof(comm) - 1);
 
-            if(strcmp(name, "wininit") == 0)
+            if(strcmp(comm, "wininit") == 0)
                 INIT_PID = p->pid;
 
-            string_freez(p->comm); // it may be detected in a previous run via GetAllProcessesInfo()
-            p->comm = string_strdupz(name);
-            p->got_info = false;
-            p->assigned_to_target = false;
+            update_pid_comm(p, comm);
             added++;
 
             COUNTER_DATA ppid = {.key = "Creating Process ID"};
