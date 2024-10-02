@@ -137,5 +137,3 @@ Now that you're collecting metrics from your Unbound servers, let us know how it
 for improvement or refinement based on real-world use cases. Feel free to [file an
 issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml) with your
 thoughts.
-
-
