@@ -6,12 +6,15 @@
 
 **Merged pull requests:**
 
+- go.d remove duplicate chart check in tests [\#18650](https://github.com/netdata/netdata/pull/18650) ([ilyam8](https://github.com/ilyam8))
 - fixed freebsd cpu calculation [\#18648](https://github.com/netdata/netdata/pull/18648) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18647](https://github.com/netdata/netdata/pull/18647) ([netdatabot](https://github.com/netdatabot))
+- Use temporary file for commit date check. [\#18646](https://github.com/netdata/netdata/pull/18646) ([Ferroin](https://github.com/Ferroin))
 - Update file names. [\#18638](https://github.com/netdata/netdata/pull/18638) ([vkalintiris](https://github.com/vkalintiris))
 - Move plugins.d directory outside of collectors [\#18637](https://github.com/netdata/netdata/pull/18637) ([vkalintiris](https://github.com/vkalintiris))
 - go.d/smartctl: fix exit status check in scan [\#18635](https://github.com/netdata/netdata/pull/18635) ([ilyam8](https://github.com/ilyam8))
 - go.d pkg/socket: keep only one timeout option [\#18633](https://github.com/netdata/netdata/pull/18633) ([ilyam8](https://github.com/ilyam8))
+- Log  agent start / stop timing events [\#18632](https://github.com/netdata/netdata/pull/18632) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18630](https://github.com/netdata/netdata/pull/18630) ([netdatabot](https://github.com/netdatabot))
 - go.d/postgres: fix checkpoints query for postgres 17 [\#18629](https://github.com/netdata/netdata/pull/18629) ([ilyam8](https://github.com/ilyam8))
 - go.d/ceph: fix leftovers after \#18582 [\#18628](https://github.com/netdata/netdata/pull/18628) ([ilyam8](https://github.com/ilyam8))
@@ -23,6 +26,7 @@
 - Revert "Add ceph commands to ndsudo" [\#18620](https://github.com/netdata/netdata/pull/18620) ([ilyam8](https://github.com/ilyam8))
 - go.d/hddtemp: connect and read [\#18619](https://github.com/netdata/netdata/pull/18619) ([ilyam8](https://github.com/ilyam8))
 - go.d/uwsgi: don't write just connect and read [\#18618](https://github.com/netdata/netdata/pull/18618) ([ilyam8](https://github.com/ilyam8))
+- Windows Installer \(Silent mode\) [\#18613](https://github.com/netdata/netdata/pull/18613) ([thiagoftsm](https://github.com/thiagoftsm))
 - POST Functions [\#18611](https://github.com/netdata/netdata/pull/18611) ([ktsaou](https://github.com/ktsaou))
 - Correctly include Windows installer in release creation. [\#18609](https://github.com/netdata/netdata/pull/18609) ([Ferroin](https://github.com/Ferroin))
 - feat: HW req for onprem installation. [\#18608](https://github.com/netdata/netdata/pull/18608) ([M4itee](https://github.com/M4itee))
@@ -417,11 +421,6 @@
 - Bump github.com/gofrs/flock from 0.11.0 to 0.12.0 in /src/go [\#18077](https://github.com/netdata/netdata/pull/18077) ([dependabot[bot]](https://github.com/apps/dependabot))
 - proc: collect ksm/swap/cma/zswap only when feature enabled [\#18076](https://github.com/netdata/netdata/pull/18076) ([ilyam8](https://github.com/ilyam8))
 - health add alarm docker container down [\#18075](https://github.com/netdata/netdata/pull/18075) ([ilyam8](https://github.com/ilyam8))
-- go.d ipfs fix tests [\#18074](https://github.com/netdata/netdata/pull/18074) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18073](https://github.com/netdata/netdata/pull/18073) ([netdatabot](https://github.com/netdatabot))
-- Port ipfs from python to Go [\#18070](https://github.com/netdata/netdata/pull/18070) ([Ancairon](https://github.com/Ancairon))
-- update golang version in netdata.spec [\#18069](https://github.com/netdata/netdata/pull/18069) ([ilyam8](https://github.com/ilyam8))
-- go.d set sensitive props to "password" widget [\#18068](https://github.com/netdata/netdata/pull/18068) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
