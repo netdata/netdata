@@ -136,7 +136,7 @@ The configuration file is `/etc/netdata/apps_groups.conf`. You can edit this fil
 
 `apps.plugin` needs to know the common process managers, meaning the names of the processes
 which spawn other processes. Process managers are used so that `apps.plugin` will automatically
-consider all their sub-processes as important to monitor.
+consider all their sub-processes important to monitor.
 
 Process managers are configured in `apps_groups.conf` with the prefix `managers:`, like this:
 
