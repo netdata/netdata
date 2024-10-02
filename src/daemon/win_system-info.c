@@ -226,15 +226,20 @@ static void netdata_windows_discover_os_version(char *os, size_t length, DWORD b
 
 static void netdata_windows_os_kernel_version(char *out, DWORD length, DWORD build)
 {
-    char version[8];
-    if (!netdata_registry_get_string(version,
-                                    7,
+    DWORD major, minor;
+    if (!netdata_registry_get_dword(&major,
                                     HKEY_LOCAL_MACHINE,
                                     "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
-                                    "CurrentVersion"))
-        version[0] = '\0';
+                                    "CurrentMajorVersionNumber"))
+        major = 0;
 
-    (void)snprintf(out, length, "%s (build: %u)", version, build);
+    if (!netdata_registry_get_dword(&minor,
+                                    HKEY_LOCAL_MACHINE,
+                                    "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                                    "CurrentMinorVersionNumber"))
+        minor = 0;
+
+    (void)snprintf(out, length, "Windows %u.%u.%u Build: %u", major, minor, build, build);
 }
 
 static void netdata_windows_host(struct rrdhost_system_info *systemInfo)
