@@ -221,7 +221,7 @@ static void netdata_windows_discover_os_version(char *os, size_t length, DWORD b
     }
     // We are not testing older, because it is not supported anymore by Microsoft
 
-    (void)snprintf(os, length, "Microsoft Windows Version %s, Build %d (Name: Windows %s)", versionName, build, version);
+    (void)snprintf(os, length, "Microsoft Windows Version %s, Build %d", version, build);
 }
 
 static void netdata_windows_os_version(char *out, DWORD length)
