@@ -14,7 +14,9 @@ import (
 )
 
 func newFuncMap() template.FuncMap {
-	custom := map[string]any{
+	fm := sprig.TxtFuncMap()
+
+	extra := map[string]any{
 		"match": funcMatchAny,
 		"glob": func(value, pattern string, patterns ...string) bool {
 			return funcMatchAny("glob", value, pattern, patterns...)
@@ -25,9 +27,7 @@ func newFuncMap() template.FuncMap {
 		},
 	}
 
-	fm := sprig.HermeticTxtFuncMap()
-
-	for name, fn := range custom {
+	for name, fn := range extra {
 		fm[name] = fn
 	}
 
