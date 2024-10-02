@@ -77,7 +77,7 @@ To edit `stream.conf`, use again the [edit-config](/docs/netdata-agent/configura
 
 #### Parent config
 
-For the Parent, besides setting up streaming, this example also provides configuration for multiple [tiers of metrics storage](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics), for 10 Children, with about 2k metrics each. This allows for:
+For the Parent, besides setting up streaming, this example also provides configuration for multiple [tiers of metrics storage](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md), for 10 Children, with about 2k metrics each. This allows for:
 
 - 1s granularity at tier 0 for 1 week
 - 1m granularity at tier 1 for 1 month
