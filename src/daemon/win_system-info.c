@@ -294,6 +294,11 @@ static void netdata_windows_container(struct rrdhost_system_info *systemInfo)
         systemInfo, "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE);
 }
 
+static void netdata_windows_install_type(struct rrdhost_system_info *systemInfo)
+{
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_INSTALL_TYPE", "netdata-installer.exe");
+}
+
 void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo)
 {
     netdata_windows_cloud(systemInfo);
@@ -302,5 +307,6 @@ void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo)
     netdata_windows_get_cpu(systemInfo);
     netdata_windows_get_mem(systemInfo);
     netdata_windows_get_total_disk_size(systemInfo);
+    netdata_windows_install_type(systemInfo);
 }
 #endif
