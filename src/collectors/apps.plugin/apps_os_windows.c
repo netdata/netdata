@@ -688,8 +688,11 @@ void GetAllProcessesInfo(void) {
         fix_windows_comm(p, comm);
         update_pid_comm(p, comm); // will sanitize p->comm
 
-        if(!p->name)
-            p->name = GetNameFromCmdlineSanitized(p);
+        STRING *better_name = GetNameFromCmdlineSanitized(p);
+        if(better_name) {
+            string_freez(p->name);
+            p->name = better_name;
+        }
 
     } while (Process32NextW(hSnapshot, &pe32));
 
