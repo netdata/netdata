@@ -451,6 +451,8 @@
 #include <tchar.h>
 #include <strsafe.h>
 
+WCHAR* GetProcessCommandLine(HANDLE hProcess);
+
 struct perflib_data {
     PERF_DATA_BLOCK *pDataBlock;
     PERF_OBJECT_TYPE *pObjectType;
@@ -541,7 +543,10 @@ static STRING *wchar_to_string(WCHAR *s) {
     return string_strdupz(wchar_to_utf8(s));
 }
 
-STRING *GetProcessFriendlyName(WCHAR *path) {
+// --------------------------------------------------------------------------------------------------------------------
+
+// return a sanitized name for the process
+STRING *GetProcessFriendlyNameSanitized(WCHAR *path) {
     static __thread uint8_t void_buf[1024 * 1024];
     static __thread DWORD void_buf_size = sizeof(void_buf);
     static __thread wchar_t unicode[PATH_MAX];
@@ -559,8 +564,61 @@ STRING *GetProcessFriendlyName(WCHAR *path) {
             len > 0 && len < unicode_size) {
             wcsncpy(unicode, value, unicode_size - 1);
             unicode[unicode_size - 1] = L'\0';
-            return wchar_to_string(unicode);
+            char *name = wchar_to_utf8(unicode);
+            sanitize_chart_meta(name);
+            return string_strdupz(name);
         }
+    }
+
+    return NULL;
+}
+
+#define SERVICE_PREFIX "Service "
+// return a sanitized name for the process
+static STRING *GetNameFromCmdlineSanitized(struct pid_stat *p) {
+    if(!p->cmdline) return NULL;
+
+    char buf[string_strlen(p->cmdline) + 1];
+    memcpy(buf, string2str(p->cmdline), sizeof(buf));
+    char *words[100];
+    size_t num_words = quoted_strings_splitter(buf, words, 100, isspace_map_pluginsd);
+
+    if(string_strcmp(p->comm, "svchost") == 0) {
+        // find -s SERVICE in the command line
+        for(size_t i = 0; i < num_words ;i++) {
+            if(strcmp(words[i], "-s") == 0 && i + 1 < num_words) {
+                char service[strlen(words[i + 1]) + sizeof(SERVICE_PREFIX)]; // sizeof() includes a null
+                strcpy(service, SERVICE_PREFIX);
+                strcpy(&service[sizeof(SERVICE_PREFIX) - 1], words[i + 1]);
+                sanitize_chart_meta(service);
+                return string_strdupz(service);
+            }
+        }
+    }
+
+    return NULL;
+}
+
+static WCHAR *executable_path_from_cmdline(WCHAR *cmdline) {
+    if (!cmdline || !*cmdline) return NULL;
+
+    WCHAR *exe_path_start = cmdline;
+    WCHAR *exe_path_end = NULL;
+
+    if (cmdline[0] == L'"') {
+        // Command line starts with a double quote
+        exe_path_start++;  // Move past the first double quote
+        exe_path_end = wcschr(exe_path_start, L'"');  // Find the next quote
+    }
+    else {
+        // Command line does not start with a double quote
+        exe_path_end = wcschr(exe_path_start, L' ');  // Find the first space
+    }
+
+    if (exe_path_end) {
+        // Null-terminate the string at the end of the executable path
+        *exe_path_end = L'\0';
+        return exe_path_start;
     }
 
     return NULL;
@@ -584,27 +642,55 @@ void GetAllProcessesInfo(void) {
     }
 
     do {
+        if(!pe32.th32ProcessID) continue;
+
         struct pid_stat *p = get_or_allocate_pid_entry((pid_t)pe32.th32ProcessID);
         p->ppid = (pid_t)pe32.th32ParentProcessID;
         if(p->got_info) continue;
         p->got_info = true;
 
         HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, p->pid);
-        if (hProcess == NULL) continue;
+        if (hProcess == NULL)
+            continue;
 
-        if(QueryFullProcessImageNameW(hProcess, 0, unicode, &unicode_size)) {
-            string_freez(p->cmdline);
-            p->cmdline = wchar_to_string(unicode);
+        // Get the full command line, if possible
+        {
+            WCHAR *cmdline = GetProcessCommandLine(hProcess); // returns malloc'd buffer
+            if (cmdline) {
+                string_freez(p->cmdline);
+                p->cmdline = wchar_to_string(cmdline);
 
-            string_freez(p->name);
-            p->name = GetProcessFriendlyName(unicode);
+                // extract the process full path from the command line
+                WCHAR *path = executable_path_from_cmdline(cmdline);
+                if(path) {
+                    string_freez(p->name);
+                    p->name = GetProcessFriendlyNameSanitized(path);
+                }
+
+                free(cmdline); // free(), not freez()
+            }
+        }
+
+        if(!p->cmdline || !p->name) {
+            if (QueryFullProcessImageNameW(hProcess, 0, unicode, &unicode_size)) {
+                // put the full path name to the command into cmdline
+                if(!p->cmdline)
+                    p->cmdline = wchar_to_string(unicode);
+
+                if(!p->name)
+                    p->name = GetProcessFriendlyNameSanitized(unicode);
+            }
         }
 
         CloseHandle(hProcess);
 
         char *comm = wchar_to_utf8(pe32.szExeFile);
         fix_windows_comm(p, comm);
-        update_pid_comm(p, comm);
+        update_pid_comm(p, comm); // will sanitize p->comm
+
+        if(!p->name)
+            p->name = GetNameFromCmdlineSanitized(p);
+
     } while (Process32NextW(hSnapshot, &pe32));
 
     CloseHandle(hSnapshot);
@@ -719,7 +805,7 @@ bool apps_os_collect_all_pids_windows(void) {
             if(strcmp(comm, "wininit") == 0)
                 INIT_PID = p->pid;
 
-            update_pid_comm(p, comm);
+            update_pid_comm(p, comm); // will sanitize p->comm
             added++;
 
             COUNTER_DATA ppid = {.key = "Creating Process ID"};

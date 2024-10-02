@@ -1895,12 +1895,14 @@ if(ENABLE_PLUGIN_APPS)
             src/collectors/apps.plugin/apps_os_macos.c
             src/collectors/apps.plugin/apps_os_windows.c
             src/collectors/apps.plugin/apps_incremental_collection.c
+            src/collectors/apps.plugin/apps_os_windows_nt.c
     )
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
 
     target_link_libraries(apps.plugin libnetdata ${CAP_LIBRARIES}
-            "$<$<BOOL:${OS_WINDOWS}>:Version>")
+            "$<$<BOOL:${OS_WINDOWS}>:Version>"
+            "$<$<BOOL:${OS_WINDOWS}>:ntdll>")
 
     target_include_directories(apps.plugin PRIVATE ${CAP_INCLUDE_DIRS})
     target_compile_options(apps.plugin PRIVATE ${CAP_CFLAGS_OTHER})

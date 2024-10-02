@@ -165,7 +165,19 @@ void print_process_tree(struct pid_stat *root, struct pid_stat *parent, int dept
             }
             printf(" \\_ ");
         }
-        printf("[%d] %s [%s]\n", children[i]->pid, string2str(children[i]->comm), string2str(children[i]->target->name));
+
+#if (PROCESSES_HAVE_COMM_AND_NAME == 1)
+        printf("[%d] %s (name: %s) [%s]: %s\n", children[i]->pid,
+               string2str(children[i]->comm),
+               string2str(children[i]->name),
+               string2str(children[i]->target->name),
+               string2str(children[i]->cmdline));
+#else
+        printf("[%d] %s [%s]: %s\n", children[i]->pid,
+               string2str(children[i]->comm),
+               string2str(children[i]->target->name),
+               string2str(children[i]->cmdline));
+#endif
 
         // Recurse to print this child's children
         print_process_tree(root, children[i], depth + 1, total_processes);

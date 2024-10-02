@@ -476,7 +476,7 @@ struct pid_stat {
     struct pid_stat *next;
     struct pid_stat *prev;
 
-    struct target *target;          // app_groups.conf targets
+    struct target *target;          // app_groups.conf/tree targets
 
 #if (PROCESSES_HAVE_UID == 1)
     struct target *uid_target;      // uid based targets
@@ -485,10 +485,10 @@ struct pid_stat {
     struct target *gid_target;      // gid based targets
 #endif
 
-    STRING *comm_orig;
-    STRING *comm;                   // the command name (short version)
-    STRING *name;                   // a better name, or NULL
-    STRING *cmdline;                // the full command line (or on windows, the full pathname of the program)
+    STRING *comm_orig;              // the command, as-collected
+    STRING *comm;                   // the command, sanitized
+    STRING *name;                   // the command name if any, sanitized
+    STRING *cmdline;                // the full command line of the program
 
 #if defined(OS_WINDOWS)
     COUNTER_DATA perflib[PDF_MAX];

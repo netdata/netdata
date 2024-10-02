@@ -317,7 +317,7 @@ static inline void link_all_processes_to_their_parents(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline STRING *comm_from_cmdline(char *comm, STRING *cmdline) {
+static inline STRING *comm_from_cmdline_sanitized(char *comm, STRING *cmdline) {
     if(!cmdline) {
         sanitize_chart_meta(comm);
         return string_strdupz(comm);
@@ -339,7 +339,7 @@ static inline STRING *comm_from_cmdline(char *comm, STRING *cmdline) {
     char *start = strstr(buf_cmd, comm);
     if(start) {
         char *end = start + comm_len;
-        while(*end && !isspace((uint8_t)*end) && *end != '/' && *end != '\\') end++;
+        while(*end && !isspace((uint8_t)*end) && *end != '/' && *end != '\\' && *end != '"') end++;
         *end = '\0';
 
         sanitize_chart_meta(start);
@@ -374,7 +374,7 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
     p->comm_orig = string_strdupz(comm);
 
     string_freez(p->comm);
-    p->comm = comm_from_cmdline(buf, p->cmdline);
+    p->comm = comm_from_cmdline_sanitized(buf, p->cmdline);
 
     p->is_manager = is_process_manager(p);
     p->is_aggregator = is_process_aggregator(p);

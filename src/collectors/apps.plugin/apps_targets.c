@@ -99,9 +99,10 @@ void apps_managers_and_aggregators_init(void) {
     managed_list_add(&tree.managers, "plasmashell");                // kde user applications
     managed_list_add(&tree.managers, "xfwm4");                      // xfce4 user applications
 #elif defined(OS_WINDOWS)
-    managed_list_add(&tree.managers, "System");
-    managed_list_add(&tree.managers, "services");
     managed_list_add(&tree.managers, "wininit");
+    managed_list_add(&tree.managers, "services");
+    managed_list_add(&tree.managers, "explorer");
+    managed_list_add(&tree.managers, "System");
 #elif defined(OS_FREEBSD)
     managed_list_add(&tree.managers, "init");
 #elif defined(OS_MACOS)
