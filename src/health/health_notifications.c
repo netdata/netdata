@@ -20,17 +20,27 @@ struct health_raised_summary {
 };
 
 void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
-    if (!(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS))
-        return;
+    // this has to ALWAYS remove the given alarm entry from the queue
 
-    if(!ae->popen_instance) {
-        // nd_log(NDLS_DAEMON, NDLP_ERR, "attempted to wait for the execution of alert that has not spawn a notification");
-        return;
+    int code = 0;
+
+    if (!(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "attempted to wait for the execution of alert that has not an execution in progress");
+        code = 128;
+        goto cleanup;
     }
 
-    ae->exec_code = spawn_popen_wait(ae->popen_instance);
+    if(!ae->popen_instance) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "attempted to wait for the execution of alert that has not spawn a notification");
+        code = 128;
+        goto cleanup;
+    }
 
+    code = spawn_popen_wait(ae->popen_instance);
     netdata_log_debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
+
+cleanup:
+    ae->exec_code = code;
     ae->flags &= ~HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
 
     if(ae->exec_code != 0)
@@ -466,13 +476,18 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
         ae->exec_run_timestamp = now_realtime_sec(); /* will be updated by real time after spawning */
 
         netdata_log_debug(D_HEALTH, "executing command '%s'", command_to_run);
-        ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
         ae->popen_instance = spawn_popen_run(command_to_run);
-        enqueue_alarm_notify_in_progress(ae);
+        if(ae->popen_instance) {
+            ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
+            enqueue_alarm_notify_in_progress(ae);
+        }
+        else
+            netdata_log_error("Failed to execute alarm notification");
+
         health_alarm_log_save(host, ae);
-    } else {
-        netdata_log_error("Failed to format command arguments");
     }
+    else
+        netdata_log_error("Failed to format command arguments");
 
     buffer_free(warn_alarms);
     buffer_free(crit_alarms);
