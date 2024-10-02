@@ -58,4 +58,3 @@ NDMINORVERSION=$"$(grep 'CMAKE_PROJECT_VERSION_MINOR:STATIC' "${build}/CMakeCach
 
 /mingw64/bin/makensis.exe -DCURRVERSION="${NDVERSION}" -DMAJORVERSION="${NDMAJORVERSION}" -DMINORVERSION="${NDMINORVERSION}" "${repo_root}/packaging/windows/installer.nsi"
 ${GITHUB_ACTIONS+echo "::endgroup::"}
-

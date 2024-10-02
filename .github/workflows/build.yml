@@ -342,7 +342,8 @@ jobs:
           endpoint: "https://eus.codesigning.azure.net/"
           trusted-signing-account-name: Netdata
           certificate-profile-name: Netdata
-          files: ${{ github.workspace }}\packaging\windows\netdata-installer.exe
+          files-folder: ${{ github.workspace }}\packaging\windows
+          files-folder-filter: exe
           file-digest: SHA256
           timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
           timestamp-digest: SHA256
@@ -351,7 +352,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-x86_64-installer
-          path: packaging\windows\netdata-installer.exe
+          path: packaging\windows\netdata*.exe
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
