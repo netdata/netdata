@@ -168,7 +168,7 @@ The process names are the ones returned by:
 -   **cmdline**: in case of substring mode (see below): `/proc/{PID}/cmdline`
 
 On Linux **comm** is limited to just a few characters. `apps.plugin` attempts to find the entire
-**comm** name by looking for it at the **cmdline**. When this succeeds, the entire process name
+**comm** name by looking for it at the **cmdline**. When this is successful, the entire process name
 is available, otherwise the shortened one is used.
 
 To add process names with spaces, enclose them in quotes (single or double)
