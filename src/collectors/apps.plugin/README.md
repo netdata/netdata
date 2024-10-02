@@ -146,7 +146,7 @@ managers: process1 process2 process3
 
 Multiple lines may exist, all starting with `managers:`.
 
-The process names given here should as the operating system gives them. In Linux these
+The process names given here should be exactly as the operating system sets them. In Linux these
 process names are limited to 15 characters. Usually the command `ps -e` or `cat /proc/{PID}/stat`
 states the names needed here.
 
