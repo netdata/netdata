@@ -180,7 +180,7 @@ You can add asterisks (`*`) to provide a pattern:
 -   `name*` _prefix_ mode: will match a **comm** beginning with `name`.
 -   `*name*` _substring_ mode: will search for `name` in **cmdline**.
 
-Asterisk may appear in the middle of `name` (like `na*me`), without affecting what is being
+Asterisks may appear in the middle of `name` (like `na*me`), without affecting what is being
 matched (**comm** or **cmdline**). 
 
 To add processes with single quotes, enclose them in double quotes: `"process with this ' single quote"`
