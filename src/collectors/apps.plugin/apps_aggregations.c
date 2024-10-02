@@ -181,13 +181,17 @@ static void assign_a_target_to_all_processes(void) {
     // assign targets from their parents, if they have
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
         if(!p->target) {
-            for(struct pid_stat *pp = p->parent ; pp ; pp = pp->parent) {
-                if(pp->target) {
-                    if(pp->matched_by_config) {
-                        // we are only interested about app_groups.conf matches
-                        p->target = pp->target;
+            if(!p->is_manager) {
+                for (struct pid_stat *pp = p->parent; pp; pp = pp->parent) {
+                    if(pp->is_manager) break;
+
+                    if (pp->target) {
+                        if (pp->matched_by_config) {
+                            // we are only interested about app_groups.conf matches
+                            p->target = pp->target;
+                        }
+                        break;
                     }
-                    break;
                 }
             }
 

@@ -532,6 +532,8 @@ struct pid_stat {
     bool updated:1;                 // true when the process is currently running
     bool merged:1;                  // true when it has been merged to its parent
     bool keep:1;                    // true when we need to keep this process in memory even after it exited
+    bool is_manager:1;              // true when this pid is a process manager
+    bool is_aggregator:1;           // true when this pid is a process aggregator
 
     bool matched_by_config:1;
 
@@ -632,7 +634,7 @@ bool managed_log(struct pid_stat *p, PID_LOG log, bool status);
 #define pid_incremental_cpu(type, idx, value) \
     incremental_rate(p->values[idx], p->raw[idx], value, p->type##_collected_usec, p->last_##type##_collected_usec, CPU_TO_NANOSECONDCORES)
 
-void apps_orchestrators_and_aggregators_init(void);
+void apps_managers_and_aggregators_init(void);
 void apps_users_and_groups_init(void);
 void apps_pids_init(void);
 
@@ -677,6 +679,7 @@ void del_pid_entry(pid_t pid);
 void update_pid_comm(struct pid_stat *p, const char *comm);
 
 bool is_process_manager(struct pid_stat *p);
+bool is_process_aggregator(struct pid_stat *p);
 
 // --------------------------------------------------------------------------------------------------------------------
 // targets management

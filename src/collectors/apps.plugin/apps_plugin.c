@@ -690,7 +690,7 @@ int main(int argc, char **argv) {
     procfile_adaptive_initial_allocation = 1;
     os_get_system_HZ();
     os_get_system_cpus_uncached();
-    apps_orchestrators_and_aggregators_init(); // before parsing args!
+    apps_managers_and_aggregators_init(); // before parsing args!
     parse_args(argc, argv);
 
 #if !defined(OS_WINDOWS)

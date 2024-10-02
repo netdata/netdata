@@ -376,6 +376,9 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
     string_freez(p->comm);
     p->comm = comm_from_cmdline(buf, p->cmdline);
 
+    p->is_manager = is_process_manager(p);
+    p->is_aggregator = is_process_aggregator(p);
+
     // the process changed comm, we may have to reassign it to
     // an apps_groups.conf target.
     p->target = NULL;

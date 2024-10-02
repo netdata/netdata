@@ -31,7 +31,7 @@ struct target *find_target_by_name(struct target *base, const char *name) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// Tree
+// Process managers and aggregators
 
 struct comm_list {
     STRING *comm;
@@ -83,7 +83,7 @@ static void managed_list_add(struct managed_list *list, const char *s) {
 
 static STRING *KernelAggregator = NULL;
 
-void apps_orchestrators_and_aggregators_init(void) {
+void apps_managers_and_aggregators_init(void) {
     KernelAggregator = string_strdupz("kernel");
 
     managed_list_clear(&tree.managers);
@@ -96,6 +96,8 @@ void apps_orchestrators_and_aggregators_init(void) {
     managed_list_add(&tree.managers, "openrc-run.sh");              // openrc
     managed_list_add(&tree.managers, "crond");                      // linux crond
     managed_list_add(&tree.managers, "gnome-shell");                // gnome user applications
+    managed_list_add(&tree.managers, "plasmashell");                // kde user applications
+    managed_list_add(&tree.managers, "xfwm4");                      // xfce4 user applications
 #elif defined(OS_WINDOWS)
     managed_list_add(&tree.managers, "System");
     managed_list_add(&tree.managers, "services");
@@ -126,7 +128,7 @@ bool is_process_manager(struct pid_stat *p) {
     return false;
 }
 
-static inline bool is_aggregator(struct pid_stat *p) {
+bool is_process_aggregator(struct pid_stat *p) {
     for(size_t c = 0; c < tree.aggregators.used ; c++) {
         if(p->comm == tree.aggregators.array[c].comm ||
             p->comm_orig == tree.aggregators.array[c].comm)
@@ -136,31 +138,32 @@ static inline bool is_aggregator(struct pid_stat *p) {
     return false;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// Tree
+
 struct target *get_tree_target(struct pid_stat *p) {
 //    // skip fast all the children that are more than 3 levels down
 //    while(p->parent && p->parent->pid != INIT_PID && p->parent->parent && p->parent->parent->parent)
 //        p = p->parent;
 
     // keep the children of INIT_PID, and process orchestrators
-    while(p->parent && p->parent->pid != INIT_PID && p->parent->pid != 0 && !is_process_manager(p->parent))
+    while(p->parent && p->parent->pid != INIT_PID && p->parent->pid != 0 && !p->parent->is_manager)
         p = p->parent;
 
     // merge all processes into process aggregators
-    STRING *search_for = string_dup(p->comm);
-    bool aggregator = false;
-    if((p->ppid == 0 && p->pid != INIT_PID) || (p->parent && is_aggregator(p->parent))) {
-        aggregator = true;
+    STRING *search_for = NULL;
+    if((p->ppid == 0 && p->pid != INIT_PID) || (p->parent && p->parent->is_aggregator)) {
         search_for = string_dup(KernelAggregator);
     }
-
-    if(!aggregator) {
+    else {
 #if (PROCESSES_HAVE_COMM_AND_NAME == 1)
-        search_for = sanitize_chart_meta_string(p->name ? p->name : p->comm);
+        search_for = string_dup(p->name ? p->name : p->comm);
 #else
         search_for = string_dup(p->comm);
 #endif
     }
 
+    // find an existing target with the required name
     struct target *w;
     for(w = apps_groups_root_target; w ; w = w->next) {
         if (w->name == search_for) {
@@ -172,7 +175,7 @@ struct target *get_tree_target(struct pid_stat *p) {
     w = callocz(sizeof(struct target), 1);
     w->type = TARGET_TYPE_TREE;
     w->starts_with = w->ends_with = false;
-    w->ag.compare = string_dup(p->comm);
+    w->ag.compare = string_dup(search_for);
     w->id = search_for;
     w->name = string_dup(search_for);
     w->clean_name = get_clean_name(w->name);
