@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "otel_config.h"
 #include "otel_utils.h"
 #include "otel_transform.h"
 
@@ -88,7 +89,7 @@ static void transformMetrics(const otel::ScopeConfig *ScopeCfg, pb::RepeatedPtrF
         return;
 
     pb::RepeatedPtrField<pb::Metric> *RestructuredMetrics =
-        pb::Arena::CreateMessage<pb::RepeatedPtrField<pb::Metric> >(RPF->GetArena());
+        pb::Arena::Create<pb::RepeatedPtrField<pb::Metric> >(RPF->GetArena());
 
     for (const auto &M : *RPF) {
         auto *MetricCfg = ScopeCfg->getMetric(M.name());
@@ -116,9 +117,9 @@ static void transformMetrics(const otel::ScopeConfig *ScopeCfg, pb::RepeatedPtrF
     RPF->Swap(RestructuredMetrics);
 }
 
-void pb::transformMetricData(const otel::Config *Cfg, MetricsData &MD)
+void pb::transformResourceMetrics(const otel::Config *Cfg, pb::RepeatedPtrField<pb::ResourceMetrics> &RPF)
 {
-    for (auto &RMs : *MD.mutable_resource_metrics()) {
+    for (auto &RMs : RPF) {
         for (auto &SMs : *RMs.mutable_scope_metrics()) {
             if (SMs.has_scope()) {
                 const auto *ScopeCfg = Cfg->getScope(SMs.scope().name());

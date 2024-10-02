@@ -8,7 +8,7 @@
 
 namespace pb
 {
-void transformMetricData(const otel::Config *Cfg, pb::MetricsData &MD);
+    void transformResourceMetrics(const otel::Config *Cfg, pb::RepeatedPtrField<pb::ResourceMetrics> &RPF);
 } // namespace pb
 
 #endif /* ND_OTEL_TRANSFORM_H */

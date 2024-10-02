@@ -268,14 +268,27 @@ if(ENABLE_PLUGIN_OTEL)
 
         include(FetchContent)
         FetchContent_Declare(
-          gRPC
-          # GIT_REPOSITORY https://github.com/grpc/grpc
-          GIT_REPOSITORY /home/vk/repos/grpc
-          GIT_TAG        v1.66.2
+                gRPC
+                # GIT_REPOSITORY https://github.com/grpc/grpc
+                GIT_REPOSITORY /home/vk/repos/grpc
+                GIT_TAG        v1.66.2
         )
 
         set(FETCHCONTENT_QUIET OFF)
         FetchContent_MakeAvailable(gRPC)
+
+        FetchContent_Declare(
+                CLI11
+                GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+                GIT_TAG        v2.4.2
+        )
+        FetchContent_MakeAvailable(CLI11)
+
+        FetchContent_Declare(
+                fmt
+                GIT_REPOSITORY https://github.com/fmtlib/fmt
+                GIT_TAG        0c9fce2ffefecfdce794e1859584e25877b7b592) # 11.0.2
+        FetchContent_MakeAvailable(fmt)
 endif()
 
 if(NEED_PROTOBUF)
@@ -1541,25 +1554,24 @@ set(TC_PLUGIN_FILES
 )
 
 set(OTEL_PLUGIN_FILES
-        src/otel/CLI11.hpp
         src/otel/otel.h
         src/otel/otel.cc
         # src/otel/otel_chart.h
         # src/otel/otel_chart.cc
-        # src/otel/otel_config.h
-        # src/otel/otel_flatten.h
-        # src/otel/otel_flatten.cc
-        # src/otel/otel_hash.h
-        # src/otel/otel_hash.cc
+        src/otel/otel_config.h
+        src/otel/otel_flatten.h
+        src/otel/otel_flatten.cc
+        src/otel/otel_hash.h
+        src/otel/otel_hash.cc
         # src/otel/otel_iterator.h
         # src/otel/otel_process.h
         # src/otel/otel_process.cc
-        # src/otel/otel_sort.h
-        # src/otel/otel_sort.cc
-        # src/otel/otel_transform.h
-        # src/otel/otel_transform.cc
-        # src/otel/otel_utils.h
-        # src/otel/otel_utils.cc
+        src/otel/otel_sort.h
+        src/otel/otel_sort.cc
+        src/otel/otel_transform.h
+        src/otel/otel_transform.cc
+        src/otel/otel_utils.h
+        src/otel/otel_utils.cc
 )
 
 
@@ -1615,11 +1627,6 @@ endfunction()
 
 
 if(ENABLE_PLUGIN_OTEL)
-        #
-        # Modify the code here so that I can build the proto files
-        # and add the proper libraries/include paths for building otel.plugin
-        # 
-        
         set(OPENTELEMETRY_PROTO_FILES "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/collector/logs/v1/logs_service.proto"
                                       "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/collector/metrics/v1/metrics_service.proto"
                                       "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/collector/trace/v1/trace_service.proto"
@@ -1629,7 +1636,6 @@ if(ENABLE_PLUGIN_OTEL)
                                       "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/resource/v1/resource.proto"
                                       "${CMAKE_SOURCE_DIR}/src/otel/opentelemetry/proto/trace/v1/trace.proto"
         )
-
 
         netdata_grpc_generate_cpp("${CMAKE_SOURCE_DIR}/src/otel"
                                   "${CMAKE_SOURCE_DIR}/src/otel"
@@ -1649,6 +1655,8 @@ if(ENABLE_PLUGIN_OTEL)
                 yaml-cpp::yaml-cpp
                 protobuf::libprotobuf
                 grpc++
+                CLI11
+                fmt::fmt
         )
 
         # install(TARGETS otel.plugin
