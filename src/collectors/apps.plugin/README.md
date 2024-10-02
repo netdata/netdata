@@ -192,7 +192,7 @@ Processes not matched by any row, will inherit it from their parents.
 
 There are a few command line options you can pass to `apps.plugin`. The list of available
 options can be acquired with the `--help` flag. The options can be set in the `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configuration/README.md).
-For example, to disable user and user group charts you should set:
+For example, to disable user and user group charts you would set:
 
 ```
 [plugin:apps]
