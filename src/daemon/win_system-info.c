@@ -224,18 +224,6 @@ static void netdata_windows_discover_os_version(char *os, size_t length, DWORD b
     (void)snprintf(os, length, "Microsoft Windows Version %s, Build %d", version, build);
 }
 
-static void netdata_windows_os_version(char *out, DWORD length)
-{
-    if (netdata_registry_get_string(out,
-                                    length,
-                                    HKEY_LOCAL_MACHINE,
-                                    "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
-                                    "ProductName"))
-        return;
-
-    (void)snprintf(out, length, "%s", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
-}
-
 static void netdata_windows_os_kernel_version(char *out, DWORD length, DWORD build)
 {
     char version[8];
@@ -262,7 +250,6 @@ static void netdata_windows_host(struct rrdhost_system_info *systemInfo)
     (void)rrdhost_set_system_info_variable(
         systemInfo, "NETDATA_HOST_OS_ID_LIKE", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
 
-    netdata_windows_os_version(osVersion, 4095);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION", osVersion);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION_ID", osVersion);
 
