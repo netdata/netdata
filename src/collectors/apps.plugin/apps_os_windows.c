@@ -805,6 +805,9 @@ static inline kernel_uint_t perflib_elapsed(COUNTER_DATA *d) {
     internal_fatal(d->current.CounterType != PERF_ELAPSED_TIME || !freq1,
                    "Wrong gauge type");
 
+    if(!data1 || !time1 || !freq1 || data1 > (ULONGLONG)time1)
+        return 0;
+    
     return (time1 - data1) / freq1;
 }
 
