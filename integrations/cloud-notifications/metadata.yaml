@@ -30,7 +30,7 @@
 
       ### Netdata Configuration Steps
       1. Click on the **User settings** on the bottom left of your screen (your profile icon)
-      2. Click on the **Notifications** tab
+      2. Click on the **Alerts & Notifications** tab
       3. Enable **Mobile App Notifications** if disabled (Enabled by default)
       4. Use the **Show QR Code** Option to login to your mobile device by scanning the **QR Code**
 - id: 'notify-cloud-discord'
@@ -62,7 +62,7 @@
 
       ### Netdata Configuration Steps
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
+      2. Click on the **Alerts & Notifications** tab
       3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
       4. On the **Discord** card click on **+ Add**
       5. A modal will be presented to you to enter the required details to enable the configuration:
@@ -106,7 +106,7 @@
       ### Netdata Configuration Steps
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
+      2. Click on the **Alerts & Notifications** tab
       3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
       4. On the **PagerDuty** card click on **+ Add**
       5. A modal will be presented to you to enter the required details to enable the configuration:
@@ -156,7 +156,7 @@
       ### Netdata Configuration Steps
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
+      2. Click on the **Alerts & Notifications** tab
       3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
       4. On the **Slack** card click on **+ Add**
       5. A modal will be presented to you to enter the required details to enable the configuration:
@@ -251,7 +251,7 @@
       ### Netdata Configuration Steps
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
+      2. Click on the **Alerts & Notifications** tab
       3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
       4. On the **Mattermost** card click on **+ Add**
       5. A modal will be presented to you to enter the required details to enable the configuration:
@@ -302,7 +302,7 @@
       ### Netdata Configuration Steps
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
+      2. Click on the **Alerts & Notifications** tab
       3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
       4. On the **RocketChat** card click on **+ Add**
       5. A modal will be presented to you to enter the required details to enable the configuration:
@@ -339,7 +339,7 @@
       ### Steps
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
+      2. Click on the **Alerts & Notifications** tab
       3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
       4. On the **AwsSns** card click on **+ Add**
       5. A modal will be presented to you to enter the required details to enable the configuration:
@@ -400,7 +400,7 @@
       ### Settings on Netdata Cloud
 
       1. Click on the **Space settings** cog (located above your profile icon).
-      2. Click on the **Notification** tab.
+      2. Click on the **Alerts & Notifications** tab.
       3. Click on the **+ Add configuration** button (near the top-right corner of your screen).
       4. On the **Microsoft Teams** card click on **+ Add**.
       5. A modal will be presented to you to enter the required details to enable the configuration:
@@ -438,7 +438,7 @@
       ### Steps
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
+      2. Click on the **Alerts & Notifications** tab
       3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
       4. On the **Telegram** card click on **+ Add**
       5. A modal will be presented to you to enter the required details to enable the configuration:
@@ -484,7 +484,7 @@
       ### Steps
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
+      2. Click on the **Alerts & Notifications** tab
       3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
       4. On the **Splunk** card click on **+ Add**
       5. A modal will be presented to you to enter the required details to enable the configuration:
@@ -524,7 +524,7 @@
       ### Steps
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
+      2. Click on the **Alerts & Notifications** tab
       3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
       4. On the **Splunk VictorOps** card click on **+ Add**
       5. A modal will be presented to you to enter the required details to enable the configuration:
@@ -560,7 +560,7 @@
       ### Netdata Configuration Steps
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
+      2. Click on the **Alerts & Notifications** tab
       3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
       4. On the **Webhook** card click on **+ Add**
       5. A modal will be presented to you to enter the required details to enable the configuration:
