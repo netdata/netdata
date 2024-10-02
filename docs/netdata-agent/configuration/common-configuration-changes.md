@@ -52,7 +52,7 @@ for that specific module. Uncomment the line and change its value to `no`.
 
 ## Modify alerts and notifications
 
-Netdata's health monitoring watchdog uses hundreds of preconfigured health entities, with intelligent thresholds, to
+Netdata's health monitoring watchdog uses hundreds of pre-configured health entities, with intelligent thresholds, to
 generate warning and critical alerts for most production systems and their applications without configuration. However,
 each alert and notification method is completely customizable.
 
@@ -107,7 +107,7 @@ section of `netdata.conf`.
 
 ### Enable alert notifications
 
-Open `health_alarm_notify.conf` for editing. First, read the [enabling notifications](/docs/alerts-and-notifications/notifications/README.md#netdata-agent) doc
+Open `health_alarm_notify.conf` for editing. First, read the [enabling notifications](/src/health/notifications/README.md) doc
 for an example of the process using Slack, then
 click on the link to your preferred notification method to find documentation for that specific endpoint.
 

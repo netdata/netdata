@@ -5,45 +5,47 @@ Netdata allows to organize your observability infrastructure with Spaces, Rooms,
 
 ## Spaces and Rooms
 
-[Spaces](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces) are used for organization-level or infrastructure-level 
+[Spaces](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces) are used for organization-level or infrastructure-level
 grouping of nodes and people. A node can only appear in a single space, while people can have access to multiple spaces.
 
-The [Rooms](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-rooms) in a space bring together nodes and people in 
-collaboration areas. Rooms can also be used for fine-tuned 
-[role based access control](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md). 
+The [Rooms](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-rooms) in a space bring together nodes and people in
+collaboration areas. Rooms can also be used for fine-tuned
+[role based access control](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
 ## Virtual nodes
 
-Netdata’s virtual nodes functionality allows you to define nodes in configuration files and have them be treated as regular nodes 
-in all of the UI, dashboards, tabs, filters etc. For example, you can create a virtual node each for all your Windows machines 
-and monitor them as discrete entities. Virtual nodes can help you simplify your infrastructure monitoring and focus on the 
+Netdata’s virtual nodes functionality allows you to define nodes in configuration files and have them be treated as regular nodes
+in all of the UI, dashboards, tabs, filters etc. For example, you can create a virtual node each for all your Windows machines
+and monitor them as discrete entities. Virtual nodes can help you simplify your infrastructure monitoring and focus on the
 individual node that matters.
 
 To define your windows server as a virtual node you need to:
 
-  * Define virtual nodes in `/etc/netdata/vnodes/vnodes.conf`
+* Define virtual nodes in `/etc/netdata/vnodes/vnodes.conf`
 
     ```yaml
     - hostname: win_server1
       guid: <value>
     ```
+
     Just remember to use a valid guid (On Linux you can use `uuidgen` command to generate one, on Windows just use the `[guid]::NewGuid()` command in PowerShell)
-    
-  * Add the vnode config to the data collection job. e.g. in `go.d/windows.conf`:
+
+* Add the vnode config to the data collection job. e.g. in `go.d/windows.conf`:
+
     ```yaml
       jobs:
         - name: win_server1
           vnode: win_server1
           url: http://203.0.113.10:9182/metrics
     ```
-    
+
 ## Host labels
 
 Host labels can be extremely useful when:
 
-- You need alerts that adapt to the system's purpose
-- You need properly-labeled metrics archiving so you can sort, correlate, and mash-up your data to your heart's content.
-- You need to keep tabs on ephemeral Docker containers in a Kubernetes cluster.
+* You need alerts that adapt to the system's purpose
+* You need properly-labeled metrics archiving so you can sort, correlate, and mash-up your data to your heart's content.
+* You need to keep tabs on ephemeral Docker containers in a Kubernetes cluster.
 
 Let's take a peek into how to create host labels and apply them across a few of Netdata's features to give you more
 organization power over your infrastructure.
@@ -56,16 +58,17 @@ parent-child status, and more.
 
 They capture the following:
 
--   Kernel version
--   Operating system name and version
--   CPU architecture, system cores, CPU frequency, RAM, and disk space
--   Whether Netdata is running inside of a container, and if so, the OS and hardware details about the container's host
--   Whether Netdata is running inside K8s node 
--   What virtualization layer the system runs on top of, if any
--   Whether the system is a streaming parent or child
+* Kernel version
+* Operating system name and version
+* CPU architecture, system cores, CPU frequency, RAM, and disk space
+* Whether Netdata is running inside of a container, and if so, the OS and hardware details about the container's host
+* Whether Netdata is running inside K8s node
+* What virtualization layer the system runs on top of, if any
+* Whether the system is a streaming parent or child
 
 If you want to organize your systems without manually creating host labels, try the automatic labels in some of the
 features below. You can see them under `http://HOST-IP:19999/api/v1/info`, beginning with an underscore `_`.
+
 ```json
 {
   ...
@@ -126,7 +129,6 @@ read the status of your agent. For example, from a VPS system running Debian 10:
 }
 ```
 
-
 ### Host labels in streaming
 
 You may have noticed the `_is_parent` and `_is_child` automatic labels from above. Host labels are also now
@@ -138,8 +140,7 @@ Now, if you'd like to remind yourself of how much RAM a certain child node has, 
 child system. It's a vastly simplified way of accessing critical information about your infrastructure.
 
 > ⚠️ Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like
-> kernel and operating system versions, you should secure streaming connections with SSL. See the [streaming
-> documentation](/src/streaming/README.md#securing-streaming-communications) for details. You may also want to use
+> kernel and operating system versions, you should secure streaming connections with SSL. See the [streaming documentation](/src/streaming/README.md#securing-streaming-with-tlsssl) for details. You may also want to use
 > [access lists](/src/web/server/README.md#access-lists) or [expose the API only to LAN/localhost
 > connections](/docs/netdata-agent/securing-netdata-agents.md#expose-netdata-only-in-a-private-lan).
 
@@ -227,27 +228,27 @@ more about exporting, read the [documentation](/src/exporting/README.md).
 
 The Netdata aggregate charts allow you to filter and group metrics based on label name-value pairs.
 
-All go.d plugin collectors support the specification of labels at the "collection job" level. Some collectors come with out of the box 
-labels (e.g. generic Prometheus collector, Kubernetes, Docker and more). But you can also add your own custom labels, by configuring 
-the data collection jobs. 
+All go.d plugin collectors support the specification of labels at the "collection job" level. Some collectors come with out of the box
+labels (e.g. generic Prometheus collector, Kubernetes, Docker and more). But you can also add your own custom labels, by configuring
+the data collection jobs.
 
-For example, suppose we have a single Netdata agent, collecting data from two remote Apache web servers, located in different data centers. 
+For example, suppose we have a single Netdata agent, collecting data from two remote Apache web servers, located in different data centers.
 The web servers are load balanced and provide access to the service "Payments".
 
 You can define the following in `go.d.conf`, to be able to group the web requests by service or location:
 
-```
+```yaml
 jobs:
-  - name: mywebserver1
+  - name: my_webserver1
     url: http://host1/server-status?auto
     labels:
       service: "Payments"
       location: "Atlanta"
-  - name: mywebserver2
+  - name: my_webserver2
     url: http://host2/server-status?auto
     labels:
       service: "Payments"
       location: "New York"
 ```
 
-Of course you may define as many custom label/value pairs as you like, in as many data collection jobs you need. 
+Of course you may define as many custom label/value pairs as you like, in as many data collection jobs you need.
