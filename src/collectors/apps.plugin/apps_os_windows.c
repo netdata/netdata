@@ -460,34 +460,17 @@ struct perflib_data {
     DWORD pid;
 };
 
-BOOL EnableDebugPrivilege() {
-    HANDLE hToken;
-    LUID luid;
-    TOKEN_PRIVILEGES tkp;
-
-    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken))
-        return FALSE;
-
-    if (!LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &luid))
-        return FALSE;
-
-    tkp.PrivilegeCount = 1;
-    tkp.Privileges[0].Luid = luid;
-    tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-
-    if (!AdjustTokenPrivileges(hToken, FALSE, &tkp, sizeof(tkp), NULL, NULL))
-        return FALSE;
-
-    CloseHandle(hToken);
-
-    return TRUE;
-}
-
 void apps_os_init_windows(void) {
     PerflibNamesRegistryInitialize();
 
-    if(!EnableDebugPrivilege())
-        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to enable debug privilege");
+    if(!EnableWindowsPrivilege(SE_DEBUG_NAME))
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to enable %s privilege", SE_DEBUG_NAME);
+
+    if(!EnableWindowsPrivilege(SE_SYSTEM_PROFILE_NAME))
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to enable %s privilege", SE_SYSTEM_PROFILE_NAME);
+
+    if(!EnableWindowsPrivilege(SE_PROF_SINGLE_PROCESS_NAME))
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to enable %s privilege", SE_PROF_SINGLE_PROCESS_NAME);
 }
 
 uint64_t apps_os_get_total_memory_windows(void) {
