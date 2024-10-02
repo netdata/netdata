@@ -160,7 +160,7 @@ group: process1 process2 ...
 
 Each group can be given multiple times, to add more processes to it.
 
-For each process given, all its sub-processes will be grouped, not just the process matched.
+For each process given, all of its sub-processes will be grouped, not just the matched process.
 
 The process names are the ones returned by:
 
