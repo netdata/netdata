@@ -188,7 +188,7 @@ To add processes with single quotes, enclose them in double quotes: `"process wi
 To add processes with double quotes, enclose them in single quotes: `'process with this " double quote'`
 
 The order of the entries in this list is important: the first one that matches a process is used, so follow a top-down hierarchy.
-ones at the top. Processes not matched by any row, will inherit it from their parents.
+Processes not matched by any row, will inherit it from their parents.
 
 There are a few command line options you can pass to `apps.plugin`. The list of available
 options can be acquired with the `--help` flag. The options can be set in the `netdata.conf` file.
