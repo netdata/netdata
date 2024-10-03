@@ -57,20 +57,20 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
             continue;
         }
 
-        c = char_map[c];
-        if(c == ' ') {
+        unsigned char c2 = char_map[c];
+        if(c == ' ' || c2 == ' ') {
             // a space character
 
             if(!last_is_space) {
                 // add one space
-                *d++ = c;
+                *d++ = c2;
                 mblen++;
             }
 
             last_is_space++;
         }
         else {
-            *d++ = c;
+            *d++ = c2;
             last_is_space = 0;
             mblen++;
         }
