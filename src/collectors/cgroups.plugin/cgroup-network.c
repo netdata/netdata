@@ -643,11 +643,12 @@ void usage(void) {
     exit(1);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, const char **argv) {
     pid_t pid = 0;
 
     clocks_init();
     nd_log_initialize_for_external_plugins("cgroup-network");
+    netdata_main_spawn_server_init(NULL, argc, argv);
 
     // since cgroup-network runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
