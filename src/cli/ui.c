@@ -142,7 +142,7 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
             for (i = 0; i < sizeof(screenMessages) / sizeof(LPCTSTR); i++) {
                 TextOut(hdc, 180, 40 + 20 * i, screenMessages[i], wcslen(screenMessages[i]));
             }
-            TextOut(hdc, 20, 150, statusMsg, wcslen(statusMsg));
+            TextOut(hdc, 20, 110, statusMsg, wcslen(statusMsg));
             EndPaint(hNetdatawnd, &ps);
 
             break;
@@ -225,7 +225,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                                   L"Netdata Client",
                                   WS_OVERLAPPEDWINDOW,
                                   CW_USEDEFAULT, CW_USEDEFAULT,
-                                  440, 200,
+                                  440, 180,
                                   HWND_DESKTOP,
                                   NULL,
                                   hInstance,
