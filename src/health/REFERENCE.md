@@ -640,7 +640,7 @@ See our [simple patterns docs](/src/libnetdata/simple_pattern/README.md) for mor
 Similar to host labels, the `chart labels` key can be used to filter if an alert will load or not for a specific chart, based on
 whether these chart labels match or not.
 
-The list of chart labels present on each chart can be obtained from http://localhost:19999/api/v1/charts?all
+The list of chart labels present on each chart can be obtained from <http://localhost:19999/api/v1/charts?all>
 
 For example, each `disk_space` chart defines a chart label called `mount_point` with each instance of this chart having
 a value there of which mount point it monitors.
@@ -808,14 +808,14 @@ You can find all the variables that can be used for a given chart, using
 Agent dashboard. For example, [variables for the `system.cpu` chart of the
 registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
 
-> If you don't know how to find the CHART_NAME, you can read about it [here](/src/web/README.md#charts).
+<!-- > If you don't know how to find the CHART_NAME, you can read about it [here](/src/web/README.md#charts). -->
 
 Netdata supports 3 internal indexes for variables that will be used in health monitoring.
 
 <details><summary>The variables below can be used in both chart alerts and context templates.</summary>
 
 Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in
-templates for charts belonging to a given [context](/src/web/README.md#contexts). The reason is that all charts of a given
+templates for charts belonging to a given context. The reason is that all charts of a given
 context are essentially identical, with the only difference being the family that identifies a particular hardware or software instance.
 
 </details>
@@ -1064,7 +1064,7 @@ template: ml_5min_cpu_chart
     info: rolling 5min anomaly rate for system.cpu chart
 ```
 
-The `lookup` line will calculate the average anomaly rate across all `system.cpu` dimensions over the last 5 minues. In this case
+The `lookup` line will calculate the average anomaly rate across all `system.cpu` dimensions over the last 5 minutes. In this case
 Netdata will create one alert for the chart.
 
 ### Example 7 - [Anomaly rate](/src/ml/README.md#anomaly-rate) based node level alert
@@ -1083,7 +1083,7 @@ template: ml_5min_node
     info: rolling 5min anomaly rate for all ML enabled dims
 ```
 
-The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate the average [node level anomaly rate](/src/ml/README.md#node-anomaly-rate) over the last 5 minutes.
+The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate the average [node level anomaly rate](/src/ml/README.md#anomaly-rate) over the last 5 minutes.
 
 ## Troubleshooting
 

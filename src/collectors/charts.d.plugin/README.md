@@ -9,7 +9,6 @@
 
 To better understand the guidelines and the API behind our External plugins, please have a look at the [Introduction to External plugins](/src/plugins.d/README.md) prior to reading this page.
 
-
 `charts.d.plugin` has been designed so that the actual script that will do data collection will be permanently in
 memory, collecting data with as little overheads as possible
 (i.e. initialize once, repeatedly collect values with minimal overhead).
@@ -121,7 +120,7 @@ Using the above, if the command `mysql` is not available in the system, the `mys
 `fixid()` will get a string and return a properly formatted id for a chart or dimension.
 
 This is an expensive function that should not be used in `X_update()`.
-You can keep the generated id in a BASH associative array to have the values availables in `X_update()`, like this:
+You can keep the generated id in a BASH associative array to have the values available in `X_update()`, like this:
 
 ```sh
 declare -A X_ids=()
