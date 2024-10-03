@@ -5,12 +5,14 @@ Given that attackers often try to hide their actions by modifying or deleting lo
 FSS provides administrators with a mechanism to identify any such unauthorized alterations.
 
 ## Importance
+
 Logs are a crucial component of system monitoring and auditing. Ensuring their integrity means administrators can trust
 the data, detect potential breaches, and trace actions back to their origins. Traditional methods to maintain this
 integrity involve writing logs to external systems or printing them out. While these methods are effective, they are
 not foolproof. FSS offers a more streamlined approach, allowing for log verification directly on the local system.
 
 ## How FSS Works
+
 FSS operates by "sealing" binary logs at regular intervals. This seal is a cryptographic operation, ensuring that any
 tampering with the logs prior to the sealing can be detected. If an attacker modifies logs before they are sealed,
 these changes become a permanent part of the sealed record, highlighting any malicious activity.
@@ -29,6 +31,7 @@ administrators to verify older seals. If logs are tampered with, verification wi
 breach.
 
 ## Enabling FSS
+
 To enable FSS, use the following command:
 
 ```bash
@@ -43,6 +46,7 @@ journalctl --setup-keys --interval=10s
 ```
 
 ## Verifying Journals
+
 After enabling FSS, you can verify the integrity of your logs using the verification key:
 
 ```bash
@@ -52,6 +56,7 @@ journalctl --verify
 If any discrepancies are found, you'll be alerted, indicating potential tampering.
 
 ## Disabling FSS
+
 Should you wish to disable FSS:
 
 **Delete the Sealing Key**: This stops new log entries from being sealed.
@@ -66,7 +71,6 @@ journalctl --rotate
 journalctl --vacuum-time=1s
 ```
 
-
 **Adjust Systemd Configuration (Optional)**: If you've made changes to facilitate FSS in `/etc/systemd/journald.conf`,
 consider reverting or adjusting those. Restart the systemd-journald service afterward:
 
@@ -75,6 +79,7 @@ systemctl restart systemd-journald
 ```
 
 ## Conclusion
+
 FSS is a significant advancement in maintaining log integrity. While not a replacement for all traditional integrity
 methods, it offers a valuable tool in the battle against unauthorized log tampering. By integrating FSS into your log
 management strategy, you ensure a more transparent, reliable, and tamper-evident logging system.
