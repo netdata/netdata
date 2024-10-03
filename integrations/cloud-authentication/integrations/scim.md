@@ -70,6 +70,20 @@ This mapping ensures that the identity of users remains consistent and secure ac
 The externalID in SCIM must correspond to the subfield in OIDC. Any deviation from this mapping may result
 in incorrect user identification and authentication failures.
 
+## FAQ
+
+### Why aren’t users automatically added to Netdata spaces when they’re created through SCIM?
+
+Currently, our SCIM server supports only the User resource. We plan to add support for the Group resource in the future.
+
+In a Netdata space, users can belong to multiple rooms and have different roles (e.g., admin, manager). Additionally, the same organization may have multiple spaces.
+
+As we don't yet support groups, when a user is created through SCIM, we don’t have a way to determine which spaces, rooms, and roles the user should be assigned to.
+
+Once we implement support for the Group resource, admins will be able to map SCIM groups to Netdata memberships, so this assignment will be done automatically.
+
+Until then, SCIM can only be used to grant or block access to Netdata for users in your organization. After a user is created, it is up to the Netdata administrator to manually invite them to spaces, rooms and assign roles.
+
 ### Reference
 [SCIM Specification](https://scim.org)
 
