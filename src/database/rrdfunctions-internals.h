@@ -31,7 +31,6 @@ struct rrd_host_function {
     struct rrd_collector *collector;
 };
 
-size_t rrd_functions_sanitize(char *dst, const char *src, size_t dst_len);
 int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, const DICTIONARY_ITEM **item);
 
 #endif //NETDATA_RRDFUNCTIONS_INTERNALS_H

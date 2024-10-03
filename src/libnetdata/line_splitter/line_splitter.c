@@ -21,7 +21,20 @@ bool line_splitter_reconstruct_line(BUFFER *wb, void *ptr) {
     return added > 0;
 }
 
-inline int pluginsd_isspace(char c) {
+inline int isspace_whitespace(char c) {
+    switch(c) {
+        case ' ':
+        case '\t':
+        case '\r':
+        case '\n':
+            return 1;
+
+        default:
+            return 0;
+    }
+}
+
+inline int isspace_pluginsd(char c) {
     switch(c) {
         case ' ':
         case '\t':
@@ -35,7 +48,7 @@ inline int pluginsd_isspace(char c) {
     }
 }
 
-inline int config_isspace(char c) {
+inline int isspace_config(char c) {
     switch (c) {
         case ' ':
         case '\t':
@@ -49,20 +62,21 @@ inline int config_isspace(char c) {
     }
 }
 
-inline int group_by_label_isspace(char c) {
+inline int isspace_group_by_label(char c) {
     if(c == ',' || c == '|')
         return 1;
 
     return 0;
 }
 
-inline int dyncfg_id_isspace(char c) {
+inline int isspace_dyncfg_id(char c) {
     if(c == ':')
         return 1;
 
     return 0;
 }
 
+bool isspace_map_whitespace[256] = {};
 bool isspace_map_pluginsd[256] = {};
 bool isspace_map_config[256] = {};
 bool isspace_map_group_by_label[256] = {};
@@ -70,9 +84,10 @@ bool isspace_dyncfg_id_map[256] = {};
 
 __attribute__((constructor)) void initialize_is_space_arrays(void) {
     for(int c = 0; c < 256 ; c++) {
-        isspace_map_pluginsd[c] = pluginsd_isspace((char) c);
-        isspace_map_config[c] = config_isspace((char) c);
-        isspace_map_group_by_label[c] = group_by_label_isspace((char) c);
-        isspace_dyncfg_id_map[c] = dyncfg_id_isspace((char)c);
+        isspace_map_whitespace[c] = isspace_whitespace((char) c);
+        isspace_map_pluginsd[c] = isspace_pluginsd((char) c);
+        isspace_map_config[c] = isspace_config((char) c);
+        isspace_map_group_by_label[c] = isspace_group_by_label((char) c);
+        isspace_dyncfg_id_map[c] = isspace_dyncfg_id((char) c);
     }
 }

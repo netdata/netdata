@@ -253,7 +253,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
         }
 
         char *words[MAX_FUNCTION_PARAMETERS] = { NULL };
-        size_t num_words = quoted_strings_splitter_pluginsd((char *)buffer_tostring(buffer), words, MAX_FUNCTION_PARAMETERS);
+        size_t num_words = quoted_strings_splitter_whitespace((char *)buffer_tostring(buffer), words, MAX_FUNCTION_PARAMETERS);
 
         const char *keyword = get_word(words, num_words, 0);
 

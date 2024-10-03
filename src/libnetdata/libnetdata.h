@@ -472,7 +472,7 @@ extern const char *netdata_configured_host_prefix;
 #include "string/string.h"
 #include "dictionary/dictionary.h"
 #include "dictionary/thread-cache.h"
-#include "sanitizers/chart_id_and_name.h"
+#include "sanitizers/sanitizers.h"
 
 #if defined(HAVE_LIBBPF) && !defined(__cplusplus)
 #include "ebpf/ebpf.h"

@@ -184,7 +184,7 @@ void rrdpush_sender_execute_commands(struct sender_state *s) {
             continue;
         }
 
-        s->line.num_words = quoted_strings_splitter_pluginsd(start, s->line.words, PLUGINSD_MAX_WORDS);
+        s->line.num_words = quoted_strings_splitter_whitespace(start, s->line.words, PLUGINSD_MAX_WORDS);
         const char *command = get_word(s->line.words, s->line.num_words, 0);
 
         if(command && strcmp(command, PLUGINSD_CALL_FUNCTION) == 0) {

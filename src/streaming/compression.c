@@ -32,7 +32,7 @@ void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *ord
     char *s = strdupz(order);
 
     char *words[COMPRESSION_ALGORITHM_MAX + 100] = { NULL };
-    size_t num_words = quoted_strings_splitter_pluginsd(s, words, COMPRESSION_ALGORITHM_MAX + 100);
+    size_t num_words = quoted_strings_splitter_whitespace(s, words, COMPRESSION_ALGORITHM_MAX + 100);
     size_t slot = 0;
     STREAM_CAPABILITIES added = STREAM_CAP_NONE;
     for(size_t i = 0; i < num_words && slot < COMPRESSION_ALGORITHM_MAX ;i++) {

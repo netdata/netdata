@@ -174,15 +174,14 @@ int read_proc_pid_cmdline(struct pid_stat *p) {
     if(unlikely(!OS_FUNCTION(apps_os_get_pid_cmdline)(p, cmdline, sizeof(cmdline))))
         goto cleanup;
 
-    string_freez(p->cmdline);
-    p->cmdline = string_strdupz(cmdline);
+    update_pid_cmdline(p, cmdline);
 
     return 1;
 
 cleanup:
     // copy the command to the command line
     string_freez(p->cmdline);
-    p->cmdline = string_dup(p->comm);
+    p->cmdline = NULL;
     return 0;
 }
 #endif

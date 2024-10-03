@@ -110,61 +110,18 @@ static inline void cleanup_exited_pids(void) {
     }
 }
 
-static struct target *matched_apps_groups_target(struct pid_stat *p, struct target *w) {
-    if(is_process_manager(p))
-        return NULL;
-
-    p->matched_by_config = true;
-    return w->target ? w->target : w;
-}
-
 static struct target *get_apps_groups_target_for_pid(struct pid_stat *p) {
     targets_assignment_counter++;
 
     for(struct target *w = apps_groups_root_target; w ; w = w->next) {
         if(w->type != TARGET_TYPE_APP_GROUP) continue;
 
-        if(!w->starts_with && !w->ends_with) {
-            if(w->ag.pattern) {
-                if(simple_pattern_matches_string(w->ag.pattern, p->comm))
-                    return matched_apps_groups_target(p, w);
-            }
-            else {
-                if(w->ag.compare == p->comm || w->ag.compare == p->comm_orig)
-                    return matched_apps_groups_target(p, w);
-            }
-        }
-        else if(w->starts_with && !w->ends_with) {
-            if(w->ag.pattern) {
-                if(simple_pattern_matches_string(w->ag.pattern, p->comm))
-                    return matched_apps_groups_target(p, w);
-            }
-            else {
-                if(string_starts_with_string(p->comm, w->ag.compare) ||
-                    (p->comm != p->comm_orig && string_starts_with_string(p->comm, w->ag.compare)))
-                    return matched_apps_groups_target(p, w);
-            }
-        }
-        else if(!w->starts_with && w->ends_with) {
-            if(w->ag.pattern) {
-                if(simple_pattern_matches_string(w->ag.pattern, p->comm))
-                    return matched_apps_groups_target(p, w);
-            }
-            else {
-                if(string_ends_with_string(p->comm, w->ag.compare) ||
-                    (p->comm != p->comm_orig && string_ends_with_string(p->comm, w->ag.compare)))
-                    return matched_apps_groups_target(p, w);
-            }
-        }
-        else if(w->starts_with && w->ends_with && p->cmdline) {
-            if(w->ag.pattern) {
-                if(simple_pattern_matches_string(w->ag.pattern, p->cmdline))
-                    return matched_apps_groups_target(p, w);
-            }
-            else {
-                if(strstr(string2str(p->cmdline), string2str(w->ag.compare)))
-                    return matched_apps_groups_target(p, w);
-            }
+        if(pid_match_check(p, &w->match)) {
+            if(p->is_manager)
+                return NULL;
+
+            p->matched_by_config = true;
+            return w->target ? w->target : w;
         }
     }
 
