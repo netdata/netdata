@@ -2,14 +2,20 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.2...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.3...HEAD)
 
 **Merged pull requests:**
 
+- Fix win apps uptime [\#18662](https://github.com/netdata/netdata/pull/18662) ([ktsaou](https://github.com/ktsaou))
+- bump go toolchain v1.22.8 [\#18659](https://github.com/netdata/netdata/pull/18659) ([ilyam8](https://github.com/ilyam8))
+- go.d sd fix sprig funcmap [\#18658](https://github.com/netdata/netdata/pull/18658) ([ilyam8](https://github.com/ilyam8))
+- Handle mqtt ping timeouts [\#18653](https://github.com/netdata/netdata/pull/18653) ([stelfrag](https://github.com/stelfrag))
+- apps.plugin improvements [\#18652](https://github.com/netdata/netdata/pull/18652) ([ktsaou](https://github.com/ktsaou))
 - go.d remove duplicate chart check in tests [\#18650](https://github.com/netdata/netdata/pull/18650) ([ilyam8](https://github.com/ilyam8))
 - fixed freebsd cpu calculation [\#18648](https://github.com/netdata/netdata/pull/18648) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18647](https://github.com/netdata/netdata/pull/18647) ([netdatabot](https://github.com/netdatabot))
 - Use temporary file for commit date check. [\#18646](https://github.com/netdata/netdata/pull/18646) ([Ferroin](https://github.com/Ferroin))
+- New wording about edit-config script in docs [\#18639](https://github.com/netdata/netdata/pull/18639) ([Ancairon](https://github.com/Ancairon))
 - Update file names. [\#18638](https://github.com/netdata/netdata/pull/18638) ([vkalintiris](https://github.com/vkalintiris))
 - Move plugins.d directory outside of collectors [\#18637](https://github.com/netdata/netdata/pull/18637) ([vkalintiris](https://github.com/vkalintiris))
 - go.d/smartctl: fix exit status check in scan [\#18635](https://github.com/netdata/netdata/pull/18635) ([ilyam8](https://github.com/ilyam8))
@@ -186,6 +192,10 @@
 - remove python.d/boinc [\#18397](https://github.com/netdata/netdata/pull/18397) ([ilyam8](https://github.com/ilyam8))
 - fix warnings in Dockerfile [\#18395](https://github.com/netdata/netdata/pull/18395) ([NicolasCARPi](https://github.com/NicolasCARPi))
 - Use existing ACLK event loop for cloud queries [\#18218](https://github.com/netdata/netdata/pull/18218) ([stelfrag](https://github.com/stelfrag))
+
+## [v1.47.3](https://github.com/netdata/netdata/tree/v1.47.3) (2024-10-02)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.2...v1.47.3)
 
 ## [v1.47.2](https://github.com/netdata/netdata/tree/v1.47.2) (2024-09-24)
 
@@ -414,13 +424,6 @@
 - Switch to legacy images for CentOS 7 CI. [\#18085](https://github.com/netdata/netdata/pull/18085) ([Ferroin](https://github.com/Ferroin))
 - Track LTS for Debian EOL status. [\#18084](https://github.com/netdata/netdata/pull/18084) ([Ferroin](https://github.com/Ferroin))
 - Remove Debian 10 from supported platforms. [\#18083](https://github.com/netdata/netdata/pull/18083) ([Ferroin](https://github.com/Ferroin))
-- Remove Ubuntu 23.10 from supported platforms. [\#18082](https://github.com/netdata/netdata/pull/18082) ([Ferroin](https://github.com/Ferroin))
-- go.d fail2ban: add docker support [\#18081](https://github.com/netdata/netdata/pull/18081) ([ilyam8](https://github.com/ilyam8))
-- Improve alerts [\#18080](https://github.com/netdata/netdata/pull/18080) ([stelfrag](https://github.com/stelfrag))
-- Bump golang.org/x/net from 0.26.0 to 0.27.0 in /src/go [\#18078](https://github.com/netdata/netdata/pull/18078) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/gofrs/flock from 0.11.0 to 0.12.0 in /src/go [\#18077](https://github.com/netdata/netdata/pull/18077) ([dependabot[bot]](https://github.com/apps/dependabot))
-- proc: collect ksm/swap/cma/zswap only when feature enabled [\#18076](https://github.com/netdata/netdata/pull/18076) ([ilyam8](https://github.com/ilyam8))
-- health add alarm docker container down [\#18075](https://github.com/netdata/netdata/pull/18075) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 

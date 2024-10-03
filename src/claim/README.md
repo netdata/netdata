@@ -102,8 +102,9 @@ cd /var/lib/netdata   # Replace with your Netdata library directory, if not /var
 sudo rm -rf cloud.d/
 ```
 
-> IMPORTANT:<br/>
-> Keep in mind that the Agent will be **re-claimed automatically** if the environment variables or `claim.conf` exist when the agent is restarted. 
+> **IMPORTANT**
+>
+> Keep in mind that the Agent will be **re-claimed automatically** if the environment variables or `claim.conf` exist when the agent is restarted.
 
 This node no longer has access to the credentials it was used when connecting to Netdata Cloud via the ACLK. You will
 still be able to see this node in your Rooms in an **unreachable** state.

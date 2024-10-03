@@ -104,8 +104,7 @@ GRANT USAGE, REPLICATION CLIENT, PROCESS ON *.* TO 'netdata'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-Run `sudo systemctl restart netdata`, or the [appropriate alternative for your
-system](/packaging/installer/README.md#maintaining-a-netdata-agent-installation), to collect dozens of metrics every second for robust MySQL monitoring.
+Run `sudo systemctl restart netdata`, or the [appropriate alternative for your system](/docs/netdata-agent/start-stop-restart.md), to collect dozens of metrics every second for robust MySQL monitoring.
 
 ## Enable PHP monitoring
 

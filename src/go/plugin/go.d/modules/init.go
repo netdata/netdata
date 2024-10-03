@@ -71,6 +71,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/openldap"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/openvpn"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/openvpn_status_log"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/oracledb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/pgbouncer"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/phpdaemon"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/phpfpm"

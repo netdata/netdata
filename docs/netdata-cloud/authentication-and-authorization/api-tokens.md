@@ -30,5 +30,5 @@ Currently, the Netdata Cloud is not exposing stable API.
 * get the cloud space list
 
 ```console
-$ curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/spaces
+curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/spaces
 ```

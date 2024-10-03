@@ -39,16 +39,16 @@ inspect the state of the container and look at build logs.
 
 ### Detailed explanation
 
-The environments used for building our packages are fully self-contianed Docker images built from [Dockerfiles](https://github.com/netdata/helper-images/tree/master/package-builders)
+The environments used for building our packages are fully self-contained Docker images built from [Dockerfiles](https://github.com/netdata/helper-images/tree/master/package-builders)
 These are published on Docker
 Hub with the image name `netdata/package-builders`, and tagged using the name and version of the distribution
 (with the tag corresponding to the suffix on the associated Dockerfile).
 
 The build code expects the following requirements to be met:
 
-- It expects the source tree it should build from to be located at `/netdata`, and expects that said source tree
+* It expects the source tree it should build from to be located at `/netdata`, and expects that said source tree
   is clean (no artifacts left over from previous builds).
-- It expects an environment variable named `VERSION` to be defined, and uses this to control what version number
+* It expects an environment variable named `VERSION` to be defined, and uses this to control what version number
   will be shown in the package metadata and filenames.
 
 Internally, the source tree gets copied to a temporary location for the build process so that the source tree can
@@ -95,7 +95,7 @@ Once you have that set up, the command to build the packages is the same as abov
 `--platform` option to the `docker run` or `podman run` command. The current list of architectures we build for,
 and the correct value for the `--platform` option is:
 
-- 32-bit ARMv7: `linux/arm/v7`
-- 64-bit ARMv8: `linux/arm64/v8`
-- 32-bit x86: `linux/i386`
-- 64-bit x86: `linux/amd64`
+* 32-bit ARMv7: `linux/arm/v7`
+* 64-bit ARMv8: `linux/arm64/v8`
+* 32-bit x86: `linux/i386`
+* 64-bit x86: `linux/amd64`

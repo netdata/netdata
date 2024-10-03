@@ -11,11 +11,13 @@ The following components are required to install Netdata Cloud On-Prem:
 - **Kubectl**
 
 The minimum requirements for Netdata-Cloud are:
+
 - 4 CPU cores
 - 15GiB of memory
 - Cloud services are ephemeral
 
 The requirements for the non-production Dependencies helm chart:
+
 - 8 CPU cores
 - 14GiB of memory
 - 160GiB for PVCs (SSD)
@@ -115,39 +117,40 @@ helm upgrade --wait --install netdata-cloud-onprem -n netdata-cloud --create-nam
 
 ## Short description of Netdata Cloud microservices
 
-#### cloud-accounts-service
+### cloud-accounts-service
 
 Responsible for user registration & authentication. Manages user account information.
 
-#### cloud-agent-data-ctrl-service
+### cloud-agent-data-ctrl-service
 
 Forwards request from the cloud to the relevant agents.
 The requests include:
+
 - Fetching chart metadata from the agent
 - Fetching chart data from the agent
 - Fetching function data from the agent
 
-#### cloud-agent-mqtt-input-service
+### cloud-agent-mqtt-input-service
 
 Forwards MQTT messages emitted by the agent related to the agent entities to the internal Pulsar broker. These include agent connection state updates.
 
-#### cloud-agent-mqtt-output-service
+### cloud-agent-mqtt-output-service
 
 Forwards Pulsar messages emitted in the cloud related to the agent entities to the MQTT broker. From there, the messages reach the relevant agent.
 
-#### cloud-alarm-config-mqtt-input-service
+### cloud-alarm-config-mqtt-input-service
 
 Forwards MQTT messages emitted by the agent related to the alarm-config entities to the internal Pulsar broker.  These include the data for the alarm configuration as seen by the agent.
 
-#### cloud-alarm-log-mqtt-input-service
+### cloud-alarm-log-mqtt-input-service
 
 Forwards MQTT messages emitted by the agent related to the alarm-log entities to the internal Pulsar broker. These contain data about the alarm transitions that occurred in an agent.
 
-#### cloud-alarm-mqtt-output-service
+### cloud-alarm-mqtt-output-service
 
 Forwards Pulsar messages emitted in the cloud related to the alarm entities to the MQTT broker. From there, the messages reach the relevant agent.
 
-#### cloud-alarm-processor-service
+### cloud-alarm-processor-service
 
 Persists latest alert statuses received from the agent in the cloud.
 Aggregates alert statuses from relevant node instances.
@@ -155,69 +158,69 @@ Exposes API endpoints to fetch alert data for visualization on the cloud.
 Determines if notifications need to be sent when alert statuses change and emits relevant messages to Pulsar.
 Exposes API endpoints to store and return notification-silencing data.
 
-#### cloud-alarm-streaming-service
+### cloud-alarm-streaming-service
 
 Responsible for starting the alert stream between the agent and the cloud.
 Ensures that messages are processed in the correct order, and starts a reconciliation process between the cloud and the agent if out-of-order processing occurs.
 
-#### cloud-charts-mqtt-input-service
+### cloud-charts-mqtt-input-service
 
 Forwards MQTT messages emitted by the agent related to the chart entities to the internal Pulsar broker. These include the chart metadata that is used to display relevant charts on the cloud.
 
-#### cloud-charts-mqtt-output-service
+### cloud-charts-mqtt-output-service
 
 Forwards Pulsar messages emitted in the cloud related to the charts entities to the MQTT broker. From there, the messages reach the relevant agent.
 
-#### cloud-charts-service
+### cloud-charts-service
 
 Exposes API endpoints to fetch the chart metadata.
 Forwards data requests via the `cloud-agent-data-ctrl-service` to the relevant agents to fetch chart data points.
 Exposes API endpoints to call various other endpoints on the agent, for instance, functions.
 
-#### cloud-custom-dashboard-service
+### cloud-custom-dashboard-service
 
 Exposes API endpoints to fetch and store custom dashboard data.
 
-#### cloud-environment-service
+### cloud-environment-service
 
 Serves as the first contact point between the agent and the cloud.
 Returns authentication and MQTT endpoints to connecting agents.
 
-#### cloud-feed-service
+### cloud-feed-service
 
 Processes incoming feed events and stores them in Elasticsearch.
 Exposes API endpoints to fetch feed events from Elasticsearch.
 
-#### cloud-frontend
+### cloud-frontend
 
 Contains the on-prem cloud website. Serves static content.
 
-#### cloud-iam-user-service
+### cloud-iam-user-service
 
 Acts as a middleware for authentication on most of the API endpoints. Validates incoming token headers, injects the relevant ones, and forwards the requests.
 
-#### cloud-metrics-exporter
+### cloud-metrics-exporter
 
 Exports various metrics from an On-Prem Cloud installation. Uses the Prometheus metric exposition format.
 
-#### cloud-netdata-assistant
+### cloud-netdata-assistant
 
 Exposes API endpoints to fetch a human-friendly explanation of various netdata configuration options, namely the alerts.
 
-#### cloud-node-mqtt-input-service
+### cloud-node-mqtt-input-service
 
 Forwards MQTT messages emitted by the agent related to the node entities to the internal Pulsar broker. These include the node metadata as well as their connectivity state, either direct or via parents.
 
-#### cloud-node-mqtt-output-service
+### cloud-node-mqtt-output-service
 
 Forwards Pulsar messages emitted in the cloud related to the charts entities to the MQTT broker. From there, the messages reach the relevant agent.
 
-#### cloud-notifications-dispatcher-service
+### cloud-notifications-dispatcher-service
 
 Exposes API endpoints to handle integrations.
 Handles incoming notification messages and uses the relevant channels(email, slack...) to notify relevant users.
 
-#### cloud-spaceroom-service
+### cloud-spaceroom-service
 
 Exposes API endpoints to fetch and store relations between agents, nodes, spaces, users, and rooms.
 Acts as a provider of authorization for other cloud endpoints.

@@ -108,9 +108,9 @@ In more detail, you can find on the following tables which functionalities are a
 
 | **Functionality**              |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     | Notes                                                                |
 |:-------------------------------|:------------------:|:------------------:|:------------------:|:------------------:|:-----------:|:------------------:|:---------------------------------------------------------------------|
-| See all functions in Room      | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      | :heavy_check_mark: |
-| Run any function in Room       | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |         -          |
-| Run read-only function in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      | :heavy_check_mark: |                                                                      |
+| See all functions in Room      | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      | :heavy_check_mark: | ::                                                                   |
+| Run any function in Room       | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |         -          | ::                                                                   |
+| Run read-only function in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      | :heavy_check_mark: | ::                                                                   |
 | Run sensitive function in Room | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |         -          | There isn't any function on this category yet, so subject to change. |
 
 ### Events feed

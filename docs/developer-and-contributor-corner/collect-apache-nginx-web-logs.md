@@ -81,18 +81,13 @@ jobs:
     log_type: auto
 ```
 
-Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/netdata-agent/start-stop-restart.md)) for your system. Netdata should pick up your web server's access log and
-begin showing real-time charts!
+Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate method](/docs/netdata-agent/start-stop-restart.md) for your system. Netdata should pick up your web server's access log and begin showing real-time charts!
 
 ### Custom log formats and fields
 
-The web log collector is capable of parsing custom Nginx and Apache log formats and presenting them as charts, but we'll
-leave that topic for a separate guide.
+The web log collector is capable of parsing custom Nginx and Apache log formats and presenting them as charts, but we'll leave that topic for a separate guide.
 
-We do have [extensive
-documentation](/src/go/plugin/go.d/modules/weblog/README.md#custom-log-format) on how
-to build custom parsing for Nginx and Apache logs.
+We do have [extensive documentation](/src/go/plugin/go.d/modules/weblog/README.md) on how to build custom parsing for Nginx and Apache logs.
 
 ## Tweak web log collector alerts
 
@@ -100,7 +95,7 @@ Over time, we've created some default alerts for web log monitoring. These alert
 web server is receiving more than 120 requests per minute. Otherwise, there's simply not enough data to make conclusions
 about what is "too few" or "too many."
 
--   [web log alerts](https://raw.githubusercontent.com/netdata/netdata/master/src/health/health.d/web_log.conf).
+- [web log alerts](https://raw.githubusercontent.com/netdata/netdata/master/src/health/health.d/web_log.conf).
 
 You can also edit this file directly with `edit-config`:
 
@@ -108,5 +103,5 @@ You can also edit this file directly with `edit-config`:
 ./edit-config health.d/weblog.conf
 ```
 
-For more information about editing the defaults or writing new alert entities, see our 
+For more information about editing the defaults or writing new alert entities, see our
 [health monitoring documentation](/src/health/README.md).

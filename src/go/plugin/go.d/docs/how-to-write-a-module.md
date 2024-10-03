@@ -1,14 +1,3 @@
-<!--
-title: "How to write a Netdata collector in Go"
-description: "This guide will walk you through the technical implementation of writing a new Netdata collector in Golang, with tips on interfaces, structure, configuration files, and more."
-custom_edit_url: "/src/go/plugin/go.d/docs/how-to-write-a-module.md"
-sidebar_label: "How to write a Netdata collector in Go"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Developers/External plugins/go.d.plugin"
-sidebar_position: 20
--->
-
 # How to write a Netdata collector in Go
 
 ## Prerequisites
@@ -22,7 +11,7 @@ sidebar_position: 20
 
 ## Write and test a simple collector
 
-> :exclamation: You can skip most of these steps if you first experiment directy with the existing
+> :exclamation: You can skip most of these steps if you first experiment directly with the existing
 > [example module](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/example), which
 > will
 > give you an idea of how things work.
@@ -33,9 +22,9 @@ The steps are:
 
 - Add the source code
   to [`modules/example2/`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules).
-    - [module interface](#module-interface).
-    - [suggested module layout](#module-layout).
-    - [helper packages](#helper-packages).
+  - [module interface](#module-interface).
+  - [suggested module layout](#module-layout).
+  - [helper packages](#helper-packages).
 - Add the configuration
   to [`config/go.d/example2.conf`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d).
 - Add the module
@@ -58,7 +47,7 @@ The steps are:
 
 Every module should implement the following interface:
 
-```
+```go
 type Module interface {
     Init() bool
     Check() bool
@@ -75,7 +64,7 @@ type Module interface {
 
 We propose to use the following template:
 
-```
+```go
 // example.go
 
 func (e *Example) Init() bool {
@@ -97,7 +86,7 @@ func (e *Example) Init() bool {
 }
 ```
 
-Move specific initialization methods into the `init.go` file. See [suggested module layout](#module-Layout).
+Move specific initialization methods into the `init.go` file. See [suggested module layout](#module-layout).
 
 ### Check method
 
@@ -108,7 +97,7 @@ Move specific initialization methods into the `init.go` file. See [suggested mod
 The simplest way to implement `Check` is to see if we are getting any metrics from `Collect`. A lot of modules use such
 approach.
 
-```
+```go
 // example.go
 
 func (e *Example) Check() bool {
@@ -134,7 +123,7 @@ it contains charts and dimensions structs.
 
 Usually charts initialized in `Init` and `Chart` method just returns the charts instance:
 
-```
+```go
 // example.go
 
 func (e *Example) Charts() *Charts {
@@ -151,7 +140,7 @@ func (e *Example) Charts() *Charts {
 
 We propose to use the following template:
 
-```
+```go
 // example.go
 
 func (e *Example) Collect() map[string]int64 {
@@ -167,7 +156,7 @@ func (e *Example) Collect() map[string]int64 {
 }
 ```
 
-Move metrics collection logic into the `collect.go` file. See [suggested module layout](#module-Layout).
+Move metrics collection logic into the `collect.go` file. See [suggested module layout](#module-layout).
 
 ### Cleanup method
 
@@ -176,7 +165,7 @@ Move metrics collection logic into the `collect.go` file. See [suggested module 
 
 If you have nothing to clean up:
 
-```
+```go
 // example.go
 
 func (Example) Cleanup() {}
@@ -229,7 +218,7 @@ All the module initialization details should go in this file.
 - make a function for each value that needs to be initialized.
 - a function should return a value(s), not implicitly set/change any values in the main struct.
 
-```
+```go
 // init.go
 
 // Prefer this approach.
@@ -244,7 +233,7 @@ func (e *Example) initSomeValue() error {
     m.someValue = someValue
     return nil
 }
-```     
+```
 
 ### File `collect.go`
 
@@ -257,7 +246,7 @@ Feel free to split it into several files if you think it makes the code more rea
 
 Use `collect_` prefix for the filenames: `collect_this.go`, `collect_that.go`, etc.
 
-```
+```go
 // collect.go
 
 func (e *Example) collect() (map[string]int64, error) {
@@ -273,10 +262,10 @@ func (e *Example) collect() (map[string]int64, error) {
 
 > :exclamation: See the
 > example: [`example_test.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/example/example_test.go).
-
+>
 > if you have no experience in testing we recommend starting
 > with [testing package documentation](https://golang.org/pkg/testing/).
-
+>
 > we use `assert` and `require` packages from [github.com/stretchr/testify](https://github.com/stretchr/testify)
 > library,
 > check [their documentation](https://pkg.go.dev/github.com/stretchr/testify).
@@ -299,4 +288,3 @@ be [`testdata`](https://golang.org/cmd/go/#hdr-Package_lists_and_patterns).
 
 There are [some helper packages](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg) for
 writing a module.
-

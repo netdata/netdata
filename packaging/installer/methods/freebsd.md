@@ -1,12 +1,3 @@
-<!--
-title: "Install Netdata on FreeBSD"
-description: "Install Netdata on FreeBSD to monitor the health and performance of bare metal or VMs with thousands of real-time, per-second metrics."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md
-sidebar_label: "FreeBSD"
-learn_status: "Published"
-learn_rel_path: "Installation/Install on specific environments"
--->
-
 # Install Netdata on FreeBSD
 
 > 💡 This document is maintained by Netdata's community, and may not be completely up-to-date. Please double-check the
@@ -24,7 +15,7 @@ This step needs root privileges.
 pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof liblz4 libuv json-c cmake gmake
 ```
 
-Please respond in the affirmative for any relevant prompts during the installation process. 
+Please respond in the affirmative for any relevant prompts during the installation process.
 
 ## Install Netdata
 
@@ -35,9 +26,10 @@ If you have a Netdata cloud account then clicking on the **Connect Nodes** butto
 ```sh
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token <CLAIM_TOKEN> --claim-url https://app.netdata.cloud
 ```
-Please respond in the affirmative for any relevant prompts during the installation process. 
 
-Once the installation is completed, you should be able to start monitoring the FreeBSD server using Netdata. 
+Please respond in the affirmative for any relevant prompts during the installation process.
+
+Once the installation is completed, you should be able to start monitoring the FreeBSD server using Netdata.
 
 Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net-mgmt/netdata).
 
@@ -89,7 +81,8 @@ more about the information collected and how to opt-out, check the [anonymous st
 page](/docs/netdata-agent/configuration/anonymous-telemetry-events.md).
 
 ## Updating the Agent on FreeBSD
-If you have not passed the `--auto-update` or `-u` parameter for the installer to enable automatic updating, repeat the last step to update Netdata whenever a new version becomes available. 
+
+If you have not passed the `--auto-update` or `-u` parameter for the installer to enable automatic updating, repeat the last step to update Netdata whenever a new version becomes available.
 The `netdata-updater.sh` script will update your Agent.
 
 ## Optional parameters to alter your installation
@@ -102,9 +95,9 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--dry-run`: Show what the installer would do, but don’t actually do any of it.
 - `--dont-start-it`: Don’t auto-start the daemon after installing. This parameter is not guaranteed to work.
 - `--release-channel`: Specify a particular release channel to install from. Currently supported release channels are:
-    - `nightly`: Installs a nightly build (this is currently the default).
-    - `stable`: Installs a stable release.
-    - `default`: Explicitly request whatever the current default is.
+  - `nightly`: Installs a nightly build (this is currently the default).
+  - `stable`: Installs a stable release.
+  - `default`: Explicitly request whatever the current default is.
 - `--nightly-channel`: Synonym for `--release-channel nightly`.
 - `--stable-channel`: Synonym for `--release-channel stable`.
 - `--auto-update`: Enable automatic updates (this is the default).
@@ -119,15 +112,15 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--local-build-options`: Specify additional options to pass to the installer code when building locally. Only valid if `--build-only` is also specified.
 - `--static-install-options`: Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
 
-The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
+The following options are mutually exclusive and specify special operations other than trying to install Netdata normally or update an existing install:
 
 - `--reinstall`: If there is an existing install, reinstall it instead of trying to update it. If there is not an existing install, install netdata normally.
-- `--reinstall-even-if-unsafe`: If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things (for example, if we cannot detect what tyep of installation it is). If there is not an existing install, install Netdata normally.
+- `--reinstall-even-if-unsafe`: If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things (for example, if we cannot detect what type of installation it is). If there is not an existing install, install Netdata normally.
 - `--reinstall-clean`: If there is an existing install, uninstall it before trying to install Netdata. Fails if there is no existing install.
 - `--uninstall`: Uninstall an existing installation of Netdata. Fails if there is no existing install.
 - `--claim-only`: If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
 - `--repositories-only`: Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
-- `--prepare-offline-install-source`: Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](/packaging/installer/methods/offline.md) for more info.
+- `--prepare-offline-install-source`: Instead of installing the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](/packaging/installer/methods/offline.md) for more info.
 
 Additionally, the following environment variables may be used to further customize how the script runs (most users
 should not need to use special values for any of these):

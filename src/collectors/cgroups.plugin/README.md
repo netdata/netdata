@@ -1,12 +1,3 @@
-<!--
-title: "Monitor Cgroups (cgroups.plugin)"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/cgroups.plugin/README.md"
-sidebar_label: "Monitor Cgroups"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Virtualized environments/Containers"
--->
-
 # Monitor Cgroups (cgroups.plugin)
 
 You can monitor containers and virtual machines using **cgroups**.

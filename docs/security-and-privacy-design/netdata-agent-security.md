@@ -14,7 +14,6 @@ databases, sent to upstream Netdata servers, or archived to external time-series
 >
 > Users are responsible for backing up, recovering, and ensuring their data's availability because Netdata stores data locally on each system due to its decentralized architecture.
 
-
 The Netdata Agent is programmed to safeguard user data. When collecting data, the raw data does not leave the host. All
 plugins, even those running with escalated capabilities or privileges, perform a hard-coded data collection job. They do
 not accept commands from Netdata, and the original application data collected do not leave the process they are
@@ -60,7 +59,7 @@ information can be found [here](https://github.com/netdata/netdata/security/poli
 
 The Netdata agent is resilient against common security threats such as DDoS attacks and SQL injections. For DDoS,
 Netdata agent uses a fixed number of threads for processing requests, providing a cap on the resources that can be
-consumed. It also automatically manages its memory to prevent overutilization. SQL injections are prevented as nothing
+consumed. It also automatically manages its memory to prevent over-utilization. SQL injections are prevented as nothing
 from the UI is passed back to the data collection plugins accessing databases.
 
 Additionally, the Netdata agent is running as a normal, unprivileged, operating system user (a few data collections

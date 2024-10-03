@@ -88,15 +88,13 @@ require disk I/O may stop and show gaps in charts.
 
 To optimize your disk footprint in any aspect described below you can:
 
-
-To configure retention, you can: 
+To configure retention, you can:
 
 1. [Change how long Netdata stores metrics](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
 
 To control disk I/O:
 
 1. [Use a different metric storage database](/src/database/README.md),
-
 
 Minimize deployment impact on the production system by optimizing disk footprint:
 
@@ -141,9 +139,9 @@ Open `netdata.conf` and scroll down to the `[plugins]` section. To disable any p
 ```conf
 [plugins]
     proc = yes
-	python.d = no
-	charts.d = no
-	go.d = yes
+ python.d = no
+ charts.d = no
+ go.d = yes
 ```
 
 Disable specific collectors by opening their respective plugin configuration files, uncommenting the line for the
@@ -160,8 +158,8 @@ For example, to disable a few Python collectors:
 ```conf
 modules:
   apache: no
-	dockerd: no
-	fail2ban: no
+ dockerd: no
+ fail2ban: no
 ```
 
 ## Reduce collection frequency
@@ -263,4 +261,3 @@ Or to lower the default compression level:
     enable gzip compression = yes
     gzip compression level = 1
 ```
-

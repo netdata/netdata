@@ -1,8 +1,8 @@
 # Develop a custom data collector in Python
 
-The Netdata Agent uses [data collectors](/src/collectors/README.md) to 
-fetch metrics from hundreds of system, container, and service endpoints. While the Netdata team and community has built 
-[powerful collectors](/src/collectors/COLLECTORS.md) for most system, container, 
+The Netdata Agent uses [data collectors](/src/collectors/README.md) to
+fetch metrics from hundreds of system, container, and service endpoints. While the Netdata team and community has built
+[powerful collectors](/src/collectors/COLLECTORS.md) for most system, container,
 and service/application endpoints, some custom applications can't be monitored by default.
 
 In this tutorial, you'll learn how to leverage the [Python programming language](https://www.python.org/) to build a
@@ -17,16 +17,16 @@ execute. Python plugins require Python on the machine to be executed. Netdata us
 production-grade collectors.
 
 We generally do not accept contributions of Python modules to the GitHub project netdata/netdata. If you write a Python collector and
-want to make it available for other users, you should create the pull request in https://github.com/netdata/community.
+want to make it available for other users, you should create the pull request in <https://github.com/netdata/community>.
 
 ## What you need to get started
 
-  - A physical or virtual Linux system, which we'll call a _node_.
-  - A working [installation of Netdata](/packaging/installer/README.md) monitoring agent.
+- A physical or virtual Linux system, which we'll call a _node_.
+- A working [installation of Netdata](/packaging/installer/README.md) monitoring agent.
 
 ### Quick start
 
-For a quick start, you can look at the 
+For a quick start, you can look at the
 [example plugin](https://raw.githubusercontent.com/netdata/netdata/master/src/collectors/python.d.plugin/example/example.chart.py).
 
 **Note**: If you are working 'locally' on a new collector and would like to run it in an already installed and running
@@ -72,21 +72,21 @@ The basic elements of a Netdata collector are:
 - `data{}`: A dictionary containing the values to be displayed.
 - `get_data()`: The basic function of the plugin which will return to Netdata the correct values.
 
-**Note**: All names are better explained in the 
+**Note**: All names are better explained in the
 [External Plugins Documentation](/src/plugins.d/README.md).
 Parameters like `priority` and `update_every` mentioned in that documentation are handled by the `python.d.plugin`,
-not by each collection module. 
+not by each collection module.
 
 Let's walk through these jobs and elements as independent elements first, then apply them to example Python code.
 
 ### Determine how to gather metrics data
 
-Netdata can collect data from any program that can print to stdout. Common input sources for collectors can be logfiles,
+Netdata can collect data from any program that can print to stdout. Common input sources for collectors can be log files,
 HTTP requests, executables, and more. While this tutorial will offer some example inputs, your custom application will
 have different inputs and metrics.
 
 A great deal of the work in developing a Netdata collector is investigating the target application and understanding
-which metrics it exposes and how to 
+which metrics it exposes and how to
 
 ### Create charts
 
@@ -117,13 +117,14 @@ context, charttype]`, where:
   that is `A.B`, with `A` being the name of the collector, and `B` being the name of the specific metric.
 - `charttype`: Either `line`, `area`, or `stacked`. If null line is the default value.
 
-You can read more about `family` and `context` in the [web dashboard](/src/web/README.md#families) doc.
+You can read more about `family` and `context` in the [Netdata Charts](/docs/dashboards-and-charts/netdata-charts.md) doc.
 
 Once the chart has been defined, you should define the dimensions of the chart. Dimensions are basically the metrics to
 be represented in this chart and each chart can have more than one dimension. In order to define the dimensions, the
 "lines" list should be filled in with the required dimensions. Each dimension is a list:
 
 `dimension: [id, name, algorithm, multiplier, divisor]`
+
 - `id` : The id of the dimension. Mandatory unique field (string) required in order to set a value.
 - `name`: The name to be presented in the chart. If null id will be used.
 - `algorithm`: Can be absolute or incremental. If null absolute is used. Incremental shows the difference from the
@@ -145,6 +146,7 @@ Once you have process your data and get the required values, you need to assign 
 This is done using the `data` dictionary, which is in the form:
 
 `"data": {dimension_id: value }`, where:
+
 - `dimension_id`: The id of a defined dimension in a created chart.
 - `value`: The numerical value to associate with this dimension.
 
@@ -153,6 +155,7 @@ This is done using the `data` dictionary, which is in the form:
 Next, set the order of chart appearance with the `ORDER` list, which is in the form:
 
 `"ORDER": [chart_name_1,chart_name_2, …., chart_name_X]`, where:
+
 - `chart_name_x`: is the chart name to be shown in X order.
 
 ### Give the charts data to Netdata for visualization
@@ -160,19 +163,19 @@ Next, set the order of chart appearance with the `ORDER` list, which is in the f
 Our plugin should just rerun the data dictionary. If everything is set correctly the charts should be updated with the
 correct values.
 
-## Framework classes 
+## Framework classes
 
 Every module needs to implement its own `Service` class. This class should inherit from one of the framework classes:
 
--   `SimpleService`
--   `UrlService`
--   `SocketService`
--   `LogService`
--   `ExecutableService`
+- `SimpleService`
+- `UrlService`
+- `SocketService`
+- `LogService`
+- `ExecutableService`
 
-Also it needs to invoke the parent class constructor in a specific way as well as assign global variables to class variables. 
+Also it needs to invoke the parent class constructor in a specific way as well as assign global variables to class variables.
 
-For example, the snippet below is from the 
+For example, the snippet below is from the
 [RabbitMQ collector](https://github.com/netdata/netdata/blob/91f3268e9615edd393bd43de4ad8068111024cc9/collectors/python.d.plugin/rabbitmq/rabbitmq.chart.py#L273).
 This collector uses an HTTP endpoint and uses the `UrlService` framework class, which only needs to define an HTTP
 endpoint for data collection.
@@ -229,10 +232,11 @@ CHARTS = {
 
 ## Parse the data to extract or create the actual data to be represented
 
-Every collector must implement `_get_data`. This method should grab raw data from `_get_raw_data`, 
+Every collector must implement `_get_data`. This method should grab raw data from `_get_raw_data`,
 parse it, and return a dictionary where keys are unique dimension names, or `None` if no data is collected.
 
 For example:
+
 ```py
 def _get_data(self):
     try:
@@ -374,7 +378,7 @@ class Service(SimpleService):
 
 To enrich the example, add another chart the collector which to present the humidity metric.
 
-Add a new entry in the `CHARTS` dictionary with the definition for the new chart. 
+Add a new entry in the `CHARTS` dictionary with the definition for the new chart.
 
 ```python
 CHARTS = {
@@ -410,7 +414,7 @@ ORDER = [
 ]
 ```
 
-[Restart Netdata](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) with `sudo systemctl restart netdata` to see the new humidity
+[Restart Netdata](/docs/netdata-agent/start-stop-restart.md) to see the new humidity
 chart:
 
 ![A snapshot of the modified chart](https://i.imgur.com/XOeCBmg.png)
@@ -467,8 +471,7 @@ ORDER = [
 ]
 ```
 
-[Restart Netdata](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) with `sudo systemctl restart netdata` to see the new
-min/max/average temperature chart with multiple dimensions:
+[Restart Netdata](/docs/netdata-agent/start-stop-restart.md) to see the new min/max/average temperature chart with multiple dimensions:
 
 ![A snapshot of the modified chart](https://i.imgur.com/g7E8lnG.png)
 
@@ -485,7 +488,7 @@ configuration in [YAML](https://www.tutorialspoint.com/yaml/yaml_basics.htm) for
   serially and will stop at the first job that returns data. If multiple jobs have the same name, only one of them can
   run. This enables you to define different "ways" to fetch data from a particular data source so that the collector has
   more chances to work out-of-the-box. For example, if the data source supports both `HTTP` and `linux socket`, you can
-  define 2 jobs named `local`, with each using a different method. 
+  define 2 jobs named `local`, with each using a different method.
 - Check the `example` collector configuration file on
   [GitHub](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/example/example.conf) to get a
   sense of the structure.
@@ -521,26 +524,26 @@ variables and inform the user about the defaults. For example, take a look at th
 [GitHub](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/example/example.conf).
 
 You can read more about the configuration file on the [`python.d.plugin`
-documentation](/src/collectors/python.d.plugin/README.md). 
+documentation](/src/collectors/python.d.plugin/README.md).
 
-You can find the source code for the above examples on [GitHub](https://github.com/papajohn-uop/netdata). 
+You can find the source code for the above examples on [GitHub](https://github.com/papajohn-uop/netdata).
 
 ## Pull Request Checklist for Python Plugins
 
-Pull requests should be created in https://github.com/netdata/community.
+Pull requests should be created in <https://github.com/netdata/community>.
 
 This is a generic checklist for submitting a new Python plugin for Netdata.  It is by no means comprehensive.
 
 At minimum, to be buildable and testable, the PR needs to include:
 
--   The module itself, following proper naming conventions: `collectors/python.d.plugin/<module_dir>/<module_name>.chart.py`
--   A README.md file for the plugin under `collectors/python.d.plugin/<module_dir>`. 
--   The configuration file for the module: `collectors/python.d.plugin/<module_dir>/<module_name>.conf`. Python config files are in YAML format, and should include comments describing what options are present. The instructions are also needed in the configuration section of the README.md 
--   A basic configuration for the plugin in the appropriate global config file: `collectors/python.d.plugin/python.d.conf`, which is also in YAML format.  Either add a line that reads `# <module_name>: yes` if the module is to be enabled by default, or one that reads `<module_name>: no` if it is to be disabled by default.
--   A makefile for the plugin at `collectors/python.d.plugin/<module_dir>/Makefile.inc`.  Check an existing plugin for what this should look like.
--   A line in `collectors/python.d.plugin/Makefile.am` including the above-mentioned makefile. Place it with the other plugin includes (please keep the includes sorted alphabetically).
--   Optionally, chart information in `src/web/gui/dashboard_info.js`.  This generally involves specifying a name and icon for the section, and may include descriptions for the section or individual charts.
--   Optionally, some default alert configurations for your collector in `health/health.d/<module_name>.conf` and a line adding `<module_name>.conf` in `health/Makefile.am`.
+- The module itself, following proper naming conventions: `collectors/python.d.plugin/<module_dir>/<module_name>.chart.py`
+- A README.md file for the plugin under `collectors/python.d.plugin/<module_dir>`.
+- The configuration file for the module: `collectors/python.d.plugin/<module_dir>/<module_name>.conf`. Python config files are in YAML format, and should include comments describing what options are present. The instructions are also needed in the configuration section of the README.md
+- A basic configuration for the plugin in the appropriate global config file: `collectors/python.d.plugin/python.d.conf`, which is also in YAML format.  Either add a line that reads `# <module_name>: yes` if the module is to be enabled by default, or one that reads `<module_name>: no` if it is to be disabled by default.
+- A makefile for the plugin at `collectors/python.d.plugin/<module_dir>/Makefile.inc`.  Check an existing plugin for what this should look like.
+- A line in `collectors/python.d.plugin/Makefile.am` including the above-mentioned makefile. Place it with the other plugin includes (please keep the includes sorted alphabetically).
+- Optionally, chart information in `src/web/gui/dashboard_info.js`.  This generally involves specifying a name and icon for the section, and may include descriptions for the section or individual charts.
+- Optionally, some default alert configurations for your collector in `health/health.d/<module_name>.conf` and a line adding `<module_name>.conf` in `health/Makefile.am`.
 
 ## Framework class reference
 
@@ -567,11 +570,11 @@ Example: `ceph`, `sensors`
 
 It is the lowest-level class which implements most of module logic, like:
 
--   threading
--   handling run times
--   chart formatting
--   logging
--   chart creation and updating
+- threading
+- handling run times
+- chart formatting
+- logging
+- chart creation and updating
 
 ### `LogService`
 
@@ -589,11 +592,11 @@ Variable from config file: `command`.
 
 This allows to execute a shell command in a secure way. It will check for invalid characters in `command` variable and won't proceed if there is one of:
 
--   '&'
--   '|'
--   ';'
--   '>'
--   '\<'
+- '&'
+- '|'
+- ';'
+- '>'
+- '\<'
 
 For additional security it uses python `subprocess.Popen` (without `shell=True` option) to execute command. Command can be specified with absolute or relative name. When using relative name, it will try to find `command` in `PATH` environment variable as well as in `/sbin` and `/usr/sbin`.
 

@@ -26,7 +26,7 @@ The installer will then guide you through these steps:
 This section provides instructions for installing Netdata in silent mode, which is ideal for automated deployments.
 Silent mode skips displaying license agreements, but requires explicitly accepting them using the `/A` option.
 
-**Available Options**:
+### Available Options
 
 | Option    | Description                                                                                      |
 |-----------|--------------------------------------------------------------------------------------------------|
@@ -39,7 +39,7 @@ Silent mode skips displaying license agreements, but requires explicitly accepti
 | `/ROOMS=` | Comma-separated list of Room IDs where you want your node to appear.                             |
 | `/PROXY=` | Sets the proxy server address if your network requires one.                                      |
 
-**Example Usage**
+### Example Usage
 
 Connect your Agent to your Netdata Cloud Space with token `<YOUR_TOKEN>` and room `<YOUR_ROOM>`:
 

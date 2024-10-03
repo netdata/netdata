@@ -6,7 +6,7 @@ They can be used to retrieve additional information to help you troubleshoot or 
 > **Tip**
 >
 > You can also execute a Function from the [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md), by pressing the `f(x)` button.
-
+>
 > **Note**
 >
 > If you get an error saying that your node can't execute Functions please check the [prerequisites](/docs/top-monitoring-netdata-functions.md#prerequisites).

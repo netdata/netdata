@@ -35,13 +35,13 @@ func Test_defaultConfigs(t *testing.T) {
 		require.NoError(t, err, "abs path")
 
 		bs, err := os.ReadFile(file)
-		require.NoError(t, err, "read config file")
+		require.NoErrorf(t, err, "read config file '%s'", file)
 
 		var cfg Config
-		require.NoError(t, yaml.Unmarshal(bs, &cfg), "unmarshal")
+		require.NoErrorf(t, yaml.Unmarshal(bs, &cfg), "unmarshal '%s'", e.Name())
 
 		_, err = New(cfg)
-		require.NoError(t, err, "create pipeline")
+		require.NoErrorf(t, err, "create pipeline '%s'", e.Name())
 	}
 }
 

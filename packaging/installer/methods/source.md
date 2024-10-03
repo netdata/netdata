@@ -1,13 +1,3 @@
-<!--
-title: "Manually build Netdata from source"
-description: "Package maintainers and power users may be interested in manually building Netdata from source without using any of our installation scripts."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md"
-sidebar_label: "Manually build Netdata from source"
-learn_status: "Published"
-learn_rel_path: "Installation/Package maintainers"
-sidebar_position: 100
--->
-
 # Manually build Netdata from source
 
 These instructions are for advanced users and distribution package
@@ -20,33 +10,33 @@ checkout](/packaging/installer/methods/manual.md) instead.
 At a bare minimum, Netdata requires the following libraries and tools
 to build and run successfully:
 
--   libuuid
--   libuv version 1.0 or newer
--   zlib
--   CMake 3.13 or newer
--   GCC or Xcode (Clang is known to have issues in certain configurations, see [Using Clang](#using-clang))
--   Ninja or Make (Ninja is preferred as it results in significantly faster builds)
--   Git (we use git in the build system to generate version info, you don't need a full install, just a working `git show` command)
+- libuuid
+- libuv version 1.0 or newer
+- zlib
+- CMake 3.13 or newer
+- GCC or Xcode (Clang is known to have issues in certain configurations, see [Using Clang](#using-clang))
+- Ninja or Make (Ninja is preferred as it results in significantly faster builds)
+- Git (we use git in the build system to generate version info, you don't need a full install, just a working `git show` command)
 
 The following additional dependencies are also needed, but will be prepared automatically by CMake if they are not available on the build system.
 
--   libyaml
--   JSON-C
+- libyaml
+- JSON-C
 
 Additionally, the following build time features require additional dependencies:
 
--   TLS support for the web GUI:
-    -   OpenSSL 1.0.2 or newer _or_ LibreSSL 3.0.0 or newer.
--   dbengine metric storage:
-    -   liblz4 r129 or newer
-    -   OpenSSL 1.0 or newer (LibreSSL _amy_ work, but is largely untested).
--   Netdata Cloud support:
-    -   A working internet connection
-    -   OpenSSL 1.0.2 or newer _or_ LibreSSL 3.0.0 or newer.
-    -   protobuf (Google Protocol Buffers) and protoc compiler. If protobuf is not available on the system,
+- TLS support for the web GUI:
+  - OpenSSL 1.0.2 or newer _or_ LibreSSL 3.0.0 or newer.
+- dbengine metric storage:
+  - liblz4 r129 or newer
+  - OpenSSL 1.0 or newer (LibreSSL _amy_ work, but is largely untested).
+- Netdata Cloud support:
+  - A working internet connection
+  - OpenSSL 1.0.2 or newer _or_ LibreSSL 3.0.0 or newer.
+  - protobuf (Google Protocol Buffers) and protoc compiler. If protobuf is not available on the system,
         CMake can be instructed to fetch and build a usable version for Netdata.
--   Netdata Go collectors:
-    -   Go 1.21 or newer
+- Netdata Go collectors:
+  - Go 1.21 or newer
 
 ## Preparing the source tree
 
@@ -111,12 +101,12 @@ a pre-built copy of the required code, or build it locally.
 We provide pre-built copies of the eBPF code for 64-bit x86 systems
 using glibc or musl. To use one of these:
 
-1.  Verify the release version that Netdata expects to be used by checking
+1. Verify the release version that Netdata expects to be used by checking
     the contents of `packaging/ebpf.version` in your Netdata sources.
-2.  Go to https://github.com/netdata/kernel-collector/releases, select the
+2. Go to <https://github.com/netdata/kernel-collector/releases>, select the
     required release, and download the `netdata-kernel-collector-*.tar.xz`
     file for the libc variant your system uses (either rmusl or glibc).
-3.  Extract the contents of the archive to a temporary location, and then
+3. Extract the contents of the archive to a temporary location, and then
     copy all of the `.o` and `.so.*` files and the contents of the `library/`
     directory to `/usr/libexec/netdata/plugins.d` or the equivalent location
     for your build of Netdata.
@@ -128,5 +118,3 @@ instructions, please consult [the README file for our kernel-collector
 repository](https://github.com/netdata/kernel-collector/#readme),
 which outlines both the required dependencies, as well as multiple
 options for building the code.
-
-

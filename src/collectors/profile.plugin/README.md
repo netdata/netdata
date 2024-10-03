@@ -4,11 +4,11 @@ This plugin allows someone to backfill an agent with random data.
 
 A user can specify:
 
- - The number charts they want,
- - the number of dimensions per chart,
- - the desire update every collection frequency,
- - the number of seconds to backfill.
- - the number of collection threads.
+- The number charts they want,
+- the number of dimensions per chart,
+- the desire update every collection frequency,
+- the number of seconds to backfill.
+- the number of collection threads.
 
 ## Configuration
 
@@ -16,7 +16,7 @@ Edit the `netdata.conf` configuration file using [`edit-config`](/docs/netdata-a
 
 Scroll down to the `[plugin:profile]` section to find the available options:
 
-```
+```txt
 [plugin:profile]
   update every = 5
   number of charts = 200
