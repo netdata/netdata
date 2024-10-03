@@ -29,10 +29,10 @@ func (o *OracleDB) validateDSN() (string, error) {
 
 	var user, pass string
 	if user = u.User.Username(); user != "" {
-		user = strings.Repeat("*", len(user))
+		user = strings.Repeat("x", len(user))
 	}
 	if pass, _ = u.User.Password(); pass != "" {
-		pass = strings.Repeat("*", len(pass))
+		pass = strings.Repeat("x", len(pass))
 	}
 
 	u.User = url.UserPassword(user, pass)
