@@ -8,6 +8,7 @@
 insightful breakdown of resource utilization:
 
 - **Tree** or **Category**: Grouped by their position in the process tree.
+<<<<<<< HEAD
    This is customizable and allows aggregation by process managers and 
    individual processes of interest. Allows also renaming the processes for
    presentation purposes.
@@ -25,6 +26,22 @@ subprocesses, such as shell scripts that fork hundreds or thousands of times
 per second. So, although processes may spawn short-lived sub-processes,
 `apps.plugin` will aggregate their resources utilization providing a holistic
 view of how resources are shared among the processes.
+=======
+   This is customizable and allows aggregation by process managers and individual
+   processes of interest. Allows also renaming the processes for presentation purposes.
+
+- **User**: Grouped by the effective user (UID) under which the processes run.
+
+- **Group**: Grouped by the effective group (GID) under which the processes run.
+
+## Short-Lived Process Handling
+
+`apps.plugin` accounts for resource utilization of both running and exited processes,
+capturing the impact of processes that spawn short-lived subprocesses, such as shell
+scripts that fork hundreds or thousands of times per second. So, although processes
+may spawn short lived sub-processes, `apps.plugin` will aggregate their resources
+utilization providing a holistic view of how resources are shared among the processes.
+>>>>>>> fedac6cde (apps plugin docs pass)
 
 ## Charts sections
 
@@ -34,10 +51,15 @@ on the dashboard.
 
 ### Custom Process Groups (Apps)
 
+<<<<<<< HEAD
 In this section, apps.plugin summarizes the resources consumed by all
 processes, grouped based on their position in the process tree and the groups
 provided in `/etc/netdata/apps_groups.conf`. You can edit this file using our
 [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script.
+=======
+In this section, apps.plugin summarizes the resources consumed by all processes, grouped based
+on the groups provided in `/etc/netdata/apps_groups.conf`. You can edit this file using our [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script.
+>>>>>>> fedac6cde (apps plugin docs pass)
 
 For this section, `apps.plugin` builds a process tree (much like `ps fax` does
 in Linux), and groups processes together (evaluating both child and parent
@@ -125,8 +147,12 @@ be once every 2 seconds.
 
 ## Configuration
 
+<<<<<<< HEAD
 The configuration file is `/etc/netdata/apps_groups.conf`. You can edit this
 file using our [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script.
+=======
+The configuration file is `/etc/netdata/apps_groups.conf`. You can edit this file using our [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script.
+>>>>>>> fedac6cde (apps plugin docs pass)
 
 ### Configuring process managers
 
