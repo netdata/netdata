@@ -464,7 +464,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
     char function_copy[strlen(function) + 1];
     memcpy(function_copy, function, sizeof(function_copy));
     char *words[1024];
-    size_t num_words = quoted_strings_splitter_pluginsd(function_copy, words, 1024);
+    size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
     for(size_t i = 1; i < num_words ;i++) {
         char *param = get_word(words, num_words, i);
         if(strcmp(param, "sockets:aggregated") == 0) {

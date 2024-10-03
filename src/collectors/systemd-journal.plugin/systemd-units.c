@@ -1607,7 +1607,7 @@ void function_systemd_units(const char *transaction, char *function,
                             BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
                             const char *source __maybe_unused, void *data __maybe_unused) {
     char *words[SYSTEMD_UNITS_MAX_PARAMS] = { NULL };
-    size_t num_words = quoted_strings_splitter_pluginsd(function, words, SYSTEMD_UNITS_MAX_PARAMS);
+    size_t num_words = quoted_strings_splitter_whitespace(function, words, SYSTEMD_UNITS_MAX_PARAMS);
     for(int i = 1; i < SYSTEMD_UNITS_MAX_PARAMS ;i++) {
         char *keyword = get_word(words, num_words, i);
         if(!keyword) break;
