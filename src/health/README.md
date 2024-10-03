@@ -2,9 +2,11 @@
 
 Netdata offers two ways to receive alert notifications on external integrations. These methods work independently, which means you can enable both at the same time to send alert notifications to any number of endpoints.
 
-Both methods use a node's health alerts to generate the content of a notification. 
+Both methods use a node's health alerts to generate the content of a notification.
 
-Read our documentation on [configuring alerts](/src/health/REFERENCE.md) to change the preconfigured thresholds or to create tailored alerts for your infrastructure.
+Read our documentation on [configuring alerts](/src/health/REFERENCE.md) to change the pre-configured thresholds or to create tailored alerts for your infrastructure.
+
+<!-- virtual links below, should not lead anywhere outside of the rendered Learn doc -->
 
 - Netdata Cloud provides centralized alert notifications, utilizing the health status data already sent to Netdata Cloud from connected nodes to send alerts to configured integrations. [Supported integrations](/docs/alerts-&-notifications/notifications/centralized-cloud-notifications) include Amazon SNS, Discord, Slack, Splunk, and others.
 
