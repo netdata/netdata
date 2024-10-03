@@ -78,7 +78,7 @@ APPS_MATCH pid_match_create(const char *comm) {
     m.compare = string_strdupz(nid);
 
     if(strchr(nid, '*'))
-        m.pattern = simple_pattern_create(comm, " ", SIMPLE_PATTERN_EXACT, true);
+        m.pattern = simple_pattern_create(comm, SIMPLE_PATTERN_NO_SEPARATORS, SIMPLE_PATTERN_EXACT, true);
 
     return m;
 }

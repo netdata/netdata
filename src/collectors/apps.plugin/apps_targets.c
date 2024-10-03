@@ -111,6 +111,12 @@ void apps_managers_and_aggregators_init(void) {
     managed_list_add(&tree.managers, "launchd");
 #endif
 
+#if defined(OS_WINDOWS)
+    managed_list_add(&tree.managers, "netdata");
+#else
+    managed_list_add(&tree.managers, "spawn-plugins");
+#endif
+
     managed_list_clear(&tree.aggregators);
 #if defined(OS_LINUX)
     managed_list_add(&tree.aggregators, "kthread");

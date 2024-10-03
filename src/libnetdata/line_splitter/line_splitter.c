@@ -27,6 +27,8 @@ inline int isspace_whitespace(char c) {
         case '\t':
         case '\r':
         case '\n':
+        case '\f':
+        case '\v':
             return 1;
 
         default:
@@ -40,6 +42,8 @@ inline int isspace_pluginsd(char c) {
         case '\t':
         case '\r':
         case '\n':
+        case '\f':
+        case '\v':
         case '=':
             return 1;
 
@@ -54,6 +58,8 @@ inline int isspace_config(char c) {
         case '\t':
         case '\r':
         case '\n':
+        case '\f':
+        case '\v':
         case ',':
             return 1;
 
