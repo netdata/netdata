@@ -173,7 +173,7 @@
 
       ### Why aren’t users automatically added to Netdata spaces when they’re created through SCIM?
 
-      Currently, our SCIM server supports the User resource only. In the future, we plan to add support for the Group resource too.
+      Currently, our SCIM server supports only the User resource. We plan to add support for the Group resource in the future.
 
       In a Netdata space, users can belong to multiple rooms and have different roles (e.g., admin, manager). Additionally, the same organization may have multiple spaces.
 
