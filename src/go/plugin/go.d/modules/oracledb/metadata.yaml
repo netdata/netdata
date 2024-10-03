@@ -41,7 +41,7 @@ modules:
 
             - Localhost, listening on port 1521
             - Within Docker containers
-            
+
             > **Note**: Oracle DB requires a username and password. While Netdata can automatically discover Oracle DB instances and create data collection jobs, these jobs will fail unless you provide the correct credentials.
         limits:
           description: ""
@@ -58,12 +58,12 @@ modules:
           - title: Create a read only user for netdata
             description: |
               Follow the official instructions for your oracle RDBMS to create a read-only user for netdata. The operation may follow this approach
-              
+
               Connect to your Oracle database with an administrative user and execute:
-              
+
               ```bash
               CREATE USER netdata IDENTIFIED BY <PASSWORD>;
-              
+
               GRANT CONNECT TO netdata;
               GRANT SELECT_CATALOG_ROLE TO netdata;
               ```
@@ -113,13 +113,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
                   - name: local
                     dsn: oracle://netdata:secret@127.0.0.1:1521/XE
-                
+
                   - name: remote
                     dsn: oracle://netdata:secret@203.0.113.0:1521/XE
     troubleshooting:
