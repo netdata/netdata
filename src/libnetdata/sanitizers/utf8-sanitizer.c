@@ -5,6 +5,10 @@
 size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, const unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length) {
     if(unlikely(!src || !dst || !dst_size)) return 0;
 
+    // skip leading spaces and invalid characters
+    while(src && *src && !IS_UTF8_BYTE(*src) && (isspace(*src) || iscntrl(*src) || !isprint(*src)))
+        src++;
+
     if(unlikely(!src || !*src)) {
         strncpyz((char *)dst, empty, dst_size);
         dst[dst_size - 1] = '\0';
@@ -57,20 +61,20 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
             continue;
         }
 
-        unsigned char c2 = char_map[c];
-        if(c == ' ' || c2 == ' ') {
+        c = char_map[c];
+        if(c == ' ') {
             // a space character
 
             if(!last_is_space) {
                 // add one space
-                *d++ = c2;
+                *d++ = c;
                 mblen++;
             }
 
             last_is_space++;
         }
         else {
-            *d++ = c2;
+            *d++ = c;
             last_is_space = 0;
             mblen++;
         }
