@@ -8,7 +8,4 @@
 void netdata_fix_chart_id(char *s);
 void netdata_fix_chart_name(char *s);
 
-void sanitize_chart_meta(char *buf);
-STRING *sanitize_chart_meta_string(STRING *s);
-
 #endif //NETDATA_CHART_ID_AND_NAME_H

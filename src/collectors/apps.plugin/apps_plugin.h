@@ -364,24 +364,26 @@ typedef enum __attribute__((packed)) {
     PDF_MAX
 } PID_FIELD;
 
+typedef struct apps_match {
+    bool starts_with:1;
+    bool ends_with:1;
+    STRING *compare;
+    SIMPLE_PATTERN *pattern;
+} APPS_MATCH;
+
 struct target {
     STRING *id;
     STRING *name;
     STRING *clean_name;
 
     TARGET_TYPE type;
-    union {
-        struct {
-            SIMPLE_PATTERN *pattern;
-            STRING *compare;
-        } ag;
+    APPS_MATCH match;
 #if (PROCESSES_HAVE_UID == 1)
-        uid_t uid;
+    uid_t uid;
 #endif
 #if (PROCESSES_HAVE_GID == 1)
-        gid_t gid;
+    gid_t gid;
 #endif
-    };
 
     kernel_uint_t values[PDF_MAX];
 
@@ -396,8 +398,6 @@ struct target {
 #endif
 
     bool exposed:1;         // if set, we have sent this to netdata
-    bool ends_with:1;       // if set, the compare string matches the end of the command
-    bool starts_with:1;     // if set, the compare string matches the start of the command
 
     struct pid_on_target *root_pid; // list of aggregated pids for target debugging
 
@@ -615,6 +615,7 @@ static inline void debug_log_dummy(void) {}
 
 #endif
 bool managed_log(struct pid_stat *p, PID_LOG log, bool status);
+void sanitize_apps_plugin_chart_meta(char *buf);
 
 // ----------------------------------------------------------------------------
 // macro to calculate the incremental rate of a value
@@ -655,6 +656,10 @@ uint32_t file_descriptor_find_or_add(const char *name, uint32_t hash);
 // --------------------------------------------------------------------------------------------------------------------
 // data collection management
 
+bool pid_match_check(struct pid_stat *p, APPS_MATCH *match);
+APPS_MATCH pid_match_create(const char *comm);
+void pid_match_cleanup(APPS_MATCH *m);
+
 bool collect_data_for_all_pids(void);
 
 void pid_collection_started(struct pid_stat *p);
@@ -677,9 +682,11 @@ struct pid_stat *get_or_allocate_pid_entry(pid_t pid);
 struct pid_stat *find_pid_entry(pid_t pid);
 void del_pid_entry(pid_t pid);
 void update_pid_comm(struct pid_stat *p, const char *comm);
+void update_pid_cmdline(struct pid_stat *p, const char *cmdline);
 
-bool is_process_manager(struct pid_stat *p);
-bool is_process_aggregator(struct pid_stat *p);
+bool is_process_a_manager(struct pid_stat *p);
+bool is_process_an_aggregator(struct pid_stat *p);
+bool is_process_an_interpreter(struct pid_stat *p);
 
 // --------------------------------------------------------------------------------------------------------------------
 // targets management

@@ -521,15 +521,24 @@ static char *wchar_to_utf8(WCHAR *s) {
     return utf8;
 }
 
-// Convert wide string to UTF-8
-static STRING *wchar_to_string(WCHAR *s) {
-    return string_strdupz(wchar_to_utf8(s));
+static char *ansi_to_utf8(LPCSTR str) {
+    static __thread WCHAR unicode[PATH_MAX];
+    static __thread int unicode_size = sizeof(unicode) / sizeof(*unicode);
+
+    // Step 1: Convert ANSI string (LPSTR) to wide string (UTF-16)
+    int wideLength = MultiByteToWideChar(CP_ACP, 0, str, -1, NULL, 0);
+    if (wideLength == 0 || wideLength > unicode_size)
+        return NULL;
+
+    MultiByteToWideChar(CP_ACP, 0, str, -1, unicode, wideLength);
+
+    return wchar_to_utf8(unicode);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
 // return a sanitized name for the process
-STRING *GetProcessFriendlyNameSanitized(WCHAR *path) {
+STRING *GetProcessFriendlyNameFromPathSanitized(WCHAR *path) {
     static __thread uint8_t void_buf[1024 * 1024];
     static __thread DWORD void_buf_size = sizeof(void_buf);
     static __thread wchar_t unicode[PATH_MAX];
@@ -548,7 +557,7 @@ STRING *GetProcessFriendlyNameSanitized(WCHAR *path) {
             wcsncpy(unicode, value, unicode_size - 1);
             unicode[unicode_size - 1] = L'\0';
             char *name = wchar_to_utf8(unicode);
-            sanitize_chart_meta(name);
+            sanitize_apps_plugin_chart_meta(name);
             return string_strdupz(name);
         }
     }
@@ -573,7 +582,7 @@ static STRING *GetNameFromCmdlineSanitized(struct pid_stat *p) {
                 char service[strlen(words[i + 1]) + sizeof(SERVICE_PREFIX)]; // sizeof() includes a null
                 strcpy(service, SERVICE_PREFIX);
                 strcpy(&service[sizeof(SERVICE_PREFIX) - 1], words[i + 1]);
-                sanitize_chart_meta(service);
+                sanitize_apps_plugin_chart_meta(service);
                 return string_strdupz(service);
             }
         }
@@ -621,13 +630,12 @@ static void GetServiceNames(void) {
         if(p && !p->got_service) {
             p->got_service = true;
 
-            size_t len = strlen(pServiceStatus[i].lpDisplayName);
-            char buf[len + 1];
-            memcpy(buf, pServiceStatus[i].lpDisplayName, sizeof(buf));
-            sanitize_chart_meta(buf);
-
-            string_freez(p->name);
-            p->name = string_strdupz(buf);
+            char *name = ansi_to_utf8(pServiceStatus[i].lpDisplayName);
+            if(name) {
+                sanitize_apps_plugin_chart_meta(name);
+                string_freez(p->name);
+                p->name = string_strdupz(name);
+            }
         }
     }
 
@@ -695,14 +703,13 @@ void GetAllProcessesInfo(void) {
         {
             WCHAR *cmdline = GetProcessCommandLine(hProcess); // returns malloc'd buffer
             if (cmdline) {
-                string_freez(p->cmdline);
-                p->cmdline = wchar_to_string(cmdline);
+                update_pid_cmdline(p, wchar_to_utf8(cmdline));
 
                 // extract the process full path from the command line
                 WCHAR *path = executable_path_from_cmdline(cmdline);
                 if(path) {
                     string_freez(p->name);
-                    p->name = GetProcessFriendlyNameSanitized(path);
+                    p->name = GetProcessFriendlyNameFromPathSanitized(path);
                 }
 
                 free(cmdline); // free(), not freez()
@@ -713,10 +720,10 @@ void GetAllProcessesInfo(void) {
             if (QueryFullProcessImageNameW(hProcess, 0, unicode, &unicode_size)) {
                 // put the full path name to the command into cmdline
                 if(!p->cmdline)
-                    p->cmdline = wchar_to_string(unicode);
+                    update_pid_cmdline(p, wchar_to_utf8(unicode));
 
                 if(!p->name)
-                    p->name = GetProcessFriendlyNameSanitized(unicode);
+                    p->name = GetProcessFriendlyNameFromPathSanitized(unicode);
             }
         }
 

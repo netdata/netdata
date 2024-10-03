@@ -216,7 +216,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
     memcpy(buf, rfe->function, sizeof(buf));
 
     char *words[20];
-    size_t num_words = quoted_strings_splitter_pluginsd(buf, words, 20);
+    size_t num_words = quoted_strings_splitter_whitespace(buf, words, 20);
 
     size_t i = 0;
     char *config = get_word(words, num_words, i++);

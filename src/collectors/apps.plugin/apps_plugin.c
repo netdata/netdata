@@ -118,6 +118,10 @@ static char *stock_config_dir = LIBCONFIG_DIR;
 
 size_t pagesize;
 
+void sanitize_apps_plugin_chart_meta(char *buf) {
+    external_plugins_sanitize(buf, buf, strlen(buf) + 1);
+}
+
 // ----------------------------------------------------------------------------
 // update chart dimensions
 

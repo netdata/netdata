@@ -374,7 +374,6 @@ static const char *facets_key_value_id(FACET_KEY *k, FACET_VALUE *v) {
 }
 
 void facets_use_hashes_for_ids(FACETS *facets, bool set) {
-    netdata_log_info("FACETS_OPTION_HASH_IDS = %s", set ? "true" : "false");
     if(set)
         facets->options |= FACETS_OPTION_HASH_IDS;
     else

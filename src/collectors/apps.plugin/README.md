@@ -4,51 +4,54 @@
 
 ## Process Aggregation and Grouping
 
-`apps.plugin` aggregates processes in three distinct ways to provide a more insightful
-breakdown of resource utilization:
+`apps.plugin` aggregates processes in three distinct ways to provide a more
+insightful breakdown of resource utilization:
 
 - **Tree** or **Category**: Grouped by their position in the process tree.
-   This is customizable and allows aggregation by process managers and individual
-   processes of interest. Allows also renaming the processes for presentation purposes.
+   This is customizable and allows aggregation by process managers and 
+   individual processes of interest. Allows also renaming the processes for
+   presentation purposes.
 
 - **User**: Grouped by the effective user (UID) under which the processes run.
 
-- **Group**: Grouped by the effective group (GID) under which the processes run.
+- **Group**: Grouped by the effective group (GID) under which the processes
+   run.
 
 ## Short-Lived Process Handling
 
-`apps.plugin` accounts for resource utilization of both running and exited processes,
-capturing the impact of processes that spawn short-lived subprocesses, such as shell
-scripts that fork hundreds or thousands of times per second. So, although processes
-may spawn short lived sub-processes, `apps.plugin` will aggregate their resources
-utilization providing a holistic view of how resources are shared among the processes.
+`apps.plugin` accounts for resource utilization of both running and exited
+processes, capturing the impact of processes that spawn short-lived
+subprocesses, such as shell scripts that fork hundreds or thousands of times
+per second. So, although processes may spawn short-lived sub-processes,
+`apps.plugin` will aggregate their resources utilization providing a holistic
+view of how resources are shared among the processes.
 
 ## Charts sections
 
-To provide more valuable insights, apps.plugin aggregates individual processes in several ways.
-Each type of aggregation is presented as a different section on the dashboard.
+To provide more valuable insights, apps.plugin aggregates individual processes
+in several ways. Each type of aggregation is presented as a different section
+on the dashboard.
 
 ### Custom Process Groups (Apps)
 
-In this section, apps.plugin summarizes the resources consumed by all processes, grouped based
-on the groups provided in `/etc/netdata/apps_groups.conf`. You can edit this file using our [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script.
+In this section, apps.plugin summarizes the resources consumed by all
+processes, grouped based on their position in the process tree and the groups
+provided in `/etc/netdata/apps_groups.conf`. You can edit this file using our
+[`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script.
 
-For this section, `apps.plugin` builds a process tree (much like `ps fax` does in Linux), and groups
-processes together (evaluating both child and parent processes) so that the result is always a list with
-a predefined set of members (of course, only process groups found running are reported).
-
-> If you find that `apps.plugin` categorizes standard applications as `other`, we would be
-> glad to accept pull requests improving the defaults shipped with Netdata in `apps_groups.conf`.
+For this section, `apps.plugin` builds a process tree (much like `ps fax` does
+in Linux), and groups processes together (evaluating both child and parent
+processes).
 
 ### By User (Users)
 
-In this section, apps.plugin summarizes the resources consumed by all processes, grouped by the
-effective user under which each process runs.
+In this section, apps.plugin summarizes the resources consumed by all
+processes, grouped by the effective user under which each process runs.
 
 ### By User Group (Groups)
 
-In this section, apps.plugin summarizes the resources consumed by all processes, grouped by the
-effective user group under which each process runs.
+In this section, apps.plugin summarizes the resources consumed by all
+processes, grouped by the effective user group under which each process runs.
 
 ## Charts
 
@@ -97,14 +100,14 @@ The above are reported:
 
 ## Performance
 
-`apps.plugin` is a complex piece of software and has a lot of work to do
-We are proud that `apps.plugin` is a lot faster compared to any other similar tool,
-while collecting a lot more information for the processes, however the fact is that
-this plugin may require more CPU resources than the `netdata` daemon itself.
+We are proud that `apps.plugin` is a lot faster compared to any other similar
+tools, while collecting a lot more information for the processes, however the
+fact is that this plugin needs to traverse the entire process tree on every
+iteration, so its resources usage may be noticable.
 
-Under Linux, for each process running, `apps.plugin` reads several `/proc` files
-per process. Doing this work per-second, especially on hosts with several thousands
-of processes, may increase the CPU resources consumed by the plugin.
+Under Linux, for each process running, `apps.plugin` reads several `/proc`
+files per process. Doing this work per-second, especially on hosts with several
+thousands of processes, may increase the CPU resources consumed by the plugin.
 
 In such cases, you many need to lower its data collection frequency.
 
@@ -116,20 +119,23 @@ To do this, edit `/etc/netdata/netdata.conf` and find this section:
  # command options =
 ```
 
-Uncomment the line `update every` and set it to a higher number. If you just set it to `2`,
-its CPU resources will be cut in half, and data collection will be once every 2 seconds.
+Uncomment the line `update every` and set it to a higher number. If you just
+set it to `2`, its CPU resources will be cut in half, and data collection will
+be once every 2 seconds.
 
 ## Configuration
 
-The configuration file is `/etc/netdata/apps_groups.conf`. You can edit this file using our [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script.
+The configuration file is `/etc/netdata/apps_groups.conf`. You can edit this
+file using our [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script.
 
 ### Configuring process managers
 
-`apps.plugin` needs to know the common process managers, meaning the names of the processes
-which spawn other processes. Process managers are used so that `apps.plugin` will automatically
-consider all their sub-processes important to monitor.
+`apps.plugin` needs to know the common process managers, the names of the processes
+which spawn other processes. Process managers help `apps.plugin` automatically
+consider all their sub-processes, important to monitor.
 
-Process managers are configured in `apps_groups.conf` with the prefix `managers:`, like this:
+Process managers are configured in `apps_groups.conf` with the prefix
+`managers:`, like this:
 
 ```txt
 managers: process1 process2 process3
@@ -137,9 +143,32 @@ managers: process1 process2 process3
 
 Multiple lines may exist, all starting with `managers:`.
 
-The process names given here should be exactly as the operating system sets them. In Linux these
-process names are limited to 15 characters. Usually the command `ps -e` or `cat /proc/{PID}/stat`
-states the names needed here.
+A line `managers: clear` will clear all managers, so that a new list can be
+provided.
+
+### Configuring interpreters
+
+Interpreted languages like `python`, `bash`, `sh`, `node` and more, may hide
+the actual name of a process.
+
+For such programs, `apps.plugin` can be instructed to check for the actual
+process name in one of the command line parameters of the program. When a
+process matches an interpreter, apps.plugin will go through all the parameters
+of the interpreter and find the first parameter that is an absolute filename
+existing on disk. When  found, `apps.plugin` will name the process using
+the name of that filename.
+
+Interpreters are configured in `apps_groups.conf` with the prefix
+`interpreters:`, like this:
+
+```txt
+interpreters: process1 process2 process3
+```
+
+Multiple lines may exist, all starting with `interpreters:`.
+
+A line `interpreters: clear` will clear all interpreters, so that a new list
+can be provided.
 
 ### Configuring process groups and renaming processes
 
@@ -151,16 +180,20 @@ group: process1 process2 ...
 
 Each group can be given multiple times, to add more processes to it.
 
-For each process given, all of its sub-processes will be grouped, not just the matched process.
+For each process given, all of its sub-processes will be grouped, not just the
+matched process.
+
+### Matching processes
 
 The process names are the ones returned by:
 
 - **comm**: `ps -e` or `cat /proc/{PID}/stat`
 - **cmdline**: in case of substring mode (see below): `/proc/{PID}/cmdline`
 
-On Linux **comm** is limited to just a few characters. `apps.plugin` attempts to find the entire
-**comm** name by looking for it at the **cmdline**. When this is successful, the entire process name
-is available, otherwise the shortened one is used.
+On Linux **comm** is limited to 15 characters. `apps.plugin` attempts to find
+the entire **comm** name by looking for it at the **cmdline**. When this is
+successful, the entire process name is available, otherwise the shortened one
+is used.
 
 To add process names with spaces, enclose them in quotes (single or double)
 example: `'Plex Media Serv'` or `"my other process"`.
@@ -171,18 +204,23 @@ You can add asterisks (`*`) to provide a pattern:
 - `name*` _prefix_ mode: will match a **comm** beginning with `name`.
 - `*name*` _substring_ mode: will search for `name` in **cmdline**.
 
-Asterisks may appear in the middle of `name` (like `na*me`), without affecting what is being
-matched (**comm** or **cmdline**).
+Asterisks may appear in the middle of `name` (like `na*me`), without affecting
+what is being matched (**comm** or **cmdline**).
 
-To add processes with single quotes, enclose them in double quotes: `"process with this ' single quote"`
+To add processes with single quotes, enclose them in double quotes:
+`"process with this ' single quote"`.
 
-To add processes with double quotes, enclose them in single quotes: `'process with this " double quote'`
+To add processes with double quotes, enclose them in single quotes:
+`'process with this " double quote'`.
 
-The order of the entries in this list is important: the first one that matches a process is used, so follow a top-down hierarchy.
-Processes not matched by any row, will inherit it from their parents.
+The order of the entries in this list is important: the first one that matches
+a process is used, so follow a top-down hierarchy. Processes not matched by any
+row, will inherit it from their parents.
 
-There are a few command line options you can pass to `apps.plugin`. The list of available
-options can be acquired with the `--help` flag. The options can be set in the `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configuration/README.md).
+There are a few command line options you can pass to `apps.plugin`. The list of
+available options can be acquired with the `--help` flag. The options can be
+set in the `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configuration/README.md).
+
 For example, to disable user and user group charts you would set:
 
 ```txt

@@ -317,37 +317,165 @@ static inline void link_all_processes_to_their_parents(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline STRING *comm_from_cmdline_sanitized(char *comm, STRING *cmdline) {
-    if(!cmdline) {
-        sanitize_chart_meta(comm);
-        return string_strdupz(comm);
+static bool is_filename(const char *s) {
+    if(!s || !*s) return false;
+
+#if defined(OS_WINDOWS)
+    if( (isalpha((uint8_t)*s) || (s[1] == ':' && s[2] == '\\')) ||                  // windows native "x:\"
+        (isalpha((uint8_t)*s) || (s[1] == ':' && s[2] == '/')) ||                   // windows native "x:/"
+        (*s == '\\' && s[1] == '\\' && isalpha((uint8_t)s[2]) && s[3] == '\\') ||   // windows native "\\x\"
+        (*s == '/' && s[1] == '/' && isalpha((uint8_t)s[2]) && s[3] == '/')) {      // windows native "//x/"
+
+        WCHAR ws[FILENAME_MAX];
+        int wlen = MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
+        if (wlen <= 0 || (size_t)wlen > sizeof(ws) / sizeof(*ws)) {
+            return false; // Failed to convert UTF-8 to UTF-16
+        }
+
+        MultiByteToWideChar(CP_UTF8, 0, s, -1, ws, wlen);
+        DWORD attributes = GetFileAttributesW(ws);
+        if (attributes != INVALID_FILE_ATTRIBUTES)
+            return true;
+    }
+#endif
+
+    // for: sh -c "exec /path/to/command parameters"
+    if(strncmp(s, "exec ", 5) == 0 && s[5]) {
+        s += 5;
+        char look_for = ' ';
+        if(*s == '\'') { look_for = '\''; s++; }
+        if(*s == '"') { look_for = '"'; s++; }
+        char *end = strchr(s, look_for);
+        if(end) *end = '\0';
     }
 
-    const char *cl = string2str(cmdline);
-    size_t len = string_strlen(cmdline);
-
-    char buf_cmd[len + 1];
-    // if it is enclosed in (), remove the parenthesis
-    if(cl[0] == '(' && cl[len - 1] == ')') {
-        memcpy(buf_cmd, &cl[1], len - 2);
-        buf_cmd[len - 2] = '\0';
+    // linux, freebsd, macos, msys, cygwin
+    if(*s == '/') {
+        struct statvfs stat;
+        return statvfs(s, &stat) == 0;
     }
-    else
-        memcpy(buf_cmd, cl, sizeof(buf_cmd));
 
-    size_t comm_len = strlen(comm);
-    char *start = strstr(buf_cmd, comm);
-    if(start) {
+    return false;
+}
+
+static const char *extensions_to_strip[] = {
+        ".sh", // shell scripts
+        ".py", // python scripts
+        ".pl", // perl scripts
+        ".js", // node.js
+#if defined(OS_WINDOWS)
+        ".exe",
+#endif
+        NULL,
+};
+
+// strip extensions we don't want to show
+static void remove_extension(char *name) {
+    size_t name_len = strlen(name);
+    for(size_t i = 0; extensions_to_strip[i] != NULL; i++) {
+        const char *ext = extensions_to_strip[i];
+        size_t ext_len = strlen(ext);
+        if(name_len > ext_len) {
+            char *check = &name[name_len - ext_len];
+            if(strcmp(check, ext) == 0) {
+                *check = '\0';
+                break;
+            }
+        }
+    }
+}
+
+static inline STRING *comm_from_cmdline_param_sanitized(STRING *cmdline) {
+    if(!cmdline) return NULL;
+
+    char buf[string_strlen(cmdline) + 1];
+    memcpy(buf, string2str(cmdline), sizeof(buf));
+
+    char *words[100];
+    size_t num_words = quoted_strings_splitter_whitespace(buf, words, 100);
+    for(size_t word = 1; word < num_words ;word++) {
+        char *s = words[word];
+        if(is_filename(s)) {
+            char *name = strrchr(s, '/');
+
+#if defined(OS_WINDOWS)
+            if(!name)
+                name = strrchr(s, '\\');
+#endif
+
+            if(name && *name) {
+                name++;
+                remove_extension(name);
+                sanitize_apps_plugin_chart_meta(name);
+                return string_strdupz(name);
+            }
+        }
+    }
+
+    return NULL;
+}
+
+static inline STRING *comm_from_cmdline_sanitized(STRING *comm, STRING *cmdline) {
+    if(!cmdline) return NULL;
+
+    char buf[string_strlen(cmdline) + 1];
+    memcpy(buf, string2str(cmdline), sizeof(buf));
+
+    size_t comm_len = string_strlen(comm);
+    char *start = strstr(buf, string2str(comm));
+    while (start) {
         char *end = start + comm_len;
-        while(*end && !isspace((uint8_t)*end) && *end != '/' && *end != '\\' && *end != '"') end++;
+        while (*end &&
+               !isspace((uint8_t) *end) &&
+               *end != '/' &&    // path separator - linux
+               *end != '\\' &&   // path separator - windows
+               *end != '"' &&    // closing double quotes
+               *end != '\'' &&   // closing single quotes
+               *end != ')' &&    // sometimes process add ) at their end
+               *end != ':')      // sometimes process add : at their end
+            end++;
+
         *end = '\0';
 
-        sanitize_chart_meta(start);
+        remove_extension(start);
+        sanitize_apps_plugin_chart_meta(start);
         return string_strdupz(start);
     }
 
-    sanitize_chart_meta(comm);
-    return string_strdupz(comm);
+    return NULL;
+}
+
+static void update_pid_comm_from_cmdline(struct pid_stat *p) {
+    bool updated = false;
+
+    STRING *new_comm = comm_from_cmdline_sanitized(p->comm, p->cmdline);
+    if(new_comm) {
+        string_freez(p->comm);
+        p->comm = new_comm;
+        updated = true;
+    }
+
+    if(is_process_an_interpreter(p)) {
+        new_comm = comm_from_cmdline_param_sanitized(p->cmdline);
+        if(new_comm) {
+            string_freez(p->comm);
+            p->comm = new_comm;
+            updated = true;
+        }
+    }
+
+    if(updated) {
+        p->is_manager = is_process_a_manager(p);
+        p->is_aggregator = is_process_an_aggregator(p);
+    }
+}
+
+void update_pid_cmdline(struct pid_stat *p, const char *cmdline) {
+    string_freez(p->cmdline);
+    p->cmdline = cmdline ? string_strdupz(cmdline) : NULL;
+
+    if(p->cmdline)
+        update_pid_comm_from_cmdline(p);
 }
 
 void update_pid_comm(struct pid_stat *p, const char *comm) {
@@ -355,10 +483,8 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
         // no change
         return;
 
-#if (PROCESSES_HAVE_CMDLINE == 1)
-    if(likely(proc_pid_cmdline_is_needed && !p->cmdline))
-        managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
-#endif
+    string_freez(p->comm_orig);
+    p->comm_orig = string_strdupz(comm);
 
     // some process names have ( and ), remove the parenthesis
     size_t len = strlen(comm);
@@ -370,14 +496,17 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
     else
         memcpy(buf, comm, sizeof(buf));
 
-    string_freez(p->comm_orig);
-    p->comm_orig = string_strdupz(comm);
+    sanitize_apps_plugin_chart_meta(buf);
+    p->comm = string_strdupz(buf);
+    p->is_manager = is_process_a_manager(p);
+    p->is_aggregator = is_process_an_aggregator(p);
 
-    string_freez(p->comm);
-    p->comm = comm_from_cmdline_sanitized(buf, p->cmdline);
-
-    p->is_manager = is_process_manager(p);
-    p->is_aggregator = is_process_aggregator(p);
+#if (PROCESSES_HAVE_CMDLINE == 1)
+    if(likely(proc_pid_cmdline_is_needed && !p->cmdline))
+        managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
+#else
+    update_pid_comm_from_cmdline(p);
+#endif
 
     // the process changed comm, we may have to reassign it to
     // an apps_groups.conf target.

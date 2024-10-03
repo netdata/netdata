@@ -511,7 +511,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
     memcpy(func_copy, function, sizeof(func_copy));
 
     char *words[LQS_MAX_PARAMS] = { NULL };
-    size_t num_words = quoted_strings_splitter_pluginsd(func_copy, words, LQS_MAX_PARAMS);
+    size_t num_words = quoted_strings_splitter_whitespace(func_copy, words, LQS_MAX_PARAMS);
     for(int i = 1; i < LQS_MAX_PARAMS;i++) {
         char *keyword = get_word(words, num_words, i);
         if(!keyword) break;

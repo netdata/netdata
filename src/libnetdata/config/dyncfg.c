@@ -277,7 +277,7 @@ int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction,
     memcpy(buf, function, sizeof(buf));
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
-    size_t num_words = quoted_strings_splitter_pluginsd(buf, words, MAX_FUNCTION_PARAMETERS);
+    size_t num_words = quoted_strings_splitter_whitespace(buf, words, MAX_FUNCTION_PARAMETERS);
 
     const char *id = get_word(words, num_words, 1);
     const char *action = get_word(words, num_words, 2);
