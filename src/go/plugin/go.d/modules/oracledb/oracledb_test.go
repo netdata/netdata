@@ -138,6 +138,7 @@ func TestOracleDB_Check(t *testing.T) {
 			)
 			require.NoError(t, err)
 			ora := New()
+			ora.DSN = "oracle://user:pass@127.0.0.1:32001/XE"
 			ora.db = db
 			defer func() { _ = db.Close() }()
 
@@ -238,6 +239,7 @@ func TestOracleDB_Collect(t *testing.T) {
 			)
 			require.NoError(t, err)
 			ora := New()
+			ora.DSN = "oracle://user:pass@127.0.0.1:32001/XE"
 			ora.db = db
 			defer func() { _ = db.Close() }()
 
