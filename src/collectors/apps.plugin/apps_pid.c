@@ -339,6 +339,16 @@ static bool is_filename(const char *s) {
     }
 #endif
 
+    // for: sh -c "exec /path/to/command parameters"
+    if(strncmp(s, "exec ", 5) == 0 && s[5]) {
+        s += 5;
+        char look_for = ' ';
+        if(*s == '\'') { look_for = '\''; s++; }
+        if(*s == '"') { look_for = '"'; s++; }
+        char *end = strchr(s, look_for);
+        if(end) *end = '\0';
+    }
+
     // linux, freebsd, macos, msys, cygwin
     if(*s == '/') {
         struct statvfs stat;
