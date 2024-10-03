@@ -106,11 +106,13 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
                                                hNetdatawnd, (HMENU)IDC_EDIT_CONFIG,
                                                NULL, NULL);
 
+            /*
             hwndStopService = CreateWindowExW(0, L"BUTTON", L"Check Update!",
                                               WS_CHILD | WS_VISIBLE,
                                               280, 60, 120, 30,
                                               hNetdatawnd, (HMENU)IDC_CHECK_UPDATE,
                                               NULL, NULL);
+                                              */
 
             hwndOpenMsys = CreateWindowExW(0, L"BUTTON", L"Open terminal",
                                            WS_CHILD | WS_VISIBLE,
@@ -120,7 +122,7 @@ static LRESULT CALLBACK NetdataCliProc(HWND hNetdatawnd, UINT message, WPARAM wP
 
             hwndExit = CreateWindowExW(0, L"BUTTON", L"Exit",
                                        WS_CHILD | WS_VISIBLE,
-                                       140, 100, 120, 30,
+                                       280, 60, 120, 30,
                                        hNetdatawnd, (HMENU)IDC_CLOSE_WINDOW,
                                        NULL, NULL);
             break;
@@ -223,7 +225,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                                   L"Netdata Client",
                                   WS_OVERLAPPEDWINDOW,
                                   CW_USEDEFAULT, CW_USEDEFAULT,
-                                  440, 230,
+                                  440, 200,
                                   HWND_DESKTOP,
                                   NULL,
                                   hInstance,
