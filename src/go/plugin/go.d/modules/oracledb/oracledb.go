@@ -27,7 +27,6 @@ func init() {
 func New() *OracleDB {
 	return &OracleDB{
 		Config: Config{
-			DSN:             "oracle://system:639y7m1jky@127.0.0.1:1521/XE",
 			Timeout:         confopt.Duration(time.Second * 2),
 			charts:          globalCharts.Copy(),
 			seenTablespaces: make(map[string]bool),
