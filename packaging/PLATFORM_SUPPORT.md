@@ -1,14 +1,3 @@
-<!--
-title: "Platform support policy"
-sidebar_label: "Platform support policy"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/PLATFORM_SUPPORT.md"
-learn_status: "Published"
-sidebar_position: "1"
-learn_topic_type: "Tasks"
-learn_rel_path: "Installation"
-learn_docs_purpose: "Present all the supported platform in the Netdata solution"
--->
-
 # Platform support policy
 
 Netdata defines three tiers of official support:
@@ -30,13 +19,13 @@ Any platforms not listed in any of these categories may or may not work.
 
 The following table shows a general outline of the various support tiers and categories.
 
-|   | Bug Support | Guaranteed Configurations | CI Coverage | Native Packages | Static Build Support |
-| - | ----------- | ------------------------- | ----------- | --------------- | -------------------- |
-| Core | High priority | Everything but rare edge cases | Full | Yes, if we can provide them | Full |
-| Intermediate | Normal priority | Common cases | Partial (CI mostly equivalent to **Core**, but possibly with some gaps, and not required to pass) | Possibly | Full |
-| Community | Best Effort | Default only | None | No | Best Effort |
-| Third-party Supported | Users directed to platform maintainers | None | None | No | Best Effort |
-| Previously Supported | Users asked to upgrade | None | None | Yes, but only already published versions | Best Effort |
+|                       | Bug Support                            | Guaranteed Configurations      | CI Coverage                                                                                       | Native Packages                          | Static Build Support |
+|-----------------------|----------------------------------------|--------------------------------|---------------------------------------------------------------------------------------------------|------------------------------------------|----------------------|
+| Core                  | High priority                          | Everything but rare edge cases | Full                                                                                              | Yes, if we can provide them              | Full                 |
+| Intermediate          | Normal priority                        | Common cases                   | Partial (CI mostly equivalent to **Core**, but possibly with some gaps, and not required to pass) | Possibly                                 | Full                 |
+| Community             | Best Effort                            | Default only                   | None                                                                                              | No                                       | Best Effort          |
+| Third-party Supported | Users directed to platform maintainers | None                           | None                                                                                              | No                                       | Best Effort          |
+| Previously Supported  | Users asked to upgrade                 | None                           | None                                                                                              | Yes, but only already published versions | Best Effort          |
 
 - ‘Bug Support’: How we handle of platform-specific bugs.
 - ‘Guaranteed Configurations’: Which runtime configurations for the agent we try to guarantee will work with minimal
@@ -56,30 +45,29 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 expected
 to work on these platforms with minimal user effort.
 
-| Platform                 | Version        | Official Native Packages               | Notes                                                                                                                                              |
-|--------------------------|----------------|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
-| Alpine Linux             | 3.18           | No                                     | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images                                     |
-| Alma Linux               | 9.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                                                    |
-| Alma Linux               | 8.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                                                    |
-| Amazon Linux             | 2023           | x86\_64, AArch64                       |                                                                                                                                                    |
-| Amazon Linux             | 2              | x86\_64, AArch64                       |                                                                                                                                                    |
-| CentOS                   | 7.x            | x86\_64                                |                                                                                                                                                    |
-| Docker                   | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker |
-| Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
-| Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
-| Fedora                   | 40             | x86\_64, AArch64                       |                                                                                                                                                    |
-| Fedora                   | 39             | x86\_64, AArch64                       |                                                                                                                                                    |
-| openSUSE                 | Leap 15.5      | x86\_64, AArch64                       |                                                                                                                                                    |
-| openSUSE                 | Leap 15.4      | x86\_64, AArch64                       |                                                                                                                                                    |
-| Oracle Linux             | 9.x            | x86\_64, AArch64                       |                                                                                                                                                    |
-| Oracle Linux             | 8.x            | x86\_64, AArch64                       |                                                                                                                                                    |
-| Red Hat Enterprise Linux | 9.x            | x86\_64, AArch64                       |                                                                                                                                                    |
-| Red Hat Enterprise Linux | 8.x            | x86\_64, AArch64                       |                                                                                                                                                    |
-| Red Hat Enterprise Linux | 7.x            | x86\_64                                |                                                                                                                                                    |
-| Ubuntu                   | 24.04          | x86\_64, AArch64, ARMv7                |                                                                                                                                                    |
-| Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
-| Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
-
+| Platform                 | Version        | Official Native Packages               | Notes                                                                                                          |
+|--------------------------|----------------|----------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| Alpine Linux             | 3.18           | No                                     | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
+| Alma Linux               | 9.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
+| Alma Linux               | 8.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
+| Amazon Linux             | 2023           | x86\_64, AArch64                       |                                                                                                                |
+| Amazon Linux             | 2              | x86\_64, AArch64                       |                                                                                                                |
+| CentOS                   | 7.x            | x86\_64                                |                                                                                                                |
+| Docker                   | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker           |
+| Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                |
+| Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                |
+| Fedora                   | 40             | x86\_64, AArch64                       |                                                                                                                |
+| Fedora                   | 39             | x86\_64, AArch64                       |                                                                                                                |
+| openSUSE                 | Leap 15.5      | x86\_64, AArch64                       |                                                                                                                |
+| openSUSE                 | Leap 15.4      | x86\_64, AArch64                       |                                                                                                                |
+| Oracle Linux             | 9.x            | x86\_64, AArch64                       |                                                                                                                |
+| Oracle Linux             | 8.x            | x86\_64, AArch64                       |                                                                                                                |
+| Red Hat Enterprise Linux | 9.x            | x86\_64, AArch64                       |                                                                                                                |
+| Red Hat Enterprise Linux | 8.x            | x86\_64, AArch64                       |                                                                                                                |
+| Red Hat Enterprise Linux | 7.x            | x86\_64                                |                                                                                                                |
+| Ubuntu                   | 24.04          | x86\_64, AArch64, ARMv7                |                                                                                                                |
+| Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64                |                                                                                                                |
+| Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64                |                                                                                                                |
 
 ### Intermediate
 
@@ -106,16 +94,16 @@ to add support for a new platform, that platform generally will start in this ti
 are expected to work on these platforms if available. Source-based installs are usually expected to work on these
 platforms, but may require some extra effort from users.
 
-| Platform     | Version    | Official Native Packages | Notes                                                                                                     |
-|--------------|------------|--------------------------|-----------------------------------------------------------------------------------------------------------|
-| Clear Linux  | Latest     | No                       |                                                                                                           |
-| Debian       | Sid        | No                       |                                                                                                           |
-| Fedora       | Rawhide    | No                       |                                                                                                           |
-| FreeBSD      | 13-STABLE  | No                       | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
-| Gentoo       | Latest     | No                       |                                                                                                           |
-| macOS        | 13         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
-| macOS        | 12         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
-| macOS        | 11         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies.                        |
+| Platform    | Version   | Official Native Packages | Notes                                                                                                     |
+|-------------|-----------|--------------------------|-----------------------------------------------------------------------------------------------------------|
+| Clear Linux | Latest    | No                       |                                                                                                           |
+| Debian      | Sid       | No                       |                                                                                                           |
+| Fedora      | Rawhide   | No                       |                                                                                                           |
+| FreeBSD     | 13-STABLE | No                       | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
+| Gentoo      | Latest    | No                       |                                                                                                           |
+| macOS       | 13        | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
+| macOS       | 12        | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
+| macOS       | 11        | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies.                        |
 
 ## Third-party supported platforms
 
