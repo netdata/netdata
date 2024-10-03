@@ -25,5 +25,21 @@ int do_PerflibProcessor(int update_every, usec_t dt);
 int do_PerflibMemory(int update_every, usec_t dt);
 int do_PerflibObjects(int update_every, usec_t dt);
 int do_PerflibThermalZone(int update_every, usec_t dt);
+int do_PerflibWebService(int update_every, usec_t dt);
+
+enum PERFLIB_PRIO {
+    PRIO_WEBSITE_IIS_TRAFFIC = 21000, // PRIO selected, because APPS is using 20YYY
+    PRIO_WEBSITE_IIS_FTP_FILE_TRANSFER_RATE,
+    PRIO_WEBSITE_IIS_ACTIVE_CONNECTIONS_COUNT,
+    PRIO_WEBSITE_IIS_REQUESTS_RATE,
+    PRIO_WEBSITE_IIS_CONNECTIONS_ATTEMP,
+    PRIO_WEBSITE_IIS_USERS,
+    PRIO_WEBSITE_IIS_ISAPI_EXT_REQUEST_COUNT,
+    PRIO_WEBSITE_IIS_ISAPI_EXT_REQUEST_RATE,
+    PRIO_WEBSITE_IIS_ERRORS_RATE,
+    PRIO_WEBSITE_IIS_LOGON_ATTEMPTS,
+    PRIO_WEBSITE_IIS_UPTIME
+};
 
 #endif //NETDATA_WINDOWS_PLUGIN_H
+
