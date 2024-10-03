@@ -102,7 +102,7 @@ You can edit the configuration file using the `edit-config` script from the Netd
     destination = tcp:127.0.0.1:19999
 ```
 
-[Restart the Agents](/packaging/installer/README.md#maintaining-a-netdata-agent-installation), and you are done!
+[Restart the Agents](/docs/netdata-agent/start-stop-restart.md), and you are done!
 
 You should now be able to have a Local Dashboard that gets its metrics from Child instances, running through Cloudflare tunnels.
 

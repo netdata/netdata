@@ -66,8 +66,8 @@ All users will be able to see events from the Topology and Alerts domain but Aud
 ## How to use the events feed
 
 1. Click on the **Events** tab (located near the top of your screen)
-1. You will be presented with a table listing the events that occurred from the timeframe defined on the [date time picker](/docs/dashboards-and-charts/visualization-date-and-time-controls.md#date-and-time-selector)
-1. You can use the filtering capabilities available on right-hand bar to slice through the results provided. See more details on [event types and filters](#event-types-and-filters)
+2. You will be presented with a table listing the events that occurred from the timeframe defined on the [date time picker](/docs/dashboards-and-charts/visualization-date-and-time-controls.md#date-and-time-selector)
+3. You can use the filtering capabilities available on right-hand bar to slice through the results provided
 
 > **Note**
 >

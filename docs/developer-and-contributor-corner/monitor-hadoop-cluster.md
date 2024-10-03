@@ -27,8 +27,8 @@ alternative, like the guide available from
 
 For more specifics on the collection modules used in this guide, read the respective pages in our documentation:
 
--   [HDFS](/src/go/plugin/go.d/modules/hdfs/README.md)
--   [Zookeeper](/src/go/plugin/go.d/modules/zookeeper/README.md)
+- [HDFS](/src/go/plugin/go.d/modules/hdfs/README.md)
+- [Zookeeper](/src/go/plugin/go.d/modules/zookeeper/README.md)
 
 ## Set up your HDFS and Zookeeper installations
 
@@ -164,7 +164,7 @@ jobs:
     address : 203.0.113.10:2182
 ```
 
-Finally, [restart Netdata](/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
+Finally, [restart Netdata](/docs/netdata-agent/start-stop-restart.md).
 
 ```sh
 sudo systemctl restart netdata
@@ -178,7 +178,7 @@ showing real-time metrics for both in your Netdata dashboard. 🎉
 The Netdata community helped us create sane defaults for alerts related to both HDFS and Zookeeper. You may want to
 investigate these to ensure they work well with your Hadoop implementation.
 
--   [HDFS alerts](https://raw.githubusercontent.com/netdata/netdata/master/src/health/health.d/hdfs.conf)
+- [HDFS alerts](https://raw.githubusercontent.com/netdata/netdata/master/src/health/health.d/hdfs.conf)
 
 You can also access/edit these files directly with `edit-config`:
 
@@ -187,5 +187,4 @@ sudo /etc/netdata/edit-config health.d/hdfs.conf
 sudo /etc/netdata/edit-config health.d/zookeeper.conf
 ```
 
-For more information about editing the defaults or writing new alert entities, see our 
-[health monitoring documentation](/src/health/README.md).
+For more information about editing the defaults or writing new alert entities, see our [health monitoring documentation](/src/health/README.md).

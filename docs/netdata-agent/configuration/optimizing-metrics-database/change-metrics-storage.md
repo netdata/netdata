@@ -32,9 +32,9 @@ retention strategies as shown in the table below:
 
 You can change these limits in `netdata.conf`:
 
-```
+```text
 [db]
-    mode = dbengine	
+    mode = dbengine
     storage tiers = 3
 
     # Tier 0, per second data. Set to 0 for no limit.
@@ -63,7 +63,7 @@ your storage space (disk space limits) and time (time limits) are used for metri
 Netdata prior to v2 supports the following configuration options in  `netdata.conf`.
 They have the same defaults as the latest v2, but the unit of each value is given in the option name, not at the value.
 
-```
+```text
 storage tiers = 3
 # Tier 0, per second data. Set to 0 for no limit.
 dbengine tier 0 disk space MB = 1024
@@ -90,9 +90,9 @@ Netdata versions prior to v1.46.0 relied on a disk space-based retention.
 
 You can change these limits in `netdata.conf`:
 
-```
+```text
 [db]
-    mode = dbengine	
+    mode = dbengine
     storage tiers = 3
     # Tier 0, per second data
     dbengine multihost disk space MB = 256
@@ -127,7 +127,6 @@ The Agent allocates resources for each instance separately using the `dbengine d
 If `dbengine disk space MB`(**deprecated**) is set to the default `256`, each instance is given 256 MiB in disk space,
 which means the total disk space required to store all instances is,
 roughly, `256 MiB * 1 parent * 4 child nodes = 1280 MiB`.
-
 
 #### Backward compatibility
 

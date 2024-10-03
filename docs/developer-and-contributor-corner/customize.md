@@ -1,15 +1,15 @@
 # Customize the standard dashboard
 
-> ### Disclaimer
+> **Disclaimer**
 >
 > This document is only applicable to the v1 version of the dashboard and doesn't affect the [Netdata Dashboard](/docs/dashboards-and-charts/README.md).
 
-While the [Netdata dashboard](/src/web/gui/README.md) comes preconfigured with hundreds of charts and
+While the [Netdata dashboard](/src/web/gui/README.md) comes pre-configured with hundreds of charts and
 thousands of metrics, you may want to alter your experience based on a particular use case or preferences.
 
 ## Dashboard settings
 
-To change dashboard settings, click the on the **settings** icon 
+To change dashboard settings, click the on the **settings** icon
 ![Import icon](https://raw.githubusercontent.com/netdata/netdata-ui/98e31799c1ec0983f433537ff16d2ac2b0d994aa/src/components/icon/assets/gear.svg)
 in the top panel.
 
@@ -21,9 +21,8 @@ Here are a few popular settings:
 
 ### Change chart legend position
 
-Find this setting under the **Visual** tab. By default, Netdata places the legend of dimensions _below_ charts. 
+Find this setting under the **Visual** tab. By default, Netdata places the legend of dimensions _below_ charts.
 Click this toggle to move the legend to the _right_ of charts.
-
 
 ### Change theme
 

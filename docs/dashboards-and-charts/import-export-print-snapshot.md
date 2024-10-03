@@ -15,8 +15,7 @@ learn_rel_path: "Operations"
 # Import, export, and print a snapshot
 
 >❗This feature is only available on v1 dashboards, it hasn't been port-forwarded to v2.
->  For more information on accessing dashboards check [this documentation](/docs/dashboards-and-charts/README.md).
-
+> For more information on accessing dashboards check [this documentation](/docs/dashboards-and-charts/README.md).
 
 Netdata can export snapshots of the contents of your dashboard at a given time, which you can then import into any other
 node running Netdata. Or, you can create a print-ready version of your dashboard to save to PDF or actually print to
@@ -44,7 +43,7 @@ Select the Netdata snapshot file to import. Once the file is loaded, the modal u
 snapshot and the system from which it was taken. Click **Import** to begin to process.
 
 Netdata takes the data embedded inside the snapshot and re-creates a static replica on your dashboard. When the import
-finishes, you're free to move around and examine the charts. 
+finishes, you're free to move around and examine the charts.
 
 Some caveats and tips to keep in mind:
 

@@ -15,23 +15,23 @@ It is notable for having much simpler configuration than many popular HTTP serve
 
 ## Why H2O
 
--   Sane configuration defaults mean that typical configurations are very minimalistic and easy to work with.
+- Sane configuration defaults mean that typical configurations are very minimalistic and easy to work with.
 
--   Native support for HTTP/2 provides improved performance when accessing the Netdata dashboard remotely.
+- Native support for HTTP/2 provides improved performance when accessing the Netdata dashboard remotely.
 
--   Password protect access to the Netdata dashboard without requiring Netdata Cloud.
+- Password protect access to the Netdata dashboard without requiring Netdata Cloud.
 
-## H2O configuration file.
+## H2O configuration file
 
-On most systems, the H2O configuration is found under `/etc/h2o`. H2O uses [YAML 1.1](https://yaml.org/spec/1.1/), with a few special extensions, for it’s configuration files, with the main configuration file being `/etc/h2o/h2o.conf`. 
+On most systems, the H2O configuration is found under `/etc/h2o`. H2O uses [YAML 1.1](https://yaml.org/spec/1.1/), with a few special extensions, for it’s configuration files, with the main configuration file being `/etc/h2o/h2o.conf`.
 
 You can edit the H2O configuration file with Nano, Vim or any other text editors with which you are comfortable.
 
 After making changes to the configuration files, perform the following:
 
--   Test the configuration with `h2o -m test -c /etc/h2o/h2o.conf`
+- Test the configuration with `h2o -m test -c /etc/h2o/h2o.conf`
 
--   Restart H2O to apply tha changes with `/etc/init.d/h2o restart` or `service h2o restart`
+- Restart H2O to apply tha changes with `/etc/init.d/h2o restart` or `service h2o restart`
 
 ## Ways to access Netdata via H2O
 
@@ -52,7 +52,7 @@ hosts:
 
 ### As a subfolder of an existing virtual host
 
-This method is recommended when Netdata is to be served from a subfolder (or directory). 
+This method is recommended when Netdata is to be served from a subfolder (or directory).
 In this case, the virtual host `netdata.example.com` already exists and Netdata has to be accessed via `netdata.example.com/netdata/`.
 
 ```yaml
@@ -72,7 +72,7 @@ hosts:
 
 ### As a subfolder for multiple Netdata servers, via one H2O instance
 
-This is the recommended configuration when one H2O instance will be used to manage multiple Netdata servers via subfolders.
+This is the recommended configuration when one H2O instance will be used to manage multiple Netdata servers via sub-folders.
 
 ```yaml
 hosts:
@@ -100,12 +100,12 @@ Of course you can add as many backend servers as you like.
 
 Using the above, you access Netdata on the backend servers, like this:
 
--   `http://netdata.example.com/netdata/server1/` to reach Netdata on `198.51.100.1:19999`
--   `http://netdata.example.com/netdata/server2/` to reach Netdata on `198.51.100.2:19999`
+- `http://netdata.example.com/netdata/server1/` to reach Netdata on `198.51.100.1:19999`
+- `http://netdata.example.com/netdata/server2/` to reach Netdata on `198.51.100.2:19999`
 
 ### Encrypt the communication between H2O and Netdata
 
-In case Netdata's web server has been [configured to use TLS](/src/web/server/README.md#enabling-tls-support), it is
+In case Netdata's web server has been [configured to use TLS](/src/web/server/README.md#enable-httpstls-support), it is
 necessary to specify inside the H2O configuration that the final destination is using TLS. To do this, change the
 `http://` on the `proxy.reverse.url` line in your H2O configuration with `https://`
 
@@ -141,31 +141,27 @@ For more information on using basic authentication with H2O, see [their official
 
 If your H2O server is on `localhost`, you can use this to ensure external access is only possible through H2O:
 
-```
+```txt
 [web]
     bind to = 127.0.0.1 ::1
 ```
 
- 
-
 You can also use a unix domain socket. This will provide faster communication between H2O and Netdata as well:
 
-```
+```txt
 [web]
     bind to = unix:/run/netdata/netdata.sock
 ```
 
 In the H2O configuration, use a line like the following to connect to Netdata via the unix socket:
 
-```yaml
+```txt
 proxy.reverse.url http://[unix:/run/netdata/netdata.sock]
 ```
 
-
-
 If your H2O server is not on localhost, you can set:
 
-```
+```txt
 [web]
     bind to = *
     allow connections from = IP_OF_H2O_SERVER
@@ -181,7 +177,7 @@ the connection IP address.
 H2O logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting
 this in `/etc/netdata/netdata.conf`:
 
-```
+```txt
 [logs]
     access = off
 ```

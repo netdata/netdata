@@ -152,7 +152,7 @@ include:
    rate-limiting and automated blacklisting.
 7. **Security-Focused Development Process** :
    To ensure a secure environment, Netdata employs a security-focused development process. This includes the use of
-   static code analysers to identify potential security vulnerabilities in the codebase.
+   static code analyzers to identify potential security vulnerabilities in the codebase.
 8. **High Security Standards** :
    Netdata Cloud maintains high security standards and can provide additional customization on a per contract basis.
 9. **Employee Security Practices** :

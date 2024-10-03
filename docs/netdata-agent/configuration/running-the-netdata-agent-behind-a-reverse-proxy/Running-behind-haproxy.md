@@ -1,16 +1,6 @@
-<!--
-title: "Netdata via HAProxy"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md"
-sidebar_label: "Netdata via HAProxy"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration/Secure your nodes"
--->
+# Running Netdata behind HAProxy
 
-# Netdata via HAProxy
-
-> HAProxy is a free, very fast and reliable solution offering high availability, load balancing, 
-> and proxying for TCP and HTTP-based applications. It is particularly suited for very high traffic websites 
+> HAProxy is a free, very fast and reliable solution offering high availability, load balancing, and proxying for TCP and HTTP-based applications. It is particularly suited for very high traffic websites
 > and powers quite a number of the world's most visited ones.
 
 If Netdata is running on a host running HAProxy, rather than connecting to Netdata from a port number, a domain name can
@@ -18,7 +8,7 @@ be pointed at HAProxy, and HAProxy can redirect connections to the Netdata port.
 Netdata at `https://example.com` or `https://example.com/netdata/`, which is a much nicer experience then
 `http://example.com:19999`.
 
-To proxy requests from [HAProxy](https://github.com/haproxy/haproxy) to Netdata, 
+To proxy requests from [HAProxy](https://github.com/haproxy/haproxy) to Netdata,
 the following configuration can be used:
 
 ## Default Configuration
@@ -107,7 +97,7 @@ backend netdata_backend
 
 ## Using TLS communication
 
-TLS can be used by adding port `443` and a cert to the frontend. 
+TLS can be used by adding port `443` and a cert to the frontend.
 This example will only use Netdata if host matches example.com (replace with your domain).
 
 ### Frontend
@@ -143,7 +133,7 @@ In the cert list file place a mapping from a certificate file to the domain used
 example.com /etc/letsencrypt/live/example.com/example.com.pem
 ```
 
-The file `/etc/letsencrypt/live/example.com/example.com.pem` should contain the key and 
+The file `/etc/letsencrypt/live/example.com/example.com.pem` should contain the key and
 certificate (in that order) concatenated into a `.pem` file.:
 
 ```sh
@@ -177,17 +167,17 @@ To use basic HTTP Authentication, create an authentication list:
 userlist basic-auth-list
   group is-admin
   # Plaintext password
-  user admin password passwordhere groups is-admin
+  user admin password YOUR_PASSWORD groups is-admin
 ```
 
 You can create a hashed password using the `mkpassword` utility.
 
 ```sh
- printf "passwordhere" | mkpasswd --stdin --method=sha-256
+ printf "YOUR_PASSWORD" | mkpasswd --stdin --method=sha-256
 $5$l7Gk0VPIpKO$f5iEcxvjfdF11khw.utzSKqP7W.0oq8wX9nJwPLwzy1
 ```
 
-Replace `passwordhere` with hash:
+Replace `YOUR_PASSWORD` with hash:
 
 ```conf
 user admin password $5$l7Gk0VPIpKO$f5iEcxvjfdF11khw.utzSKqP7W.0oq8wX9nJwPLwzy1 groups is-admin
@@ -293,5 +283,3 @@ backend netdata_backend
     http-request set-header X-Forwarded-Port %[dst_port]
     http-request set-header Connection "keep-alive"
 ```
-
-

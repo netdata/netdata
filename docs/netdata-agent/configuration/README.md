@@ -4,7 +4,7 @@ The main Netdata Agent configuration is `netdata.conf`.
 
 ## The Netdata config directory
 
-On most Linux systems, by using our [recommended one-line installation](/packaging/installer/README.md#install-on-linux-with-one-line-installer), the **Netdata config
+On most Linux systems, the **Netdata config
 directory** will be `/etc/netdata/`. The config directory contains several configuration files with the `.conf` extension, a
 few directories, and a shell script named `edit-config`.
 
@@ -33,7 +33,7 @@ Your editor will open.
 
 The running version of `netdata.conf` can be downloaded from a running Netdata Agent, at this URL:
 
-```
+```url
 http://agent-ip:19999/netdata.conf
 ```
 
