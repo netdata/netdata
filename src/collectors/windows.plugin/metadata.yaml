@@ -35,24 +35,28 @@ modules:
         auto_detection:
           description: |
             The collector automatically detects all metrics, no configuration required.
-          limits:
-            description: ""
-          performance_impact:
-            description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
           file:
-            section_name: "plugin:windows"
             name: "netdata.conf"
-            description: ""
+            section_name: "plugin:windows"
+            description:  "The main configuration file"
           options:
             description: ""
             folding:
-              title: ""
+              title: "Config option"
               enabled: true
-            list: []
+            list:
+              - name: PerflibProcesses
+                description: An option to enable or disable the data collection.
+                default_value: Yes
+                required: false
           examples:
             folding:
               enabled: true
@@ -134,15 +138,19 @@ modules:
         list: []
       configuration:
         file:
-          section_name: "plugin:windows"
           name: "netdata.conf"
-          description: ""
+          section_name: "plugin:windows"
+          description: "The main configuration file"
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config option"
             enabled: true
-          list: []
+          list:
+             - name: PerflibMemory
+               description: An option to enable or disable the data collection.
+               default_value: Yes
+               required: false
         examples:
           folding:
             enabled: true
@@ -230,13 +238,17 @@ modules:
         file:
           section_name: "plugin:windows"
           name: "netdata.conf"
-          description: ""
+          description: "The main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config Option"
             enabled: false
-          list: []
+          list:
+            - name: PerflibThermalZone
+              description: An option to enable or disable the data collection.
+              default_value: Yes
+              required: false
         examples:
           folding:
             enabled: false
