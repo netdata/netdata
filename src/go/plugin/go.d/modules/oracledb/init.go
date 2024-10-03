@@ -3,6 +3,7 @@
 package oracledb
 
 import (
+	"errors"
 	"net/url"
 	"strings"
 
@@ -10,11 +11,14 @@ import (
 )
 
 func (o *OracleDB) validateDSN() (string, error) {
-	if _, err := goora.ParseConfig(o.Config.DSN); err != nil {
+	if o.DSN == "" {
+		return "", errors.New("dsn required but not set")
+	}
+	if _, err := goora.ParseConfig(o.DSN); err != nil {
 		return "", err
 	}
 
-	u, err := url.Parse(o.Config.DSN)
+	u, err := url.Parse(o.DSN)
 	if err != nil {
 		return "", err
 	}
