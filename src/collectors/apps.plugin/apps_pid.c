@@ -348,6 +348,33 @@ static bool is_filename(const char *s) {
     return false;
 }
 
+static const char *extensions_to_strip[] = {
+        ".sh", // shell scripts
+        ".py", // python scripts
+        ".pl", // perl scripts
+        ".js", // node.js
+#if defined(OS_WINDOWS)
+        ".exe",
+#endif
+        NULL,
+};
+
+// strip extensions we don't want to show
+static void remove_extension(char *name) {
+    size_t name_len = strlen(name);
+    for(size_t i = 0; extensions_to_strip[i] != NULL; i++) {
+        const char *ext = extensions_to_strip[i];
+        size_t ext_len = strlen(ext);
+        if(name_len > ext_len) {
+            char *check = &name[name_len - ext_len];
+            if(strcmp(check, ext) == 0) {
+                *check = '\0';
+                break;
+            }
+        }
+    }
+}
+
 static inline STRING *comm_from_cmdline_param_sanitized(STRING *cmdline) {
     if(!cmdline) return NULL;
 
@@ -368,6 +395,7 @@ static inline STRING *comm_from_cmdline_param_sanitized(STRING *cmdline) {
 
             if(name && *name) {
                 name++;
+                remove_extension(name);
                 sanitize_apps_plugin_chart_meta(name);
                 return string_strdupz(name);
             }
@@ -399,6 +427,7 @@ static inline STRING *comm_from_cmdline_sanitized(STRING *comm, STRING *cmdline)
 
         *end = '\0';
 
+        remove_extension(start);
         sanitize_apps_plugin_chart_meta(start);
         return string_strdupz(start);
     }
@@ -414,11 +443,6 @@ static void update_pid_comm_from_cmdline(struct pid_stat *p) {
         string_freez(p->comm);
         p->comm = new_comm;
         updated = true;
-    }
-
-    if(string_strcmp(p->comm, "bash") == 0) {
-        int x = 0;
-        x++;
     }
 
     if(is_process_an_interpreter(p)) {
