@@ -1,12 +1,3 @@
-<!--
-title: "Install Netdata with Docker"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/docker/README.md"
-sidebar_label: "Docker"
-learn_status: "Published"
-learn_rel_path: "Installation/Installation methods"
-sidebar_position: 40
--->
-
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -34,7 +25,7 @@ along with their descriptions.
 <details open>
 <summary>Privileges</summary>
 
-|       Component       |          Privileges           | Description                                                                                                              | 
+|       Component       |          Privileges           | Description                                                                                                              |
 |:---------------------:|:-----------------------------:|--------------------------------------------------------------------------------------------------------------------------|
 |    cgroups.plugin     |   host PID mode, SYS_ADMIN    | Container network interfaces monitoring. Map virtual interfaces in the system namespace to interfaces inside containers. |
 |      proc.plugin      |       host network mode       | Host system networking stack monitoring.                                                                                 |
@@ -47,7 +38,7 @@ along with their descriptions.
 <details open>
 <summary>Mounts</summary>
 
-|       Component        |           Mounts           | Description                                                                                                                                | 
+|       Component        |           Mounts           | Description                                                                                                                                |
 |:----------------------:|:--------------------------:|--------------------------------------------------------------------------------------------------------------------------------------------|
 |        netdata         |      /etc/os-release       | Host info detection.                                                                                                                       |
 |    diskspace.plugin    |             /              | Host mount points monitoring.                                                                                                              |
@@ -177,13 +168,11 @@ Add `- /run/dbus:/run/dbus:ro` to the netdata service `volumes`.
 
 ### With NVIDIA GPUs monitoring
 
-
 Monitoring NVIDIA GPUs requires:
 
 - Using official [NVIDIA driver](https://www.nvidia.com/Download/index.aspx).
 - Installing [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 - Allowing the Netdata container to access GPU resources.
-
 
 <Tabs>
 <TabItem value="docker_run" label="docker run">
