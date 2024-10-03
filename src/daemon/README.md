@@ -1,8 +1,8 @@
 # Netdata daemon
 
-The Netdata daemon is practically a synonym for the Netdata Agent, as it controls its 
-entire operation. We support various methods to 
-[start, stop, or restart the daemon](/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
+The Netdata daemon is practically a synonym for the Netdata Agent, as it controls its
+entire operation. We support various methods to
+[start, stop, or restart the daemon](/docs/netdata-agent/start-stop-restart.md).
 
 This document provides some basic information on the command line options, log files, and how to debug and troubleshoot
 
@@ -116,10 +116,10 @@ You can send commands during runtime via [netdatacli](/src/cli/README.md).
 
 Netdata uses 4 log files:
 
-1.  `error.log`
-2.  `collector.log`
-3.  `access.log`
-4.  `debug.log`
+1. `error.log`
+2. `collector.log`
+3. `access.log`
+4. `debug.log`
 
 Any of them can be disabled by setting it to `/dev/null` or `none` in `netdata.conf`. By default `error.log`,
 `collector.log`, and `access.log` are enabled. `debug.log` is only enabled if debugging/tracing is also enabled
@@ -133,8 +133,8 @@ The `error.log` is the `stderr` of the `netdata` daemon .
 
 For most Netdata programs (including standard external plugins shipped by netdata), the following lines may appear:
 
-| tag     | description                                                                                                               |
-|:-:|:----------|
+|   tag   | description                                                                                                               |
+|:-------:|:--------------------------------------------------------------------------------------------------------------------------|
 | `INFO`  | Something important the user should know.                                                                                 |
 | `ERROR` | Something that might disable a part of netdata.<br/>The log line includes `errno` (if it is not zero).                    |
 | `FATAL` | Something prevented a program from running.<br/>The log line includes `errno` (if it is not zero) and the program exited. |
@@ -166,15 +166,15 @@ DATE: ID: (sent/all = SENT_BYTES/ALL_BYTES bytes PERCENT_COMPRESSION%, prep/sent
 
 where:
 
--   `ID` is the client ID. Client IDs are auto-incremented every time a client connects to netdata.
--   `SENT_BYTES` is the number of bytes sent to the client, without the HTTP response header.
--   `ALL_BYTES` is the number of bytes of the response, before compression.
--   `PERCENT_COMPRESSION` is the percentage of traffic saved due to compression.
--   `PREP_TIME` is the time in milliseconds needed to prepared the response.
--   `SENT_TIME` is the time in milliseconds needed to sent the response to the client.
--   `TOTAL_TIME` is the total time the request was inside Netdata (from the first byte of the request to the last byte
+- `ID` is the client ID. Client IDs are auto-incremented every time a client connects to netdata.
+- `SENT_BYTES` is the number of bytes sent to the client, without the HTTP response header.
+- `ALL_BYTES` is the number of bytes of the response, before compression.
+- `PERCENT_COMPRESSION` is the percentage of traffic saved due to compression.
+- `PREP_TIME` is the time in milliseconds needed to prepared the response.
+- `SENT_TIME` is the time in milliseconds needed to sent the response to the client.
+- `TOTAL_TIME` is the total time the request was inside Netdata (from the first byte of the request to the last byte
     of the response).
--   `ACTION` can be `filecopy`, `options` (used in CORS), `data` (API call).
+- `ACTION` can be `filecopy`, `options` (used in CORS), `data` (API call).
 
 ### debug.log
 
@@ -198,13 +198,13 @@ You can set Netdata scheduling policy in `netdata.conf`, like this:
 
 You can use the following:
 
-| policy                    | description                                                                                                                                                                                                                                                                                                                                                                                                              |
-| :-----------------------: | :----------                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `idle`                    | use CPU only when there is spare - this is lower than nice 19 - it is the default for Netdata and it is so low that Netdata will run in "slow motion" under extreme system load, resulting in short (1-2 seconds) gaps at the charts.                                                                                                                                                                                    |
+|          policy           | description                                                                                                                                                                                                                                                                                                                                                                                                              |
+|:-------------------------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|          `idle`           | use CPU only when there is spare - this is lower than nice 19 - it is the default for Netdata and it is so low that Netdata will run in "slow motion" under extreme system load, resulting in short (1-2 seconds) gaps at the charts.                                                                                                                                                                                    |
 | `other`<br/>or<br/>`nice` | this is the default policy for all processes under Linux. It provides dynamic priorities based on the `nice` level of each process. Check below for setting this `nice` level for netdata.                                                                                                                                                                                                                               |
-| `batch`                   | This policy is similar to `other` in that it schedules the thread according to its dynamic priority (based on the `nice` value).  The difference is that this policy will cause the scheduler to always assume that the thread is CPU-intensive.  Consequently, the scheduler will  apply a small scheduling penalty with respect to wake-up behavior, so that this thread is mildly disfavored in scheduling decisions. |
-| `fifo`                    | `fifo` can be used only with static priorities higher than 0, which means that when a `fifo` threads becomes runnable, it will always  immediately  preempt  any  currently running  `other`, `batch`, or `idle` thread.  `fifo` is a simple scheduling algorithm without time slicing.                                                                                                                                  |
-| `rr`                      | a simple enhancement of `fifo`.  Everything described above for `fifo` also applies to `rr`, except that each thread is allowed to run only for a  maximum time quantum.                                                                                                                                                                                                                                                 |
+|          `batch`          | This policy is similar to `other` in that it schedules the thread according to its dynamic priority (based on the `nice` value).  The difference is that this policy will cause the scheduler to always assume that the thread is CPU-intensive.  Consequently, the scheduler will  apply a small scheduling penalty with respect to wake-up behavior, so that this thread is mildly disfavored in scheduling decisions. |
+|          `fifo`           | `fifo` can be used only with static priorities higher than 0, which means that when a `fifo` threads becomes runnable, it will always  immediately  preempt  any  currently running  `other`, `batch`, or `idle` thread.  `fifo` is a simple scheduling algorithm without time slicing.                                                                                                                                  |
+|           `rr`            | a simple enhancement of `fifo`.  Everything described above for `fifo` also applies to `rr`, except that each thread is allowed to run only for a  maximum time quantum.                                                                                                                                                                                                                                                 |
 | `keep`<br/>or<br/>`none`  | do not set scheduling policy, priority or nice level - i.e. keep running with whatever it is set already (e.g. by systemd).                                                                                                                                                                                                                                                                                              |
 
 For more information see `man sched`.
@@ -278,11 +278,7 @@ all programs), edit `netdata.conf` and set:
   process nice level = -1
 ```
 
-then execute this to [restart Netdata](/packaging/installer/README.md#maintaining-a-netdata-agent-installation):
-
-```sh
-sudo systemctl restart netdata
-```
+then [restart Netdata](/docs/netdata-agent/start-stop-restart.md):
 
 #### Example 2: Netdata with nice -1 on systemd systems
 
@@ -332,7 +328,7 @@ will roughly get the number of threads running.
 The system does this for speed. Having a separate memory arena for each thread, allows the threads to run in parallel in
 multi-core systems, without any locks between them.
 
-This behaviour is system specific. For example, the chart above when running
+This behavior is system specific. For example, the chart above when running
 Netdata on Alpine Linux (that uses **musl** instead of **glibc**) is this:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/19013807/7cf5878e-87e4-11e6-9651-082e68701eab.png)
@@ -364,9 +360,9 @@ accounts the whole pages, even if parts of them are actually used).
 
 When you compile Netdata with debugging:
 
-1.  compiler optimizations for your CPU are disabled (Netdata will run somewhat slower)
+1. compiler optimizations for your CPU are disabled (Netdata will run somewhat slower)
 
-2.  a lot of code is added all over netdata, to log debug messages to `/var/log/netdata/debug.log`. However, nothing is
+2. a lot of code is added all over netdata, to log debug messages to `/var/log/netdata/debug.log`. However, nothing is
     printed by default. Netdata allows you to select which sections of Netdata you want to trace. Tracing is activated
     via the config option `debug flags`. It accepts a hex number, to enable or disable specific sections. You can find
     the options supported at [log.h](https://raw.githubusercontent.com/netdata/netdata/master/src/libnetdata/log/log.h).
@@ -404,9 +400,9 @@ To provide stack traces, **you need to have Netdata compiled with debugging**. T
 
 Then you need to be in one of the following 2 cases:
 
-1.  Netdata crashes and you have a core dump
+1. Netdata crashes and you have a core dump
 
-2.  you can reproduce the crash
+2. you can reproduce the crash
 
 If you are not on these cases, you need to find a way to be (i.e. if your system does not produce core dumps, check your
 distro documentation to enable them).
