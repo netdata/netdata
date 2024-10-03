@@ -15,7 +15,6 @@ enum netdata_mssql_metrics {
     NETDATA_MSSQL_MEMORY,
     NETDATA_MSSQL_BUFFER_MANAGEMENT,
     NETDATA_MSSQL_SQL_STATS,
-    NETDATA_MSSQL_TRANSACTIONS,
     NETDATA_MSSQL_ACCESS_METHODS,
 
     NETDATA_MSSQL_METRICS_END
@@ -71,6 +70,12 @@ struct mssql_instance {
     DICTIONARY *locks_instances;
 
     RRDSET *st_db_data_file_size;
+    RRDSET *st_db_active_transactions;
+    RRDSET *st_db_backup_restore_operations;
+    RRDSET *st_db_log_flushed;
+    RRDSET *st_db_log_flushes;
+    RRDSET *st_db_transactions;
+    RRDSET *st_db_write_transactions;
     DICTIONARY *databases;
 
     RRDSET *st_conn_memory;
@@ -127,6 +132,12 @@ struct mssql_db_instance {
     COUNTER_DATA MSSQLDatabaseWriteTransactions;
 
     RRDDIM *rd_db_data_size;
+    RRDDIM *rd_db_active_transactions;
+    RRDDIM *rd_db_backup_restore_operations;
+    RRDDIM *rd_db_log_flushed;
+    RRDDIM *rd_db_log_flushes;
+    RRDDIM *rd_db_transactions;
+    RRDDIM *rd_db_write_transactions;
 };
 
 static DICTIONARY *mssql_instances = NULL;
@@ -149,9 +160,6 @@ static void initialize_mssql_objects(struct mssql_instance *p, const char *insta
 
     strncpyz(&name[length], "Databases", sizeof(name) - length);
     p->objectName[NETDATA_MSSQL_DATABASE] = strdup(name);
-
-    strncpyz(&name[length], "Transactions", sizeof(name) - length);
-    p->objectName[NETDATA_MSSQL_TRANSACTIONS] = strdup(name);
 
     strncpyz(&name[length], "SQL Statistics", sizeof(name) - length);
     p->objectName[NETDATA_MSSQL_SQL_STATS] = strdup(name);
@@ -201,15 +209,6 @@ static inline void initialize_mssql_keys(struct mssql_instance *p) {
     p->MSSQLExternalBenefitOfMemory.key = "External benefit of memory";
     p->MSSQLPendingMemoryGrants.key = "Memory Grants Pending";
     p->MSSQLTotalServerMemory.key = "Total Server Memory (KB)";
-
-    /*
-    p->MSSQLDatabaseActiveTransactions.key = "";
-    p->MSSQLDatabaseBackupRestoreOperations.key = "";
-    p->MSSQLDatabaseLogFlushed.key = "";
-    p->MSSQLDatabaseLogFlushes.key = "";
-    p->MSSQLDatabaseTransactions.key = "";
-    p->MSSQLDatabaseWriteTransactions.key = "";
-     */
 }
 
 void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -223,6 +222,12 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
 
     ptr->MSSQLDatabaseDataFileSize.key = "Data File(s) Size (KB)";
 
+    ptr->MSSQLDatabaseActiveTransactions.key = "Active Transactions";
+    ptr->MSSQLDatabaseBackupRestoreOperations.key = "Backup/Restore Throughput/sec";
+    ptr->MSSQLDatabaseLogFlushed.key = "Log Bytes Flushed/sec";
+    ptr->MSSQLDatabaseLogFlushes.key = "Log Flushes/sec";
+    ptr->MSSQLDatabaseTransactions.key = "Transactions/sec";
+    ptr->MSSQLDatabaseWriteTransactions.key = "Write Transactions/sec";
 }
 
 void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -610,7 +615,7 @@ static void do_mssql_buffer_management(PERF_DATA_BLOCK *pDataBlock, struct mssql
             snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_instance_%s_bufman_checkpoint_pages", p->instanceID);
             p->rd_buff_checkpoint_pages  = rrddim_add(p->st_buff_checkpoint_pages,
                                                      id,
-                                                     "flushed",
+                                                     "log",
                                                      1,
                                                      1,
                                                      RRD_ALGORITHM_INCREMENTAL);
@@ -759,7 +764,7 @@ static void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *
                                                        , id, NULL
                                                        , "Errors"
                                                        , "mssql.instance_sql_errors"
-                                                       , "Errors"
+                                                       , "errors"
                                                        , "errors/s"
                                                        , PLUGIN_WINDOWS_NAME
                                                        , "PerflibMSSQL"
@@ -905,14 +910,279 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p
     rrdset_done(p->st_deadLocks);
 }
 
-int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
-    struct mssql_db_instance *mli = value;
-    const char *db = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+    if (!mli->parent->st_db_backup_restore_operations) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_backup_restore_operations", db, mli->parent->instanceID);
+        mli->parent->st_db_backup_restore_operations = rrdset_create_localhost("mssql",
+                                                                               id,
+                                                                               NULL,
+                                                                               "transactions",
+                                                                               "mssql.database_backup_restore_operations",
+                                                                               "Backup IO per database",
+                                                                               "operations/s",
+                                                                               PLUGIN_WINDOWS_NAME,
+                                                                               "PerflibMSSQL",
+                                                                               PRIO_MSSQL_DATABASE_BACKUP_RESTORE_OPERATIONS,
+                                                                               update_every,
+                                                                               RRDSET_TYPE_LINE);
 
-    int *update_every = data;
+        rrdlabels_add(mli->parent->st_db_backup_restore_operations->rrdlabels,
+                      "mssql_instance",
+                      mli->parent->instanceID,
+                      RRDLABEL_SRC_AUTO);
 
+        rrdlabels_add(mli->parent->st_db_backup_restore_operations->rrdlabels,
+                      "database",
+                      db,
+                      RRDLABEL_SRC_AUTO);
+    }
+
+    if (!mli->rd_db_backup_restore_operations) {
+        snprintfz(id,
+                  RRD_ID_LENGTH_MAX,
+                  "mssql_db_%s_instance_%s_backup_restore_operations",
+                  db,
+                  mli->parent->instanceID);
+
+        mli->rd_db_backup_restore_operations = rrddim_add(mli->parent->st_db_backup_restore_operations, id, db,
+                                                          1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(mli->parent->st_db_backup_restore_operations,
+                          mli->rd_db_backup_restore_operations,
+                          (collected_number)mli->MSSQLDatabaseBackupRestoreOperations.current.Data);
+}
+
+static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (!mli->parent->st_db_log_flushes) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_log_flushes", db, mli->parent->instanceID);
+        mli->parent->st_db_log_flushes = rrdset_create_localhost("mssql",
+                                                                 id,
+                                                                 NULL,
+                                                                 "transactions",
+                                                                 "mssql.database_log_flushes",
+                                                                 "Log flushes",
+                                                                 "flushes/s",
+                                                                 PLUGIN_WINDOWS_NAME,
+                                                                 "PerflibMSSQL",
+                                                                 PRIO_MSSQL_DATABASE_LOG_FLUSHES,
+                                                                 update_every,
+                                                                 RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mli->parent->st_db_log_flushes->rrdlabels,
+                      "mssql_instance",
+                      mli->parent->instanceID,
+                      RRDLABEL_SRC_AUTO);
+
+        rrdlabels_add(mli->parent->st_db_log_flushes->rrdlabels,
+                      "database",
+                      db,
+                      RRDLABEL_SRC_AUTO);
+    }
+
+    if (!mli->rd_db_log_flushes) {
+        snprintfz(id,
+                  RRD_ID_LENGTH_MAX,
+                  "mssql_db_%s_instance_%s_log_flushes_bytes",
+                  db,
+                  mli->parent->instanceID);
+
+        mli->rd_db_log_flushes = rrddim_add(mli->parent->st_db_log_flushes, id, db,
+                                            1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(mli->parent->st_db_log_flushes,
+                          mli->rd_db_log_flushes,
+                          (collected_number)mli->MSSQLDatabaseLogFlushes.current.Data);
+}
+
+static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (!mli->parent->st_db_log_flushed) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_log_flushed", db, mli->parent->instanceID);
+        mli->parent->st_db_log_flushed = rrdset_create_localhost("mssql",
+                                                                 id,
+                                                                 NULL,
+                                                                 "transactions",
+                                                                 "mssql.database_log_flushed",
+                                                                 "Log flushed",
+                                                                 "bytes/s",
+                                                                 PLUGIN_WINDOWS_NAME,
+                                                                 "PerflibMSSQL",
+                                                                 PRIO_MSSQL_DATABASE_LOG_FLUSHED,
+                                                                 update_every,
+                                                                 RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mli->parent->st_db_log_flushed->rrdlabels,
+                      "mssql_instance",
+                      mli->parent->instanceID,
+                      RRDLABEL_SRC_AUTO);
+
+        rrdlabels_add(mli->parent->st_db_log_flushed->rrdlabels,
+                      "database",
+                      db,
+                      RRDLABEL_SRC_AUTO);
+    }
+
+    if (!mli->rd_db_log_flushed) {
+        snprintfz(id,
+                  RRD_ID_LENGTH_MAX,
+                  "mssql_db_%s_instance_%s_log_flushed_bytes",
+                  db,
+                  mli->parent->instanceID);
+
+        mli->rd_db_log_flushed = rrddim_add(mli->parent->st_db_log_flushed, id, db,
+                                                          1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(mli->parent->st_db_log_flushed,
+                          mli->rd_db_log_flushed,
+                          (collected_number)mli->MSSQLDatabaseLogFlushed.current.Data);
+}
+
+static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (!mli->parent->st_db_transactions) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_transactions", db, mli->parent->instanceID);
+        mli->parent->st_db_transactions = rrdset_create_localhost("mssql",
+                                                                  id,
+                                                                  NULL,
+                                                                  "transactions",
+                                                                  "mssql.database_transactions",
+                                                                  "Transactions",
+                                                                  "transactions/s",
+                                                                  PLUGIN_WINDOWS_NAME,
+                                                                  "PerflibMSSQL",
+                                                                  PRIO_MSSQL_DATABASE_TRANSACTIONS,
+                                                                  update_every,
+                                                                  RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mli->parent->st_db_transactions->rrdlabels,
+                      "mssql_instance",
+                      mli->parent->instanceID,
+                      RRDLABEL_SRC_AUTO);
+
+        rrdlabels_add(mli->parent->st_db_transactions->rrdlabels,
+                      "database",
+                      db,
+                      RRDLABEL_SRC_AUTO);
+    }
+
+    if (!mli->rd_db_transactions) {
+        snprintfz(id,
+                  RRD_ID_LENGTH_MAX,
+                  "mssql_db_%s_instance_%s_transactions",
+                  db,
+                  mli->parent->instanceID);
+
+        mli->rd_db_transactions = rrddim_add(mli->parent->st_db_transactions, id, db,
+                                             1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(mli->parent->st_db_transactions,
+                          mli->rd_db_transactions,
+                          (collected_number)mli->MSSQLDatabaseTransactions.current.Data);
+}
+
+static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (!mli->parent->st_db_write_transactions) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_write_transactions", db, mli->parent->instanceID);
+        mli->parent->st_db_write_transactions = rrdset_create_localhost("mssql",
+                                                                         id,
+                                                                         NULL,
+                                                                         "transactions",
+                                                                         "mssql.database_write_transactions",
+                                                                         "Write transactions",
+                                                                         "transactions/s",
+                                                                         PLUGIN_WINDOWS_NAME,
+                                                                         "PerflibMSSQL",
+                                                                         PRIO_MSSQL_DATABASE_WRITE_TRANSACTIONS,
+                                                                         update_every,
+                                                                         RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mli->parent->st_db_write_transactions->rrdlabels,
+                      "mssql_instance",
+                      mli->parent->instanceID,
+                      RRDLABEL_SRC_AUTO);
+
+        rrdlabels_add(mli->parent->st_db_write_transactions->rrdlabels,
+                      "database",
+                      db,
+                      RRDLABEL_SRC_AUTO);
+    }
+
+    if (!mli->rd_db_write_transactions) {
+        snprintfz(id,
+                  RRD_ID_LENGTH_MAX,
+                  "mssql_db_%s_instance_%s_write_transactions",
+                  db,
+                  mli->parent->instanceID);
+
+        mli->rd_db_write_transactions = rrddim_add(mli->parent->st_db_write_transactions, id, db,
+                                                    1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(mli->parent->st_db_write_transactions,
+                          mli->rd_db_write_transactions,
+                          (collected_number)mli->MSSQLDatabaseWriteTransactions.current.Data);
+}
+
+static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    if (!mli->parent->st_db_active_transactions) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_active_transactions", db, mli->parent->instanceID);
+        mli->parent->st_db_active_transactions = rrdset_create_localhost("mssql",
+                                                                  id,
+                                                                  NULL,
+                                                                  "transactions",
+                                                                  "mssql.database_active_transactions",
+                                                                  "Active transactions per database",
+                                                                  "transactions",
+                                                                  PLUGIN_WINDOWS_NAME,
+                                                                  "PerflibMSSQL",
+                                                                  PRIO_MSSQL_DATABASE_ACTIVE_TRANSACTIONS,
+                                                                  update_every,
+                                                                  RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mli->parent->st_db_active_transactions->rrdlabels,
+                      "mssql_instance",
+                      mli->parent->instanceID,
+                      RRDLABEL_SRC_AUTO);
+
+        rrdlabels_add(mli->parent->st_db_active_transactions->rrdlabels,
+                      "database",
+                      db,
+                      RRDLABEL_SRC_AUTO);
+    }
+
+    if (!mli->rd_db_active_transactions) {
+        snprintfz(id,
+                  RRD_ID_LENGTH_MAX,
+                  "mssql_db_%s_instance_%s_active_transactions",
+                  db,
+                  mli->parent->instanceID);
+
+        mli->rd_db_active_transactions = rrddim_add(mli->parent->st_db_active_transactions, id, db,
+                                             1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(mli->parent->st_db_active_transactions,
+                          mli->rd_db_active_transactions,
+                          (collected_number)mli->MSSQLDatabaseActiveTransactions.current.Data);
+}
+
+static void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
     if (!mli->parent->st_db_data_file_size) {
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_data_files_size", db, mli->parent->instanceID);
         mli->parent->st_db_data_file_size = rrdset_create_localhost("mssql",
@@ -925,8 +1195,9 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
                                                                     PLUGIN_WINDOWS_NAME,
                                                                     "PerflibMSSQL",
                                                                     PRIO_MSSQL_DATABASE_DATA_FILE_SIZE,
-                                                                    *update_every,
+                                                                    update_every,
                                                                     RRDSET_TYPE_LINE);
+
         rrdlabels_add(mli->parent->st_db_data_file_size->rrdlabels,
                       "mssql_instance",
                       mli->parent->instanceID,
@@ -951,7 +1222,34 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrddim_set_by_pointer(mli->parent->st_db_data_file_size,
                           mli->rd_db_data_size,
-                          (collected_number)mli->MSSQLDatabaseDataFileSize.current.Data*1024);
+                         (collected_number)mli->MSSQLDatabaseDataFileSize.current.Data*1024);
+
+}
+
+int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct mssql_db_instance *mli = value;
+    const char *db = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+
+    int *update_every = data;
+
+    void (*transaction_chart[])(struct mssql_db_instance *, const char *, int) = {
+        mssql_data_file_size_chart,
+        mssql_transactions_chart,
+        mssql_database_backup_restore_chart,
+        mssql_database_log_flushed_chart,
+        mssql_database_log_flushes_chart,
+        mssql_active_transactions_chart,
+        mssql_write_transactions_chart,
+
+        // Last function pointer must be NULL
+        NULL
+    };
+
+    int i;
+    for (i = 0; transaction_chart[i]; i++) {
+        transaction_chart[i](mli, db, *update_every);
+    }
 }
 
 static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
@@ -984,10 +1282,22 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
         }
 
         perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseDataFileSize);
+        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseActiveTransactions);
+        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseBackupRestoreOperations);
+        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseLogFlushed);
+        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseLogFlushes);
+        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseTransactions);
+        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseWriteTransactions);
     }
 
     dictionary_sorted_walkthrough_read(p->databases, dict_mssql_databases_charts_cb, &update_every);
     rrdset_done(p->st_db_data_file_size);
+    rrdset_done(p->st_db_active_transactions);
+    rrdset_done(p->st_db_backup_restore_operations);
+    rrdset_done(p->st_db_log_flushed);
+    rrdset_done(p->st_db_log_flushes);
+    rrdset_done(p->st_db_transactions);
+    rrdset_done(p->st_db_write_transactions);
 }
 
 static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
@@ -1142,7 +1452,6 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         do_mssql_memory_mgr,
         do_mssql_buffer_management,
         do_mssql_sql_statistics,
-        NULL,
         do_mssql_access_methods
     };
 
