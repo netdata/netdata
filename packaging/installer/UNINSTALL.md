@@ -1,7 +1,7 @@
 # Uninstall Netdata
 
-> ### Note 
-> 
+> **Note**
+>
 > If you're having trouble updating Netdata, moving from one installation method to another, or generally having
 > issues with your Netdata Agent installation, consider our [reinstalling Netdata](/packaging/installer/REINSTALL.md) instead of removing the Netdata Agent entirely.
 
@@ -40,15 +40,15 @@ installation prefix it will usually be located in a similar place under that pre
 
 A workflow for uninstallation looks like this:
 
-1.  Find your `.environment` file, which is usually `/etc/netdata/.environment` in a default installation.
-2.  If you cannot find that file and would like to uninstall Netdata, then create a new file with the following content:
+1. Find your `.environment` file, which is usually `/etc/netdata/.environment` in a default installation.
+2. If you cannot find that file and would like to uninstall Netdata, then create a new file with the following content:
 
-```sh
-NETDATA_PREFIX="<installation prefix>"   # put what you used as a parameter to shell installed `--install-prefix` flag. Otherwise it should be empty
-NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user running the Netdata process
-```
+    ```sh
+    NETDATA_PREFIX="<installation prefix>"   # put what you used as a parameter to shell installed `--install-prefix` flag. Otherwise it should be empty
+    NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user running the Netdata process
+    ```
 
-3.  Run `netdata-uninstaller.sh` as follows
+3. Run `netdata-uninstaller.sh` as follows
 
     3.1 **Interactive mode (Default)**
 

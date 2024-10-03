@@ -35,21 +35,21 @@ The installation process securely connects your Kubernetes cluster to stream met
 
 1. Add the Netdata Helm chart repository by running:
 
-  ```bash
-  helm repo add netdata https://netdata.github.io/helmchart/
-  ```
+    ```bash
+    helm repo add netdata https://netdata.github.io/helmchart/
+    ```
 
 2. To install Netdata using the `helm install` command, run:
 
-  ```bash
-  helm install netdata netdata/netdata 
-  ```
+    ```bash
+    helm install netdata netdata/netdata 
+    ```
 
-  > ### Note
-  >  
-  > If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's Nodes tab.
+    > **Note**
+    >
+    > If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's Nodes tab.
 
-  For more installation options, please read our [Netdata Helm chart for Kubernetes](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) reference.
+    For more installation options, please read our [Netdata Helm chart for Kubernetes](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) reference.
 
 #### Expected Result
 
@@ -66,50 +66,50 @@ On an existing installation, in order to connect it to Netdata Cloud you will ne
 
 1. You can start with creating a file called `override.yml`
 
-  ```bash
-  touch override.yml
-  ```
-  
+    ```bash
+    touch override.yml
+    ```
+
 2. Paste the following into your `override.yml` file.
 
-  ```yaml
-  parent:
-    claiming:
-      enabled: true
-      token: YOUR_CLAIM_TOKEN
-      rooms: YOUR_ROOM_ID_A,YOUR_ROOM_ID_B
+    ```yaml
+    parent:
+      claiming:
+        enabled: true
+        token: YOUR_CLAIM_TOKEN
+        rooms: YOUR_ROOM_ID_A,YOUR_ROOM_ID_B
 
-  child:
-    claiming:
-      enabled: true
-      token: YOUR_CLAIM_TOKEN
-      rooms: YOUR_ROOM_ID_A,YOUR_ROOM_ID_B
-    configs:
-      netdata:
-        data: |
-          [db]
-            db = ram
-            retention = 3600
-          [health]
-            enabled = no
-  ```
+    child:
+      claiming:
+        enabled: true
+        token: YOUR_CLAIM_TOKEN
+        rooms: YOUR_ROOM_ID_A,YOUR_ROOM_ID_B
+      configs:
+        netdata:
+          data: |
+            [db]
+              db = ram
+              retention = 3600
+            [health]
+              enabled = no
+    ```
 
-  > :bookmark_tabs: Note
-  >  
-  > Make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-  > and `YOUR_ROOM_ID` with the ID of the Room you are willing to connect to.
+    > **Note**
+    >
+    > Make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
+    > and `YOUR_ROOM_ID` with the ID of the Room you are willing to connect to.
 
-  These settings connect your `parent`/`child` nodes to Netdata Cloud and store more metrics in the nodes' time-series databases.
+    These settings connect your `parent`/`child` nodes to Netdata Cloud and store more metrics in the nodes' time-series databases.
 
-  > :bookmark_tabs: Info
-  >  
-  > These override settings, along with the Helm chart's defaults, will retain an hour's worth of metrics (`retention = 3600`, or `3600 seconds`) on each child node. Based on your metrics retention needs, and the resources available on your cluster, you may want to increase the `history` setting.
+    > **Info**
+    >
+    > These override settings, along with the Helm chart's defaults, will retain an hour's worth of metrics (`retention = 3600`, or `3600 seconds`) on each child node. Based on your metrics retention needs, and the resources available on your cluster, you may want to increase the `history` setting.
 
 3. To apply these new settings, run:
 
-  ```bash
-  helm upgrade -f override.yml netdata netdata/netdata
-  ```
+    ```bash
+    helm upgrade -f override.yml netdata netdata/netdata
+    ```
 
 #### Expected Result
 
@@ -188,13 +188,3 @@ To update Netdata's Helm chart to the latest version, run `helm repo update`, th
 helm repo update
 helm upgrade netdata netdata/netdata
 ```
-
-## What's next?
-
-[Start Kubernetes monitoring](/docs/dashboards-and-charts/kubernetes-tab.md) in Netdata Cloud, which comes with meaningful visualizations out of the box.
-
-### Related reference documentation
-
-- [Netdata Cloud · Kubernetes monitoring](/docs/dashboards-and-charts/kubernetes-tab.md)
-- [Netdata Helm chart](https://github.com/netdata/helmchart)
-- [Netdata service discovery](https://github.com/netdata/agent-service-discovery/)

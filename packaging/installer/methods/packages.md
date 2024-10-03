@@ -1,13 +1,3 @@
-<!--
-title: "Install Netdata using native DEB/RPM packages."
-description: "Instructions for how to install Netdata using native DEB or RPM packages."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/packages.md"
-sidebar_label: "Native DEB/RPM packages"
-learn_status: "Published"
-learn_rel_path: "Installation/Installation methods"
-sidebar_position: 20
--->
-
 # Install Netdata using native DEB/RPM packages
 
 For most common Linux distributions that use either DEB or RPM packages, Netdata provides pre-built native packages
@@ -20,7 +10,7 @@ When using the kickstart script, you can force usage of native DEB or RPM packag
 `--native-only` when invoking the script. This will cause it to only attempt to use native packages for the install,
 and fail if it cannot do so.
 
-> ### Note
+> **Note**
 >
 > In July 2022, we switched hosting of our native packages from Package Cloud to self-hosted repositories.
 > We still maintain the Package cloud repositories, but they are not guaranteed to work and may be removed
@@ -63,9 +53,9 @@ appropriate repository configuration package from <https://repo.netdata.cloud/re
 directly on the target system using the system package manager. This will ensure any packages needed to use the
 repository are also installed, and will help enable a seamless transition if we ever need to change our infrastructure.
 
-> ### Note
+> **Note**
 >
-> On RHEL and other systems that use the `el` repostiroies, some of the dependencies for Netdata can only be found
+> On RHEL and other systems that use the `el` repositories, some of the dependencies for Netdata can only be found
 > in the EPEL repository, which is not enabled or installed by default on most of these systems. This additional
 > repository _should_ be pulled in automatically by our repository config packages, but if it is not you may need
 > to manually install `epel-release` to be able to successfully install the Netdata packages.
@@ -91,7 +81,7 @@ These repositories are set up as what Debian calls ‘flat repositories’, and 
 
 As a result of this structure, the required APT sources entry for stable packages for Debian 11 (Bullseye) is:
 
-```
+```txt
 deb http://repo.netdata.cloud/repos/stable/debian/ bullseye/
 ```
 
@@ -134,7 +124,7 @@ but we do have some tips for anyone looking to do so:
 - A full mirror of all of our repositories currently requires up to 100 GB of storage space, though the exact
   amount of space needed fluctuates over time. Because of this, users seeking to mirror our repositories are
   encouraged to mirror only those repositories they actually need instead of mirroring everything.
-- If syncing daily (or less frequently), some time between 05:00 and 08:00 UTC each day is usually the saftest
+- If syncing daily (or less frequently), some time between 05:00 and 08:00 UTC each day is usually the safest
   time to do so, as publishing nightly packages will almost always be done by this point, and publishing of stable
   releases typically happens after that time window.
 - If you intend to use our existing GPG signatures on the repository metadata and packages, you probably also want

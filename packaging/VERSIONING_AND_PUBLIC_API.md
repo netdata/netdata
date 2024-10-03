@@ -36,7 +36,7 @@ will be as up-to-date as possible.
 Versions for nightly builds of the Netdata Agent consist of four parts, a major version, a minor version, a revision
 number, and an optional commit ID, presented like `<major>.<minor>.0-<revision>-<commit>`. For example, a version
 of `1.43.0-11-gb15437502` has a major version of 1, a minor version of 43, a revision of 11, and a commit ID of
-`gb15437502`. A commit ID consists of a lowercaase letter `g`, followed by the short commit hash for the corresponding
+`gb15437502`. A commit ID consists of a lowercase letter `g`, followed by the short commit hash for the corresponding
 commit. If the commit ID is not included, it may be replaced by the word ‘nightly’.
 
 The major and minor version numbers for a nightly build correspond exactly to an associated stable release. A
@@ -80,9 +80,9 @@ notes at least one minor release prior to being merged:
 
 - All mandatory build dependencies which are not vendored in the Netdata Agent code. This includes, but is not
   limited to:
-    - The underlying build system (such as autotools or CMake).
-    - Primary library dependencies (such as libuv).
-    - Any external tooling that is required at build time.
+  - The underlying build system (such as autotools or CMake).
+  - Primary library dependencies (such as libuv).
+  - Any external tooling that is required at build time.
 - The REST API provided by the Netdata Agent’s internal web server, accessible via the `/api` endpoint. This
   does not extend to the charts, labels, or other system-specific data returned by some API endpoints.
 - The protocol used for streaming and replicating data between Netdata Agents.
@@ -138,7 +138,7 @@ Any components which are not explicitly listed above as being part of the public
 API. This includes, but is not limited to:
 
 - Any mandatory build components which are vendored as part of the Netdata sources, such as SQLite3 or libJudy. This
-  extends to both the presence or abscence of such components, as well as the exact version being bundled.
+  extends to both the presence or absence of such components, as well as the exact version being bundled.
 - The exact installation mechanism that will be used on any given system when using our `kickstart.sh` installation
   script.
 - The exact underlying implementation of any data collection plugin.
