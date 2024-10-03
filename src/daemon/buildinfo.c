@@ -1332,6 +1332,7 @@ char *get_value_from_key(char *buffer, char *key) {
 }
 
 void get_install_type(char **install_type, char **prebuilt_arch, char **prebuilt_dist) {
+#ifndef OS_WINDOWS
     char *install_type_filename;
 
     int install_type_filename_len = (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 3);
@@ -1354,6 +1355,9 @@ void get_install_type(char **install_type, char **prebuilt_arch, char **prebuilt
         fclose(fp);
     }
     freez(install_type_filename);
+#else
+    *install_type = strdupz("netdata_installer.exe");
+#endif
 }
 
 static struct {
