@@ -249,6 +249,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Oracle DB (community)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/oracle_db_community.md)
 
+- [Oracle DB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/oracledb/integrations/oracle_db.md)
+
 - [Patroni](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/patroni.md)
 
 - [Percona MySQL](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/mysql/integrations/percona_mysql.md)
