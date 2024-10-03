@@ -3,6 +3,8 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+SPAWN_SERVER *spawn_server = NULL;
+
 char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
 char env_netdata_log_method[FILENAME_MAX + 50] = "";
 char env_netdata_log_format[FILENAME_MAX + 50] = "";
@@ -160,7 +162,6 @@ static void continue_as_child(void) {
         } else {
             break;
         }
-
         tinysleep();
     }
 
@@ -231,10 +232,8 @@ static struct ns {
         { .nstype = 0,               .fd = -1, .status = -1, .name = NULL,      .path = NULL        }
 };
 
-int switch_namespace(const char *prefix, pid_t pid) {
-
+static int switch_namespace(const char *prefix, pid_t pid) {
 #ifdef HAVE_SETNS
-
     int i;
     for(i = 0; all_ns[i].name ; i++)
         all_ns[i].fd = proc_pid_fd(prefix, all_ns[i].path, pid);
@@ -306,7 +305,6 @@ int switch_namespace(const char *prefix, pid_t pid) {
     errno = ENOSYS;
     collector_error("setns() is missing on this system.");
     return 1;
-
 #endif
 }
 
@@ -506,15 +504,78 @@ void detect_veth_interfaces(pid_t pid) {
         if(iface_is_eligible(h)) {
             for (c = cgroup; c; c = c->next) {
                 if(iface_is_eligible(c) && h->ifindex == c->iflink && h->iflink == c->ifindex) {
-                    add_device(h->device, c->device);
+                    printf("%s %s\n", h->device, c->device);
+                    // add_device(h->device, c->device);
                 }
             }
         }
     }
 
+    printf("EXIT DONE\n");
+    fflush(stdout);
+
 cleanup:
     free_host_ifaces(cgroup);
     free_host_ifaces(host);
+}
+
+struct send_to_spawned_process {
+    pid_t pid;
+    char host_prefix[FILENAME_MAX];
+};
+
+
+static int spawn_callback(SPAWN_REQUEST *request) {
+    const struct send_to_spawned_process *d = request->data;
+    detect_veth_interfaces(d->pid);
+    return 0;
+}
+
+#define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
+static void read_from_spawned(SPAWN_INSTANCE *si, const char *name) {
+    char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
+    char *s;
+    FILE *fp = fdopen(spawn_server_instance_read_fd(si), "r");
+    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
+        trim(s);
+
+        if(*s && *s != '\n') {
+            char *t = s;
+            while(*t && *t != ' ') t++;
+            if(*t == ' ') {
+                *t = '\0';
+                t++;
+            }
+
+            if(strcmp(s, "EXIT") == 0)
+                break;
+
+            if(!*s || !*t) continue;
+            add_device(s, t);
+        }
+    }
+    fclose(fp);
+    spawn_server_instance_read_fd_unset(si);
+
+#ifndef __SANITIZE_ADDRESS__
+    int status = spawn_server_exec_kill(spawn_server, si);
+#else
+    int status = 0;
+#endif
+    if(status != 0)
+        collector_error("cgroup-network spawned process exited with status %d: %s", status, name);
+}
+
+void detect_veth_interfaces_spawn(pid_t pid) {
+    struct send_to_spawned_process d = {
+        .pid = pid,
+    };
+    strncpyz(d.host_prefix, netdata_configured_host_prefix, sizeof(d.host_prefix) - 1);
+    SPAWN_INSTANCE *si = spawn_server_exec(spawn_server, STDERR_FILENO, 0, NULL, &d, sizeof(d), SPAWN_INSTANCE_TYPE_CALLBACK);
+    if(si)
+        read_from_spawned(si, "switch namespace callback");
+    else
+        collector_error("cgroup-network cannot spawn switch namespace callback");
 }
 
 // ----------------------------------------------------------------------------
@@ -533,37 +594,31 @@ void call_the_helper(pid_t pid, const char *cgroup) {
 
     collector_info("running: %s", command);
 
-    POPEN_INSTANCE *pi;
+    SPAWN_INSTANCE *si;
 
-    if(cgroup)
-        pi = spawn_popen_run_variadic(PLUGINS_DIR "/cgroup-network-helper.sh", "--cgroup", cgroup, NULL);
+    if(cgroup) {
+        const char *argv[] = {
+            PLUGINS_DIR "/cgroup-network-helper.sh",
+            "--cgroup",
+            cgroup,
+            NULL,
+        };
+        si = spawn_server_exec(spawn_server, nd_log_collectors_fd(), 0, argv, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
+    }
     else {
         char buffer[100];
         snprintfz(buffer, sizeof(buffer) - 1, "%d", pid);
-        pi = spawn_popen_run_variadic(PLUGINS_DIR "/cgroup-network-helper.sh", "--pid", buffer, NULL);
+        const char *argv[] = {
+            PLUGINS_DIR "/cgroup-network-helper.sh",
+            "--pid",
+            buffer,
+            NULL,
+        };
+        si = spawn_server_exec(spawn_server, nd_log_collectors_fd(), 0, argv, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
     }
 
-    if(pi) {
-        char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
-        char *s;
-        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, spawn_popen_stdout(pi)))) {
-            trim(s);
-
-            if(*s && *s != '\n') {
-                char *t = s;
-                while(*t && *t != ' ') t++;
-                if(*t == ' ') {
-                    *t = '\0';
-                    t++;
-                }
-
-                if(!*s || !*t) continue;
-                add_device(s, t);
-            }
-        }
-
-        spawn_popen_kill(pi);
-    }
+    if(si)
+        read_from_spawned(si, command);
     else
         collector_error("cannot execute cgroup-network helper script: %s", command);
 }
@@ -676,7 +731,7 @@ int main(int argc, const char **argv) {
 
     clocks_init();
     nd_log_initialize_for_external_plugins("cgroup-network");
-    netdata_main_spawn_server_init(NULL, argc, argv);
+    spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC | SPAWN_SERVER_OPTION_CALLBACK, NULL, spawn_callback, argc, argv);
 
     // since cgroup-network runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
@@ -754,9 +809,14 @@ int main(int argc, const char **argv) {
         usage();
 
     if(pid > 0)
-        detect_veth_interfaces(pid);
+        detect_veth_interfaces_spawn(pid);
 
     int found = send_devices();
+
+#ifndef __SANITIZE_ADDRESS__
+    spawn_server_destroy(spawn_server);
+#endif
+
     if(found <= 0) return 1;
     return 0;
 }

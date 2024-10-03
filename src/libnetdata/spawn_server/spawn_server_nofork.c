@@ -4,8 +4,12 @@
 
 #if defined(SPAWN_SERVER_VERSION_NOFORK)
 
+// the child's output pipe, reading side
 int spawn_server_instance_read_fd(SPAWN_INSTANCE *si) { return si->read_fd; }
+
+// the child's input pipe, writing side
 int spawn_server_instance_write_fd(SPAWN_INSTANCE *si) { return si->write_fd; }
+
 void spawn_server_instance_read_fd_unset(SPAWN_INSTANCE *si) { si->read_fd = -1; }
 void spawn_server_instance_write_fd_unset(SPAWN_INSTANCE *si) { si->write_fd = -1; }
 pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si) { return si->child_pid; }

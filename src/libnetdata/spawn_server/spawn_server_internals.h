@@ -68,8 +68,8 @@ struct spawn_server {
 struct spawn_instance {
     size_t request_id;
     int sock;
-    int write_fd;
-    int read_fd;
+    int write_fd;       // the child's input pipe, writing side
+    int read_fd;        // the child's output pipe, reading side
     pid_t child_pid;
 
 #if defined(SPAWN_SERVER_VERSION_UV)
