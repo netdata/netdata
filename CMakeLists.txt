@@ -2945,7 +2945,6 @@ if(ENABLE_PLUGIN_PYTHON)
           src/collectors/python.d.plugin/am2320/am2320.conf
           src/collectors/python.d.plugin/go_expvar/go_expvar.conf
           src/collectors/python.d.plugin/haproxy/haproxy.conf
-          src/collectors/python.d.plugin/oracledb/oracledb.conf
           src/collectors/python.d.plugin/pandas/pandas.conf
           src/collectors/python.d.plugin/spigotmc/spigotmc.conf
           src/collectors/python.d.plugin/traefik/traefik.conf
@@ -2957,7 +2956,6 @@ if(ENABLE_PLUGIN_PYTHON)
           src/collectors/python.d.plugin/am2320/am2320.chart.py
           src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
           src/collectors/python.d.plugin/haproxy/haproxy.chart.py
-          src/collectors/python.d.plugin/oracledb/oracledb.chart.py
           src/collectors/python.d.plugin/pandas/pandas.chart.py
           src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
           src/collectors/python.d.plugin/traefik/traefik.chart.py
