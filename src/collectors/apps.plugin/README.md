@@ -1,12 +1,3 @@
-<!--
-title: "Application monitoring (apps.plugin)"
-sidebar_label: "Application monitoring "
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/apps.plugin/README.md"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/System metrics"
--->
-
 # Applications monitoring (apps.plugin)
 
 `apps.plugin` monitors the resources utilization of all processes running.
@@ -16,21 +7,21 @@ learn_rel_path: "Integrations/Monitor/System metrics"
 `apps.plugin` aggregates processes in three distinct ways to provide a more insightful
 breakdown of resource utilization:
 
- - **Tree** or **Category**: Grouped by their position in the process tree.
+- **Tree** or **Category**: Grouped by their position in the process tree.
    This is customizable and allows aggregation by process managers and individual
    processes of interest. Allows also renaming the processes for presentation purposes.
- 
- - **User**: Grouped by the effective user (UID) under which the processes run.
- 
- - **Group**: Grouped by the effective group (GID) under which the processes run.
 
- ## Short-Lived Process Handling
+- **User**: Grouped by the effective user (UID) under which the processes run.
+
+- **Group**: Grouped by the effective group (GID) under which the processes run.
+
+## Short-Lived Process Handling
 
 `apps.plugin` accounts for resource utilization of both running and exited processes,
 capturing the impact of processes that spawn short-lived subprocesses, such as shell
 scripts that fork hundreds or thousands of times per second. So, although processes
 may spawn short lived sub-processes, `apps.plugin` will aggregate their resources
-utilization providing a holistic view of how resources are shared among the processes. 
+utilization providing a holistic view of how resources are shared among the processes.
 
 ## Charts sections
 
@@ -40,7 +31,7 @@ Each type of aggregation is presented as a different section on the dashboard.
 ### Custom Process Groups (Apps)
 
 In this section, apps.plugin summarizes the resources consumed by all processes, grouped based
-on the groups provided in `/etc/netdata/apps_groups.conf`. You can edit this file using our [`edit-config`](docs/netdata-agent/configuration/README.md) script.
+on the groups provided in `/etc/netdata/apps_groups.conf`. You can edit this file using our [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script.
 
 For this section, `apps.plugin` builds a process tree (much like `ps fax` does in Linux), and groups
 processes together (evaluating both child and parent processes) so that the result is always a list with
@@ -63,46 +54,46 @@ effective user group under which each process runs.
 
 `apps.plugin` provides charts for 3 sections:
 
-1.  Per application charts as **Applications** at Netdata dashboards
-2.  Per user charts as **Users** at Netdata dashboards
-3.  Per user group charts as **User Groups** at Netdata dashboards
+1. Per application charts as **Applications** at Netdata dashboards
+2. Per user charts as **Users** at Netdata dashboards
+3. Per user group charts as **User Groups** at Netdata dashboards
 
 Each of these sections provides the same number of charts:
 
--   CPU utilization (`apps.cpu`)
-    -   Total CPU usage
-    -   User/system CPU usage (`apps.cpu_user`/`apps.cpu_system`)
--   Disk I/O
-    -   Physical reads/writes (`apps.preads`/`apps.pwrites`)
-    -   Logical reads/writes (`apps.lreads`/`apps.lwrites`)
-    -   Open unique files (if a file is found open multiple times, it is counted just once, `apps.files`)
--   Memory
-    -   Real Memory Used (non-shared, `apps.mem`)
-    -   Virtual Memory Allocated (`apps.vmem`)
-    -   Minor page faults (i.e. memory activity, `apps.minor_faults`)
--   Processes
-    -   Threads running (`apps.threads`)
-    -   Processes running (`apps.processes`)
-    -   Carried over uptime (since the last Netdata Agent restart, `apps.uptime`)
-    -   Minimum uptime (`apps.uptime_min`)
-    -   Average uptime (`apps.uptime_average`)
-    -   Maximum uptime (`apps.uptime_max`)
-    -   Pipes open (`apps.pipes`)
--   Swap memory
-    -   Swap memory used (`apps.swap`)
-    -   Major page faults (i.e. swap activity, `apps.major_faults`)
--   Network
-    -   Sockets open (`apps.sockets`)
-    
+- CPU utilization (`apps.cpu`)
+  - Total CPU usage
+  - User/system CPU usage (`apps.cpu_user`/`apps.cpu_system`)
+- Disk I/O
+  - Physical reads/writes (`apps.preads`/`apps.pwrites`)
+  - Logical reads/writes (`apps.lreads`/`apps.lwrites`)
+  - Open unique files (if a file is found open multiple times, it is counted just once, `apps.files`)
+- Memory
+  - Real Memory Used (non-shared, `apps.mem`)
+  - Virtual Memory Allocated (`apps.vmem`)
+  - Minor page faults (i.e. memory activity, `apps.minor_faults`)
+- Processes
+  - Threads running (`apps.threads`)
+  - Processes running (`apps.processes`)
+  - Carried over uptime (since the last Netdata Agent restart, `apps.uptime`)
+  - Minimum uptime (`apps.uptime_min`)
+  - Average uptime (`apps.uptime_average`)
+  - Maximum uptime (`apps.uptime_max`)
+  - Pipes open (`apps.pipes`)
+- Swap memory
+  - Swap memory used (`apps.swap`)
+  - Major page faults (i.e. swap activity, `apps.major_faults`)
+- Network
+  - Sockets open (`apps.sockets`)
+
 In addition, if the [eBPF collector](/src/collectors/ebpf.plugin/README.md) is running, your dashboard will also show an
 additional [list of charts](/src/collectors/ebpf.plugin/README.md#integration-with-appsplugin) using low-level Linux
 metrics.
 
 The above are reported:
 
--   For **Applications** per target configured.
--   For **Users** per username or UID (when the username is not available).
--   For **User Groups** per group name or GID (when group name is not available).
+- For **Applications** per target configured.
+- For **Users** per username or UID (when the username is not available).
+- For **User Groups** per group name or GID (when group name is not available).
 
 ## Performance
 
@@ -119,10 +110,10 @@ In such cases, you many need to lower its data collection frequency.
 
 To do this, edit `/etc/netdata/netdata.conf` and find this section:
 
-```
+```txt
 [plugin:apps]
-	# update every = 1
-	# command options =
+ # update every = 1
+ # command options =
 ```
 
 Uncomment the line `update every` and set it to a higher number. If you just set it to `2`,
@@ -130,7 +121,7 @@ its CPU resources will be cut in half, and data collection will be once every 2 
 
 ## Configuration
 
-The configuration file is `/etc/netdata/apps_groups.conf`. You can edit this file using our [`edit-config`](docs/netdata-agent/configuration/README.md) script.
+The configuration file is `/etc/netdata/apps_groups.conf`. You can edit this file using our [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script.
 
 ### Configuring process managers
 
@@ -140,7 +131,7 @@ consider all their sub-processes important to monitor.
 
 Process managers are configured in `apps_groups.conf` with the prefix `managers:`, like this:
 
-```
+```txt
 managers: process1 process2 process3
 ```
 
@@ -164,8 +155,8 @@ For each process given, all of its sub-processes will be grouped, not just the m
 
 The process names are the ones returned by:
 
--   **comm**: `ps -e` or `cat /proc/{PID}/stat`
--   **cmdline**: in case of substring mode (see below): `/proc/{PID}/cmdline`
+- **comm**: `ps -e` or `cat /proc/{PID}/stat`
+- **cmdline**: in case of substring mode (see below): `/proc/{PID}/cmdline`
 
 On Linux **comm** is limited to just a few characters. `apps.plugin` attempts to find the entire
 **comm** name by looking for it at the **cmdline**. When this is successful, the entire process name
@@ -176,12 +167,12 @@ example: `'Plex Media Serv'` or `"my other process"`.
 
 You can add asterisks (`*`) to provide a pattern:
 
--   `*name` _suffix_ mode: will match a **comm** ending with `name`.
--   `name*` _prefix_ mode: will match a **comm** beginning with `name`.
--   `*name*` _substring_ mode: will search for `name` in **cmdline**.
+- `*name` _suffix_ mode: will match a **comm** ending with `name`.
+- `name*` _prefix_ mode: will match a **comm** beginning with `name`.
+- `*name*` _substring_ mode: will search for `name` in **cmdline**.
 
 Asterisks may appear in the middle of `name` (like `na*me`), without affecting what is being
-matched (**comm** or **cmdline**). 
+matched (**comm** or **cmdline**).
 
 To add processes with single quotes, enclose them in double quotes: `"process with this ' single quote"`
 
@@ -194,7 +185,7 @@ There are a few command line options you can pass to `apps.plugin`. The list of 
 options can be acquired with the `--help` flag. The options can be set in the `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configuration/README.md).
 For example, to disable user and user group charts you would set:
 
-```
+```txt
 [plugin:apps]
   command options = without-users without-groups
 ```
@@ -246,7 +237,7 @@ but it will not be able to collect all the information.
 
 You can create badges that you can embed anywhere you like, with URLs like this:
 
-```
+```txt
 https://your.netdata.ip:19999/api/v1/badge.svg?chart=apps.processes&dimensions=myapp&value_color=green%3E0%7Cred
 ```
 
@@ -259,23 +250,23 @@ Here is an example for the process group `sql` at `https://registry.my-netdata.i
 Netdata is able to give you a lot more badges for your app.
 Examples below for process group `sql`:
 
--   CPU usage: ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.cpu&dimensions=sql&value_color=green=0%7Corange%3C50%7Cred)
--   Disk Physical Reads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.preads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
--   Disk Physical Writes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
--   Disk Logical Reads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lreads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
--   Disk Logical Writes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
--   Open Files ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.fds_files&dimensions=sql&value_color=green%3E30%7Cred)
--   Real Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.mem&dimensions=sql&value_color=green%3C100%7Corange%3C200%7Cred)
--   Virtual Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.vmem&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
--   Swap Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.swap&dimensions=sql&value_color=green=0%7Cred)
--   Minor Page Faults ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.minor_faults&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
--   Processes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.processes&dimensions=sql&value_color=green%3E0%7Cred)
--   Threads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.threads&dimensions=sql&value_color=green%3E=28%7Cred)
--   Major Faults (swap activity) ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.major_faults&dimensions=sql&value_color=green=0%7Cred)
--   Open Pipes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.fds_pipes&dimensions=sql&value_color=green=0%7Cred)
--   Open Sockets ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.fds_sockets&dimensions=sql&value_color=green%3E=3%7Cred)
+- CPU usage: ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.cpu&dimensions=sql&value_color=green=0%7Corange%3C50%7Cred)
+- Disk Physical Reads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.preads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Disk Physical Writes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Disk Logical Reads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lreads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Disk Logical Writes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Open Files ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.fds_files&dimensions=sql&value_color=green%3E30%7Cred)
+- Real Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.mem&dimensions=sql&value_color=green%3C100%7Corange%3C200%7Cred)
+- Virtual Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.vmem&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Swap Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.swap&dimensions=sql&value_color=green=0%7Cred)
+- Minor Page Faults ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.minor_faults&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Processes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.processes&dimensions=sql&value_color=green%3E0%7Cred)
+- Threads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.threads&dimensions=sql&value_color=green%3E=28%7Cred)
+- Major Faults (swap activity) ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.major_faults&dimensions=sql&value_color=green=0%7Cred)
+- Open Pipes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.fds_pipes&dimensions=sql&value_color=green=0%7Cred)
+- Open Sockets ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.fds_sockets&dimensions=sql&value_color=green%3E=3%7Cred)
 
-For more information about badges check [Generating Badges](/src/web/api/v2/api_v3_badge/README.md)
+<!-- For more information about badges check [Generating Badges](/src/web/api/v2/api_v3_badge/README.md) -->
 
 ## Comparison with console tools
 
@@ -302,7 +293,7 @@ If you check the total system CPU utilization, it says there is no idle CPU at a
 fails to provide a breakdown of the CPU consumption in the system. The sum of the CPU utilization
 of all processes reported by `top`, is 15.6%.
 
-```
+```txt
 top - 18:46:28 up 3 days, 20:14,  2 users,  load average: 0.22, 0.05, 0.02
 Tasks:  76 total,   2 running,  74 sleeping,   0 stopped,   0 zombie
 %Cpu(s): 32.8 us, 65.6 sy,  0.0 ni,  0.0 id,  0.0 wa,  1.3 hi,  0.3 si,  0.0 st
@@ -322,7 +313,7 @@ KiB Swap:        0 total,        0 free,        0 used.   753712 avail Mem
 
 Exactly like `top`, `htop` is providing an incomplete breakdown of the system CPU utilization.
 
-```
+```bash
   CPU[||||||||||||||||||||||||100.0%]   Tasks: 27, 11 thr; 2 running
   Mem[||||||||||||||||||||85.4M/993M]   Load average: 1.16 0.88 0.90
   Swp[                         0K/0K]   Uptime: 3 days, 21:37:03
@@ -332,7 +323,7 @@ Exactly like `top`, `htop` is providing an incomplete breakdown of the system CP
  7024 netdata    20   0  9544  2480  1744 S  0.7  0.2  0:00.88 /usr/libexec/netd
  7009 netdata    20   0  138M 21016  2712 S  0.7  2.1  0:00.89 /usr/sbin/netdata
  7012 netdata    20   0  138M 21016  2712 S  0.0  2.1  0:00.31 /usr/sbin/netdata
-  563 root	     20   0  308M  202M  202M S  0.0 20.4  1:00.81 /usr/lib/systemd/
+  563 root      20   0  308M  202M  202M S  0.0 20.4  1:00.81 /usr/lib/systemd/
  7019 netdata    20   0  138M 21016  2712 S  0.0  2.1  0:00.14 /usr/sbin/netdata
 ```
 
@@ -340,7 +331,7 @@ Exactly like `top`, `htop` is providing an incomplete breakdown of the system CP
 
 `atop` also fails to break down CPU usage.
 
-```
+```bash
 ATOP - localhost            2016/12/10  20:11:27    -----------      10s elapsed
 PRC | sys    1.13s | user   0.43s | #proc     75 | #zombie    0 | #exit   5383 |
 CPU | sys      67% | user     31% | irq       2% | idle      0% | wait      0% |
@@ -356,7 +347,7 @@ NET | eth0    ---- | pcki      16 | pcko      15 | si    1 Kbps | so    4 Kbps |
 12789  0.98s  0.40s      0K     0K     0K    336K --   -  S  14% bash
     9  0.08s  0.00s      0K     0K     0K      0K --   -  S   1% rcuos/0
  7024  0.03s  0.00s      0K     0K     0K      0K --   -  S   0% apps.plugin
- 7009  0.01s  0.01s	     0K     0K     0K      4K --   -  S   0% netdata
+ 7009  0.01s  0.01s      0K     0K     0K      4K --   -  S   0% netdata
 ```
 
 ### glances
@@ -366,7 +357,7 @@ per process utilization.
 
 Note also, that being a `python` program, `glances` uses 1.6% CPU while it runs.
 
-```
+```bash
 localhost                                               Uptime: 3 days, 21:42:00
 
 CPU  [100.0%]   CPU     100.0%   MEM     23.7%   SWAP      0.0%   LOAD    1-core
@@ -388,8 +379,8 @@ FILE SYS    Used  Total      0.3   2.1  7009 netdata      0 S /usr/sbin/netdata
 
 ### why does this happen?
 
-All the console tools report usage based on the processes found running *at the moment they
-examine the process tree*. So, they see just one `ls` command, which is actually very quick
+All the console tools report usage based on the processes found running _at the moment they
+examine the process tree_. So, they see just one `ls` command, which is actually very quick
 with minor CPU utilization. But the shell, is spawning hundreds of them, one after another
 (much like shell scripts do).
 
@@ -398,12 +389,12 @@ with minor CPU utilization. But the shell, is spawning hundreds of them, one aft
 The total CPU utilization of the system:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/21076212/9198e5a6-bf2e-11e6-9bc0-6bdea25befb2.png)
-<br/>***Figure 1**: The system overview section at Netdata, just a few seconds after the command was run*
+<br/>_**Figure 1**: The system overview section at Netdata, just a few seconds after the command was run_
 
 And at the applications `apps.plugin` breaks down CPU usage per application:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/21076220/c9687848-bf2e-11e6-8d81-348592c5aca2.png)
-<br/>***Figure 2**: The Applications section at Netdata, just a few seconds after the command was run*
+<br/>_**Figure 2**: The Applications section at Netdata, just a few seconds after the command was run_
 
 So, the `ssh` session is using 95% CPU time.
 
