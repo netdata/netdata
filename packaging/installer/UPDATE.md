@@ -13,15 +13,15 @@ icon in the local Agent dashboard's top navigation. This modal informs you wheth
 
 The exact update method to use depends on the install type:
 
--   Installs with an install type of 'custom' usually indicate installing a third-party package through the system
+- Installs with an install type of 'custom' usually indicate installing a third-party package through the system
     package manager. To update these installs, you should update the package just like you would any other package
     on your system.
--   Installs with an install type starting with `binpkg` or ending with `build` or `static` can be updated using
+- Installs with an install type starting with `binpkg` or ending with `build` or `static` can be updated using
     our [regular update method](#updates-for-most-systems).
--   Installs with an install type of 'oci' were created from our official Docker images, and should be updated
+- Installs with an install type of 'oci' were created from our official Docker images, and should be updated
     using our [Docker](#docker) update procedure.
--   macOS users should check [our update instructions for macOS](#macos).
--   Manually built installs should check [our update instructions for manual builds](#manual-installation-from-git).
+- macOS users should check [our update instructions for macOS](#macos).
+- Manually built installs should check [our update instructions for manual builds](#manual-installation-from-git).
 
 ## Determine which installation method you used
 
@@ -45,7 +45,6 @@ The following table contains all possible installation types:
 | oci                | Installed using official Docker images from Netdata, though not necessarily running on Docker                                                               |
 | custom             | Anything not covered by the other identifiers, including manual builds, manually running netdata-installer.sh, and third-party packages (community).        |
 | Unknown            | Same as custom.                                                                                                                                             |
-
 
 If you are using an older version of Netdata, or the above command produces no output, you can run our one-line
 installation script in dry-run mode to attempt to determine what method to use to update by running the following
@@ -189,7 +188,7 @@ and:
 /opt/netdata/usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
 ```
 
-## Control runtime behavior of the updater script.
+## Control runtime behavior of the updater script
 
 Starting with v1.40.0, the `netdata-updater.sh` script supports a config file called `netdata-updater.conf`,
 located in the same directory as the main `netdata.conf` file. This file uses POSIX shell script syntax to define
