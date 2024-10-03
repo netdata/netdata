@@ -38,9 +38,9 @@ func (o *OracleDB) collectTablespace(mx map[string]int64) error {
 	var ts struct {
 		name       string
 		autoExtent bool
-		allocBytes int64
-		maxBytes   int64
-		usedBytes  int64
+		allocBytes float64
+		maxBytes   float64
+		usedBytes  float64
 	}
 
 	seen := make(map[string]bool)
@@ -54,11 +54,11 @@ func (o *OracleDB) collectTablespace(mx map[string]int64) error {
 		case "AUTOEXTENSIBLE":
 			ts.autoExtent = value == "YES"
 		case "ALLOCATED_BYTES":
-			ts.allocBytes, err = strconv.ParseInt(value, 10, 64)
+			ts.allocBytes, err = strconv.ParseFloat(value, 64)
 		case "MAX_BYTES":
-			ts.maxBytes, err = strconv.ParseInt(value, 10, 64)
+			ts.maxBytes, err = strconv.ParseFloat(value, 64)
 		case "USED_BYTES":
-			ts.usedBytes, err = strconv.ParseInt(value, 10, 64)
+			ts.usedBytes, err = strconv.ParseFloat(value, 64)
 		}
 		if err != nil {
 			return fmt.Errorf("could not parse column '%s' value '%s': %w", column, value, err)
@@ -74,12 +74,12 @@ func (o *OracleDB) collectTablespace(mx map[string]int64) error {
 
 			px := fmt.Sprintf("tablespace_%s_", ts.name)
 
-			mx[px+"max_size_bytes"] = limit
-			mx[px+"used_bytes"] = ts.usedBytes
-			mx[px+"avail_bytes"] = limit - ts.usedBytes
+			mx[px+"max_size_bytes"] = int64(limit)
+			mx[px+"used_bytes"] = int64(ts.usedBytes)
+			mx[px+"avail_bytes"] = int64(limit - ts.usedBytes)
 			mx[px+"utilization"] = 0
 			if limit > 0 {
-				mx[px+"utilization"] = int64(float64(ts.usedBytes) / float64(limit) * 100 * precision)
+				mx[px+"utilization"] = int64(ts.usedBytes / limit * 100 * precision)
 			}
 		}
 
