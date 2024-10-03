@@ -1,0 +1,17 @@
+NAME						|		      VALUE
+---------------------------------------------------------------- ----------
+logons cumulative				|		       8717
+logons current					|			 93
+user commits					|		      16056
+user rollbacks					|			  2
+enqueue timeouts				|			229
+physical reads					|		      65690
+physical read bytes				|		  538132480
+physical writes 				|		      95906
+physical write bytes			|			  785661952
+table scans (short tables)		|			     798515
+table scans (long tables)		|				998
+parse count (total)				|		    1251128
+execute count					|		    4066130
+sorts (memory)					|		     220071
+sorts (disk)					|			  0

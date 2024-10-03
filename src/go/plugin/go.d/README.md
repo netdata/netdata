@@ -117,6 +117,7 @@ see the appropriate collector readme.
 | [openvpn](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/openvpn)                       |            OpenVPN            |
 | [openvpn_status_log](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/openvpn_status_log) |            OpenVPN            |
 | [pgbouncer](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/pgbouncer)                   |           PgBouncer           |
+| [oracledb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/oracledb)                     |           Oracle DB           |
 | [phpdaemon](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/phpdaemon)                   |           phpDaemon           |
 | [phpfpm](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/phpfpm)                         |            PHP-FPM            |
 | [pihole](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/pihole)                         |            Pi-hole            |
