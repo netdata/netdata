@@ -610,7 +610,7 @@ function podman_validate_id() {
 DOCKER_HOST="${DOCKER_HOST:=/var/run/docker.sock}"
 PODMAN_HOST="${PODMAN_HOST:=/run/podman/podman.sock}"
 CGROUP_PATH="${1}" # the path as it is (e.g. '/docker/efcf4c409')
-CGROUP="${2}"      # the modified path (e.g. 'docker_efcf4c409')
+CGROUP="${2//\//_}" # the modified path (e.g. 'docker_efcf4c409')
 EXIT_SUCCESS=0
 EXIT_RETRY=2
 EXIT_DISABLE=3

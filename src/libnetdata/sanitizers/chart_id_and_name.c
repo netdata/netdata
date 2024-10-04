@@ -3,20 +3,26 @@
 #include "../libnetdata.h"
 
 /*
- *  !  ->  simple patterns negation (only when it is the first character)
- *  "  ->  needs escaping when parsing
- *  $  ->  can be a shell variable (security in alarm-notify.sh)
- *  %  ->  http GET encoded characters
- *  &  ->  http GET fields separator
- *  '  ->  needs escaping when parsing
- *  *  ->  simple pattern wildcard
- *  +  ->  http GET space
- *  ,  ->  list separator (probably not used today)
- *  =  ->  plugins.d protocol separator
- *  ?  ->  http GET query string separator
- *  @  ->  hostname separator (on the UI)
- *  `  ->  bash expansion (security in alarm-notify.sh)
- *  |  ->  list separator (simple patterns and http GET)
+ * control characters become space, which are deduplicated.
+ *
+ *  Character Name   Sym      To  Why
+ *  ---------------- ---      --- -------------------------------------------------------------------------------------
+ *  space            [ ]  ->  [_]
+ *  exclamation mark [!]  ->  [_] (only when it is the first character) simple patterns negation
+ *  double quotes    ["]  ->  [_] needs escaping when parsing
+ *  dollar           [$]  ->  [_] health variables and security in alarm-notify.sh, cgroup-name.sh, etc.
+ *  percent          [%]  ->  [_] http GET encoded characters
+ *  ampersand        [&]  ->  [_] http GET fields separator
+ *  single quote     [']  ->  [_] needs escaping when parsing
+ *  asterisk         [*]  ->  [_] simple pattern wildcard
+ *  plus             [+]  ->  [_] http GET space
+ *  comma            [,]  ->  [.] list separator (probably not used today)
+ *  equal            [=]  ->  [_] plugins.d protocol separator
+ *  question mark    [?]  ->  [_] http GET query string separator
+ *  at               [@]  ->  [_] hostname separator (on the UI)
+ *  apostrophe       [`]  ->  [_] bash expansion (security in alarm-notify.sh and other shell scripts)
+ *  pipe             [|]  ->  [_] list separator (simple patterns and http GET)
+ *  backslash        [\]  ->  [/] to avoid interfering with escaping logic
  */
 
 unsigned char chart_names_allowed_chars[256] = {
