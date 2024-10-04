@@ -71,14 +71,14 @@ const std::string &otel::MetricHasher::hash(const pb::Metric &M)
     }
 #endif
 
-    uint8_t Output[BLAKE3_OUT_LEN];
+    uint8_t Output[8];
     blake3_hasher_finalize(&TmpBH, Output, BLAKE3_OUT_LEN);
 
     MetricId.clear();
     MetricId += M.name();
     MetricId += "-";
 
-    for (int Idx = 0; Idx < BLAKE3_OUT_LEN; Idx++) {
+    for (int Idx = 0; Idx < 8; Idx++) {
         char HexValue[3];
         std::snprintf(HexValue, sizeof(HexValue), "%02x", static_cast<unsigned int>(Output[Idx]));
         MetricId.append(HexValue);

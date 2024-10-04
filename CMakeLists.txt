@@ -1554,6 +1554,8 @@ set(TC_PLUGIN_FILES
 )
 
 set(OTEL_PLUGIN_FILES
+        src/otel/netdata.cc
+        src/otel/netdata.h
         src/otel/otel.h
         src/otel/otel.cc
         # src/otel/otel_chart.h

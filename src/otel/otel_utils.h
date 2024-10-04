@@ -3,6 +3,9 @@
 #ifndef ND_OTEL_UTILS_H
 #define ND_OTEL_UTILS_H
 
+#include "fmt/core.h"
+#include "fmt/color.h"
+
 #include "opentelemetry/proto/metrics/v1/metrics.pb.h"
 
 namespace pb

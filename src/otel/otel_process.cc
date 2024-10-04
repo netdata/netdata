@@ -2,6 +2,9 @@
 
 #include "otel_process.h"
 
+#include "absl/strings/match.h"
+#include "fmt/core.h"
+
 void otel::MetricsDataProcessor::onResourceMetrics(const pb::ResourceMetrics &RMs)
 {
     SMH = RMH.hash(RMs);
@@ -34,6 +37,11 @@ void otel::MetricsDataProcessor::onMetric(
     UNUSED(SMs);
 
     const std::string &Id = MH.hash(M);
+    if (!absl::StartsWith(Id, "system.cpu.load_average.1m")) {
+        return;
+    }
+
+    fmt::print("{}\n", M.DebugString());
 
     auto &Charts = Ctx.charts();
 

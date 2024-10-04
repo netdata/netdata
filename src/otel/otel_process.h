@@ -8,8 +8,12 @@
 #include "otel_hash.h"
 #include "otel_iterator.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace otel
 {
+    using ChartMap = absl::flat_hash_map<std::string, Chart>;
+
 class ProcessorContext {
 public:
     ProcessorContext(const Config *Cfg) : Cfg(Cfg)
@@ -21,14 +25,14 @@ public:
         return Cfg;
     }
 
-    inline std::unordered_map<std::string, Chart> &charts()
+    inline ChartMap &charts()
     {
         return Charts;
     }
 
 private:
     const Config *Cfg;
-    std::unordered_map<std::string, Chart> Charts;
+    ChartMap Charts;
 };
 
 class MetricsDataProcessor : public Processor {

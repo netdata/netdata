@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "otel_chart.h"
+#include "fmt/color.h"
+#include "netdata.h"
 #include "otel_utils.h"
 
 const std::string &origMetricName(const pb::Metric &M)
@@ -61,12 +63,8 @@ void otel::Chart::createRDs(const pb::Metric &M)
     }
 }
 
-void otel::Chart::createRS(const pb::Metric &M, const std::string &Id)
+void otel::Chart::createNetdataChart(const pb::Metric &M, const std::string &Id)
 {
-    UNUSED(M);
-    UNUSED(Id);
-
-#if 0
     uint64_t UpdateEvery = (pb::findOldestCollectionTime(M) / NSEC_PER_SEC) - LastCollectionTime;
     if (UpdateEvery == 0) {
         fatal("[GVD] WTF!? alfkjalkrjwoi");
@@ -75,23 +73,27 @@ void otel::Chart::createRS(const pb::Metric &M, const std::string &Id)
     const std::string &OrigMetricName = origMetricName(M);
     const std::string ContextName = "otel." + OrigMetricName;
 
-    RS = rrdset_create_localhost(
-        "otel",                  // type
-        Id.c_str(),              // id
-        Id.c_str(),              // name
-        ContextName.c_str(),     // family
-        ContextName.c_str(),     // context
-        M.description().c_str(), // title
-        M.unit().c_str(),        // units
-        "otel.plugin",           // plugin
-        "otel.module",           // module
-        666666,                  // priority
-        UpdateEvery,             // update_every
-        RRDSET_TYPE_LINE         // chart_type
-    );
+    netdata::Chart C = {
+        "otel",
+        Id,
+        Id,
+        M.description(),
+        M.unit(),
+        ContextName,
+        ContextName,
+        netdata::ChartType::Line,
+        666666,
+        std::chrono::seconds(UpdateEvery),
+        {},
+        "otel",
+        "otel",
+    };
 
     createRDs(M);
-#endif
+
+    fmt::print(fmt::fg(fmt::color::dark_green), "{}\n", C);
+
+    DefinedChart = true;
 }
 
 void otel::Chart::updateRDs(const pb::Metric &M)

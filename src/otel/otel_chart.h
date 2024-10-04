@@ -17,29 +17,26 @@ namespace otel
 {
 class Chart {
 public:
-    Chart(const MetricConfig *MetricCfg) : MetricCfg(MetricCfg), LastCollectionTime(0)
+    Chart(const MetricConfig *MetricCfg) : MetricCfg(MetricCfg)
     {
     }
 
     void update(const pb::Metric &M, const std::string &Id, const pb::RepeatedPtrField<pb::KeyValue> &Labels)
     {
-        UNUSED(M);
         UNUSED(Id);
         UNUSED(Labels);
 
-#if 0
         if (!LastCollectionTime) {
             LastCollectionTime = pb::findOldestCollectionTime(M) / NSEC_PER_SEC;
             return;
         }
 
-        if (!RS) {
-            createRS(M, Id);
+        if (!DefinedChart) {
+            createNetdataChart(M, Id);
             setLabels(Labels);
         }
 
         updateRDs(M);
-#endif
     }
 
     void setLabels(const pb::RepeatedPtrField<pb::KeyValue> &RPF)
@@ -93,18 +90,19 @@ private:
     template <typename T> void createRDs(bool Monotonic, const T &DPs);
     void createRDs(const pb::Metric &M);
 
-    void createRS(const pb::Metric &M, const std::string &BlakeId);
+    void createNetdataChart(const pb::Metric &M, const std::string &BlakeId);
 
     void updateRDs(const pb::Metric &M);
     template <typename T> void updateRDs(const pb::Metric &M, const pb::RepeatedPtrField<T> &DPs);
 
 private:
-    const MetricConfig *MetricCfg;
+    const MetricConfig *MetricCfg = nullptr;
+    uint64_t LastCollectionTime = 0;
+    bool DefinedChart = false;
 #if 0
     RRDSET *RS;
     std::vector<RRDDIM *> RDs;
 #endif
-    uint64_t LastCollectionTime;
 };
 
 } // namespace otel

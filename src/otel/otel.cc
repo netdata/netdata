@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "google/protobuf/arena.h"
+#include "netdata.h"
+
+#include "otel_iterator.h"
 #include "otel_sort.h"
 #include "otel_config.h"
 #include "otel_transform.h"
+#include "otel_process.h"
 
 #include "libnetdata/required_dummies.h"
 
@@ -17,64 +22,69 @@
 using grpc::Server;
 using grpc::Status;
 
-void printClientMetadata(const grpc::ServerContext* context) {
-    const auto& client_metadata = context->client_metadata();
-    for (const auto& pair : client_metadata) {
+static google::protobuf::ArenaOptions ArenaOpts = {
+    .start_block_size = 16 * 1024 * 1024,
+    .max_block_size = 512 * 1024 * 1024,
+};
+
+static void printClientMetadata(const grpc::ServerContext *context)
+{
+    const auto &client_metadata = context->client_metadata();
+    for (const auto &pair : client_metadata) {
         std::cout << "Key: " << pair.first << ", Value: " << pair.second << std::endl;
     }
 }
 
 class MetricsServiceImpl final : public opentelemetry::proto::collector::metrics::v1::MetricsService::Service {
+    using ExportMetricsServiceRequest = opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
+    using ExportMetricsServiceResponse = opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse;
+
 public:
-    MetricsServiceImpl(otel::Config *Cfg) : Cfg(Cfg) {}
+    MetricsServiceImpl(otel::Config *Cfg) : Cfg(Cfg), ProcCtx(Cfg), Arena(ArenaOpts)
+    {
+    }
 
     Status Export(
         grpc::ServerContext *Ctx,
-        const opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest *Request,
-        opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse *Response) override
+        const ExportMetricsServiceRequest *Request,
+        ExportMetricsServiceResponse *Response) override
     {
-        (void) Ctx;
-        (void) Response;
+        (void)Ctx;
+        (void)Response;
 
-        auto *RMs = pb::Arena::Create<pb::RepeatedPtrField<pb::ResourceMetrics>>(&Arena, Request->resource_metrics());
-        RMs->CopyFrom(Request->resource_metrics());
+        auto *RPF = pb::Arena::Create<pb::RepeatedPtrField<pb::ResourceMetrics> >(&Arena, Request->resource_metrics());
+        RPF->CopyFrom(Request->resource_metrics());
 
-        pb::transformResourceMetrics(Cfg, *RMs);
-        pb::sortResourceMetrics(RMs);
+        pb::transformResourceMetrics(Cfg, *RPF);
+        pb::sortResourceMetrics(RPF);
 
-        std::cout << "Received " << Request->resource_metrics_size() << " resource metrics";
-        std::cout << " (" << Request->ByteSizeLong() / 1024 << " KiB)\n";
+        otel::MetricsDataProcessor MDP(ProcCtx);
+        for (const otel::Element &E : otel::Data(*RPF, MDP)) {
+            /* ... */
+        }
+
+        fmt::println(
+            "Received {} resource metrics ({} KiB)", Request->resource_metrics_size(), Request->ByteSizeLong() / 1024);
+
+        fmt::println(
+            "{:.4} / {:.4} MiB",
+            static_cast<double>(Arena.SpaceUsed()) / (1024 * 1024),
+            static_cast<double>(Arena.SpaceAllocated()) / (1024 * 1024));
+
+        fmt::println("");
 
         Arena.Reset();
-
-        #if 0
-        for (const auto &RMs : Request->resource_metrics()) {
-            std::cout << "Resource:\n";
-            for (const auto &Attr : RMs.resource().attributes()) {
-                std::cout << "  " << Attr.key() << ": " << Attr.value().string_value() << "\n";
-            }
-
-            for (const auto &SMs : RMs.scope_metrics()) {
-                for (const auto &metric : SMs.metrics()) {
-                    std::cout << "Metric: " << metric.name() << "\n";
-                    std::cout << "  Description: " << metric.description() << "\n";
-                    std::cout << "  Unit: " << metric.unit() << "\n";
-                    // Process different types of metrics (gauge, sum, histogram, etc.)
-                    // This is a simplified example, you may want to handle different metric types
-                }
-            }
-        }
-        #endif
 
         return Status::OK;
     }
 
 private:
     otel::Config *Cfg;
+    otel::ProcessorContext ProcCtx;
     pb::Arena Arena;
 };
 
-void RunServer(otel::Config *Cfg)
+static void RunServer(otel::Config *Cfg)
 {
     std::string Address("localhost:21212");
     MetricsServiceImpl MS(Cfg);

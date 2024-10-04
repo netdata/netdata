@@ -3,6 +3,7 @@
 #ifndef ND_OTEL_ITERATOR_H
 #define ND_OTEL_ITERATOR_H
 
+#include "fmt/core.h"
 #include "otel_utils.h"
 
 namespace otel
@@ -175,22 +176,22 @@ class Data {
     };
 
 public:
-    Data(const pb::MetricsData &MD, Processor &P) : MD(MD), P(P)
+    Data(const pb::RepeatedPtrField<pb::ResourceMetrics> &RPF, Processor &P) : RPF(RPF), P(P)
     {
     }
 
     inline Iterator begin()
     {
-        return Iterator(MD.resource_metrics().begin(), MD.resource_metrics().end(), P);
+        return Iterator(RPF.begin(), RPF.end(), P);
     }
 
     inline Iterator end() const
     {
-        return Iterator(MD.resource_metrics().end(), MD.resource_metrics().end(), P);
+        return Iterator(RPF.end(), RPF.end(), P);
     }
 
 private:
-    const pb::MetricsData &MD;
+    const pb::RepeatedPtrField<pb::ResourceMetrics> &RPF;
     Processor &P;
 };
 
