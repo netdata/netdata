@@ -23,26 +23,6 @@ void errno_clear(void) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-
-void log_stack_pop(void *ptr) {
-    if(!ptr) return;
-
-    struct log_stack_entry *lgs = *(struct log_stack_entry (*)[])ptr;
-
-    if(unlikely(!thread_log_stack_next || lgs != thread_log_stack_base[thread_log_stack_next - 1])) {
-        fatal("You cannot pop in the middle of the stack, or an item not in the stack");
-        return;
-    }
-
-    thread_log_stack_next--;
-}
-
-void log_stack_push(struct log_stack_entry *lgs) {
-    if(!lgs || thread_log_stack_next >= THREAD_LOG_STACK_MAX) return;
-    thread_log_stack_base[thread_log_stack_next++] = lgs;
-}
-
-// --------------------------------------------------------------------------------------------------------------------
 // logger router
 
 static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, SPINLOCK **spinlock) {
