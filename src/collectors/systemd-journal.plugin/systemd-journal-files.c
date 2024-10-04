@@ -369,8 +369,7 @@ static STRING *string_strdupz_source(const char *s, const char *e, size_t max_le
     buf[max_len - 1] = '\0';
 
     for(size_t i = 0; buf[i] ;i++)
-        if(!isalnum(buf[i]) && buf[i] != '-' && buf[i] != '.' && buf[i] != ':')
-            buf[i] = '_';
+        if(!is_netdata_api_valid_character(buf[i])) buf[i] = '_';
 
     return string_strdupz(buf);
 }
