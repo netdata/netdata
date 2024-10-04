@@ -2,7 +2,7 @@
 
 Here is a config for accessing Netdata in a suburl via lighttpd 1.4.46 and newer:
 
-```txt
+```conf
 $HTTP["url"] =~ "^/netdata/" {
     proxy.server  = ( "" => ("netdata" => ( "host" => "127.0.0.1", "port" => 19999 )))
     proxy.header = ( "map-urlpath" => ( "/netdata/" => "/") )
@@ -11,7 +11,7 @@ $HTTP["url"] =~ "^/netdata/" {
 
 If you have older lighttpd you have to use a chain (such as below), as explained [at this Stack Overflow answer](http://stackoverflow.com/questions/14536554/lighttpd-configuration-to-proxy-rewrite-from-one-domain-to-another).
 
-```txt
+```conf
 $HTTP["url"] =~ "^/netdata/" {
     proxy.server  = ( "" => ("" => ( "host" => "127.0.0.1", "port" => 19998 )))
 }
@@ -25,13 +25,13 @@ $SERVER["socket"] == ":19998" {
 If the only thing the server is exposing via the web is Netdata (and thus no suburl rewriting required),
 then you can get away with just
 
-```txt
+```conf
 proxy.server  = ( "" => ( ( "host" => "127.0.0.1", "port" => 19999 )))
 ```
 
 Though if it's public facing you might then want to put some authentication on it. `htdigest` support looks like:
 
-```txt
+```conf
 auth.backend = "htdigest"
 auth.backend.htdigest.userfile = "/etc/lighttpd/lighttpd.htdigest"
 auth.require = ( "" => ( "method" => "digest", 
@@ -48,7 +48,7 @@ To solve this issue, disable web response compression in Netdata.
 
 Open `/etc/netdata/netdata.conf` and set in `[global]`:
 
-```txt
+```conf
 enable web responses gzip compression = no
 ```
 

@@ -32,7 +32,7 @@ retention strategies as shown in the table below:
 
 You can change these limits in `netdata.conf`:
 
-```text
+```conf
 [db]
     mode = dbengine
     storage tiers = 3

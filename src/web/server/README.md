@@ -58,7 +58,7 @@ Scroll down to the `[web]` section to find the following settings.
 
 Disable the web server by editing `netdata.conf` and setting:
 
-```txt
+```conf
 [web]
     mode = none
 ```
@@ -67,7 +67,7 @@ Disable the web server by editing `netdata.conf` and setting:
 
 Control the number of threads and sockets with the following settings:
 
-```txt
+```conf
 [web]
     web server threads = 4
     web server max sockets = 512
@@ -79,7 +79,7 @@ Netdata can bind to multiple IPs and ports, offering access to different service
 
 The ports to bind are controlled via `[web].bind to`, like this:
 
-```txt
+```conf
 [web]
    default port = 19999
    bind to = 127.0.0.1=dashboard^SSL=optional 10.1.1.1:19998=management|netdata.conf hostname:19997=badges [::]:19996=streaming^SSL=force localhost:19995=registry *:http=dashboard unix:/run/netdata/netdata.sock
@@ -123,8 +123,8 @@ To enable TLS, provide the path to your certificate and private key in the `[web
 
 ```conf
 [web]
- ssl key = /etc/netdata/ssl/key.pem
- ssl certificate = /etc/netdata/ssl/cert.pem
+    ssl key = /etc/netdata/ssl/key.pem
+    ssl certificate = /etc/netdata/ssl/cert.pem
 ```
 
 Both files must be readable by the `netdata` user. If either of these files do not exist or are unreadable, Netdata will fall back to HTTP. For a parent-child connection, only the parent needs these settings.
@@ -172,7 +172,7 @@ To change this behavior, you need to modify the `bind to` setting in the `[web]`
 
 Example:
 
-```txt
+```conf
 [web]
     bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
 ```
@@ -181,7 +181,7 @@ For information how to configure the child to use TLS, check [securing the commu
 
 When we define the use of SSL in a Netdata agent for different ports,  Netdata will apply the behavior specified on each port. For example, using the configuration line below:
 
-```txt
+```conf
 [web]
     bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force *:20000=netdata.conf^SSL=optional *:20001=dashboard|registry
 ```
@@ -205,14 +205,14 @@ In the near future, Netdata will allow our users to change the internal configur
 
 Netdata supports access lists in `netdata.conf`:
 
-```txt
+```conf
 [web]
- allow connections from = localhost *
- allow dashboard from = localhost *
- allow badges from = *
- allow streaming from = *
- allow netdata.conf from = localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.* 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.* 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.* 172.31.*
- allow management from = localhost
+    allow connections from = localhost *
+    allow dashboard from = localhost *
+    allow badges from = *
+    allow streaming from = *
+    allow netdata.conf from = localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.* 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.* 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.* 172.31.*
+    allow management from = localhost
 ```
 
 `*` does string matches on the IPs or FQDNs of the clients.
@@ -243,12 +243,12 @@ Please note that this process can be expensive on a machine that is serving many
 associated configuration option to turn off DNS-based patterns completely to avoid incurring this cost at run-time:
 
 ```conf
- allow connections by dns = heuristic
- allow dashboard by dns = heuristic
- allow badges by dns = heuristic
- allow streaming by dns = heuristic
- allow netdata.conf by dns = no
- allow management by dns = heuristic
+    allow connections by dns = heuristic
+    allow dashboard by dns = heuristic
+    allow badges by dns = heuristic
+    allow streaming by dns = heuristic
+    allow netdata.conf by dns = no
+    allow management by dns = heuristic
 ```
 
 The three possible values for each of these options are `yes`, `no` and `heuristic`. The `heuristic` option disables

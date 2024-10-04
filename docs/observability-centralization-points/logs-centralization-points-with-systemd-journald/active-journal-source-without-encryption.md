@@ -47,7 +47,7 @@ sudo systemctl enable --now systemd-journal-gatewayd.socket
 
 To use it, open your web browser and navigate to:
 
-```txt
+```url
 http://server.ip:19531/browse
 ```
 

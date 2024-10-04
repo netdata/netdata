@@ -76,7 +76,7 @@ This is done in `Netdata.conf` with these settings:
 
 ```txt
 [web]
- bind to = 10.1.1.1:19999 localhost:19999
+    bind to = 10.1.1.1:19999 localhost:19999
 ```
 
 You can bind Netdata to multiple IPs and ports. If you use hostnames, Netdata will resolve them and use all the IPs

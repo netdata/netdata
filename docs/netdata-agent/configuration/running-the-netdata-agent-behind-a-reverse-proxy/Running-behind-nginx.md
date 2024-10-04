@@ -202,14 +202,14 @@ server {
 
 If your Nginx is on `localhost`, you can use this to protect your Netdata:
 
-```txt
+```conf
 [web]
     bind to = 127.0.0.1 ::1
 ```
 
 You can also use a unix domain socket. This will also provide a faster route between Nginx and Netdata:
 
-```txt
+```conf
 [web]
     bind to = unix:/var/run/netdata/netdata.sock
 ```
@@ -225,7 +225,7 @@ upstream backend {
 
 If your Nginx server is not on localhost, you can set:
 
-```txt
+```conf
 [web]
     bind to = *
     allow connections from = IP_OF_NGINX_SERVER
@@ -238,7 +238,7 @@ connection IP address.
 
 Nginx logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
-```txt
+```conf
 [logs]
     access = off
 ```
@@ -248,12 +248,12 @@ Nginx logs accesses and Netdata logs them too. You can prevent Netdata from gene
 By default, netdata compresses its responses. You can have nginx do that instead, with the following options in the `location /` block:
 
 ```conf
-  location / {
-  ...
-  gzip on;
-  gzip_proxied any;
-  gzip_types *;
- }
+location / {
+    ...
+    gzip on;
+    gzip_proxied any;
+    gzip_types *;
+}
 ```
 
 To disable Netdata's gzip compression, open `netdata.conf` and in the `[web]` section put:

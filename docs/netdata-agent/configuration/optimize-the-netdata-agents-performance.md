@@ -139,9 +139,9 @@ Open `netdata.conf` and scroll down to the `[plugins]` section. To disable any p
 ```conf
 [plugins]
     proc = yes
- python.d = no
- charts.d = no
- go.d = yes
+    python.d = no
+    charts.d = no
+    go.d = yes
 ```
 
 Disable specific collectors by opening their respective plugin configuration files, uncommenting the line for the
@@ -157,9 +157,9 @@ For example, to disable a few Python collectors:
 
 ```conf
 modules:
-  apache: no
- dockerd: no
- fail2ban: no
+    apache: no
+    dockerd: no
+    fail2ban: no
 ```
 
 ## Reduce collection frequency

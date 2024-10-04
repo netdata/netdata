@@ -408,21 +408,21 @@ The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio
 
 Module configuration:
 
-```txt
+```conf
 [plugin:proc:/proc/net/dev]
-  # filename to monitor = /proc/net/dev
-  # path to get virtual interfaces = /sys/devices/virtual/net/%s
-  # path to get net device speed = /sys/class/net/%s/speed
-  # enable new interfaces detected at runtime = auto
-  # bandwidth for all interfaces = auto
-  # packets for all interfaces = auto
-  # errors for all interfaces = auto
-  # drops for all interfaces = auto
-  # fifo for all interfaces = auto
-  # compressed packets for all interfaces = auto
-  # frames, collisions, carrier counters for all interfaces = auto
-  # disable by default interfaces matching = lo fireqos* *-ifb
-  # refresh interface speed every seconds = 10
+    # filename to monitor = /proc/net/dev 
+    # path to get virtual interfaces = /sys/devices/virtual/net/%s
+    # path to get net device speed = /sys/class/net/%s/speed
+    # enable new interfaces detected at runtime = auto
+    # bandwidth for all interfaces = auto
+    # packets for all interfaces = auto
+    # errors for all interfaces = auto
+    # drops for all interfaces = auto
+    # fifo for all interfaces = auto
+    # compressed packets for all interfaces = auto
+    # frames, collisions, carrier counters for all interfaces = auto
+    # disable by default interfaces matching = lo fireqos* *-ifb
+    # refresh interface speed every seconds = 10
 ```
 
 Per interface configuration:
