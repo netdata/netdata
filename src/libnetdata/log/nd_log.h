@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_LOG_H
-#define NETDATA_LOG_H 1
+#ifndef NETDATA_ND_LOG_H
+#define NETDATA_ND_LOG_H 1
 
 # ifdef __cplusplus
 extern "C" {
@@ -156,7 +156,7 @@ void nd_log_set_flood_protection(size_t logs, time_t period);
 void nd_log_initialize_for_external_plugins(const char *name);
 void nd_log_reopen_log_files_for_spawn_server(void);
 bool nd_log_journal_socket_available(void);
-ND_LOG_FIELD_ID nd_log_field_id_by_name(const char *field, size_t len);
+ND_LOG_FIELD_ID nd_log_field_id_by_journal_name(const char *field, size_t len);
 int nd_log_priority2id(const char *priority);
 const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority);
 const char *nd_log_method_for_external_plugins(const char *s);
@@ -306,4 +306,4 @@ void netdata_logger_fatal( const char *file, const char *function, unsigned long
 }
 # endif
 
-#endif /* NETDATA_LOG_H */
+#endif /* NETDATA_ND_LOG_H */

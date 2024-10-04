@@ -661,10 +661,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/libnetdata.h
         src/libnetdata/locks/locks.c
         src/libnetdata/locks/locks.h
-        src/libnetdata/log/journal.c
-        src/libnetdata/log/journal.h
-        src/libnetdata/log/log.c
-        src/libnetdata/log/log.h
+        src/libnetdata/log/systemd-journal-helpers.c
+        src/libnetdata/log/systemd-journal-helpers.h
+        src/libnetdata/log/nd_log.c
+        src/libnetdata/log/nd_log.h
         src/libnetdata/os/os.c
         src/libnetdata/os/os.h
         src/libnetdata/simple_hashtable.h
@@ -813,6 +813,19 @@ set(LIBNETDATA_FILES
         src/libnetdata/sanitizers/sanitizers-functions.h
         src/libnetdata/sanitizers/sanitizers-pluginsd.c
         src/libnetdata/sanitizers/sanitizers-pluginsd.h
+        src/libnetdata/log/nd_log-internals.c
+        src/libnetdata/log/nd_log-internals.h
+        src/libnetdata/log/nd_log_limit.c
+        src/libnetdata/log/nd_log_limit.h
+        src/libnetdata/log/nd_log-config.c
+        src/libnetdata/log/nd_log-init.c
+        src/libnetdata/log/nd_log-to-syslog.c
+        src/libnetdata/log/nd_log-to-systemd-journal.c
+        src/libnetdata/log/nd_log-annotators.c
+        src/libnetdata/log/nd_log-field-formatters.c
+        src/libnetdata/log/nd_log-format-logfmt.c
+        src/libnetdata/log/nd_log-format-json.c
+        src/libnetdata/log/nd_log-to-file.c
 )
 
 if(ENABLE_PLUGIN_EBPF)

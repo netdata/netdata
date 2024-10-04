@@ -606,7 +606,7 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
             if(equal) {
                 const char *field = line->buffer;
                 size_t field_len = equal - line->buffer;
-                ND_LOG_FIELD_ID id = nd_log_field_id_by_name(field, field_len);
+                ND_LOG_FIELD_ID id = nd_log_field_id_by_journal_name(field, field_len);
                 if(id != NDF_STOP) {
                     const char *value = ++equal;
 
