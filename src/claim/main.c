@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "daemon/common.h"
+
 #define UNICODE
 #define _UNICODE
 #include <windows.h>
