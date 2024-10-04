@@ -43,25 +43,25 @@ modules:
       prerequisites:
         list: []
       configuration:
-          file:
-            name: "netdata.conf"
-            section_name: "plugin:windows"
-            description:  "The main configuration file"
-          options:
-            description: ""
-            folding:
-              title: "Config option"
-              enabled: true
-            list:
-              - name: PerflibProcesses
-                description: An option to enable or disable the data collection.
-                default_value: Yes
-                required: false
-          examples:
-            folding:
-              enabled: true
-              title: ""
-            list: []
+        file:
+          name: "netdata.conf"
+          section_name: "plugin:windows"
+          description: "The main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: true
+          list:
+            - name: PerflibProcesses
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
     troubleshooting:
       problems:
         list: []
@@ -147,10 +147,10 @@ modules:
             title: "Config option"
             enabled: true
           list:
-             - name: PerflibMemory
-               description: An option to enable or disable the data collection.
-               default_value: Yes
-               required: false
+            - name: PerflibMemory
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -247,7 +247,7 @@ modules:
           list:
             - name: PerflibThermalZone
               description: An option to enable or disable the data collection.
-              default_value: Yes
+              default_value: yes
               required: false
         examples:
           folding:
