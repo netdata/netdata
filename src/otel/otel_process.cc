@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#if 0 
+
 #include "otel_process.h"
 
 #include "absl/strings/match.h"
@@ -53,3 +55,5 @@ void otel::MetricsDataProcessor::onMetric(
 
     It->second.update(M, Id, Labels);
 }
+
+#endif

@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "google/protobuf/arena.h"
-#include "netdata.h"
 
-#include "otel_iterator.h"
-#include "otel_sort.h"
+#include "otel_utils.h"
 #include "otel_config.h"
-#include "otel_transform.h"
-#include "otel_process.h"
+#include "otel_iterator.h"
 
 #include "libnetdata/required_dummies.h"
 
@@ -40,7 +37,7 @@ class MetricsServiceImpl final : public opentelemetry::proto::collector::metrics
     using ExportMetricsServiceResponse = opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse;
 
 public:
-    MetricsServiceImpl(otel::Config *Cfg) : Cfg(Cfg), ProcCtx(Cfg), Arena(ArenaOpts)
+    MetricsServiceImpl(otel::Config *Cfg) : Cfg(Cfg), Arena(ArenaOpts)
     {
     }
 
@@ -52,35 +49,22 @@ public:
         (void)Ctx;
         (void)Response;
 
-        auto *RPF = pb::Arena::Create<pb::RepeatedPtrField<pb::ResourceMetrics> >(&Arena, Request->resource_metrics());
-        RPF->CopyFrom(Request->resource_metrics());
+        fmt::println("Received {} resource metrics ({} KiB)",
+                     Request->resource_metrics_size(),
+                     Request->ByteSizeLong() / 1024);
 
-        pb::transformResourceMetrics(Cfg, *RPF);
-        pb::sortResourceMetrics(RPF);
+        OtelData OD(&Request->resource_metrics());
 
-        otel::MetricsDataProcessor MDP(ProcCtx);
-        for (const otel::Element &E : otel::Data(*RPF, MDP)) {
-            /* ... */
+        for (const OtelElement &OE: OD) {
+            std::cout << "Name: " << OE.M->name() << "\n";
         }
 
-        fmt::println(
-            "Received {} resource metrics ({} KiB)", Request->resource_metrics_size(), Request->ByteSizeLong() / 1024);
-
-        fmt::println(
-            "{:.4} / {:.4} MiB",
-            static_cast<double>(Arena.SpaceUsed()) / (1024 * 1024),
-            static_cast<double>(Arena.SpaceAllocated()) / (1024 * 1024));
-
         fmt::println("");
-
-        Arena.Reset();
-
         return Status::OK;
     }
 
 private:
     otel::Config *Cfg;
-    otel::ProcessorContext ProcCtx;
     pb::Arena Arena;
 };
 

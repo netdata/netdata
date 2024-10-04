@@ -3,6 +3,8 @@
 #ifndef ND_OTEL_PROCESS_H
 #define ND_OTEL_PROCESS_H
 
+#if 0
+
 #include "otel_chart.h"
 #include "otel_config.h"
 #include "otel_hash.h"
@@ -62,5 +64,7 @@ private:
 };
 
 } // namespace otel
+
+#endif
 
 #endif /* ND_OTEL_PROCESS_H */
