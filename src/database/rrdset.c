@@ -597,21 +597,6 @@ void rrdset_acquired_release(RRDSET_ACQUIRED *rsa) {
 // ----------------------------------------------------------------------------
 // RRDSET - rename charts
 
-char *rrdset_strncpyz_name(char *to, const char *from, size_t length) {
-    char c, *p = to;
-
-    while (length-- && (c = *from++)) {
-        if(c != '.' && c != '-' && !isalnum(c))
-            c = '_';
-
-        *p++ = c;
-    }
-
-    *p = '\0';
-
-    return to;
-}
-
 int rrdset_reset_name(RRDSET *st, const char *name) {
     if(unlikely(!strcmp(rrdset_name(st), name)))
         return 1;

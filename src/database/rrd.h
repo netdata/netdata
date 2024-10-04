@@ -1569,7 +1569,6 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 // ----------------------------------------------------------------------------
 // Miscellaneous functions
 
-char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 void reload_host_labels(void);
 void rrdhost_set_is_parent_label(void);
 
