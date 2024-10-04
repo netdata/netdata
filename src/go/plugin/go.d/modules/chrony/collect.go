@@ -3,19 +3,32 @@
 package chrony
 
 import (
+	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
 const scaleFactor = 1000000000
 
+const (
+	// https://github.com/mlichvar/chrony/blob/7daf34675a5a2487895c74d1578241ca91a4eb70/ntp.h#L70-L75
+	leapStatusNormal         = 0
+	leapStatusInsertSecond   = 1
+	leapStatusDeleteSecond   = 2
+	leapStatusUnsynchronised = 3
+)
+
 func (c *Chrony) collect() (map[string]int64, error) {
-	if c.client == nil {
-		client, err := c.newClient(c.Config)
+	if c.conn == nil {
+		client, err := c.newConn(c.Config)
 		if err != nil {
 			return nil, err
 		}
-		c.client = client
+		c.conn = client
 	}
 
 	mx := make(map[string]int64)
@@ -26,28 +39,20 @@ func (c *Chrony) collect() (map[string]int64, error) {
 	if err := c.collectActivity(mx); err != nil {
 		return mx, err
 	}
-	//if strings.HasPrefix(c.Address, "/") {
-	// TODO: Allowed only through the Unix domain socket (requires "_chrony" group membership).
-	// See https://github.com/facebook/time/blob/18207c5d8ddc7242e8d4192985898b6dbe66932c/cmd/ntpcheck/checker/chrony.go#L38
-	// ^^ For some reason doesn't work, Chrony doesn't respond. Additional configuration needed?
-	//if err := c.collectServerStats(mx); err != nil {
-	//	return mx, err
-	//}
-	//}
+	if c.exec != nil {
+		if err := c.collectServerStats(mx); err != nil {
+			c.Warning(err)
+			c.exec = nil
+		} else {
+			c.addServerStatsChartsOnce.Do(c.addServerStatsCharts)
+		}
+	}
 
 	return mx, nil
 }
 
-const (
-	// https://github.com/mlichvar/chrony/blob/7daf34675a5a2487895c74d1578241ca91a4eb70/ntp.h#L70-L75
-	leapStatusNormal         = 0
-	leapStatusInsertSecond   = 1
-	leapStatusDeleteSecond   = 2
-	leapStatusUnsynchronised = 3
-)
-
 func (c *Chrony) collectTracking(mx map[string]int64) error {
-	reply, err := c.client.Tracking()
+	reply, err := c.conn.tracking()
 	if err != nil {
 		return fmt.Errorf("error on collecting tracking: %v", err)
 	}
@@ -76,7 +81,7 @@ func (c *Chrony) collectTracking(mx map[string]int64) error {
 }
 
 func (c *Chrony) collectActivity(mx map[string]int64) error {
-	reply, err := c.client.Activity()
+	reply, err := c.conn.activity()
 	if err != nil {
 		return fmt.Errorf("error on collecting activity: %v", err)
 	}
@@ -90,56 +95,42 @@ func (c *Chrony) collectActivity(mx map[string]int64) error {
 	return nil
 }
 
-//func (c *Chrony) collectServerStats(mx map[string]int64) error {
-//	stats, err := c.client.ServerStats()
-//	if err != nil {
-//		return fmt.Errorf("error on collecting server stats: %v", err)
-//	}
-//
-//	switch {
-//	case stats.v4 != nil:
-//		mx["ntp_packets_received"] = int64(stats.v4.NTPHits)
-//		mx["ntp_packets_dropped"] = int64(stats.v4.NTPDrops)
-//		mx["command_packets_received"] = int64(stats.v4.CMDHits)
-//		mx["command_packets_dropped"] = int64(stats.v4.CMDDrops)
-//		mx["client_log_records_dropped"] = int64(stats.v4.LogDrops)
-//		mx["nke_connections_accepted"] = int64(stats.v4.NKEHits)
-//		mx["nke_connections_dropped"] = int64(stats.v4.NKEDrops)
-//		mx["authenticated_ntp_packets"] = int64(stats.v4.NTPAuthHits)
-//		mx["interleaved_ntp_packets"] = int64(stats.v4.NTPInterleavedHits)
-//	case stats.v3 != nil:
-//		mx["ntp_packets_received"] = int64(stats.v3.NTPHits)
-//		mx["ntp_packets_dropped"] = int64(stats.v3.NTPDrops)
-//		mx["command_packets_received"] = int64(stats.v3.CMDHits)
-//		mx["command_packets_dropped"] = int64(stats.v3.CMDDrops)
-//		mx["client_log_records_dropped"] = int64(stats.v3.LogDrops)
-//		mx["nke_connections_accepted"] = int64(stats.v3.NKEHits)
-//		mx["nke_connections_dropped"] = int64(stats.v3.NKEDrops)
-//		mx["authenticated_ntp_packets"] = int64(stats.v3.NTPAuthHits)
-//		mx["interleaved_ntp_packets"] = int64(stats.v3.NTPInterleavedHits)
-//	case stats.v2 != nil:
-//		mx["ntp_packets_received"] = int64(stats.v2.NTPHits)
-//		mx["ntp_packets_dropped"] = int64(stats.v2.NTPDrops)
-//		mx["command_packets_received"] = int64(stats.v2.CMDHits)
-//		mx["command_packets_dropped"] = int64(stats.v2.CMDDrops)
-//		mx["client_log_records_dropped"] = int64(stats.v2.LogDrops)
-//		mx["nke_connections_accepted"] = int64(stats.v2.NKEHits)
-//		mx["nke_connections_dropped"] = int64(stats.v2.NKEDrops)
-//		mx["authenticated_ntp_packets"] = int64(stats.v2.NTPAuthHits)
-//	case stats.v1 != nil:
-//		mx["ntp_packets_received"] = int64(stats.v1.NTPHits)
-//		mx["ntp_packets_dropped"] = int64(stats.v1.NTPDrops)
-//		mx["command_packets_received"] = int64(stats.v1.CMDHits)
-//		mx["command_packets_dropped"] = int64(stats.v1.CMDDrops)
-//		mx["client_log_records_dropped"] = int64(stats.v1.LogDrops)
-//	default:
-//		return errors.New("invalid server stats reply")
-//	}
-//
-//	//c.addStatsChartsOnce.Do(func() { c.addServerStatsCharts(stats) })
-//
-//	return nil
-//}
+func (c *Chrony) collectServerStats(mx map[string]int64) error {
+	bs, err := c.exec.serverStats()
+	if err != nil {
+		return fmt.Errorf("error on collecting server stats: %v", err)
+	}
+
+	sc := bufio.NewScanner(bytes.NewReader(bs))
+	var n int
+
+	for sc.Scan() {
+		key, value, ok := strings.Cut(sc.Text(), ":")
+		if !ok {
+			continue
+		}
+
+		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
+
+		switch key {
+		case "NTP packets received",
+			"NTP packets dropped",
+			"Command packets received",
+			"Command packets dropped":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				key = strings.ToLower(strings.ReplaceAll(key, " ", "_"))
+				mx[key] = v
+				n++
+			}
+		}
+	}
+
+	if n == 0 {
+		return errors.New("no server stats metrics found in the response")
+	}
+
+	return nil
+}
 
 func boolToInt(v bool) int64 {
 	if v {

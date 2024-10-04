@@ -206,3 +206,19 @@ modules:
                 - name: burst_online
                 - name: burst_offline
                 - name: unresolved
+            - name: chrony.ntp_packets
+              availability: []
+              description: NTP packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: dropped
+            - name: chrony.command_packets
+              availability: []
+              description: Command packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: dropped
