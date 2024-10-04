@@ -77,7 +77,7 @@ sudo ./edit-config health.d/example-alert.conf
 sudo ./edit-config health.d/example-alert.conf
 ```
 
-```txt
+```text
  to: silent
 ```
 

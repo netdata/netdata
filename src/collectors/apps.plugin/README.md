@@ -135,7 +135,7 @@ In such cases, you many need to lower its data collection frequency.
 
 To do this, edit `/etc/netdata/netdata.conf` and find this section:
 
-```txt
+```text
 [plugin:apps]
  # update every = 1
  # command options =
@@ -163,7 +163,7 @@ consider all their sub-processes, important to monitor.
 Process managers are configured in `apps_groups.conf` with the prefix
 `managers:`, like this:
 
-```txt
+```text
 managers: process1 process2 process3
 ```
 
@@ -187,7 +187,7 @@ the name of that filename.
 Interpreters are configured in `apps_groups.conf` with the prefix
 `interpreters:`, like this:
 
-```txt
+```text
 interpreters: process1 process2 process3
 ```
 
@@ -200,7 +200,7 @@ can be provided.
 
 The configuration file works accepts multiple lines, each having this format:
 
-```txt
+```text
 group: process1 process2 ...
 ```
 
@@ -249,7 +249,7 @@ set in the `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/c
 
 For example, to disable user and user group charts you would set:
 
-```txt
+```text
 [plugin:apps]
   command options = without-users without-groups
 ```
@@ -301,7 +301,7 @@ but it will not be able to collect all the information.
 
 You can create badges that you can embed anywhere you like, with URLs like this:
 
-```txt
+```text
 https://your.netdata.ip:19999/api/v1/badge.svg?chart=apps.processes&dimensions=myapp&value_color=green%3E0%7Cred
 ```
 
@@ -357,7 +357,7 @@ If you check the total system CPU utilization, it says there is no idle CPU at a
 fails to provide a breakdown of the CPU consumption in the system. The sum of the CPU utilization
 of all processes reported by `top`, is 15.6%.
 
-```txt
+```text
 top - 18:46:28 up 3 days, 20:14,  2 users,  load average: 0.22, 0.05, 0.02
 Tasks:  76 total,   2 running,  74 sleeping,   0 stopped,   0 zombie
 %Cpu(s): 32.8 us, 65.6 sy,  0.0 ni,  0.0 id,  0.0 wa,  1.3 hi,  0.3 si,  0.0 st

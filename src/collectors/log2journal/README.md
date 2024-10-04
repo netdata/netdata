@@ -80,7 +80,7 @@ We have an nginx server logging in this standard combined log format:
 
 First, let's find the right pattern for `log2journal`. We ask ChatGPT:
 
-```txt
+```text
 My nginx log uses this log format:
 
 log_format access '$remote_addr - $remote_user [$time_local] '
@@ -484,7 +484,7 @@ tail -F /var/log/nginx/access.log |\
 
 Create the file `/etc/systemd/system/nginx-logs.service` (change `/path/to/nginx.yaml` to the right path):
 
-```txt
+```text
 [Unit]
 Description=NGINX Log to Systemd Journal
 After=network.target
@@ -575,7 +575,7 @@ If on other hand your organization prefers to maintain the full logs and control
 
 ## `log2journal` options
 
-```txt
+```text
 
 Netdata log2journal v1.43.0-341-gdac4df856
 

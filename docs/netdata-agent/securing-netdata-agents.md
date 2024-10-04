@@ -74,7 +74,7 @@ If you are using Netdata with Docker, make sure to set the `NETDATA_HEALTHCHECK_
 If your organization has a private administration and management LAN, you can bind Netdata on this network interface on all your servers.
 This is done in `Netdata.conf` with these settings:
 
-```txt
+```text
 [web]
     bind to = 10.1.1.1:19999 localhost:19999
 ```

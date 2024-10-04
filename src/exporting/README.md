@@ -52,14 +52,14 @@ connector to enable and configure for your database of choice.
 Netdata can filter metrics, to send only a subset of the collected metrics. You can use the
 configuration file
 
-```txt
+```text
 [prometheus:exporter]
     send charts matching = system.*
 ```
 
 or the URL parameter `filter` in the `allmetrics` API call.
 
-```txt
+```text
 http://localhost:19999/api/v1/allmetrics?format=shell&filter=system.*
 ```
 

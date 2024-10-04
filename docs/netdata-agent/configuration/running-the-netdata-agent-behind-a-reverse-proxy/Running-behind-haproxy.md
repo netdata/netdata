@@ -129,7 +129,7 @@ In the cert list file place a mapping from a certificate file to the domain used
 
 `/etc/letsencrypt/certslist.txt`:
 
-```txt
+```text
 example.com /etc/letsencrypt/live/example.com/example.com.pem
 ```
 

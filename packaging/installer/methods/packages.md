@@ -81,7 +81,7 @@ These repositories are set up as what Debian calls ‘flat repositories’, and 
 
 As a result of this structure, the required APT sources entry for stable packages for Debian 11 (Bullseye) is:
 
-```txt
+```text
 deb http://repo.netdata.cloud/repos/stable/debian/ bullseye/
 ```
 

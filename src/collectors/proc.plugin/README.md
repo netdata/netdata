@@ -118,7 +118,7 @@ mv netdata.conf.new netdata.conf
 
 Then edit `netdata.conf` and find the following section. This is the basic plugin configuration.
 
-```txt
+```text
 [plugin:proc:/proc/diskstats]
   # enable new disks detected at runtime = yes
   # performance metrics for physical disks = auto
@@ -152,7 +152,7 @@ Then edit `netdata.conf` and find the following section. This is the basic plugi
 
 For each virtual disk, physical disk and partition you will have a section like this:
 
-```txt
+```text
 [plugin:proc:/proc/diskstats:sda]
  # enable = yes
  # enable performance metrics = auto
@@ -180,14 +180,14 @@ After saving `/etc/netdata/netdata.conf`, restart your Netdata to apply them.
 
 You can pretty easy disable performance metrics for individual device, for ex.:
 
-```txt
+```text
 [plugin:proc:/proc/diskstats:sda]
  enable performance metrics = no
 ```
 
 But sometimes you need disable performance metrics for all devices with the same type, to do it you need to figure out device type from `/proc/diskstats` for ex.:
 
-```txt
+```text
    7       0 loop0 1651 0 3452 168 0 0 0 0 0 8 168
    7       1 loop1 4955 0 11924 880 0 0 0 0 0 64 880
    7       2 loop2 36 0 216 4 0 0 0 0 0 4 4
@@ -200,7 +200,7 @@ But sometimes you need disable performance metrics for all devices with the same
 All zram devices starts with `251` number and all loop devices starts with `7`.
 So, to disable performance metrics for all loop devices you could add `performance metrics for disks with major 7 = no` to `[plugin:proc:/proc/diskstats]` section.
 
-```txt
+```text
 [plugin:proc:/proc/diskstats]
        performance metrics for disks with major 7 = no
 ```
@@ -236,7 +236,7 @@ So, to disable performance metrics for all loop devices you could add `performan
 
 #### configuration
 
-```txt
+```text
 [plugin:proc:/proc/mdstat]
   # faulty devices = yes
   # nonredundant arrays availability = yes
@@ -427,7 +427,7 @@ Module configuration:
 
 Per interface configuration:
 
-```txt
+```text
 [plugin:proc:/proc/net/dev:enp0s3]
   # enabled = yes
   # virtual = no
@@ -511,7 +511,7 @@ and metrics:
 
 ### configuration
 
-```txt
+```text
 [plugin:proc:/sys/class/power_supply]
   # battery capacity = yes
   # battery charge = no
@@ -566,7 +566,7 @@ If your vendor is supported, you'll also get HW-Counters statistics. These being
 
 Default configuration will monitor only enabled infiniband ports, and refresh newly activated or created ports every 30 seconds
 
-```txt
+```text
 [plugin:proc:/sys/class/infiniband]
   # dirname to monitor = /sys/class/infiniband
   # bandwidth counters = yes
@@ -602,7 +602,7 @@ The following charts will be provided:
 
 The `drm` path can be configured if it differs from the default:
 
-```txt
+```text
 [plugin:proc:/sys/class/drm]
   # directory to monitor = /sys/class/drm
 ```
@@ -626,7 +626,7 @@ As far as the message queue charts are dynamic, sane limits are applied for the 
 
 ### configuration
 
-```txt
+```text
 [plugin:proc:ipc]
   # message queues = yes
   # semaphore totals = yes

@@ -160,7 +160,7 @@ Data stored inside this file follows pattern already described for `error.log`.
 
 The `access.log` logs web requests. The format is:
 
-```txt
+```text
 DATE: ID: (sent/all = SENT_BYTES/ALL_BYTES bytes PERCENT_COMPRESSION%, prep/sent/total PREP_TIME/SENT_TIME/TOTAL_TIME ms): ACTION CODE URL
 ```
 
