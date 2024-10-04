@@ -1558,16 +1558,16 @@ set(OTEL_PLUGIN_FILES
         src/otel/netdata.h
         src/otel/otel.h
         src/otel/otel.cc
-        # src/otel/otel_chart.h
-        # src/otel/otel_chart.cc
+        src/otel/otel_chart.h
+        src/otel/otel_chart.cc
         src/otel/otel_config.h
         src/otel/otel_flatten.h
         src/otel/otel_flatten.cc
         src/otel/otel_hash.h
         src/otel/otel_hash.cc
-        # src/otel/otel_iterator.h
-        # src/otel/otel_process.h
-        # src/otel/otel_process.cc
+        src/otel/otel_iterator.h
+        src/otel/otel_process.h
+        src/otel/otel_process.cc
         src/otel/otel_sort.h
         src/otel/otel_sort.cc
         src/otel/otel_transform.h
