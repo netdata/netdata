@@ -52,14 +52,14 @@ connector to enable and configure for your database of choice.
 Netdata can filter metrics, to send only a subset of the collected metrics. You can use the
 configuration file
 
-```txt
+```text
 [prometheus:exporter]
     send charts matching = system.*
 ```
 
 or the URL parameter `filter` in the `allmetrics` API call.
 
-```txt
+```text
 http://localhost:19999/api/v1/allmetrics?format=shell&filter=system.*
 ```
 
@@ -106,7 +106,7 @@ different.
 You can configure each connector individually using the available [options](#options). The
 `[graphite:my_graphite_instance]` block contains examples of some of these additional options in action.
 
-```conf
+```text
 [exporting:global]
     enabled = yes
     send configured labels = no
@@ -213,13 +213,13 @@ Configure individual connectors and override any global settings with the follow
 
      Example IPv4:
 
-```conf
+```text
    destination = 10.11.14.2:4242 10.11.14.3:4242 10.11.14.4:4242
 ```
 
    Example IPv6 and IPv4 together:
 
-```conf
+```text
    destination = [ffff:...:0001]:2003 10.11.12.1:2003
 ```
 

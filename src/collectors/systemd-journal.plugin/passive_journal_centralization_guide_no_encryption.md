@@ -74,7 +74,7 @@ sudo apt-get install systemd-journal-remote
 
 Edit `/etc/systemd/journal-upload.conf` and set the IP address and the port of the server, like so:
 
-```conf
+```text
 [Upload]
 URL=http://centralization.server.ip:19532
 ```
@@ -87,7 +87,7 @@ sudo systemctl edit systemd-journal-upload
 
 At the top, add:
 
-```conf
+```text
 [Service]
 Restart=always
 ```

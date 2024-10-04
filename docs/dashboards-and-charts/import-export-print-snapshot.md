@@ -1,17 +1,3 @@
-<!--
-title: "Import, export, and print a snapshot"
-description: >-
-    "Snapshots can be incredibly useful for diagnosing anomalies after 
-    they've already happened, and are interoperable with any other node 
-    running Netdata."
-type: "how-to"
-custom_edit_url: "/docs/dashboards-and-charts/import-export-print-snapshot.md"
-sidebar_label: "Import, export, and print a snapshot"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
--->
-
 # Import, export, and print a snapshot
 
 >❗This feature is only available on v1 dashboards, it hasn't been port-forwarded to v2.

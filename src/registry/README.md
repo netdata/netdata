@@ -85,7 +85,7 @@ We believe, it can do it...
 
 **To turn any Netdata into a registry**, edit `/etc/netdata/netdata.conf` and set:
 
-```conf
+```text
 [registry]
     enabled = yes
     registry to announce = http://your.registry:19999
@@ -96,7 +96,7 @@ Restart your Netdata to activate it.
 Then, you need to tell **all your other Netdata servers to advertise your registry**, instead of the default. To do
 this, on each of your Netdata servers, edit `/etc/netdata/netdata.conf` and set:
 
-```conf
+```text
 [registry]
     enabled = no
     registry to announce = http://your.registry:19999
@@ -110,7 +110,7 @@ This is it. You have your registry now.
 You may also want to give your server different names under the node menu (i.e. to have them sorted / grouped). You can
 change its registry name, by setting on each Netdata server:
 
-```conf
+```text
 [registry]
     registry hostname = Group1 - Master DB
 ```
@@ -121,7 +121,7 @@ So this server will appear in the node menu as `Group1 - Master DB`. The max nam
 
 Netdata v1.9+ support limiting access to the registry from given IPs, like this:
 
-```conf
+```text
 [registry]
     allow from = *
 ```
@@ -142,7 +142,7 @@ against the name-pattern.
 Please note that this process can be expensive on a machine that is serving many connections. The behaviour of the
 pattern matching can be controlled with the following setting:
 
-```conf
+```text
 [registry]
     allow by dns = heuristic
 ```
@@ -175,7 +175,7 @@ Beginning with `v1.30.0`, when the Netdata Agent's web server processes a reques
 and `Secure` cookies. If you have problems accessing the local Agent dashboard or Netdata Cloud, disable these
 cookies by [editing `netdata.conf`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config):
 
-```conf
+```text
 [registry]
     enable cookies SameSite and Secure = no
 ```
@@ -198,7 +198,7 @@ redirecting the browser back to itself hoping that it will receive the cookie. I
 registry will keep redirecting your web browser back to itself, which after a few redirects will fail with an error like
 this:
 
-```conf
+```text
 ERROR 409: Cannot ACCESS netdata registry: https://registry.my-netdata.io responded with: {"status":"redirect","registry":"https://registry.my-netdata.io"}
 ```
 

@@ -63,7 +63,7 @@ You can define multiple entries like this: user1@email.com user2@email.com.
 All roles will default to this variable if left unconfigured.
 
 The `DEFAULT_RECIPIENT_PUSHBULLET` can be edited in the following entries at the bottom of the same file:
-```conf
+```text
 role_recipients_pushbullet[sysadmin]="user1@email.com"
 role_recipients_pushbullet[domainadmin]="user2@mail.com"
 role_recipients_pushbullet[dba]="#channel1"

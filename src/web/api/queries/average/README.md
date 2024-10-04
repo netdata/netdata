@@ -1,12 +1,3 @@
-<!--
-title: "Average or Mean"
-sidebar_label: "Average or Mean"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/average/README.md
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Developers/Web/Api/Queries"
--->
-
 # Average or Mean
 
 > This query is available as `average` and `mean`.

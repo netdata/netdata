@@ -43,7 +43,7 @@ Sign in to the [Azure portal](https://portal.azure.com) and open the virtual mac
 
 Add a new rule with the following options:
 
-```conf
+```text
 Source: Any
 Source port ranges: 19999
 Destination: Any

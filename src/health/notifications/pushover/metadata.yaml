@@ -49,7 +49,7 @@
               All roles will default to this variable if left unconfigured.
 
               The `DEFAULT_RECIPIENT_PUSHOVER` can be edited in the following entries at the bottom of the same file:
-              ```conf
+              ```text
               role_recipients_pushover[sysadmin]="USERTOKEN1"
               role_recipients_pushover[domainadmin]="USERTOKEN2"
               role_recipients_pushover[dba]="USERTOKEN3 USERTOKEN4"

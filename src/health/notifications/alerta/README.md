@@ -71,7 +71,7 @@ You will need an API key to send messages from any source, if Alerta is configur
 
 The `DEFAULT_RECIPIENT_CUSTOM` can be edited in the following entries at the bottom of the same file:
 
-```conf
+```text
 role_recipients_alerta[sysadmin]="Systems"
 role_recipients_alerta[domainadmin]="Domains"
 role_recipients_alerta[dba]="Databases Systems"

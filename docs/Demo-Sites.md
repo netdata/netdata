@@ -1,13 +1,3 @@
-<!--
-title: "Live demos"
-date: 2020-03-26
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.md
-sidebar_label: "Live demos"
-learn_status: "Published"
-learn_topic_type: "Getting started"
-learn_rel_path: "Getting started"
-sidebar_position: "90"
--->
 
 # Live demos
 

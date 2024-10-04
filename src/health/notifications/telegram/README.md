@@ -63,7 +63,7 @@ All roles will default to this variable if left unconfigured.
 
 The `DEFAULT_RECIPIENT_CUSTOM` can be edited in the following entries at the bottom of the same file:
 
-```conf
+```text
 role_recipients_telegram[sysadmin]="-49999333324"
 role_recipients_telegram[domainadmin]="-49999333389"
 role_recipients_telegram[dba]="-10099992222"

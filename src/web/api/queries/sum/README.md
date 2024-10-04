@@ -1,12 +1,3 @@
-<!--
-title: "Sum"
-sidebar_label: "Sum"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/sum/README.md
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Developers/Web/Api/Queries"
--->
-
 # Sum
 
 This module sums all the values in the time-frame requested.

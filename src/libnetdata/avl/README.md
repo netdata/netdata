@@ -1,12 +1,3 @@
-<!--
-title: "AVL"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/avl/README.md
-sidebar_label: "AVL"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Developers/libnetdata"
--->
-
 # AVL
 
 AVL is a library indexing objects in B-Trees.

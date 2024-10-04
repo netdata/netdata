@@ -63,7 +63,7 @@ The `hosts` file contains a list of IP addresses or hostnames that Ansible will 
 `hosts` file that comes with the repository contains two example IP addresses, which you should replace according to the
 IP address/hostname of your nodes.
 
-```conf
+```text
 203.0.113.0  hostname=node-01
 203.0.113.1  hostname=node-02 
 ```
@@ -76,7 +76,7 @@ omit the `hostname=` string entirely to use the system's default hostname.
 If you SSH into your nodes as a user other than `root`, you need to configure `hosts` according to those user names. Use
 the `ansible_user` variable to set the login user. For example:
 
-```conf
+```text
 203.0.113.0  hostname=ansible-01  ansible_user=example
 ```
 
@@ -86,7 +86,7 @@ If you use an SSH key other than `~/.ssh/id_rsa` for logging into your nodes, yo
 the `hosts` file with the `ansible_ssh_private_key_file` variable. For example, to log into a Lightsail instance using
 two different SSH keys supplied by AWS.
 
-```conf
+```text
 203.0.113.0  hostname=ansible-01  ansible_ssh_private_key_file=~/.ssh/LightsailDefaultKey-us-west-2.pem
 203.0.113.1  hostname=ansible-02  ansible_ssh_private_key_file=~/.ssh/LightsailDefaultKey-us-east-1.pem
 ```

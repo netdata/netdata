@@ -19,7 +19,7 @@ Use `edit-config` from your [Netdata config directory](/docs/netdata-agent/confi
 
 Enable the exporting engine itself by setting `enabled` to `yes`:
 
-```conf
+```text
 [exporting:global]
     enabled = yes
 ```
@@ -30,7 +30,7 @@ Save the file but keep it open, as you will edit it again to enable specific con
 
 Use the following configuration as a starting point. Copy and paste it into `exporting.conf`.
 
-```conf
+```text
 [opentsdb:http:my_opentsdb_http_instance]
     enabled = yes
     destination = localhost:4242

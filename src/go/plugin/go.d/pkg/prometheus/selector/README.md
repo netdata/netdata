@@ -1,11 +1,3 @@
-<!--
-title: "Time series selector"
-custom_edit_url: "/src/go/plugin/go.d/pkg/prometheus/selector/README.md"
-sidebar_label: "Time series selector"
-learn_status: "Published"
-learn_rel_path: "Developers/External plugins/go.d.plugin/Helper Packages"
--->
-
 # Time series selector
 
 Selectors allow selecting and filtering of a set of time series.

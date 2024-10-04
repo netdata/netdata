@@ -1,10 +1,3 @@
-<!--
-title: Noun that describes the concept
-description: Short summary (will be displayed in search engines)
-custom_edit_url: Edit URL of the source file
-keywords: [keywords, describing, the main topics]
--->
-
 # Title
 
 Why should the reader care: “What’s in it for me?”

@@ -43,7 +43,7 @@ installed. You'll have to do this manually:
     executable with `chmod 0755 /etc/rc.netdata`.
 2. Add or edit `/etc/rc.local` and add a line calling `/etc/rc.netdata` to have it start on boot:
 
-    ```conf
+    ```text
     # Netdata startup
     [ -x /etc/rc.netdata ] && /etc/rc.netdata start
     ```

@@ -1,12 +1,3 @@
-<!--
-title: "Max"
-sidebar_label: "Max"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/max/README.md
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Developers/Web/Api/Queries"
--->
-
 # Max
 
 This module finds the max value in the time-frame given.

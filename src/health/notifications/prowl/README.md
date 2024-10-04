@@ -66,7 +66,7 @@ The following options can be defined for this notification
 All roles will default to this variable if left unconfigured.
 
 The `DEFAULT_RECIPIENT_PROWL` can be edited in the following entries at the bottom of the same file:
-```conf
+```text
 role_recipients_prowl[sysadmin]="AAAAAAAA"
 role_recipients_prowl[domainadmin]="BBBBBBBBB"
 role_recipients_prowl[dba]="CCCCCCCCC"

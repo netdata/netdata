@@ -59,7 +59,7 @@ The following options can be defined for this notification
 ##### DEFAULT_RECIPIENT_FLOCK
 
 You can have different channels per role, by editing DEFAULT_RECIPIENT_FLOCK with the channel you want, in the following entries at the bottom of the same file:
-```conf
+```text
 role_recipients_flock[sysadmin]="systems"
 role_recipients_flock[domainadmin]="domains"
 role_recipients_flock[dba]="databases systems"

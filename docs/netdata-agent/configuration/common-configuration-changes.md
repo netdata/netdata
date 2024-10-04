@@ -29,7 +29,7 @@ of `netdata.conf` so
 that it is greater than `1`. An `update every` of `5` means the Netdata Agent enforces a _minimum_ collection frequency
 of 5 seconds.
 
-```conf
+```text
 [global]
     update every = 5
 ```
@@ -90,7 +90,7 @@ Because the source path contains `health.d/cpu.conf`, run `sudo edit-config heal
 
 Open the configuration file for that alert and set the `to` line to `silent`.
 
-```conf
+```text
 template: disk_fill_rate
        on: disk.space
    lookup: max -1s at -30m unaligned of avail

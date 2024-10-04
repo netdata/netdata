@@ -137,7 +137,7 @@ point to talk about Prometheus's data model which can be viewed here: <https://p
 As explained we have two key elements in Prometheus metrics. We have the _metric_ and its _labels_. Labels allow for
 granularity between metrics. Let's use our previous example to further explain.
 
-```conf
+```text
 netdata_disk_space_GiB_average{chart="disk_space._run",dimension="avail",family="/run",mount_point="/run",filesystem="tmpfs",mount_root="/"} 0.0298195 1684951093000
 ```
 
@@ -193,7 +193,7 @@ across a section of metrics with the first comments  `# COMMENT homogeneous char
 family "cpu", units "percentage"` followed by the metrics. This is a good start now let us drill down to the specific
 metric we would like to graph.
 
-```conf
+```text
 # COMMENT
 netdata_system_cpu_percentage_average: dimension "system", value is percentage, gauge, dt 1501275951 to 1501275951 inclusive
 netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension="system"} 0.0000000 1501275951000
