@@ -211,7 +211,7 @@ bool dyncfg_is_valid_id(const char *id) {
     return true;
 }
 
-static inline bool is_forbidden_char(char c) {
+static inline bool is_forbidden_filename_char(char c) {
     if(isspace((uint8_t)c) || !isprint((uint8_t)c))
         return true;
 
@@ -239,7 +239,7 @@ char *dyncfg_escape_id_for_filename(const char *id) {
     char *dest = escaped;
 
     while (*src) {
-        if (is_forbidden_char(*src)) {
+        if (is_forbidden_filename_char(*src)) {
             sprintf(dest, "%%%02X", (unsigned char)*src);
             dest += 3;
         } else {
