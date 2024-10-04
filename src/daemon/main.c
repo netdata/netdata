@@ -852,19 +852,19 @@ static void log_init(void) {
 
     char* os_default_method = NULL;
 #if defined(OS_LINUX)
-    with_journal = is_stderr_connected_to_journal() /* || nd_log_journal_socket_available() */ ? "journal" : NULL;
+    os_default_method = is_stderr_connected_to_journal() /* || nd_log_journal_socket_available() */ ? "journal" : NULL;
 #elif defined(OS_WINDOWS)
     os_default_method = "wevents";
 #endif
 
     if(os_default_method)
-        snprintfz(filename, FILENAME_MAX, os_default_method);
+        snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
     else
         snprintfz(filename, FILENAME_MAX, "%s/daemon.log", netdata_configured_log_dir);
     nd_log_set_user_settings(NDLS_DAEMON, config_get(CONFIG_SECTION_LOGS, "daemon", filename));
 
     if(os_default_method)
-        snprintfz(filename, FILENAME_MAX, os_default_method);
+        snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
     else
         snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
     nd_log_set_user_settings(NDLS_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
@@ -873,7 +873,7 @@ static void log_init(void) {
     nd_log_set_user_settings(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
 
     if(os_default_method)
-        snprintfz(filename, FILENAME_MAX, os_default_method);
+        snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
     else
         snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
     nd_log_set_user_settings(NDLS_HEALTH, config_get(CONFIG_SECTION_LOGS, "health", filename));
