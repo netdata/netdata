@@ -191,7 +191,7 @@ issues with gaps in charts on busy systems while still keeping the impact on the
 
 You can set Netdata scheduling policy in `netdata.conf`, like this:
 
-```conf
+```text
 [global]
   process scheduling policy = idle
 ```
@@ -213,7 +213,7 @@ For more information see `man sched`.
 
 Once the policy is set to one of `rr` or `fifo`, the following will appear:
 
-```conf
+```text
 [global]
     process scheduling priority = 0
 ```
@@ -225,7 +225,7 @@ important.
 
 When the policy is set to `other`, `nice`, or `batch`, the following will appear:
 
-```conf
+```text
 [global]
     process nice level = 19
 ```
@@ -259,7 +259,7 @@ Run `systemctl daemon-reload` to reload these changes.
 Now, tell Netdata to keep these settings, as set by systemd, by editing
 `netdata.conf` and setting:
 
-```conf
+```text
 [global]
     process scheduling policy = keep
 ```
@@ -272,7 +272,7 @@ will be maintained by netdata.
 On a system that is not based on systemd, to make Netdata run with nice level -1 (a little bit higher to the default for
 all programs), edit `netdata.conf` and set:
 
-```conf
+```text
 [global]
   process scheduling policy = other
   process nice level = -1
@@ -285,7 +285,7 @@ then [restart Netdata](/docs/netdata-agent/start-stop-restart.md):
 On a system that is based on systemd, to make Netdata run with nice level -1 (a little bit higher to the default for all
 programs), edit `netdata.conf` and set:
 
-```conf
+```text
 [global]
   process scheduling policy = keep
 ```

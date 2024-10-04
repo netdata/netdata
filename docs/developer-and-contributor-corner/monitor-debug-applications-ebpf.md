@@ -38,7 +38,7 @@ your application's process name.
 
 Your file should now look like this:
 
-```conf
+```text
 ...
 # -----------------------------------------------------------------------------
 # Custom applications to monitor with apps.plugin and ebpf.plugin
@@ -57,7 +57,7 @@ You can set up `apps_groups.conf` to more show more precise eBPF metrics for any
 system, even if it's a standard package like Redis, Apache, or any other [application/service Netdata collects
 from](/src/collectors/COLLECTORS.md).
 
-```conf
+```text
 # -----------------------------------------------------------------------------
 # Custom applications to monitor with apps.plugin and ebpf.plugin
 
@@ -88,7 +88,7 @@ sudo ./edit-config ebpf.d.conf
 
 Replace `entry` with `return`:
 
-```conf
+```text
 [global]
     ebpf load mode = return
     disable apps = no

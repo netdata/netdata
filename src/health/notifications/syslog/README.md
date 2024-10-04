@@ -78,7 +78,7 @@ All roles will default to this variable if left unconfigured.
 
 You can then have different recipients per role, by editing DEFAULT_RECIPIENT_SYSLOG with the recipient you want, in the following entries at the bottom of the same file:
 
-```conf
+```text
 role_recipients_syslog[sysadmin]="daemon.notice@loghost1:514/netdata"
 role_recipients_syslog[domainadmin]="daemon.notice@loghost2:514/netdata"
 role_recipients_syslog[dba]="daemon.notice@loghost3:514/netdata"

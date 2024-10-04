@@ -25,7 +25,7 @@ You can enable or disable individual plugins by opening `netdata.conf` and scrol
 This section features a list of Netdata's plugins, with a boolean setting to enable or disable them. The exception is
 `statsd.plugin`, which has its own `[statsd]` section. Your `[plugins]` section should look similar to this:
 
-```conf
+```text
 [plugins]
     # timex = yes
     # idlejitter = yes

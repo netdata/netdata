@@ -38,7 +38,7 @@ After making changes to the configuration files:
 
 With this method instead of `SERVER_IP_ADDRESS:19999`, the Netdata dashboard can be accessed via a human-readable URL such as `netdata.example.com` used in the configuration below.
 
-```conf
+```text
 upstream backend {
     # the Netdata server
     server 127.0.0.1:19999;
@@ -72,7 +72,7 @@ server {
 This method is recommended when Netdata is to be served from a subfolder (or directory).
 In this case, the virtual host `netdata.example.com` already exists and Netdata has to be accessed via `netdata.example.com/netdata/`.
 
-```conf
+```text
 upstream netdata {
     server 127.0.0.1:19999;
     keepalive 64;
@@ -114,7 +114,7 @@ server {
 
 This is the recommended configuration when one Nginx will be used to manage multiple Netdata servers via sub-folders.
 
-```conf
+```text
 upstream backend-server1 {
     server 10.1.1.103:19999;
     keepalive 64;
@@ -168,7 +168,7 @@ In case Netdata's web server has been [configured to use TLS](/src/web/server/RE
 necessary to specify inside the Nginx configuration that the final destination is using TLS. To do this, please, append
 the following parameters in your `nginx.conf`
 
-```conf
+```text
 proxy_set_header X-Forwarded-Proto https;
 proxy_pass https://localhost:19999;
 ```
@@ -189,7 +189,7 @@ printf "yourusername:$(openssl passwd -apr1)" > /etc/nginx/passwords
 
 And then enable the authentication inside your server directive:
 
-```conf
+```text
 server {
     # ...
     auth_basic "Protected";
@@ -202,21 +202,21 @@ server {
 
 If your Nginx is on `localhost`, you can use this to protect your Netdata:
 
-```conf
+```text
 [web]
     bind to = 127.0.0.1 ::1
 ```
 
 You can also use a unix domain socket. This will also provide a faster route between Nginx and Netdata:
 
-```conf
+```text
 [web]
     bind to = unix:/var/run/netdata/netdata.sock
 ```
 
 At the Nginx side, use something like this to use the same unix domain socket:
 
-```conf
+```text
 upstream backend {
     server unix:/var/run/netdata/netdata.sock;
     keepalive 64;
@@ -225,7 +225,7 @@ upstream backend {
 
 If your Nginx server is not on localhost, you can set:
 
-```conf
+```text
 [web]
     bind to = *
     allow connections from = IP_OF_NGINX_SERVER
@@ -238,7 +238,7 @@ connection IP address.
 
 Nginx logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
-```conf
+```text
 [logs]
     access = off
 ```
@@ -247,7 +247,7 @@ Nginx logs accesses and Netdata logs them too. You can prevent Netdata from gene
 
 By default, netdata compresses its responses. You can have nginx do that instead, with the following options in the `location /` block:
 
-```conf
+```text
 location / {
     ...
     gzip on;
@@ -258,7 +258,7 @@ location / {
 
 To disable Netdata's gzip compression, open `netdata.conf` and in the `[web]` section put:
 
-```conf
+```text
 [web]
     enable gzip compression = no
 ```

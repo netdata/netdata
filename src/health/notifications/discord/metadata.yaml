@@ -45,7 +45,7 @@
             detailed_description: |
               All roles will default to this variable if left unconfigured.
               You can then have different channels per role, by editing `DEFAULT_RECIPIENT_DISCORD` with the channel you want, in the following entries at the bottom of the same file:
-              ```conf
+              ```text
               role_recipients_discord[sysadmin]="systems"
               role_recipients_discord[domainadmin]="domains"
               role_recipients_discord[dba]="databases systems"

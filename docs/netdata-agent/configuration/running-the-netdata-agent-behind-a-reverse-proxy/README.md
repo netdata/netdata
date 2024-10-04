@@ -26,7 +26,7 @@ The above will prevent anyone except your web server to access a Netdata dashboa
 
 You can also use `netdata.conf`:
 
-```conf
+```text
 [web]
     allow connections from = localhost 1.2.3.4
 ```

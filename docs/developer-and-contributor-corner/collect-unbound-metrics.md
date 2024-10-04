@@ -25,7 +25,7 @@ the TLS key files that will encrypt connections to the remote interface. Then ad
 documentation](https://nlnetlabs.nl/documentation/unbound/howto-setup/#setup-remote-control) for more details on using
 `unbound-control`, such as how to handle situations when Unbound is run under a unique user.
 
-```conf
+```text
 # enable remote-control
 remote-control:
     control-enable: yes

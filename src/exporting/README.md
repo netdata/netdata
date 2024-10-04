@@ -106,7 +106,7 @@ different.
 You can configure each connector individually using the available [options](#options). The
 `[graphite:my_graphite_instance]` block contains examples of some of these additional options in action.
 
-```conf
+```text
 [exporting:global]
     enabled = yes
     send configured labels = no
@@ -213,13 +213,13 @@ Configure individual connectors and override any global settings with the follow
 
      Example IPv4:
 
-```conf
+```text
    destination = 10.11.14.2:4242 10.11.14.3:4242 10.11.14.4:4242
 ```
 
    Example IPv6 and IPv4 together:
 
-```conf
+```text
    destination = [ffff:...:0001]:2003 10.11.12.1:2003
 ```
 

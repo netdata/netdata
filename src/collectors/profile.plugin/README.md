@@ -16,7 +16,7 @@ Edit the `netdata.conf` configuration file using [`edit-config`](/docs/netdata-a
 
 Scroll down to the `[plugin:profile]` section to find the available options:
 
-```conf
+```text
 [plugin:profile]
     update every = 5
     number of charts = 200

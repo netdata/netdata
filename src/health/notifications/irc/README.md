@@ -76,7 +76,7 @@ nc="/usr/bin/nc"
 ##### DEFAULT_RECIPIENT_IRC
 
 The `DEFAULT_RECIPIENT_IRC` can be edited in the following entries at the bottom of the same file:
-```conf
+```text
 role_recipients_irc[sysadmin]="#systems"
 role_recipients_irc[domainadmin]="#domains"
 role_recipients_irc[dba]="#databases #systems"

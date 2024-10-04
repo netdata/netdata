@@ -64,7 +64,7 @@ In Microsoft Teams the channel name is encoded in the URI after `/IncomingWebhoo
 All roles will default to this variable if left unconfigured.
 
 You can have different channels per role, by editing `DEFAULT_RECIPIENT_MSTEAMS` with the channel you want, in the following entries at the bottom of the same file:
-```conf
+```text
 role_recipients_msteams[sysadmin]="CHANNEL1"
 role_recipients_msteams[domainadmin]="CHANNEL2"
 role_recipients_msteams[dba]="databases CHANNEL3"

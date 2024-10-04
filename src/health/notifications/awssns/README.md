@@ -124,7 +124,7 @@ All roles will default to this variable if left unconfigured.
 
 You can have different recipient Topics per **role**, by editing `DEFAULT_RECIPIENT_AWSSNS` with the Topic ARN you want, in the following entries at the bottom of the same file:
 
-```conf
+```text
 role_recipients_awssns[sysadmin]="arn:aws:sns:us-east-2:123456789012:Systems"
 role_recipients_awssns[domainadmin]="arn:aws:sns:us-east-2:123456789012:Domains"
 role_recipients_awssns[dba]="arn:aws:sns:us-east-2:123456789012:Databases"
@@ -143,7 +143,7 @@ role_recipients_awssns[sitemgr]="arn:aws:sns:us-east-2:123456789012:Sites"
 An example working configuration would be:
 
 ```yaml
-```conf
+```text
 #------------------------------------------------------------------------------
 # Amazon SNS notifications
 

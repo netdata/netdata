@@ -35,7 +35,7 @@ connecting to cloud](/src/claim/README.md).
 
 You can configure following keys in the `netdata.conf` section `[cloud]`:
 
-```conf
+```text
 [cloud]
     statistics = yes
     query thread count = 2

@@ -77,7 +77,7 @@ All roles will default to this variable if left unconfigured.
 
 You can have different Rooms per role, by editing `DEFAULT_RECIPIENT_MATRIX` with the `!roomid:homeservername` you want, in the following entries at the bottom of the same file:
 
-```conf
+```text
 role_recipients_matrix[sysadmin]="!roomid1:homeservername"
 role_recipients_matrix[domainadmin]="!roomid2:homeservername"
 role_recipients_matrix[dba]="!roomid3:homeservername"

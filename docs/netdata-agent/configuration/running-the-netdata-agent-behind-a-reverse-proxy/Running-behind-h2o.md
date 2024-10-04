@@ -132,27 +132,27 @@ For more information on using basic authentication with H2O, see [their official
 
 If your H2O server is on `localhost`, you can use this to ensure external access is only possible through H2O:
 
-```conf
+```text
 [web]
     bind to = 127.0.0.1 ::1
 ```
 
 You can also use a unix domain socket. This will provide faster communication between H2O and Netdata as well:
 
-```conf
+```text
 [web]
     bind to = unix:/run/netdata/netdata.sock
 ```
 
 In the H2O configuration, use a line like the following to connect to Netdata via the unix socket:
 
-```conf
+```text
 proxy.reverse.url http://[unix:/run/netdata/netdata.sock]
 ```
 
 If your H2O server is not on localhost, you can set:
 
-```conf
+```text
 [web]
     bind to = *
     allow connections from = IP_OF_H2O_SERVER
@@ -168,7 +168,7 @@ the connection IP address.
 H2O logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting
 this in `/etc/netdata/netdata.conf`:
 
-```conf
+```text
 [logs]
     access = off
 ```

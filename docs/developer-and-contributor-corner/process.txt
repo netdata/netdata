@@ -142,7 +142,7 @@ Inside the file are lists of process names, oftentimes using wildcards (`*`), th
 groups together. For example, the Netdata Agent looks for processes starting with `mysqld`, `mariad`, `postgres`, and
 others, and groups them into `sql`. That makes sense, since all these processes are for SQL databases.
 
-```conf
+```text
 sql: mysqld* mariad* postgres* postmaster* oracle_* ora_* sqlservr
 ```
 
@@ -170,7 +170,7 @@ the [section above](#configure-the-netdata-agent-to-recognize-a-specific-process
 the `database servers` section. Create new groups for MySQL and PostgreSQL, and move their process queries into the
 unique groups.
 
-```conf
+```text
 # -----------------------------------------------------------------------------
 # database servers
 
@@ -194,7 +194,7 @@ to `# NETDATA processes accounting`.
 Above that, paste in the following text, which creates a new `custom-app` group with the `custom-app` process. Replace
 `custom-app` with the name of your application's Linux process. `apps_groups.conf` should now look like this:
 
-```conf
+```text
 ...
 # -----------------------------------------------------------------------------
 # Custom applications to monitor with apps.plugin and ebpf.plugin

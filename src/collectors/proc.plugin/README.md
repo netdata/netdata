@@ -267,7 +267,7 @@ If your system has more than 50 processors and you would like to see the CPU the
 state charts that are automatically disabled, you can set the following boolean options in the
 `[plugin:proc:/proc/stat]` section.
 
-```conf
+```text
     keep per core files open = yes
     keep cpuidle files open = yes
     core_throttle_count = yes
@@ -319,7 +319,7 @@ each state.
 
 ### Configuration
 
-```conf
+```text
 [plugin:proc:/proc/vmstat]
  filename to monitor = /proc/vmstat
  swap i/o = auto
@@ -363,7 +363,7 @@ By default Netdata will enable monitoring metrics only when they are not zero. I
 
 The settings for monitoring wireless is in the `[plugin:proc:/proc/net/wireless]` section of your `netdata.conf` file.
 
-```conf
+```text
     status for all interfaces = yes
     quality for all interfaces = yes
     discarded packets for all interfaces = yes
@@ -408,7 +408,7 @@ The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio
 
 Module configuration:
 
-```conf
+```text
 [plugin:proc:/proc/net/dev]
     # filename to monitor = /proc/net/dev 
     # path to get virtual interfaces = /sys/devices/virtual/net/%s

@@ -31,7 +31,7 @@ You are expected to use this method in all following configuration changes.
 sudo ./edit-config netdata.conf
 ```
 
-```conf
+```text
 [plugins]
  go.d = yes # enabled
  node.d = no # disabled
@@ -94,7 +94,7 @@ sudo ./edit-config health.d/example-alert.conf
 
 ### Change the port Netdata listens to (example, set it to port 39999)
 
-```conf
+```text
 [web]
 default port = 39999
 ```

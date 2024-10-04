@@ -785,7 +785,7 @@ sudo ./edit-config statsd.d/k6.conf
 
 Copy the following configuration into your file as a starting point.
 
-```conf
+```text
 [app]
     name = k6
     metrics = k6*

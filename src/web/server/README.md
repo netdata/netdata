@@ -58,7 +58,7 @@ Scroll down to the `[web]` section to find the following settings.
 
 Disable the web server by editing `netdata.conf` and setting:
 
-```conf
+```text
 [web]
     mode = none
 ```
@@ -67,7 +67,7 @@ Disable the web server by editing `netdata.conf` and setting:
 
 Control the number of threads and sockets with the following settings:
 
-```conf
+```text
 [web]
     web server threads = 4
     web server max sockets = 512
@@ -79,7 +79,7 @@ Netdata can bind to multiple IPs and ports, offering access to different service
 
 The ports to bind are controlled via `[web].bind to`, like this:
 
-```conf
+```text
 [web]
    default port = 19999
    bind to = 127.0.0.1=dashboard^SSL=optional 10.1.1.1:19998=management|netdata.conf hostname:19997=badges [::]:19996=streaming^SSL=force localhost:19995=registry *:http=dashboard unix:/run/netdata/netdata.sock
@@ -121,7 +121,7 @@ Inbound unix socket connections are unaffected, regardless of the TLS settings.
 
 To enable TLS, provide the path to your certificate and private key in the `[web]` section of `netdata.conf`:
 
-```conf
+```text
 [web]
     ssl key = /etc/netdata/ssl/key.pem
     ssl certificate = /etc/netdata/ssl/cert.pem
@@ -147,7 +147,7 @@ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out
 
 Beginning with version `v1.21.0`, specify the TLS version and the ciphers that you want to use:
 
-```conf
+```text
 [web]
     tls version = 1.3
     tls ciphers = TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256
@@ -172,7 +172,7 @@ To change this behavior, you need to modify the `bind to` setting in the `[web]`
 
 Example:
 
-```conf
+```text
 [web]
     bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
 ```
@@ -181,7 +181,7 @@ For information how to configure the child to use TLS, check [securing the commu
 
 When we define the use of SSL in a Netdata agent for different ports,  Netdata will apply the behavior specified on each port. For example, using the configuration line below:
 
-```conf
+```text
 [web]
     bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force *:20000=netdata.conf^SSL=optional *:20001=dashboard|registry
 ```
@@ -205,7 +205,7 @@ In the near future, Netdata will allow our users to change the internal configur
 
 Netdata supports access lists in `netdata.conf`:
 
-```conf
+```text
 [web]
     allow connections from = localhost *
     allow dashboard from = localhost *
@@ -242,7 +242,7 @@ a forward DNS resolution is made to validate the IP address against the name-pat
 Please note that this process can be expensive on a machine that is serving many connections. Each access list has an
 associated configuration option to turn off DNS-based patterns completely to avoid incurring this cost at run-time:
 
-```conf
+```text
     allow connections by dns = heuristic
     allow dashboard by dns = heuristic
     allow badges by dns = heuristic

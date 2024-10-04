@@ -66,7 +66,7 @@ dashboard.
 Save the file, then navigate to your [Netdata config directory](/docs/netdata-agent/configuration/README.md) to edit `netdata.conf`. Add
 the following line to the `[web]` section to tell Netdata where to find your custom configuration.
 
-```conf
+```text
 [web]
     custom dashboard_info.js = your_dashboard_info_file.js
 ```
