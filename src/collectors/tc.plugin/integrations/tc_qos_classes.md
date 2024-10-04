@@ -93,7 +93,7 @@ There are no alerts configured by default for this integration.
 
 In order to view tc classes, you need to create the file `/etc/netdata/tc-qos-helper.conf` with content:
 
-```conf
+```text
 tc_show="class"
 ```
 
@@ -144,7 +144,7 @@ A basic example configuration using classes defined in `/etc/iproute2/tc_cls`.
 
 An example of class IDs mapped to names in that file can be:
 
-```conf
+```text
 2:1 Standard
 2:8 LowPriorityData
 2:10 HighThroughputData

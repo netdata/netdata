@@ -15,7 +15,7 @@ the following configuration can be used:
 
 For all examples, set the mode to `http`
 
-```conf
+```text
 defaults
     mode    http
 ```
@@ -28,7 +28,7 @@ A simple example where the base URL, say `http://example.com`, is used with no s
 
 Create a frontend to receive the request.
 
-```conf
+```text
 frontend http_frontend
     ## HTTP ipv4 and ipv6 on all ips ##
     bind :::80 v4v6
@@ -40,7 +40,7 @@ frontend http_frontend
 
 Create the Netdata backend which will send requests to port `19999`.
 
-```conf
+```text
 backend netdata_backend
     option       forwardfor
     server       netdata_local     127.0.0.1:19999
@@ -59,7 +59,7 @@ An example where the base URL is used with a subpath `/netdata/`:
 
 To use a subpath, create an ACL, which will set a variable based on the subpath.
 
-```conf
+```text
 frontend http_frontend
     ## HTTP ipv4 and ipv6 on all ips ##
     bind :::80 v4v6
@@ -82,7 +82,7 @@ frontend http_frontend
 
 Same as simple example, except remove `/netdata/` with regex.
 
-```conf
+```text
 backend netdata_backend
     option      forwardfor
     server      netdata_local     127.0.0.1:19999
@@ -104,7 +104,7 @@ This example will only use Netdata if host matches example.com (replace with you
 
 This frontend uses a certificate list.
 
-```conf
+```text
 frontend https_frontend
     ## HTTP ##
     bind :::80 v4v6
@@ -129,7 +129,7 @@ In the cert list file place a mapping from a certificate file to the domain used
 
 `/etc/letsencrypt/certslist.txt`:
 
-```txt
+```text
 example.com /etc/letsencrypt/live/example.com/example.com.pem
 ```
 
@@ -146,7 +146,7 @@ cat /etc/letsencrypt/live/example.com/fullchain.pem \
 
 Same as simple, except set protocol `https`.
 
-```conf
+```text
 backend netdata_backend
     option forwardfor
     server      netdata_local     127.0.0.1:19999
@@ -162,7 +162,7 @@ backend netdata_backend
 
 To use basic HTTP Authentication, create an authentication list:
 
-```conf
+```text
 # HTTP Auth
 userlist basic-auth-list
   group is-admin
@@ -179,13 +179,13 @@ $5$l7Gk0VPIpKO$f5iEcxvjfdF11khw.utzSKqP7W.0oq8wX9nJwPLwzy1
 
 Replace `YOUR_PASSWORD` with hash:
 
-```conf
+```text
 user admin password $5$l7Gk0VPIpKO$f5iEcxvjfdF11khw.utzSKqP7W.0oq8wX9nJwPLwzy1 groups is-admin
 ```
 
 Now add at the top of the backend:
 
-```conf
+```text
 acl devops-auth http_auth_group(basic-auth-list) is-admin
 http-request auth realm netdata_local unless devops-auth
 ```
@@ -194,7 +194,7 @@ http-request auth realm netdata_local unless devops-auth
 
 Full example configuration with HTTP auth over TLS with subpath:
 
-```conf
+```text
 global
     maxconn     20000
 

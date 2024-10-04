@@ -25,28 +25,28 @@ You can enable or disable individual plugins by opening `netdata.conf` and scrol
 This section features a list of Netdata's plugins, with a boolean setting to enable or disable them. The exception is
 `statsd.plugin`, which has its own `[statsd]` section. Your `[plugins]` section should look similar to this:
 
-```conf
+```text
 [plugins]
- # timex = yes
- # idlejitter = yes
- # netdata monitoring = yes
- # tc = yes
- # diskspace = yes
- # proc = yes
- # cgroups = yes
- # enable running new plugins = yes
- # check for new plugins every = 60
- # slabinfo = no
- # python.d = yes
- # perf = yes
- # ioping = yes
- # fping = yes
- # nfacct = yes
- # go.d = yes
- # apps = yes
- # ebpf = yes
- # charts.d = yes
- # statsd = yes
+    # timex = yes
+    # idlejitter = yes
+    # netdata monitoring = yes
+    # tc = yes
+    # diskspace = yes
+    # proc = yes
+    # cgroups = yes
+    # enable running new plugins = yes
+    # check for new plugins every = 60
+    # slabinfo = no
+    # python.d = yes
+    # perf = yes
+    # ioping = yes
+    # fping = yes
+    # nfacct = yes
+    # go.d = yes
+    # apps = yes
+    # ebpf = yes
+    # charts.d = yes
+    # statsd = yes
 ```
 
 By default, most plugins are enabled, so you don't need to enable them explicitly to use their collectors. To enable or

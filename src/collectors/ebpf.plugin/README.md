@@ -49,7 +49,7 @@ To enable or disable the entire eBPF collector:
 3. Enable the collector by scrolling down to the `[plugins]` section. Uncomment the line `ebpf` (not
     `ebpf_process`) and set it to `yes`.
 
-    ```conf
+    ```text
     [plugins]
        ebpf = yes
     ```
@@ -101,7 +101,7 @@ interact with the Linux kernel.
 
 If you want to enable `apps.plugin` integration, change the "apps" setting to "yes".
 
-```conf
+```text
 [global]
    apps = yes
 ```
@@ -115,7 +115,7 @@ interacts with the Linux kernel.
 The integration with `cgroups.plugin` is disabled by default to avoid creating overhead on your system. If you want to
 _enable_ the integration with `cgroups.plugin`, change the `cgroups` setting to `yes`.
 
-```conf
+```text
 [global]
    cgroups = yes
 ```
@@ -296,7 +296,7 @@ are divided in the following sections:
 
 You can configure the information shown with function `ebpf_socket` using the settings in this section.
 
-```conf
+```text
 [network connections]
     enabled = yes
     resolve hostname ips = no
@@ -338,7 +338,7 @@ section.
 For example, Netdata's default port (`19999`) is not listed in `/etc/services`. To associate that port with the Netdata
 service in network connection charts, and thus see the name of the service instead of its port, define it:
 
-```conf
+```text
 [service name]
     19999 = Netdata
 ```
@@ -347,7 +347,7 @@ service in network connection charts, and thus see the name of the service inste
 
 The sync configuration has specific options to disable monitoring for syscalls.  All syscalls are monitored by default.
 
-```conf
+```text
 [syscalls]
     sync = yes
     msync = yes
@@ -362,7 +362,7 @@ The sync configuration has specific options to disable monitoring for syscalls. 
 The filesystem configuration has specific options to disable monitoring for filesystems; by default, all filesystems are
 monitored.
 
-```conf
+```text
 [filesystem]
     btrfsdist = yes
     ext4dist = yes
@@ -620,7 +620,7 @@ in [disk latency](#disk) charts.
 By default, MD flush is disabled. To enable it, configure your
 `/etc/netdata/ebpf.d.conf` file as:
 
-```conf
+```text
 [global]
     mdflush = yes
 ```
@@ -940,7 +940,7 @@ This will create two new files: `netdata_ebpf.te` and `netdata_ebpf.mod`.
 Edit the `netdata_ebpf.te` file to change the options `class` and `allow`. You should have the following at the end of
 the `netdata_ebpf.te` file.
 
-```conf
+```text
 module netdata_ebpf 1.0;
 require {
         type unconfined_service_t;

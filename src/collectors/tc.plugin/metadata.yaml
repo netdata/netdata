@@ -41,7 +41,7 @@ modules:
             description: |
               In order to view tc classes, you need to create the file `/etc/netdata/tc-qos-helper.conf` with content:
 
-              ```conf
+              ```text
               tc_show="class"
               ```
       configuration:
@@ -74,7 +74,7 @@ modules:
 
                 An example of class IDs mapped to names in that file can be:
 
-                ```conf
+                ```text
                 2:1 Standard
                 2:8 LowPriorityData
                 2:10 HighThroughputData

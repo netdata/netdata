@@ -1,12 +1,3 @@
-<!--
-title: "Log"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/log/README.md
-sidebar_label: "Log"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Developers/libnetdata"
--->
-
 # Log
 
 The netdata log library supports debug, info, error and fatal error logging. 

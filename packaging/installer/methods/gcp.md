@@ -44,7 +44,7 @@ click **Create firewall rule**.
 The following configuration has previously worked for Netdata running on GCP instances
 ([see #7786](https://github.com/netdata/netdata/issues/7786)):
 
-```conf
+```text
 Name: <name>
 Type: Ingress
 Targets: <name-tag>

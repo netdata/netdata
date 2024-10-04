@@ -60,7 +60,7 @@ The following options can be defined for this notification
 
 All roles will default to this variable if left unconfigured.
 The `DEFAULT_RECIPIENT_CUSTOM` can be edited in the following entries at the bottom of the same file:
-```conf
+```text
 role_recipients_email[sysadmin]="systems@example.com"
 role_recipients_email[domainadmin]="domains@example.com"
 role_recipients_email[dba]="databases@example.com systems@example.com"

@@ -45,7 +45,7 @@ inbound rules**.
 
 Add a new rule with the following options:
 
-```conf
+```text
 Type: Custom TCP
 Protocol: TCP
 Port Range: 19999

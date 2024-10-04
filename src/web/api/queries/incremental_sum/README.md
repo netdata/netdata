@@ -1,12 +1,3 @@
-<!--
-title: "Incremental Sum (`incremental_sum`)"
-sidebar_label: "Incremental Sum (`incremental_sum`)"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/incremental_sum/README.md
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Developers/Web/Api/Queries"
--->
-
 # Incremental Sum (`incremental_sum`)
 
 This modules finds the incremental sum of a period, which `last value - first value`.

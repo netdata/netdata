@@ -63,7 +63,7 @@ The following options can be defined for this notification
 All roles will default to this variable if left unconfigured.
 
 The `DEFAULT_RECIPIENT_PD` can be edited in the following entries at the bottom of the same file:
-```conf
+```text
 role_recipients_pd[sysadmin]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa"
 role_recipients_pd[domainadmin]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxb"
 role_recipients_pd[dba]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxc"

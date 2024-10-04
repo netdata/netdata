@@ -1,11 +1,3 @@
-<!--
-title: "iprange"
-custom_edit_url: "/src/go/plugin/go.d/pkg/iprange/README.md"
-sidebar_label: "iprange"
-learn_status: "Published"
-learn_rel_path: "Developers/External plugins/go.d.plugin/Helper Packages"
--->
-
 # iprange
 
 This package helps you to work with IP ranges.

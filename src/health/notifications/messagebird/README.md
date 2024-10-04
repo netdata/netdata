@@ -62,7 +62,7 @@ The following options can be defined for this notification
 All roles will default to this variable if left unconfigured.
 
 You can then have different recipients per role, by editing `DEFAULT_RECIPIENT_MESSAGEBIRD` with the number you want, in the following entries at the bottom of the same file:
-```conf
+```text
 role_recipients_messagebird[sysadmin]="+15555555555"
 role_recipients_messagebird[domainadmin]="+15555555556"
 role_recipients_messagebird[dba]="+15555555557"
