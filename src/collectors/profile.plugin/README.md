@@ -16,13 +16,13 @@ Edit the `netdata.conf` configuration file using [`edit-config`](/docs/netdata-a
 
 Scroll down to the `[plugin:profile]` section to find the available options:
 
-```txt
+```conf
 [plugin:profile]
-  update every = 5
-  number of charts = 200
-  number of dimensions per chart = 5
-  seconds to backfill = 86400
-  number of threads = 16
+    update every = 5
+    number of charts = 200
+    number of dimensions per chart = 5
+    seconds to backfill = 86400
+    number of threads = 16
 ```
 
 The `number of threads` option will create the specified number of collection
