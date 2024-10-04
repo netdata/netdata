@@ -1,11 +1,3 @@
-<!--
-title: "Asterisk monitoring with Netdata"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/statsd.plugin/asterisk.md"
-sidebar_label: "Asterisk"
-learn_status: "Published"
-learn_rel_path: "Integrations/Monitor/VoIP"
--->
-
 # Asterisk collector
 
 Monitors [Asterisk](https://www.asterisk.org/) dialplan application's statistics.

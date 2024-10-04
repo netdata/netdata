@@ -1,12 +1,3 @@
-<!--
-title: "Array Allocator"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/aral/README.md
-sidebar_label: "Array allocator"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Developers/libnetdata"
--->
-
 # Array Allocator
 
 Come on! Array allocators are embedded in libc! Why do we need such a thing in Netdata?

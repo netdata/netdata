@@ -1,12 +1,3 @@
-<!--
-title: "Running Netdata behind H2O"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md"
-sidebar_label: "Running Netdata behind H2O"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration/Secure your nodes"
--->
-
 # Running Netdata behind H2O
 
 [H2O](https://h2o.examp1e.net/) is a new generation HTTP server that provides quicker response to users with less CPU utilization when compared to older generation of web servers.

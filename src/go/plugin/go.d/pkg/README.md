@@ -1,11 +1,3 @@
-<!--
-title: "Helper Packages"
-custom_edit_url: "/src/go/plugin/go.d/pkg/README.md"
-sidebar_label: "Helper Packages"
-learn_status: "Published"
-learn_rel_path: "Developers/External plugins/go.d.plugin/Helper Packages"
--->
-
 # Helper Packages
 
 - if you need IP ranges consider to

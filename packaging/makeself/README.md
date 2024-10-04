@@ -1,13 +1,3 @@
-<!--
-title: "Netdata static binary build"
-description: "Users can build the static 64-bit binary package that we ship with every release of the open-source Netdata Agent for debugging or specialize purposes."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/makeself/README.md
-sidebar_label: "Static binary packages"
-learn_status: "Published"
-learn_rel_path: "Installation/Installation methods"
-sidebar_position: 30
--->
-
 # Netdata static binary build
 
 We publish pre-built static builds of Netdata for Linux systems. Currently, these are published for 64-bit x86, ARMv7,

@@ -1,13 +1,3 @@
-<!--
-title: "Bind9 monitoring with Netdata"
-description: "Monitor the health and performance of Bind9 DNS servers with zero configuration, per-second metric granularity, and interactive visualizations."
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/bind/README.md"
-sidebar_label: "Bind9"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Webapps"
--->
-
 # Bind9 collector
 
 [`Bind9`](https://www.isc.org/bind/) (or named) is a very flexible, full-featured DNS system.

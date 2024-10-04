@@ -1,12 +1,3 @@
-<!--
-title: "External plugins"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/plugins.d/README.md"
-sidebar_label: "External plugins"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Developers/External plugins"
--->
-
 # External plugins
 
 `plugins.d` is the Netdata internal plugin that collects metrics
