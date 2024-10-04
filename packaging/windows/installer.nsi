@@ -3,7 +3,7 @@
 !include "FileFunc.nsh"
 
 Name "Netdata"
-Outfile "netdata-installer.exe"
+Outfile "netdata-installer-x64.exe"
 InstallDir "$PROGRAMFILES\Netdata"
 RequestExecutionLevel admin
 
