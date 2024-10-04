@@ -155,11 +155,13 @@ func TestChrony_Collect(t *testing.T) {
 		prepare  func() *Chrony
 		expected map[string]int64
 	}{
-		"tracking: success, activity: success": {
+		"tracking: success, activity: success, serverstats: success": {
 			prepare: func() *Chrony { return prepareChronyWithMock(&mockClient{}) },
 			expected: map[string]int64{
 				"burst_offline_sources":      3,
 				"burst_online_sources":       4,
+				"command_packets_dropped":    1,
+				"command_packets_received":   652,
 				"current_correction":         154872,
 				"frequency":                  51051185607,
 				"last_offset":                3095,
@@ -167,6 +169,8 @@ func TestChrony_Collect(t *testing.T) {
 				"leap_status_insert_second":  1,
 				"leap_status_normal":         0,
 				"leap_status_unsynchronised": 0,
+				"ntp_packets_dropped":        1,
+				"ntp_packets_received":       1,
 				"offline_sources":            2,
 				"online_sources":             8,
 				"ref_measurement_time":       63793323616,
@@ -219,12 +223,13 @@ func TestChrony_Collect(t *testing.T) {
 			c := test.prepare()
 
 			require.NoError(t, c.Init())
+			c.exec = &mockChronyc{}
 			_ = c.Check()
 
-			collected := c.Collect()
-			copyRefMeasurementTime(collected, test.expected)
+			mx := c.Collect()
+			copyRefMeasurementTime(mx, test.expected)
 
-			assert.Equal(t, test.expected, collected)
+			assert.Equal(t, test.expected, mx)
 		})
 	}
 }
@@ -232,11 +237,30 @@ func TestChrony_Collect(t *testing.T) {
 func prepareChronyWithMock(m *mockClient) *Chrony {
 	c := New()
 	if m == nil {
-		c.newClient = func(_ Config) (chronyClient, error) { return nil, errors.New("mock.newClient error") }
+		c.newConn = func(_ Config) (chronyConn, error) { return nil, errors.New("mock.newClient error") }
 	} else {
-		c.newClient = func(_ Config) (chronyClient, error) { return m, nil }
+		c.newConn = func(_ Config) (chronyConn, error) { return m, nil }
 	}
 	return c
+}
+
+type mockChronyc struct{}
+
+func (m *mockChronyc) serverStats() ([]byte, error) {
+	data := `
+NTP packets received       : 1
+NTP packets dropped        : 1
+Command packets received   : 652
+Command packets dropped    : 1
+Client log records dropped : 1
+NTS-KE connections accepted: 1
+NTS-KE connections dropped : 1
+Authenticated NTP packets  : 1
+Interleaved NTP packets    : 1
+NTP timestamps held        : 1
+NTP timestamp span         : 0
+`
+	return []byte(data), nil
 }
 
 type mockClient struct {
@@ -246,7 +270,7 @@ type mockClient struct {
 	closeCalled      bool
 }
 
-func (m *mockClient) Tracking() (*chrony.ReplyTracking, error) {
+func (m *mockClient) tracking() (*chrony.ReplyTracking, error) {
 	if m.errOnTracking {
 		return nil, errors.New("mockClient.Tracking call error")
 	}
@@ -271,7 +295,7 @@ func (m *mockClient) Tracking() (*chrony.ReplyTracking, error) {
 	return &reply, nil
 }
 
-func (m *mockClient) Activity() (*chrony.ReplyActivity, error) {
+func (m *mockClient) activity() (*chrony.ReplyActivity, error) {
 	if m.errOnActivity {
 		return nil, errors.New("mockClient.Activity call error")
 	}
@@ -287,31 +311,7 @@ func (m *mockClient) Activity() (*chrony.ReplyActivity, error) {
 	return &reply, nil
 }
 
-func (m *mockClient) ServerStats() (*serverStats, error) {
-	if m.errOnServerStats {
-		return nil, errors.New("mockClient.ServerStats call error")
-	}
-
-	reply := serverStats{
-		v3: &chrony.ServerStats3{
-			NTPHits:            10,
-			NKEHits:            10,
-			CMDHits:            10,
-			NTPDrops:           1,
-			NKEDrops:           1,
-			CMDDrops:           1,
-			LogDrops:           1,
-			NTPAuthHits:        10,
-			NTPInterleavedHits: 10,
-			NTPTimestamps:      0,
-			NTPSpanSeconds:     0,
-		},
-	}
-
-	return &reply, nil
-}
-
-func (m *mockClient) Close() {
+func (m *mockClient) close() {
 	m.closeCalled = true
 }
 

@@ -76,8 +76,8 @@ github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/emicklei/go-restful/v3 v3.11.0 h1:rAQeMHw1c7zTmncogyy8VvRZwtkmkZ4FxERmMY4rD+g=
 github.com/emicklei/go-restful/v3 v3.11.0/go.mod h1:6n3XBCmQQb25CM2LCACGz8ukIrRry+4bhvbpWn3mrbc=
-github.com/facebook/time v0.0.0-20240626113945-18207c5d8ddc h1:0VQsg5ZXW9MPUxzemUHW7UBK8gfIO8K+YJGbdv4kBIM=
-github.com/facebook/time v0.0.0-20240626113945-18207c5d8ddc/go.mod h1:2UFAomOuD2vAK1x68czUtCVjAqmyWCEnAXOlmGqf+G0=
+github.com/facebook/time v0.0.0-20241003211043-324a0f2e94c0 h1:Z/QF2fnP1QWi755nNDKxiOfnSboaF/lvsYlB2eh4Hiw=
+github.com/facebook/time v0.0.0-20241003211043-324a0f2e94c0/go.mod h1:ROiLXrJb1QHiB4rvK6Sqhl6SAgkjV47z5O/Oy5jKzgU=
 github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHkI4W8=
