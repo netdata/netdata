@@ -34,7 +34,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The collector automatically detects all metrics, no configuration required.
+            The collector automatically detects all of the metrics, no further configuration is required.
         limits:
           description: ""
         performance_impact:
@@ -45,13 +45,13 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:windows"
-          description: "The main configuration file"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
         options:
           description: ""
           folding:
             title: "Config option"
-            enabled: true
+            enabled: false
           list:
             - name: PerflibProcesses
               description: An option to enable or disable the data collection.
@@ -116,9 +116,10 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Perflib provides different statistical methods about Microsoft Windows environment. This collector query for
-          Object 'Memory' to show swap usage and operations.
-        method_description: ""
+          This collector monitors swap and memory pool statistics on Windows systems.
+        method_description: |
+          It queries for the 'Memory' object from Perflib in order to gather the metrics.
+          
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -128,7 +129,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The collector auto-detects all metrics. No configuration is needed.
+            The collector automatically detects all of the metrics, no further configuration is required.
         limits:
           description: ""
         performance_impact:
@@ -139,13 +140,13 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:windows"
-          description: "The main configuration file"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
         options:
           description: ""
           folding:
             title: "Config option"
-            enabled: true
+            enabled: false
           list:
             - name: PerflibMemory
               description: An option to enable or disable the data collection.
@@ -207,16 +208,15 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords:
-        - process counts
-        - threads
-        - context switch
+        - thermal
+        - temperature
       most_popular: false
     overview:
       data_collection:
         metrics_description: |
-          Perflib provides different statistical methods about Microsoft Windows environment. This collector query for
-          Object 'Thermal Zone Information' to show actual temperature per zone.
-        method_description: ""
+          This collector monitors thermal zone statistics on Windows systems.
+        method_description: |
+          It queries for the 'Thermal Zone Information' object from Perflib in order to gather the metrics.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -226,7 +226,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The collector auto-detects all metrics. No configuration is needed.
+            The collector automatically detects all of the metrics, no further configuration is required.
         limits:
           description: ""
         performance_impact:
@@ -236,9 +236,9 @@ modules:
         list: []
       configuration:
         file:
-          section_name: "plugin:windows"
+          section_name: "[plugin:windows]"
           name: "netdata.conf"
-          description: "The main configuration file."
+          description: "The Netdata main configuration file."
         options:
           description: ""
           folding:
