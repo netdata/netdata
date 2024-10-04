@@ -7,7 +7,6 @@
 #include "../libnetdata.h"
 #include "nd_log-internals.h"
 
-
 const char *program_name = "";
 uint64_t debug_flags = 0;
 int aclklog_enabled = 0;
@@ -41,6 +40,20 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
                 *spinlock = NULL;
             }
             break;
+
+#if defined(OS_WINDOWS)
+        case NDLM_WEVENTS:
+            if(unlikely(!nd_log.wevents.initialized)) {
+                output = NDLM_FILE;
+                *fpp = stderr;
+                *spinlock = &nd_log.std_error.spinlock;
+            }
+            else {
+                *fpp = NULL;
+                *spinlock = NULL;
+            }
+            break;
+#endif
 
         case NDLM_SYSLOG:
             if(unlikely(!nd_log.syslog.initialized)) {
@@ -118,6 +131,23 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
         }
     }
 
+#if defined(OS_WINDOWS)
+    if(output == NDLM_WEVENTS) {
+        if(!nd_logger_wevents(fields, fields_max)) {
+            // we can't log to windows events, let's log to stderr
+            if(spinlock)
+                spinlock_unlock(spinlock);
+
+            output = NDLM_FILE;
+            spinlock = &nd_log.std_error.spinlock;
+            fp = stderr;
+
+            if(spinlock)
+                spinlock_lock(spinlock);
+        }
+    }
+#endif
+
     if(output == NDLM_SYSLOG)
         nd_logger_syslog(priority, source->format, fields, fields_max);
 
@@ -168,7 +198,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     SPINLOCK *spinlock;
     FILE *fp;
     ND_LOG_METHOD output = nd_logger_select_output(source, &fp, &spinlock);
-    if(output != NDLM_FILE && output != NDLM_JOURNAL && output != NDLM_SYSLOG)
+    if(!IS_FINAL_LOG_METHOD(output))
         return;
 
     // mark all fields as unset

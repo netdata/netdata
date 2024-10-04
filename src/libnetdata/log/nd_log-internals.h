@@ -39,9 +39,19 @@ typedef enum  __attribute__((__packed__)) {
     NDLM_STDOUT,
     NDLM_STDERR,
     NDLM_FILE,
+#if defined(OS_WINDOWS)
+    NDLM_WEVENTS,
+#endif
 } ND_LOG_METHOD;
 
 #define IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(ndlo) ((ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || (ndlo) == NDLM_STDERR)
+
+// all the log methods are finally mapped to these
+#if defined(OS_WINDOWS)
+#define IS_FINAL_LOG_METHOD(ndlo) ((ndlo) == NDLM_FILE || (ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || (ndlo) == NDLM_WEVENTS)
+#else
+#define IS_FINAL_LOG_METHOD(ndlo) ((ndlo) == NDLM_FILE || (ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG)
+#endif
 
 ND_LOG_METHOD nd_log_method2id(const char *method);
 const char *nd_log_id2method(ND_LOG_METHOD method);
@@ -53,6 +63,9 @@ typedef enum __attribute__((__packed__)) {
     NDLF_JOURNAL,
     NDLF_LOGFMT,
     NDLF_JSON,
+#if defined(OS_WINDOWS)
+    NDLF_WEVENTS,
+#endif
 } ND_LOG_FORMAT;
 
 const char *nd_log_id2format(ND_LOG_FORMAT format);
@@ -103,6 +116,10 @@ struct nd_log {
         bool initialized;
         int facility;
     } syslog;
+
+    struct {
+        bool initialized;
+    } wevents;
 
     struct {
         SPINLOCK spinlock;
@@ -184,5 +201,13 @@ bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields_max);
 // output to file
 
 bool nd_logger_file(FILE *fp, ND_LOG_FORMAT format, struct log_field *fields, size_t fields_max);
+
+// --------------------------------------------------------------------------------------------------------------------
+// output to windows events log
+
+#if defined(OS_WINDOWS)
+bool nd_log_wevents_init(void);
+bool nd_logger_wevents(struct log_field *fields, size_t fields_max);
+#endif
 
 #endif //NETDATA_ND_LOG_INTERNALS_H

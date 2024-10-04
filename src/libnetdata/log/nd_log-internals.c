@@ -46,6 +46,9 @@ static struct {
     { .method = NDLM_STDOUT, .name = "stdout" },
     { .method = NDLM_STDERR, .name = "stderr" },
     { .method = NDLM_FILE, .name = "file" },
+#if defined(OS_WINDOWS)
+    { .method = NDLM_WEVENTS, .name = "wevents" },
+#endif
 };
 
 ND_LOG_METHOD nd_log_method2id(const char *method) {
@@ -235,6 +238,9 @@ static struct {
     const char *name;
 } nd_log_formats[] = {
     { .format = NDLF_JOURNAL, .name = "journal" },
+#if defined(OS_WINDOWS)
+    { .format = NDLF_WEVENTS, .name = "wevents" },
+#endif
     { .format = NDLF_LOGFMT, .name = "logfmt" },
     { .format = NDLF_JSON, .name = "json" },
 };
@@ -277,6 +283,11 @@ struct nd_log nd_log = {
         .initialized = false,
         .facility = LOG_DAEMON,
     },
+#if defined(OS_WINDOWS)
+    .wevents =  {
+        .initialized =  false,
+    },
+#endif
     .std_output = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
         .initialized = false,
@@ -733,97 +744,4 @@ bool nd_log_replace_existing_fd(struct nd_log_source *e, int new_fd) {
     }
 
     return false;
-}
-
-void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
-    if(e->method == NDLM_DEFAULT)
-        nd_log_set_user_settings(source, e->filename);
-
-    if((e->method == NDLM_FILE && !e->filename) ||
-        (e->method == NDLM_DEVNULL && e->fd == -1))
-        e->method = NDLM_DISABLED;
-
-    if(e->fp)
-        fflush(e->fp);
-
-    switch(e->method) {
-        case NDLM_SYSLOG:
-            nd_log_syslog_init();
-            break;
-
-        case NDLM_JOURNAL:
-            nd_log_journal_direct_init(NULL);
-            nd_log_journal_systemd_init();
-            break;
-
-        case NDLM_STDOUT:
-            e->fp = stdout;
-            e->fd = STDOUT_FILENO;
-            break;
-
-        case NDLM_DISABLED:
-            break;
-
-        case NDLM_DEFAULT:
-        case NDLM_STDERR:
-            e->method = NDLM_STDERR;
-            e->fp = stderr;
-            e->fd = STDERR_FILENO;
-            break;
-
-        case NDLM_DEVNULL:
-        case NDLM_FILE: {
-            int fd = open(e->filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
-            if(fd == -1) {
-                if(e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO) {
-                    e->fd = STDERR_FILENO;
-                    e->method = NDLM_STDERR;
-                    netdata_log_error("Cannot open log file '%s'. Falling back to stderr.", e->filename);
-                }
-                else
-                    netdata_log_error("Cannot open log file '%s'. Leaving fd %d as-is.", e->filename, e->fd);
-            }
-            else {
-                if (!nd_log_replace_existing_fd(e, fd)) {
-                    if(e->fd == STDOUT_FILENO || e->fd == STDERR_FILENO) {
-                        if(e->fd == STDOUT_FILENO)
-                            e->method = NDLM_STDOUT;
-                        else if(e->fd == STDERR_FILENO)
-                            e->method = NDLM_STDERR;
-
-                        // we have dup2() fd, so we can close the one we opened
-                        if(fd != STDOUT_FILENO && fd != STDERR_FILENO)
-                            close(fd);
-                    }
-                    else
-                        e->fd = fd;
-                }
-            }
-
-            // at this point we have e->fd set properly
-
-            if(e->fd == STDOUT_FILENO)
-                e->fp = stdout;
-            else if(e->fd == STDERR_FILENO)
-                e->fp = stderr;
-
-            if(!e->fp) {
-                e->fp = fdopen(e->fd, "a");
-                if (!e->fp) {
-                    netdata_log_error("Cannot fdopen() fd %d ('%s')", e->fd, e->filename);
-
-                    if(e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO)
-                        close(e->fd);
-
-                    e->fp = stderr;
-                    e->fd = STDERR_FILENO;
-                }
-            }
-            else {
-                if (setvbuf(e->fp, NULL, _IOLBF, 0) != 0)
-                    netdata_log_error("Cannot set line buffering on fd %d ('%s')", e->fd, e->filename);
-            }
-        }
-        break;
-    }
 }

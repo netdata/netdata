@@ -826,6 +826,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/nd_log-format-logfmt.c
         src/libnetdata/log/nd_log-format-json.c
         src/libnetdata/log/nd_log-to-file.c
+        src/libnetdata/log/nd_log-to-windows-events.c
 )
 
 if(ENABLE_PLUGIN_EBPF)
