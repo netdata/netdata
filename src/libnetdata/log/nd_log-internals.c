@@ -412,10 +412,12 @@ __thread struct log_field thread_log_fields[_NDF_MAX] = {
         .annotator = errno_annotator,
     },
     [NDF_WINERROR] = {
+#if defined(OS_WINDOWS)
         .journal = "WINERROR",
         .wevents = "WindowsLastError",
         .logfmt = "winerror",
         .annotator = winerror_annotator,
+#endif
     },
     [NDF_INVOCATION_ID] = {
         .journal = "INVOCATION_ID", // standard journald field
