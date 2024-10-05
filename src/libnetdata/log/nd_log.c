@@ -133,7 +133,7 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
 
 #if defined(OS_WINDOWS)
     if(output == NDLM_WEVENTS) {
-        if(!nd_logger_wevents(fields, fields_max)) {
+        if(!nd_logger_wevents(source, fields, fields_max)) {
             // we can't log to windows events, let's log to stderr
             if(spinlock)
                 spinlock_unlock(spinlock);
@@ -261,10 +261,8 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     if(saved_errno != 0 && !thread_log_fields[NDF_ERRNO].entry.set)
         thread_log_fields[NDF_ERRNO].entry = ND_LOG_FIELD_I64(NDF_ERRNO, saved_errno);
 
-#if defined(OS_WINDOWS)
     if(saved_winerror != 0 && !thread_log_fields[NDF_WINERROR].entry.set)
         thread_log_fields[NDF_WINERROR].entry = ND_LOG_FIELD_U64(NDF_WINERROR, saved_winerror);
-#endif
 
     CLEAN_BUFFER *wb = NULL;
     if(fmt && !thread_log_fields[NDF_MESSAGE].entry.set) {

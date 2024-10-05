@@ -44,12 +44,12 @@ typedef enum  __attribute__((__packed__)) {
 #endif
 } ND_LOG_METHOD;
 
-#define IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(ndlo) ((ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || (ndlo) == NDLM_STDERR)
-
 // all the log methods are finally mapped to these
 #if defined(OS_WINDOWS)
+#define IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(ndlo) ((ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || (ndlo) == NDLM_STDERR || (ndlo) == NDLM_WEVENTS)
 #define IS_FINAL_LOG_METHOD(ndlo) ((ndlo) == NDLM_FILE || (ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || (ndlo) == NDLM_WEVENTS)
 #else
+#define IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(ndlo) ((ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || (ndlo) == NDLM_STDERR)
 #define IS_FINAL_LOG_METHOD(ndlo) ((ndlo) == NDLM_FILE || (ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG)
 #endif
 
@@ -93,6 +93,10 @@ struct nd_log_source {
     ND_LOG_FIELD_PRIORITY min_priority;
     const char *pending_msg;
     struct nd_log_limit limits;
+
+#if defined(OS_WINDOWS)
+    ND_LOG_SOURCES source;
+#endif
 };
 
 struct nd_log {
@@ -136,12 +140,13 @@ struct nd_log {
 // --------------------------------------------------------------------------------------------------------------------
 
 struct log_field;
-typedef void (*annotator_t)(BUFFER *wb, const char *key, struct log_field *lf);
+typedef const char *(*annotator_t)(struct log_field *lf);
 
 struct log_field {
     const char *journal;
     const char *logfmt;
-    annotator_t logfmt_annotator;
+    const char *wevents;
+    annotator_t annotator;
     struct log_stack_entry entry;
 };
 
@@ -163,12 +168,12 @@ void nd_log_stdin_init(int fd, const char *filename);
 // annotators
 
 struct log_field;
-void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf);
-void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf);
-void timestamp_usec_annotator(BUFFER *wb, const char *key, struct log_field *lf);
+const char *errno_annotator(struct log_field *lf);
+const char *priority_annotator(struct log_field *lf);
+const char *timestamp_usec_annotator(struct log_field *lf);
 
 #if defined(OS_WINDOWS)
-void winerror_annotator(BUFFER *wb, const char *key, struct log_field *lf);
+const char *winerror_annotator(struct log_field *lf);
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -207,7 +212,7 @@ bool nd_logger_file(FILE *fp, ND_LOG_FORMAT format, struct log_field *fields, si
 
 #if defined(OS_WINDOWS)
 bool nd_log_wevents_init(void);
-bool nd_logger_wevents(struct log_field *fields, size_t fields_max);
+bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, size_t fields_max);
 #endif
 
 #endif //NETDATA_ND_LOG_INTERNALS_H

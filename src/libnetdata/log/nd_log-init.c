@@ -24,8 +24,13 @@ __attribute__((constructor)) void initialize_invocation_id(void) {
 void nd_log_initialize_for_external_plugins(const char *name) {
     // if we don't run under Netdata, log to stderr,
     // otherwise, use the logging method Netdata wants us to use.
+#if defined(OS_WINDOWS)
+    nd_setenv("NETDATA_LOG_METHOD", "wevents", 0);
+    nd_setenv("NETDATA_LOG_FORMAT", "wevents", 0);
+#else
     nd_setenv("NETDATA_LOG_METHOD", "stderr", 0);
     nd_setenv("NETDATA_LOG_FORMAT", "logfmt", 0);
+#endif
 
     nd_log.overwrite_process_source = NDLS_COLLECTORS;
     program_name = name;

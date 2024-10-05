@@ -521,13 +521,13 @@ static inline size_t print_int64(char *dst, int64_t value) {
 
 #define UINT64_MAX_LENGTH (24) // 21 should be enough
 static inline void buffer_print_uint64(BUFFER *wb, uint64_t value) {
-    buffer_need_bytes(wb, 50);
+    buffer_need_bytes(wb, UINT64_MAX_LENGTH);
     wb->len += print_uint64(&wb->buffer[wb->len], value);
     buffer_overflow_check(wb);
 }
 
 static inline void buffer_print_int64(BUFFER *wb, int64_t value) {
-    buffer_need_bytes(wb, 50);
+    buffer_need_bytes(wb, UINT64_MAX_LENGTH);
     wb->len += print_int64(&wb->buffer[wb->len], value);
     buffer_overflow_check(wb);
 }

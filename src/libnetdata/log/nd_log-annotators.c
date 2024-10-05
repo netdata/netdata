@@ -2,51 +2,53 @@
 
 #include "nd_log-internals.h"
 
-void timestamp_usec_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
+const char *timestamp_usec_annotator(struct log_field *lf) {
     usec_t ut = log_field_to_uint64(lf);
 
     if(!ut)
-        return;
+        return NULL;
 
-    char datetime[RFC3339_MAX_LENGTH];
+    static __thread char datetime[RFC3339_MAX_LENGTH];
     rfc3339_datetime_ut(datetime, sizeof(datetime), ut, 3, false);
-
-    if(buffer_strlen(wb))
-        buffer_fast_strcat(wb, " ", 1);
-
-    buffer_strcat(wb, key);
-    buffer_fast_strcat(wb, "=", 1);
-    buffer_json_strcat(wb, datetime);
+    return datetime;
 }
 
-void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
+const char *errno_annotator(struct log_field *lf) {
     int64_t errnum = log_field_to_int64(lf);
 
     if(errnum == 0)
-        return;
+        return NULL;
 
-    char buf[1024];
-    const char *s = errno2str((int)errnum, buf, sizeof(buf));
+    static __thread char buf[256];
+    size_t len = print_uint64(buf, errnum);
+    buf[len++] = ',';
+    buf[len++] = ' ';
 
-    if(buffer_strlen(wb))
-        buffer_fast_strcat(wb, " ", 1);
+    char *msg_to = &buf[len];
+    size_t msg_size = sizeof(buf) - len;
 
-    buffer_strcat(wb, key);
-    buffer_fast_strcat(wb, "=\"", 2);
-    buffer_print_int64(wb, errnum);
-    buffer_fast_strcat(wb, ", ", 2);
-    buffer_json_strcat(wb, s);
-    buffer_fast_strcat(wb, "\"", 1);
+    const char *s = errno2str((int)errnum, msg_to, msg_size);
+    if(s != msg_to)
+        strncpyz(msg_to, s, msg_size - 1);
+
+    return buf;
 }
 
 #if defined(OS_WINDOWS)
-void winerror_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
+const char *winerror_annotator(struct log_field *lf) {
     DWORD errnum = log_field_to_uint64(lf);
 
     if (errnum == 0)
-        return;
+        return NULL;
 
-    char buf[1024];
+    static __thread char buf[256];
+    size_t len = print_uint64(buf, errnum);
+    buf[len++] = ',';
+    buf[len++] = ' ';
+
+    char *msg_to = &buf[len];
+    size_t msg_size = sizeof(buf) - len;
+
     wchar_t wbuf[1024];
     DWORD size = FormatMessageW(
         FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -64,34 +66,19 @@ void winerror_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
             wbuf[--size] = L'\0';
 
         // Convert wide string to UTF-8
-        int utf8_size = WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, buf, sizeof(buf), NULL, NULL);
+        int utf8_size = WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, msg_to, (int)msg_size, NULL, NULL);
         if (utf8_size == 0)
-            snprintf(buf, sizeof(buf) - 1, "unknown error code");
-        buf[sizeof(buf) - 1] = '\0';
+            snprintf(msg_to, msg_size - 1, "unknown error code");
+        msg_to[msg_size - 1] = '\0';
     }
     else
-        snprintf(buf, sizeof(buf) - 1, "unknown error code");
+        snprintf(msg_to, msg_size - 1, "unknown error code");
 
-    if (buffer_strlen(wb))
-        buffer_fast_strcat(wb, " ", 1);
-
-    buffer_strcat(wb, key);
-    buffer_fast_strcat(wb, "=\"", 2);
-    buffer_print_int64(wb, errnum);
-    buffer_fast_strcat(wb, ", ", 2);
-    buffer_json_strcat(wb, buf);
-    buffer_fast_strcat(wb, "\"", 1);
+    return buf;
 }
 #endif
 
-void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
+const char *priority_annotator(struct log_field *lf) {
     uint64_t pri = log_field_to_uint64(lf);
-
-    if(buffer_strlen(wb))
-        buffer_fast_strcat(wb, " ", 1);
-
-    buffer_strcat(wb, key);
-    buffer_fast_strcat(wb, "=", 1);
-    buffer_strcat(wb, nd_log_id2priority(pri));
+    return nd_log_id2priority(pri);
 }
-

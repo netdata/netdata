@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instrumentationManifest xmlns="http://schemas.microsoft.com/win/2004/08/events">
+    <instrumentation>
+        <events xmlns="http://schemas.microsoft.com/win/2004/08/events">
+
+            <provider name="Netdata"
+                      guid="{96c5ca72-9bd8-4634-81e5-000014e7da7a}"
+                      symbol="Netdata"
+                      messageFileName="C:\Windows\System32\nd_wevents.dll"
+                      resourceFileName="C:\Windows\System32\nd_wevents.dll"
+                      parameterFileName="C:\Windows\System32\nd_wevents.dll">
+
+                <!-- Define the channels -->
+                <channels>
+                    <channel name="Netdata/Operational" type="Operational" symbol="NetdataOperationalChannel" enabled="true" isolation="Application" access="O:BAG:SYD:(A;;0xf0007;;;WD)"/>
+                    <channel name="Netdata/Collectors" type="Operational" symbol="NetdataCollectorsChannel" enabled="true" isolation="Application" access="O:BAG:SYD:(A;;0xf0007;;;WD)"/>
+                    <channel name="Netdata/Access" type="Analytic" symbol="NetdataAccessChannel" enabled="true" isolation="Application" access="O:BAG:SYD:(A;;0xf0007;;;WD)"/>
+                    <channel name="Netdata/Alerts" type="Admin" symbol="NetdataAlertsChannel" enabled="true" isolation="Application" access="O:BAG:SYD:(A;;0xf0007;;;WD)"/>
+                    <channel name="Netdata/ACLK" type="Debug" symbol="NetdataACLKChannel" enabled="true" isolation="Application" access="O:BAG:SYD:(A;;0xf0007;;;WD)"/>
+                </channels>
+
+                <!-- Define the events -->
+                <events>
+                    <!-- Daemon Events -->
+                    <event symbol="DaemonInfo" value="0x1000" channel="Netdata/Operational" level="win:Informational" task="LogEvent" opcode="Info" template="NetdataLogTemplate"/>
+                    <event symbol="DaemonWarning" value="0x1001" channel="Netdata/Operational" level="win:Warning" task="LogEvent" opcode="Warning" template="NetdataLogTemplate"/>
+                    <event symbol="DaemonError" value="0x1002" channel="Netdata/Operational" level="win:Error" task="LogEvent" opcode="Error" template="NetdataLogTemplate"/>
+
+                    <!-- Collector Events -->
+                    <event symbol="CollectorInfo" value="0x2000" channel="Netdata/Collectors" level="win:Informational" task="LogEvent" opcode="Info" template="NetdataLogTemplate"/>
+                    <event symbol="CollectorWarning" value="0x2001" channel="Netdata/Collectors" level="win:Warning" task="LogEvent" opcode="Warning" template="NetdataLogTemplate"/>
+                    <event symbol="CollectorError" value="0x2002" channel="Netdata/Collectors" level="win:Error" task="LogEvent" opcode="Error" template="NetdataLogTemplate"/>
+
+                    <!-- Access Events -->
+                    <event symbol="AccessInfo" value="0x3000" channel="Netdata/Access" level="win:Informational" task="LogEvent" opcode="Info" template="NetdataLogTemplate"/>
+                    <event symbol="AccessWarning" value="0x3001" channel="Netdata/Access" level="win:Warning" task="LogEvent" opcode="Warning" template="NetdataLogTemplate"/>
+                    <event symbol="AccessError" value="0x3002" channel="Netdata/Access" level="win:Error" task="LogEvent" opcode="Error" template="NetdataLogTemplate"/>
+
+                    <!-- Health Events -->
+                    <event symbol="HealthInfo" value="0x4000" channel="Netdata/Alerts" level="win:Informational" task="LogEvent" opcode="Info" template="NetdataLogTemplate"/>
+                    <event symbol="HealthWarning" value="0x4001" channel="Netdata/Alerts" level="win:Warning" task="LogEvent" opcode="Warning" template="NetdataLogTemplate"/>
+                    <event symbol="HealthError" value="0x4002" channel="Netdata/Alerts" level="win:Error" task="LogEvent" opcode="Error" template="NetdataLogTemplate"/>
+
+                    <!-- ACLK Events -->
+                    <event symbol="ACLKInfo" value="0x5000" channel="Netdata/ACLK" level="win:Informational" task="LogEvent" opcode="Info" template="NetdataLogTemplate"/>
+                    <event symbol="ACLKWarning" value="0x5001" channel="Netdata/ACLK" level="win:Warning" task="LogEvent" opcode="Warning" template="NetdataLogTemplate"/>
+                    <event symbol="ACLKError" value="0x5002" channel="Netdata/ACLK" level="win:Error" task="LogEvent" opcode="Error" template="NetdataLogTemplate"/>
+                </events>
+
+                <!-- Define the templates -->
+                <templates>
+                    <template tid="NetdataLogTemplate">
+                        <data name="Reserved1" inType="win:UInt32"/>
+                        <data name="Timestamp" inType="win:UnicodeString"/>
+                        <data name="Program" inType="win:UnicodeString"/>
+                        <data name="NetdataLogSource" inType="win:UnicodeString"/>
+                        <data name="Level" inType="win:UnicodeString"/>
+                        <data name="UnixErrno" inType="win:UnicodeString"/>
+                        <data name="WindowsLastError" inType="win:UnicodeString"/>
+                        <data name="InvocationID" inType="win:UnicodeString"/>
+                        <data name="CodeLine" inType="win:UInt32"/>
+                        <data name="CodeFile" inType="win:UnicodeString"/>
+                        <data name="CodeFunction" inType="win:UnicodeString"/>
+                        <data name="ThreadID" inType="win:UInt32"/>
+                        <data name="ThreadName" inType="win:UnicodeString"/>
+                        <data name="MessageID" inType="win:UnicodeString"/>
+                        <data name="Module" inType="win:UnicodeString"/>
+                        <data name="Node" inType="win:UnicodeString"/>
+                        <data name="Instance" inType="win:UnicodeString"/>
+                        <data name="Context" inType="win:UnicodeString"/>
+                        <data name="Dimension" inType="win:UnicodeString"/>
+                        <data name="SourceTransport" inType="win:UnicodeString"/>
+                        <data name="AccountID" inType="win:UnicodeString"/>
+                        <data name="UserName" inType="win:UnicodeString"/>
+                        <data name="UserRole" inType="win:UnicodeString"/>
+                        <data name="UserPermissions" inType="win:UnicodeString"/>
+                        <data name="SourceIP" inType="win:UnicodeString"/>
+                        <data name="SourceForwardedHost" inType="win:UnicodeString"/>
+                        <data name="SourceForwardedFor" inType="win:UnicodeString"/>
+                        <data name="SourcePort" inType="win:UInt32"/>
+                        <data name="SourceCapabilities" inType="win:UnicodeString"/>
+                        <data name="DestinationTransport" inType="win:UnicodeString"/>
+                        <data name="DestinationIP" inType="win:UnicodeString"/>
+                        <data name="DestinationPort" inType="win:UInt32"/>
+                        <data name="DestinationCapabilities" inType="win:UnicodeString"/>
+                        <data name="RequestMethod" inType="win:UnicodeString"/>
+                        <data name="ResponseCode" inType="win:UInt32"/>
+                        <data name="ConnectionID" inType="win:UnicodeString"/>
+                        <data name="TransactionID" inType="win:UnicodeString"/>
+                        <data name="ResponseSentBytes" inType="win:UInt64"/>
+                        <data name="ResponseSizeBytes" inType="win:UInt64"/>
+                        <data name="ResponsePreparationTimeUsec" inType="win:UInt64"/>
+                        <data name="ResponseSentTimeUsec" inType="win:UInt64"/>
+                        <data name="ResponseTotalTimeUsec" inType="win:UInt64"/>
+                        <data name="AlertID" inType="win:UnicodeString"/>
+                        <data name="AlertUniqueID" inType="win:UnicodeString"/>
+                        <data name="AlertTransitionID" inType="win:UnicodeString"/>
+                        <data name="AlertEventID" inType="win:UnicodeString"/>
+                        <data name="AlertConfig" inType="win:UnicodeString"/>
+                        <data name="AlertName" inType="win:UnicodeString"/>
+                        <data name="AlertClass" inType="win:UnicodeString"/>
+                        <data name="AlertComponent" inType="win:UnicodeString"/>
+                        <data name="AlertType" inType="win:UnicodeString"/>
+                        <data name="AlertExec" inType="win:UnicodeString"/>
+                        <data name="AlertRecipient" inType="win:UnicodeString"/>
+                        <data name="AlertValue" inType="win:Double"/>
+                        <data name="AlertOldValue" inType="win:Double"/>
+                        <data name="AlertStatus" inType="win:UnicodeString"/>
+                        <data name="AlertOldStatus" inType="win:UnicodeString"/>
+                        <data name="AlertUnits" inType="win:UnicodeString"/>
+                        <data name="AlertSummary" inType="win:UnicodeString"/>
+                        <data name="AlertInfo" inType="win:UnicodeString"/>
+                        <data name="AlertDuration" inType="win:UInt64"/>
+                        <data name="AlertNotificationTime" inType="win:UInt64"/>
+                        <data name="Request" inType="win:UnicodeString"/>
+                        <data name="Message" inType="win:UnicodeString"/>
+                    </template>
+                </templates>
+
+            </provider>
+        </events>
+    </instrumentation>
+</instrumentationManifest>

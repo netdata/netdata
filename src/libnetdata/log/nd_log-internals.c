@@ -375,263 +375,323 @@ struct nd_log nd_log = {
 __thread struct log_stack_entry *thread_log_stack_base[THREAD_LOG_STACK_MAX];
 __thread size_t thread_log_stack_next = 0;
 __thread struct log_field thread_log_fields[_NDF_MAX] = {
-    // THE ORDER DEFINES THE ORDER FIELDS WILL APPEAR IN logfmt
+    // THE ORDER HERE IS IRRELEVANT (but keep them sorted by their number)
 
     [NDF_STOP] = { // processing will not stop on this - so it is ok to be first
         .journal = NULL,
         .logfmt = NULL,
-        .logfmt_annotator = NULL,
+        .wevents = NULL,
+        .annotator = NULL,
     },
     [NDF_TIMESTAMP_REALTIME_USEC] = {
         .journal = NULL,
+        .wevents = "Timestamp",
         .logfmt = "time",
-        .logfmt_annotator = timestamp_usec_annotator,
+        .annotator = timestamp_usec_annotator,
     },
     [NDF_SYSLOG_IDENTIFIER] = {
         .journal = "SYSLOG_IDENTIFIER", // standard journald field
+        .wevents = "Program",
         .logfmt = "comm",
     },
     [NDF_LOG_SOURCE] = {
         .journal = "ND_LOG_SOURCE",
+        .wevents = "NetdataLogSource",
         .logfmt = "source",
     },
     [NDF_PRIORITY] = {
         .journal = "PRIORITY", // standard journald field
+        .wevents = "Level",
         .logfmt = "level",
-        .logfmt_annotator = priority_annotator,
+        .annotator = priority_annotator,
     },
     [NDF_ERRNO] = {
         .journal = "ERRNO", // standard journald field
+        .wevents = "UnixErrno",
         .logfmt = "errno",
-        .logfmt_annotator = errno_annotator,
+        .annotator = errno_annotator,
     },
-#if defined(OS_WINDOWS)
     [NDF_WINERROR] = {
         .journal = "WINERROR",
+        .wevents = "WindowsLastError",
         .logfmt = "winerror",
-        .logfmt_annotator = winerror_annotator,
+        .annotator = winerror_annotator,
     },
-#endif
     [NDF_INVOCATION_ID] = {
         .journal = "INVOCATION_ID", // standard journald field
+        .wevents = "InvocationID",
         .logfmt = NULL,
     },
     [NDF_LINE] = {
         .journal = "CODE_LINE", // standard journald field
+        .wevents = "CodeLine",
         .logfmt = NULL,
     },
     [NDF_FILE] = {
         .journal = "CODE_FILE", // standard journald field
+        .wevents = "CodeFile",
         .logfmt = NULL,
     },
     [NDF_FUNC] = {
         .journal = "CODE_FUNC", // standard journald field
+        .wevents = "CodeFunction",
         .logfmt = NULL,
     },
     [NDF_TID] = {
         .journal = "TID", // standard journald field
+        .wevents = "ThreadID",
         .logfmt = "tid",
     },
     [NDF_THREAD_TAG] = {
         .journal = "THREAD_TAG",
+        .wevents = "ThreadName",
         .logfmt = "thread",
     },
     [NDF_MESSAGE_ID] = {
         .journal = "MESSAGE_ID",
+        .wevents = "MessageID",
         .logfmt = "msg_id",
     },
     [NDF_MODULE] = {
         .journal = "ND_MODULE",
+        .wevents = "Module",
         .logfmt = "module",
     },
     [NDF_NIDL_NODE] = {
         .journal = "ND_NIDL_NODE",
+        .wevents = "Node",
         .logfmt = "node",
     },
     [NDF_NIDL_INSTANCE] = {
         .journal = "ND_NIDL_INSTANCE",
+        .wevents = "Instance",
         .logfmt = "instance",
     },
     [NDF_NIDL_CONTEXT] = {
         .journal = "ND_NIDL_CONTEXT",
+        .wevents = "Context",
         .logfmt = "context",
     },
     [NDF_NIDL_DIMENSION] = {
         .journal = "ND_NIDL_DIMENSION",
+        .wevents = "Dimension",
         .logfmt = "dimension",
     },
     [NDF_SRC_TRANSPORT] = {
         .journal = "ND_SRC_TRANSPORT",
+        .wevents = "SourceTransport",
         .logfmt = "src_transport",
     },
     [NDF_ACCOUNT_ID] = {
         .journal = "ND_ACCOUNT_ID",
+        .wevents = "AccountID",
         .logfmt = "account",
     },
     [NDF_USER_NAME] = {
         .journal = "ND_USER_NAME",
+        .wevents = "UserName",
         .logfmt = "user",
     },
     [NDF_USER_ROLE] = {
         .journal = "ND_USER_ROLE",
+        .wevents = "UserRole",
         .logfmt = "role",
     },
     [NDF_USER_ACCESS] = {
         .journal = "ND_USER_PERMISSIONS",
+        .wevents = "UserPermissions",
         .logfmt = "permissions",
     },
     [NDF_SRC_IP] = {
         .journal = "ND_SRC_IP",
+        .wevents = "SourceIP",
         .logfmt = "src_ip",
     },
     [NDF_SRC_FORWARDED_HOST] = {
         .journal = "ND_SRC_FORWARDED_HOST",
+        .wevents = "SourceForwardedHost",
         .logfmt = "src_forwarded_host",
     },
     [NDF_SRC_FORWARDED_FOR] = {
         .journal = "ND_SRC_FORWARDED_FOR",
+        .wevents = "SourceForwardedFor",
         .logfmt = "src_forwarded_for",
     },
     [NDF_SRC_PORT] = {
         .journal = "ND_SRC_PORT",
+        .wevents = "SourcePort",
         .logfmt = "src_port",
     },
     [NDF_SRC_CAPABILITIES] = {
         .journal = "ND_SRC_CAPABILITIES",
+        .wevents = "SourceCapabilities",
         .logfmt = "src_capabilities",
     },
     [NDF_DST_TRANSPORT] = {
         .journal = "ND_DST_TRANSPORT",
+        .wevents = "DestinationTransport",
         .logfmt = "dst_transport",
     },
     [NDF_DST_IP] = {
         .journal = "ND_DST_IP",
+        .wevents = "DestinationIP",
         .logfmt = "dst_ip",
     },
     [NDF_DST_PORT] = {
         .journal = "ND_DST_PORT",
+        .wevents = "DestinationPort",
         .logfmt = "dst_port",
     },
     [NDF_DST_CAPABILITIES] = {
         .journal = "ND_DST_CAPABILITIES",
+        .wevents = "DestinationCapabilities",
         .logfmt = "dst_capabilities",
     },
     [NDF_REQUEST_METHOD] = {
         .journal = "ND_REQUEST_METHOD",
+        .wevents = "RequestMethod",
         .logfmt = "req_method",
     },
     [NDF_RESPONSE_CODE] = {
         .journal = "ND_RESPONSE_CODE",
+        .wevents = "ResponseCode",
         .logfmt = "code",
     },
     [NDF_CONNECTION_ID] = {
         .journal = "ND_CONNECTION_ID",
+        .wevents = "ConnectionID",
         .logfmt = "conn",
     },
     [NDF_TRANSACTION_ID] = {
         .journal = "ND_TRANSACTION_ID",
+        .wevents = "TransactionID",
         .logfmt = "transaction",
     },
     [NDF_RESPONSE_SENT_BYTES] = {
         .journal = "ND_RESPONSE_SENT_BYTES",
+        .wevents = "ResponseSentBytes",
         .logfmt = "sent_bytes",
     },
     [NDF_RESPONSE_SIZE_BYTES] = {
         .journal = "ND_RESPONSE_SIZE_BYTES",
+        .wevents = "ResponseSizeBytes",
         .logfmt = "size_bytes",
     },
     [NDF_RESPONSE_PREPARATION_TIME_USEC] = {
         .journal = "ND_RESPONSE_PREP_TIME_USEC",
+        .wevents = "ResponsePreparationTimeUsec",
         .logfmt = "prep_ut",
     },
     [NDF_RESPONSE_SENT_TIME_USEC] = {
         .journal = "ND_RESPONSE_SENT_TIME_USEC",
+        .wevents = "ResponseSentTimeUsec",
         .logfmt = "sent_ut",
     },
     [NDF_RESPONSE_TOTAL_TIME_USEC] = {
         .journal = "ND_RESPONSE_TOTAL_TIME_USEC",
+        .wevents = "ResponseTotalTimeUsec",
         .logfmt = "total_ut",
     },
     [NDF_ALERT_ID] = {
         .journal = "ND_ALERT_ID",
+        .wevents = "AlertID",
         .logfmt = "alert_id",
     },
     [NDF_ALERT_UNIQUE_ID] = {
         .journal = "ND_ALERT_UNIQUE_ID",
+        .wevents = "AlertUniqueID",
         .logfmt = "alert_unique_id",
     },
     [NDF_ALERT_TRANSITION_ID] = {
         .journal = "ND_ALERT_TRANSITION_ID",
+        .wevents = "AlertTransitionID",
         .logfmt = "alert_transition_id",
     },
     [NDF_ALERT_EVENT_ID] = {
         .journal = "ND_ALERT_EVENT_ID",
+        .wevents = "AlertEventID",
         .logfmt = "alert_event_id",
     },
     [NDF_ALERT_CONFIG_HASH] = {
         .journal = "ND_ALERT_CONFIG",
+        .wevents = "AlertConfig",
         .logfmt = "alert_config",
     },
     [NDF_ALERT_NAME] = {
         .journal = "ND_ALERT_NAME",
+        .wevents = "AlertName",
         .logfmt = "alert",
     },
     [NDF_ALERT_CLASS] = {
         .journal = "ND_ALERT_CLASS",
+        .wevents = "AlertClass",
         .logfmt = "alert_class",
     },
     [NDF_ALERT_COMPONENT] = {
         .journal = "ND_ALERT_COMPONENT",
+        .wevents = "AlertComponent",
         .logfmt = "alert_component",
     },
     [NDF_ALERT_TYPE] = {
         .journal = "ND_ALERT_TYPE",
+        .wevents = "AlertType",
         .logfmt = "alert_type",
     },
     [NDF_ALERT_EXEC] = {
         .journal = "ND_ALERT_EXEC",
+        .wevents = "AlertExec",
         .logfmt = "alert_exec",
     },
     [NDF_ALERT_RECIPIENT] = {
         .journal = "ND_ALERT_RECIPIENT",
+        .wevents = "AlertRecipient",
         .logfmt = "alert_recipient",
     },
     [NDF_ALERT_VALUE] = {
         .journal = "ND_ALERT_VALUE",
+        .wevents = "AlertValue",
         .logfmt = "alert_value",
     },
     [NDF_ALERT_VALUE_OLD] = {
         .journal = "ND_ALERT_VALUE_OLD",
+        .wevents = "AlertOldValue",
         .logfmt = "alert_value_old",
     },
     [NDF_ALERT_STATUS] = {
         .journal = "ND_ALERT_STATUS",
+        .wevents = "AlertStatus",
         .logfmt = "alert_status",
     },
     [NDF_ALERT_STATUS_OLD] = {
         .journal = "ND_ALERT_STATUS_OLD",
+        .wevents = "AlertOldStatus",
         .logfmt = "alert_value_old",
     },
     [NDF_ALERT_UNITS] = {
         .journal = "ND_ALERT_UNITS",
+        .wevents = "AlertUnits",
         .logfmt = "alert_units",
     },
     [NDF_ALERT_SUMMARY] = {
         .journal = "ND_ALERT_SUMMARY",
+        .wevents = "AlertSummary",
         .logfmt = "alert_summary",
     },
     [NDF_ALERT_INFO] = {
         .journal = "ND_ALERT_INFO",
+        .wevents = "AlertInfo",
         .logfmt = "alert_info",
     },
     [NDF_ALERT_DURATION] = {
         .journal = "ND_ALERT_DURATION",
+        .wevents = "AlertDuration",
         .logfmt = "alert_duration",
     },
     [NDF_ALERT_NOTIFICATION_REALTIME_USEC] = {
         .journal = "ND_ALERT_NOTIFICATION_TIMESTAMP_USEC",
+        .wevents = "AlertNotificationTime",
         .logfmt = "alert_notification_timestamp",
-        .logfmt_annotator = timestamp_usec_annotator,
+        .annotator = timestamp_usec_annotator,
     },
 
     // put new items here
@@ -639,10 +699,12 @@ __thread struct log_field thread_log_fields[_NDF_MAX] = {
 
     [NDF_REQUEST] = {
         .journal = "ND_REQUEST",
+        .wevents = "Request",
         .logfmt = "request",
     },
     [NDF_MESSAGE] = {
         .journal = "MESSAGE",
+        .wevents = "Message",
         .logfmt = "msg",
     },
 };
