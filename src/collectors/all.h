@@ -56,7 +56,7 @@
 #define NETDATA_CHART_PRIO_SYSTEM_PACKETS              7001 // freebsd only
 #define NETDATA_CHART_PRIO_WINDOWS_THREADS             8001 // Windows only
 #define NETDATA_CHART_PRIO_WINDOWS_THERMAL_ZONES       8002 // Windows only
-
+#define NETDATA_CHART_PRIO_WINDOWS_HYPERV              9000 // Windows only
 
 // CPU per core
 
