@@ -35,6 +35,10 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
                 ls->format = NDLF_JSON;
             else if(strcmp(name, "journal") == 0)
                 ls->format = NDLF_JOURNAL;
+#if defined(OS_WINDOWS)
+            else if(strcmp(name, "wevents") == 0)
+                ls->format = NDLF_WEVENTS;
+#endif
             else if(strcmp(name, "level") == 0 && value && *value)
                 ls->min_priority = nd_log_priority2id(value);
             else if(strcmp(name, "protection") == 0 && value && *value) {
@@ -82,6 +86,12 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
         ls->method = NDLM_JOURNAL;
         ls->filename = NULL;
     }
+#if defined(OS_WINDOWS)
+    else if(strcmp(output, "wevents") == 0) {
+        ls->method = NDLM_WEVENTS;
+        ls->filename = NULL;
+    }
+#endif
     else if(strcmp(output, "syslog") == 0) {
         ls->method = NDLM_SYSLOG;
         ls->filename = NULL;
