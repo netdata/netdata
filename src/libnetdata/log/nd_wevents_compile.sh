@@ -3,12 +3,12 @@
 # Check if both parameters are provided
 if [ $# -ne 2 ]; then
     echo "Error: Incorrect number of parameters."
-    echo "Usage: $0 <path_to_mc_file> <destination_directory>"
+    echo "Usage: $0 <source_directory> <destination_directory>"
     exit 1
 fi
 
 # Get the parameters
-mc_file="$1"
+src_dir="$1"
 dest_dir="$2"
 
 # Get the directory of this script
@@ -21,7 +21,7 @@ temp_bat=$(mktemp --suffix=.bat)
 # Use cygpath directly within the heredoc
 cat << EOF > "$temp_bat"
 @echo off
-call "$(cygpath -w -a "$SCRIPT_DIR/nd_wevents_compile.bat")" "$(cygpath -w -a "$mc_file")" "$(cygpath -w -a "$dest_dir")"
+call "$(cygpath -w -a "$SCRIPT_DIR/nd_wevents_compile.bat")" "$(cygpath -w -a "$src_dir")" "$(cygpath -w -a "$dest_dir")"
 EOF
 
 grep call <"$temp_bat"

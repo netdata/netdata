@@ -1,31 +1,89 @@
 ;// SPDX-License-Identifier: GPL-3.0-or-later
-;//
-;// Required Programs:
-;// mc       - a program in Windows SDK
-;// rc       - a program in Windows SDK
-;// link     - a program in Visual Studio
-;// icacls   - a standard system program
-;// wevtutil - a standard system program
-;//
-;// Compile with:
-;// mc nd_wevents.mc
-;//  -> generates nd_wevents.rc and MSG00001.bin
-;//
-;// rc nd_wevents.rc
-;//  -> generates nd_wevents.res and nd_wevents.h
-;//
-;// link /dll /noentry /machine:X64 /out:nd_wevents.dll nd_wevents.res
-;//  -> generates nd_wevents.dll
-;//
-;// To install:
-;// copy nd_wevents.dll C:\Windows\System32
-;//
-;// Give access to Windows Events Log:
-;// icacls "C:\Windows\System32\nd_wevents.dll" /grant "NT SERVICE\EventLog":R
-;//
-;// To register it:
-;// wevtutil im NetdataEventManifest.xml
-;//
+
+SeverityNames=(Success=0x0:STATUS_SEVERITY_SUCCESS
+               Informational=0x1:STATUS_SEVERITY_INFORMATIONAL
+               Warning=0x2:STATUS_SEVERITY_WARNING
+               Error=0x3:STATUS_SEVERITY_ERROR
+              )
+
+FacilityNames=(System=0x0:FACILITY_SYSTEM
+               Runtime=0x2:FACILITY_RUNTIME
+               Stubs=0x3:FACILITY_STUBS
+               Io=0x4:FACILITY_IO_ERROR_CODE
+              )
+
+LanguageNames=(English=0x409:MSG00409)
+
+MessageIdTypedef=WORD
+
+MessageId=0x1
+SymbolicName=ND_PROVIDER_NAME
+Language=English
+Netdata
+.
+
+MessageId=0x2
+SymbolicName=NETDATA_MSG_VERSION
+Language=English
+1.0
+.
+
+MessageId=0x3
+SymbolicName=ND_GENERIC_LOG_MESSAGE
+Language=English
+%64
+.
+
+MessageId=0x4
+SymbolicName=ND_ACCESS_EVENT_MESSAGE
+Language=English
+Transaction %36, method: %33, path: %63
+
+    Source IP     : %24, Forwarded-For: %27
+    User          : %21, role: %22, permissions: %23
+    Timings (usec): prep %39, sent %40, total %41
+    Response Size : sent %37, uncompressed %38
+    Response Code : %34
+.
+
+MessageId=0x5
+SymbolicName=ND_HEALTH_EVENT_MESSAGE
+Language=English
+Alert '%47' of instance '%16' on node '%15', transitioned from %57 to %56
+.
+
+;// -------------------------------------------------------------------------------------------------------------------
+;// category
+
+MessageId=0x20
+SymbolicName=NETDATA_DAEMON_CATEGORY
+Language=English
+Netdata Daemon Log
+.
+
+MessageId=0x21
+SymbolicName=NETDATA_COLLECTOR_CATEGORY
+Language=English
+Netdata Collector Log
+.
+
+MessageId=0x22
+SymbolicName=NETDATA_ACCESS_CATEGORY
+Language=English
+Netdata Access Log
+.
+
+MessageId=0x23
+SymbolicName=NETDATA_HEALTH_CATEGORY
+Language=English
+Netdata Alert Transition
+.
+
+MessageId=0x24
+SymbolicName=NETDATA_ACLK_CATEGORY
+Language=English
+Netdata ACLK Log
+.
 
 ;// -------------------------------------------------------------------------------------------------------------------
 ;// daemon.log

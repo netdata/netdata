@@ -18,28 +18,57 @@
  * Until we put it in cmake, here are the values:
  */
 
-#define ND_EVENT_DAEMON_INFO             0x40001000L
-#define ND_EVENT_DAEMON_WARNING          0x80001001L
-#define ND_EVENT_DAEMON_ERROR            0xC0001002L
-#define ND_EVENT_COLLECTOR_INFO          0x40002000L
-#define ND_EVENT_COLLECTOR_WARNING       0x80002001L
-#define ND_EVENT_COLLECTOR_ERROR         0xC0002002L
-#define ND_EVENT_ACCESS_INFO             0x40003000L
-#define ND_EVENT_ACCESS_WARNING          0x80003001L
-#define ND_EVENT_ACCESS_ERROR            0xC0003002L
-#define ND_EVENT_HEALTH_INFO             0x40004000L
-#define ND_EVENT_HEALTH_WARNING          0x80004001L
-#define ND_EVENT_HEALTH_ERROR            0xC0004002L
-#define ND_EVENT_ACLK_INFO               0x40005000L
-#define ND_EVENT_ACLK_WARNING            0x80005001L
-#define ND_EVENT_ACLK_ERROR              0xC0005002L
+#define NETDATA_DAEMON_CATEGORY          ((WORD)0x00000020L)
+#define NETDATA_COLLECTOR_CATEGORY       ((WORD)0x00000021L)
+#define NETDATA_ACCESS_CATEGORY          ((WORD)0x00000022L)
+#define NETDATA_HEALTH_CATEGORY          ((WORD)0x00000023L)
+#define NETDATA_ACLK_CATEGORY            ((WORD)0x00000024L)
+
+#define ND_EVENT_DAEMON_INFO             ((WORD)0x40001000L)
+#define ND_EVENT_DAEMON_WARNING          ((WORD)0x80001001L)
+#define ND_EVENT_DAEMON_ERROR            ((WORD)0xC0001002L)
+#define ND_EVENT_COLLECTOR_INFO          ((WORD)0x40002000L)
+#define ND_EVENT_COLLECTOR_WARNING       ((WORD)0x80002001L)
+#define ND_EVENT_COLLECTOR_ERROR         ((WORD)0xC0002002L)
+#define ND_EVENT_ACCESS_INFO             ((WORD)0x40003000L)
+#define ND_EVENT_ACCESS_WARNING          ((WORD)0x80003001L)
+#define ND_EVENT_ACCESS_ERROR            ((WORD)0xC0003002L)
+#define ND_EVENT_HEALTH_INFO             ((WORD)0x40004000L)
+#define ND_EVENT_HEALTH_WARNING          ((WORD)0x80004001L)
+#define ND_EVENT_HEALTH_ERROR            ((WORD)0xC0004002L)
+#define ND_EVENT_ACLK_INFO               ((WORD)0x40005000L)
+#define ND_EVENT_ACLK_WARNING            ((WORD)0x80005001L)
+#define ND_EVENT_ACLK_ERROR              ((WORD)0xC0005002L)
 
 // --------------------------------------------------------------------------------------------------------------------
 
 #define NETDATA_PROVIDER_NAME L"Netdata"
 static HANDLE hEventLog = NULL;
 
-static uint32_t get_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority) {
+static DWORD get_category(ND_LOG_SOURCES source) {
+    // this is actually the task of the event
+
+    switch(source) {
+        default:
+        case NDLS_DEBUG:
+        case NDLS_DAEMON:
+            return NETDATA_DAEMON_CATEGORY;
+
+        case NDLS_COLLECTORS:
+            return NETDATA_COLLECTOR_CATEGORY;
+
+        case NDLS_ACCESS:
+            return NETDATA_ACCESS_CATEGORY;
+
+        case NDLS_HEALTH:
+            return NETDATA_HEALTH_CATEGORY;
+
+        case NDLS_ACLK:
+            return NETDATA_ACLK_CATEGORY;
+    }
+}
+
+static DWORD get_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority) {
     // the return value must match the manifest and the .mc file
 
     if(source == NDLS_DEBUG || source == NDLS_DAEMON) {
@@ -159,12 +188,10 @@ bool nd_log_wevents_init(void) {
     RegSetValueExW(hRegKey, L"TypesSupported", 0, REG_DWORD, (LPBYTE)&types_supported, sizeof(DWORD));
 
     // Set the EventMessageFile value to point to the executable or DLL containing the event message strings
-    wchar_t modulePath[MAX_PATH];
-    if (GetModuleFileNameW(NULL, modulePath, MAX_PATH) == 0) {
-        RegCloseKey(hRegKey);
-        return false; // Failed to get module path
-    }
+    wchar_t *modulePath = L"%SystemRoot%\\System32\\nd_wevents.dll";
+    RegSetValueExW(hRegKey, L"CategoryMessageFile", 0, REG_EXPAND_SZ, (LPBYTE)modulePath, (wcslen(modulePath) + 1) * sizeof(wchar_t));
     RegSetValueExW(hRegKey, L"EventMessageFile", 0, REG_EXPAND_SZ, (LPBYTE)modulePath, (wcslen(modulePath) + 1) * sizeof(wchar_t));
+    RegSetValueExW(hRegKey, L"ParameterMessageFile", 0, REG_EXPAND_SZ, (LPBYTE)modulePath, (wcslen(modulePath) + 1) * sizeof(wchar_t));
 
     RegCloseKey(hRegKey);
 
@@ -218,7 +245,7 @@ static struct {
     wchar_t *buf;
 } fields_buffers[_NDF_MAX] = { 0 };
 
-static LPCWSTR messages[_NDF_MAX];
+static LPCWSTR messages[_NDF_MAX - 1];
 
 __attribute__((constructor)) void wevents_initialize_buffers(void) {
     for(size_t i = 0; i < _NDF_MAX ;i++) {
@@ -234,8 +261,10 @@ __attribute__((constructor)) void wevents_initialize_buffers(void) {
     fields_buffers[NDF_MESSAGE].buf = big_wide_buffers[1];
     fields_buffers[NDF_MESSAGE].size = BIG_WIDE_BUFFERS_SIZE;
 
-    for(size_t i = 0; i < _NDF_MAX ;i++)
-        messages[i] = fields_buffers[i].buf;
+    // we remove NDF_STOP from the list
+    // so that %1 it the NDF_TIMESTAMP and %64 is NDF_MESSAGE
+    for(size_t i = 1; i < _NDF_MAX ;i++)
+        messages[i - 1] = fields_buffers[i].buf;
 }
 
 bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
@@ -248,6 +277,7 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
 
     DWORD eventType = get_event_type(priority);
     DWORD eventID = get_event_id(source->source, priority);
+    DWORD category = get_category(source->source);
 
     CLEAN_BUFFER *tmp = NULL;
 
@@ -315,7 +345,7 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
             MultiByteToWideChar(CP_UTF8, 0, s, -1, fields_buffers[i].buf, (int)fields_buffers[i].size);
     }
 
-    BOOL rc = ReportEventW(hEventLog, eventType, 0, eventID, NULL, _NDF_MAX, 0, messages, NULL);
+    BOOL rc = ReportEventW(hEventLog, eventType, category, eventID, NULL, _NDF_MAX - 1, 0, messages, NULL);
     spinlock_unlock(&spinlock);
 
     return rc == TRUE;
