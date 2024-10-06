@@ -113,6 +113,12 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+wevtutil gp "Netdata"
+if %errorlevel% neq 0 (
+    echo Error: Failed to get publisher Netdata.
+    exit /b 1
+)
+
 echo.
 echo Process completed successfully.
 exit /b 0
