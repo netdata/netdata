@@ -1329,7 +1329,7 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
                                            "memory",
                                            1,
                                            1,
-                                           RRD_ALGORITHM_INCREMENTAL);
+                                           RRD_ALGORITHM_ABSOLUTE);
 
             rrdlabels_add(p->st_conn_memory->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
         }
@@ -1428,7 +1428,7 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
                                               "memory",
                                               1,
                                               1,
-                                              RRD_ALGORITHM_INCREMENTAL);
+                                              RRD_ALGORITHM_ABSOLUTE);
 
             rrdlabels_add(p->st_mem_tot_server->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
         }
