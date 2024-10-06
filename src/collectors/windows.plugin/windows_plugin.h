@@ -77,5 +77,6 @@ enum PERFLIB_PRIO {
     PRIO_MSSQL_SQL_ERRORS
 };
 
-#endif //NETDATA_WINDOWS_PLUGIN_H
+int do_PerflibHyperV(int update_every, usec_t dt);
 
+#endif //NETDATA_WINDOWS_PLUGIN_H
