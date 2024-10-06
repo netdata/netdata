@@ -235,7 +235,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     // http://calimeroteknik.free.fr/blag/?article20/really-used-memory-on-gnu-linux
     // KReclaimable includes SReclaimable, it was added in kernel v4.20
-    unsigned long long reclaimable = KReclaimable > 0 ? KReclaimable : SReclaimable;
+    unsigned long long reclaimable = inside_lxc_container ? 0 : (KReclaimable > 0 ? KReclaimable : SReclaimable);
     unsigned long long MemCached = Cached + reclaimable - Shmem;
     unsigned long long MemUsed = MemTotal - MemFree - MemCached - Buffers;
     // The Linux kernel doesn't report ZFS ARC usage as cache memory (the ARC is included in the total used system memory)
