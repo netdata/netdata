@@ -65,8 +65,8 @@ modules:
               default_value: nvidia_smi
               required: false
             - name: timeout
-              description: nvidia_smi binary execution timeout.
-              default_value: 2
+              description: The maximum duration, in seconds, to wait for an `nvidia-smi` command to complete. This setting applies differently based on the collector's mode. **Loop Mode:** In loop mode, the timeout primarily determines how long to wait for the initial `nvidia-smi` execution. If the initial query takes longer than the timeout, the collector may report an error. For systems with multiple GPUs, the initial load time can sometimes be significant (e.g., 5-10 seconds). **Regular Mode:** If the collector is in regular mode, the timeout specifies how long to wait for each individual `nvidia-smi` execution.
+              default_value: 10
               required: false
             - name: loop_mode
               description: "When enabled, `nvidia-smi` is executed continuously in a separate thread using the `-l` option."
