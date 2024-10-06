@@ -1,0 +1,1553 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "windows_plugin.h"
+#include "windows-internals.h"
+
+#define _COMMON_PLUGIN_NAME "windows.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "PerflibHyperV"
+#include "../common-contexts/common-contexts.h"
+
+#define HYPERV  "hyperv"
+
+
+long chart_priority = NETDATA_CHART_PRIO_WINDOWS_HYPERV;
+
+void get_and_sanitize_instance_value(PERF_DATA_BLOCK *pDataBlock,  PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pi, char *buffer, size_t buffer_size)
+{
+    char wstr[8192];
+    if (!getInstanceName(pDataBlock, pObjectType, pi, wstr, sizeof(wstr))) {
+        strncpyz(buffer, "[unknown]", buffer_size - 1);
+        return;
+    }
+    rrdlabels_sanitize_value(buffer, wstr, buffer_size);
+}
+
+#define DICT_PERF_OPTION (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE)
+
+#define DEFINE_RD(counter_name) RRDDIM *rd_##counter_name
+
+#define GET_INSTANCE_COUNTER(counter)                                                                                  \
+    do {                                                                                                               \
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->counter);                                           \
+    } while (0)
+
+#define GET_OBJECT_COUNTER(counter)                                                                                    \
+    do {                                                                                                               \
+        perflibGetObjectCounter(pDataBlock, pObjectType, &p->counter);                                                 \
+    } while (0)
+
+#define SETP_DIM_VALUE(st, field)                                                                                      \
+    do {                                                                                                               \
+        rrddim_set_by_pointer(p->st, p->rd_##field, (collected_number)p->field.current.Data);                          \
+    } while (0)
+
+typedef bool (*perf_func_collect)(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data);
+
+typedef struct {
+    const char *registry_name;
+    perf_func_collect function_collect;
+    dict_cb_insert_t dict_insert_cb;
+    size_t dict_size;
+    DICTIONARY *instance;
+} hyperv_perf_item;
+
+struct hypervisor_memory {
+    bool collected_metadata;
+
+    RRDSET *st_pressure;
+    RRDSET *st_vm_memory_physical;
+    RRDSET *st_vm_memory_physical_guest_visible;
+
+    DEFINE_RD(CurrentPressure);
+    DEFINE_RD(PhysicalMemory);
+    DEFINE_RD(GuestVisiblePhysicalMemory);
+    DEFINE_RD(GuestAvailableMemory);
+
+    COUNTER_DATA CurrentPressure;
+    COUNTER_DATA PhysicalMemory;
+    COUNTER_DATA GuestVisiblePhysicalMemory;
+    COUNTER_DATA GuestAvailableMemory;
+};
+
+void initialize_hyperv_memory_keys(struct hypervisor_memory *p) {
+    p->CurrentPressure.key = "Current Pressure";
+    p->PhysicalMemory.key = "Physical Memory";
+    p->GuestVisiblePhysicalMemory.key = "Guest Visible Physical Memory";
+    p->GuestAvailableMemory.key = "Guest Available Memory";
+}
+
+
+void dict_hyperv_memory_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct hypervisor_memory *p = value;
+    initialize_hyperv_memory_keys(p);
+}
+
+struct hypervisor_partition {
+    bool collected_metadata;
+
+    RRDSET *st_vm_vid_physical_pages_allocated;
+    RRDSET *st_vm_vid_remote_physical_pages;
+
+    DEFINE_RD(PhysicalPagesAllocated);
+    DEFINE_RD(RemotePhysicalPages);
+
+    COUNTER_DATA PhysicalPagesAllocated;
+    COUNTER_DATA RemotePhysicalPages;
+
+};
+
+void initialize_hyperv_partition_keys(struct hypervisor_partition *p)
+{
+    p->PhysicalPagesAllocated.key = "Physical Pages Allocated";
+    p->RemotePhysicalPages.key = "Remote Physical Pages";
+}
+
+void dict_hyperv_partition_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct hypervisor_partition *p = value;
+    initialize_hyperv_partition_keys(p);
+}
+
+static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
+{
+    hyperv_perf_item *item = data;
+
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
+    if (!pObjectType)
+        return false;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for(LONG i = 0; i < pObjectType->NumInstances ; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+
+        struct hypervisor_memory *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+
+        if(!p->collected_metadata) {
+            p->collected_metadata = true;
+        }
+
+        GET_INSTANCE_COUNTER(CurrentPressure);
+        GET_INSTANCE_COUNTER(PhysicalMemory);
+        GET_INSTANCE_COUNTER(GuestVisiblePhysicalMemory);
+        GET_INSTANCE_COUNTER(GuestAvailableMemory);
+
+        if(!p->st_vm_memory_physical) {
+            p->st_vm_memory_physical = rrdset_create_localhost(
+                "vm_memory_physical",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".vm_memory_physical",
+                "VM assigned memory",
+                "bytes",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->st_vm_memory_physical_guest_visible = rrdset_create_localhost(
+                "vm_memory_physical_guest_visible",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".vm_memory_physical_guest_visible",
+                "VM guest visible memory",
+                "bytes",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->st_pressure = rrdset_create_localhost(
+                "vm_memory_pressure_current",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".vm_memory_pressure_current",
+                "VM Memory Pressure",
+                "percentage",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_CurrentPressure = rrddim_add(p->st_pressure, "pressure", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            p->rd_PhysicalMemory = rrddim_add(p->st_vm_memory_physical, "assigned_memory", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_GuestVisiblePhysicalMemory = rrddim_add(p->st_vm_memory_physical_guest_visible, "visible_memory", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_GuestAvailableMemory = rrddim_add(p->st_vm_memory_physical_guest_visible, "available_memory", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrdlabels_add(p->st_vm_memory_physical->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_pressure->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_vm_memory_physical_guest_visible->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        SETP_DIM_VALUE(st_pressure, CurrentPressure);
+        SETP_DIM_VALUE(st_vm_memory_physical, PhysicalMemory);
+        SETP_DIM_VALUE(st_vm_memory_physical_guest_visible, GuestVisiblePhysicalMemory);
+        SETP_DIM_VALUE(st_vm_memory_physical_guest_visible, GuestAvailableMemory);
+
+        rrdset_done(p->st_pressure);
+        rrdset_done(p->st_vm_memory_physical);
+        rrdset_done(p->st_vm_memory_physical_guest_visible);
+    }
+
+    return true;
+}
+
+static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
+{
+    hyperv_perf_item *item = data;
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
+    if (!pObjectType)
+        return false;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for(LONG i = 0; i < pObjectType->NumInstances ; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+
+        struct hypervisor_partition *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+
+        if(!p->collected_metadata) {
+
+            p->collected_metadata = true;
+        }
+
+        GET_INSTANCE_COUNTER(RemotePhysicalPages);
+        GET_INSTANCE_COUNTER(PhysicalPagesAllocated);
+
+        if(!p->st_vm_vid_physical_pages_allocated) {
+            p->st_vm_vid_physical_pages_allocated = rrdset_create_localhost(
+                "vm_vid_physical_pages_allocated",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".vm_vid_physical_pages_allocated",
+                "VM physical pages allocated",
+                "pages",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->st_vm_vid_remote_physical_pages = rrdset_create_localhost(
+                "vm_vid_remote_physical_pages",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".vm_vid_remote_physical_pages",
+                "VM physical pages not allocated from the preferred NUMA node",
+                "pages",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_PhysicalPagesAllocated = rrddim_add(p->st_vm_vid_physical_pages_allocated, "allocated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_RemotePhysicalPages = rrddim_add(p->st_vm_vid_remote_physical_pages, "remote_physical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrdlabels_add(p->st_vm_vid_physical_pages_allocated->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_vm_vid_remote_physical_pages->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        SETP_DIM_VALUE(st_vm_vid_remote_physical_pages, RemotePhysicalPages);
+        SETP_DIM_VALUE(st_vm_vid_physical_pages_allocated, PhysicalPagesAllocated);
+
+        rrdset_done(p->st_vm_vid_physical_pages_allocated);
+        rrdset_done(p->st_vm_vid_remote_physical_pages);
+    }
+
+    return true;
+}
+
+// Define structure for Hyper-V Virtual Machine Health Summary
+static struct hypervisor_health_summary {
+    bool collected_metadata;
+
+    RRDSET *st_health;
+
+    DEFINE_RD(HealthCritical);
+    DEFINE_RD(HealthOk);
+
+    COUNTER_DATA HealthCritical;
+    COUNTER_DATA HealthOk;
+} health_summary = {
+    .collected_metadata = false,
+    .st_health = NULL,
+    .HealthCritical.key = "Health Critical",
+    .HealthOk.key = "Health Ok"};
+
+// Function to handle "Hyper-V Virtual Machine Health Summary"
+static bool do_hyperv_health_summary(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
+{
+    hyperv_perf_item *item = data;
+
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
+    if (!pObjectType)
+        return false;
+
+    struct hypervisor_health_summary *p = &health_summary;
+
+    GET_OBJECT_COUNTER(HealthCritical);
+    GET_OBJECT_COUNTER(HealthOk);
+
+    if (!p->st_health) {
+        p->st_health = rrdset_create_localhost(
+            "vms_health",
+            windows_shared_buffer,
+            NULL,
+            HYPERV,
+            HYPERV".vms_health",
+            "Virtual machines health status",
+            "vms",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            chart_priority++,
+            update_every,
+            RRDSET_TYPE_STACKED);
+
+        p->rd_HealthCritical = rrddim_add(p->st_health, "critical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_HealthOk = rrddim_add(p->st_health, "ok", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(p->st_health->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+    }
+
+    SETP_DIM_VALUE(st_health, HealthCritical);
+    SETP_DIM_VALUE(st_health, HealthOk);
+
+    rrdset_done(p->st_health);
+    return true;
+}
+
+// Define structure for Hyper-V Root Partition Metrics (Device and GPA Space Pages)
+struct hypervisor_root_partition {
+    bool collected_metadata;
+
+    RRDSET *st_device_space_pages;
+    RRDSET *st_gpa_space_pages;
+    RRDSET *st_gpa_space_modifications;
+    RRDSET *st_attached_devices;
+    RRDSET *st_deposited_pages;
+
+    RRDSET *st_DeviceDMAErrors;
+    RRDSET *st_DeviceInterruptErrors;
+    RRDSET *st_DeviceInterruptThrottleEvents;
+    RRDSET *st_IOΤLBFlushesSec;
+    RRDSET *st_AddressSpaces;
+    RRDSET *st_VirtualTLBPages;
+    RRDSET *st_VirtualTLBFlushEntiresSec;
+
+    DEFINE_RD(DeviceSpacePages4K);
+    DEFINE_RD(DeviceSpacePages2M);
+    DEFINE_RD(DeviceSpacePages1G);
+    DEFINE_RD(GPASpacePages4K);
+    DEFINE_RD(GPASpacePages2M);
+    DEFINE_RD(GPASpacePages1G);
+    DEFINE_RD(GPASpaceModifications);
+
+    DEFINE_RD(AttachedDevices);
+    DEFINE_RD(DepositedPages);
+
+    DEFINE_RD(DeviceDMAErrors);
+    DEFINE_RD(DeviceInterruptErrors);
+    DEFINE_RD(DeviceInterruptThrottleEvents);
+    DEFINE_RD(IOΤLBFlushesSec);
+    DEFINE_RD(AddressSpaces);
+    DEFINE_RD(VirtualTLBPages);
+    DEFINE_RD(VirtualTLBFlushEntiresSec);
+
+    COUNTER_DATA DeviceSpacePages4K;
+    COUNTER_DATA DeviceSpacePages2M;
+    COUNTER_DATA DeviceSpacePages1G;
+    COUNTER_DATA GPASpacePages4K;
+    COUNTER_DATA GPASpacePages2M;
+    COUNTER_DATA GPASpacePages1G;
+    COUNTER_DATA GPASpaceModifications;
+    COUNTER_DATA AttachedDevices;
+    COUNTER_DATA DepositedPages;
+    COUNTER_DATA DeviceDMAErrors;
+    COUNTER_DATA DeviceInterruptErrors;
+    COUNTER_DATA DeviceInterruptThrottleEvents;
+    COUNTER_DATA IOΤLBFlushesSec;
+    COUNTER_DATA AddressSpaces;
+    COUNTER_DATA VirtualTLBPages;
+    COUNTER_DATA VirtualTLBFlushEntiresSec;
+};
+
+// Initialize the keys for the root partition metrics
+void initialize_hyperv_root_partition_keys(struct hypervisor_root_partition *p) {
+    p->DeviceSpacePages4K.key = "4K device pages";
+    p->DeviceSpacePages2M.key = "2M device pages";
+    p->DeviceSpacePages1G.key = "1G device pages";
+
+    p->GPASpacePages4K.key = "4K GPA pages";
+    p->GPASpacePages2M.key = "2M GPA pages";
+    p->GPASpacePages1G.key = "1G GPA pages";
+
+    p->GPASpaceModifications.key = "GPA Space Modifications/sec";
+    p->AttachedDevices.key = "Attached Devices";
+    p->DepositedPages.key = "Deposited Pages";
+
+    p->DeviceDMAErrors.key = "Device DMA Errors";
+    p->DeviceInterruptErrors.key = "Device Interrupt Errors";
+    p->DeviceInterruptThrottleEvents.key = "Device Interrupt Throttle Events";
+    p->IOΤLBFlushesSec.key = "I/O TLB Flushes/sec";
+    p->AddressSpaces.key = "Address Spaces";
+    p->VirtualTLBPages.key = "Virtual TLB Pages";
+    p->VirtualTLBFlushEntiresSec.key = "Virtual TLB Flush Entires/sec";
+}
+
+// Callback function for inserting root partition metrics into the dictionary
+void dict_hyperv_root_partition_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct hypervisor_root_partition *p = value;
+    initialize_hyperv_root_partition_keys(p);
+}
+
+// Function to handle "Hyper-V Hypervisor Root Partition" metrics (Device Space and GPA Space)
+static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
+{
+    hyperv_perf_item *item = data;
+
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
+    if (!pObjectType)
+        return false;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+
+        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;
+
+        struct hypervisor_root_partition *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+
+        if (!p->collected_metadata) {
+            p->collected_metadata = true;
+        }
+
+        // Fetch counters
+        GET_INSTANCE_COUNTER(DeviceSpacePages4K);
+        GET_INSTANCE_COUNTER(DeviceSpacePages2M);
+        GET_INSTANCE_COUNTER(DeviceSpacePages1G);
+        GET_INSTANCE_COUNTER(GPASpacePages4K);
+        GET_INSTANCE_COUNTER(GPASpacePages2M);
+        GET_INSTANCE_COUNTER(GPASpacePages1G);
+        GET_INSTANCE_COUNTER(GPASpaceModifications);
+        GET_INSTANCE_COUNTER(AttachedDevices);
+        GET_INSTANCE_COUNTER(DepositedPages);
+
+        GET_INSTANCE_COUNTER(DeviceDMAErrors);
+        GET_INSTANCE_COUNTER(DeviceInterruptErrors);
+        GET_INSTANCE_COUNTER(DeviceInterruptThrottleEvents);
+        GET_INSTANCE_COUNTER(IOΤLBFlushesSec);
+        GET_INSTANCE_COUNTER(AddressSpaces);
+        GET_INSTANCE_COUNTER(VirtualTLBPages);
+        GET_INSTANCE_COUNTER(VirtualTLBFlushEntiresSec);
+
+
+        // Create charts
+        if (!p->st_device_space_pages) {
+            p->st_device_space_pages = rrdset_create_localhost(
+                "root_partition_device_space_pages",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".root_partition_device_space_pages",
+                "Root partition device space pages",
+                "pages",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_DeviceSpacePages4K = rrddim_add(p->st_device_space_pages, "4K", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_DeviceSpacePages2M = rrddim_add(p->st_device_space_pages, "2M", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_DeviceSpacePages1G = rrddim_add(p->st_device_space_pages, "1G", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrdlabels_add(p->st_device_space_pages->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        }
+
+        if (!p->st_gpa_space_pages) {
+            p->st_gpa_space_pages = rrdset_create_localhost(
+                "root_partition_gpa_space_pages",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".root_partition_gpa_space_pages",
+                "Root partition GPA space pages",
+                "pages",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_GPASpacePages4K= rrddim_add(p->st_gpa_space_pages, "4K", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_GPASpacePages2M = rrddim_add(p->st_gpa_space_pages, "2M", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            p->rd_GPASpacePages1G = rrddim_add(p->st_gpa_space_pages, "1G", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrdlabels_add(p->st_gpa_space_pages->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        }
+
+        if (!p->st_gpa_space_modifications) {
+            p->st_gpa_space_modifications = rrdset_create_localhost(
+                "root_partition_gpa_space_modifications",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".root_partition_gpa_space_modifications",
+                "Root partition GPA space modifications",
+                "modifications/s",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_GPASpaceModifications = rrddim_add(p->st_gpa_space_modifications, "gpa", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(p->st_gpa_space_modifications->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+
+        if (!p->st_attached_devices) {
+            p->st_attached_devices = rrdset_create_localhost(
+                "root_partition_attached_devices",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".root_partition_attached_devices",
+                "Root partition attached devices",
+                "devices",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_AttachedDevices = rrddim_add(p->st_attached_devices, "attached", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrdlabels_add(p->st_attached_devices->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        }
+
+        if (!p->st_deposited_pages) {
+            p->st_deposited_pages = rrdset_create_localhost(
+                "root_partition_deposited_pages",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".root_partition_deposited_pages",
+                "Root partition deposited pages",
+                "pages",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_DepositedPages = rrddim_add(p->st_deposited_pages, "gpa", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(p->st_deposited_pages->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        if (!p->st_DeviceDMAErrors) {
+            p->st_DeviceDMAErrors = rrdset_create_localhost(
+                "root_partition_device_dma_errors",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".root_partition_device_dma_errors",
+                "Root partition illegal DMA requests",
+                "requests",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_DeviceDMAErrors = rrddim_add(p->st_DeviceDMAErrors, "illegal_dma", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(p->st_DeviceDMAErrors->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        if (!p->st_DeviceInterruptErrors) {
+            p->st_DeviceInterruptErrors = rrdset_create_localhost(
+                "root_partition_device_interrupt_errors",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".root_partition_device_interrupt_errors",
+                "Root partition illegal interrupt requestss",
+                "requests",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_DeviceInterruptErrors = rrddim_add(p->st_DeviceInterruptErrors, "illegal_interrupt", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(p->st_DeviceInterruptErrors->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        if (!p->st_DeviceInterruptThrottleEvents) {
+            p->st_DeviceInterruptThrottleEvents = rrdset_create_localhost(
+                "root_partition_device_interrupt_throttle_events",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".root_partition_device_interrupt_throttle_events",
+                "Root partition throttled interrupts",
+                "events",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_DeviceInterruptThrottleEvents = rrddim_add(p->st_DeviceInterruptThrottleEvents, "throttling", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(p->st_DeviceInterruptThrottleEvents->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        if (!p->st_IOΤLBFlushesSec) {
+            p->st_IOΤLBFlushesSec = rrdset_create_localhost(
+                "root_partition_io_tlb_flush",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".root_partition_io_tlb_flush",
+                "Root partition flushes of I/O TLBs",
+                "flushes/s",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_IOΤLBFlushesSec = rrddim_add(p->st_IOΤLBFlushesSec, "gpa", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_IOΤLBFlushesSec->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        if (!p->st_AddressSpaces) {
+            p->st_AddressSpaces = rrdset_create_localhost(
+                "root_partition_address_space",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".root_partition_address_space",
+                "Root partition address spaces in the virtual TLB",
+                "address spaces",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_AddressSpaces = rrddim_add(p->st_AddressSpaces, "address_spaces", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(p->st_AddressSpaces->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        if (!p->st_VirtualTLBPages) {
+            p->st_VirtualTLBPages = rrdset_create_localhost(
+                "root_partition_virtual_tlb_pages",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".root_partition_virtual_tlb_pages",
+                "Root partition pages used by the virtual TLB",
+                "pages",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_VirtualTLBPages = rrddim_add(p->st_VirtualTLBPages, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(p->st_VirtualTLBPages->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        if (!p->st_VirtualTLBFlushEntiresSec) {
+            p->st_VirtualTLBFlushEntiresSec = rrdset_create_localhost(
+                "root_partition_virtual_tlb_flush_entries",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".root_partition_virtual_tlb_flush_entries",
+                "Root partition flushes of the entire virtual TLB",
+                "flushes/s",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_VirtualTLBFlushEntiresSec = rrddim_add(p->st_VirtualTLBFlushEntiresSec, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_VirtualTLBFlushEntiresSec->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        // Set the data for each dimension
+
+        SETP_DIM_VALUE(st_device_space_pages,DeviceSpacePages4K);
+        SETP_DIM_VALUE(st_device_space_pages,DeviceSpacePages2M);
+        SETP_DIM_VALUE(st_device_space_pages,DeviceSpacePages1G);
+
+        SETP_DIM_VALUE(st_gpa_space_pages, GPASpacePages4K);
+        SETP_DIM_VALUE(st_gpa_space_pages, GPASpacePages2M);
+        SETP_DIM_VALUE(st_gpa_space_pages, GPASpacePages1G);
+
+        SETP_DIM_VALUE(st_gpa_space_modifications, GPASpaceModifications);
+
+        SETP_DIM_VALUE(st_attached_devices, AttachedDevices);
+        SETP_DIM_VALUE(st_deposited_pages, DepositedPages);
+
+        SETP_DIM_VALUE(st_DeviceDMAErrors, DeviceDMAErrors);
+        SETP_DIM_VALUE(st_DeviceInterruptErrors, DeviceInterruptErrors);
+        SETP_DIM_VALUE(st_DeviceInterruptThrottleEvents, DeviceInterruptThrottleEvents);
+        SETP_DIM_VALUE(st_IOΤLBFlushesSec, IOΤLBFlushesSec);
+        SETP_DIM_VALUE(st_AddressSpaces, AddressSpaces);
+        SETP_DIM_VALUE(st_VirtualTLBPages, VirtualTLBPages);
+        SETP_DIM_VALUE(st_VirtualTLBFlushEntiresSec, VirtualTLBFlushEntiresSec);
+
+
+        // Mark the charts as done
+        rrdset_done(p->st_device_space_pages);
+        rrdset_done(p->st_gpa_space_pages);
+        rrdset_done(p->st_gpa_space_modifications);
+        rrdset_done(p->st_attached_devices);
+        rrdset_done(p->st_deposited_pages);
+        rrdset_done(p->st_DeviceInterruptErrors);
+        rrdset_done(p->st_DeviceInterruptThrottleEvents);
+        rrdset_done(p->st_IOΤLBFlushesSec);
+        rrdset_done(p->st_AddressSpaces);
+        rrdset_done(p->st_DeviceDMAErrors);
+        rrdset_done(p->st_VirtualTLBPages);
+        rrdset_done(p->st_VirtualTLBFlushEntiresSec);
+
+    }
+
+    return true;
+}
+
+// Storage DEVICE
+
+struct hypervisor_storage_device {
+    bool collected_metadata;
+    RRDSET *st_operations;
+    DEFINE_RD(ReadOperationsSec);
+    DEFINE_RD(WriteOperationsSec);
+
+    RRDSET *st_bytes;
+    DEFINE_RD(ReadBytesSec);
+    DEFINE_RD(WriteBytesSec);
+
+    RRDSET *st_errors;
+    DEFINE_RD(ErrorCount);
+
+    COUNTER_DATA ReadOperationsSec;
+    COUNTER_DATA WriteOperationsSec;
+
+    COUNTER_DATA ReadBytesSec;
+    COUNTER_DATA WriteBytesSec;
+    COUNTER_DATA ErrorCount;
+};
+
+
+// Initialize the keys for the root partition metrics
+void initialize_hyperv_storage_device_keys(struct hypervisor_storage_device *p) {
+    p->ReadOperationsSec.key = "Read Operations/Sec";
+    p->WriteOperationsSec.key = "Write Operations/Sec";
+
+    p->ReadBytesSec.key = "Read Bytes/sec";
+    p->WriteBytesSec.key = "Write Bytes/sec";
+    p->ErrorCount.key = "Error Count";
+}
+
+// Callback function for inserting root partition metrics into the dictionary
+void dict_hyperv_storage_device_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct hypervisor_storage_device *p = value;
+    initialize_hyperv_storage_device_keys(p);
+}
+
+static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
+{
+    hyperv_perf_item *item = data;
+
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
+    if (!pObjectType)
+        return false;
+
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+
+        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;
+
+        struct hypervisor_storage_device *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+
+        if (!p->collected_metadata) {
+            p->collected_metadata = true;
+        }
+
+        // Fetch counters
+        GET_INSTANCE_COUNTER(ReadOperationsSec);
+        GET_INSTANCE_COUNTER(WriteOperationsSec);
+
+        GET_INSTANCE_COUNTER(ReadBytesSec);
+        GET_INSTANCE_COUNTER(WriteBytesSec);
+        GET_INSTANCE_COUNTER(ErrorCount);
+
+        // Create charts
+        if (!p->st_operations) {
+            p->st_operations = rrdset_create_localhost(
+                "vm_device_operations",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".vm_device_operations",
+                "VM storage device IOPS",
+                "operations/sec",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_ReadOperationsSec = rrddim_add(p->st_operations, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_WriteOperationsSec = rrddim_add(p->st_operations, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_operations->rrdlabels, "vm_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        if (!p->st_bytes) {
+            p->st_bytes = rrdset_create_localhost(
+                "vm_device_bytes",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".vm_device_bytes",
+                "VM storage device IO",
+                "bytes/sec",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_AREA);
+
+            p->rd_ReadBytesSec = rrddim_add(p->st_bytes, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_WriteBytesSec = rrddim_add(p->st_bytes, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_bytes->rrdlabels, "vm_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        if (!p->st_errors) {
+            p->st_errors = rrdset_create_localhost(
+                "vm_device_errors",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".vm_device_errors",
+                "VM storage device errors",
+                "errors/sec",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_ErrorCount = rrddim_add(p->st_errors, "errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_errors->rrdlabels, "vm_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        SETP_DIM_VALUE(st_operations,ReadOperationsSec);
+        SETP_DIM_VALUE(st_operations,WriteOperationsSec);
+
+        SETP_DIM_VALUE(st_bytes,ReadBytesSec);
+        SETP_DIM_VALUE(st_bytes,WriteBytesSec);
+
+        SETP_DIM_VALUE(st_errors,ErrorCount);
+
+        // Mark the charts as done
+        rrdset_done(p->st_operations);
+        rrdset_done(p->st_bytes);
+        rrdset_done(p->st_errors);
+    }
+
+    return true;
+}
+
+struct hypervisor_switch {
+    bool collected_metadata;
+    RRDSET *st_bytes;
+    DEFINE_RD(BytesSentSec);
+    DEFINE_RD(BytesReceivedSec);
+
+    RRDSET *st_packets;
+    DEFINE_RD(PacketsSentSec);
+    DEFINE_RD(PacketsReceivedSec);
+
+    RRDSET *st_directed_packets;
+    DEFINE_RD(DirectedPacketsSentSec);
+    DEFINE_RD(DirectedPacketsReceivedSec);
+
+    RRDSET *st_broadcast_packets;
+    DEFINE_RD(BroadcastPacketsSentSec);
+    DEFINE_RD(BroadcastPacketsReceivedSec);
+
+    RRDSET *st_multicast_packets;
+    DEFINE_RD(MulticastPacketsSentSec);
+    DEFINE_RD(MulticastPacketsReceivedSec);
+
+    RRDSET *st_dropped_packets;
+    DEFINE_RD(DroppedPacketsOutgoingSec);
+    DEFINE_RD(DroppedPacketsIncomingSec);
+
+    RRDSET *st_ext_dropped_packets;
+    DEFINE_RD(ExtensionsDroppedPacketsOutgoingSec);
+    DEFINE_RD(ExtensionsDroppedPacketsIncomingSec);
+
+    RRDSET *st_flooded;
+    DEFINE_RD(PacketsFlooded);
+
+    RRDSET *st_learned_mac;
+    DEFINE_RD(LearnedMacAddresses);
+
+    RRDSET *st_purged_mac;
+    DEFINE_RD(PurgedMacAddresses);
+
+    COUNTER_DATA BytesSentSec;
+    COUNTER_DATA BytesReceivedSec;
+
+    COUNTER_DATA PacketsSentSec;
+    COUNTER_DATA PacketsReceivedSec;
+
+    COUNTER_DATA DirectedPacketsSentSec;
+    COUNTER_DATA DirectedPacketsReceivedSec;
+
+    COUNTER_DATA BroadcastPacketsSentSec;
+    COUNTER_DATA BroadcastPacketsReceivedSec;
+
+    COUNTER_DATA MulticastPacketsSentSec;
+    COUNTER_DATA MulticastPacketsReceivedSec;
+
+    COUNTER_DATA DroppedPacketsOutgoingSec;
+    COUNTER_DATA DroppedPacketsIncomingSec;
+
+    COUNTER_DATA ExtensionsDroppedPacketsOutgoingSec;
+    COUNTER_DATA ExtensionsDroppedPacketsIncomingSec;
+
+    COUNTER_DATA PacketsFlooded;
+
+    COUNTER_DATA LearnedMacAddresses;
+
+    COUNTER_DATA PurgedMacAddresses;
+};
+
+// Initialize the keys for the root partition metrics
+void initialize_hyperv_switch_keys(struct hypervisor_switch *p)
+{
+    p->BytesSentSec.key = "Bytes Sent/sec";
+    p->BytesReceivedSec.key = "Bytes Received/sec";
+    p->PacketsSentSec.key = "Packets Sent/sec";
+    p->PacketsReceivedSec.key = "Packets Received/sec";
+
+    p->DirectedPacketsSentSec.key = "Directed Packets Sent/sec";
+    p->DirectedPacketsReceivedSec.key = "Directed Packets Received/sec";
+    p->BroadcastPacketsSentSec.key = "Broadcast Packets Sent/sec";
+    p->BroadcastPacketsReceivedSec.key = "Broadcast Packets Received/sec";
+    p->MulticastPacketsSentSec.key = "Multicast Packets Sent/sec";
+    p->MulticastPacketsReceivedSec.key = "Multicast Packets Received/sec";
+    p->DroppedPacketsOutgoingSec.key = "Dropped Packets Outgoing/sec";
+    p->DroppedPacketsIncomingSec.key = "Dropped Packets Incoming/sec";
+    p->ExtensionsDroppedPacketsOutgoingSec.key = "Extensions Dropped Packets Outgoing/sec";
+    p->ExtensionsDroppedPacketsIncomingSec.key = "Extensions Dropped Packets Incoming/sec";
+    p->PacketsFlooded.key = "Packets Flooded";
+    p->LearnedMacAddresses.key = "Learned Mac Addresses";
+    p->PurgedMacAddresses.key = "Purged Mac Addresses";
+}
+
+void dict_hyperv_switch_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct hypervisor_switch *p = value;
+    initialize_hyperv_switch_keys(p);
+}
+
+static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
+{
+
+    hyperv_perf_item *item = data;
+
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
+    if (!pObjectType)
+        return false;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+
+        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;
+
+        struct hypervisor_switch *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+
+        if (!p->collected_metadata) {
+            p->collected_metadata = true;
+        }
+
+        // Fetch counters
+//        metricHypervVSwitchNumberOfSendChannelMovesTotal         = "windows_hyperv_vswitch_number_of_send_channel_moves_total"
+
+        GET_INSTANCE_COUNTER(BytesReceivedSec);
+        GET_INSTANCE_COUNTER(BytesSentSec);
+
+        GET_INSTANCE_COUNTER(PacketsReceivedSec);
+        GET_INSTANCE_COUNTER(PacketsSentSec);
+
+        GET_INSTANCE_COUNTER(DirectedPacketsSentSec);
+        GET_INSTANCE_COUNTER(DirectedPacketsReceivedSec);
+
+        GET_INSTANCE_COUNTER(BroadcastPacketsSentSec);
+        GET_INSTANCE_COUNTER(BroadcastPacketsReceivedSec);
+
+        GET_INSTANCE_COUNTER(MulticastPacketsSentSec);
+        GET_INSTANCE_COUNTER(MulticastPacketsReceivedSec);
+
+        GET_INSTANCE_COUNTER(DroppedPacketsOutgoingSec);
+        GET_INSTANCE_COUNTER(DroppedPacketsIncomingSec);
+
+        GET_INSTANCE_COUNTER(ExtensionsDroppedPacketsOutgoingSec);
+        GET_INSTANCE_COUNTER(ExtensionsDroppedPacketsIncomingSec);
+
+        GET_INSTANCE_COUNTER(PacketsFlooded);
+
+        GET_INSTANCE_COUNTER(LearnedMacAddresses);
+
+        GET_INSTANCE_COUNTER(PurgedMacAddresses);
+
+            // Create charts
+            if (!p->st_bytes) {
+                p->st_bytes = rrdset_create_localhost(
+                    "vswitch_bytes",
+                    windows_shared_buffer,
+                    NULL,
+                    HYPERV,
+                    HYPERV".vswitch_bytes",
+                    "Virtual switch traffic",
+                    "bytes/sec",
+                    _COMMON_PLUGIN_NAME,
+                    _COMMON_PLUGIN_MODULE_NAME,
+                    chart_priority++,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                p->rd_BytesReceivedSec = rrddim_add(p->st_bytes, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_BytesSentSec = rrddim_add(p->st_bytes, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_bytes->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            if (!p->st_packets) {
+                p->st_packets = rrdset_create_localhost(
+                    "vswitch_packets",
+                    windows_shared_buffer,
+                    NULL,
+                    HYPERV,
+                    HYPERV".vswitch_packets",
+                    "Virtual switch packets",
+                    "packets/sec",
+                    _COMMON_PLUGIN_NAME,
+                    _COMMON_PLUGIN_MODULE_NAME,
+                    chart_priority++,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                p->rd_PacketsReceivedSec = rrddim_add(p->st_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_PacketsSentSec = rrddim_add(p->st_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            if (!p->st_directed_packets) {
+                p->st_directed_packets = rrdset_create_localhost(
+                    "vswitch_directed_packets",
+                    windows_shared_buffer,
+                    NULL,
+                    HYPERV,
+                    HYPERV".vswitch_directed_packets",
+                    "Virtual switch directed packets",
+                    "packets/sec",
+                    _COMMON_PLUGIN_NAME,
+                    _COMMON_PLUGIN_MODULE_NAME,
+                    chart_priority++,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                p->rd_DirectedPacketsReceivedSec = rrddim_add(p->st_directed_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_DirectedPacketsSentSec = rrddim_add(p->st_directed_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_directed_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            if (!p->st_broadcast_packets) {
+                p->st_broadcast_packets = rrdset_create_localhost(
+                    "vswitch_broadcast_packets",
+                    windows_shared_buffer,
+                    NULL,
+                    HYPERV,
+                    HYPERV".vswitch_broadcast_packets",
+                    "Virtual switch broadcast packets",
+                    "packets/sec",
+                    _COMMON_PLUGIN_NAME,
+                    _COMMON_PLUGIN_MODULE_NAME,
+                    chart_priority++,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                p->rd_BroadcastPacketsReceivedSec = rrddim_add(p->st_broadcast_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_BroadcastPacketsSentSec = rrddim_add(p->st_broadcast_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_broadcast_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            if (!p->st_multicast_packets) {
+                p->st_multicast_packets = rrdset_create_localhost(
+                    "vswitch_multicast_packets",
+                    windows_shared_buffer,
+                    NULL,
+                    HYPERV,
+                    HYPERV".vswitch_multicast_packets",
+                    "Virtual switch multicast packets",
+                    "packets/sec",
+                    _COMMON_PLUGIN_NAME,
+                    _COMMON_PLUGIN_MODULE_NAME,
+                    chart_priority++,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                p->rd_MulticastPacketsReceivedSec = rrddim_add(p->st_multicast_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_MulticastPacketsSentSec = rrddim_add(p->st_multicast_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_multicast_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            if (!p->st_dropped_packets) {
+                p->st_dropped_packets = rrdset_create_localhost(
+                    "vswitch_dropped_packets",
+                    windows_shared_buffer,
+                    NULL,
+                    HYPERV,
+                    HYPERV".vswitch_dropped_packets",
+                    "Virtual switch dropped packets",
+                    "drops/sec",
+                    _COMMON_PLUGIN_NAME,
+                    _COMMON_PLUGIN_MODULE_NAME,
+                    chart_priority++,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                p->rd_DroppedPacketsIncomingSec = rrddim_add(p->st_dropped_packets, "incoming", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_DroppedPacketsOutgoingSec = rrddim_add(p->st_dropped_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_dropped_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            if (!p->st_ext_dropped_packets) {
+                p->st_ext_dropped_packets = rrdset_create_localhost(
+                    "vswitch_extensions_dropped_packets",
+                    windows_shared_buffer,
+                    NULL,
+                    HYPERV,
+                    HYPERV".vswitch_extensions_dropped_packets",
+                    "Virtual switch extensions dropped packets",
+                    "drops/sec",
+                    _COMMON_PLUGIN_NAME,
+                    _COMMON_PLUGIN_MODULE_NAME,
+                    chart_priority++,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                p->rd_ExtensionsDroppedPacketsIncomingSec = rrddim_add(p->st_ext_dropped_packets, "incoming", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_ExtensionsDroppedPacketsOutgoingSec = rrddim_add(p->st_ext_dropped_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_ext_dropped_packets->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            if (!p->st_flooded) {
+                p->st_flooded = rrdset_create_localhost(
+                    "vswitch_packets_flooded",
+                    windows_shared_buffer,
+                    NULL,
+                    HYPERV,
+                    HYPERV".vswitch_packets_flooded",
+                    "Virtual switch flooded packets",
+                    "packets/sec",
+                    _COMMON_PLUGIN_NAME,
+                    _COMMON_PLUGIN_MODULE_NAME,
+                    chart_priority++,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                p->rd_PacketsFlooded = rrddim_add(p->st_flooded, "flooded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_flooded->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            if (!p->st_learned_mac) {
+                p->st_learned_mac = rrdset_create_localhost(
+                    "vswitch_learned_mac_addresses",
+                    windows_shared_buffer,
+                    NULL,
+                    HYPERV,
+                    HYPERV".vswitch_learned_mac_addresses",
+                    "Virtual switch learned MAC addresses",
+                    "mac addresses/sec",
+                    _COMMON_PLUGIN_NAME,
+                    _COMMON_PLUGIN_MODULE_NAME,
+                    chart_priority++,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                p->rd_LearnedMacAddresses = rrddim_add(p->st_learned_mac, "learned", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_learned_mac->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+            if (!p->st_purged_mac) {
+                p->st_purged_mac = rrdset_create_localhost(
+                    "vswitch_purged_mac_addresses",
+                    windows_shared_buffer,
+                    NULL,
+                    HYPERV,
+                    HYPERV".vswitch_purged_mac_addresses",
+                    "Virtual switch purged MAC addresses",
+                    "mac addresses/sec",
+                    _COMMON_PLUGIN_NAME,
+                    _COMMON_PLUGIN_MODULE_NAME,
+                    chart_priority++,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                p->rd_PurgedMacAddresses = rrddim_add(p->st_purged_mac, "purged", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_purged_mac->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            }
+
+        SETP_DIM_VALUE(st_packets, PacketsReceivedSec);
+        SETP_DIM_VALUE(st_packets, PacketsSentSec);
+
+        SETP_DIM_VALUE(st_bytes, BytesReceivedSec);
+        SETP_DIM_VALUE(st_bytes, BytesSentSec);
+
+        SETP_DIM_VALUE(st_directed_packets, DirectedPacketsSentSec);
+        SETP_DIM_VALUE(st_directed_packets, DirectedPacketsReceivedSec);
+
+        SETP_DIM_VALUE(st_broadcast_packets, BroadcastPacketsSentSec);
+        SETP_DIM_VALUE(st_broadcast_packets, BroadcastPacketsReceivedSec);
+
+        SETP_DIM_VALUE(st_multicast_packets, MulticastPacketsSentSec);
+        SETP_DIM_VALUE(st_multicast_packets, MulticastPacketsReceivedSec);
+
+        SETP_DIM_VALUE(st_dropped_packets, DroppedPacketsOutgoingSec);
+        SETP_DIM_VALUE(st_dropped_packets, DroppedPacketsIncomingSec);
+
+        SETP_DIM_VALUE(st_ext_dropped_packets, ExtensionsDroppedPacketsOutgoingSec);
+        SETP_DIM_VALUE(st_ext_dropped_packets, ExtensionsDroppedPacketsIncomingSec);
+
+        SETP_DIM_VALUE(st_flooded, PacketsFlooded);
+        SETP_DIM_VALUE(st_learned_mac, LearnedMacAddresses);
+        SETP_DIM_VALUE(st_purged_mac, PurgedMacAddresses);
+
+        // Mark the charts as done
+        rrdset_done(p->st_packets);
+        rrdset_done(p->st_bytes);
+
+        rrdset_done(p->st_directed_packets);
+        rrdset_done(p->st_broadcast_packets);
+        rrdset_done(p->st_multicast_packets);
+        rrdset_done(p->st_dropped_packets);
+        rrdset_done(p->st_ext_dropped_packets);
+        rrdset_done(p->st_flooded);
+        rrdset_done(p->st_learned_mac);
+        rrdset_done(p->st_purged_mac);
+
+    }
+    return true;
+}
+
+
+struct hypervisor_network_adapter {
+    bool collected_metadata;
+    RRDSET *st_packets;
+    DEFINE_RD(DroppedPacketsOutgoingSec);
+    DEFINE_RD(DroppedPacketsIncomingSec);
+
+    COUNTER_DATA DroppedPacketsOutgoingSec;
+    COUNTER_DATA DroppedPacketsIncomingSec;
+};
+
+// Initialize the keys for the root partition metrics
+void initialize_hyperv_network_adapter_keys(struct hypervisor_network_adapter *p)
+{
+    p->DroppedPacketsOutgoingSec.key = "Dropped Packets Outgoing/sec";
+    p->DroppedPacketsIncomingSec.key = "Dropped Packets Incoming/sec";
+}
+
+void dict_hyperv_network_adapter_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct hypervisor_network_adapter *p = value;
+    initialize_hyperv_network_adapter_keys(p);
+}
+
+static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
+{
+    hyperv_perf_item *item = data;
+
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
+    if (!pObjectType)
+        return false;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+
+        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;
+
+        struct hypervisor_network_adapter *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+
+        if (!p->collected_metadata) {
+            p->collected_metadata = true;
+        }
+
+        GET_INSTANCE_COUNTER(DroppedPacketsIncomingSec);
+        GET_INSTANCE_COUNTER(DroppedPacketsOutgoingSec);
+
+//        metricHypervVMInterfaceBytesReceived          = "windows_hyperv_vm_interface_bytes_received"
+//metricHypervVMInterfaceBytesSent              = "windows_hyperv_vm_interface_bytes_sent"
+//metricHypervVMInterfacePacketsReceived        = "windows_hyperv_vm_interface_packets_received"
+//metricHypervVMInterfacePacketsSent            = "windows_hyperv_vm_interface_packets_sent"
+
+        if (!p->st_packets) {
+            p->st_packets = rrdset_create_localhost(
+                "vm_interface_packets_dropped",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".vm_interface_packets_dropped",
+                "VM interface packets dropped",
+                "drops/sec",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_DroppedPacketsIncomingSec = rrddim_add(p->st_packets, "incoming", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_DroppedPacketsOutgoingSec = rrddim_add(p->st_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_packets->rrdlabels, "vm_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        SETP_DIM_VALUE(st_packets, DroppedPacketsIncomingSec);
+        SETP_DIM_VALUE(st_packets, DroppedPacketsOutgoingSec);
+
+        rrdset_done(p->st_packets);
+    }
+    return true;
+}
+
+
+// Hypervisor Virtual Processor
+struct hypervisor_processor {
+    bool collected_metadata;
+
+    RRDSET *st;
+
+    DEFINE_RD(GuestRunTime);
+    DEFINE_RD(HypervisorRunTime);
+    DEFINE_RD(RemoteRunTime);
+
+    COUNTER_DATA GuestRunTime;
+    COUNTER_DATA HypervisorRunTime;
+    COUNTER_DATA RemoteRunTime;
+};
+
+
+void initialize_hyperv_processor_keys(struct hypervisor_processor *p)
+{
+    p->GuestRunTime.key = "% Guest Run Time";
+    p->HypervisorRunTime.key = "% Hypervisor Run Time";
+    p->RemoteRunTime.key = "% Remote Run Time";
+}
+
+void dict_hyperv_processor_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct hypervisor_processor *p = value;
+    initialize_hyperv_processor_keys(p);
+}
+
+static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data)
+{
+    hyperv_perf_item *item = data;
+
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, item->registry_name);
+    if (!pObjectType)
+        return false;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
+
+        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;
+
+        struct hypervisor_processor *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+
+        if (!p->collected_metadata) {
+            p->collected_metadata = true;
+        }
+
+        // Fetch counters
+        GET_INSTANCE_COUNTER(GuestRunTime);
+        GET_INSTANCE_COUNTER(HypervisorRunTime);
+        GET_INSTANCE_COUNTER(RemoteRunTime);
+
+            // Create charts
+        if (!p->st) {
+            p->st = rrdset_create_localhost(
+                "vm_cpu_usage",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV".vm_cpu_usage",
+                "VM CPU usage (100% = 1 core)",
+                "percentage",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_STACKED);
+
+            p->rd_GuestRunTime = rrddim_add(p->st, "guest", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            p->rd_HypervisorRunTime = rrddim_add(p->st, "hypervisor", NULL, -1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            p->rd_RemoteRunTime = rrddim_add(p->st, "remote", NULL, -1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+
+            rrdlabels_add(p->st->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        SETP_DIM_VALUE(st, GuestRunTime);
+        SETP_DIM_VALUE(st, HypervisorRunTime);
+        SETP_DIM_VALUE(st, RemoteRunTime);
+
+        rrdset_done(p->st);
+    }
+    return true;
+}
+
+hyperv_perf_item hyperv_perf_list[] = {
+    {.registry_name = "Hyper-V Dynamic Memory VM",
+     .function_collect = do_hyperv_memory,
+     .dict_insert_cb = dict_hyperv_memory_insert_cb,
+     .dict_size = sizeof(struct hypervisor_memory)},
+
+    {.registry_name = "Hyper-V VM Vid Partition",
+     .function_collect = do_hyperv_vid_partition,
+     .dict_insert_cb = dict_hyperv_partition_insert_cb,
+     .dict_size = sizeof(struct hypervisor_partition)},
+
+    {
+        .registry_name = "Hyper-V Virtual Machine Health Summary",
+        .function_collect = do_hyperv_health_summary,
+    },
+
+    {
+        .registry_name = "Hyper-V Hypervisor Root Partition",
+        .function_collect = do_hyperv_root_partition,
+        .dict_insert_cb = dict_hyperv_root_partition_insert_cb,
+        .dict_size = sizeof(struct hypervisor_root_partition),
+    },
+
+    {.registry_name = "Hyper-V Virtual Storage Device",
+     .function_collect = do_hyperv_storage_device,
+     .dict_insert_cb = dict_hyperv_storage_device_insert_cb,
+     .dict_size = sizeof(struct hypervisor_storage_device)},
+
+    {.registry_name = "Hyper-V Virtual Switch",
+     .function_collect = do_hyperv_switch,
+     .dict_insert_cb = dict_hyperv_switch_insert_cb,
+     .dict_size = sizeof(struct hypervisor_switch)},
+
+    {.registry_name = "Hyper-V Virtual Network Adapter",
+     .function_collect = do_hyperv_network_adapter,
+     .dict_insert_cb = dict_hyperv_network_adapter_insert_cb,
+     .dict_size = sizeof(struct hypervisor_network_adapter)},
+
+    {.registry_name = "Hyper-V Hypervisor Virtual Processor",
+     .function_collect = do_hyperv_processor,
+     .dict_insert_cb = dict_hyperv_processor_insert_cb,
+     .dict_size = sizeof(struct hypervisor_processor)},
+
+    {.registry_name = NULL, .function_collect = NULL}};
+
+int do_PerflibHyperV(int update_every, usec_t dt __maybe_unused) {
+    static bool initialized = false;
+
+    if (unlikely(!initialized)) {
+        for (int i = 0; hyperv_perf_list[i].registry_name != NULL; i++) {
+            hyperv_perf_item *item = &hyperv_perf_list[i];
+            if (item->dict_insert_cb) {
+                item->instance = dictionary_create_advanced(DICT_PERF_OPTION, NULL, item->dict_size);
+                dictionary_register_insert_callback(item->instance, item->dict_insert_cb, NULL);
+            }
+        }
+        initialized = true;
+    }
+
+    for (int i = 0; hyperv_perf_list[i].registry_name != NULL; i++) {
+        // Find the registry ID using the registry name
+        DWORD id = RegistryFindIDByName(hyperv_perf_list[i].registry_name);
+        if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
+            continue;
+
+        // Get the performance data using the registry ID
+        PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
+        if (!pDataBlock)
+            continue;
+
+        hyperv_perf_list[i].function_collect(pDataBlock, update_every, &hyperv_perf_list[i]);
+    }
+    return 0;
+}
