@@ -131,7 +131,7 @@ struct mssql_db_instance {
     COUNTER_DATA MSSQLDatabaseTransactions;
     COUNTER_DATA MSSQLDatabaseWriteTransactions;
 
-    RRDDIM *rd_db_data_size;
+    RRDDIM *rd_db_data_file_size;
     RRDDIM *rd_db_active_transactions;
     RRDDIM *rd_db_backup_restore_operations;
     RRDDIM *rd_db_log_flushed;
@@ -1172,7 +1172,7 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
                   mli->parent->instanceID);
 
         mli->rd_db_active_transactions = rrddim_add(mli->parent->st_db_active_transactions, id, db,
-                                             1, 1, RRD_ALGORITHM_INCREMENTAL);
+                                             1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(mli->parent->st_db_active_transactions,
@@ -1209,19 +1209,19 @@ static void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char
                       RRDLABEL_SRC_AUTO);
     }
 
-    if (!mli->rd_db_data_size) {
+    if (!mli->rd_db_data_file_size) {
         snprintfz(id,
                   RRD_ID_LENGTH_MAX,
                   "mssql_db_%s_instance_%s_data_files_size_bytes",
                   db,
                   mli->parent->instanceID);
 
-        mli->rd_db_data_size = rrddim_add(mli->parent->st_db_data_file_size, id, db,
-                                          1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mli->rd_db_data_file_size = rrddim_add(mli->parent->st_db_data_file_size, id, db,
+                                               1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(mli->parent->st_db_data_file_size,
-                          mli->rd_db_data_size,
+                          mli->rd_db_data_file_size,
                          (collected_number)mli->MSSQLDatabaseDataFileSize.current.Data*1024);
 
 }
@@ -1395,7 +1395,7 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
                                                  "pending",
                                                  1,
                                                  1,
-                                                 RRD_ALGORITHM_INCREMENTAL);
+                                                 RRD_ALGORITHM_ABSOLUTE);
 
             rrdlabels_add(p->st_pending_mem_grant->rrdlabels, "mssql_instance", p->instanceID, RRDLABEL_SRC_AUTO);
         }
@@ -1406,7 +1406,7 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
         rrdset_done(p->st_pending_mem_grant);
     }
 
-    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLPendingMemoryGrants)) {
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLTotalServerMemory)) {
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_server_memory", p->instanceID);
         if (!p->st_mem_tot_server) {
             p->st_mem_tot_server = rrdset_create_localhost("mssql"
@@ -1435,7 +1435,7 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
 
         rrddim_set_by_pointer(p->st_mem_tot_server,
                               p->rd_mem_tot_server,
-                              (collected_number)(p->MSSQLPendingMemoryGrants.current.Data*1024));
+                              (collected_number)(p->MSSQLTotalServerMemory.current.Data*1024));
         rrdset_done(p->st_mem_tot_server);
     }
 }
