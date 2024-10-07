@@ -59,10 +59,6 @@ netdata-installer.exe /S /A /TOKEN=<YOUR_TOKEN> /ROOMS=<YOUR_ROOM>
 
 Replace `<YOUR_TOKEN>` and `<YOUR_ROOM>` with your actual Netdata Cloud Space claim token and room ID, respectively.
 
-> **Note**
->
-> If you are running the installation for the first time, MSYS2 will also initialize.
-
 ## Uninstalling
 
 To uninstall Netdata, run the `uninstall.exe` file in your Netdata installation directory, typically `<YOUR_INSTALL_LOCATION>\Netdata`.
