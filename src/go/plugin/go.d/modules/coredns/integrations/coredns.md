@@ -177,7 +177,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 Metrics of servers matching the selector will be collected.
 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
-- Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format).
+- Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).
 - Syntax:
 
 ```yaml
@@ -195,7 +195,7 @@ per_server_stats:
 
 Metrics of zones matching the selector will be collected.
 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
-- Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format).
+- Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).
 - Syntax:
 
 ```yaml
