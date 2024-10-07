@@ -15,11 +15,16 @@
 // return an always null terminated wide string, truncate to given size if destination is not big enough,
 // src_len can be -1 use all of it.
 // returns zero on errors, > 0 otherwise (including the null, even if src is not null terminated).
-size_t any_to_utf16(uint32_t CodePage, wchar_t *utf16, size_t utf16_count, const char *src, int src_len);
+size_t any_to_utf16(uint32_t CodePage, wchar_t *dst, size_t dst_size, const char *src, int src_len);
 
-// always null terminated, truncated if it does not fit, src_len can be -1 use all of it.
+// always null terminated, truncated if it does not fit, src_len can be -1 to use all of it.
 // returns zero on errors, > 0 otherwise (including the null, even if src is not null terminated).
 #define utf8_to_utf16(utf16, utf16_count, src, src_len) any_to_utf16(CP_UTF8, utf16, utf16_count, src, src_len)
+
+// always null terminated, truncated if it does not fit, src_len can be -1 to use all of it.
+// returns zero on errors, > 0 otherwise (including the null, even if src is not null terminated).
+size_t utf16_to_utf8(char *dst, size_t dst_size, const wchar_t *src, int src_len);
+
 #endif
 
 #endif /* NETDATA_STRING_UTF8_H */
