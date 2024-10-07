@@ -232,7 +232,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     char* env_block = GetEnvironmentStrings();
 //    print_environment_block(env_block);
 
-    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+    nd_log(NDLS_COLLECTORS, NDLP_INFO,
            "SPAWN PARENT: Running request No %zu, command: '%s'",
            instance->request_id, command);
 
@@ -281,7 +281,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     log_forwarder_annotate_fd_pid(server->log_forwarder, instance->stderr_fd, spawn_server_instance_pid(instance));
 
     errno_clear();
-    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+    nd_log(NDLS_COLLECTORS, NDLP_INFO,
            "SPAWN PARENT: created process for request No %zu, pid %d (winpid %d), command: %s",
            instance->request_id, (int)instance->child_pid, (int)pi.dwProcessId, command);
 
@@ -339,7 +339,7 @@ static void TerminateChildProcesses(SPAWN_INSTANCE *si) {
             if (pe.th32ParentProcessID == si->dwProcessId) {
                 HANDLE hChildProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pe.th32ProcessID);
                 if (hChildProcess) {
-                    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                    nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                            "SPAWN PARENT: killing subprocess %u of request No %zu, pid %d (winpid %u)",
                            pe.th32ProcessID, si->request_id, (int)si->child_pid, si->dwProcessId);
 
@@ -441,7 +441,7 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 
     char *err = GetErrorString(exit_code);
 
-    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+    nd_log(NDLS_COLLECTORS, NDLP_INFO,
            "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), exited with code %u (0x%x): %s",
            si->request_id, (int)si->child_pid, si->dwProcessId,
            (unsigned)exit_code, (unsigned)exit_code, err ? err : "(no reason text)");
