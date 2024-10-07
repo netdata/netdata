@@ -250,22 +250,22 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
     }
 
     static __thread wchar_t msg[4096];
-    static __thread wchar_t all[4096];
+//    static __thread wchar_t all[4096];
     utf8_to_utf16(msg, _countof(msg), buffer_tostring(wb), buffer_strlen(wb));
 
-    buffer_flush(wb);
-    for(size_t i = 1; i < fields_max ; i++) {
-        if(!is_field_set(fields, fields_max, i) || !fields[i].wevents)
-            continue;
+//    buffer_flush(wb);
+//    for(size_t i = 1; i < fields_max ; i++) {
+//        if(!is_field_set(fields, fields_max, i) || !fields[i].wevents)
+//            continue;
+//
+//        t = get_field_value(fields, i, fields_max, &tmp);
+//        if(*t) buffer_sprintf(wb, "\r\n  %s: %s", fields[i].wevents, t);
+//    }
+//    utf8_to_utf16(all, _countof(all), buffer_tostring(wb), buffer_strlen(wb));
+//    LPCWSTR messages[2] = { msg, all };
 
-        t = get_field_value(fields, i, fields_max, &tmp);
-        if(*t) buffer_sprintf(wb, "\r\n  %s: %s", fields[i].wevents, t);
-    }
-    utf8_to_utf16(all, _countof(all), buffer_tostring(wb), buffer_strlen(wb));
-
-    LPCWSTR messages[2] = { msg, all };
-
-    BOOL rc = ReportEventW(hEventLog, eventType, 0, eventID, NULL, 2, 0, messages, NULL);
+    LPCWSTR messages[1] = { msg };
+    BOOL rc = ReportEventW(hEventLog, eventType, 0, eventID, NULL, 1, 0, messages, NULL);
     return rc == TRUE;
 }
 
