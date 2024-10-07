@@ -22,19 +22,51 @@ template <> struct fmt::formatter<pb::AnyValue> {
             case pb::AnyValue::kDoubleValue:
                 return fmt::format_to(Ctx.out(), "{}", AV.double_value());
             case pb::AnyValue::kArrayValue:
-                return fmt::format_to(Ctx.out(), "{}", AV.array_value().values());
+                return fmt::format_to(Ctx.out(), "{}", AV.array_value());
             case pb::AnyValue::kKvlistValue:
-                return format_kvlist(AV.kvlist_value(), Ctx);
+                return fmt::format_to(Ctx.out(), "{}", AV.kvlist_value());
             case pb::AnyValue::kBytesValue:
                 return fmt::format_to(Ctx.out(), "<bytes-value>");
             default:
                 return fmt::format_to(Ctx.out(), "<unknown>");
         }
     }
+};
 
-private:
+template <> struct fmt::formatter<pb::KeyValue> {
+    constexpr auto parse(format_parse_context &Ctx) -> decltype(Ctx.begin())
+    {
+        return Ctx.end();
+    }
+
     template <typename FormatContext>
-    auto format_kvlist(const pb::KeyValueList &KVL, FormatContext &Ctx) const -> decltype(Ctx.out())
+    auto format(const pb::KeyValue &KV, FormatContext &Ctx) const -> decltype(Ctx.out())
+    {
+        return fmt::format_to(Ctx.out(), "{}: {}", KV.key(), KV.value());
+    }
+};
+
+template <> struct fmt::formatter<pb::ArrayValue> {
+    constexpr auto parse(format_parse_context &Ctx) -> decltype(Ctx.begin())
+    {
+        return Ctx.end();
+    }
+
+    template <typename FormatContext>
+    auto format(const pb::ArrayValue &AV, FormatContext &Ctx) const -> decltype(Ctx.out())
+    {
+        return fmt::format_to(Ctx.out(), "{}", AV.values());
+    }
+};
+
+template <> struct fmt::formatter<pb::KeyValueList> {
+    constexpr auto parse(format_parse_context &Ctx) -> decltype(Ctx.begin())
+    {
+        return Ctx.end();
+    }
+
+    template <typename FormatContext>
+    auto format(const pb::KeyValueList &KVL, FormatContext &Ctx) const -> decltype(Ctx.out())
     {
         fmt::format_to(Ctx.out(), "{{");
 
@@ -43,7 +75,7 @@ private:
             if (!First) {
                 fmt::format_to(Ctx.out(), ", ");
             }
-            fmt::format_to(Ctx.out(), "{}: {}", KV.key(), KV.value());
+            fmt::format_to(Ctx.out(), "{}", KV);
             First = false;
         }
         return fmt::format_to(Ctx.out(), "}}");

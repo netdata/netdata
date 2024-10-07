@@ -81,6 +81,7 @@ static void RunServer(otel::Config *Cfg)
     Srv->Wait();
 }
 
+#if 0
 int main(int argc, char **argv)
 {
     CLI::App App{"OTEL plugin"};
@@ -99,3 +100,73 @@ int main(int argc, char **argv)
     RunServer(*Cfg);
     return 0;
 }
+#else
+int main()
+{
+    // String value
+    pb::AnyValue string_value;
+    string_value.set_string_value("Hello, OpenTelemetry!");
+    std::cout << fmt::format("String value: {}\n", string_value);
+
+    // Boolean value
+    pb::AnyValue bool_value;
+    bool_value.set_bool_value(true);
+    std::cout << fmt::format("Boolean value: {}\n", bool_value);
+
+    // Integer value
+    pb::AnyValue int_value;
+    int_value.set_int_value(42);
+    std::cout << fmt::format("Integer value: {}\n", int_value);
+
+    // Double value
+    pb::AnyValue double_value;
+    double_value.set_double_value(3.14159);
+    std::cout << fmt::format("Double value: {}\n", double_value);
+
+    // Array value
+    pb::AnyValue array_value;
+    auto *array = array_value.mutable_array_value();
+    array->add_values()->set_string_value("one");
+    array->add_values()->set_int_value(2);
+    array->add_values()->set_bool_value(true);
+    std::cout << fmt::format("Array value: {}\n", array_value);
+
+    // KVList value (commented out in your formatter)
+    pb::AnyValue kvlist_value;
+    auto *kvlist = kvlist_value.mutable_kvlist_value();
+
+    auto *kv1 = kvlist->add_values();
+    kv1->set_key("key1");
+    kv1->mutable_value()->set_string_value("value1");
+
+    auto *kv2 = kvlist->add_values();
+    kv2->set_key("key2");
+    kv2->mutable_value()->set_int_value(42);
+
+    auto *kv3 = kvlist->add_values();
+    kv3->set_key("key3");
+    auto *nested_kvlist = kv3->mutable_value()->mutable_kvlist_value();
+
+    // Adding values to the nested KeyValueList
+    auto *nested_kv1 = nested_kvlist->add_values();
+    nested_kv1->set_key("nested_key1");
+    nested_kv1->mutable_value()->set_string_value("nested_value1");
+
+    auto *nested_kv2 = nested_kvlist->add_values();
+    nested_kv2->set_key("nested_key2");
+    nested_kv2->mutable_value()->set_double_value(3.14);
+
+    std::cout << fmt::format("KVList value: {}\n", kvlist_value);
+
+    // Bytes value
+    pb::AnyValue bytes_value;
+    bytes_value.set_bytes_value("\x00\x01\x02\x03\x04");
+    std::cout << fmt::format("Bytes value: {}\n", bytes_value);
+
+    // Unknown value
+    pb::AnyValue unknown_value;
+    std::cout << fmt::format("Unknown value: {}\n", unknown_value);
+
+    return 0;
+}
+#endif
