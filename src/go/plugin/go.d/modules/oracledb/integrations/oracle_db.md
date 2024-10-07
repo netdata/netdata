@@ -157,7 +157,7 @@ GRANT SELECT_CATALOG_ROLE TO netdata;
 
 #### File
 
-The configuration file name for this integration is `go.d/oracle.conf`.
+The configuration file name for this integration is `go.d/oracledb.conf`.
 
 
 You can edit the configuration file using the `edit-config` script from the
@@ -165,7 +165,7 @@ Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netda
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/oracle.conf
+sudo ./edit-config go.d/oracledb.conf
 ```
 #### Options
 
