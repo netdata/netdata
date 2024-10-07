@@ -1366,6 +1366,7 @@ set(CLAIM_WINDOWS_FILES
         src/claim/main.h
         src/claim/ui.c
         src/claim/ui.h
+        src/claim/cloud-conf.c
 )
 
 set(ACLK_ALWAYS_BUILD
