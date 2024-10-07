@@ -14,11 +14,11 @@
 
 // return an always null terminated wide string, truncate to given size if destination is not big enough,
 // src_len can be -1 use all of it.
-// returns zero on errors, > 0 (including the null) otherwise.
+// returns zero on errors, > 0 otherwise (including the null if src is null terminated).
 size_t any_to_utf16(uint32_t CodePage, wchar_t *utf16, size_t utf16_count, const char *src, int src_len);
 
 // always null terminated, truncated if it does not fit, src_len can be -1 use all of it.
-// returns zero on errors, > 0 (including the null) otherwise.
+// returns zero on errors, > 0 otherwise (including the null if src is null terminated).
 #define utf8_to_utf16(utf16, utf16_count, src, src_len) any_to_utf16(CP_UTF8, utf16, utf16_count, src, src_len)
 #endif
 
