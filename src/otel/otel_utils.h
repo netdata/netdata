@@ -45,6 +45,8 @@ using Histogram = opentelemetry::proto::metrics::v1::Histogram;
 using ExponentialHistogram = opentelemetry::proto::metrics::v1::ExponentialHistogram;
 using Summary = opentelemetry::proto::metrics::v1::Summary;
 
+using AggregationTemporality = opentelemetry::proto::metrics::v1::AggregationTemporality;
+
 std::string anyValueToString(const AnyValue &AV);
 uint64_t findOldestCollectionTime(const pb::Metric &M);
 

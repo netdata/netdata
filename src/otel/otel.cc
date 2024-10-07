@@ -195,6 +195,70 @@ int main()
         std::cout << fmt::format("{}\n", Res);
     }
 
+    // Exemplar
+    {
+        opentelemetry::proto::metrics::v1::Exemplar E;
+        E.set_time_unix_nano(1234567890);
+        E.set_as_double(42.0);
+        auto *Attr = E.add_filtered_attributes();
+        Attr->set_key("example_key");
+        Attr->mutable_value()->set_string_value("example_value");
+        E.set_span_id(std::string("\x01\x02\x03\x04\x05\x06\x07\x08", 8));
+        E.set_trace_id(std::string("\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\x10", 16));
+
+        std::cout << fmt::format("{}\n", E);
+    }
+
+    // NumberDataPoint
+    {
+        unsigned long long TS = (unsigned long long)1635724810000000000;
+        pb::NumberDataPoint NDP;
+        NDP.set_start_time_unix_nano(TS);
+        NDP.set_time_unix_nano(TS);
+        NDP.set_as_double(42.0);
+        auto *attr = NDP.add_attributes();
+        attr->set_key("example_key");
+        attr->mutable_value()->set_string_value("example_value");
+        NDP.set_flags(1);
+
+        // Add an exemplar
+        auto *E = NDP.add_exemplars();
+        E->set_time_unix_nano(1234567890);
+        E->set_as_double(42.0);
+
+        auto *Attr = E->add_filtered_attributes();
+        Attr->set_key("example_key");
+        Attr->mutable_value()->set_string_value("example_value");
+        E->set_span_id(std::string("\x01\x02\x03\x04\x05\x06\x07\x08", 8));
+        E->set_trace_id(std::string("\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\x10", 16));
+
+        std::cout << fmt::format("{}\n", NDP);
+    }
+
+    // Gauge/Sum
+    {
+        unsigned long long TS = (unsigned long long)1635724810000000000;
+
+        opentelemetry::proto::metrics::v1::Gauge gauge;
+        auto dataPoint = gauge.add_data_points();
+        dataPoint->set_start_time_unix_nano(TS);
+        dataPoint->set_time_unix_nano(TS);
+        dataPoint->set_as_double(42.0);
+
+        std::cout << fmt::format("{}\n", gauge);
+
+        opentelemetry::proto::metrics::v1::Sum sum;
+        sum.set_aggregation_temporality(
+            opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
+        sum.set_is_monotonic(true);
+        auto sumDataPoint = sum.add_data_points();
+        sumDataPoint->set_start_time_unix_nano(TS);
+        sumDataPoint->set_time_unix_nano(TS);
+        sumDataPoint->set_as_double(100.0);
+
+        std::cout << fmt::format("{}\n", sum);
+    }
+
     return 0;
 }
 #endif
