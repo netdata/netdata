@@ -229,7 +229,7 @@ static void health_event_loop(void) {
                    "Postponing alarm checks for %"PRId32" seconds, "
                    "because it seems that the system was just resumed from suspension.",
                    (int32_t)health_globals.config.postpone_alarms_during_hibernation_for_seconds);
-            schedule_node_info_update(localhost);
+            schedule_node_state_update(localhost, 0);
         }
 
         if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {

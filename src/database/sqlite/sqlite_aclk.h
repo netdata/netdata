@@ -39,6 +39,8 @@ struct aclk_database_cmd {
 
 typedef struct aclk_sync_cfg_t {
     RRDHOST *host;
+    uv_timer_t timer;
+    bool timer_initialized;
     int8_t send_snapshot;
     bool stream_alerts;
     int alert_count;
@@ -53,7 +55,7 @@ typedef struct aclk_sync_cfg_t {
 void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid, nd_uuid_t *node_id);
 void sql_aclk_sync_init(void);
 void aclk_push_alert_config(const char *node_id, const char *config_hash);
-void schedule_node_info_update(RRDHOST *host);
+void schedule_node_state_update(RRDHOST *host, uint64_t delay);
 void unregister_node(const char *machine_guid);
 
 #endif //NETDATA_SQLITE_ACLK_H
