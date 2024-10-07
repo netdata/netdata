@@ -177,6 +177,7 @@ char *channel2utf8(const wchar_t *channel);
 wchar_t *channel2unicode(const char *utf8str);
 
 char *query2utf8(const wchar_t *query);
+char *provider2utf8(const wchar_t *provider);
 
 char *unicode2utf8_strdupz(const wchar_t *src, size_t *utf8_len);
 

@@ -13,6 +13,9 @@ void publisher_release(PROVIDER_META_HANDLE *h);
 EVT_HANDLE publisher_handle(PROVIDER_META_HANDLE *h);
 PROVIDER_META_HANDLE *publisher_dup(PROVIDER_META_HANDLE *h);
 
+const char *publisher_get_name(PROVIDER_META_HANDLE *p);
+ND_UUID publisher_get_uuid(PROVIDER_META_HANDLE *p);
+
 void publisher_cache_init(void);
 
 bool publisher_keywords_cacheable(PROVIDER_META_HANDLE *h);
