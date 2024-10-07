@@ -827,6 +827,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/nd_log-format-json.c
         src/libnetdata/log/nd_log-to-file.c
         src/libnetdata/log/nd_log-to-windows-events.c
+        src/libnetdata/string/utf8.c
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1752,62 +1753,35 @@ target_link_libraries(libnetdata PUBLIC
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 
-if(OS_WINDOWS)
-        # Define the source and generated file paths
-        set(WEVT_MC_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata.mc")
-        set(WEVT_RC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.rc")
-        set(WEVT_H_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.h")
-        set(WEVT_RES_OBJECT "${CMAKE_BINARY_DIR}/wevt_netdata_res.o")
-        set(WEVT_DLL_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.dll")
-
-        # Step 1: Run windmc to generate .rc and .h files from .mc file
-        add_custom_command(
-                OUTPUT ${WEVT_RC_FILE} ${WEVT_H_FILE}
-                COMMAND windmc -r "${CMAKE_BINARY_DIR}" -h "${CMAKE_BINARY_DIR}" ${WEVT_MC_FILE}
-                DEPENDS ${WEVT_MC_FILE}
-                COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_RC_FILE} and ${WEVT_H_FILE}"
-        )
-
-        # Create a custom target for the generated .rc and .h files
-        add_custom_target(wevt_netdata_generated ALL DEPENDS ${WEVT_RC_FILE} ${WEVT_H_FILE})
-
-        # Step 2: Run windres to compile the .rc file into a resource object file
-        add_custom_command(
-                OUTPUT ${WEVT_RES_OBJECT}
-                COMMAND windres ${WEVT_RC_FILE} -O coff -o ${WEVT_RES_OBJECT}
-                DEPENDS ${WEVT_RC_FILE} ${WEVT_H_FILE}
-                COMMENT "Compiling ${WEVT_RC_FILE} to generate resource object ${WEVT_RES_OBJECT}"
-        )
-
-        # Create a custom target for the resource object
-        add_custom_target(wevt_netdata_res_object DEPENDS ${WEVT_RES_OBJECT})
-
-        # Step 3: Create a resource-only DLL from the resource object file using ld directly
-        add_custom_command(
-                OUTPUT ${WEVT_DLL_FILE}
-                COMMAND ${CMAKE_LINKER} -dll --entry 0 -nostdlib --disable-auto-import -o ${WEVT_DLL_FILE} ${WEVT_RES_OBJECT}
-                DEPENDS ${WEVT_RES_OBJECT}
-                COMMENT "Linking resource object into resource-only DLL ${WEVT_DLL_FILE}"
-        )
-
-        # Create a custom target for the DLL
-        add_custom_target(wevt_netdata ALL DEPENDS ${WEVT_DLL_FILE})
-
-        # Ensure that libnetdata depends on the generated header file
-        add_dependencies(libnetdata wevt_netdata_generated)
-
-        # Include the directory where the generated header file is located
-        target_include_directories(libnetdata PRIVATE "${CMAKE_BINARY_DIR}")
-
-        # libnetdata source files include wevt_netdata.h
-        set_source_files_properties(${LIBNETDATA_FILES} PROPERTIES
-                OBJECT_DEPENDS "${WEVT_H_FILE}")
-
-        # Install the wevt_netdata DLL
-        install(FILES ${WEVT_DLL_FILE}
-                COMPONENT wevt_netdata_dll
-                DESTINATION "${BINDIR}")
-endif()
+#if(OS_WINDOWS)
+#        # Define the source and generated file paths
+#        set(WEVT_MC_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata.mc")
+#        set(WEVT_RC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.rc")
+#        set(WEVT_H_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.h")
+#        set(WEVT_RES_OBJECT "${CMAKE_BINARY_DIR}/wevt_netdata_res.o")
+#        set(WEVT_DLL_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.dll")
+#
+#        add_custom_command(
+#                OUTPUT ${WEVT_H_FILE} ${WEVT_DLL_FILE}
+#                COMMAND windmc -r "${CMAKE_BINARY_DIR}" -h "${CMAKE_BINARY_DIR}" ${WEVT_MC_FILE}
+#                COMMAND windres ${WEVT_RC_FILE} -o ${WEVT_RES_OBJECT}
+#                COMMAND ${CMAKE_LINKER} -dll --entry 0 -nostdlib -o ${WEVT_DLL_FILE} ${WEVT_RES_OBJECT}
+#                DEPENDS ${WEVT_MC_FILE}
+#                COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_H_FILE} and ${WEVT_DLL_FILE}"
+#        )
+#
+#        # Create a custom target for the DLL
+#        add_custom_target(wevt_netdata ALL DEPENDS ${WEVT_DLL_FILE})
+#
+#        target_include_directories(libnetdata PRIVATE "${CMAKE_BINARY_DIR}")
+#        set_source_files_properties(src/libnetdata/log/nd_log-to-windows-events.c PROPERTIES
+#                OBJECT_DEPENDS "${WEVT_H_FILE}")
+#
+#        # Install the wevt_netdata DLL
+#        install(FILES ${WEVT_DLL_FILE}
+#                COMPONENT wevt_netdata_dll
+#                DESTINATION "${BINDIR}")
+#endif()
 
 # ebpf
 if(ENABLE_PLUGIN_EBPF)
