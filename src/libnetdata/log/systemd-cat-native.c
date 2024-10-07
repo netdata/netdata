@@ -648,7 +648,7 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
     }
 
     if(fields_added) {
-        nd_log(NDLS_HEALTH, priority, "added %zu fields", fields_added);
+        nd_log(NDLS_COLLECTORS, priority, "added %zu fields", fields_added);
         messages_logged++;
     }
 
