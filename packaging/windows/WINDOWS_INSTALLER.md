@@ -18,10 +18,10 @@ The installer will then guide you through these steps:
     - [GPLv3 License](/LICENSE): Read the GNU General Public License v3, which governs the Netdata software.
 3. **Destination**:  Choose the installation directory. By default, Netdata installs in `C:\Program Files\Netdata`.
 4. **Installation**: The installer will copy the necessary files to the chosen directory.
-5. **Connecting**: In order to [connect](/src/claim/README.md) your Agent to your Netdata Cloud Space you need to provide the following:
-    - **Claim Token**: This is the Claim Token that will be used to connect the Agent to your Space.
-    - **Room IDs**: These are the Room IDs where your Agent will be added. Multiple IDs are separated by a comma `,`.
-    - **Proxy address**: Enter the address of a proxy server if required for communication with Netdata Cloud.
+5. **Connect to Netdata Cloud**: To [connect](/src/claim/README.md) your Agent to your Netdata Cloud Space you need to provide the following:
+    - **Claim Token**: The Claim Token that securely authenticates and links your Agent to your Space.
+    - **Room IDs**: A comma-separated list of Room IDs where you want to add your Agent.
+    - **Proxy address**: The address of a proxy server, if one is required for communication with Netdata Cloud.
     - **Insecure connection**: By default, Netdata verifies the server's certificate. Enabling this option bypasses verification (use only if necessary).
     - **Open Terminal**: Select this option to launch the `MSYS2` terminal after installation completes.
 6. **Finish**: The installation process is complete!
@@ -32,7 +32,7 @@ This section provides instructions for installing Netdata in silent mode, which 
 
 > **Info**
 >
-> In order to have no interaction with the install process, make sure to run the installation file as an administrator. Otherwise the Windows admin prompt popup will appear
+> Run the installer as admin to avoid the Windows prompt.
 >
 > Silent mode skips displaying license agreements, but requires explicitly accepting them using the `/A` option.
 
@@ -65,4 +65,4 @@ Replace `<YOUR_TOKEN>` and `<YOUR_ROOM>` with your actual Netdata Cloud Space cl
 
 ## Uninstalling
 
-You can uninstall Netdata via running the `uninstall.exe`, located under `<YOUR_INSTALL_LOCATION>\Netdata`.
+To uninstall Netdata, run the `uninstall.exe` file in your Netdata installation directory, typically `<YOUR_INSTALL_LOCATION>\Netdata`.
