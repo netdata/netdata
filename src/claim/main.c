@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "daemon/common.h"
+#include "claim.h"
 
 #define UNICODE
 #define _UNICODE
@@ -218,6 +218,19 @@ static int netdata_claim_get_path(char *path)
     return 0;
 }
 
+static void netdata_claim_update_cloud_conf()
+{
+    cloud_conf_load(1);
+
+    const char *urlValue = (aURL) ? aURL : appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
+    const char *mGUID = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "machine_guid", "");
+    const char *claimed_id = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "claimed_id", "");
+    const char *lHostname = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "hostname", "");
+    const char *proxyValue = (aProxy) ? aProxy : appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", "env");
+    if(!cloud_conf_regenerate(claimed_id, mGUID, lHostname, aToken, aRoom, urlValue, proxyValue, insecure))
+        MessageBoxW(NULL, L"Cannot write cloud.conf.", L"Error", MB_OK|MB_ICONERROR);
+}
+
 static void netdata_claim_write_config(char *path)
 {
     char configPath[WINDOWS_MAX_PATH + 1];
@@ -267,6 +280,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (!netdata_claim_get_path(basePath)) {
             netdata_claim_write_config(basePath);
         }
+        netdata_claim_update_cloud_conf();
     }
 
 exit_claim:
