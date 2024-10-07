@@ -828,6 +828,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/nd_log-to-file.c
         src/libnetdata/log/nd_log-to-windows-events.c
         src/libnetdata/string/utf8.c
+        src/libnetdata/spawn_server/log-forwarder.c
+        src/libnetdata/spawn_server/log-forwarder.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
