@@ -361,6 +361,17 @@ fi
 # -------------------------------------------------------------------------------------------------
 # Detect the total system disk space
 
+is_inside_lxc_container() {
+  mounts_file="/proc/self/mounts"
+
+  [ ! -r "$mounts_file" ] && return 1
+
+  # Check if lxcfs is mounted on /proc
+  awk '$1 == "lxcfs" && $2 ~ "^/proc" { found=1; exit } END { exit !found }' "$mounts_file"
+
+  return $?
+}
+
 DISK_SIZE="unknown"
 DISK_DETECTION="none"
 
@@ -393,7 +404,7 @@ elif [ "${KERNEL_NAME}" = FreeBSD ]; then
   total="$(df -t ${types} -c -k | tail -n 1 | awk '{print $2}')"
   DISK_SIZE="$((total * 1024))"
 else
-  if [ -d /sys/block ] && [ -r /proc/devices ]; then
+  if [ -d /sys/block ] && [ -r /proc/devices ] && ! is_inside_lxc_container; then
     dev_major_whitelist=''
 
     # This is a list of device names used for block storage devices.
@@ -424,7 +435,7 @@ else
   else
     DISK_DETECTION="df"
     include_fs_types="ext*|btrfs|xfs|jfs|reiser*|zfs"
-    DISK_SIZE=$(($(df -T -P | tail -n +2 | sort -u -k 1 | grep "${include_fs_types}" | awk '{print $3}' | tr '\n' '+' | head -c -1) * 1024))
+    DISK_SIZE=$(($(df -T -P | tail -n +2 | sort -u -k 1 | grep -E "${include_fs_types}" | awk '{print $3}' | tr '\n' '+' | head -c -1) * 1024))
   fi
 fi
 

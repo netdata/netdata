@@ -10,6 +10,68 @@
         "type": "integer",
         "minimum": 1,
         "default": 10
+      },
+      "relabel": {
+        "title": "Update Labels",
+        "description": " This configuration can be used to update existing sensor labels or add labels to sensors that don't have them.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "",
+          "description": "",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "chip": {
+              "title": "Chip",
+              "description": "[Pattern](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher) to match the `chip_id` label.",
+              "type": "string"
+            },
+            "sensors": {
+              "title": "Relabel",
+              "description": "A list of sensors to be relabeled for the specified chip. The sensor name will be matched against the `sensor` label value.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "title": "Sensor",
+                "description": "",
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "name": {
+                    "title": "Name",
+                    "description": "",
+                    "type": "string"
+                  },
+                  "label": {
+                    "title": "New label",
+                    "description": "",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "label"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "chip",
+            "sensors"
+          ]
+        },
+        "uniqueItems": true
       }
     },
     "required": [
@@ -22,6 +84,38 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
+    },
+    "relabel": {
+      "items": {
+        "chip": {
+          "ui:placeholder": "it8688-*"
+        },
+        "sensors": {
+          "ui:listFlavour": "list",
+          "items": {
+            "name": {
+              "ui:placeholder": "For example, temp1, in1, or voltage1."
+            }
+          }
+        }
+      }
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every"
+          ]
+        },
+        {
+          "title": "Relabel Sensors",
+          "fields": [
+            "relabel"
+          ]
+        }
+      ]
     }
   }
 }

@@ -216,7 +216,7 @@ Notes:
 | exclude_path | Path to exclude. | *.gz | no |
 | url_patterns | List of URL patterns. | [] | no |
 | url_patterns.name | Used as a dimension name. |  | yes |
-| url_patterns.pattern | Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format). |  | yes |
+| url_patterns.pattern | Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format). |  | yes |
 | log_type | Log parser type. | auto | no |
 | csv_config | CSV log parser config. |  | no |
 | csv_config.delimiter | CSV field delimiter. | , | no |
