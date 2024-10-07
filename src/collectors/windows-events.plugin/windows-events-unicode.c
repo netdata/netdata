@@ -41,7 +41,7 @@ char *unicode2utf8_strdupz(const wchar_t *src, size_t *utf8_len) {
 
 wchar_t *channel2unicode(const char *utf8str) {
     static __thread wchar_t buffer[1024];
-    utf82unicode(buffer, sizeof(buffer) / sizeof(wchar_t), utf8str);
+    utf82unicode(buffer, _countof(buffer), utf8str);
     return buffer;
 }
 
