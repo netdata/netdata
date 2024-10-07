@@ -2,6 +2,7 @@
 
 #include "google/protobuf/arena.h"
 
+#include "fmt_utils.h"
 #include "otel_utils.h"
 #include "otel_config.h"
 #include "otel_iterator.h"
@@ -9,7 +10,6 @@
 #include "libnetdata/required_dummies.h"
 
 #include "CLI/CLI.hpp"
-#include "fmt/core.h"
 #include "opentelemetry/proto/collector/metrics/v1/metrics_service.grpc.pb.h"
 #include "grpcpp/grpcpp.h"
 
@@ -49,13 +49,12 @@ public:
         (void)Ctx;
         (void)Response;
 
-        fmt::println("Received {} resource metrics ({} KiB)",
-                     Request->resource_metrics_size(),
-                     Request->ByteSizeLong() / 1024);
+        fmt::println(
+            "Received {} resource metrics ({} KiB)", Request->resource_metrics_size(), Request->ByteSizeLong() / 1024);
 
         OtelData OD(&Request->resource_metrics());
 
-        for (const OtelElement &OE: OD) {
+        for (const OtelElement &OE : OD) {
             std::cout << "Name: " << OE.M->name() << "\n";
         }
 

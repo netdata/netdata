@@ -5,6 +5,9 @@
 
 #include "fmt/core.h"
 #include "fmt/color.h"
+#include <fmt/format.h>
+#include <fmt/ranges.h>
+
 
 #include "opentelemetry/proto/metrics/v1/metrics.pb.h"
 

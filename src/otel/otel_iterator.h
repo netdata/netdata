@@ -81,43 +81,6 @@ public:
         return absl::NotFoundError(SS.str());
     }
 
-    inline absl::StatusOr<std::string> dimensionName(const std::string *Key) const
-    {
-        const auto &Result = attribute(Key);
-        if (!Result.ok())
-            return Result.status();
-
-        return anyValueToString(*Result.value());
-    }
-
-    inline absl::StatusOr<std::string> instanceName(const std::set<std::string> *Keys) const
-    {
-        std::string Name;
-
-        bool Underscore = false;
-        for (const auto &Key : *Keys) {
-            const auto &Result = attribute(&Key);
-            if (!Result.ok())
-                return Result.status();
-
-            if (Underscore)
-                Name += "_";
-
-            auto Part = anyValueToString(*Result.value());
-            if (!Part.ok()) {
-                return Part.status();
-            }
-
-            Name += *Part;
-            Underscore = true;
-        }
-
-        if (Keys->size() && Name.empty())
-            fatal("Could not create instance name...");
-
-        return Name;
-    }
-
     uint64_t time() const
     {
         switch (DpKind) {
