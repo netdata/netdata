@@ -338,4 +338,43 @@ template <> struct fmt::formatter<pb::AggregationTemporality> {
     }
 };
 
+template <> struct fmt::formatter<pb::Metric> {
+    constexpr auto parse(format_parse_context &Ctx) -> decltype(Ctx.begin())
+    {
+        return Ctx.end();
+    }
+
+    template <typename FormatContext> auto format(const pb::Metric &M, FormatContext &Ctx) const -> decltype(Ctx.out())
+    {
+        fmt::format_to(Ctx.out(), "Metric{{name: {}, description: {}, unit: {}", M.name(), M.description(), M.unit());
+
+        switch (M.data_case()) {
+            case opentelemetry::proto::metrics::v1::Metric::kGauge:
+                fmt::format_to(Ctx.out(), ", gauge: {}", M.gauge());
+                break;
+            case opentelemetry::proto::metrics::v1::Metric::kSum:
+                fmt::format_to(Ctx.out(), ", sum: {}", M.sum());
+                break;
+            case opentelemetry::proto::metrics::v1::Metric::kHistogram:
+                fmt::format_to(Ctx.out(), ", histogram: <not supported>");
+                break;
+            case opentelemetry::proto::metrics::v1::Metric::kExponentialHistogram:
+                fmt::format_to(Ctx.out(), ", exponential_histogram: <not supported>");
+                break;
+            case opentelemetry::proto::metrics::v1::Metric::kSummary:
+                fmt::format_to(Ctx.out(), ", summary: <not supported>");
+                break;
+            default:
+                fmt::format_to(Ctx.out(), ", data: <unset>");
+                break;
+        }
+
+        if (M.metadata().size() > 0) {
+            fmt::format_to(Ctx.out(), ", metadata: {}", M.metadata());
+        }
+
+        return fmt::format_to(Ctx.out(), "}}");
+    }
+};
+
 #endif /* ND_FMT_UTILS_H */

@@ -8,23 +8,6 @@
 
 using KeyValueArray = google::protobuf::RepeatedPtrField<pb::KeyValue>;
 
-static inline absl::StatusOr<std::string> anyValueToString(const pb::AnyValue &V)
-{
-    if (V.has_string_value())
-        return V.string_value();
-
-    if (V.has_bool_value())
-        return V.bool_value() ? "true" : "false";
-
-    if (V.has_int_value())
-        return std::to_string(V.int_value());
-
-    if (V.has_double_value())
-        return std::to_string(V.double_value());
-
-    return absl::InvalidArgumentError("unknown conversion type");
-}
-
 enum class DataPointKind {
     Number,
     Sum,
@@ -100,15 +83,15 @@ public:
         return 0;
     }
 
-    uint64_t value(uint64_t multiplier) const
+    uint64_t value(uint64_t Multiplier) const
     {
         switch (DpKind) {
             case DataPointKind::Number:
             case DataPointKind::Sum:
                 if (NDP->has_as_double())
-                    return NDP->as_double() * multiplier;
+                    return NDP->as_double() * Multiplier;
                 else
-                    return NDP->as_int() * multiplier;
+                    return NDP->as_int() * Multiplier;
             case DataPointKind::Summary:
             case DataPointKind::Histogram:
             case DataPointKind::Exponential:
