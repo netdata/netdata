@@ -82,4 +82,53 @@ template <> struct fmt::formatter<pb::KeyValueList> {
     }
 };
 
+template <> struct fmt::formatter<pb::InstrumentationScope> {
+    constexpr auto parse(format_parse_context &Ctx) -> decltype(Ctx.begin())
+    {
+        return Ctx.end();
+    }
+
+    template <typename FormatContext>
+    auto format(const pb::InstrumentationScope &IS, FormatContext &Ctx) const -> decltype(Ctx.out())
+    {
+        fmt::format_to(Ctx.out(), "InstrumentationScope{{name: {}, version: {}", IS.name(), IS.version());
+
+        if (IS.attributes_size() > 0) {
+            fmt::format_to(Ctx.out(), ", attributes: {}", IS.attributes());
+        }
+
+        if (IS.dropped_attributes_count() > 0) {
+            fmt::format_to(Ctx.out(), ", dropped_attributes_count: {}", IS.dropped_attributes_count());
+        }
+
+        return fmt::format_to(Ctx.out(), "}}");
+    }
+};
+
+template <> struct fmt::formatter<pb::Resource> {
+    constexpr auto parse(format_parse_context &Ctx) -> decltype(Ctx.begin())
+    {
+        return Ctx.end();
+    }
+
+    template <typename FormatContext>
+    auto format(const pb::Resource &Res, FormatContext &Ctx) const -> decltype(Ctx.out())
+    {
+        fmt::format_to(Ctx.out(), "Resource{{");
+
+        if (Res.attributes_size() > 0) {
+            fmt::format_to(Ctx.out(), "attributes: {}", Res.attributes());
+        }
+
+        if (Res.dropped_attributes_count() > 0) {
+            if (Res.attributes_size() > 0) {
+                fmt::format_to(Ctx.out(), ", ");
+            }
+            fmt::format_to(Ctx.out(), "dropped_attributes_count: {}", Res.dropped_attributes_count());
+        }
+
+        return fmt::format_to(Ctx.out(), "}}");
+    }
+};
+
 #endif /* ND_FMT_UTILS_H */

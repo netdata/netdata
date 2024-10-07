@@ -131,32 +131,34 @@ int main()
     array->add_values()->set_bool_value(true);
     std::cout << fmt::format("Array value: {}\n", array_value);
 
-    // KVList value (commented out in your formatter)
-    pb::AnyValue kvlist_value;
-    auto *kvlist = kvlist_value.mutable_kvlist_value();
+    // KeyValueList value
+    {
+        pb::AnyValue kvlist_value;
+        auto *kvlist = kvlist_value.mutable_kvlist_value();
 
-    auto *kv1 = kvlist->add_values();
-    kv1->set_key("key1");
-    kv1->mutable_value()->set_string_value("value1");
+        auto *kv1 = kvlist->add_values();
+        kv1->set_key("key1");
+        kv1->mutable_value()->set_string_value("value1");
 
-    auto *kv2 = kvlist->add_values();
-    kv2->set_key("key2");
-    kv2->mutable_value()->set_int_value(42);
+        auto *kv2 = kvlist->add_values();
+        kv2->set_key("key2");
+        kv2->mutable_value()->set_int_value(42);
 
-    auto *kv3 = kvlist->add_values();
-    kv3->set_key("key3");
-    auto *nested_kvlist = kv3->mutable_value()->mutable_kvlist_value();
+        auto *kv3 = kvlist->add_values();
+        kv3->set_key("key3");
+        auto *nested_kvlist = kv3->mutable_value()->mutable_kvlist_value();
 
-    // Adding values to the nested KeyValueList
-    auto *nested_kv1 = nested_kvlist->add_values();
-    nested_kv1->set_key("nested_key1");
-    nested_kv1->mutable_value()->set_string_value("nested_value1");
+        // Adding values to the nested KeyValueList
+        auto *nested_kv1 = nested_kvlist->add_values();
+        nested_kv1->set_key("nested_key1");
+        nested_kv1->mutable_value()->set_string_value("nested_value1");
 
-    auto *nested_kv2 = nested_kvlist->add_values();
-    nested_kv2->set_key("nested_key2");
-    nested_kv2->mutable_value()->set_double_value(3.14);
+        auto *nested_kv2 = nested_kvlist->add_values();
+        nested_kv2->set_key("nested_key2");
+        nested_kv2->mutable_value()->set_double_value(3.14);
 
-    std::cout << fmt::format("KVList value: {}\n", kvlist_value);
+        std::cout << fmt::format("KVList value: {}\n", kvlist_value);
+    }
 
     // Bytes value
     pb::AnyValue bytes_value;
@@ -166,6 +168,32 @@ int main()
     // Unknown value
     pb::AnyValue unknown_value;
     std::cout << fmt::format("Unknown value: {}\n", unknown_value);
+
+    // Instrumentation scope
+    {
+        pb::InstrumentationScope IS;
+        IS.set_name("example_scope");
+        IS.set_version("1.0.0");
+        auto *attr = IS.add_attributes();
+        attr->set_key("example_key");
+        attr->mutable_value()->set_string_value("example_value");
+        IS.set_dropped_attributes_count(2);
+
+        std::cout << fmt::format("{}\n", IS);
+    }
+
+    // Resource
+    {
+        pb::Resource Res;
+
+        auto *A1 = Res.add_attributes();
+        A1->set_key("example_key");
+        A1->mutable_value()->set_string_value("example_value");
+
+        Res.set_dropped_attributes_count(2);
+
+        std::cout << fmt::format("{}\n", Res);
+    }
 
     return 0;
 }
