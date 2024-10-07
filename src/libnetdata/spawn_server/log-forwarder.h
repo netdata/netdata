@@ -1,6 +1,4 @@
-//
-// Created by costa on 07/10/2024.
-//
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef NETDATA_LOG_FORWARDER_H
 #define NETDATA_LOG_FORWARDER_H
