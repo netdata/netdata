@@ -6,10 +6,17 @@
 
 **Merged pull requests:**
 
+- fix system-info disk space in LXC [\#18696](https://github.com/netdata/netdata/pull/18696) ([ilyam8](https://github.com/ilyam8))
+- fix ram usage calculation in LXC [\#18695](https://github.com/netdata/netdata/pull/18695) ([ilyam8](https://github.com/ilyam8))
+- cgroups.plugin: call `setresuid` before spawn server init [\#18694](https://github.com/netdata/netdata/pull/18694) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18693](https://github.com/netdata/netdata/pull/18693) ([netdatabot](https://github.com/netdatabot))
+- go.d/nvidia\_smi: use configured "timeout" in loop mode [\#18692](https://github.com/netdata/netdata/pull/18692) ([ilyam8](https://github.com/ilyam8))
+- fix\(cgroups.plugin\): handle containers no env vars [\#18691](https://github.com/netdata/netdata/pull/18691) ([daniel-sampliner](https://github.com/daniel-sampliner))
 - fix sanitization issues [\#18687](https://github.com/netdata/netdata/pull/18687) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18686](https://github.com/netdata/netdata/pull/18686) ([netdatabot](https://github.com/netdatabot))
 - go.d/chrony: collect serverstats using chronyc [\#18685](https://github.com/netdata/netdata/pull/18685) ([ilyam8](https://github.com/ilyam8))
 - UTF8 support for chart ids, names and other metadata [\#18684](https://github.com/netdata/netdata/pull/18684) ([ktsaou](https://github.com/ktsaou))
+- Send node info update after ACLK connection timeout [\#18683](https://github.com/netdata/netdata/pull/18683) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18682](https://github.com/netdata/netdata/pull/18682) ([netdatabot](https://github.com/netdatabot))
 - Bump github.com/tidwall/gjson from 1.17.3 to 1.18.0 in /src/go [\#18681](https://github.com/netdata/netdata/pull/18681) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/prometheus/common from 0.59.1 to 0.60.0 in /src/go [\#18680](https://github.com/netdata/netdata/pull/18680) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -420,12 +427,6 @@
 - Spawn server improvements 5 [\#18131](https://github.com/netdata/netdata/pull/18131) ([ktsaou](https://github.com/ktsaou))
 - Spawn server fixes No 4 [\#18127](https://github.com/netdata/netdata/pull/18127) ([ktsaou](https://github.com/ktsaou))
 - go.d filecheck fix dir existence chart label [\#18126](https://github.com/netdata/netdata/pull/18126) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18124](https://github.com/netdata/netdata/pull/18124) ([netdatabot](https://github.com/netdatabot))
-- go.d whoisquery fix "days until" in config\_schema.json [\#18121](https://github.com/netdata/netdata/pull/18121) ([ilyam8](https://github.com/ilyam8))
-- go.d smartctl: add scsi read/write/verify error rate [\#18119](https://github.com/netdata/netdata/pull/18119) ([ilyam8](https://github.com/ilyam8))
-- log in the same line [\#18118](https://github.com/netdata/netdata/pull/18118) ([ktsaou](https://github.com/ktsaou))
-- spawn server fixes 3 [\#18117](https://github.com/netdata/netdata/pull/18117) ([ktsaou](https://github.com/ktsaou))
-- make claiming work again [\#18116](https://github.com/netdata/netdata/pull/18116) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
