@@ -386,44 +386,30 @@ static inline PERF_COUNTER_DEFINITION *getCounterDefinition(PERF_DATA_BLOCK *pDa
 // --------------------------------------------------------------------------------------------------------------------
 
 static inline BOOL getEncodedStringToUTF8(char *dst, size_t dst_len, DWORD CodePage, char *start, DWORD length) {
+    static __thread wchar_t unicode[PERFLIB_MAX_NAME_LENGTH];
+
     WCHAR *tempBuffer;  // Temporary buffer for Unicode data
     DWORD charsCopied = 0;
-    BOOL free_tempBuffer;
 
     if (CodePage == 0) {
         // Input is already Unicode (UTF-16)
         tempBuffer = (WCHAR *)start;
         charsCopied = length / sizeof(WCHAR);  // Convert byte length to number of WCHARs
-        free_tempBuffer = FALSE;
     }
     else {
-        // Convert the multi-byte instance name to Unicode (UTF-16)
-        // Calculate maximum possible characters in UTF-16
-
-        int charCount = MultiByteToWideChar(CodePage, 0, start, (int)length, NULL, 0);
-        tempBuffer = (WCHAR *)malloc(charCount * sizeof(WCHAR));
-        if (!tempBuffer) return FALSE;
-
-        charsCopied = MultiByteToWideChar(CodePage, 0, start, (int)length, tempBuffer, charCount);
-        if (charsCopied == 0) {
-            free(tempBuffer);
-            dst[0] = '\0';
-            return FALSE;
-        }
-
-        free_tempBuffer = TRUE;
+        tempBuffer = unicode;
+        charsCopied = any_to_utf16(CodePage, unicode, _countof(unicode), start, (int)length);
+        if(!charsCopied) return FALSE;
     }
 
     // Now convert from Unicode (UTF-16) to UTF-8
     int bytesCopied = WideCharToMultiByte(CP_UTF8, 0, tempBuffer, (int)charsCopied, dst, (int)dst_len, NULL, NULL);
     if (bytesCopied == 0) {
-        if (free_tempBuffer) free(tempBuffer);
         dst[0] = '\0'; // Ensure the buffer is null-terminated even on failure
         return FALSE;
     }
 
-    dst[bytesCopied] = '\0'; // Ensure buffer is null-terminated
-    if (free_tempBuffer) free(tempBuffer); // Free temporary buffer if used
+    dst[bytesCopied - 1] = '\0'; // Ensure buffer is null-terminated
     return TRUE;
 }
 
