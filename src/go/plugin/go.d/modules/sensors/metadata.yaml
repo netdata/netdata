@@ -73,6 +73,26 @@ modules:
               description: Data collection frequency.
               default_value: 10
               required: false
+            - name: relabel
+              description: A list used to update existing sensor labels or add labels to sensors that don't have them.
+              default_value: "[]"
+              required: false
+            - name: relabel[].chip
+              description: [Pattern](/src/libnetdata/simple_pattern/README.md#simple-patterns) to match the `chip_id` label value.
+              default_value: ""
+              required: false
+            - name: relabel[].sensors
+              description: A list of sensors to be relabeled for the specified chip.
+              default_value: "[]"
+              required: false
+            - name: relabel[].sensors[].name
+              description: The exact sensor name (e.g., `'temp1'`, `'in1'`, `'voltage1'`).
+              default_value: ""
+              required: false
+            - name: relabel[].sensors[].label
+              description: The new label value for the sensor.
+              default_value: ""
+              required: false
         examples:
           folding:
             title: Config
@@ -84,6 +104,18 @@ modules:
                 jobs:
                   - name: sensors
                     update_every: 5  # Collect sensors statistics every 5 seconds
+            - name: Renaming labels
+              description: Allows you to override/add labels.
+              config: |
+                jobs:
+                  - name: sensors
+                    relabel:
+                      - chip: as99127f-*
+                        sensors: 
+                          - name: temp1
+                            label: Mobo Temp
+                          - name: temp2
+                            label: CPU0 Temp
     troubleshooting:
       problems:
         list: []
@@ -106,7 +138,6 @@ modules:
               description: The name of the specific sensor within the chip device. This provides a direct identifier for the individual measurement point.
             - name: label
               description: A label provided by the kernel driver to indicate the intended use or purpose of the sensor.
-
           metrics:
             - name: sensors.chip_sensor_temperature
               description: Sensor Temperature
