@@ -78,7 +78,7 @@ modules:
               default_value: "[]"
               required: false
             - name: relabel[].chip
-              description: [Pattern](/src/libnetdata/simple_pattern/README.md#simple-patterns) to match the `chip_id` label value.
+              description: "[Pattern](/src/libnetdata/simple_pattern/README.md#simple-patterns) to match the `chip_id` label value."
               default_value: ""
               required: false
             - name: relabel[].sensors
@@ -111,7 +111,7 @@ modules:
                   - name: sensors
                     relabel:
                       - chip: as99127f-*
-                        sensors: 
+                        sensors:
                           - name: temp1
                             label: Mobo Temp
                           - name: temp2
