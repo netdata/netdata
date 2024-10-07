@@ -134,14 +134,14 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
     if(source == NDLS_COLLECTORS) {
         // set the method for the collector processes we will spawn
 
-        ND_LOG_METHOD method;
-        ND_LOG_FORMAT format = ls->format;
+        ND_LOG_METHOD method = NDLM_STDERR;
+        ND_LOG_FORMAT format = NDLF_LOGFMT;
         ND_LOG_FIELD_PRIORITY priority = ls->min_priority;
 
-        if(ls->method == NDLM_SYSLOG || ls->method == NDLM_JOURNAL)
+        if(IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(ls->method)) {
             method = ls->method;
-        else
-            method = NDLM_STDERR;
+            format = ls->format;
+        }
 
         nd_setenv("NETDATA_LOG_METHOD", nd_log_id2method(method), 1);
         nd_setenv("NETDATA_LOG_FORMAT", nd_log_id2format(format), 1);
