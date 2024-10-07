@@ -847,15 +847,21 @@ static void log_init(void) {
     nd_log_set_priority_level(config_get(CONFIG_SECTION_LOGS, "level", netdata_log_level));
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", filename));
-
     char* os_default_method = NULL;
 #if defined(OS_LINUX)
     os_default_method = is_stderr_connected_to_journal() /* || nd_log_journal_socket_available() */ ? "journal" : NULL;
 #elif defined(OS_WINDOWS)
     os_default_method = "wevents";
 #endif
+
+#if defined(OS_WINDOWS)
+    // on windows, debug log goes to windows events
+    snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
+#else
+    snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
+#endif
+
+    nd_log_set_user_settings(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", filename));
 
     if(os_default_method)
         snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
@@ -869,7 +875,12 @@ static void log_init(void) {
         snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
     nd_log_set_user_settings(NDLS_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
 
+#if defined(OS_WINDOWS)
+    // on windows, access log goes to windows events
+    snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
+#else
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
+#endif
     nd_log_set_user_settings(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
 
     if(os_default_method)
@@ -880,7 +891,12 @@ static void log_init(void) {
 
     aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
+#if defined(OS_WINDOWS)
+        // on windows, aclk log goes to windows events
+        snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
+#else
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
+#endif
         nd_log_set_user_settings(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
     }
 
