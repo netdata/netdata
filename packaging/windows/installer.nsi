@@ -62,6 +62,7 @@ Page Custom NetdataConfigPage NetdataConfigLeave
     launch:
 !macroend
 
+var hCtrlButton
 var hStartMsys
 var startMsys
 
@@ -145,6 +146,12 @@ Function un.onInit
 !insertmacro SingleInstanceFile
 FunctionEnd
 
+Function ShowHelp
+Pop $0
+        MessageBox MB_ICONQUESTION|MB_OK "$\"Proxy URL$\" accepts any proxy configuration supported by libcurl.$\n$\n$\"Insecure connection$\" instructs libcurl to disable host verification.$\n$\n$\"Open Terminal$\" launches a terminal to run additional commands after the installation completes." IDOK endHelp
+        endHelp:
+FunctionEnd
+
 Function NetdataConfigPage
         !insertmacro MUI_HEADER_TEXT "Netdata configuration" "Connect your Agent on your Netdata Cloud Space"
 
@@ -174,11 +181,16 @@ Function NetdataConfigPage
         ${NSD_CreateText} 21% 60% 79% 10% ""
         Pop $hProxy
 
-        ${NSD_CreateCheckbox} 0 75% 100% 10u "Insecure connection"
+        ${NSD_CreateCheckbox} 0 75% 50% 10u "Insecure connection"
         Pop $hInsecure
 
-        ${NSD_CreateCheckbox} 0 90% 100% 10u "Open terminal"
+        ${NSD_CreateCheckbox} 0 90% 50% 10u "Open terminal"
         Pop $hStartMsys
+
+        ${NSD_CreateButton} 80% 90% 30u 15u "&Help"
+        Pop $hCtrlButton
+        ${NSD_OnClick} $hCtrlButton ShowHelp
+
         Goto EndDialogDraw
 
         NotNeeded:
