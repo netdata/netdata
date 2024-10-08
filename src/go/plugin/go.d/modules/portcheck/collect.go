@@ -20,10 +20,13 @@ func (pc *PortCheck) collect() (map[string]int64, error) {
 		port := port
 		go func() { defer wg.Done(); pc.checkTCPPort(port) }()
 	}
-	for _, port := range pc.udpPorts {
-		wg.Add(1)
-		port := port
-		go func() { defer wg.Done(); pc.checkUDPPort(port) }()
+
+	if pc.doUdpPorts {
+		for _, port := range pc.udpPorts {
+			wg.Add(1)
+			port := port
+			go func() { defer wg.Done(); pc.checkUDPPort(port) }()
+		}
 	}
 
 	wg.Wait()

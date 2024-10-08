@@ -1,0 +1,276 @@
+plugin_name: windows.plugin
+modules:
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibProcesses
+      monitored_instance:
+        name: System statistics
+        link: "https://learn.microsoft.com/en-us/windows/win32/procthread/processes-and-threads"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - process counts
+        - threads
+        - context switch
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the current number of processes, threads, and context switches on Windows systems.
+        method_description: |
+          It queries the 'System' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibProcesses
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored instance."
+          labels: []
+          metrics:
+            - name: system.processes
+              description: System Processes
+              unit: "processes"
+              chart_type: line
+              dimensions:
+                - name: running
+            - name: system.threads
+              description: System Threads
+              unit: "threads"
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: system.ctxt
+              description: CPU Context Switches
+              unit: "context switches/s"
+              chart_type: line
+              dimensions:
+                - name: switches
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibMemory
+      monitored_instance:
+        name: Memory statistics
+        link: "https://learn.microsoft.com/en-us/windows/win32/Memory/memory-management"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - memory
+        - swap
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors swap and memory pool statistics on Windows systems.
+        method_description: |
+          It queries for the 'Memory' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibMemory
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored instance"
+          labels: []
+          metrics:
+            - name: mem.swap_iops
+              description: Swap Operations
+              unit: "operations/s"
+              chart_type: stacked
+              dimensions:
+                - name: read
+                - name: write
+            - name: mem.swap_pages_io
+              description: Swap Pages
+              unit: "pages/s"
+              chart_type: stacked
+              dimensions:
+                - name: read
+                - name: write
+            - name: mem.system_pool_size
+              description: System Memory Pool
+              unit: "bytes"
+              chart_type: stacked
+              dimensions:
+                - name: paged
+                - name: pool-paged
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibThermalZone
+      monitored_instance:
+        name: System thermal zone
+        link: "https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/design-guide"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - thermal
+        - temperature
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors thermal zone statistics on Windows systems.
+        method_description: |
+          It queries for the 'Thermal Zone Information' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          section_name: "[plugin:windows]"
+          name: "netdata.conf"
+          description: "The Netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config Option"
+            enabled: false
+          list:
+            - name: PerflibThermalZone
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: false
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Thermal zone
+          description: "These metrics refer to a Thermal zone"
+          labels: []
+          metrics:
+            - name: system.thermalzone_temperature
+              description: Thermal zone temperature
+              unit: celsius
+              chart_type: line
+              dimensions:
+                - name: temperature

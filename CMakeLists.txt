@@ -453,6 +453,15 @@ int main() {
 }
 " HAVE_BUILTIN_ATOMICS)
 
+check_cxx_source_compiles("
+#include <stdint.h>
+int main(void) {
+        uint64_t a;
+        __sync_add_and_fetch(&a, 1);
+        return 0;
+}
+" ARCH_SUPPORTS_64BIT_ATOMICS)
+
 check_c_source_compiles("
 void my_printf(char const *s, ...) __attribute__((format(gnu_printf, 1, 2)));
 int main() { return 0; }
@@ -1698,6 +1707,8 @@ if(ENABLE_H2O)
 
         target_compile_options(h2o PUBLIC -DH2O_USE_LIBUV=0)
         target_link_libraries(h2o PRIVATE PkgConfig::TLS)
+        target_compile_definitions(h2o PRIVATE
+                "$<$<NOT:$<BOOL:${ARCH_SUPPORTS_64BIT_ATOMICS}>>:H2O_NO_64BIT_ATOMICS>")
 endif()
 
 #
@@ -2442,7 +2453,10 @@ set(SYSTEMD_CAT_NATIVE_FILES src/libnetdata/log/systemd-cat-native.c
                              src/libnetdata/log/systemd-cat-native.h)
 
 add_executable(systemd-cat-native ${SYSTEMD_CAT_NATIVE_FILES})
-target_link_libraries(systemd-cat-native libnetdata)
+target_link_libraries(systemd-cat-native
+        libnetdata
+        "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
+)
 
 install(TARGETS systemd-cat-native
         COMPONENT netdata
