@@ -1366,7 +1366,6 @@ set(CLAIM_WINDOWS_FILES
         src/claim/main.h
         src/claim/ui.c
         src/claim/ui.h
-        src/claim/cloud-conf.c
 )
 
 set(ACLK_ALWAYS_BUILD
@@ -2358,7 +2357,7 @@ add_executable(netdata
 
 if(OS_WINDOWS)
         add_executable(NetdataClaim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
-        target_link_libraries(NetdataClaim shell32;gdi32;msftedit;libnetdata)
+        target_link_libraries(NetdataClaim shell32 gdi32 msftedit)
         target_compile_options(NetdataClaim PUBLIC -mwindows)
 endif()
 
