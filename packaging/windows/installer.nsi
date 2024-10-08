@@ -146,7 +146,7 @@ Function un.onInit
 FunctionEnd
 
 Function NetdataConfigPage
-        !insertmacro MUI_HEADER_TEXT "Netdata configuration" "Claim your agent on Netdata Cloud"
+        !insertmacro MUI_HEADER_TEXT "Netdata configuration" "Connect your Agent on your Netdata Cloud Space"
 
         nsDialogs::Create 1018
         Pop $0
@@ -156,20 +156,20 @@ Function NetdataConfigPage
 
         IfFileExists "$INSTDIR\etc\netdata\claim.conf" NotNeeded
 
-        ${NSD_CreateLabel} 0 0 100% 12u "Enter your Token and Cloud Room(s)."
-        ${NSD_CreateLabel} 0 15% 100% 12u "Optionally, you can open a terminal to execute additional commands."
+        ${NSD_CreateLabel} 0 0 100% 12u "Please enter your Space's Claim Token and the Room IDs you want the Agent "
+        ${NSD_CreateLabel} 0 12% 100% 12u "to be added to. If left empty, it will be added to the $\"All nodes$\" Room"
 
-        ${NSD_CreateLabel} 0 30% 20% 10% "Token"
+        ${NSD_CreateLabel} 0 30% 20% 10% "Claim Token"
         Pop $0
         ${NSD_CreateText} 21% 30% 79% 10% ""
         Pop $hCloudToken
 
-        ${NSD_CreateLabel} 0 45% 20% 10% "Room(s)"
+        ${NSD_CreateLabel} 0 45% 20% 10% "Room ID(s)"
         Pop $0
         ${NSD_CreateText} 21% 45% 79% 10% ""
         Pop $hCloudRooms
 
-        ${NSD_CreateLabel} 0 60% 20% 10% "Proxy"
+        ${NSD_CreateLabel} 0 60% 20% 10% "Proxy URL"
         Pop $0
         ${NSD_CreateText} 21% 60% 79% 10% ""
         Pop $hProxy
