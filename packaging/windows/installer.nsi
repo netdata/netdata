@@ -188,13 +188,13 @@ Function NetdataConfigPage
         ${NSD_CreateText} 21% 75% 79% 10% "https://app.netdata.cloud"
         Pop $hCloudURL
 
-        ${NSD_CreateCheckbox} 0 90% 45% 10u "Insecure connection"
+        ${NSD_CreateCheckbox} 0 92% 25% 10u "Insecure connection"
         Pop $hInsecure
 
-        ${NSD_CreateCheckbox} 50% 90% 45% 10u "Open terminal"
+        ${NSD_CreateCheckbox} 50% 92% 25% 10u "Open terminal"
         Pop $hStartMsys
 
-        ${NSD_CreateButton} 80% 90% 30u 15u "&Help"
+        ${NSD_CreateButton} 90% 90% 30u 15u "&Help"
         Pop $hCtrlButton
         ${NSD_OnClick} $hCtrlButton ShowHelp
 
