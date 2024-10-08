@@ -177,7 +177,8 @@ void print_process_tree(struct pid_stat *root, struct pid_stat *parent, int dept
                string2str(children[i]->target->name),
                string2str(children[i]->cmdline));
 #else
-        printf("[%d] %s [%s]: %s\n", children[i]->pid,
+        printf("[%d] orig: '%s' new: '%s' [target: %s]: cmdline: %s\n", children[i]->pid,
+               string2str(children[i]->comm_orig),
                string2str(children[i]->comm),
                string2str(children[i]->target->name),
                string2str(children[i]->cmdline));
