@@ -3,13 +3,48 @@
 #include "nd_log-internals.h"
 
 #if defined(OS_WINDOWS)
-
 #include <windows.h>
 #include <winevt.h>
 #include <evntprov.h>
 #include <wchar.h>
 #include <objbase.h>
 #include <guiddef.h>
+
+
+// --------------------------------------------------------------------------------------------------------------------
+// construct an event id (must be aligned with .mc file)
+
+#include "wevt_netdata.h"
+#include "nd_log-to-windows-common.h"
+
+// Function to construct EventID
+static DWORD complete_event_id(DWORD facility, DWORD severity, DWORD event_code) {
+    DWORD event_id = 0;
+
+    // Set Severity
+    event_id |= ((DWORD)(severity) << EVENT_ID_SEV_SHIFT) & EVENT_ID_SEV_MASK;
+
+    // Set Customer Code Flag (C)
+    event_id |= (0x1 << EVENT_ID_C_SHIFT) & EVENT_ID_C_MASK;
+
+    // Set Reserved Bit (R) - typically 0
+    event_id |= (0x0 << EVENT_ID_R_SHIFT) & EVENT_ID_R_MASK;
+
+    // Set Facility
+    event_id |= ((DWORD)(facility) << EVENT_ID_FACILITY_SHIFT) & EVENT_ID_FACILITY_MASK;
+
+    // Set Code
+    event_id |= ((DWORD)(event_code) << EVENT_ID_CODE_SHIFT) & EVENT_ID_CODE_MASK;
+
+    return event_id;
+}
+
+DWORD construct_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, MESSAGE_ID messageID) {
+    DWORD event_code = construct_event_code(source, priority, messageID);
+    return complete_event_id(FACILITY_APPLICATION, get_severity_from_priority(priority), event_code);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 
 #define NETDATA_PROVIDER_NAME L"Netdata"
 
@@ -37,7 +72,7 @@ static bool add_to_registry(const wchar_t *logName, const wchar_t *sourceName) {
     if (result != ERROR_SUCCESS)
         return false; // Could not create the registry key
 
-    wchar_t *modulePath = L"%SystemRoot%\\System32\\EventCreate.exe"; // Update as needed
+    wchar_t *modulePath = L"%SystemRoot%\\System32\\wevt_netdata.dll"; // Update as needed
     RegSetValueExW(hRegKey, L"EventMessageFile", 0, REG_EXPAND_SZ,
                    (LPBYTE)modulePath, (wcslen(modulePath) + 1) * sizeof(wchar_t));
     DWORD types_supported = EVENTLOG_SUCCESS | EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | EVENTLOG_INFORMATION_TYPE;
@@ -47,9 +82,35 @@ static bool add_to_registry(const wchar_t *logName, const wchar_t *sourceName) {
     return true;
 }
 
+static bool check_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, MESSAGE_ID messageID, DWORD event_code) {
+    DWORD generated = construct_event_id(source, priority, messageID);
+    if(generated != event_code) {
+        char current[UINT64_HEX_MAX_LENGTH];
+        print_uint64_hex(current, generated);
+
+        char wanted[UINT64_HEX_MAX_LENGTH];
+        print_uint64_hex(wanted, event_code);
+
+        const char *got = current;
+        const char *good = wanted;
+
+        return false;
+    }
+
+    return true;
+}
+
 bool nd_log_wevents_init(void) {
     if(nd_log.wevents.initialized)
         return true;
+
+    // validate we have the right keys
+    if(!check_event_id(NDLS_COLLECTORS, NDLP_INFO, MSGID_MESSAGE_ONLY, COLLECTORS_INFO_MESSAGE_ONLY) ||
+       !check_event_id(NDLS_DAEMON, NDLP_ERR, MSGID_MESSAGE_ONLY, DAEMON_ERR_MESSAGE_ONLY) ||
+       !check_event_id(NDLS_ACCESS, NDLP_WARNING, MSGID_ACCESS_FORWARDER_USER, ACCESS_WARN_ACCESS_FORWARDER_USER) ||
+       !check_event_id(NDLS_HEALTH, NDLP_CRIT, MSGID_ALERT_TRANSITION, HEALTH_CRIT_ALERT_TRANSITION)) {
+        return false;
+    }
 
     const wchar_t *logName = NETDATA_PROVIDER_NAME; // Custom log name "Netdata"
 
@@ -75,25 +136,6 @@ bool nd_log_wevents_init(void) {
 
     nd_log.wevents.initialized = true;
     return true;
-}
-
-static WORD get_event_type(ND_LOG_FIELD_PRIORITY priority) {
-    switch (priority) {
-        case NDLP_EMERG:
-        case NDLP_ALERT:
-        case NDLP_CRIT:
-        case NDLP_ERR:
-            return EVENTLOG_ERROR_TYPE;
-
-        case NDLP_WARNING:
-            return EVENTLOG_WARNING_TYPE;
-
-        case NDLP_NOTICE:
-        case NDLP_INFO:
-        case NDLP_DEBUG:
-        default:
-            return EVENTLOG_INFORMATION_TYPE;
-    }
 }
 
 #define is_field_set(fields, fields_max, field) ((field) < (fields_max) && (fields)[field].entry.set)
@@ -166,8 +208,8 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
     if(fields[NDF_PRIORITY].entry.set)
         priority = (ND_LOG_FIELD_PRIORITY) fields[NDF_PRIORITY].entry.u64;
 
-    DWORD eventType = get_event_type(priority);
-    DWORD eventID = 1;
+    DWORD wType = get_event_type_from_priority(priority);
+    MESSAGE_ID messageID = MSGID_MESSAGE_ONLY;
 
     CLEAN_BUFFER *wb = buffer_create(4096, NULL);
     CLEAN_BUFFER *tmp = NULL;
@@ -185,22 +227,22 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
     switch(source->source) {
         default:
         case NDLS_DEBUG:
-            eventID = 1;
+            messageID = MSGID_MESSAGE_ONLY;
             buffer_strcat(wb, get_field_value(fields, NDF_MESSAGE, fields_max, &tmp));
             break;
 
         case NDLS_DAEMON:
-            eventID = 101;
+            messageID = MSGID_MESSAGE_ONLY;
             buffer_strcat(wb, get_field_value(fields, NDF_MESSAGE, fields_max, &tmp));
             break;
 
         case NDLS_COLLECTORS:
-            eventID = 201;
+            messageID = MSGID_MESSAGE_ONLY;
             buffer_strcat(wb, get_field_value(fields, NDF_MESSAGE, fields_max, &tmp));
             break;
 
         case NDLS_HEALTH:
-            eventID = 301;
+            messageID = MSGID_ALERT_TRANSITION;
             buffer_strcat(wb, "Alert '");
             buffer_strcat(wb, get_field_value(fields, NDF_ALERT_NAME, fields_max, &tmp));
             buffer_strcat(wb, "' of instance '");
@@ -215,11 +257,11 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
 
         case NDLS_ACCESS:
             if(is_field_set(fields, fields_max, NDF_MESSAGE)) {
-                eventID = 501;
+                messageID = MSGID_MESSAGE_ONLY;
                 buffer_strcat(wb, get_field_value(fields, NDF_MESSAGE, fields_max, &tmp));
             }
             else if(is_field_set(fields, fields_max, NDF_RESPONSE_CODE)) {
-                eventID = 502;
+                messageID = MSGID_ACCESS;
                 buffer_strcat(wb, "Transaction ");
                 buffer_strcat(wb, get_field_value(fields, NDF_TRANSACTION_ID, fields_max, &tmp));
                 buffer_strcat(wb, ", Response Code: ");
@@ -231,12 +273,15 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
                 buffer_strcat(wb, "\r\n\r\n  From: ");
                 buffer_strcat(wb, get_field_value(fields, NDF_SRC_IP, fields_max, &tmp));
                 if(*(t = get_field_value(fields, NDF_SRC_FORWARDED_FOR, fields_max, &tmp))) {
-                    eventID += 10;
+                    messageID = MSGID_ACCESS_FORWARDER;
                     buffer_strcat(wb, ", for: ");
                     buffer_strcat(wb, t);
                 }
                 if(is_field_set(fields, fields_max, NDF_USER_NAME) || is_field_set(fields, fields_max, NDF_USER_ROLE)) {
-                    eventID += 20;
+                    if(messageID == MSGID_ACCESS)
+                        messageID = MSGID_ACCESS_USER;
+                    else
+                        messageID = MSGID_ACCESS_FORWARDER_USER;
                     buffer_strcat(wb, "\r\n  User: ");
                     buffer_strcat(wb, get_field_value(fields, NDF_USER_NAME, fields_max, &tmp));
                     buffer_strcat(wb, ", role: ");
@@ -246,16 +291,17 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
                 }
             }
             else {
-                eventID = 503;
+                messageID = MSGID_REQUEST_ONLY;
                 buffer_strcat(wb, get_field_value(fields, NDF_REQUEST, fields_max, &tmp));
             }
             break;
 
         case NDLS_ACLK:
-            eventID = 901;
+            messageID = MSGID_MESSAGE_ONLY;
             buffer_strcat(wb, get_field_value(fields, NDF_MESSAGE, fields_max, &tmp));
             break;
     }
+    DWORD eventID = construct_event_id(source->source, priority, messageID);
 
     buffer_strcat(wb, "\r\n");
 
@@ -284,8 +330,21 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
 //    utf8_to_utf16(all, _countof(all), buffer_tostring(wb), buffer_strlen(wb));
 //    LPCWSTR messages[2] = { msg, all };
 
+
+    // wType
+    //
+    // without a manifest => this determines the Level of the event
+    // with a manifest    => Level from the manifest is used (wType ignored)
+    //                       [however it is good to have, in case the manifest is not accessible somehow]
+    //
+
+    // wCategory
+    //
+    // without a manifest => numeric Task values appear
+    // with a manifest    => Task from the manifest is used (wCategory ignored)
+
     LPCWSTR messages[1] = { msg };
-    BOOL rc = ReportEventW(source->hEventLog, eventType, 0, eventID, NULL, 1, 0, messages, NULL);
+    BOOL rc = ReportEventW(source->hEventLog, wType, 0, eventID, NULL, 1, 0, messages, NULL);
     return rc == TRUE;
 }
 

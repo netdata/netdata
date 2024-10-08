@@ -22,6 +22,7 @@ int64_t log_field_to_int64(struct log_field *lf) {
     const char *s = NULL;
 
     switch(lf->entry.type) {
+        default:
         case NDFT_UUID:
         case NDFT_UNSET:
             return 0;
@@ -83,6 +84,7 @@ uint64_t log_field_to_uint64(struct log_field *lf) {
     const char *s = NULL;
 
     switch(lf->entry.type) {
+        default:
         case NDFT_UUID:
         case NDFT_UNSET:
             return 0;
