@@ -185,7 +185,7 @@ Function NetdataConfigPage
 
         ${NSD_CreateLabel} 0 75% 20% 10% "URL"
         Pop $0
-        ${NSD_CreateText} 21% 75% 79% 10% ""
+        ${NSD_CreateText} 21% 75% 79% 10% "https://api.netdata.cloud"
         Pop $hCloudURL
 
         ${NSD_CreateCheckbox} 0 90% 45% 10u "Insecure connection"
