@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- fix wrong config file name in go.d/oracledb meta [\#18709](https://github.com/netdata/netdata/pull/18709) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18708](https://github.com/netdata/netdata/pull/18708) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d/sensors\): add a config option to update/add sensor label value [\#18707](https://github.com/netdata/netdata/pull/18707) ([ilyam8](https://github.com/ilyam8))
+- improve apps.plugin readme [\#18705](https://github.com/netdata/netdata/pull/18705) ([ilyam8](https://github.com/ilyam8))
+- Update windows documentation [\#18703](https://github.com/netdata/netdata/pull/18703) ([Ancairon](https://github.com/Ancairon))
+- Detect when swap is disabled when agent is running [\#18702](https://github.com/netdata/netdata/pull/18702) ([stelfrag](https://github.com/stelfrag))
+- Bump golang.org/x/net from 0.29.0 to 0.30.0 in /src/go [\#18701](https://github.com/netdata/netdata/pull/18701) ([dependabot[bot]](https://github.com/apps/dependabot))
 - fix system-info disk space in LXC [\#18696](https://github.com/netdata/netdata/pull/18696) ([ilyam8](https://github.com/ilyam8))
 - fix ram usage calculation in LXC [\#18695](https://github.com/netdata/netdata/pull/18695) ([ilyam8](https://github.com/ilyam8))
 - cgroups.plugin: call `setresuid` before spawn server init [\#18694](https://github.com/netdata/netdata/pull/18694) ([ilyam8](https://github.com/ilyam8))
@@ -243,10 +250,6 @@
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.47.0...v1.99.0)
 
-**Merged pull requests:**
-
-- WIP - Netdata v2 [\#18125](https://github.com/netdata/netdata/pull/18125) ([ktsaou](https://github.com/ktsaou))
-
 ## [v1.47.0](https://github.com/netdata/netdata/tree/v1.47.0) (2024-08-22)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.46.3...v1.47.0)
@@ -421,12 +424,6 @@
 - Regenerate integrations.js [\#18141](https://github.com/netdata/netdata/pull/18141) ([netdatabot](https://github.com/netdatabot))
 - go.d smartctl add "extra\_devices" option [\#18140](https://github.com/netdata/netdata/pull/18140) ([ilyam8](https://github.com/ilyam8))
 - Spawn server fixes 6 [\#18136](https://github.com/netdata/netdata/pull/18136) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#18135](https://github.com/netdata/netdata/pull/18135) ([netdatabot](https://github.com/netdatabot))
-- docs: go.d mysql: remove unix sockets from auto\_detection [\#18134](https://github.com/netdata/netdata/pull/18134) ([ilyam8](https://github.com/ilyam8))
-- go.d fix url path overwrite [\#18132](https://github.com/netdata/netdata/pull/18132) ([ilyam8](https://github.com/ilyam8))
-- Spawn server improvements 5 [\#18131](https://github.com/netdata/netdata/pull/18131) ([ktsaou](https://github.com/ktsaou))
-- Spawn server fixes No 4 [\#18127](https://github.com/netdata/netdata/pull/18127) ([ktsaou](https://github.com/ktsaou))
-- go.d filecheck fix dir existence chart label [\#18126](https://github.com/netdata/netdata/pull/18126) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
