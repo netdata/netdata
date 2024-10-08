@@ -185,7 +185,7 @@ Function NetdataConfigPage
 
         ${NSD_CreateLabel} 0 75% 20% 10% "URL"
         Pop $0
-        ${NSD_CreateText} 21% 75% 79% 10% "https://api.netdata.cloud"
+        ${NSD_CreateText} 21% 75% 79% 10% "https://app.netdata.cloud"
         Pop $hCloudURL
 
         ${NSD_CreateCheckbox} 0 90% 45% 10u "Insecure connection"
@@ -277,57 +277,15 @@ Section "Install Netdata"
 	    DetailPrint "Warning: Failed to add Netdata service description."
         ${EndIf}
 
-        ClearErrors
-        nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
-        pop $0
-        ${If} $0 != 0
-	        MessageBox MB_OK "Warning: Failed to start Netdata service."
-        ${EndIf}
-
-	WriteUninstaller "$INSTDIR\Uninstall.exe"
+        WriteUninstaller "$INSTDIR\Uninstall.exe"
 
         Call NetdataUninstallRegistry
-
-        IfSilent runcmds goodbye
-        runcmds:
-           nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
-           pop $0
-
-           System::Call 'kernel32::AttachConsole(i -1)i.r0'
-           ${If} $0 != 0
-                System::Call 'kernel32::GetStdHandle(i -11)i.r0'
-                FileWrite $0 "Netdata installed with success.$\r$\n"
-           ${EndIf}
-           ${If} $startMsys == ${BST_CHECKED}
-                   nsExec::ExecToLog '$INSTDIR\msys2.exe'
-                   pop $0
-           ${EndIf}
-
-           StrLen $0 $cloudToken
-           StrLen $1 $cloudRooms
-           ${If} $0 == 0
-           ${OrIf} $1 == 0
-                   Goto goodbye
-           ${EndIf}
-
-           ${If} $0 == 135
-           ${AndIf} $1 >= 36
-                    nsExec::ExecToLog '$INSTDIR\usr\bin\NetdataClaim.exe /T $cloudToken /R $cloudRooms /P $proxy /I $insecure'
-                    pop $0
-           ${Else}         
-                    System::Call 'kernel32::AttachConsole(i -1)i.r0'
-                    ${If} $0 != 0
-                        System::Call 'kernel32::GetStdHandle(i -11)i.r0'
-                        FileWrite $0 "Room(s) or Token invalid.$\r$\n"
-                    ${EndIf}
-           ${EndIf}
-        goodbye:
 
         StrLen $0 $cloudToken
         StrLen $1 $cloudRooms
         ${If} $0 == 0
         ${OrIf} $1 == 0
-                Goto runMsys
+                Goto runCmds
         ${EndIf}
 
         ${If} $0 == 135
@@ -338,7 +296,14 @@ Section "Install Netdata"
                 MessageBox MB_OK "The Cloud information does not have the expected length."
         ${EndIf}
 
-        runMsys:
+        runCmds:
+        ClearErrors
+        nsExec::ExecToLog '$SYSDIR\sc.exe start Netdata'
+        pop $0
+        ${If} $0 != 0
+	        MessageBox MB_OK "Warning: Failed to start Netdata service."
+        ${EndIf}
+
         ${If} $startMsys == ${BST_CHECKED}
                 nsExec::ExecToLog '$INSTDIR\msys2.exe'
                 pop $0
