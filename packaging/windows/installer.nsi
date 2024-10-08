@@ -164,7 +164,7 @@ Function NetdataConfigPage
         IfFileExists "$INSTDIR\etc\netdata\claim.conf" NotNeeded
 
         ${NSD_CreateLabel} 0 0 100% 12u "Enter your Space's Claim Token and the Room IDs where you want "
-        ${NSD_CreateLabel} 0 12% 100% 12u "to add the Agent. If no Room IDs are specified, the Agent will be added to the $\"All nodes$\" Room."
+        ${NSD_CreateLabel} 0 12% 100% 15u "to add the Agent. If no Room IDs are specified, the Agent will be added to the $\"All nodes$\" Room."
 
         ${NSD_CreateLabel} 0 30% 20% 10% "Claim Token"
         Pop $0
