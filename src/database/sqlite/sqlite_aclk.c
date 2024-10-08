@@ -206,8 +206,6 @@ fail:
 static void invalidate_host_last_connected(nd_uuid_t *host_uuid)
 {
     sqlite3_stmt *res = NULL;
-    if (!host_uuid)
-        return;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_INVALIDATE_HOST_LAST_CONNECTED, &res))
         return;
