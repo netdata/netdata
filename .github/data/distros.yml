@@ -6,7 +6,7 @@ platform_map:  # map packaging architectures to docker platforms
   arm64: linux/arm64/v8
   armhf: linux/arm/v7
   armhfp: linux/arm/v7
-  i386: linux/i386
+  i386: linux/386
   x86_64: linux/amd64
 arch_order:  # sort order for per-architecture jobs in CI
   - amd64
