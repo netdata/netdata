@@ -74,7 +74,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics refer to the entire monitored application."
+          description: "These metrics refer to the entire monitored instance."
           labels: []
           metrics:
             - name: system.processes
@@ -168,8 +168,8 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: memory
-          description: ""
+        - name: global
+          description: "These metrics refer to the entire monitored instance"
           labels: []
           metrics:
             - name: mem.swap_iops
@@ -265,13 +265,13 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: ""
+        - name: Thermal zone
+          description: "These metrics refer to a Thermal zone"
           labels: []
           metrics:
             - name: system.thermalzone_temperature
               description: Thermal zone temperature
-              unit: "Celsius"
+              unit: celsius
               chart_type: line
               dimensions:
                 - name: temperature
