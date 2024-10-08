@@ -119,7 +119,6 @@ modules:
           This collector monitors swap and memory pool statistics on Windows systems.
         method_description: |
           It queries for the 'Memory' object from Perflib in order to gather the metrics.
-          
       supported_platforms:
         include: ["windows"]
         exclude: []
