@@ -2401,7 +2401,10 @@ set(SYSTEMD_CAT_NATIVE_FILES src/libnetdata/log/systemd-cat-native.c
                              src/libnetdata/log/systemd-cat-native.h)
 
 add_executable(systemd-cat-native ${SYSTEMD_CAT_NATIVE_FILES})
-target_link_libraries(systemd-cat-native libnetdata)
+target_link_libraries(systemd-cat-native
+        libnetdata
+        "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
+)
 
 install(TARGETS systemd-cat-native
         COMPONENT netdata
