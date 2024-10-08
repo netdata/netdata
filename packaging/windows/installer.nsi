@@ -148,7 +148,7 @@ FunctionEnd
 
 Function ShowHelp
 Pop $0
-        MessageBox MB_ICONQUESTION|MB_OK "$\"Proxy URL$\" accepts any proxy configuration supported by libcurl.$\n$\n$\"Insecure connection$\" instructs libcurl to disable host verification.$\n$\n$\"Open Terminal$\" launches a terminal to run additional commands after the installation completes." IDOK endHelp
+        MessageBox MB_ICONQUESTION|MB_OK "$\"Proxy URL$\" set the proxy server address to use if your network requires one.$\n$\n$\"Insecure connection$\" disable verification of the server's certificate chain and host name.$\n$\n$\"Open Terminal$\" open MSYS2 terminal to run additional commands after installation." IDOK endHelp
         endHelp:
 FunctionEnd
 
