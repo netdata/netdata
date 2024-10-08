@@ -12,10 +12,23 @@
 #include <guiddef.h>
 
 #define NETDATA_PROVIDER_NAME L"Netdata"
-static HANDLE hEventLog = NULL;
 
-static bool add_to_registry(wchar_t *key) {
-    // Register the event source in the Windows Event Log under "Application"
+// Define source names with "Netdata" prefix
+static const wchar_t *source_names[_NDLS_MAX] = {
+        NETDATA_PROVIDER_NAME L"_Unset",        // NDLS_UNSET (not used)
+        NETDATA_PROVIDER_NAME L"_Access",       // NDLS_ACCESS
+        NETDATA_PROVIDER_NAME L"_ACLK",         // NDLS_ACLK
+        NETDATA_PROVIDER_NAME L"_Collectors",   // NDLS_COLLECTORS
+        NETDATA_PROVIDER_NAME L"_Daemon",       // NDLS_DAEMON
+        NETDATA_PROVIDER_NAME L"_Health",       // NDLS_HEALTH
+        NETDATA_PROVIDER_NAME L"_Debug",        // NDLS_DEBUG
+};
+
+static bool add_to_registry(const wchar_t *logName, const wchar_t *sourceName) {
+    // Build the registry path: SYSTEM\CurrentControlSet\Services\EventLog\<LogName>\<SourceName>
+    wchar_t key[MAX_PATH];
+    swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls\\%ls", logName, sourceName);
+
     HKEY hRegKey;
     DWORD disposition;
     LONG result = RegCreateKeyExW(HKEY_LOCAL_MACHINE, key,
@@ -24,7 +37,7 @@ static bool add_to_registry(wchar_t *key) {
     if (result != ERROR_SUCCESS)
         return false; // Could not create the registry key
 
-    wchar_t *modulePath = L"%SystemRoot%\\System32\\EventCreate.exe";
+    wchar_t *modulePath = L"%SystemRoot%\\System32\\EventCreate.exe"; // Update as needed
     RegSetValueExW(hRegKey, L"EventMessageFile", 0, REG_EXPAND_SZ,
                    (LPBYTE)modulePath, (wcslen(modulePath) + 1) * sizeof(wchar_t));
     DWORD types_supported = EVENTLOG_SUCCESS | EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | EVENTLOG_INFORMATION_TYPE;
@@ -35,23 +48,30 @@ static bool add_to_registry(wchar_t *key) {
 }
 
 bool nd_log_wevents_init(void) {
-    if(nd_log.wevents.initialized && hEventLog)
+    if(nd_log.wevents.initialized)
         return true;
 
-    // Registering to SYSTEM\CurrentControlSet\Services\EventLog is needed for Event Viewer to show the publisher
-    // Registering to SYSTEM\CurrentControlSet\Services\EventLog\Application is what the official way
+    const wchar_t *logName = NETDATA_PROVIDER_NAME; // Custom log name "Netdata"
 
-    if(!add_to_registry(L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\" NETDATA_PROVIDER_NAME) ||
-        !add_to_registry(L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\" NETDATA_PROVIDER_NAME))
-        return false;
-
-    // Register the event source with the system (this opens a handle to the event log)
-    hEventLog = RegisterEventSourceW(NULL, NETDATA_PROVIDER_NAME);
-    if (!hEventLog)
-        return false; // Failed to register event source
-
-    for(size_t i = 0; i < _NDLS_MAX ;i++)
+    // Loop through each source and add it to the registry
+    for(size_t i = 0; i < _NDLS_MAX; i++) {
         nd_log.sources[i].source = i;
+
+        // Skip NDLS_UNSET
+        if(i == NDLS_UNSET) continue;
+
+        if(!add_to_registry(logName, source_names[i])) {
+            // Handle error (optional)
+            return false;
+        }
+
+        // Register the event source with the prefixed source name
+        nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, source_names[i]);
+        if (!nd_log.sources[i].hEventLog) {
+            // Handle error (optional)
+            return false;
+        }
+    }
 
     nd_log.wevents.initialized = true;
     return true;
@@ -139,7 +159,7 @@ static const char *get_field_value(struct log_field *fields, ND_LOG_FIELD_ID i, 
 }
 
 bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
-    if(!nd_log.wevents.initialized || !hEventLog)
+    if(!nd_log.wevents.initialized || !source->hEventLog)
         return false;
 
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
@@ -265,7 +285,7 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
 //    LPCWSTR messages[2] = { msg, all };
 
     LPCWSTR messages[1] = { msg };
-    BOOL rc = ReportEventW(hEventLog, eventType, 0, eventID, NULL, 1, 0, messages, NULL);
+    BOOL rc = ReportEventW(source->hEventLog, eventType, 0, eventID, NULL, 1, 0, messages, NULL);
     return rc == TRUE;
 }
 
