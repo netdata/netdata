@@ -183,7 +183,7 @@ Function NetdataConfigPage
         ${NSD_CreateText} 21% 60% 79% 10% ""
         Pop $hProxy
 
-        ${NSD_CreateLabel} 0 75% 20% 10% "URL"
+        ${NSD_CreateLabel} 0 75% 20% 10% "Cloud URL"
         Pop $0
         ${NSD_CreateText} 21% 75% 79% 10% "https://app.netdata.cloud"
         Pop $hCloudURL
