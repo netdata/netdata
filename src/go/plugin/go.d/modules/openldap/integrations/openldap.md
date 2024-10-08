@@ -100,7 +100,7 @@ Follow instructions from https://www.openldap.org/doc/admin24/monitoringslapd.ht
 The configuration file name for this integration is `go.d/openldap.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
