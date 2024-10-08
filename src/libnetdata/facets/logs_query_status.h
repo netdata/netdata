@@ -403,9 +403,14 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
                 return false;
             }
 
-            buffer_json_member_add_array(wb, key);
+            bool is_source = false;
+            if(strcmp(key, LQS_PARAMETER_SOURCE) == 0) {
+                // reset the sources, so that only what the user selects will be shown
+                is_source = true;
+                rq->source_type = LQS_SOURCE_TYPE_NONE;
+            }
 
-            bool is_source = strcmp(key, LQS_PARAMETER_SOURCE) == 0;
+            buffer_json_member_add_array(wb, key);
 
             size_t values_len = json_object_array_length(val);
             for (size_t i = 0; i < values_len; i++) {
