@@ -26,6 +26,20 @@ The System for Cross-domain Identity Management (SCIM) specification is designed
 - The Space must be on a paid plan
 - OIDC/SSO integration must already be enabled in one of your Spaces
 
+### Supported Features
+This integration adheres to SCIM v2 specifications. Supported features include:
+
+- User Resource Management (urn:ietf:params:scim:schemas:core:2.0:User)
+- Create users
+- Update user attributes
+- Deactivate users
+- Patch operations: Supported
+- Bulk operations: Not supported
+- Filtering: Supported (max results: 200)
+- Password synchronization: Not supported, as we rely on SSO/OIDC authentication
+- eTag: Not supported
+- Authentication schemes: OAuth Bearer Token
+
 ### Netdata Configuration Steps
 1. Click on the Space settings cog (located above your profile icon).
 2. Click on the **User Management** section and access **Authentication and Authorization** tab.
@@ -37,6 +51,19 @@ The System for Cross-domain Identity Management (SCIM) specification is designed
    - **Base URL**: Use this URL as the base URL for your SCIM client.
    - **Token**: Use this token for Bearer Authentication with your SCIM client.
 
+## Client Configuration Steps
+
+### Okta
+If you're configuring SCIM in Okta, and you already have the Token from the previous section, follow these steps:
+
+1. Go to the **Applications** menu on the left-hand panel and select the **Netdata** application.
+2. In the **Netdata** application, navigate to the **Provisioning** tab.
+3. Click on **Configure API Integration** and check the box for **Enable API Integration**.
+4. Enter the Token (obtained in the *Netdata Configuration Steps* section) into the **API Token** field, then click **Test API Credentials** to ensure the connection is successful.
+5. If the test is successful, click **Save** to apply the configuration.
+
+## Troubleshoot
+
 ### Rotating the SCIM Token
 You can rotate the token provided during SCIM integration setup if needed.
 
@@ -46,17 +73,6 @@ Steps to rotate the token:
 3. In the already configured SCIM card, click **Configure**.
 4. Click **Regenerate Token**.
 5. If successful, you will receive a new token for Bearer Authentication with your SCIM client.
-
-### Supported Features
-This integration adheres to SCIM v2 specifications. Supported features include:
-
-- User Resource Management (urn:ietf:params:scim:schemas:core:2.0:User)
-- Patch operations: Supported
-- Bulk operations: Not supported
-- Filtering: Supported (max results: 200)
-- Password synchronization: Not supported, as we rely on SSO/OIDC authentication
-- eTag: Not supported
-- Authentication schemes: OAuth Bearer Token
 
 ### User Keying Between SCIM and OIDC
 Our SCIM (System for Cross-domain Identity Management) integration utilizes OIDC (OpenID Connect) to authenticate users.
