@@ -104,13 +104,13 @@ run mkdir -p artifacts
 run mv "${NETDATA_INSTALL_PATH}.gz.run" "artifacts/${FILE}"
 
 [ -f "netdata-${BUILDARCH}-latest.gz.run" ] && rm "netdata-${BUILDARCH}-latest.gz.run"
-run ln -s "artifacts/${FILE}" "netdata-${BUILDARCH}-latest.gz.run"
+run cp "artifacts/${FILE}" "netdata-${BUILDARCH}-latest.gz.run"
 
 if [ "${BUILDARCH}" = "x86_64" ]; then
   [ -f "netdata-latest.gz.run" ] && rm "netdata-latest.gz.run"
-  run ln -s "artifacts/${FILE}" "netdata-latest.gz.run"
+  run cp "artifacts/${FILE}" "netdata-latest.gz.run"
   [ -f "artifacts/netdata-${VERSION}.gz.run" ] && rm "netdata-${VERSION}.gz.run"
-  run ln -s "./${FILE}" "artifacts/netdata-${VERSION}.gz.run"
+  run cp "artifacts/${FILE}" "artifacts/netdata-${VERSION}.gz.run"
 fi
 
 # shellcheck disable=SC2015
