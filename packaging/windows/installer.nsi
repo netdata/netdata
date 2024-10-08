@@ -153,7 +153,7 @@ Pop $0
 FunctionEnd
 
 Function NetdataConfigPage
-        !insertmacro MUI_HEADER_TEXT "Netdata configuration" "Connect your Agent on your Netdata Cloud Space"
+        !insertmacro MUI_HEADER_TEXT "Netdata configuration" "Connect your Agent to your Netdata Cloud Space"
 
         nsDialogs::Create 1018
         Pop $0
