@@ -269,6 +269,7 @@ func parsePower(s *PowerSensor, values map[string]rawValue) error {
 		case "input_lowest":
 			s.InputLowest, err = parseFloat(v, div)
 		case "accuracy":
+			v = strings.TrimSuffix(v, "%")
 			s.Accuracy, err = parseFloat(v, 1)
 		case "cap":
 			s.Cap, err = parseFloat(v, div)

@@ -71,7 +71,7 @@ func TestScanner_Scan(t *testing.T) {
 					{name: "/sys/devices/LNXSYSTM:00/device:00/ACPI0000:00/power1_input", val: "345000000"},
 					{name: "/sys/devices/LNXSYSTM:00/device:00/ACPI0000:00/power1_input_highest", val: "345000000"},
 					{name: "/sys/devices/LNXSYSTM:00/device:00/ACPI0000:00/power1_input_lowest", val: "345000000"},
-					{name: "/sys/devices/LNXSYSTM:00/device:00/ACPI0000:00/power1_accuracy", val: "34.5"},
+					{name: "/sys/devices/LNXSYSTM:00/device:00/ACPI0000:00/power1_accuracy", val: "34.5%"},
 					{name: "/sys/devices/LNXSYSTM:00/device:00/ACPI0000:00/power1_cap", val: "345000000"},
 					{name: "/sys/devices/LNXSYSTM:00/device:00/ACPI0000:00/power1_cap_max", val: "345000000"},
 					{name: "/sys/devices/LNXSYSTM:00/device:00/ACPI0000:00/power1_cap_min", val: "345000000"},
