@@ -27,6 +27,7 @@ int do_PerflibObjects(int update_every, usec_t dt);
 int do_PerflibThermalZone(int update_every, usec_t dt);
 int do_PerflibWebService(int update_every, usec_t dt);
 int do_PerflibMSSQL(int update_every, usec_t dt);
+int do_PerflibNetFramework(int update_every, usec_t dt);
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_TRAFFIC = 21000, // PRIO selected, because APPS is using 20YYY
