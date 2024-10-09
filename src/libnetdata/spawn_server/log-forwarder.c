@@ -9,7 +9,7 @@ typedef struct LOG_FORWARDER_ENTRY {
     pid_t pid;
     BUFFER *wb;
     size_t pfds_idx;
-    bool remove;
+    bool delete;
 
     struct LOG_FORWARDER_ENTRY *prev;
     struct LOG_FORWARDER_ENTRY *next;
@@ -24,6 +24,9 @@ typedef struct LOG_FORWARDER {
 } LOG_FORWARDER;
 
 static void *log_forwarder_thread_func(void *arg);
+
+// --------------------------------------------------------------------------------------------------------------------
+// helper functions
 
 static inline LOG_FORWARDER_ENTRY *log_forwarder_find_entry_unsafe(LOG_FORWARDER *lf, int fd) {
     for (LOG_FORWARDER_ENTRY *entry = lf->entries; entry; entry = entry->next) {
@@ -49,6 +52,9 @@ static inline void log_forwarder_wake_up_worker(LOG_FORWARDER *lf) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to write to notification pipe");
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// starting / stopping
+
 LOG_FORWARDER *log_forwarder_start(void) {
     LOG_FORWARDER *lf = callocz(1, sizeof(LOG_FORWARDER));
 
@@ -67,12 +73,20 @@ LOG_FORWARDER *log_forwarder_start(void) {
     return lf;
 }
 
+static inline void mark_all_entries_for_deletion_unsafe(LOG_FORWARDER *lf) {
+    for(LOG_FORWARDER_ENTRY *entry = lf->entries; entry ;entry = entry->next)
+        entry->delete = true;
+}
+
 void log_forwarder_stop(LOG_FORWARDER *lf) {
-    if (!lf) return;
+    if(!lf || !lf->running) return;
 
     // Signal the thread to stop
     spinlock_lock(&lf->spinlock);
     lf->running = false;
+
+    // mark them all for deletion
+    mark_all_entries_for_deletion_unsafe(lf);
 
     // Send a byte to the pipe to wake up the thread
     char ch = 0;
@@ -84,20 +98,21 @@ void log_forwarder_stop(LOG_FORWARDER *lf) {
     nd_thread_join(lf->thread);
     close(lf->pipe_fds[PIPE_READ]);
 
-    // Clean up
-    while (lf->entries)
-        log_forwarder_del_entry_unsafe(lf, lf->entries);
-
     freez(lf);
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// managing entries
+
 void log_forwarder_add_fd(LOG_FORWARDER *lf, int fd) {
+    if(!lf || !lf->running || fd < 0) return;
+
     LOG_FORWARDER_ENTRY *entry = callocz(1, sizeof(LOG_FORWARDER_ENTRY));
     entry->fd = fd;
     entry->cmd = NULL;
     entry->pid = 0;
     entry->pfds_idx = 0;
-    entry->remove = false;
+    entry->delete = false;
     entry->wb = buffer_create(0, NULL);
 
     spinlock_lock(&lf->spinlock);
@@ -112,13 +127,15 @@ void log_forwarder_add_fd(LOG_FORWARDER *lf, int fd) {
 }
 
 bool log_forwarder_del_and_close_fd(LOG_FORWARDER *lf, int fd) {
+    if(!lf || !lf->running || fd < 0) return false;
+
     bool ret = false;
 
     spinlock_lock(&lf->spinlock);
 
     LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, fd);
     if(entry) {
-        log_forwarder_del_entry_unsafe(lf, entry);
+        entry->delete = true;
 
         // Send a byte to the pipe to wake up the thread
         log_forwarder_wake_up_worker(lf);
@@ -132,6 +149,8 @@ bool log_forwarder_del_and_close_fd(LOG_FORWARDER *lf, int fd) {
 }
 
 void log_forwarder_annotate_fd_name(LOG_FORWARDER *lf, int fd, const char *cmd) {
+    if(!lf || !lf->running || fd < 0 || !cmd || !*cmd) return;
+
     spinlock_lock(&lf->spinlock);
 
     LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, fd);
@@ -144,6 +163,8 @@ void log_forwarder_annotate_fd_name(LOG_FORWARDER *lf, int fd, const char *cmd) 
 }
 
 void log_forwarder_annotate_fd_pid(LOG_FORWARDER *lf, int fd, pid_t pid) {
+    if(!lf || !lf->running || fd < 0) return;
+
     spinlock_lock(&lf->spinlock);
 
     LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, fd);
@@ -152,6 +173,9 @@ void log_forwarder_annotate_fd_pid(LOG_FORWARDER *lf, int fd, pid_t pid) {
 
     spinlock_unlock(&lf->spinlock);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// log forwarder thread
 
 static inline void log_forwarder_log(LOG_FORWARDER *lf __maybe_unused, LOG_FORWARDER_ENTRY *entry, const char *msg) {
     const char *s = msg;
@@ -168,22 +192,44 @@ static inline void log_forwarder_log(LOG_FORWARDER *lf __maybe_unused, LOG_FORWA
     nd_log(NDLS_COLLECTORS, NDLP_WARNING, "STDERR: %s", msg);
 }
 
+// returns the number of entries active
+static inline size_t log_forwarder_remove_deleted_unsafe(LOG_FORWARDER *lf) {
+    size_t entries = 0;
+
+    LOG_FORWARDER_ENTRY *entry = lf->entries;
+    while(entry) {
+        LOG_FORWARDER_ENTRY *next = entry->next;
+
+        if(entry->delete) {
+            if (buffer_strlen(entry->wb))
+                // there is something not logged in it - log it
+                log_forwarder_log(lf, entry, buffer_tostring(entry->wb));
+
+            log_forwarder_del_entry_unsafe(lf, entry);
+        }
+        else
+            entries++;
+
+        entry = next;
+    }
+
+    return entries;
+}
+
 static void *log_forwarder_thread_func(void *arg) {
     LOG_FORWARDER *lf = (LOG_FORWARDER *)arg;
 
     while (1) {
         spinlock_lock(&lf->spinlock);
         if (!lf->running) {
+            mark_all_entries_for_deletion_unsafe(lf);
+            log_forwarder_remove_deleted_unsafe(lf);
             spinlock_unlock(&lf->spinlock);
             break;
         }
 
         // Count the number of fds
-        size_t nfds = 1; // For the notification pipe
-
-        // count the entries
-        for(LOG_FORWARDER_ENTRY *entry = lf->entries; entry ; entry = entry->next)
-            nfds++;
+        size_t nfds = 1 + log_forwarder_remove_deleted_unsafe(lf);
 
         struct pollfd pfds[nfds];
 
@@ -237,7 +283,7 @@ static void *log_forwarder_thread_func(void *arg) {
                     wb->len += bytes_read;
                 else if(bytes_read == 0 || (bytes_read == -1 && errno != EINTR && errno != EAGAIN)) {
                     // EOF or error
-                    entry->remove = true;
+                    entry->delete = true;
                     to_remove++;
                 }
 
@@ -261,29 +307,15 @@ static void *log_forwarder_thread_func(void *arg) {
                 entry->pfds_idx = 0;
             }
 
-            if(to_remove) {
-                LOG_FORWARDER_ENTRY *entry = lf->entries;
-                while(entry) {
-                    LOG_FORWARDER_ENTRY *next = entry->next;
-                    if(entry->remove) {
-                        if (buffer_strlen(entry->wb))
-                            log_forwarder_log(lf, entry, buffer_tostring(entry->wb));
-
-                        log_forwarder_del_entry_unsafe(lf, entry);
-                    }
-                    entry = next;
-                }
-            }
-
             spinlock_unlock(&lf->spinlock);
-        } else if (ret == 0) {
+        }
+        else if (ret == 0) {
             // Timeout, nothing to do
             continue;
 
         }
-        else {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder poll() error: %s", strerror(errno));
-        }
+        else
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: poll() error");
     }
 
     return NULL;
