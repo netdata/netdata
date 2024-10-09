@@ -85,6 +85,9 @@ static bool add_to_registry(const wchar_t *logName, const wchar_t *sourceName) {
 static bool check_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, MESSAGE_ID messageID, DWORD event_code) {
     DWORD generated = construct_event_id(source, priority, messageID);
     if(generated != event_code) {
+        
+#ifdef NETDATA_INTERNAL_CHECKS
+        // this is just used for a break point, to see the values in hex
         char current[UINT64_HEX_MAX_LENGTH];
         print_uint64_hex(current, generated);
 
@@ -93,6 +96,8 @@ static bool check_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority
 
         const char *got = current;
         const char *good = wanted;
+        (void)got; (void)good;
+#endif
 
         return false;
     }
@@ -105,12 +110,13 @@ bool nd_log_wevents_init(void) {
         return true;
 
     // validate we have the right keys
-    if(!check_event_id(NDLS_COLLECTORS, NDLP_INFO, MSGID_MESSAGE_ONLY, COLLECTORS_INFO_MESSAGE_ONLY) ||
-       !check_event_id(NDLS_DAEMON, NDLP_ERR, MSGID_MESSAGE_ONLY, DAEMON_ERR_MESSAGE_ONLY) ||
-       !check_event_id(NDLS_ACCESS, NDLP_WARNING, MSGID_ACCESS_FORWARDER_USER, ACCESS_WARN_ACCESS_FORWARDER_USER) ||
-       !check_event_id(NDLS_HEALTH, NDLP_CRIT, MSGID_ALERT_TRANSITION, HEALTH_CRIT_ALERT_TRANSITION)) {
-        return false;
-    }
+    internal_fatal(
+            !check_event_id(NDLS_COLLECTORS, NDLP_INFO, MSGID_MESSAGE_ONLY, COLLECTORS_INFO_MESSAGE_ONLY) ||
+            !check_event_id(NDLS_DAEMON, NDLP_ERR, MSGID_MESSAGE_ONLY, DAEMON_ERR_MESSAGE_ONLY) ||
+            !check_event_id(NDLS_ACCESS, NDLP_WARNING, MSGID_ACCESS_USER, ACCESS_WARN_ACCESS_USER) ||
+            !check_event_id(NDLS_HEALTH, NDLP_CRIT, MSGID_ALERT_TRANSITION, HEALTH_CRIT_ALERT_TRANSITION) ||
+            !check_event_id(NDLS_DEBUG, NDLP_ALERT, MSGID_ACCESS_FORWARDER_USER, DEBUG_ALERT_ACCESS_FORWARDER_USER),
+       "The encoding of the event ids is wrong!");
 
     const wchar_t *logName = NETDATA_PROVIDER_NAME; // Custom log name "Netdata"
 
