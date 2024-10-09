@@ -14,6 +14,7 @@ const (
 	prioControllerHealthStatus = module.Priority + iota
 	prioControllerStatus
 	prioControllerBBUStatus
+	prioControllerROCTemperature
 
 	prioPhysDriveErrors
 	prioPhysDrivePredictiveFailures
@@ -31,6 +32,7 @@ var controllerMegaraidChartsTmpl = module.Charts{
 
 var controllerMpt3sasChartsTmpl = module.Charts{
 	controllerHealthStatusChartTmpl.Copy(),
+	controllerROCTemperatureChartTmpl.Copy(),
 }
 
 var (
@@ -74,6 +76,18 @@ var (
 			{ID: "cntrl_%s_bbu_status_healthy", Name: "healthy"},
 			{ID: "cntrl_%s_bbu_status_unhealthy", Name: "unhealthy"},
 			{ID: "cntrl_%s_bbu_status_na", Name: "na"},
+		},
+	}
+	controllerROCTemperatureChartTmpl = module.Chart{
+		ID:       "controller_%s_roc_temperature_celsius",
+		Title:    "Controller ROC Temperature Celsius",
+		Units:    "Celsius",
+		Fam:      "cntrl roc temperature",
+		Ctx:      "storcli.controller_roc_temperature_celsius",
+		Type:     module.Line,
+		Priority: prioControllerROCTemperature,
+		Dims: module.Dims{
+			{ID: "cntrl_%s_roc_temperature_celsius", Name: "temperature"},
 		},
 	}
 )
