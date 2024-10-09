@@ -4,7 +4,7 @@ Netdata offers a convenient Windows installer for easy setup. This executable pr
 
 > **Note**
 >
-> This feature is currently only available for Nightly releases, and the installer can be found in our [nightlies repo](https://github.com/netdata/netdata-nightlies)
+> This feature is currently under beta and only available for Nightly releases, and the installer can be found in our [nightlies repo](https://github.com/netdata/netdata-nightlies). A stable version will be released soon.
 
 ## Graphical User Interface (GUI)
 
@@ -62,8 +62,6 @@ Replace `<YOUR_TOKEN>` and `<YOUR_ROOM>` with your actual Netdata Cloud Space cl
 > **Note**
 >
 > The Windows version of Netdata is intended for users on paid plans.
->
-> The Windows installer is currently under beta. A stable version will be released soon.
 
 ## Uninstalling
 
