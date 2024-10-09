@@ -41,22 +41,21 @@ static DWORD complete_event_id(DWORD facility, DWORD severity, DWORD event_code)
 
 DWORD construct_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, MESSAGE_ID messageID) {
     DWORD event_code = construct_event_code(source, priority, messageID);
-    return complete_event_id(FACILITY_APPLICATION, get_severity_from_priority(priority), event_code);
+    return complete_event_id(FACILITY_NETDATA, get_severity_from_priority(priority), event_code);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-
-#define NETDATA_PROVIDER_NAME L"Netdata"
+// initialization
 
 // Define source names with "Netdata" prefix
 static const wchar_t *source_names[_NDLS_MAX] = {
-        NETDATA_PROVIDER_NAME L"_Unset",        // NDLS_UNSET (not used)
-        NETDATA_PROVIDER_NAME L"_Access",       // NDLS_ACCESS
-        NETDATA_PROVIDER_NAME L"_ACLK",         // NDLS_ACLK
-        NETDATA_PROVIDER_NAME L"_Collectors",   // NDLS_COLLECTORS
-        NETDATA_PROVIDER_NAME L"_Daemon",       // NDLS_DAEMON
-        NETDATA_PROVIDER_NAME L"_Health",       // NDLS_HEALTH
-        NETDATA_PROVIDER_NAME L"_Debug",        // NDLS_DEBUG
+        NETDATA_PROVIDER_WNAME L"_Unset",        // NDLS_UNSET (not used)
+        NETDATA_PROVIDER_WNAME L"_Access",       // NDLS_ACCESS
+        NETDATA_PROVIDER_WNAME L"_ACLK",         // NDLS_ACLK
+        NETDATA_PROVIDER_WNAME L"_Collectors",   // NDLS_COLLECTORS
+        NETDATA_PROVIDER_WNAME L"_Daemon",       // NDLS_DAEMON
+        NETDATA_PROVIDER_WNAME L"_Health",       // NDLS_HEALTH
+        NETDATA_PROVIDER_WNAME L"_Debug",        // NDLS_DEBUG
 };
 
 static bool add_to_registry(const wchar_t *logName, const wchar_t *sourceName) {
@@ -118,7 +117,7 @@ bool nd_log_wevents_init(void) {
             !check_event_id(NDLS_DEBUG, NDLP_ALERT, MSGID_ACCESS_FORWARDER_USER, DEBUG_ALERT_ACCESS_FORWARDER_USER),
        "The encoding of the event ids is wrong!");
 
-    const wchar_t *logName = NETDATA_PROVIDER_NAME; // Custom log name "Netdata"
+    const wchar_t *logName = NETDATA_PROVIDER_WNAME; // Custom log name "Netdata"
 
     // Loop through each source and add it to the registry
     for(size_t i = 0; i < _NDLS_MAX; i++) {
@@ -144,13 +143,54 @@ bool nd_log_wevents_init(void) {
     return true;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// we pass all our fields to the windows events logs
+// numbered the same way we have them in memory.
+//
+// to avoid runtime memory allocations, we use a static allocations with ready to use buffers
+// which are immediately available for logging.
+
+#define SMALL_WIDE_BUFFERS_SIZE 256
+#define MEDIUM_WIDE_BUFFERS_SIZE 2048
+#define BIG_WIDE_BUFFERS_SIZE 16384
+static wchar_t small_wide_buffers[_NDF_MAX][SMALL_WIDE_BUFFERS_SIZE];
+static wchar_t medium_wide_buffers[2][MEDIUM_WIDE_BUFFERS_SIZE];
+static wchar_t big_wide_buffers[2][BIG_WIDE_BUFFERS_SIZE];
+
+static struct {
+    size_t size;
+    wchar_t *buf;
+} fields_buffers[_NDF_MAX] = { 0 };
+
+static LPCWSTR messages[_NDF_MAX - 1];
+
+__attribute__((constructor)) void wevents_initialize_buffers(void) {
+    for(size_t i = 0; i < _NDF_MAX ;i++) {
+        fields_buffers[i].buf = small_wide_buffers[i];
+        fields_buffers[i].size = SMALL_WIDE_BUFFERS_SIZE;
+    }
+
+    fields_buffers[NDF_NIDL_INSTANCE].buf = medium_wide_buffers[0];
+    fields_buffers[NDF_NIDL_INSTANCE].size = MEDIUM_WIDE_BUFFERS_SIZE;
+
+    fields_buffers[NDF_REQUEST].buf = big_wide_buffers[0];
+    fields_buffers[NDF_REQUEST].size = BIG_WIDE_BUFFERS_SIZE;
+    fields_buffers[NDF_MESSAGE].buf = big_wide_buffers[1];
+    fields_buffers[NDF_MESSAGE].size = BIG_WIDE_BUFFERS_SIZE;
+
+    for(size_t i = 1; i < _NDF_MAX ;i++)
+        messages[i - 1] = fields_buffers[i].buf;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 #define is_field_set(fields, fields_max, field) ((field) < (fields_max) && (fields)[field].entry.set)
 
 static const char *get_field_value(struct log_field *fields, ND_LOG_FIELD_ID i, size_t fields_max, BUFFER **tmp) {
     if(!is_field_set(fields, fields_max, i) || !fields[i].wevents)
         return "";
 
-    static __thread char number_str[MAX(MAX(UINT64_MAX_LENGTH, DOUBLE_MAX_LENGTH), UUID_STR_LEN)];
+    static char number_str[MAX(MAX(UINT64_MAX_LENGTH, DOUBLE_MAX_LENGTH), UUID_STR_LEN)];
 
     const char *s = NULL;
     if (fields[i].annotator)
@@ -206,6 +246,83 @@ static const char *get_field_value(struct log_field *fields, ND_LOG_FIELD_ID i, 
     return s;
 }
 
+static void wevt_generate_all_fields_unsafe(struct log_field *fields, size_t fields_max) {
+    CLEAN_BUFFER *tmp = NULL;
+    char number_str[MAX(MAX(UINT64_MAX_LENGTH, DOUBLE_MAX_LENGTH), UUID_STR_LEN)];
+
+    for (size_t i = 0; i < fields_max; i++) {
+        fields_buffers[i].buf[0] = L'\0';
+
+        if (!fields[i].entry.set || !fields[i].wevents)
+            continue;
+
+        const char *s = NULL;
+        if (fields[i].annotator)
+            s = fields[i].annotator(&fields[i]);
+
+        else
+            switch (fields[i].entry.type) {
+                case NDFT_TXT:
+                    s = fields[i].entry.txt;
+                    break;
+                case NDFT_STR:
+                    s = string2str(fields[i].entry.str);
+                    break;
+                case NDFT_BFR:
+                    s = buffer_tostring(fields[i].entry.bfr);
+                    break;
+                case NDFT_U64:
+                    print_uint64(number_str, fields[i].entry.u64);
+                    s = number_str;
+                    break;
+                case NDFT_I64:
+                    print_int64(number_str, fields[i].entry.i64);
+                    s = number_str;
+                    break;
+                case NDFT_DBL:
+                    print_netdata_double(number_str, fields[i].entry.dbl);
+                    s = number_str;
+                    break;
+                case NDFT_UUID:
+                    if (!uuid_is_null(*fields[i].entry.uuid)) {
+                        uuid_unparse_lower(*fields[i].entry.uuid, number_str);
+                        s = number_str;
+                    }
+                    break;
+                case NDFT_CALLBACK:
+                    if (!tmp)
+                        tmp = buffer_create(1024, NULL);
+                    else
+                        buffer_flush(tmp);
+
+                    if (fields[i].entry.cb.formatter(tmp, fields[i].entry.cb.formatter_data))
+                        s = buffer_tostring(tmp);
+                    else
+                        s = NULL;
+                    break;
+
+                default:
+                    s = "UNHANDLED";
+                    break;
+            }
+
+        if (s && *s)
+            utf8_to_utf16(fields_buffers[i].buf, (int) fields_buffers[i].size, s, -1);
+    }
+}
+
+static bool has_user_role_permissions(struct log_field *fields, size_t fields_max, BUFFER **tmp) {
+    if(is_field_set(fields, fields_max, NDF_USER_NAME)) return true;
+    if(is_field_set(fields, fields_max, NDF_USER_ACCESS)) return true;
+
+    if(is_field_set(fields, fields_max, NDF_USER_ACCESS)) {
+        const char *t = get_field_value(fields, NDF_USER_ROLE, fields_max, tmp);
+        if (*t && strcmp(t, "none") != 0) return true;
+    }
+
+    return false;
+}
+
 bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
     if(!nd_log.wevents.initialized || !source->hEventLog)
         return false;
@@ -217,125 +334,66 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
     DWORD wType = get_event_type_from_priority(priority);
     MESSAGE_ID messageID = MSGID_MESSAGE_ONLY;
 
-    CLEAN_BUFFER *wb = buffer_create(4096, NULL);
     CLEAN_BUFFER *tmp = NULL;
-    const char *t;
 
-    buffer_strcat(wb, get_field_value(fields, NDF_SYSLOG_IDENTIFIER, fields_max, &tmp));
-    buffer_strcat(wb, "(");
-    buffer_strcat(wb, get_field_value(fields, NDF_TID, fields_max, &tmp));
-    if(*(t = get_field_value(fields, NDF_THREAD_TAG, fields_max, &tmp))) {
-        buffer_strcat(wb, ", ");
-        buffer_strcat(wb, t);
-    }
-    buffer_strcat(wb, "): ");
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    spinlock_lock(&spinlock);
+    wevt_generate_all_fields_unsafe(fields, fields_max);
 
     switch(source->source) {
         default:
         case NDLS_DEBUG:
             messageID = MSGID_MESSAGE_ONLY;
-            buffer_strcat(wb, get_field_value(fields, NDF_MESSAGE, fields_max, &tmp));
             break;
 
         case NDLS_DAEMON:
             messageID = MSGID_MESSAGE_ONLY;
-            buffer_strcat(wb, get_field_value(fields, NDF_MESSAGE, fields_max, &tmp));
             break;
 
         case NDLS_COLLECTORS:
             messageID = MSGID_MESSAGE_ONLY;
-            buffer_strcat(wb, get_field_value(fields, NDF_MESSAGE, fields_max, &tmp));
             break;
 
         case NDLS_HEALTH:
             messageID = MSGID_ALERT_TRANSITION;
-            buffer_strcat(wb, "Alert '");
-            buffer_strcat(wb, get_field_value(fields, NDF_ALERT_NAME, fields_max, &tmp));
-            buffer_strcat(wb, "' of instance '");
-            buffer_strcat(wb, get_field_value(fields, NDF_NIDL_INSTANCE, fields_max, &tmp));
-            buffer_strcat(wb, "'\r\n  Node: '");
-            buffer_strcat(wb, get_field_value(fields, NDF_NIDL_NODE, fields_max, &tmp));
-            buffer_strcat(wb, "'\r\n  Transitioned from ");
-            buffer_strcat(wb, get_field_value(fields, NDF_ALERT_STATUS_OLD, fields_max, &tmp));
-            buffer_strcat(wb, " to ");
-            buffer_strcat(wb, get_field_value(fields, NDF_ALERT_STATUS, fields_max, &tmp));
             break;
 
         case NDLS_ACCESS:
             if(is_field_set(fields, fields_max, NDF_MESSAGE)) {
-                messageID = MSGID_MESSAGE_ONLY;
-                buffer_strcat(wb, get_field_value(fields, NDF_MESSAGE, fields_max, &tmp));
+                messageID = MSGID_ACCESS_MESSAGE;
+
+                if(has_user_role_permissions(fields, fields_max, &tmp))
+                    messageID = MSGID_ACCESS_MESSAGE_USER;
             }
             else if(is_field_set(fields, fields_max, NDF_RESPONSE_CODE)) {
                 messageID = MSGID_ACCESS;
-                buffer_strcat(wb, "Transaction ");
-                buffer_strcat(wb, get_field_value(fields, NDF_TRANSACTION_ID, fields_max, &tmp));
-                buffer_strcat(wb, ", Response Code: ");
-                buffer_strcat(wb, get_field_value(fields, NDF_RESPONSE_CODE, fields_max, &tmp));
-                buffer_strcat(wb, "\r\n\r\n  Request: ");
-                buffer_strcat(wb, get_field_value(fields, NDF_REQUEST_METHOD, fields_max, &tmp));
-                buffer_strcat(wb, " ");
-                buffer_strcat(wb, get_field_value(fields, NDF_REQUEST, fields_max, &tmp));
-                buffer_strcat(wb, "\r\n\r\n  From: ");
-                buffer_strcat(wb, get_field_value(fields, NDF_SRC_IP, fields_max, &tmp));
-                if(*(t = get_field_value(fields, NDF_SRC_FORWARDED_FOR, fields_max, &tmp))) {
+
+                if(*get_field_value(fields, NDF_SRC_FORWARDED_FOR, fields_max, &tmp))
                     messageID = MSGID_ACCESS_FORWARDER;
-                    buffer_strcat(wb, ", for: ");
-                    buffer_strcat(wb, t);
-                }
-                if(is_field_set(fields, fields_max, NDF_USER_NAME) || is_field_set(fields, fields_max, NDF_USER_ROLE)) {
+
+                if(has_user_role_permissions(fields, fields_max, &tmp)) {
                     if(messageID == MSGID_ACCESS)
                         messageID = MSGID_ACCESS_USER;
                     else
                         messageID = MSGID_ACCESS_FORWARDER_USER;
-                    buffer_strcat(wb, "\r\n  User: ");
-                    buffer_strcat(wb, get_field_value(fields, NDF_USER_NAME, fields_max, &tmp));
-                    buffer_strcat(wb, ", role: ");
-                    buffer_strcat(wb, get_field_value(fields, NDF_USER_ROLE, fields_max, &tmp));
-                    buffer_strcat(wb, ", permissions: ");
-                    buffer_strcat(wb, get_field_value(fields, NDF_USER_ACCESS, fields_max, &tmp));
                 }
             }
-            else {
+            else
                 messageID = MSGID_REQUEST_ONLY;
-                buffer_strcat(wb, get_field_value(fields, NDF_REQUEST, fields_max, &tmp));
-            }
             break;
 
         case NDLS_ACLK:
             messageID = MSGID_MESSAGE_ONLY;
-            buffer_strcat(wb, get_field_value(fields, NDF_MESSAGE, fields_max, &tmp));
             break;
     }
+
+    if(messageID == MSGID_MESSAGE_ONLY && (
+        *get_field_value(fields, NDF_ERRNO, fields_max, &tmp) ||
+        *get_field_value(fields, NDF_WINERROR, fields_max, &tmp))) {
+        messageID = MSGID_MESSAGE_ERRNO;
+    }
+
     DWORD eventID = construct_event_id(source->source, priority, messageID);
-
-    buffer_strcat(wb, "\r\n");
-
-    if(*(t = get_field_value(fields, NDF_ERRNO, fields_max, &tmp))) {
-        buffer_strcat(wb, "\r\n   unix errno: ");
-        buffer_strcat(wb, t);
-    }
-
-    if(*(t = get_field_value(fields, NDF_WINERROR, fields_max, &tmp))) {
-        buffer_strcat(wb, "\r\n   Windows Error: ");
-        buffer_strcat(wb, t);
-    }
-
-    static __thread wchar_t msg[4096];
-//    static __thread wchar_t all[4096];
-    utf8_to_utf16(msg, _countof(msg), buffer_tostring(wb), buffer_strlen(wb));
-
-//    buffer_flush(wb);
-//    for(size_t i = 1; i < fields_max ; i++) {
-//        if(!is_field_set(fields, fields_max, i) || !fields[i].wevents)
-//            continue;
-//
-//        t = get_field_value(fields, i, fields_max, &tmp);
-//        if(*t) buffer_sprintf(wb, "\r\n  %s: %s", fields[i].wevents, t);
-//    }
-//    utf8_to_utf16(all, _countof(all), buffer_tostring(wb), buffer_strlen(wb));
-//    LPCWSTR messages[2] = { msg, all };
-
 
     // wType
     //
@@ -349,8 +407,10 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
     // without a manifest => numeric Task values appear
     // with a manifest    => Task from the manifest is used (wCategory ignored)
 
-    LPCWSTR messages[1] = { msg };
-    BOOL rc = ReportEventW(source->hEventLog, wType, 0, eventID, NULL, 1, 0, messages, NULL);
+    BOOL rc = ReportEventW(source->hEventLog, wType, 0, eventID, NULL, _NDF_MAX - 1, 0, messages, NULL);
+
+    spinlock_unlock(&spinlock);
+
     return rc == TRUE;
 }
 

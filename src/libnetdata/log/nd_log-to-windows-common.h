@@ -3,6 +3,9 @@
 #ifndef NETDATA_ND_LOG_TO_WINDOWS_COMMON_H
 #define NETDATA_ND_LOG_TO_WINDOWS_COMMON_H
 
+#define NETDATA_PROVIDER_WNAME L"Netdata"
+#define NETDATA_PROVIDER_NAME "Netdata"
+
 // Define shift values
 #define EVENT_ID_SEV_SHIFT          30
 #define EVENT_ID_C_SHIFT            29
@@ -25,12 +28,15 @@
 
 typedef enum __attribute__((packed)) {
     MSGID_MESSAGE_ONLY = 1,
+    MSGID_MESSAGE_ERRNO,
     MSGID_REQUEST_ONLY,
     MSGID_ALERT_TRANSITION,
     MSGID_ACCESS,
     MSGID_ACCESS_FORWARDER,
     MSGID_ACCESS_USER,
     MSGID_ACCESS_FORWARDER_USER,
+    MSGID_ACCESS_MESSAGE,
+    MSGID_ACCESS_MESSAGE_USER,
 
     // terminator
     _MSGID_MAX,
