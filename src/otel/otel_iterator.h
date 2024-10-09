@@ -1,7 +1,12 @@
 #ifndef NETDATA_OTEL_ITERATOR_H
 #define NETDATA_OTEL_ITERATOR_H
 
+#include "libnetdata/blake3/blake3.h"
 #include "otel_utils.h"
+
+#include "otel_config.h"
+#include "fmt_utils.h"
+#include "otel_hash.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -42,14 +47,31 @@ public:
     {
     }
 
+    inline DataPointKind kind() const
+    {
+        return DpKind;
+    }
+
+    inline const pb::NumberDataPoint *ndp() const
+    {
+        assert(DpKind == DataPointKind::Number || DpKind == DataPointKind::Sum);
+        return NDP;
+    }
+
+    inline const pb::SummaryDataPoint *sdp() const
+    {
+        assert(DpKind == DataPointKind::Summary);
+        return SDP;
+    }
+
     inline absl::StatusOr<const pb::AnyValue *> attribute(const std::string *Key) const
     {
-        auto KVA = getAttrs();
-        if (!KVA.ok()) {
-            return KVA.status();
+        const KeyValueArray *KVA = getAttrs();
+        if (!KVA) {
+            return absl::NotFoundError("DataPoint has no attributes");
         }
 
-        for (const auto &KV : *KVA.value()) {
+        for (const auto &KV : *KVA) {
             if (KV.key() != *Key)
                 continue;
 
@@ -59,9 +81,7 @@ public:
             return &KV.value();
         }
 
-        std::stringstream SS;
-        SS << "Datapoint key not found: '" << Key->c_str() << "'";
-        return absl::NotFoundError(SS.str());
+        return absl::NotFoundError(absl::StrFormat("data point %s key not found", Key->c_str()));
     }
 
     uint64_t time() const
@@ -102,27 +122,20 @@ public:
 
     friend inline bool operator==(const DataPoint &LHS, const DataPoint &RHS)
     {
-        if (LHS.DpKind == RHS.DpKind) {
-            switch (LHS.DpKind) {
-                case DataPointKind::Number:
-                case DataPointKind::Sum:
-                    return LHS.NDP == RHS.NDP;
-                case DataPointKind::Summary:
-                    return LHS.SDP == RHS.SDP;
-                case DataPointKind::Histogram:
-                    return LHS.HDP == RHS.HDP;
-                case DataPointKind::Exponential:
-                    return LHS.EHDP == RHS.EHDP;
-                default:
-                    return false;
-            }
-        }
-
-        return false;
+        return LHS.time() == RHS.time() && LHS.getAttrs() == RHS.getAttrs();
     }
 
-private:
-    const absl::StatusOr<const KeyValueArray *> getAttrs() const
+    friend inline bool operator<(const DataPoint &LHS, const DataPoint &RHS)
+    {
+        if (LHS.time() != RHS.time()) {
+            return LHS.time() < RHS.time();
+        }
+
+        // FIXME: we should perform a value-based comparison
+        return LHS.getAttrs() < RHS.getAttrs();
+    }
+
+    absl::Nullable<const KeyValueArray *> getAttrs() const
     {
         switch (DpKind) {
             case DataPointKind::Number:
@@ -135,7 +148,7 @@ private:
             case DataPointKind::Exponential:
                 return &EHDP->attributes();
             default:
-                return absl::InvalidArgumentError("Uknown data point kind");
+                return nullptr;
         }
     }
 
@@ -150,17 +163,58 @@ private:
     };
 };
 
+template <> struct fmt::formatter<DataPoint> {
+    constexpr auto parse(format_parse_context &Ctx) -> decltype(Ctx.begin())
+    {
+        return Ctx.end();
+    }
+
+    template <typename FormatContext> auto format(const DataPoint &DP, FormatContext &Ctx) const -> decltype(Ctx.out())
+    {
+        switch (DP.kind()) {
+            case DataPointKind::Number:
+            case DataPointKind::Sum:
+                return fmt::format_to(Ctx.out(), "{}", *DP.ndp());
+            default:
+                return fmt::format_to(Ctx.out(), "<unknown-dp>");
+        }
+    }
+};
+
 struct OtelElement {
     const pb::ResourceMetrics *RM;
     const pb::ScopeMetrics *SM;
     const pb::Metric *M;
     DataPoint DP;
 
-    OtelElement() : RM(nullptr), SM(nullptr), M(nullptr), DP()
+    absl::Nullable<const std::string *> DimAttr;
+    absl::Nullable<const std::vector<std::string> *> InstanceAttrs;
+
+    OtelElement() : RM(nullptr), SM(nullptr), M(nullptr), DP(), DimAttr(nullptr), InstanceAttrs(nullptr)
     {
     }
 
 public:
+    const absl::StatusOr<const std::string *> name() const {
+        static std::string DefaultName = "value";
+
+        if (!DimAttr) {
+            return &DefaultName;
+        }
+
+        auto Res = DP.attribute(DimAttr);
+        if (!Res.ok()) {
+            return Res.status();
+        }
+
+        const pb::AnyValue *AV = *Res;
+        if (!AV->has_string_value()) {
+            return absl::InvalidArgumentError(absl::StrFormat("data point %s key contains a non-string value", *DimAttr));
+        }
+
+        return &AV->string_value();
+    }
+
     inline uint64_t time() const
     {
         return DP.time();
@@ -171,7 +225,8 @@ public:
         return DP.value(multiplier);
     }
 
-    inline bool monotonic() const {
+    inline bool monotonic() const
+    {
         if (!M->has_sum())
             return false;
 
@@ -180,7 +235,89 @@ public:
 
     friend inline bool operator==(const OtelElement &LHS, const OtelElement &RHS)
     {
-        return LHS.DP == RHS.DP;
+        return LHS.RM == RHS.RM && LHS.SM == RHS.SM && LHS.M == RHS.M && LHS.DP == RHS.DP;
+    }
+
+    friend inline bool operator<(const OtelElement &LHS, const OtelElement &RHS)
+    {
+        if (LHS.RM != RHS.RM) {
+            return std::less<const pb::ResourceMetrics *>()(LHS.RM, RHS.RM);
+        }
+
+        if (LHS.SM != RHS.SM) {
+            return std::less<const pb::ScopeMetrics *>()(LHS.SM, RHS.SM);
+        }
+
+        if (LHS.M != RHS.M) {
+            return std::less<const pb::Metric *>()(LHS.M, RHS.M);
+        }
+
+        return LHS.DP < RHS.DP;
+    }
+
+    BlakeId chartHash() const
+    {
+        blake3_hasher H;
+        blake3_hasher_init(&H);
+
+        if (RM->has_resource()) {
+            otel::hashResource(H, RM->resource());
+        }
+
+        if (SM->has_scope()) {
+            otel::hashInstrumentationScope(H, SM->scope());
+        }
+
+        otel::hashMetric(H, *M);
+
+        // Hash all the data point attributes except for the one used for the
+        // dimension name
+        if (auto *Attrs = DP.getAttrs()) {
+            for (const auto &KV : *Attrs) {
+                if (!DimAttr || KV.key() != *DimAttr) {
+                    otel::hashKeyValue(H, KV);
+                }
+            }
+        }
+
+        BlakeId BID;
+        blake3_hasher_finalize(&H, BID.data(), BID.size());
+        return BID;
+    }
+};
+
+template <> struct fmt::formatter<OtelElement> {
+    constexpr auto parse(format_parse_context &Ctx) -> decltype(Ctx.begin())
+    {
+        return Ctx.end();
+    }
+
+    template <typename FormatContext>
+    auto format(const OtelElement &OE, FormatContext &Ctx) const -> decltype(Ctx.out())
+    {
+        fmt::format_to(Ctx.out(), "OtelElement{{");
+
+        if (OE.RM->has_resource()) {
+            fmt::format_to(Ctx.out(), "resource: {}", OE.RM->resource());
+        }
+
+        if (!OE.RM->schema_url().empty()) {
+            fmt::format_to(Ctx.out(), ", resource_url: {}", OE.RM->schema_url());
+        }
+
+        if (OE.SM->has_scope()) {
+            fmt::format_to(Ctx.out(), ", instrumentation_scope: {}", OE.SM->scope());
+        }
+
+        if (!OE.SM->schema_url().empty()) {
+            fmt::format_to(Ctx.out(), ", scope_url: {}", OE.SM->schema_url());
+        }
+
+        fmt::format_to(Ctx.out(), ", name: {}", OE.M->name());
+        fmt::format_to(Ctx.out(), ", description: {}", OE.M->description());
+        fmt::format_to(Ctx.out(), ", point: {}", OE.DP);
+
+        return Ctx.out();
     }
 };
 
@@ -220,8 +357,8 @@ class OtelData {
         using reference = OtelElement &;
 
     public:
-        explicit Iterator(const pb::RepeatedPtrField<pb::ResourceMetrics> *RPF)
-            : DPKind(DataPointKind::NotAvailable), End(true)
+        explicit Iterator(otel::Config *Cfg, const pb::RepeatedPtrField<pb::ResourceMetrics> *RPF)
+            : Cfg(Cfg), DPKind(DataPointKind::NotAvailable), End(true)
         {
             if (RPF) {
                 RMIt = RPF->begin();
@@ -374,6 +511,15 @@ class OtelData {
                 }
             }
 
+            const auto *MetricCfg = Cfg->getMetric(OE.SM->scope().name(), OE.M->name());
+            if (MetricCfg) {
+                OE.DimAttr = MetricCfg->getDimensionsAttribute();
+                OE.InstanceAttrs = MetricCfg->getInstanceAttributes();
+            } else {
+                OE.DimAttr = nullptr;
+                OE.InstanceAttrs = nullptr;
+            }
+
             advanceIterators();
             return OE;
         }
@@ -492,6 +638,7 @@ class OtelData {
         }
 
     private:
+        otel::Config *Cfg;
         ResourceMetricsIterator RMIt, RMEnd;
         ScopeMetricsIterator SMIt, SMEnd;
         MetricsIterator MIt, MEnd;
@@ -504,21 +651,22 @@ class OtelData {
     };
 
 public:
-    OtelData(const pb::RepeatedPtrField<pb::ResourceMetrics> *RPF) : RPF(RPF)
+    OtelData(otel::Config *Cfg, const pb::RepeatedPtrField<pb::ResourceMetrics> *RPF) : Cfg(Cfg), RPF(RPF)
     {
     }
 
     inline Iterator begin()
     {
-        return Iterator(RPF);
+        return Iterator(Cfg, RPF);
     }
 
     inline Iterator end() const
     {
-        return Iterator(nullptr);
+        return Iterator(Cfg, nullptr);
     }
 
 private:
+    otel::Config *Cfg;
     const pb::RepeatedPtrField<pb::ResourceMetrics> *RPF;
 };
 

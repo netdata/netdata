@@ -3,6 +3,7 @@
 #ifndef ND_OTEL_CONFIG_H
 #define ND_OTEL_CONFIG_H
 
+#include "absl/base/nullability.h"
 #include "libnetdata/libnetdata.h"
 
 #include "yaml-cpp/exceptions.h"
@@ -54,12 +55,16 @@ private:
     }
 
 public:
-    const std::string *getDimensionsAttribute() const
+    absl::Nullable<const std::string *> getDimensionsAttribute() const
     {
+        if (DimensionsAttribute.empty()) {
+            return nullptr;
+        }
+
         return &DimensionsAttribute;
     }
 
-    const std::vector<std::string> *getInstanceAttributes() const
+    absl::Nonnull<const std::vector<std::string> *> getInstanceAttributes() const
     {
         return &InstanceAttributes;
     }
@@ -105,7 +110,7 @@ private:
     }
 
 public:
-    const MetricConfig *getMetric(const std::string &Name) const
+    absl::Nullable<const MetricConfig *> getMetric(const std::string &Name) const
     {
         auto It = Metrics.find(Name);
         return (It != Metrics.end()) ? &(It->second) : nullptr;
@@ -134,12 +139,15 @@ public:
                     return ScopeCfg.status();
                 }
 
+                std::cout << "Adding scope config for key: " << Key << "\n";
+
                 Patterns.emplace(SP, *ScopeCfg);
                 Scopes.emplace(Key, *ScopeCfg);
             }
 
             return new Config(Path, Patterns, Scopes);
         } catch (YAML::Exception &E) {
+            abort();
             std::stringstream SS;
 
             SS << "Failed to load " << Path;
@@ -166,7 +174,7 @@ private:
     }
 
 public:
-    const ScopeConfig *getScope(const std::string &Name) const
+    absl::Nullable<const ScopeConfig *> getScope(const std::string &Name) const
     {
         auto It = Scopes.find(Name);
         if (It != Scopes.end())
@@ -175,7 +183,7 @@ public:
         return getScopeFromPatterns(Name);
     }
 
-    const MetricConfig *getMetric(const std::string &ScopeName, const std::string &MetricName) const
+    absl::Nullable<const MetricConfig *> getMetric(const std::string &ScopeName, const std::string &MetricName) const
     {
         const ScopeConfig *S = getScope(ScopeName);
         if (!S)
@@ -184,7 +192,7 @@ public:
         return S->getMetric(MetricName);
     }
 
-    const std::string *getDimensionsAttribute(const std::string &ScopeName, const std::string &MetricName) const
+    absl::Nullable<const std::string *> getDimensionsAttribute(const std::string &ScopeName, const std::string &MetricName) const
     {
         const MetricConfig *M = getMetric(ScopeName, MetricName);
         if (!M)
@@ -193,7 +201,7 @@ public:
         return M->getDimensionsAttribute();
     }
 
-    const std::vector<std::string> *
+    absl::Nullable<const std::vector<std::string> *>
     getInstanceAttribute(const std::string &ScopeName, const std::string &MetricName) const
     {
         const MetricConfig *M = getMetric(ScopeName, MetricName);
@@ -210,7 +218,7 @@ public:
     }
 
 private:
-    const ScopeConfig *getScopeFromPatterns(const std::string &Name) const
+    absl::Nullable<const ScopeConfig *> getScopeFromPatterns(const std::string &Name) const
     {
         for (const auto &P : Patterns) {
             SIMPLE_PATTERN *SP = P.first;

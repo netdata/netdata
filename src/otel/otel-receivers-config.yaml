@@ -98,4 +98,3 @@ scopes:
 
       system.filesystem.utilization:
         instance_attributes: [mountpoint]
-        dimensions_attribute: state

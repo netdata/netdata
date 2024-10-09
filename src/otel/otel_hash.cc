@@ -86,3 +86,89 @@ const std::string &otel::MetricHasher::hash(const pb::Metric &M)
 
     return MetricId;
 }
+
+void otel::hashAnyValue(blake3_hasher &H, const pb::AnyValue &AV)
+{
+    switch (AV.value_case()) {
+        case pb::AnyValue::kStringValue: {
+            blake3_hasher_update(&H, AV.string_value().data(), AV.string_value().size());
+            break;
+        }
+        case pb::AnyValue::kBoolValue: {
+            char V = AV.bool_value();
+            blake3_hasher_update(&H, &V, sizeof(V));
+            break;
+        }
+        case pb::AnyValue::kIntValue: {
+            int64_t V = AV.int_value();
+            blake3_hasher_update(&H, &V, sizeof(V));
+            break;
+        }
+        case pb::AnyValue::kDoubleValue: {
+            double V = AV.double_value();
+            blake3_hasher_update(&H, &V, sizeof(V));
+            break;
+        }
+        case pb::AnyValue::kBytesValue: {
+            blake3_hasher_update(&H, AV.bytes_value().data(), AV.bytes_value().size());
+            break;
+        }
+        case pb::AnyValue::kArrayValue: {
+            for (const auto &V : AV.array_value().values()) {
+                hashAnyValue(H, V);
+            }
+            break;
+        }
+        case pb::AnyValue::kKvlistValue: {
+            hashKeyValues(H, AV.kvlist_value().values());
+            break;
+        }
+        case pb::AnyValue::VALUE_NOT_SET: {
+            break;
+        }
+    }
+}
+
+void otel::hashKeyValue(blake3_hasher &H, const pb::KeyValue &KV)
+{
+    blake3_hasher_update(&H, KV.key().data(), KV.key().size());
+
+}
+
+void otel::hashKeyValues(
+    blake3_hasher &H,
+    const pb::RepeatedPtrField<pb::KeyValue> &KVs)
+{
+    for (const auto &KV : KVs)
+    {
+        blake3_hasher_update(&H, KV.key().data(), KV.key().size());
+
+        hashAnyValue(H, KV.value());
+    }
+}
+
+void otel::hashResource(
+    blake3_hasher &H,
+    const pb::Resource &R)
+{
+    hashKeyValues(H, R.attributes());
+}
+
+void otel::hashInstrumentationScope(
+    blake3_hasher &H,
+    const pb::InstrumentationScope &IS)
+{
+    blake3_hasher_update(&H, IS.name().data(), IS.name().size());
+    blake3_hasher_update(&H, IS.version().data(), IS.version().size());
+    hashKeyValues(H, IS.attributes());
+}
+
+void otel::hashMetric(
+    blake3_hasher &H,
+    const pb::Metric &M)
+{
+    blake3_hasher_update(&H, M.name().data(), M.name().size());
+    blake3_hasher_update(&H, M.unit().data(), M.unit().size());
+    blake3_hasher_update(&H, M.description().data(), M.description().size());
+}
+

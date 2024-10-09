@@ -126,7 +126,7 @@ template <> struct fmt::formatter<pb::InstrumentationScope> {
     template <typename FormatContext>
     auto format(const pb::InstrumentationScope &IS, FormatContext &Ctx) const -> decltype(Ctx.out())
     {
-        fmt::format_to(Ctx.out(), "InstrumentationScope{{name: {}, version: {}", IS.name(), IS.version());
+        fmt::format_to(Ctx.out(), "{{name: {}, version: {}", IS.name(), IS.version());
 
         if (IS.attributes_size() > 0) {
             fmt::format_to(Ctx.out(), ", attributes: {}", IS.attributes());
@@ -149,7 +149,7 @@ template <> struct fmt::formatter<pb::Resource> {
     template <typename FormatContext>
     auto format(const pb::Resource &Res, FormatContext &Ctx) const -> decltype(Ctx.out())
     {
-        fmt::format_to(Ctx.out(), "Resource{{");
+        fmt::format_to(Ctx.out(), "{{");
 
         if (Res.attributes_size() > 0) {
             fmt::format_to(Ctx.out(), "attributes: {}", Res.attributes());
@@ -346,7 +346,8 @@ template <> struct fmt::formatter<pb::Metric> {
 
     template <typename FormatContext> auto format(const pb::Metric &M, FormatContext &Ctx) const -> decltype(Ctx.out())
     {
-        fmt::format_to(Ctx.out(), "Metric{{name: {}, description: {}, unit: {}", M.name(), M.description(), M.unit());
+        fmt::format_to(
+            Ctx.out(), "Metric{{name: {}, description: \"{}\", unit: {}", M.name(), M.description(), M.unit());
 
         switch (M.data_case()) {
             case opentelemetry::proto::metrics::v1::Metric::kGauge:
@@ -374,6 +375,22 @@ template <> struct fmt::formatter<pb::Metric> {
         }
 
         return fmt::format_to(Ctx.out(), "}}");
+    }
+};
+
+template <> struct fmt::formatter<absl::Span<uint8_t> > {
+    constexpr auto parse(format_parse_context &Ctx) -> decltype(Ctx.begin())
+    {
+        return Ctx.end();
+    }
+
+    template <typename FormatContext>
+    auto format(const absl::Span<uint8_t> &S, FormatContext &Ctx) const -> decltype(Ctx.out())
+    {
+        for (const auto &Byte : S) {
+            format_to(Ctx.out(), "{:02x}", Byte);
+        }
+        return Ctx.out();
     }
 };
 

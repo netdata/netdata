@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
 #include "google/protobuf/arena.h"
 
 #include "fmt_utils.h"
+#include "libnetdata/blake3/blake3.h"
 #include "otel_utils.h"
 #include "otel_config.h"
 #include "otel_iterator.h"
+#include "otel_hash.h"
 
 #include "libnetdata/required_dummies.h"
 
@@ -18,6 +22,10 @@
 
 using grpc::Server;
 using grpc::Status;
+
+#include <google/protobuf/repeated_field.h>
+#include <opentelemetry/proto/common/v1/common.pb.h>
+#include <string>
 
 static google::protobuf::ArenaOptions ArenaOpts = {
     .start_block_size = 16 * 1024 * 1024,
@@ -32,12 +40,64 @@ static void printClientMetadata(const grpc::ServerContext *context)
     }
 }
 
+struct Sample {
+    time_t TimePoint;
+    uint64_t Value;
+};
+
+struct Dimension {
+    std::string Name;
+    std::vector<Sample> Samples;
+};
+
+class Chart {
+public:
+    void initialize(BlakeId &BID, const pb::ResourceMetrics *RM, const pb::ScopeMetrics *SM, const pb::Metric *M)
+    {
+        UNUSED(RM);
+        UNUSED(SM);
+
+        this->BID = BID;
+        Name = M->name();
+
+        Committed = false;
+    }
+
+    inline void add(const OtelElement &OE)
+    {
+        absl::string_view DimName = "value";
+        if (auto Result = OE.name(); Result.ok()) {
+            DimName = *Result.value();
+        }
+
+        auto [It, Emplaced] = Dimensions.try_emplace({DimName.data()});
+        auto &ND = It->second;
+
+        if (Emplaced) {
+            Committed = false;
+            ND.Name = DimName.data();
+        }
+
+        // Add to sample
+        //
+    }
+
+private:
+    BlakeId BID;
+    std::string Name;
+    absl::flat_hash_map<std::string, Dimension> Dimensions;
+
+    std::optional<uint32_t> UpdateEvery;
+    std::optional<uint32_t> CurrentSlot;
+    bool Committed;
+};
+
 class MetricsServiceImpl final : public opentelemetry::proto::collector::metrics::v1::MetricsService::Service {
     using ExportMetricsServiceRequest = opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
     using ExportMetricsServiceResponse = opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse;
 
 public:
-    MetricsServiceImpl(otel::Config *Cfg) : Cfg(Cfg), Arena(ArenaOpts)
+    MetricsServiceImpl(otel::Config *Cfg) : Cfg(Cfg), Arena(ArenaOpts), Counter(0)
     {
     }
 
@@ -50,21 +110,36 @@ public:
         (void)Response;
 
         fmt::println(
-            "Received {} resource metrics ({} KiB)", Request->resource_metrics_size(), Request->ByteSizeLong() / 1024);
+            "{} Received {} resource metrics ({} KiB)",
+            Counter++,
+            Request->resource_metrics_size(),
+            Request->ByteSizeLong() / 1024);
 
-        OtelData OD(&Request->resource_metrics());
+        OtelData OD(Cfg, &Request->resource_metrics());
+        std::vector<OtelElement> Elements(OD.begin(), OD.end());
+        std::sort(Elements.begin(), Elements.end());
 
-        for (const OtelElement &OE : OD) {
-            std::cout << "Name: " << OE.M->name() << "\n";
+        for (const OtelElement &OE : Elements) {
+            BlakeId BID = OE.chartHash();
+
+            auto [It, Emplaced] = PendingCharts.try_emplace(BID);
+            auto &NC = It->second;
+
+            if (Emplaced) {
+                NC.initialize(BID, OE.RM, OE.SM, OE.M);
+            }
+
+            NC.add(OE);
         }
 
-        fmt::println("");
         return Status::OK;
     }
 
 private:
     otel::Config *Cfg;
     pb::Arena Arena;
+    size_t Counter;
+    absl::flat_hash_map<BlakeId, Chart> PendingCharts;
 };
 
 static void RunServer(otel::Config *Cfg)
@@ -81,12 +156,12 @@ static void RunServer(otel::Config *Cfg)
     Srv->Wait();
 }
 
-#if 0
+#if 1
 int main(int argc, char **argv)
 {
     CLI::App App{"OTEL plugin"};
 
-    std::string Path;
+    std::string Path = "/home/vk/repos/nd/otel/src/otel/otel-receivers-config.yaml";
     App.add_option("--config", Path, "Path to the receivers configuration file");
 
     CLI11_PARSE(App, argc, argv);

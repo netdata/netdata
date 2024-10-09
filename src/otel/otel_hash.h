@@ -7,6 +7,8 @@
 
 #include "libnetdata/blake3/blake3.h"
 
+using BlakeId = std::array<uint8_t, BLAKE3_OUT_LEN / 2>;
+
 namespace otel
 {
 
@@ -54,6 +56,13 @@ private:
     blake3_hasher BH;
     std::string MetricId;
 };
+
+void hashAnyValue(blake3_hasher &H, const pb::AnyValue &AV);
+void hashKeyValue(blake3_hasher &H, const pb::KeyValue &KV);
+void hashKeyValues(blake3_hasher &H, const pb::RepeatedPtrField<pb::KeyValue> &KVs);
+void hashInstrumentationScope(blake3_hasher &H, const pb::InstrumentationScope &IS);
+void hashResource(blake3_hasher &H, const pb::Resource &R);
+void hashMetric(blake3_hasher &H, const pb::Metric &M);
 
 } // namespace otel
 
