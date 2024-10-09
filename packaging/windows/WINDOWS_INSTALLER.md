@@ -59,6 +59,12 @@ netdata-installer-x64.exe /S /A /TOKEN=<YOUR_TOKEN> /ROOMS=<YOUR_ROOM>
 
 Replace `<YOUR_TOKEN>` and `<YOUR_ROOM>` with your actual Netdata Cloud Space claim token and room ID, respectively.
 
+> **Note**
+>
+> The Windows version of Netdata is intended for users on paid plans.
+>
+> The Windows installer is currently under beta, and thus it is only available in the nightly release channel. A stable version will be released soon.
+
 ## Uninstalling
 
 To uninstall Netdata, run the `uninstall.exe` file in your Netdata installation directory, typically `<YOUR_INSTALL_LOCATION>\Netdata`.
