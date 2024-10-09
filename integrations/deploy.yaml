@@ -560,6 +560,8 @@
   install_description: |
     Netdata offers a convenient Windows installer for easy setup. This executable provides two distinct installation modes, outlined below.
 
+    The Windows installer is currently under beta, and thus it is only available in the nightly release channel. A stable version will be released soon.
+
     ## Graphical User Interface (GUI)
 
     1. Download the Netdata [Windows installer](https://github.com/netdata/netdata-nightlies/releases) from the latest nightly release.
@@ -569,9 +571,6 @@
     ## Silent Mode (Command line)
 
     If you prefer to install Netdata through the command line, you can do so by running the following command on Windows Powershell with administrator rights.
-
-    The Windows installer is currently under beta, and thus it is only available in the nightly release channel. A stable version will be released soon.
-
   methods:
     - method: Silent Mode (Command line)
       commands:
