@@ -576,13 +576,13 @@
         - channel: stable
           command: |
             $ProgressPreference = 'SilentlyContinue';
-            Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/download/v1.99.0-267-nightly/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe";
+            Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe";
             .\netdata-installer-x64.exe /S /A `
             {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
         - channel: nightly
           command: >
             $ProgressPreference = 'SilentlyContinue';
-            Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/download/v1.99.0-267-nightly/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe";
+            Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe";
             .\netdata-installer-x64.exe /S /A `
             {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
   additional_info: |
