@@ -63,7 +63,7 @@ Replace `<YOUR_TOKEN>` and `<YOUR_ROOM>` with your actual Netdata Cloud Space cl
 >
 > The Windows version of Netdata is intended for users on paid plans.
 >
-> The Windows installer is currently under beta, and thus it is only available in the nightly release channel. A stable version will be released soon.
+> The Windows installer is currently under beta. A stable version will be released soon.
 
 ## Uninstalling
 
