@@ -574,11 +574,17 @@
     - method: Silent Mode (Command line)
       commands:
         - channel: stable
-          command: >
-            $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/download/v1.99.0-267-nightly/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe"; .\netdata-installer-x64.exe /S /A {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
+          command: |
+            $ProgressPreference = 'SilentlyContinue';
+            Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/download/v1.99.0-267-nightly/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe";
+            .\netdata-installer-x64.exe /S /A `
+            {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
         - channel: nightly
           command: >
-            $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/download/v1.99.0-267-nightly/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe"; .\netdata-installer-x64.exe /S /A {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
+            $ProgressPreference = 'SilentlyContinue';
+            Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/download/v1.99.0-267-nightly/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe";
+            .\netdata-installer-x64.exe /S /A `
+            {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
   additional_info: |
     ### Available Options
 
