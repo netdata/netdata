@@ -152,10 +152,15 @@ endfunction()
 function(extract_gzipped_tarball tarball target)
   if(CMAKE_VERSION VERSION_LESS 3.18)
     find_program(TAR NAMES tar bsdtar DOC "TAR archive program")
+
+    if(TAR STREQUAL "TAR-NOTFOUND")
+      message(FATAL_ERROR "Unable to find tar command")
+    endif()
+
     find_program(GZIP NAMES gzip DOC "GZIP compression program")
 
-    if(TAR STREQUAL "TAR-NOTFOUND" OR GZIP STREQUAL "GZIP-NOTFOUND")
-      message(FATAL_ERROR "Unable to find tar or gzip command")
+    if(GZIP STREQUAL "GZIP-NOTFOUND")
+      message(FATAL_ERROR "Unable to find gzip command")
     endif()
 
     file(MAKE_DIRECTORY "${target}")
