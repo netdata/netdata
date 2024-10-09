@@ -62,6 +62,7 @@ Page Custom NetdataConfigPage NetdataConfigLeave
     launch:
 !macroend
 
+var hCtrlButton
 var hStartMsys
 var startMsys
 
@@ -145,8 +146,14 @@ Function un.onInit
 !insertmacro SingleInstanceFile
 FunctionEnd
 
+Function ShowHelp
+Pop $0
+        MessageBox MB_ICONQUESTION|MB_OK "$\"Proxy URL$\" set the proxy server address to use if your network requires one.$\n$\n$\"Insecure connection$\" disable verification of the server's certificate chain and host name.$\n$\n$\"Open Terminal$\" open MSYS2 terminal to run additional commands after installation." IDOK endHelp
+        endHelp:
+FunctionEnd
+
 Function NetdataConfigPage
-        !insertmacro MUI_HEADER_TEXT "Netdata configuration" "Claim your agent on Netdata Cloud"
+        !insertmacro MUI_HEADER_TEXT "Netdata configuration" "Connect your Agent to your Netdata Cloud Space"
 
         nsDialogs::Create 1018
         Pop $0
@@ -156,29 +163,34 @@ Function NetdataConfigPage
 
         IfFileExists "$INSTDIR\etc\netdata\claim.conf" NotNeeded
 
-        ${NSD_CreateLabel} 0 0 100% 12u "Enter your Token and Cloud Room(s)."
-        ${NSD_CreateLabel} 0 15% 100% 12u "Optionally, you can open a terminal to execute additional commands."
+        ${NSD_CreateLabel} 0 0 100% 12u "Enter your Space's Claim Token and the Room IDs where you want to add the Agent."
+        ${NSD_CreateLabel} 0 12% 100% 12u "If no Room IDs are specified, the Agent will be added to the $\"All nodes$\" Room."
 
-        ${NSD_CreateLabel} 0 30% 20% 10% "Token"
+        ${NSD_CreateLabel} 0 30% 20% 10% "Claim Token"
         Pop $0
         ${NSD_CreateText} 21% 30% 79% 10% ""
         Pop $hCloudToken
 
-        ${NSD_CreateLabel} 0 45% 20% 10% "Room(s)"
+        ${NSD_CreateLabel} 0 45% 20% 10% "Room ID(s)"
         Pop $0
         ${NSD_CreateText} 21% 45% 79% 10% ""
         Pop $hCloudRooms
 
-        ${NSD_CreateLabel} 0 60% 20% 10% "Proxy"
+        ${NSD_CreateLabel} 0 60% 20% 10% "Proxy URL"
         Pop $0
         ${NSD_CreateText} 21% 60% 79% 10% ""
         Pop $hProxy
 
-        ${NSD_CreateCheckbox} 0 75% 100% 10u "Insecure connection"
+        ${NSD_CreateCheckbox} 0 75% 50% 10u "Insecure connection"
         Pop $hInsecure
 
-        ${NSD_CreateCheckbox} 0 90% 100% 10u "Open terminal"
+        ${NSD_CreateCheckbox} 0 90% 50% 10u "Open terminal"
         Pop $hStartMsys
+
+        ${NSD_CreateButton} 80% 90% 30u 15u "&Help"
+        Pop $hCtrlButton
+        ${NSD_OnClick} $hCtrlButton ShowHelp
+
         Goto EndDialogDraw
 
         NotNeeded:
