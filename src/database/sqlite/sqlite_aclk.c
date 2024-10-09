@@ -448,11 +448,8 @@ static void aclk_synchronization(void *arg)
                     }
 
                     if (ahc->timer_initialized) {
-                        if (uv_is_active((uv_handle_t *)&ahc->timer)) {
-                            uint64_t due_in = uv_timer_get_due_in(&ahc->timer);
-                            nd_log(NDLS_ACLK, NDLP_DEBUG, "Timer is due in %zu ms -- setting to run in %zu ms", due_in, schedule_time);
+                        if (uv_is_active((uv_handle_t *)&ahc->timer))
                             uv_timer_stop(&ahc->timer);
-                        }
 
                         ahc->timer.data = ahc;
                         int rc = uv_timer_start(&ahc->timer, node_update_timer_cb, schedule_time, 0);
