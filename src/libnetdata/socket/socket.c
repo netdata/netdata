@@ -1182,7 +1182,7 @@ inline int wait_on_socket_or_cancel_with_timeout(
         .revents = 0,
     };
 
-    bool forever = (timeout_ms == 0);
+    bool forever = (timeout_ms <= 0);
 
     while (timeout_ms > 0 || forever) {
         if(nd_thread_signaled_to_cancel()) {
