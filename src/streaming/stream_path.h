@@ -47,6 +47,7 @@ void stream_path_node_id_updated(struct rrdhost *host);
 
 void stream_path_child_disconnected(struct rrdhost *host);
 void stream_path_parent_disconnected(struct rrdhost *host);
+STREAM_PATH rrdhost_stream_path_fetch(struct rrdhost *host);
 
 bool stream_path_set_from_json(struct rrdhost *host, const char *json, bool from_parent);
 

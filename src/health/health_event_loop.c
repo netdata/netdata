@@ -75,7 +75,7 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         time_t needed = now + rc->config.before + rc->config.after;
 
         if(needed + update_every < first || needed - update_every > last) {
-            netdata_log_info(
+            netdata_log_debug(D_HEALTH,
                 "Health not examining alarm '%s.%s' yet (not enough data yet - we need %lu but got %lu - %lu).",
                 rrdcalc_chart_name(rc),
                 rrdcalc_name(rc),
@@ -229,7 +229,7 @@ static void health_event_loop(void) {
                    "Postponing alarm checks for %"PRId32" seconds, "
                    "because it seems that the system was just resumed from suspension.",
                    (int32_t)health_globals.config.postpone_alarms_during_hibernation_for_seconds);
-            schedule_node_info_update(localhost);
+            schedule_node_state_update(localhost, 0);
         }
 
         if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {

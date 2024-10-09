@@ -804,7 +804,7 @@ void *aclk_main(void *ptr)
             goto exit_full;
 
         if (schedule_node_update) {
-            schedule_node_info_update(localhost);
+            schedule_node_state_update(localhost, 0);
             schedule_node_update = false;
         }
 
