@@ -568,7 +568,11 @@
 
     ## Silent Mode (Command line)
 
-    If you prefer to install Netdata through the command line, you can do so by running the following command on Windows Powershell with administrator rights:
+    If you prefer to install Netdata through the command line, you can do so by running the following command on Windows Powershell with administrator rights.
+
+    > **Note**
+    >
+    > The Windows installer is currently under beta, and thus it is only available in the nightly release channel. A stable version will be released soon.
 
   methods:
     - method: Silent Mode (Command line)
@@ -580,7 +584,7 @@
             .\netdata-installer-x64.exe /S /A `
             {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
         - channel: nightly
-          command: >
+          command: |
             $ProgressPreference = 'SilentlyContinue';
             Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe";
             .\netdata-installer-x64.exe /S /A `
