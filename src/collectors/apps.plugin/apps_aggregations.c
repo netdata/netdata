@@ -143,10 +143,7 @@ static void assign_a_target_to_all_processes(void) {
                     if(pp->is_manager) break;
 
                     if (pp->target) {
-                        if (pp->matched_by_config) {
-                            // we are only interested about app_groups.conf matches
-                            p->target = pp->target;
-                        }
+                        p->target = pp->target;
                         break;
                     }
                 }

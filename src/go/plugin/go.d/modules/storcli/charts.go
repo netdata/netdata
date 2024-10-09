@@ -14,6 +14,7 @@ const (
 	prioControllerHealthStatus = module.Priority + iota
 	prioControllerStatus
 	prioControllerBBUStatus
+	prioControllerROCTemperature
 
 	prioPhysDriveErrors
 	prioPhysDrivePredictiveFailures
@@ -31,6 +32,7 @@ var controllerMegaraidChartsTmpl = module.Charts{
 
 var controllerMpt3sasChartsTmpl = module.Charts{
 	controllerHealthStatusChartTmpl.Copy(),
+	controllerROCTemperatureChartTmpl.Copy(),
 }
 
 var (
@@ -74,6 +76,18 @@ var (
 			{ID: "cntrl_%s_bbu_status_healthy", Name: "healthy"},
 			{ID: "cntrl_%s_bbu_status_unhealthy", Name: "unhealthy"},
 			{ID: "cntrl_%s_bbu_status_na", Name: "na"},
+		},
+	}
+	controllerROCTemperatureChartTmpl = module.Chart{
+		ID:       "controller_%s_roc_temperature",
+		Title:    "Controller ROC temperature",
+		Units:    "Celsius",
+		Fam:      "cntrl roc temperature",
+		Ctx:      "storcli.controller_roc_temperature",
+		Type:     module.Line,
+		Priority: prioControllerROCTemperature,
+		Dims: module.Dims{
+			{ID: "cntrl_%s_roc_temperature_celsius", Name: "temperature"},
 		},
 	}
 )
@@ -165,6 +179,9 @@ func (s *StorCli) addControllerCharts(cntrl controllerInfo) {
 		charts = controllerMegaraidChartsTmpl.Copy()
 	case driverNameSas:
 		charts = controllerMpt3sasChartsTmpl.Copy()
+		if !strings.EqualFold(cntrl.HwCfg.TemperatureSensorForROC, "present") {
+			_ = charts.Remove(controllerROCTemperatureChartTmpl.ID)
+		}
 	default:
 		return
 	}

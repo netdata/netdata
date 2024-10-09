@@ -25,6 +25,7 @@ LRESULT CALLBACK WndProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM l
                          L"/T TOKEN: The cloud token;",
                          L"/R ROOMS: A list of rooms to claim;",
                          L"/P PROXY: The proxy information;",
+                         L"/U URL  : The cloud URL;",
                          L"/I      : Use insecure connection;"
     };
 
@@ -83,7 +84,7 @@ int netdata_claim_window_loop(HINSTANCE hInstance, int nCmdShow)
                                       L"Netdata Claim",
                                       WS_OVERLAPPEDWINDOW,
                                       CW_USEDEFAULT, CW_USEDEFAULT,
-                                      460, 220,
+                                      460, 240,
                                       NULL,
                                       NULL,
                                       hInstance,
