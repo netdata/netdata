@@ -59,6 +59,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
             buffer_json_member_add_object(wb, rrddim_id(rd));
             buffer_json_member_add_string(wb, "name", rrddim_name(rd));
+            buffer_json_member_add_int64(wb, "dimension_id", rd->dimension_id);
             buffer_json_object_close(wb);
 
             dimensions++;

@@ -73,14 +73,14 @@ static inline bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_d
             if(rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now) {
                 size_t references = dictionary_acquired_item_references(rd_dfe.item);
                 if(references == 1) {
-//                    netdata_log_info("Removing obsolete dimension 'host:%s/chart:%s/dim:%s'",
-//                                     rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
+                    netdata_log_info("Removing obsolete dimension 'host:%s/chart:%s/dim:%s'",
+                                     rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
                     svc_rrddim_obsolete_to_archive(rd);
                     dim_archives++;
                 }
-//                else
-//                    netdata_log_info("Cannot remove obsolete dimension 'host:%s/chart:%s/dim:%s'",
-//                            rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
+                else
+                    netdata_log_info("Cannot remove obsolete dimension 'host:%s/chart:%s/dim:%s'",
+                            rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
             }
         }
     }
