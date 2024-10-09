@@ -535,6 +535,57 @@
         - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Splunk VictorOps:
             - Destination URL - The URL provided by VictorOps of your REST endpoint.
 
+- id: 'notify-cloud-ilert'
+  meta:
+    name: 'Ilert'
+    link: 'https://www.ilert.com/'
+    categories:
+      - notify.cloud
+    icon_filename: 'ilert.svg'
+  keywords:
+    - ilert
+  overview:
+    notification_description: "From the Cloud interface, you can manage your space's notification settings and from there you can add a specific configuration to get notifications delivered on ilert."
+    notification_limitations: ''
+  setup:
+    description: |
+      ### Prerequisites
+
+      To add ilert notification you need:
+
+      - A Netdata Cloud account
+      - Access to the space as an **Admin**
+      - The Space needs to be on a paid plan
+      - You need to have permissions on ilert to add new Alert sources.
+
+      ### Settings on ilert
+
+      1. **Access the Alert sources Settings**: From the navigation bar, open Alert sources dropdown and click Alert sources.
+      2. **Create a New Alert source**: Click on "+ Create a new alert source" button.
+      3. **Configure Alert sourc**:
+          - 1 step - select API integration and click Next
+          - 2 step - provide a name that suits better to you, for example Netdata
+          - 3 step - select Escalation policy
+          - 4 step - select Alert grouping (optional)
+          - 5 step - review all configurations and click "Finish setup"
+      4. **Obtain the API Key**:
+          - Once the Alert sources is created, you will be provided with an API key.
+          - Copy this API Key, as it will be required to configure Netdata Cloud.
+
+      ### Settings on Netdata Cloud
+
+      1. Click on the **Space settings** cog (located above your profile icon)
+      2. Click on the **Notification** tab
+      3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
+      4. On the **ilert** card click on **+ Add**
+      5. A modal will be presented to you to enter the required details to enable the configuration:
+        - **Notification settings** are Netdata specific settings
+            - Configuration name - provide a descriptive name for your configuration to easily identify it.
+            - Rooms - select the nodes or areas of your infrastructure you want to receive notifications about.
+            - Notification - choose the type of notifications you want to receive: All Alerts and unreachable, All Alerts, Critical only.
+        - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For ilert:
+            - Alert Source API key.
+
 - id: 'notify-cloud-webhook'
   meta:
     name: 'Webhook'
