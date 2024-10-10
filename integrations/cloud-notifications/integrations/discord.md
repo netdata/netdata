@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/discord.png" width="150"/>
 
 
-From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Discord.
+From the Netdata Cloud UI, you can configure notification delivery to your Discord server.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
@@ -21,30 +21,32 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
 ## Setup
 
 ### Prerequisites
+
 - A Netdata Cloud account
 - Access to the Netdata Space as an **Admin**
-- You need to have a Discord server able to receive webhooks integrations.
 
 ### Discord Server Configuration
+
 Steps to configure your Discord server to receive [webhook notifications](https://support.discord.com/hc/en-us/articles/228383668) from Netdata:
-1. Go to `Server Settings` --> `Integrations`
+
+1. Go to **Server Settings** --> **Integrations**
 2. **Create Webhook** or **View Webhooks** if you already have some defined
 3. Specify the **Name** and **Channel** on your new webhook
-4. Use Webhook URL to add your notification configuration on Netdata UI
+4. Keep note of the **Webhook URL** as you will need it for the configuration of the integration on the Netdata Cloud UI
 
-### Netdata Configuration Steps
+### Netdata Configuration
+
 1. Click on the **Space settings** cog (located above your profile icon)
-2. Click on the **Notification** tab
-3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-4. On the **Discord** card click on **+ Add**
-5. A modal will be presented to you to enter the required details to enable the configuration:
-  * **Notification settings** are Netdata specific settings
-    - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
-    - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-    - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-  * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Discord:
-    - Define the type channel you want to send notifications to: **Text channel** or **Forum channel**
-    - Webhook URL - URL provided on Discord for the channel you want to receive your notifications.
-    - Thread name - if the Discord channel is a **Forum channel** you will need to provide the thread name as well
+2. Click on the **Alerts & Notifications** tab
+3. Click on the **+ Add configuration** button
+4. Add the Discord Integration
+5. A modal will be presented to you to enter the required details to enable the integration:
+    - **Notification settings**
+      - Configuration name (optional): A name for your configuration in order to easily refer to it
+      - Rooms: A list of Rooms for which you want to be notified
+      - Notifications: The notifications which you want to be notified
+    - **Integration configuration**
+      - Webhook URL: The URL you copied from the previous section
+      - Channel Parameters: Select the channel type which the notifications will be sent to, if it is a Forum channel, you need to specify a thread name
 
 

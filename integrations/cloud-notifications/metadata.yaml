@@ -1,135 +1,139 @@
 # yamllint disable rule:line-length
 ---
-- id: 'notify-cloud-mobile-app'
+- id: "notify-cloud-mobile-app"
   meta:
-    name: 'Netdata Mobile App'
-    link: 'https://netdata.cloud'
+    name: "Netdata Mobile App"
+    link: "https://netdata.cloud"
     categories:
       - notify.cloud
-    icon_filename: 'netdata.png'
+    icon_filename: "netdata.png"
   keywords:
     - mobile-app
     - phone
     - personal-notifications
   overview:
-    notification_description: "From the Netdata Cloud UI, you can manage your user notification settings and enable the configuration to deliver notifications on the Netdata Mobile Application."
-    notification_limitations: ''
+    notification_description: "From the Netdata Cloud UI, you can configure notification delivery to the Netdata Mobile Application."
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
+
       - A Netdata Cloud account
-      - You need to have the Netdata Mobile Application installed on your [Android](https://play.google.com/store/apps/details?id=cloud.netdata.android&pli=1) or [iOS](https://apps.apple.com/in/app/netdata-mobile/id6474659622) phone.
+      - You need to have the Netdata Mobile App installed on your [Android](https://play.google.com/store/apps/details?id=cloud.netdata.android&pli=1) or [iOS](https://apps.apple.com/in/app/netdata-mobile/id6474659622) phone.
 
-      ### Netdata Mobile App Configuration
-      Steps to login to the Netdata Mobile Application to receive alert and reachability and alert notifications:
-      1. Download the Netdata Mobile Application from [Google Play Store](https://play.google.com/store/apps/details?id=cloud.netdata.android&pli=1) or the [iOS App Store](https://apps.apple.com/in/app/netdata-mobile/id6474659622)
-      2. Open the App and Choose the Sign In Option
-        - Sign In with Email Address: Enter the Email Address of your registered Netdata Cloud Account and Click on the Verification link received by Email on your mobile device.
-        - Sign In with QR Code: Scan the QR Code from your `Netdata Cloud` UI under **User Settings** --> **Notifications** --> **Mobile App Notifications** --> **Show QR Code**
-      3. Start receiving alert and reachability notifications for your **Space(s)** on a **Paid Subscription plan**
+      ### Netdata Mobile App Configuration and device linking
 
-      ### Netdata Configuration Steps
-      1. Click on the **User settings** on the bottom left of your screen (your profile icon)
-      2. Click on the **Notifications** tab
-      3. Enable **Mobile App Notifications** if disabled (Enabled by default)
-      4. Use the **Show QR Code** Option to login to your mobile device by scanning the **QR Code**
-- id: 'notify-cloud-discord'
+      In order to login to the Netdata Mobile App
+
+      1. Download the Netdata Mobile App from [Google Play Store](https://play.google.com/store/apps/details?id=cloud.netdata.android&pli=1) or the [iOS App Store](https://apps.apple.com/in/app/netdata-mobile/id6474659622)
+      2. Open the App and Choose your Sign-in option
+        - Email Address: Enter the email address of your registered Netdata Cloud account and click on the verification link received by email on your mobile device.
+        - Sign-in with QR Code: Scan the QR code from the Netdata Cloud UI under **Profile Picture** --> **Settings** --> **Notifications** --> **Mobile App Notifications** --> **Show QR Code**
+
+      ### Netdata Configuration
+
+      After linking your device, enable the toggle for **Mobile App Notifications** under the same settings panel.
+
+- id: "notify-cloud-discord"
   meta:
-    name: 'Discord'
-    link: 'https://discord.com/'
+    name: "Discord"
+    link: "https://discord.com/"
     categories:
       - notify.cloud
-    icon_filename: 'discord.png'
+    icon_filename: "discord.png"
   keywords:
     - discord
     - community
   overview:
-    notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Discord."
-    notification_limitations: ''
+    notification_description: "From the Netdata Cloud UI, you can configure notification delivery to your Discord server."
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
+      
       - A Netdata Cloud account
       - Access to the Netdata Space as an **Admin**
-      - You need to have a Discord server able to receive webhooks integrations.
 
       ### Discord Server Configuration
+
       Steps to configure your Discord server to receive [webhook notifications](https://support.discord.com/hc/en-us/articles/228383668) from Netdata:
-      1. Go to `Server Settings` --> `Integrations`
+
+      1. Go to **Server Settings** --> **Integrations**
       2. **Create Webhook** or **View Webhooks** if you already have some defined
       3. Specify the **Name** and **Channel** on your new webhook
-      4. Use Webhook URL to add your notification configuration on Netdata UI
+      4. Keep note of the **Webhook URL** as you will need it for the configuration of the integration on the Netdata Cloud UI
 
-      ### Netdata Configuration Steps
+      ### Netdata Configuration
+      
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
-      3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-      4. On the **Discord** card click on **+ Add**
-      5. A modal will be presented to you to enter the required details to enable the configuration:
-        * **Notification settings** are Netdata specific settings
-          - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
-          - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-          - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-        * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Discord:
-          - Define the type channel you want to send notifications to: **Text channel** or **Forum channel**
-          - Webhook URL - URL provided on Discord for the channel you want to receive your notifications.
-          - Thread name - if the Discord channel is a **Forum channel** you will need to provide the thread name as well
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Add the Discord Integration
+      5. A modal will be presented to you to enter the required details to enable the integration:
+          - **Notification settings**
+            - Configuration name (optional): A name for your configuration in order to easily refer to it
+            - Rooms: A list of Rooms for which you want to be notified
+            - Notifications: The notifications which you want to be notified
+          - **Integration configuration**
+            - Webhook URL: The URL you copied from the previous section
+            - Channel Parameters: Select the channel type which the notifications will be sent to, if it is a Forum channel, you need to specify a thread name
 
-- id: 'notify-cloud-pagerduty'
+- id: "notify-cloud-pagerduty"
   meta:
-    name: 'PagerDuty'
-    link: 'https://www.pagerduty.com/'
+    name: "PagerDuty"
+    link: "https://www.pagerduty.com/"
     categories:
       - notify.cloud
-    icon_filename: 'pagerduty.png'
+    icon_filename: "pagerduty.png"
   keywords:
     - pagerduty
   overview:
-    notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on PagerDuty."
-    notification_limitations: ''
+    notification_description: "From the Netdata Cloud UI, you can configure notification delivery to PagerDuty."
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
+      
       - A Netdata Cloud account
       - Access to the Netdata Space as an **Admin**
       - The Netdata Space needs to be on a paid plan
       - You need to have a PagerDuty service to receive events using webhooks.
 
-
       ### PagerDuty Server Configuration
-      Steps to configure your PagerDuty to receive notifications from Netdata:
+
+      Steps to configure your PagerDuty to receive notifications from Netdata Cloud:
 
       1. Create a service to receive events from your services directory page on PagerDuty
-      2. At step 3, select `Events API V2` Integration or **View Webhooks** if you already have some defined
-      3. Once the service is created, you will be redirected to its configuration page, where you can copy the **Integration Key** and **Integration URL (Alert Events)** fields to add them to your notification configuration in the Netdata UI.
+      2. On the third step of the service creation, select `Events API V2` Integration
+      3. Once the service is created, you will be redirected to its configuration page, where you can copy the **Integration Key** and **Integration URL (Alert Events)** in order to add them to your integration configuration in the Netdata Cloud UI
 
-      ### Netdata Configuration Steps
+      ### Netdata Configuration
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
-      3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-      4. On the **PagerDuty** card click on **+ Add**
-      5. A modal will be presented to you to enter the required details to enable the configuration:
-        * **Notification settings** are Netdata specific settings
-          - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
-          - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-          - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-        * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For PagerDuty:
-          - Integration Key - is a 32 character key provided by PagerDuty to receive events on your service.
-          - Integration URL (Alert Events) - is the URL provided by PagerDuty where we will send notifications.
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Add the PagerDuty Integration
+      5. A modal will be presented to you to enter the required details to enable the integration:
+          - **Notification settings**
+            - Configuration name (optional): A name for your configuration in order to easily refer to it
+            - Rooms: A list of Rooms for which you want to be notified
+            - Notifications: The notifications which you want to be notified
+          - **Integration configuration**
+            - Integration Key: A 32 character key provided by PagerDuty to receive events on your service.
+            - Integration URL (Alert Events): The URL provided by PagerDuty where Netdata Cloud will send notifications.
 
-- id: 'notify-cloud-slack'
+- id: "notify-cloud-slack"
   meta:
-    name: 'Slack'
-    link: 'https://slack.com/'
+    name: "Slack"
+    link: "https://slack.com/"
     categories:
       - notify.cloud
-    icon_filename: 'slack.png'
+    icon_filename: "slack.png"
   keywords:
     - slack
   overview:
-    notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Slack."
-    notification_limitations: ''
+    notification_description: "From the Netdata Cloud UI, you can configure notification delivery to Slack."
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -141,45 +145,45 @@
 
       ### Slack Server Configuration
 
-      Steps to configure your Slack to receive notifications from Netdata:
+      Steps to configure your Slack to receive notifications from Netdata Cloud:
 
-      1. Create an app to receive webhook integrations. Check [Create an app](https://api.slack.com/apps?new_app=1) from Slack documentation for further details
+      1. Create an app to receive webhook integrations. Check the [Slack documentation](https://api.slack.com/apps?new_app=1) for further details
       2. Install the app on your workspace
       3. Configure Webhook URLs for your workspace
-        - On your app go to **Incoming Webhooks** and click on **activate incoming webhooks**
-        - At the bottom of **Webhook URLs for Your Workspace** section you have **Add New Webhook to Workspace**
-        - After pressing that specify the channel where you want your notifications to be delivered
-        - Once completed copy the Webhook URL that you will need to add to your notification configuration on Netdata UI
+          - On your app go to **Incoming Webhooks** and click on **activate incoming webhooks**
+          - At the bottom of **Webhook URLs for Your Workspace** section you have **Add New Webhook to Workspace**
+          - Specify the channel where you want your notifications to be delivered
+          - Once completed, copy the Webhook URL in order to add it to your integration configuration in the Netdata Cloud UI
 
-      For more details please check Slacks's article [Incoming webhooks for Slack](https://slack.com/help/articles/115005265063-Incoming-webhooks-for-Slack).
+      For more details please check [Incoming webhooks for Slack](https://slack.com/help/articles/115005265063-Incoming-webhooks-for-Slack).
 
-      ### Netdata Configuration Steps
+      ### Netdata Configuration
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
-      3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-      4. On the **Slack** card click on **+ Add**
-      5. A modal will be presented to you to enter the required details to enable the configuration:
-        * **Notification settings** are Netdata specific settings
-          - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
-          - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-          - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-        * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Slack:
-          - Webhook URL - URL provided on Slack for the channel you want to receive your notifications.
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Add the PagerDuty Integration
+      5. A modal will be presented to you to enter the required details to enable the integration:
+          - **Notification settings**
+            - Configuration name (optional): A name for your configuration in order to easily refer to it
+            - Rooms: A list of Rooms for which you want to be notified
+            - Notifications: The notifications which you want to be notified
+          - **Integration configuration**
+            - Webhook URL: URL provided on Slack for the channel you want to receive your notifications
 
-- id: 'notify-cloud-opsgenie'
+- id: "notify-cloud-opsgenie"
   meta:
-    name: 'Opsgenie'
-    link: 'https://www.atlassian.com/software/opsgenie'
+    name: "Opsgenie"
+    link: "https://www.atlassian.com/software/opsgenie"
     categories:
       - notify.cloud
-    icon_filename: 'opsgenie.png'
+    icon_filename: "opsgenie.png"
   keywords:
     - opsgenie
     - atlassian
   overview:
-    notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Opsgenie."
-    notification_limitations: ''
+    notification_description: "From the Netdata Cloud UI, you can configure notification delivery to Opsgenie."
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -191,38 +195,37 @@
 
       ### Opsgenie Server Configuration
 
-      Steps to configure your Opsgenie to receive notifications from Netdata:
+      Steps to configure your Opsgenie to receive notifications from Netdata Cloud:
 
-      1. Go to integrations tab of your team, click **Add integration**
-      2. Pick **API** from available integrations. Copy your API Key and press **Save Integration**.
-      3. Paste copied API key into the corresponding field in **Integration configuration** section of Opsgenie modal window in Netdata.
+      1. Go to the integrations tab of your team, click **Add integration**
+      2. Pick **API** from available integrations and copy the API Key in order to add it to your integration configuration in the Netdata Cloud UI
 
-      ### Netdata Configuration Steps
+      ### Netdata Configuration
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
-      3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-      4. On the **Opsgenie** card click on **+ Add**
-      5. A modal will be presented to you to enter the required details to enable the configuration:
-        * **Notification settings** are Netdata specific settings
-          - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
-          - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-          - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-        * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Opsgenie:
-          - API Key - a key provided on Opsgenie for the channel you want to receive your notifications.
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Add the PagerDuty Integration
+      5. A modal will be presented to you to enter the required details to enable the integration:
+          - **Notification settings**
+            - Configuration name (optional): A name for your configuration in order to easily refer to it
+            - Rooms: A list of Rooms for which you want to be notified
+            - Notifications: The notifications which you want to be notified
+          - **Integration configuration**
+            - API Key: The key provided on Opsgenie for the channel you want to receive your notifications
 
-- id: 'notify-cloud-mattermost'
+- id: "notify-cloud-mattermost"
   meta:
-    name: 'Mattermost'
-    link: 'https://mattermost.com/'
+    name: "Mattermost"
+    link: "https://mattermost.com/"
     categories:
       - notify.cloud
-    icon_filename: 'mattermost.png'
+    icon_filename: "mattermost.png"
   keywords:
     - mattermost
   overview:
-    notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Mattermost."
-    notification_limitations: ''
+    notification_description: "From the Netdata Cloud UI, you can configure notification delivery to Mattermost."
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -231,49 +234,45 @@
       - Access to the Netdata Space as an **Admin**
       - The Netdata Space needs to be on a paid plan
       - You need to have permissions on Mattermost to add new integrations.
-      - You need to have a Mattermost app on your workspace to receive the webhooks.
 
       ### Mattermost Server Configuration
 
-      Steps to configure your Mattermost to receive notifications from Netdata:
+      Steps to configure your Mattermost server to receive notifications from Netdata Cloud:
 
       1. In Mattermost, go to Product menu > Integrations > Incoming Webhook
-        - If you don’t have the Integrations option, incoming webhooks may not be enabled on your Mattermost server or may be disabled for non-admins. They can be enabled by a System Admin from System Console > Integrations > Integration Management. Once incoming webhooks are enabled, continue with the steps below.
-      2. Select Add Incoming Webhook and add a name and description for the webhook. The description can be up to 500 characters
+          - If you don't have the Integrations option, incoming webhooks may not be enabled on your Mattermost server or may be disabled for non-admins. They can be enabled by a System Admin from System Console > Integrations > Integration Management. Once incoming webhooks are enabled, continue with the steps below.
+      2. Select Add Incoming Webhook and add a name and description for the webhook.
       3. Select the channel to receive webhook payloads, then select Add to create the webhook
-      4. You will end up with a webhook endpoint that looks like below:
-        `https://your-mattermost-server.com/hooks/xxx-generatedkey-xxx`
+      4. You will end up with a webhook URL that looks like `https://your-mattermost-server.com/hooks/xxx-generatedkey-xxx`, copy it in order to add it to your integration configuration in the Netdata Cloud UI
 
-        - Treat this endpoint as a secret. Anyone who has it will be able to post messages to your Mattermost instance.
+      For more details please check [Incoming webhooks for Mattermost](https://developers.mattermost.com/integrate/webhooks/incoming/).
 
-      For more details please check Mattermost's article [Incoming webhooks for Mattermost](https://developers.mattermost.com/integrate/webhooks/incoming/).
-
-      ### Netdata Configuration Steps
+      ### Netdata Configuration
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
-      3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-      4. On the **Mattermost** card click on **+ Add**
-      5. A modal will be presented to you to enter the required details to enable the configuration:
-        * **Notification settings** are Netdata specific settings
-          - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
-          - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-          - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-        * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Mattermost:
-          - Webhook URL - URL provided on Mattermost for the channel you want to receive your notifications
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Add the PagerDuty Integration
+      5. A modal will be presented to you to enter the required details to enable the integration:
+          - **Notification settings**
+            - Configuration name (optional): A name for your configuration in order to easily refer to it
+            - Rooms: A list of Rooms for which you want to be notified
+            - Notifications: The notifications which you want to be notified
+          - **Integration configuration**
+            - Webhook URL: URL provided on Mattermost for the channel you want to receive your notifications
 
-- id: 'notify-cloud-rocketchat'
+- id: "notify-cloud-rocketchat"
   meta:
-    name: 'RocketChat'
-    link: 'https://www.rocket.chat/'
+    name: "RocketChat"
+    link: "https://www.rocket.chat/"
     categories:
       - notify.cloud
-    icon_filename: 'rocketchat.png'
+    icon_filename: "rocketchat.png"
   keywords:
     - rocketchat
   overview:
-    notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on RocketChat."
-    notification_limitations: ''
+    notification_description: "From the Netdata Cloud UI, you can configure notification delivery to RocketChat."
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -281,99 +280,92 @@
       - A Netdata Cloud account
       - Access to the Netdata Space as an **Admin**
       - The Netdata Space needs to be on a paid plan
-      - You need to have permissions on Mattermost to add new integrations.
-      - You need to have a RocketChat app on your workspace to receive the webhooks.
+      - You need to have permissions on RocketChat to add new integrations.
 
-      ### Mattermost Server Configuration
+      ### RocketChat Server Configuration
 
-      Steps to configure your RocketChat to receive notifications from Netdata:
+      Steps to configure your RocketChat server to receive notifications from Netdata Cloud:
 
-      1. In RocketChat, Navigate to Administration > Workspace > Integrations.
-      2. Click **+New** at the top right corner.
-      3. For more details about each parameter, check [create-a-new-incoming-webhook](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations#create-a-new-incoming-webhook).
-      4. After configuring integration, click Save.
-      5. You will end up with a webhook endpoint that looks like below:
-        `https://your-server.rocket.chat/hooks/YYYYYYYYYYYYYYYYYYYYYYYY/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
-        - Treat this endpoint as a secret. Anyone who has it will be able to post messages to your RocketChat instance.
+      1. In RocketChat, Navigate to Administration > Workspace > Integrations
+      2. Click **+New** at the top right corner
+      3. For more details about each parameter, check [Create a new incoming webhook](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations#create-a-new-incoming-webhook)
+      4. You will end up with a webhook endpoint that looks like `https://your-server.rocket.chat/hooks/YYYYYYYYYYYYYYYYYYYYYYYY/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`, copy it in order to add it to your integration configuration in the Netdata Cloud UI
 
+      For more details please check [Incoming webhooks for RocketChat](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations/).
 
-      For more details please check RocketChat's article Incoming webhooks for [RocketChat](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations/).
-
-      ### Netdata Configuration Steps
+      ### Netdata Configuration
 
       1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
-      3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-      4. On the **RocketChat** card click on **+ Add**
-      5. A modal will be presented to you to enter the required details to enable the configuration:
-        * **Notification settings** are Netdata specific settings
-          - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
-          - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-          - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-        * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For RocketChat:
-          - Webhook URL - URL provided on RocketChat for the channel you want to receive your notifications.
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Add the PagerDuty Integration
+      5. A modal will be presented to you to enter the required details to enable the integration:
+          - **Notification settings**
+            - Configuration name (optional): A name for your configuration in order to easily refer to it
+            - Rooms: A list of Rooms for which you want to be notified
+            - Notifications: The notifications which you want to be notified
+          - **Integration configuration**
+            - Webhook URL: URL provided on RocketChat for the channel you want to receive your notifications
 
-- id: 'notify-cloud-awssns'
+- id: "notify-cloud-awssns"
   meta:
-    name: 'Amazon SNS'
-    link: 'https://aws.amazon.com/sns/'
+    name: "Amazon SNS"
+    link: "https://aws.amazon.com/sns/"
     categories:
       - notify.cloud
-    icon_filename: 'awssns.png'
+    icon_filename: "awssns.png"
   keywords:
     - awssns
   overview:
-    notification_description: "From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on AWS SNS."
-    notification_limitations: ''
+    notification_description: "From the Netdata Cloud UI, you can configure notification delivery to AWS SNS."
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
 
-      To add AWS SNS notification you need:
-
       - A Netdata Cloud account
       - Access to the space as an **Admin**
-      - The Space needs to be on a paid plan
-      - Have an AWS account with AWS SNS access, for more details check [how to configure this on AWS SNS](#settings-on-aws-sns)
+      - The Netdata Space needs to be on a paid plan
+      - An AWS account with AWS SNS access
 
-      ### Steps
+      ### AWS SNS Configuration
 
-      1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Notification** tab
-      3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-      4. On the **AwsSns** card click on **+ Add**
-      5. A modal will be presented to you to enter the required details to enable the configuration:
-        * **Notification settings** are Netdata specific settings
-            - Configuration name - you can optionally provide a name for your configuration  you can easily refer to it
-            - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-            - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-        * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For AWS SNS:
-            - Topic ARN - topic provided on AWS SNS (with region) for where to publish your notifications. For more details check [how to configure this on AWS SNS](#settings-on-aws-sns)
+      Steps to configure the AWS SNS webhook integration to receive notifications from Netdata Cloud:
 
-      ### Settings on AWS SNS
-
-      To enable the webhook integration on AWS SNS you need:
       1. [Setting up access for Amazon SNS](https://docs.aws.amazon.com/sns/latest/dg/sns-setting-up.html)
       2. Create a topic
           - On AWS SNS management console click on **Create topic**
-          - On the **Details** section, the standard type and provide the topic name
+          - On the **Details** section, select the standard type and provide the topic name
           - On the **Access policy** section, change the **Publishers** option to **Only the specified AWS accounts** and provide the Netdata AWS account **(123269920060)** that will be used to publish notifications to the topic being created
-          - Finally, click on **Create topic** on the bottom of the page
-      3. Now, use the new **Topic ARN** while adding AWS SNS integration on your space.
+      3. Copy the **Topic ARN** in order to add it to your integration configuration in the Netdata Cloud UI.
 
-- id: 'notify-cloud-microsoftteams'
+      ### Netdata Configuration
+
+      1. Click on the **Space settings** cog (located above your profile icon)
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Add the PagerDuty Integration
+      5. A modal will be presented to you to enter the required details to enable the integration:
+          - **Notification settings**
+            - Configuration name (optional): A name for your configuration in order to easily refer to it
+            - Rooms: A list of Rooms for which you want to be notified
+            - Notifications: The notifications which you want to be notified
+          - **Integration configuration**
+            - Topic ARN: The topic provided on AWS SNS (with region) for where to publish your notifications.
+
+- id: "notify-cloud-microsoftteams"
   meta:
-    name: 'Microsoft Teams'
-    link: 'https://www.microsoft.com/en-us/microsoft-teams'
+    name: "Microsoft Teams"
+    link: "https://www.microsoft.com/en-us/microsoft-teams"
     categories:
       - notify.cloud
-    icon_filename: 'teams.svg'
+    icon_filename: "teams.svg"
   keywords:
     - microsoft
     - teams
   overview:
     notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications to a Microsoft Teams channel."
-    notification_limitations: ''
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -411,19 +403,18 @@
         * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Microsoft Teams:
             - Microsoft Teams Incoming Webhook URL - the _Incoming Webhook URL_ that was generated earlier.
 
-
-- id: 'notify-cloud-telegram'
+- id: "notify-cloud-telegram"
   meta:
-    name: 'Telegram'
-    link: 'https://telegram.org/'
+    name: "Telegram"
+    link: "https://telegram.org/"
     categories:
       - notify.cloud
-    icon_filename: 'telegram.svg'
+    icon_filename: "telegram.svg"
   keywords:
     - Telegram
   overview:
     notification_description: "From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on Telegram."
-    notification_limitations: ''
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -458,18 +449,18 @@
           - Contact the [@myidbot](https://t.me/myidbot) bot and send the `/getid` command to get your personal chat ID, or invite it into a group and use the `/getgroupid` command to get the group chat ID.
           - Alternatively, you can get the chat ID directly from the bot API. Send your bot a command in the chat you want to use, then check `https://api.telegram.org/bot{YourBotToken}/getUpdates`, eg. `https://api.telegram.org/bot111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5/getUpdates`
       - To get the topic ID, the easiest way is this: Post a message to that topic, then right-click on it and select `Copy Message Link`. Paste it on a scratchpad and notice that it has the following structure `https://t.me/c/XXXXXXXXXX/YY/ZZ`. The topic ID is `YY` (integer).
-- id: 'notify-cloud-splunk'
+- id: "notify-cloud-splunk"
   meta:
-    name: 'Splunk'
-    link: 'https://splunk.com/'
+    name: "Splunk"
+    link: "https://splunk.com/"
     categories:
       - notify.cloud
-    icon_filename: 'splunk-black.svg'
+    icon_filename: "splunk-black.svg"
   keywords:
     - Splunk
   overview:
     notification_description: "From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on Splunk."
-    notification_limitations: ''
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -496,20 +487,20 @@
             - HTTP Event Collector URI - The URI of your HTTP event collector in Splunk
             - HTTP Event Collector Token - the token that Splunk provided to you when you created the HTTP Event Collector
 
-- id: 'notify-cloud-victorops'
+- id: "notify-cloud-victorops"
   meta:
-    name: 'Splunk VictorOps'
-    link: 'https://www.splunk.com/en_us/about-splunk/acquisitions/splunk-on-call.html'
+    name: "Splunk VictorOps"
+    link: "https://www.splunk.com/en_us/about-splunk/acquisitions/splunk-on-call.html"
     categories:
       - notify.cloud
-    icon_filename: 'victorops.svg'
+    icon_filename: "victorops.svg"
   keywords:
     - VictorOps
     - Splunk
     - On-Call
   overview:
     notification_description: "From the Cloud interface, you can manage your space's notification settings and from there you can add a specific configuration to get notifications delivered on Splunk On-Call/VictorOps."
-    notification_limitations: ''
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -535,71 +526,19 @@
         - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Splunk VictorOps:
             - Destination URL - The URL provided by VictorOps of your REST endpoint.
 
-- id: 'notify-cloud-ilert'
+- id: "notify-cloud-webhook"
   meta:
-    name: 'Ilert'
-    link: 'https://www.ilert.com/'
+    name: "Webhook"
+    link: "https://en.wikipedia.org/wiki/Webhook"
     categories:
       - notify.cloud
-    icon_filename: 'ilert.svg'
-  keywords:
-    - ilert
-  overview:
-    notification_description: "From the Cloud interface, you can manage your space's notification settings and from there you can add a specific configuration to get notifications delivered on ilert."
-    notification_limitations: ''
-  setup:
-    description: |
-      ### Prerequisites
-
-      To add ilert notification you need:
-
-      - A Netdata Cloud account
-      - Access to the space as an **Admin**
-      - The Space needs to be on a paid plan
-      - You need to have permissions on ilert to add new Alert sources.
-
-      ### Settings on ilert
-
-      1. **Access the Alert sources Settings**: From the navigation bar, open the Alert sources drop down and click "Alert sources".
-      2. **Create a New Alert source**: Click on the "+ Create a new alert source" button.
-      3. **Configure an Alert source**:
-        - select "API integration" and click Next
-        - provide a name that suits the source's purpose, for example Netdata
-        - select Escalation policy
-        - select Alert grouping (optional)
-        - review all configurations and click "Finish setup"
-      4. **Obtain the API Key**:
-        - Once the Alert source is created, you will be provided with an API key.
-        - Copy this API Key, as it will be required to configure the integration on Netdata Cloud.
-
-      ### Settings on Netdata Cloud
-
-      1. Click on the **Space settings** cog (located above your profile icon)
-      2. Click on the **Alerts & Notifications** tab
-      3. Click on the **+ Add configuration** button
-      4. Click on **+ Add** on the **ilert** card 
-      5. A modal will be presented in order to enter the required details to enable the configuration:
-      
-      - **Notification settings** are Netdata specific settings
-          - Configuration name: provide a descriptive name for your configuration to easily identify it.
-          - Rooms: select the nodes or areas of your infrastructure you want to receive notifications about.
-          - Notification: choose the type of notifications you want to receive.
-        - **Integration configuration** are the required integration settings, which vary by notification method. For ilert:
-          - Alert Source API key.
-
-- id: 'notify-cloud-webhook'
-  meta:
-    name: 'Webhook'
-    link: 'https://en.wikipedia.org/wiki/Webhook'
-    categories:
-      - notify.cloud
-    icon_filename: 'webhook.svg'
+    icon_filename: "webhook.svg"
   keywords:
     - generic webhooks
     - webhooks
   overview:
     notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on a webhook using a predefined schema."
-    notification_limitations: ''
+    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -837,3 +776,55 @@
           # returns properly formatted json response
           return json.dumps(response)
         ```
+
+- id: "notify-cloud-ilert"
+  meta:
+    name: "Ilert"
+    link: "https://www.ilert.com/"
+    categories:
+      - notify.cloud
+    icon_filename: "ilert.svg"
+  keywords:
+    - ilert
+  overview:
+    notification_description: "From the Cloud interface, you can manage your space's notification settings and from there you can add a specific configuration to get notifications delivered on ilert."
+    notification_limitations: ""
+  setup:
+    description: |
+      ### Prerequisites
+
+      To add ilert notification you need:
+
+      - A Netdata Cloud account
+      - Access to the space as an **Admin**
+      - The Space needs to be on a paid plan
+      - You need to have permissions on ilert to add new Alert sources.
+
+      ### Settings on ilert
+
+      1. **Access the Alert sources Settings**: From the navigation bar, open the Alert sources drop down and click "Alert sources".
+      2. **Create a New Alert source**: Click on the "+ Create a new alert source" button.
+      3. **Configure an Alert source**:
+        - select "API integration" and click Next
+        - provide a name that suits the source's purpose, for example Netdata
+        - select Escalation policy
+        - select Alert grouping (optional)
+        - review all configurations and click "Finish setup"
+      4. **Obtain the API Key**:
+        - Once the Alert source is created, you will be provided with an API key.
+        - Copy this API Key, as it will be required to configure the integration on Netdata Cloud.
+
+      ### Settings on Netdata Cloud
+
+      1. Click on the **Space settings** cog (located above your profile icon)
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Click on **+ Add** on the **ilert** card 
+      5. A modal will be presented in order to enter the required details to enable the configuration:
+
+      - **Notification settings** are Netdata specific settings
+          - Configuration name: provide a descriptive name for your configuration to easily identify it.
+          - Rooms: select the nodes or areas of your infrastructure you want to receive notifications about.
+          - Notification: choose the type of notifications you want to receive.
+        - **Integration configuration** are the required integration settings, which vary by notification method. For ilert:
+          - Alert Source API key.
