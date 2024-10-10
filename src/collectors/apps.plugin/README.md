@@ -137,8 +137,8 @@ You can use asterisks (`*`) to create patterns:
 
 | Mode      | Pattern  | Description                              |
 |-----------|----------|------------------------------------------|
-| prefix    | `*name`  | Matches a **comm** that begins with name |
-| suffix    | `name*`  | Matches a **comm** that ends with name   |
+| prefix    | `name*`  | Matches a **comm** that begins with name |
+| suffix    | `*name`  | Matches a **comm** that ends with name   |
 | substring | `*name*` | Searches for name within the **cmdline** |
 
 - Asterisks can be placed anywhere within name (e.g., `na*me`) without affecting the matching criteria (**comm** or **cmdline**).

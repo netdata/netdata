@@ -237,13 +237,16 @@ var (
 	}
 )
 
-func (n *NVMe) addDeviceCharts(device string) {
+func (n *NVMe) addDeviceCharts(devicePath, model string) {
+	device := extractDeviceFromPath(devicePath)
+
 	charts := deviceChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, device)
 		chart.Labels = []module.Label{
 			{Key: "device", Value: device},
+			{Key: "model_number", Value: model},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, device)
@@ -255,7 +258,9 @@ func (n *NVMe) addDeviceCharts(device string) {
 	}
 }
 
-func (n *NVMe) removeDeviceCharts(device string) {
+func (n *NVMe) removeDeviceCharts(devicePath string) {
+	device := extractDeviceFromPath(devicePath)
+
 	px := fmt.Sprintf("device_%s", device)
 
 	for _, chart := range *n.Charts() {

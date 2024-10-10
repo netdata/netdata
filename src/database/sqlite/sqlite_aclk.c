@@ -434,27 +434,30 @@ static void aclk_synchronization(void *arg)
                 case ACLK_DATABASE_NODE_STATE:;
                     RRDHOST *host = cmd.param[0];
                     struct aclk_sync_cfg_t *ahc = host->aclk_config;
-                    if (unlikely(!ahc))
+                    if (unlikely(!ahc)) {
                         create_aclk_config(host, &host->host_id.uuid, &host->node_id.uuid);
-
-                    uint64_t schedule_time = (uint64_t)(uintptr_t)cmd.param[1];
-
-                    if (!ahc->timer_initialized) {
-                        int rc = uv_timer_init(loop, &ahc->timer);
-                        if (!rc) {
-                            ahc->timer_initialized = true;
-                            ahc->timer.data = ahc;
-                        }
+                        ahc = host->aclk_config;
                     }
 
-                    if (ahc->timer_initialized) {
-                        if (uv_is_active((uv_handle_t *)&ahc->timer))
-                            uv_timer_stop(&ahc->timer);
+                    if (ahc) {
+                        uint64_t schedule_time = (uint64_t)(uintptr_t)cmd.param[1];
+                        if (!ahc->timer_initialized) {
+                            int rc = uv_timer_init(loop, &ahc->timer);
+                            if (!rc) {
+                                ahc->timer_initialized = true;
+                                ahc->timer.data = ahc;
+                            }
+                        }
 
-                        ahc->timer.data = ahc;
-                        int rc = uv_timer_start(&ahc->timer, node_update_timer_cb, schedule_time, 0);
-                        if (!rc)
-                            break; // Timer started, exit
+                        if (ahc->timer_initialized) {
+                            if (uv_is_active((uv_handle_t *)&ahc->timer))
+                                uv_timer_stop(&ahc->timer);
+
+                            ahc->timer.data = ahc;
+                            int rc = uv_timer_start(&ahc->timer, node_update_timer_cb, schedule_time, 0);
+                            if (!rc)
+                                break; // Timer started, exit
+                        }
                     }
 
                     // This is fallback if timer fails
