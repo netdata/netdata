@@ -2,21 +2,27 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.3...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.4...HEAD)
 
 **Merged pull requests:**
 
+- fix\(go.d/sensors\): fix parsing power accuracy [\#18735](https://github.com/netdata/netdata/pull/18735) ([ilyam8](https://github.com/ilyam8))
+- apps.plugin; allow parents to identify the children [\#18734](https://github.com/netdata/netdata/pull/18734) ([ktsaou](https://github.com/ktsaou))
+- \[storcli\] Support for controller ROC temperature. [\#18732](https://github.com/netdata/netdata/pull/18732) ([eatnumber1](https://github.com/eatnumber1))
 - systemd-cat-native negative timeout [\#18729](https://github.com/netdata/netdata/pull/18729) ([ktsaou](https://github.com/ktsaou))
+- fix\(perf.plugin\): disable if all events disabled during init [\#18728](https://github.com/netdata/netdata/pull/18728) ([ilyam8](https://github.com/ilyam8))
 - apps.plugin: print also the original comm [\#18727](https://github.com/netdata/netdata/pull/18727) ([ktsaou](https://github.com/ktsaou))
 - Fix handling of workflow artifacts. [\#18726](https://github.com/netdata/netdata/pull/18726) ([Ferroin](https://github.com/Ferroin))
 - reset the log sources to apply user selection [\#18725](https://github.com/netdata/netdata/pull/18725) ([ktsaou](https://github.com/ktsaou))
 - fix logs POST query payload parsing [\#18722](https://github.com/netdata/netdata/pull/18722) ([ktsaou](https://github.com/ktsaou))
 - fix\(go.d/portcheck\): stop checking UDP ports on ICMP listen error [\#18721](https://github.com/netdata/netdata/pull/18721) ([ilyam8](https://github.com/ilyam8))
+- static install: bump openssl and curl to latest stable versions [\#18719](https://github.com/netdata/netdata/pull/18719) ([ilyam8](https://github.com/ilyam8))
 - go.d: use lib function to check if stderr connected to journal [\#18718](https://github.com/netdata/netdata/pull/18718) ([ilyam8](https://github.com/ilyam8))
 - Pass correct GOOS and GOARCH on to package builders in CI. [\#18717](https://github.com/netdata/netdata/pull/18717) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#18715](https://github.com/netdata/netdata/pull/18715) ([netdatabot](https://github.com/netdatabot))
 - Regenerate integrations.js [\#18714](https://github.com/netdata/netdata/pull/18714) ([netdatabot](https://github.com/netdatabot))
 - Add link to meta section on integrations template [\#18713](https://github.com/netdata/netdata/pull/18713) ([Ancairon](https://github.com/Ancairon))
+- Delay child disconnect update [\#18712](https://github.com/netdata/netdata/pull/18712) ([stelfrag](https://github.com/stelfrag))
 - Windows installer \(Change descriptions add helping\) [\#18711](https://github.com/netdata/netdata/pull/18711) ([thiagoftsm](https://github.com/thiagoftsm))
 - add instructions to configure SCIM integration in Okta [\#18710](https://github.com/netdata/netdata/pull/18710) ([juacker](https://github.com/juacker))
 - fix wrong config file name in go.d/oracledb meta [\#18709](https://github.com/netdata/netdata/pull/18709) ([ilyam8](https://github.com/ilyam8))
@@ -32,6 +38,7 @@
 - Regenerate integrations.js [\#18693](https://github.com/netdata/netdata/pull/18693) ([netdatabot](https://github.com/netdatabot))
 - go.d/nvidia\_smi: use configured "timeout" in loop mode [\#18692](https://github.com/netdata/netdata/pull/18692) ([ilyam8](https://github.com/ilyam8))
 - fix\(cgroups.plugin\): handle containers no env vars [\#18691](https://github.com/netdata/netdata/pull/18691) ([daniel-sampliner](https://github.com/daniel-sampliner))
+- MSSQL Metrics \(Part II\). [\#18689](https://github.com/netdata/netdata/pull/18689) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix sanitization issues [\#18687](https://github.com/netdata/netdata/pull/18687) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18686](https://github.com/netdata/netdata/pull/18686) ([netdatabot](https://github.com/netdatabot))
 - go.d/chrony: collect serverstats using chronyc [\#18685](https://github.com/netdata/netdata/pull/18685) ([ilyam8](https://github.com/ilyam8))
@@ -64,6 +71,7 @@
 - apps.plugin improvements [\#18652](https://github.com/netdata/netdata/pull/18652) ([ktsaou](https://github.com/ktsaou))
 - remove python implementation of oracledb [\#18651](https://github.com/netdata/netdata/pull/18651) ([Ancairon](https://github.com/Ancairon))
 - go.d remove duplicate chart check in tests [\#18650](https://github.com/netdata/netdata/pull/18650) ([ilyam8](https://github.com/ilyam8))
+- Improve windows installer [\#18649](https://github.com/netdata/netdata/pull/18649) ([thiagoftsm](https://github.com/thiagoftsm))
 - fixed freebsd cpu calculation [\#18648](https://github.com/netdata/netdata/pull/18648) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18647](https://github.com/netdata/netdata/pull/18647) ([netdatabot](https://github.com/netdatabot))
 - Use temporary file for commit date check. [\#18646](https://github.com/netdata/netdata/pull/18646) ([Ferroin](https://github.com/Ferroin))
@@ -249,6 +257,10 @@
 - fix warnings in Dockerfile [\#18395](https://github.com/netdata/netdata/pull/18395) ([NicolasCARPi](https://github.com/NicolasCARPi))
 - Use existing ACLK event loop for cloud queries [\#18218](https://github.com/netdata/netdata/pull/18218) ([stelfrag](https://github.com/stelfrag))
 
+## [v1.47.4](https://github.com/netdata/netdata/tree/v1.47.4) (2024-10-09)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.3...v1.47.4)
+
 ## [v1.47.3](https://github.com/netdata/netdata/tree/v1.47.3) (2024-10-02)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.47.2...v1.47.3)
@@ -414,15 +426,6 @@
 - Skip building ndsudo when it’s not actually needed. [\#18191](https://github.com/netdata/netdata/pull/18191) ([Ferroin](https://github.com/Ferroin))
 - Port Icecast collector to Go [\#18190](https://github.com/netdata/netdata/pull/18190) ([Ancairon](https://github.com/Ancairon))
 - ndsudo setuid before looking for command [\#18189](https://github.com/netdata/netdata/pull/18189) ([ilyam8](https://github.com/ilyam8))
-- Add Widnows CI jobs. [\#18187](https://github.com/netdata/netdata/pull/18187) ([Ferroin](https://github.com/Ferroin))
-- Remove logs-management plugin. [\#18186](https://github.com/netdata/netdata/pull/18186) ([Ferroin](https://github.com/Ferroin))
-- Create release branches for major releases as well. [\#18184](https://github.com/netdata/netdata/pull/18184) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#18183](https://github.com/netdata/netdata/pull/18183) ([netdatabot](https://github.com/netdatabot))
-- docs: go.d/ap update data\_collection description [\#18182](https://github.com/netdata/netdata/pull/18182) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18181](https://github.com/netdata/netdata/pull/18181) ([netdatabot](https://github.com/netdatabot))
-- go.d smarctl simplify scan open [\#18180](https://github.com/netdata/netdata/pull/18180) ([ilyam8](https://github.com/ilyam8))
-- Addition to postfix meta [\#18177](https://github.com/netdata/netdata/pull/18177) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations.js [\#18176](https://github.com/netdata/netdata/pull/18176) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
