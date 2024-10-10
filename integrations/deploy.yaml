@@ -16,23 +16,19 @@
       commands:
         - channel: nightly
           command: >
-            wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
+            wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --nightly-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
         - channel: stable
           command: >
-            wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
+            wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
     - &ks_curl
       method: curl
       commands:
         - channel: nightly
           command: >
-            curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
+            curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --nightly-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
         - channel: stable
           command: >
-            curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
+            curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
   additional_info: &ref_containers >
     Did you know you can also deploy Netdata on your OS using {% goToCategory navigateToSettings=$navigateToSettings categoryId="deploy.docker-kubernetes" %}Kubernetes{% /goToCategory %} or {% goToCategory categoryId="deploy.docker-kubernetes" %}Docker{% /goToCategory %}?
   clean_additional_info: &ref_clean_containers >
@@ -562,14 +558,47 @@
   keywords:
     - windows
   install_description: |
-    1. Install [Windows Exporter](https://github.com/prometheus-community/windows_exporter) on every Windows host you want to monitor.
-    2. Install Netdata agent on Linux, FreeBSD or Mac.
-    3. Configure Netdata to collect data remotely from your Windows hosts by adding one job per host to windows.conf file. See the [configuration section](https://learn.netdata.cloud/docs/data-collection/monitor-anything/System%20Metrics/Windows-machines#configuration) for details.
-    4. Enable [virtual nodes](https://learn.netdata.cloud/docs/data-collection/windows-systems#virtual-nodes) configuration so the windows nodes are displayed as separate nodes.
+    Netdata offers a convenient Windows installer for easy setup. This executable provides two distinct installation modes, outlined below.
+
+    The Windows installer is currently under beta, and thus it is only available in the nightly release channel. A stable version will be released soon.
+
+    ## Graphical User Interface (GUI)
+
+    1. Download the Netdata [Windows installer](https://github.com/netdata/netdata-nightlies/releases) from the latest nightly release.
+    2. Run the `.exe` file and proceed with the installation process.
+    3. At a minimum, you will need your Netdata Cloud Space's claim token to connect your Agent to your Space.
+
+    ## Silent Mode (Command line)
+
+    If you prefer to install Netdata through the command line, you can do so by running the following command on Windows Powershell with administrator rights.
   methods:
-    - *ks_wget
-    - *ks_curl
-  additional_info: ""
+    - method: Silent Mode (Command line)
+      commands:
+        - channel: stable
+          command: |
+            $ProgressPreference = 'SilentlyContinue';
+            Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe";
+            .\netdata-installer-x64.exe /S /A `
+            {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
+        - channel: nightly
+          command: |
+            $ProgressPreference = 'SilentlyContinue';
+            Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe";
+            .\netdata-installer-x64.exe /S /A `
+            {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
+  additional_info: |
+    ### Available Options
+
+    | Option    | Description                                                                                      |
+    |-----------|--------------------------------------------------------------------------------------------------|
+    | `/S`      | Enables silent mode installation.                                                                |
+    | `/A`      | Accepts all Netdata licenses. This option is mandatory for silent installations.                 |
+    | `/D`      | Specifies the desired installation directory (defaults to `C:\Program Files\Netdata`).           |
+    | `/T`      | Opens the `MSYS2` terminal after installation.                                                   |
+    | `/I`      | Forces insecure connections, bypassing hostname verification (use only if absolutely necessary). |
+    | `/TOKEN=` | Sets the Claim Token for your Netdata Cloud Space.                                               |
+    | `/ROOMS=` | Comma-separated list of Room IDs where you want your node to appear.                             |
+    | `/PROXY=` | Sets the proxy server address if your network requires one.                                      |
   related_resources: {}
   most_popular: true
   platform_info:
@@ -600,12 +629,10 @@
       commands:
         - channel: nightly
           command: >
-            fetch -o /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
+            fetch -o /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --nightly-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
         - channel: stable
           command: >
-            fetch -o /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
+            fetch -o /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
   additional_info: |
     Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net-mgmt/netdata).
   related_resources: {}

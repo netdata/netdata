@@ -4,7 +4,7 @@ Netdata offers a convenient Windows installer for easy setup. This executable pr
 
 > **Note**
 >
-> This feature is currently only available for Nightly releases, and the installer can be found in our [nightlies repo](https://github.com/netdata/netdata-nightlies)
+> This feature is currently under beta and only available for Nightly releases, and the installer can be found in our [nightlies repo](https://github.com/netdata/netdata-nightlies). A stable version will be released soon.
 
 ## Graphical User Interface (GUI)
 
@@ -54,10 +54,14 @@ This section provides instructions for installing Netdata in silent mode, which 
 Connect your Agent to your Netdata Cloud Space with token `<YOUR_TOKEN>` and room `<YOUR_ROOM>`:
 
 ```bash
-netdata-installer.exe /S /A /TOKEN=<YOUR_TOKEN> /ROOMS=<YOUR_ROOM>
+netdata-installer-x64.exe /S /A /TOKEN=<YOUR_TOKEN> /ROOMS=<YOUR_ROOM>
 ```
 
 Replace `<YOUR_TOKEN>` and `<YOUR_ROOM>` with your actual Netdata Cloud Space claim token and room ID, respectively.
+
+> **Note**
+>
+> The Windows version of Netdata is intended for users on paid plans.
 
 ## Uninstalling
 
