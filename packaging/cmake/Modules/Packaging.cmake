@@ -63,6 +63,10 @@ netdata-plugin-network-viewer")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
 
+if(ENABLE_DASHBOARD)
+  list(APPEND _main_deps "netdata-dashboard")
+endif()
+
 if(ENABLE_PLUGIN_CHARTS)
   list(APPEND _main_deps "netdata-plugin-chartsd")
 endif()
@@ -108,6 +112,27 @@ set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/netdata/postrm")
 
 set(CPACK_DEBIAN_NETDATA_DEBUGINFO_PACKAGE On)
+
+#
+# dashboard
+#
+
+set(CPACK_COMPONENT_DASHBOARD_DEPENDS "netdata")
+set(CPACK_COMPONENT_DASHBOARD_DESCRIPTION
+    "The local dashboard for the Netdata Agent.
+ This allows access to the dashboard on the local node without internet access.")
+
+set(CPACK_DEBIAN_DASHBOARD_PACKAGE_NAME "netdata-dashboard")
+set(CPACK_DEBIAN_DASHBOARD_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_DASHBOARD_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_DASHBOARD_PACKAGE_PREDEPENDS "adduser")
+
+set(CPACK_DEBIAN_DASHBOARD_PACKAGE_CONTROL_EXTRA
+    "${PKG_FILES_PATH}/deb/plugin-apps/preinst"
+    "${PKG_FILES_PATH}/deb/plugin-apps/postinst"
+    "${PKG_FILES_PATH}/deb/plugin-apps/postrm")
+
+set(CPACK_DEBIAN_DASHBOARD_DEBUGINFO_PACKAGE Off)
 
 #
 # apps.plugin
@@ -439,6 +464,9 @@ set(CPACK_DEBIAN_PLUGIN-XENSTAT_DEBUGINFO_PACKAGE On)
 #
 
 list(APPEND CPACK_COMPONENTS_ALL "netdata")
+if(ENABLE_DASHBOARD)
+  list(APPEND CPACK_COMPONENTS_ALL "dashboard")
+endif()
 if(ENABLE_PLUGIN_APPS)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-apps")
 endif()
