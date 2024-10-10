@@ -82,8 +82,8 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
         src++;
     }
 
-    // remove trailing spaces and underscores
-    while(d > dst && !IS_UTF8_BYTE(*(d - 1)) && (*(d - 1) == '_' || *(d - 1) == ' ')) {
+    // remove trailing spaces
+    while(d > dst && !IS_UTF8_BYTE(*(d - 1)) && *(d - 1) == ' ') {
         d--;
         mblen--;
     }
