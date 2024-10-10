@@ -50,13 +50,11 @@
   setup:
     description: |
       ### Prerequisites
-      
+
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **Admin**
+      - Access to the Space as an **Admin**
 
       ### Discord Server Configuration
-
-      Steps to configure your Discord server to receive [webhook notifications](https://support.discord.com/hc/en-us/articles/228383668) from Netdata:
 
       1. Go to **Server Settings** --> **Integrations**
       2. **Create Webhook** or **View Webhooks** if you already have some defined
@@ -64,7 +62,7 @@
       4. Keep note of the **Webhook URL** as you will need it for the configuration of the integration on the Netdata Cloud UI
 
       ### Netdata Configuration
-      
+
       1. Click on the **Space settings** cog (located above your profile icon)
       2. Click on the **Alerts & Notifications** tab
       3. Click on the **+ Add configuration** button
@@ -93,15 +91,13 @@
   setup:
     description: |
       ### Prerequisites
-      
+
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **Admin**
-      - The Netdata Space needs to be on a paid plan
+      - Access to the Space as an **Admin**
+      - The Space needs to be on a paid plan
       - You need to have a PagerDuty service to receive events using webhooks.
 
       ### PagerDuty Server Configuration
-
-      Steps to configure your PagerDuty to receive notifications from Netdata Cloud:
 
       1. Create a service to receive events from your services directory page on PagerDuty
       2. On the third step of the service creation, select `Events API V2` Integration
@@ -139,13 +135,11 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **Admin**
-      - The Netdata Space needs to be on a paid plan
+      - Access to the Space as an **Admin**
+      - The Space needs to be on a paid plan
       - You need to have a Slack app on your workspace to receive the Webhooks.
 
       ### Slack Server Configuration
-
-      Steps to configure your Slack to receive notifications from Netdata Cloud:
 
       1. Create an app to receive webhook integrations. Check the [Slack documentation](https://api.slack.com/apps?new_app=1) for further details
       2. Install the app on your workspace
@@ -189,16 +183,14 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **Admin**
-      - The Netdata Space needs to be on a paid plan
+      - Access to the Space as an **Admin**
+      - The Space needs to be on a paid plan
       - You need to have permissions on Opsgenie to add new integrations.
 
       ### Opsgenie Server Configuration
 
-      Steps to configure your Opsgenie to receive notifications from Netdata Cloud:
-
       1. Go to the integrations tab of your team, click **Add integration**
-      2. Pick **API** from available integrations and copy the API Key in order to add it to your integration configuration in the Netdata Cloud UI
+      2. Pick **API** from the available integrations and copy the API Key in order to add it to your integration configuration in the Netdata Cloud UI
 
       ### Netdata Configuration
 
@@ -231,13 +223,11 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **Admin**
-      - The Netdata Space needs to be on a paid plan
+      - Access to the Space as an **Admin**
+      - The Space needs to be on a paid plan
       - You need to have permissions on Mattermost to add new integrations.
 
       ### Mattermost Server Configuration
-
-      Steps to configure your Mattermost server to receive notifications from Netdata Cloud:
 
       1. In Mattermost, go to Product menu > Integrations > Incoming Webhook
           - If you don't have the Integrations option, incoming webhooks may not be enabled on your Mattermost server or may be disabled for non-admins. They can be enabled by a System Admin from System Console > Integrations > Integration Management. Once incoming webhooks are enabled, continue with the steps below.
@@ -278,8 +268,8 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **Admin**
-      - The Netdata Space needs to be on a paid plan
+      - Access to the Space as an **Admin**
+      - The Space needs to be on a paid plan
       - You need to have permissions on RocketChat to add new integrations.
 
       ### RocketChat Server Configuration
@@ -325,19 +315,17 @@
 
       - A Netdata Cloud account
       - Access to the space as an **Admin**
-      - The Netdata Space needs to be on a paid plan
+      - The Space needs to be on a paid plan
       - An AWS account with AWS SNS access
 
       ### AWS SNS Configuration
-
-      Steps to configure the AWS SNS webhook integration to receive notifications from Netdata Cloud:
 
       1. [Setting up access for Amazon SNS](https://docs.aws.amazon.com/sns/latest/dg/sns-setting-up.html)
       2. Create a topic
           - On AWS SNS management console click on **Create topic**
           - On the **Details** section, select the standard type and provide the topic name
           - On the **Access policy** section, change the **Publishers** option to **Only the specified AWS accounts** and provide the Netdata AWS account **(123269920060)** that will be used to publish notifications to the topic being created
-      3. Copy the **Topic ARN** in order to add it to your integration configuration in the Netdata Cloud UI.
+      3. Copy the **Topic ARN** in order to add it to your integration configuration in the Netdata Cloud UI
 
       ### Netdata Configuration
 
@@ -364,44 +352,40 @@
     - microsoft
     - teams
   overview:
-    notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications to a Microsoft Teams channel."
+    notification_description: "From the Netdata Cloud UI, you can configure notification delivery to a Microsoft Teams channel."
     notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
 
-      To add Microsoft Teams notifications integration to your Netdata Cloud space you will need the following:
+      - A Netdata Cloud account
+      - Access to the Space as an **Admin**
+      - The Space to be on a paid plan
+      - A [Microsoft Teams Essentials subscription](https://www.microsoft.com/en-sg/microsoft-teams/essentials) or higher. Note that this is a **paid** feature
 
-      - A Netdata Cloud account.
-      - Access to the Netdata Cloud space as an **Admin**.
-      - The Space to be on a paid plan.
-      - A [Microsoft Teams Essentials subscription](https://www.microsoft.com/en-sg/microsoft-teams/essentials) or higher. Note that this is a **paid** feature.
+      ### Microsoft Teams Configuration
 
-      ### Settings on Microsoft Teams
+      1. Navigate to the desired Microsoft Teams channel and hover over the channel name. Click the three dots icon that appears
+      2. Select "Workflows" from the options, then choose "Post to a channel when a webhook request is received"
+      3. **Configure Workflow Details**
+          - Give your workflow a name, such as "Netdata Alerts"
+          - Select the target team and channel where you will receive notifications
+          - Click "Add workflow"
+      4. Once the workflow is created, you will receive a unique Workflow Webhook URL, copy it, in order to add it to your integration configuration in the Netdata Cloud UI
 
-      1. **Access the Channel Settings**: Navigate to the desired Microsoft Teams channel and hover over the channel name. Click the three dots (ellipsis) icon that appears.
-      2. **Create a New Workflow**: Select "Workflows" from the options, then choose "Post to a channel when a webhook request is received."
-      3. **Configure Workflow Details**:
-          - Give your workflow a descriptive name, such as "Netdata Alerts."
-          - Select the target team and channel to receive notifications.
-          - Click "Add workflow."
-      4. **Obtain the Webhook URL**:
-          - Once the workflow is created, you will receive a unique Workflow Webhook URL.
-          - Copy this URL, as it will be required to configure Netdata Cloud.
+      ### Netdata Configuration
 
-      ### Settings on Netdata Cloud
-
-      1. Click on the **Space settings** cog (located above your profile icon).
-      2. Click on the **Notification** tab.
-      3. Click on the **+ Add configuration** button (near the top-right corner of your screen).
-      4. On the **Microsoft Teams** card click on **+ Add**.
-      5. A modal will be presented to you to enter the required details to enable the configuration:
-        * **Notification settings** are Netdata specific settings:
-            - Configuration name - you can optionally provide a name for your configuration  you can easily refer to it.
-            - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration.
-            - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only.
-        * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Microsoft Teams:
-            - Microsoft Teams Incoming Webhook URL - the _Incoming Webhook URL_ that was generated earlier.
+      1. Click on the **Space settings** cog (located above your profile icon)
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Add the Microsoft Teams Integration
+      5. A modal will be presented to you to enter the required details to enable the integration:
+          - **Notification settings**
+            - Configuration name (optional): A name for your configuration in order to easily refer to it
+            - Rooms: A list of Rooms for which you want to be notified
+            - Notifications: The notifications which you want to be notified
+          - **Integration configuration**
+            - Microsoft Teams Incoming Webhook URL: The Incoming Webhook URL that you copied earlier.
 
 - id: "notify-cloud-telegram"
   meta:
@@ -544,8 +528,8 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **Admin**
-      - The Netdata Space needs to be on a paid plan
+      - Access to the Space as an **Admin**
+      - The Space needs to be on a paid plan
       - You need to have an app that allows you to receive webhooks following a predefined schema.
 
       ### Netdata Configuration Steps

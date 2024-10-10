@@ -23,11 +23,9 @@ From the Netdata Cloud UI, you can configure notification delivery to your Disco
 ### Prerequisites
 
 - A Netdata Cloud account
-- Access to the Netdata Space as an **Admin**
+- Access to the Space as an **Admin**
 
 ### Discord Server Configuration
-
-Steps to configure your Discord server to receive [webhook notifications](https://support.discord.com/hc/en-us/articles/228383668) from Netdata:
 
 1. Go to **Server Settings** --> **Integrations**
 2. **Create Webhook** or **View Webhooks** if you already have some defined

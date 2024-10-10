@@ -23,16 +23,14 @@ From the Netdata Cloud UI, you can configure notification delivery to Opsgenie.
 ### Prerequisites
 
 - A Netdata Cloud account
-- Access to the Netdata Space as an **Admin**
-- The Netdata Space needs to be on a paid plan
+- Access to the Space as an **Admin**
+- The Space needs to be on a paid plan
 - You need to have permissions on Opsgenie to add new integrations.
 
 ### Opsgenie Server Configuration
 
-Steps to configure your Opsgenie to receive notifications from Netdata Cloud:
-
 1. Go to the integrations tab of your team, click **Add integration**
-2. Pick **API** from available integrations and copy the API Key in order to add it to your integration configuration in the Netdata Cloud UI
+2. Pick **API** from the available integrations and copy the API Key in order to add it to your integration configuration in the Netdata Cloud UI
 
 ### Netdata Configuration
 

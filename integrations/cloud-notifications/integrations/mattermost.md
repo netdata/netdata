@@ -23,13 +23,11 @@ From the Netdata Cloud UI, you can configure notification delivery to Mattermost
 ### Prerequisites
 
 - A Netdata Cloud account
-- Access to the Netdata Space as an **Admin**
-- The Netdata Space needs to be on a paid plan
+- Access to the Space as an **Admin**
+- The Space needs to be on a paid plan
 - You need to have permissions on Mattermost to add new integrations.
 
 ### Mattermost Server Configuration
-
-Steps to configure your Mattermost server to receive notifications from Netdata Cloud:
 
 1. In Mattermost, go to Product menu > Integrations > Incoming Webhook
     - If you don't have the Integrations option, incoming webhooks may not be enabled on your Mattermost server or may be disabled for non-admins. They can be enabled by a System Admin from System Console > Integrations > Integration Management. Once incoming webhooks are enabled, continue with the steps below.

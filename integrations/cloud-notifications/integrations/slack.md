@@ -23,13 +23,11 @@ From the Netdata Cloud UI, you can configure notification delivery to Slack.
 ### Prerequisites
 
 - A Netdata Cloud account
-- Access to the Netdata Space as an **Admin**
-- The Netdata Space needs to be on a paid plan
+- Access to the Space as an **Admin**
+- The Space needs to be on a paid plan
 - You need to have a Slack app on your workspace to receive the Webhooks.
 
 ### Slack Server Configuration
-
-Steps to configure your Slack to receive notifications from Netdata Cloud:
 
 1. Create an app to receive webhook integrations. Check the [Slack documentation](https://api.slack.com/apps?new_app=1) for further details
 2. Install the app on your workspace

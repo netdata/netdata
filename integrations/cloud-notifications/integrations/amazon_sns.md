@@ -24,19 +24,17 @@ From the Netdata Cloud UI, you can configure notification delivery to AWS SNS.
 
 - A Netdata Cloud account
 - Access to the space as an **Admin**
-- The Netdata Space needs to be on a paid plan
+- The Space needs to be on a paid plan
 - An AWS account with AWS SNS access
 
 ### AWS SNS Configuration
-
-Steps to configure the AWS SNS webhook integration to receive notifications from Netdata Cloud:
 
 1. [Setting up access for Amazon SNS](https://docs.aws.amazon.com/sns/latest/dg/sns-setting-up.html)
 2. Create a topic
     - On AWS SNS management console click on **Create topic**
     - On the **Details** section, select the standard type and provide the topic name
     - On the **Access policy** section, change the **Publishers** option to **Only the specified AWS accounts** and provide the Netdata AWS account **(123269920060)** that will be used to publish notifications to the topic being created
-3. Copy the **Topic ARN** in order to add it to your integration configuration in the Netdata Cloud UI.
+3. Copy the **Topic ARN** in order to add it to your integration configuration in the Netdata Cloud UI
 
 ### Netdata Configuration
 

@@ -23,13 +23,11 @@ From the Netdata Cloud UI, you can configure notification delivery to PagerDuty.
 ### Prerequisites
 
 - A Netdata Cloud account
-- Access to the Netdata Space as an **Admin**
-- The Netdata Space needs to be on a paid plan
+- Access to the Space as an **Admin**
+- The Space needs to be on a paid plan
 - You need to have a PagerDuty service to receive events using webhooks.
 
 ### PagerDuty Server Configuration
-
-Steps to configure your PagerDuty to receive notifications from Netdata Cloud:
 
 1. Create a service to receive events from your services directory page on PagerDuty
 2. On the third step of the service creation, select `Events API V2` Integration
