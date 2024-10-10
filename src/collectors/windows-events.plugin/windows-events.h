@@ -10,12 +10,8 @@
 #include <wchar.h>
 
 typedef enum {
-    WEVT_NO_CHANNEL_MATCHED,
-    WEVT_FAILED_TO_OPEN,
-    WEVT_FAILED_TO_SEEK,
     WEVT_TIMED_OUT,
     WEVT_OK,
-    WEVT_NOT_MODIFIED,
     WEVT_CANCELLED,
 } WEVT_QUERY_STATUS;
 
@@ -164,7 +160,8 @@ typedef enum {
 
 // structures needed by LQS
 struct lqs_extension {
-    wchar_t *query;
+    wchar_t *query_unicode;
+    BUFFER *query;
 
     struct {
         struct {

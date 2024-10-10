@@ -7,4 +7,6 @@
 
 wchar_t *wevt_generate_query_no_xpath(LOGS_QUERY_STATUS *lqs, BUFFER *wb);
 
+bool wevt_xpath_query_build(LOGS_QUERY_STATUS *lqs);
+
 #endif //NETDATA_WINDOWS_EVENTS_QUERY_BUILDER_H
