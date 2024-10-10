@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/ilert.svg" width="150"/>
 
 
-From the Netdata Cloud UI, you can configure notification delivery to ilert.
+You can configure notification delivery to ilert from the Netdata Cloud UI.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />

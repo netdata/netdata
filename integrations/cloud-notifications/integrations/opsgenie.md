@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/opsgenie.png" width="150"/>
 
 
-From the Netdata Cloud UI, you can configure notification delivery to Opsgenie.
+You can configure notification delivery to Opsgenie from the Netdata Cloud UI.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
